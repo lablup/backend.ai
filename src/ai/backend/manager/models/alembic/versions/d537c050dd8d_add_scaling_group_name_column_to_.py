@@ -1,7 +1,7 @@
 """add scaling_group_name column to resource_presets table
 
 Revision ID: d537c050dd8d
-Revises: 8f85e9d0bd4e
+Revises: c002140f14d3
 Create Date: 2025-02-16 18:20:18.694834
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "d537c050dd8d"
-down_revision = "8f85e9d0bd4e"
+down_revision = "c002140f14d3"
 branch_labels = None
 depends_on = None
 

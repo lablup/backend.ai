@@ -12,6 +12,7 @@ import shutil
 import signal
 import ssl
 import sys
+import time
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv6Address, ip_network
@@ -50,6 +51,8 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
 
+from ai.backend.agent.metrics.metric import RPCMetricObserver
+from ai.backend.agent.resources import scan_gpu_alloc_map
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
@@ -162,15 +165,18 @@ def collect_error(meth: Callable) -> Callable:
 
 class RPCFunctionRegistry:
     functions: Set[str]
+    _metric_observer: RPCMetricObserver
 
     def __init__(self) -> None:
         self.functions = set()
+        self._metric_observer = RPCMetricObserver.instance()
 
     def __call__(
         self,
         meth: Callable[..., Coroutine[None, None, Any]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
+        @_collect_metrics(self._metric_observer)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
                 if request.body is None:
@@ -193,6 +199,33 @@ class RPCFunctionRegistry:
 
         self.functions.add(meth.__name__)
         return _inner
+
+
+def _collect_metrics(observer: RPCMetricObserver) -> Callable:
+    def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
+        @functools.wraps(meth)
+        async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
+            start_time = time.perf_counter()
+            try:
+                res = await meth(self, *args, **kwargs)
+                duration = time.perf_counter() - start_time
+                observer.observe_rpc_request_success(
+                    method=meth.__name__,
+                    duration=duration,
+                )
+                return res
+            except BaseException as e:
+                duration = time.perf_counter() - start_time
+                observer.observe_rpc_request_failure(
+                    method=meth.__name__,
+                    duration=duration,
+                    exception=e,
+                )
+                raise
+
+        return _inner
+
+    return decorator
 
 
 class AgentRPCServer(aobject):
@@ -932,6 +965,14 @@ class AgentRPCServer(aobject):
     async def release_port(self, port_no: int):
         log.debug("rpc::release_port(port_no:{})", port_no)
         self.agent.port_pool.add(port_no)
+
+    @rpc_function
+    @collect_error
+    async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:
+        log.debug("rpc::scan_gpu_alloc_map()")
+        scratch_root = self.agent.local_config["container"]["scratch-root"]
+        result = await scan_gpu_alloc_map(list(self.agent.kernel_registry.keys()), scratch_root)
+        return {k: str(v) for k, v in result.items()}
 
 
 @aiotools.server_context

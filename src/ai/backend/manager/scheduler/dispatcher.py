@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -64,6 +64,7 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
+    EtcdRedisConfig,
     KernelId,
     RedisConnectionInfo,
     ResourceSlot,
@@ -226,15 +227,18 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            self.shared_config.data["redis"]
+        )
         self.redis_live = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.LIVE),
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
         self.redis_stat = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
 
     async def __ainit__(self) -> None:
@@ -264,7 +268,7 @@ class SchedulerDispatcher(aobject):
             task_name="schedule_timer",
         )
         self.session_start_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
+            self.lock_factory(LockID.LOCKID_START_TIMER, 10.0),
             self.event_producer,
             lambda: DoStartSessionEvent(),
             interval=10.0,
@@ -354,10 +358,11 @@ class SchedulerDispatcher(aobject):
             known_slot_types=known_slot_types,
         )
 
+        lock_lifetime = self.local_config["manager"]["session_schedule_lock_lifetime"]
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
-            async with self.lock_factory(LockID.LOCKID_SCHEDULE, 60):
+            async with self.lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
                 async with self.db.begin_readonly_session() as db_sess:
                     # query = (
                     #     sa.select(ScalingGroupRow)
@@ -1222,8 +1227,9 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
+        lock_lifetime = self.local_config["manager"]["session_check_precondition_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, 600):
+            async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
 
                 async def _transit_scheduled_to_preparing(
@@ -1316,8 +1322,9 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
+        lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_START_TIMER, 600):
+            async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
                 known_slot_types = await self.shared_config.get_resource_slots()
                 sched_ctx = SchedulingContext(
@@ -1616,15 +1623,16 @@ class SchedulerDispatcher(aobject):
             if len(active_routings) > replicas:
                 # We need to scale down!
                 destroy_count = len(active_routings) - replicas
+
+                # we do not expect sessions to be spawned when the endpoint is about to be destroyed
+                # so also delete routes in provisioning status
+
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
                             for route in active_routings
-                            if (
-                                route.status != RouteStatus.PROVISIONING
-                                and route.status != RouteStatus.TERMINATING
-                            )
+                            if route.status in endpoint.terminatable_route_statuses
                         ],
                         key=lambda r: r.status == RouteStatus.UNHEALTHY,
                     )

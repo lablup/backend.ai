@@ -824,7 +824,9 @@ class PurgeGroup(graphene.Mutation):
             result = await db_session.scalars(query)
             rows = cast(list[VFolderRow], result.fetchall())
             for vf in rows:
-                target_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
+                target_vfs.append(
+                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:

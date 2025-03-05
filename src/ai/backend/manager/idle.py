@@ -45,7 +45,7 @@ import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.config import BaseSchema, config_key_to_snake_case
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -64,6 +64,7 @@ from ai.backend.common.events import (
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
+    EtcdRedisConfig,
     RedisConnectionInfo,
     ResourceSlot,
     SessionTypes,
@@ -205,15 +206,18 @@ class IdleCheckerHost:
         self._event_dispatcher = event_dispatcher
         self._event_producer = event_producer
         self._lock_factory = lock_factory
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            self._shared_config.data["redis"]
+        )
         self._redis_live = redis_helper.get_redis_object(
-            self._shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.LIVE),
             name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
-            self._shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="idle.stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
             event_dispatcher, self._redis_live, self._redis_stat
@@ -1193,7 +1197,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             utilizations: defaultdict[str, float] = defaultdict(float)
             live_stat = {}
-            divider = len(kernel_ids) if kernel_ids else 1
+            kernel_counter = 0
             for kernel_id in kernel_ids:
                 raw_live_stat = cast(
                     bytes | None,
@@ -1204,26 +1208,33 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 )
                 if raw_live_stat is None:
                     log.warning(
-                        f"Utilization data not found or failed to fetch utilization data, abort idle check (k:{kernel_id})"
+                        f"Utilization data not found or failed to fetch utilization data. Skip idle check (k:{kernel_id})"
                     )
-                    return None
+                    continue
                 live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_names_to_check
                 }
 
-            for resource, val in kernel_utils.items():
-                utilizations[resource] = utilizations[resource] + val
-            total_utilizations = {k: v / divider for k, v in utilizations.items()}
+                for resource, val in kernel_utils.items():
+                    utilizations[resource] = utilizations[resource] + val
 
-            # NOTE: Manual calculation of mem utilization.
-            # mem.capacity does not report total amount of memory allocated to
-            # the container, and mem.pct always report >90% even when nothing is
-            # executing. So, we just replace it with the value of occupied slot.
-            mem_slots = float(occupied_slots.get("mem", 0))
-            mem_current = float(nmget(live_stat, "mem.current", 0.0))
-            total_utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
+                # NOTE: Manual calculation of mem utilization.
+                # mem.capacity does not report total amount of memory allocated to
+                # the container, and mem.pct always report >90% even when nothing is
+                # executing. So, we just replace it with the value of occupied slot.
+                mem_slots = float(occupied_slots.get("mem", 0))
+                mem_current = float(nmget(live_stat, "mem.current", 0.0))
+                utilizations["mem"] = (
+                    utilizations["mem"] + mem_current / mem_slots * 100 if mem_slots > 0 else 0
+                )
+
+                kernel_counter += 1
+            if kernel_counter == 0:
+                return None
+            divider = kernel_counter
+            total_utilizations = {k: v / divider for k, v in utilizations.items()}
             return total_utilizations
         except Exception as e:
             _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"

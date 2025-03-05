@@ -502,6 +502,22 @@ class EndpointRow(Base):
         session.add(row)
         return row
 
+    @property
+    def terminatable_route_statuses(self) -> set[RouteStatus]:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
+            return {
+                RouteStatus.PROVISIONING,
+                RouteStatus.HEALTHY,
+                RouteStatus.UNHEALTHY,
+                RouteStatus.FAILED_TO_START,
+            }
+        else:
+            return {
+                RouteStatus.HEALTHY,
+                RouteStatus.UNHEALTHY,
+                RouteStatus.FAILED_TO_START,
+            }
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
@@ -826,7 +842,7 @@ class ModelServicePredicateChecker:
                 vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
                 folder_host = model_vfolder_row["host"]
 
-        proxy_name, volume_name = storage_manager.split_host(folder_host)
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
 
         if model_definition_path:
             path = Path(model_definition_path)
@@ -1039,7 +1055,7 @@ class Endpoint(graphene.ObjectType):
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
-            image_object=ImageNode.from_row(row.image_row),
+            image_object=ImageNode.from_row(ctx, row.image_row),
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,

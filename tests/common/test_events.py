@@ -15,7 +15,7 @@ from ai.backend.common.events import (
     EventProducer,
 )
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.types import AgentId, EtcdRedisConfig
+from ai.backend.common.types import AgentId, RedisConfig
 
 
 @attrs.define(slots=True, frozen=True)
@@ -42,7 +42,7 @@ async def test_dispatch(
 ) -> None:
     app = object()
 
-    redis_config = EtcdRedisConfig(
+    redis_config = RedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
     dispatcher = await dispatcher_cls.new(
@@ -99,7 +99,7 @@ async def test_error_on_dispatch(
     ) -> None:
         exception_log.append(type(exc).__name__)
 
-    redis_config = EtcdRedisConfig(
+    redis_config = RedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
     dispatcher = await dispatcher_cls.new(

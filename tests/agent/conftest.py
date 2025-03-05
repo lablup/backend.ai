@@ -13,7 +13,7 @@ from ai.backend.agent.config import agent_local_config_iv
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import EtcdRedisConfig, HostPortPair
+from ai.backend.common.types import HostPortPair
 from ai.backend.logging import LocalLogger
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
@@ -106,13 +106,13 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "addr": etcd_addr,
             "namespace": f"ns-{test_id}",
         },
-        "redis": EtcdRedisConfig(
-            addr=redis_container[1],
-            sentinel=None,
-            service_name=None,
-            password=None,
-            redis_helper_config=config.redis_helper_default_config,
-        ),
+        "redis": {
+            "addr": redis_container[1],
+            "sentinel": None,
+            "service_name": None,
+            "password": None,
+            "redis_helper_config": config.redis_helper_default_config,
+        },
         "plugins": {},
     }
     cfg = agent_local_config_iv.check(cfg)

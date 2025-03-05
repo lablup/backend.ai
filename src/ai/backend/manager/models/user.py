@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Self, Sequence, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -18,7 +18,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload, relationship
+from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -48,6 +48,7 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
+    from .keypair import KeyPairRow
     from .storage import StorageSessionManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -190,6 +191,42 @@ class UserRow(Base):
         back_populates="user_row",
         primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
     )
+
+    @classmethod
+    async def query_user_by_uuid(
+        cls,
+        user_uuid: UUID,
+        db_session: SASession,
+    ) -> Optional[Self]:
+        user_query = (
+            sa.select(UserRow)
+            .where(UserRow.uuid == user_uuid)
+            .options(
+                joinedload(UserRow.main_keypair),
+                selectinload(UserRow.keypairs),
+            )
+        )
+        user_row = await db_session.scalar(user_query)
+        return user_row
+
+    def get_main_keypair_row(self) -> Optional[KeyPairRow]:
+        # `cast()` requires import of KeyPairRow
+        from .keypair import KeyPairRow
+
+        keypair_candidate: Optional[KeyPairRow] = None
+        main_keypair_row = cast(Optional[KeyPairRow], self.main_keypair)
+        if main_keypair_row is None:
+            keypair_rows = cast(list[KeyPairRow], self.keypairs)
+            active_keypairs = [row for row in keypair_rows if row.is_active]
+            for row in active_keypairs:
+                if keypair_candidate is None or not keypair_candidate.is_admin:
+                    keypair_candidate = row
+                    break
+            if keypair_candidate is not None:
+                self.main_keypair = keypair_candidate
+        else:
+            keypair_candidate = main_keypair_row
+        return keypair_candidate
 
 
 class UserGroup(graphene.ObjectType):
@@ -1179,7 +1216,9 @@ class PurgeUser(graphene.Mutation):
             )
             rows = cast(list[VFolderRow], result.fetchall())
             for vf in rows:
-                target_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
+                target_vfs.append(
+                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
