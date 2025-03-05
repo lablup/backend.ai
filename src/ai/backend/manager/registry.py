@@ -57,6 +57,7 @@ from yarl import URL
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -122,7 +123,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
@@ -182,7 +182,7 @@ from .models import (
     verify_vfolder_name,
 )
 from .models.container_registry import ContainerRegistryRow
-from .models.image import bulk_get_image_configs
+from .models.image import ImageIdentifier, bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
@@ -434,6 +434,11 @@ class AgentRegistry:
                 await storage_resp.json(),
                 HardwareMetadata,
             )
+
+    async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
+        agent = await self.get_instance(instance_id, agents.c.addr)
+        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
+            return await rpc.call.scan_gpu_alloc_map()
 
     async def create_session(
         self,
@@ -3638,6 +3643,22 @@ class AgentRegistry:
     ) -> Mapping[str, str]:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
+
+    async def purge_images(
+        self,
+        agent_id: AgentId,
+        images: list[str],
+    ) -> PurgeImageResponses:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            result = await rpc.call.purge_images(images)
+
+            return PurgeImageResponses([
+                PurgeImageResponse(
+                    image=resp["image"],
+                    error=resp.get("error"),
+                )
+                for resp in result["responses"]
+            ])
 
     async def get_abusing_report(
         self,

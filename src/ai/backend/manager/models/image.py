@@ -21,7 +21,6 @@ from typing import (
 )
 from uuid import UUID
 
-import aiotools
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -33,10 +32,10 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
+    DispatchResult,
     ImageAlias,
     ImageConfig,
     ImageRegistry,
-    MultipleResult,
     ResourceSlot,
 )
 from ai.backend.common.utils import join_non_empty
@@ -50,6 +49,7 @@ from .base import (
     Base,
     ForeignKeyIDColumn,
     IDColumn,
+    StrEnumType,
     StructuredJSONColumn,
 )
 from .rbac import (
@@ -169,37 +169,27 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> MultipleResult[ImageRow]:
+) -> DispatchResult[list[ImageRow]]:
     """
     Performs an image rescan for all images in the registries.
     """
-    tasks = []
+    images, errors = [], []
 
-    async with aiotools.TaskGroup() as tg:
-        for registry_key, registry_row in registries.items():
-            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-            log.info('Scanning kernel images from the registry "{0}"', registry_name)
+    for registry_key, registry_row in registries.items():
+        registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+        log.info('Scanning kernel images from the registry "{0}"', registry_name)
 
-            scanner_cls = get_container_registry_cls(registry_row)
-            scanner = scanner_cls(db, registry_name, registry_row)
+        scanner_cls = get_container_registry_cls(registry_row)
+        scanner = scanner_cls(db, registry_name, registry_row)
 
-            task = tg.create_task(scanner.rescan_single_registry(reporter))
-            tasks.append(task)
-
-    images: list[ImageRow] = []
-    errors: list[str] = []
-    for task in tasks:
         try:
-            scan_result: MultipleResult[ImageRow] = task.result()
-
-            if scan_result.results:
-                images.extend(scan_result.results)
-            if scan_result.errors:
-                errors.extend(scan_result.errors)
+            scan_result = await scanner.rescan_single_registry(reporter)
+            images.extend(scan_result.result or [])
+            errors.extend(scan_result.errors or [])
         except Exception as e:
             errors.append(str(e))
 
-    return MultipleResult(results=images, errors=errors)
+    return DispatchResult(result=images, errors=errors)
 
 
 async def scan_single_image(
@@ -207,7 +197,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> MultipleResult[ImageRow]:
+) -> DispatchResult[list[ImageRow]]:
     """
     Performs a scan for a single image.
     """
@@ -262,7 +252,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> MultipleResult[ImageRow]:
+) -> DispatchResult[list[ImageRow]]:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
@@ -312,8 +302,19 @@ def _get_image_endpoint_join_condition():
     return ImageRow.id == foreign(EndpointRow.image)
 
 
+class ImageStatus(enum.StrEnum):
+    ALIVE = "ALIVE"
+    DELETED = "DELETED"
+
+
 class ImageRow(Base):
     __tablename__ = "images"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "registry", "project", "name", "tag", "architecture", name="uq_image_identifier"
+        ),
+    )
+
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
     project = sa.Column("project", sa.String, nullable=True)
@@ -354,6 +355,14 @@ class ImageRow(Base):
         ),
         nullable=False,
     )
+    status = sa.Column(
+        "status",
+        StrEnumType(ImageStatus),
+        default=ImageStatus.ALIVE,
+        server_default=ImageStatus.ALIVE.name,
+        nullable=False,
+    )
+
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
     endpoints = relationship(
@@ -384,6 +393,7 @@ class ImageRow(Base):
         accelerators=None,
         labels=None,
         resources=None,
+        status=ImageStatus.ALIVE,
     ) -> None:
         self.name = name
         self.project = project
@@ -399,6 +409,7 @@ class ImageRow(Base):
         self.accelerators = accelerators
         self.labels = labels
         self.resources = resources
+        self.status = status
 
     @property
     def trimmed_digest(self) -> str:
@@ -425,6 +436,7 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -435,6 +447,9 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
         result = await session.scalar(query)
         if result is not None:
@@ -448,6 +463,7 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -458,6 +474,9 @@ class ImageRow(Base):
 
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
@@ -476,6 +495,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
@@ -488,6 +508,9 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
@@ -509,6 +532,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -559,7 +583,11 @@ class ImageRow(Base):
                 searched_refs.append(f"identifier:{reference!r}")
             try:
                 if row := await resolver_func(
-                    session, reference, load_aliases=load_aliases, loading_options=loading_options
+                    session,
+                    reference,
+                    load_aliases=load_aliases,
+                    filter_by_statuses=filter_by_statuses,
+                    loading_options=loading_options,
                 ):
                     return row
             except UnknownImageReference:
@@ -568,19 +596,34 @@ class ImageRow(Base):
 
     @classmethod
     async def get(
-        cls, session: AsyncSession, image_id: UUID, load_aliases=False
+        cls,
+        session: AsyncSession,
+        image_id: UUID,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        load_aliases: bool = False,
     ) -> ImageRow | None:
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         result = await session.execute(query)
         return result.scalar()
 
     @classmethod
-    async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:
+    async def list(
+        cls,
+        session: AsyncSession,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        load_aliases: bool = False,
+    ) -> List[ImageRow]:
         query = sa.select(ImageRow)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -676,6 +719,10 @@ class ImageRow(Base):
         parsed_image_info["reverse_aliases"] = [x.alias for x in self.aliases]
         return parsed_image_info
 
+    async def mark_as_deleted(self, db_session: AsyncSession) -> None:
+        self.status = ImageStatus.DELETED
+        await db_session.flush()
+
     def set_resource_limit(
         self,
         slot_type: str,
@@ -690,6 +737,9 @@ class ImageRow(Base):
             resources[slot_type]["max"] = str(value_range[1])
 
         self.resources = resources
+
+    def is_customized_by(self, user_id: str) -> bool:
+        return (self.labels or {}).get("ai.backend.customized-image.owner") == f"user:{user_id}"
 
 
 async def bulk_get_image_configs(

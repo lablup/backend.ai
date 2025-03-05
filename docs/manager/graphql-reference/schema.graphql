@@ -92,6 +92,9 @@ type Queries {
     is_installed: Boolean
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
+
     """
     Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
     """
@@ -121,6 +124,9 @@ type Queries {
 
     """Default is read_attribute."""
     permission: ImagePermissionValueField = "read_attribute"
+
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
     filter: String
     order: String
     offset: Int
@@ -290,6 +296,9 @@ type Agent implements Item {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   mem_slots: Int
   cpu_slots: Float
   gpu_slots: Float
@@ -321,6 +330,12 @@ Use of this type is *not recommended* as you lose the benefits of having a defin
 schema (one of the key benefits of GraphQL).
 """
 scalar JSONString
+
+"""
+Added in 25.4.0.
+Verifies that the key is a UUID (represented as a string) and the value is a float.
+"""
+scalar UUIDFloatMap
 
 type ComputeContainer implements Item {
   id: ID
@@ -398,6 +413,9 @@ type ImageNode implements Node {
   digest: String
   labels: [KVPair]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
 
@@ -613,6 +631,9 @@ type AgentNode implements Node {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
   """
@@ -880,11 +901,20 @@ type Image {
   labels: [KVPair]
   aliases: [String]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
   installed: Boolean
   installed_agents: [String]
   hash: String
+}
+
+"""Added in 25.4.0."""
+enum ImageStatus {
+  ALIVE
+  DELETED
 }
 
 """Added in 25.3.0."""
@@ -1156,9 +1186,16 @@ type ProjectResourcePolicy {
 }
 
 type ResourcePreset {
+  """Added in 25.4.0. ID of the resource preset."""
+  id: UUID
   name: String
   resource_slots: JSONString
   shared_memory: BigInt
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type ScalingGroup {
@@ -1904,6 +1941,12 @@ type Mutations {
   This action cannot be undone.
   """
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
+
+  """Added in 25.4.0."""
+  rescan_gpu_alloc_maps(
+    """Agent ID to rescan GPU alloc map"""
+    agent_id: String!
+  ): RescanGPUAllocMaps
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
@@ -1918,13 +1961,21 @@ type Mutations {
 
   """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+
+  """Added in 25.4.0"""
+  purge_image_by_id(image_id: String!): PurgeImageById
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
+
+  """Added in 25.4.0"""
+  purge_images(agent_id: String!, images: [ImageRefType]!): PurgeImages
 
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
@@ -1938,7 +1989,12 @@ type Mutations {
   modify_project_resource_policy(name: String!, props: ModifyProjectResourcePolicyInput!): ModifyProjectResourcePolicy
   delete_project_resource_policy(name: String!): DeleteProjectResourcePolicy
   create_resource_preset(name: String!, props: CreateResourcePresetInput!): CreateResourcePreset
-  modify_resource_preset(name: String!, props: ModifyResourcePresetInput!): ModifyResourcePreset
+  modify_resource_preset(
+    """Added in 25.4.0. ID of the resource preset."""
+    id: UUID!
+    name: String @deprecated(reason: "Deprecated since 25.4.0.")
+    props: ModifyResourcePresetInput!
+  ): ModifyResourcePreset
   delete_resource_preset(name: String!): DeleteResourcePreset
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
@@ -2377,6 +2433,11 @@ input PurgeUserInput {
   purge_shared_vfolders: Boolean
 }
 
+"""Added in 25.4.0."""
+type RescanGPUAllocMaps {
+  task_id: UUID
+}
+
 type CreateKeyPair {
   ok: Boolean
   msg: String
@@ -2467,11 +2528,17 @@ type ForgetImageById {
   image: ImageNode
 }
 
+"""Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
 type ForgetImage {
   ok: Boolean
   msg: String
 
   """Added since 24.03.1."""
+  image: ImageNode
+}
+
+"""Added in 25.4.0."""
+type PurgeImageById {
   image: ImageNode
 }
 
@@ -2497,6 +2564,17 @@ type DealiasImage {
 type ClearImages {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.4.0."""
+type PurgeImages {
+  task_id: String
+}
+
+input ImageRefType {
+  name: String!
+  registry: String
+  architecture: String
 }
 
 """Added in 24.09.0."""
@@ -2690,6 +2768,11 @@ type CreateResourcePreset {
 input CreateResourcePresetInput {
   resource_slots: JSONString!
   shared_memory: String
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type ModifyResourcePreset {
@@ -2698,8 +2781,15 @@ type ModifyResourcePreset {
 }
 
 input ModifyResourcePresetInput {
+  """Added in 25.4.0. A name of resource preset."""
+  name: String
   resource_slots: JSONString
   shared_memory: String
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type DeleteResourcePreset {
@@ -3082,12 +3172,6 @@ input ModifyEndpointInput {
 
   """Added in 24.03.5."""
   runtime_variant: String
-}
-
-input ImageRefType {
-  name: String!
-  registry: String
-  architecture: String
 }
 
 """Added in 24.03.4."""

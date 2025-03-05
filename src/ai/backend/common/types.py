@@ -1606,8 +1606,8 @@ ResultType = TypeVar("ResultType")
 
 
 @dataclass
-class MultipleResult(Generic[ResultType]):
-    results: list[ResultType] = field(default_factory=list)
+class DispatchResult(Generic[ResultType]):
+    result: Optional[ResultType] = None
     errors: list[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
@@ -1615,3 +1615,17 @@ class MultipleResult(Generic[ResultType]):
 
     def has_error(self) -> bool:
         return not self.is_success()
+
+    def message(self) -> str:
+        if self.is_success():
+            return str(self.result)
+        if self.result is not None:
+            return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
+        else:
+            return "errors: " + "\n".join(self.errors)
+
+
+class PurgeImageResult(TypedDict):
+    image: str
+    result: Optional[list[Any]]
+    error: Optional[str]
