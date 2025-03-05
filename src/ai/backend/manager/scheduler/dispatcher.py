@@ -501,7 +501,6 @@ class SchedulerDispatcher(aobject):
                     dispersions = await get_kernel_count_per_agent_at_endpoint(db_sess, endpoint_id)
                     extra_config["dispersions"] = dispersions
 
-                # TODO: If there are no services with the same model, it should operate as "concentrated".
                 agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
                 agselector_name = "dispersed"
@@ -520,8 +519,6 @@ class SchedulerDispatcher(aobject):
             **global_agselector_opts,
             **sgroup_opts.agent_selector_config,
         }
-
-        print("agselector_config!!", agselector_config)
 
         agent_selection_resource_priority = self.local_config["manager"][
             "agent-selection-resource-priority"
@@ -542,7 +539,6 @@ class SchedulerDispatcher(aobject):
     ) -> None:
         # Part 0: Load the scheduler and the agent selector.
         async with self.db.begin_readonly_session() as db_sess:
-            # 스케줄러 로드 -> pending session 리스트업 -> agent selector 로드 (pending session 타입에 따라 다른 agent selector 로드)
             scheduler = await self._load_scheduler(db_sess, sgroup_name)
             existing_sessions, pending_sessions, cancelled_sessions = await _list_managed_sessions(
                 db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout
@@ -584,9 +580,6 @@ class SchedulerDispatcher(aobject):
             log_fmt = "schedule(s:{}, prio:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
 
             async with self.db.begin_readonly_session() as db_sess:
-                # TODO: 분산도 계산하는 함수는 별도로 빼고 테스트 작성할 것.
-                # pending_sess에 해당하는 엔드포인트 id를 가져옴
-
                 agent_selector = await self._load_agent_selector(db_sess, sgroup_name, pending_sess)
 
             log_args = (

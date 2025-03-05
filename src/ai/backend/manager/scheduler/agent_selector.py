@@ -199,6 +199,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         )
 
         if dispersions_at_endpoint := self.config.get("dispersions"):
+            log.debug(f"agent dispersions: {dispersions_at_endpoint}")
             agents = sorted(agents, key=lambda agent: dispersions_at_endpoint.get(agent.id, 0))
 
         return agents[0].id
