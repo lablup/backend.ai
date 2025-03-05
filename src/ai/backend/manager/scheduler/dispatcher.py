@@ -74,7 +74,7 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.kernel import IS_RUNNING
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -197,57 +197,38 @@ def load_agent_selector(
     raise ImportError("Cannot load the agent-selector plugin", name)
 
 
-async def get_dispersion_at_endpoint(db: SAEngine, endpoint_id: uuid.UUID) -> dict[AgentId, int]:
-    async with db.begin_readonly_session() as db_sess:
-        # 이 아랫 부분을 함수로 만들자.
-        # 특정 엔드포인트에서의 각 에이전트의 커널 할당 분산도를 계산
-        # pending_sess 빼는 조건은 어떻게 하지...
-        # exclude 옵션?
+async def get_kernel_count_per_agent_at_endpoint(
+    db_sess: SASession, endpoint_id: uuid.UUID
+) -> dict[AgentId, int]:
+    """
+    Query the agents to which the kernels of each session belong,
+    and calculate the number of kernels for each agent at a specific endpoint.
+    """
 
-        # 해당 엔드포인트에 속한 모든 routing row들을 한 번에 조회. (스케줄링 될 pending_session은 제외하고)
-        routing_rows: list[RoutingRow] = (
-            await db_sess.scalars(
-                sa.select(RoutingRow)
-                .options(
-                    selectinload(RoutingRow.session_row).options(selectinload(SessionRow.kernels))
-                )
-                .where(
-                    sa.and_(
-                        RoutingRow.endpoint == endpoint_id,
-                        # 의문점: 이거 빼는 게 맞나...?
-                        # 걍 PENDING만 뒤에서 빼 주면 될 듯...?
-                        # RoutingRow.session != pending_sess.id,
-                    )
-                )
+    routing_rows: list[RoutingRow] = (
+        await db_sess.scalars(
+            sa.select(RoutingRow)
+            .options(selectinload(RoutingRow.session_row).options(selectinload(SessionRow.kernels)))
+            .where(
+                RoutingRow.endpoint == endpoint_id,
             )
-        ).all()
+        )
+    ).all()
 
-        # print("_schedule_in_sgroup! pending_sess.id", pending_sess.id)
+    kernel_count_per_agent: dict[AgentId, int] = {}
 
-        # 각 세션들의 커널들이 속한 에이전트를 조회해서
-        # 특정 엔드포인트에서의 각 에이전트의 커널 할당 분산도를 계산
-        dispersion_at_endpoint: dict[AgentId, int] = {}
+    for routing_row in routing_rows:
+        session_row: SessionRow = routing_row.session_row
+        kernels: list[KernelRow] = session_row.kernels
 
-        for routing_row in routing_rows:
-            print("routing_row!!", routing_row.id)
-            session_row: SessionRow = routing_row.session_row
-            print("session_row!!", session_row.id)
-            kernels: list[KernelRow] = cast(list[KernelRow], session_row.kernels)
-            for kernel in kernels:
-                print("kernel!", kernel.id)
-                print("kernel.status!!", kernel.status)
-                # Pending은 여기서 걸러짐.
+        for kernel in kernels:
+            if kernel.status not in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                continue
 
-                # TODO: 이거 해야 되는 거 맞나? 아니면 Pending 만 걸러야?
-                if kernel.status not in IS_RUNNING:
-                    continue
-                print("kernel.agent!!", kernel.agent)
+            if agent_id := kernel.agent:
+                kernel_count_per_agent[agent_id] = kernel_count_per_agent.get(agent_id, 0) + 1
 
-                if agent_id := kernel.agent:
-                    dispersion_at_endpoint[agent_id] = dispersion_at_endpoint.get(agent_id, 0) + 1
-
-        print("dispersion_dict!", dispersion_at_endpoint)
-        return dispersion_at_endpoint
+    return kernel_count_per_agent
 
 
 class SchedulerDispatcher(aobject):
@@ -517,7 +498,7 @@ class SchedulerDispatcher(aobject):
                         )
                     )
 
-                    dispersions = await get_dispersion_at_endpoint(db_sess, endpoint_id)
+                    dispersions = await get_kernel_count_per_agent_at_endpoint(db_sess, endpoint_id)
                     extra_config["dispersions"] = dispersions
 
                 # TODO: If there are no services with the same model, it should operate as "concentrated".

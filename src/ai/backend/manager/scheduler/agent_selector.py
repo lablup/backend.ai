@@ -164,7 +164,10 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
     @property
     @override
     def config_iv(self) -> t.Dict:
-        return t.Dict({"dispersion": t.Dict(t.String, t.Int())}).allow_extra("*")
+        return t.Dict({
+            t.Key("dispersions", optional=True, default=None): t.Null
+            | t.Mapping(t.String, t.Int()),
+        }).allow_extra("*")
 
     @override
     @classmethod
@@ -195,7 +198,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
             ],
         )
 
-        if dispersions_at_endpoint := self.config.get("dispersion"):
+        if dispersions_at_endpoint := self.config.get("dispersions"):
             agents = sorted(agents, key=lambda agent: dispersions_at_endpoint.get(agent.id, 0))
 
         return agents[0].id
