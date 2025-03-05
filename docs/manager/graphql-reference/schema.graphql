@@ -1989,7 +1989,6 @@ type Mutations {
   modify_resource_preset(
     """Added in 25.03.0. ID of the resource preset."""
     id: UUID!
-    name: String!
     props: ModifyResourcePresetInput!
   ): ModifyResourcePreset
   delete_resource_preset(name: String!): DeleteResourcePreset
@@ -2767,6 +2766,8 @@ type ModifyResourcePreset {
 }
 
 input ModifyResourcePresetInput {
+  """Added in 25.4.0. A name of resource preset."""
+  name: String
   resource_slots: JSONString
   shared_memory: String
 
