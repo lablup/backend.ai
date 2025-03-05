@@ -653,6 +653,9 @@ def load_raft_cluster_config(
 
 
 class SharedConfig(AbstractConfig):
+    etcd: AbstractKVStore
+    etcetra_etcd: EtcetraAsyncEtcd
+
     def __init__(
         self,
         etcd_instance: AbstractKVStore,

@@ -1,7 +1,6 @@
 import asyncio
 from typing import AsyncIterator, Dict, Final, List, Optional, Self, Tuple
 
-import aiohttp
 from attr import dataclass
 from raftify import RaftNode
 
@@ -78,7 +77,6 @@ class RaftKVSClient:
     _endpoints: list[str]
     _connect_options: Optional[ConnectOptions]
     _state_machine: HashStore
-    # _communicator: "RaftKVSCommunicator"
     _watchers: Dict[bytes, list[asyncio.Queue[WatchEvent]]]
     _prefix_watchers: List[Tuple[bytes, asyncio.Queue[WatchEvent]]]
     _leases: Dict[bytes, float]
@@ -135,25 +133,25 @@ class RaftKVSClient:
                 return endpoint.split(":", 1)[1]
         return None
 
-    async def _redirect_write_to_leader(self, key: bytes, value: bytes, method: str) -> None:
-        leader_addr = await self._get_leader_addr()
-        if leader_addr is None:
-            raise RuntimeError("No leader found in the cluster. Request cannot be redirected.")
+    # async def _redirect_write_to_leader(self, key: bytes, value: bytes, method: str) -> None:
+    #     leader_addr = await self._get_leader_addr()
+    #     if leader_addr is None:
+    #         raise RuntimeError("No leader found in the cluster. Request cannot be redirected.")
 
-        if method == "PUT":
-            url = f"http://{leader_addr}/put/{key.decode()}/{value.decode()}"
-        elif method == "DELETE":
-            url = f"http://{leader_addr}/delete/{key.decode()}"
-        else:
-            raise RuntimeError(f"Unsupported method: {method}")
+    #     if method == "PUT":
+    #         url = f"http://{leader_addr}/put/{key.decode()}/{value.decode()}"
+    #     elif method == "DELETE":
+    #         url = f"http://{leader_addr}/delete/{key.decode()}"
+    #     else:
+    #         raise RuntimeError(f"Unsupported method: {method}")
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as resp:
-                    if resp.status != 200:
-                        raise RuntimeError(f"Failed to redirect request to leader: {resp.status}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to redirect request to leader: {e}")
+    #     try:
+    #         async with aiohttp.ClientSession() as session:
+    #             async with session.get(url) as resp:
+    #                 if resp.status != 200:
+    #                     raise RuntimeError(f"Failed to redirect request to leader: {resp.status}")
+    #     except Exception as e:
+    #         raise RuntimeError(f"Failed to redirect request to leader: {e}")
 
     async def watch(self, key: bytes, start_revision: Optional[int] = None) -> Watch:
         if key not in self._watchers:
@@ -186,9 +184,9 @@ class RaftKVSClient:
                 await q.put(event)
 
     async def put(self, key: bytes, value: bytes) -> None:
-        if not await self.is_leader():
-            await self._redirect_write_to_leader(key, value, method="PUT")
-            return
+        # if not await self.is_leader():
+        #     await self._redirect_write_to_leader(key, value, method="PUT")
+        #     return
         # todo: add mutex
         message = SetCommand(key.decode(), value.decode()).encode()
         """
@@ -203,16 +201,16 @@ class RaftKVSClient:
         """
         await self._raft_node.propose(message)
         # todo: end mutex
-        revision = self._state_machine.current_revision()
-        old_val = self._state_machine.get(key.decode())
+        # revision = self._state_machine.current_revision()
+        # old_val = self._state_machine.get(key.decode())
 
-        await self.notify_watchers(
-            key,
-            WatchEventType.PUT,
-            value,
-            revision,
-            prev_value=old_val.encode() if old_val else None,
-        )
+        # await self.notify_watchers(
+        #     key,
+        #     WatchEventType.PUT,
+        #     value,
+        #     revision,
+        #     prev_value=old_val.encode() if old_val else None,
+        # )
 
     # todo implement multiple puts
     # message pre-processing needs to be synchronous?
@@ -222,10 +220,17 @@ class RaftKVSClient:
         val = self._state_machine.get(key.decode())
         return val.encode() if val is not None else None
 
+    async def get_prefix(self, prefix: bytes) -> Dict[bytes, bytes]:
+        return {
+            k.encode(): v.encode()
+            for k, v in self._state_machine.as_dict().items()
+            if k.startswith(prefix.decode())
+        }
+
     async def delete(self, key: bytes) -> None:
-        if not await self.is_leader():
-            await self._redirect_write_to_leader(key, b"", method="DELETE")
-            return
+        # if not await self.is_leader():
+        #     await self._redirect_write_to_leader(key, b"", method="DELETE")
+        #     return
 
         old_val = self._state_machine.get(key.decode())
         message = SetCommand(key.decode(), "").encode()  # send empty value to delete
@@ -243,9 +248,9 @@ class RaftKVSClient:
         return await self._raft_node.get_cluster_size()
 
     async def lease_grant(self, key: bytes, ttl: int) -> None:
-        if not await self.is_leader():
-            await self._redirect_write_to_leader(key, str(ttl).encode(), method="PUT")
-            return
+        # if not await self.is_leader():
+        #     await self._redirect_write_to_leader(key, str(ttl).encode(), method="PUT")
+        #     return
 
         self._leases[key] = asyncio.get_event_loop().time() + ttl
 
@@ -253,9 +258,9 @@ class RaftKVSClient:
         if key not in self._leases:
             return
 
-        if not await self.is_leader():
-            await self._redirect_write_to_leader(key, b"", method="DELETE")
-            return
+        # if not await self.is_leader():
+        #     await self._redirect_write_to_leader(key, b"", method="DELETE")
+        #     return
 
         del self._leases[key]
         await self.delete(key)

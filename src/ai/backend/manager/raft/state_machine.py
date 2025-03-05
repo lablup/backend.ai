@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, NamedTuple, Optional, Self
 
 
@@ -30,10 +31,12 @@ class SetCommand:
 class HashStore:
     _store: dict[str, Any]
     _revision: int
+    _loop: asyncio.AbstractEventLoop
 
     def __init__(self) -> None:
         self._store: dict[str, Any] = {}
         self._revision = 0
+        self._loop = asyncio.get_event_loop()
 
     def get(self, key: str) -> Optional[str]:
         return self._store.get(key)
