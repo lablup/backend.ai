@@ -134,6 +134,19 @@ class KernelStatus(enum.StrEnum):
     CANCELLED = "CANCELLED"
 
 
+# TODO: Rename this.
+IS_RUNNING = tuple(
+    e
+    for e in KernelStatus
+    if e
+    not in (
+        KernelStatus.TERMINATED,
+        KernelStatus.TERMINATING,
+        KernelStatus.ERROR,
+        KernelStatus.CANCELLED,
+    )
+)
+
 # statuses to consider when calculating current resource usage
 AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
     e

@@ -69,10 +69,10 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     ResourceSlot,
     SessionId,
-    SessionTypes,
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.kernel import IS_RUNNING
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -450,11 +450,7 @@ class SchedulerDispatcher(aobject):
                 agselector_name = "roundrobin"
             case AgentSelectionStrategy.CONCENTRATED:
                 # TODO: If there are no services with the same model, it should operate as "concentrated".
-                if session_type == SessionTypes.INFERENCE:
-                    # TODO: Roundrobin?
-                    agselector_name = "dispersed"
-                else:
-                    agselector_name = "concentrated"
+                agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
                 agselector_name = "dispersed"
             case _ as unknown:
@@ -486,7 +482,6 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
     ) -> None:
         # Part 0: Load the scheduler and the agent selector.
-
         async with self.db.begin_readonly_session() as db_sess:
             # 스케줄러 로드 -> pending session 리스트업 -> agent selector 로드 (pending session 타입에 따라 다른 agent selector 로드)
             scheduler = await self._load_scheduler(db_sess, sgroup_name)
@@ -530,6 +525,64 @@ class SchedulerDispatcher(aobject):
             log_fmt = "schedule(s:{}, prio:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
 
             async with self.db.begin_readonly_session() as db_sess:
+                # TODO: 분산도 계산하는 함수는 별도로 빼고 테스트 작성할 것.
+                # pending_sess에 해당하는 엔드포인트 id를 가져옴
+                endpoint_id = await db_sess.scalar(
+                    sa.select(RoutingRow.endpoint).where(RoutingRow.session == pending_sess.id)
+                )
+
+                # 이 아랫 부분을 함수로 만들자.
+                # 특정 엔드포인트에서의 각 에이전트의 커널 할당 분산도를 계산
+                # pending_sess 빼는 조건은 어떻게 하지...
+                # exclude 옵션?
+
+                # 해당 엔드포인트에 속한 모든 routing row들을 한 번에 조회. (스케줄링 될 pending_session은 제외하고)
+                routing_rows: list[RoutingRow] = (
+                    await db_sess.scalars(
+                        sa.select(RoutingRow)
+                        .options(
+                            selectinload(RoutingRow.session_row).options(
+                                selectinload(SessionRow.kernels)
+                            )
+                        )
+                        .where(
+                            sa.and_(
+                                RoutingRow.endpoint == endpoint_id,
+                                # 의문점: 이거 빼는 게 맞나...?
+                                # 걍 PENDING만 뒤에서 빼 주면 될 듯...?
+                                # RoutingRow.session != pending_sess.id,
+                            )
+                        )
+                    )
+                ).all()
+
+                print("_schedule_in_sgroup! pending_sess.id", pending_sess.id)
+                # 각 세션들의 커널들이 속한 에이전트를 조회해서
+                # 특정 엔드포인트에서의 각 에이전트의 커널 할당 분산도를 계산
+                dispersion_at_endpoint: dict[AgentId, int] = {}
+
+                for routing_row in routing_rows:
+                    print("routing_row!!", routing_row.id)
+                    session_row: SessionRow = routing_row.session_row
+                    print("session_row!!", session_row.id)
+                    kernels: list[KernelRow] = cast(list[KernelRow], session_row.kernels)
+                    for kernel in kernels:
+                        print("kernel!", kernel.id)
+                        print("kernel.status!!", kernel.status)
+                        # Pending은 여기서 걸러짐.
+
+                        # TODO: 이거 해야 되는 거 맞나? 아니면 Pending 만 걸러야?
+                        if kernel.status not in IS_RUNNING:
+                            continue
+                        print("kernel.agent!!", kernel.agent)
+
+                        if agent_id := kernel.agent:
+                            dispersion_at_endpoint[agent_id] = (
+                                dispersion_at_endpoint.get(agent_id, 0) + 1
+                            )
+
+                print("dispersion_dict!", dispersion_at_endpoint)
+
                 agent_selector = await self._load_agent_selector(db_sess, sgroup_name, pending_sess)
 
             log_args = (
