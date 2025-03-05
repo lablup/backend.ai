@@ -661,7 +661,7 @@ class ModifyUserInput(graphene.InputObjectType):
 
 class PurgeUserInput(graphene.InputObjectType):
     purge_shared_vfolders = graphene.Boolean(required=False, default=False)
-    delegate_endpoints = graphene.Boolean(
+    delegate_endpoint_ownership = graphene.Boolean(
         required=False,
         default=False,
         description="Added in 25.4.0. Indicates whether the user's existing endpoints are delegated to the requester.",
@@ -1071,10 +1071,13 @@ class PurgeUser(graphene.Mutation):
 
         async def _delete(db_session: SASession) -> None:
             conn = await db_session.connection()
-            user_uuid = await conn.scalar(
-                sa.select([users.c.uuid]).select_from(users).where(users.c.email == email),
+            user_uuid = await db_session.scalar(
+                sa.select(UserRow.uuid).where(UserRow.email == email),
             )
+            user_uuid = cast(Optional[UUID], user_uuid)
             log.info("Purging all records of the user {0}...", email)
+            if user_uuid is None:
+                raise RuntimeError(f"User not found (email: {email})")
 
             if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
                 raise RuntimeError(
@@ -1089,16 +1092,16 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            if props.delegate_endpoints:
+            if props.delegate_endpoint_ownership:
                 delegated_session_ids = await cls._delegate_endpoint(
                     db_session, user_uuid, graph_ctx.user["uuid"], graph_ctx.user["main_access_key"]
                 )
                 await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=True)
             else:
-                if await cls.user_has_active_kernels(conn, user_uuid):
-                    raise RuntimeError("User has some active kernels. Terminate them first.")
                 await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=False)
                 delegated_session_ids = []
+            if await cls._user_has_active_sessions(db_session, user_uuid):
+                raise RuntimeError("User has some active sessions. Terminate them first.")
             await cls._delete_sessions(conn, user_uuid, excluded_session_ids=delegated_session_ids)
             await cls._delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_error_logs(conn, user_uuid)
@@ -1294,9 +1297,9 @@ class PurgeUser(graphene.Mutation):
         return False
 
     @classmethod
-    async def user_has_active_kernels(
+    async def _user_has_active_sessions(
         cls,
-        conn: SAConnection,
+        db_session: SASession,
         user_uuid: UUID,
     ) -> bool:
         """
@@ -1307,17 +1310,20 @@ class PurgeUser(graphene.Mutation):
 
         :return: True if the user has some active kernels.
         """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+        # from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+        from .session import AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES, SessionRow
 
-        active_kernel_count = await conn.scalar(
-            sa.select([sa.func.count()])
-            .select_from(kernels)
+        active_session_count = await db_session.scalar(
+            sa.select(sa.func.count())
+            .select_from(SessionRow)
             .where(
-                (kernels.c.user_uuid == user_uuid)
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                sa.and_(
+                    SessionRow.user_uuid == user_uuid,
+                    SessionRow.status.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+                )
             ),
         )
-        return active_kernel_count > 0
+        return active_session_count > 0
 
     @classmethod
     async def _delegate_endpoint(
