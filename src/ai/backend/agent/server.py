@@ -57,7 +57,6 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.request import PurgeImageRequest
 from ai.backend.common.dto.agent.response import AbstractAgentResponse, PurgeImageResponses
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
@@ -923,14 +922,9 @@ class AgentRPCServer(aobject):
 
     @rpc_function_v2
     @collect_error
-    # TODO: Handle type conversion automatically using rpc_function_v2
     async def purge_images(self, images: list[str]) -> PurgeImageResponses:
         log.info("rpc::purge_images(images:{0})", images)
-        return await self.agent.purge_images(
-            PurgeImageRequest(
-                images=images,
-            )
-        )
+        return await self.agent.purge_images(images)
 
     @rpc_function
     @collect_error
