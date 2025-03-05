@@ -228,6 +228,12 @@ async def get_kernel_count_per_agent_at_endpoint(
             if agent_id := kernel.agent:
                 kernel_count_per_agent[agent_id] = kernel_count_per_agent.get(agent_id, 0) + 1
 
+    log.debug(
+        'kernel counts at endpoint "{0}" : "{1}"',
+        endpoint_id,
+        repr(kernel_count_per_agent),
+    )
+
     return kernel_count_per_agent
 
 
@@ -475,8 +481,6 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         pending_session: SessionRow,  # TODO: id and session_type?
     ) -> AbstractAgentSelector:
-        session_type = pending_session.session_type
-
         _scheduler_name, sgroup_opts = await self._get_scaling_group_data(db_sess, sgroup_name)
 
         # TODO: Remove "extra_config after refactoring.
@@ -490,7 +494,7 @@ class SchedulerDispatcher(aobject):
             case AgentSelectionStrategy.CONCENTRATED:
                 if (
                     sgroup_opts.enforce_spreading_endpoint_replica
-                    and session_type == SessionTypes.INFERENCE
+                    and pending_session.session_type == SessionTypes.INFERENCE
                 ):
                     endpoint_id = await db_sess.scalar(
                         sa.select(RoutingRow.endpoint).where(
@@ -498,8 +502,9 @@ class SchedulerDispatcher(aobject):
                         )
                     )
 
-                    dispersions = await get_kernel_count_per_agent_at_endpoint(db_sess, endpoint_id)
-                    extra_config["dispersions"] = dispersions
+                    extra_config[
+                        "kernel_counts_at_same_endpoint"
+                    ] = await get_kernel_count_per_agent_at_endpoint(db_sess, endpoint_id)
 
                 agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
