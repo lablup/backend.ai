@@ -28,7 +28,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponseList
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AgentId,
@@ -1118,12 +1118,12 @@ class ModifyImage(graphene.Mutation):
 
 @dataclass
 class PurgeImagesResult:
-    results: PurgeImageResponseList
+    results: PurgeImageResponses
     reserved_bytes: int
 
     def __str__(self) -> str:
         results_str = "\n  ".join(
-            f"{r.image}: {'Success' if r.success else f'Failed (error: {r.error})'}"
+            f"{r.image}: {'Success' if not r.error else f'Failed (error: {r.error})'}"
             for r in self.results.responses
         )
         return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
@@ -1156,7 +1156,7 @@ class PurgeImages(graphene.Mutation):
             reporter: ProgressReporter,
         ) -> DispatchResult[PurgeImagesResult]:
             errors = []
-            task_result = PurgeImagesResult(results=PurgeImageResponseList([]), reserved_bytes=0)
+            task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
             arch_per_images = {image.name: image.architecture for image in images}
 
             results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
@@ -1165,7 +1165,7 @@ class PurgeImages(graphene.Mutation):
                 image_canonical = result.image
                 arch = arch_per_images[result.image]
 
-                if result.success:
+                if not result.error:
                     image_identifier = ImageIdentifier(image_canonical, arch)
                     async with ctx.db.begin_session() as session:
                         image_row = await ImageRow.resolve(session, [image_identifier])

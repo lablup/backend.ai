@@ -33,7 +33,8 @@ from kubernetes_asyncio import config as kube_config
 
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponseList
+from ai.backend.common.dto.agent.request import PurgeImageRequest
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -1027,10 +1028,10 @@ class KubernetesAgent(
 
     async def purge_images(
         self,
-        images: list[str],
-    ) -> PurgeImageResponseList:
+        args: PurgeImageRequest,
+    ) -> PurgeImageResponses:
         # TODO: Add support for appropriate image purging mechanism on K8s
-        return PurgeImageResponseList([])
+        return PurgeImageResponses([])
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

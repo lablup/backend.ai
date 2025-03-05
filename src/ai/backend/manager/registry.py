@@ -57,7 +57,7 @@ from yarl import URL
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponseList
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -3648,14 +3648,13 @@ class AgentRegistry:
         self,
         agent_id: AgentId,
         images: list[str],
-    ) -> PurgeImageResponseList:
+    ) -> PurgeImageResponses:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             result = list(await rpc.call.purge_images(images))
 
-            return PurgeImageResponseList([
+            return PurgeImageResponses([
                 PurgeImageResponse(
                     image=resp["image"],
-                    success=resp["success"],
                     error=resp.get("error"),
                 )
                 for resp in result

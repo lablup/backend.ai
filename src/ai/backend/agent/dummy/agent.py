@@ -15,7 +15,8 @@ from typing import (
 
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponseList
+from ai.backend.common.dto.agent.request import PurgeImageRequest
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.events import EventProducer
 from ai.backend.common.types import (
     AgentId,
@@ -307,11 +308,11 @@ class DummyAgent(
 
     async def purge_images(
         self,
-        images: list[str],
-    ) -> PurgeImageResponseList:
+        args: PurgeImageRequest,
+    ) -> PurgeImageResponses:
         delay = self.dummy_agent_cfg["delay"]["purge-images"]
         await asyncio.sleep(delay)
-        return PurgeImageResponseList([])
+        return PurgeImageResponses([])
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

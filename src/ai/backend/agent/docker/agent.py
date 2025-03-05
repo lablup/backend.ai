@@ -49,7 +49,8 @@ from async_timeout import timeout
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponseList
+from ai.backend.common.dto.agent.request import PurgeImageRequest
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -1690,25 +1691,22 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResponse:
         try:
             await docker.images.delete(image)
-            return PurgeImageResponse(image=image, success=True, error=None)
+            return PurgeImageResponse.success(image=image)
         except Exception as e:
             log.error(f'Failed to purge image "{image}": {e}')
-            return PurgeImageResponse(image=image, success=False, error=str(e))
+            return PurgeImageResponse.failure(image=image, error=str(e))
 
-    async def purge_images(
-        self,
-        images: list[str],
-    ) -> PurgeImageResponseList:
+    async def purge_images(self, args: PurgeImageRequest) -> PurgeImageResponses:
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
-                tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
+                tasks = [tg.create_task(self._purge_image(docker, image)) for image in args.images]
 
         results = []
         for task in tasks:
             deleted_info = task.result()
             results.append(deleted_info)
 
-        return PurgeImageResponseList(responses=results)
+        return PurgeImageResponses(responses=results)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
