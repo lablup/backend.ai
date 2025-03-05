@@ -3650,14 +3650,14 @@ class AgentRegistry:
         images: list[str],
     ) -> PurgeImageResponses:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            result = list(await rpc.call.purge_images(images))
+            result = await rpc.call.purge_images(images)
 
             return PurgeImageResponses([
                 PurgeImageResponse(
                     image=resp["image"],
                     error=resp.get("error"),
                 )
-                for resp in result
+                for resp in result["responses"]
             ])
 
     async def get_abusing_report(

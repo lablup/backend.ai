@@ -1,19 +1,19 @@
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Generic, Optional, TypeVar, override
+from typing import Optional, TypeVar, override
 
 T = TypeVar("T")
 
 
 @dataclass
-class AbstractAgentResponse(ABC, Generic[T]):
+class AbstractAgentResponse(ABC):
     @abstractmethod
-    def as_dict(self) -> T:
+    def as_dict(self) -> dict:
         raise NotImplementedError
 
 
 @dataclass
-class PurgeImageResponse(AbstractAgentResponse[dict]):
+class PurgeImageResponse(AbstractAgentResponse):
     image: str
     error: Optional[str] = None
 
@@ -31,9 +31,9 @@ class PurgeImageResponse(AbstractAgentResponse[dict]):
 
 
 @dataclass
-class PurgeImageResponses(AbstractAgentResponse[list[dict]]):
+class PurgeImageResponses(AbstractAgentResponse):
     responses: list[PurgeImageResponse]
 
     @override
-    def as_dict(self) -> list[dict]:
-        return [resp.as_dict() for resp in self.responses]
+    def as_dict(self) -> dict:
+        return asdict(self)
