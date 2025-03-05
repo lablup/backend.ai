@@ -33,7 +33,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
+from sqlalchemy.orm import contains_eager, foreign, joinedload, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack, redis_helper
@@ -1100,6 +1100,7 @@ class Endpoint(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
+        creator = cast(Optional[UserRow], row.created_user_row)
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
@@ -1115,7 +1116,7 @@ class Endpoint(graphene.ObjectType):
             model_mount_destination=row.model_mount_destination,
             created_user=row.created_user,
             created_user_id=row.created_user,
-            created_user_email=row.created_user_row.email,
+            created_user_email=creator.email if creator is not None else None,
             session_owner=row.session_owner,
             session_owner_id=row.session_owner,
             session_owner_email=row.session_owner_row.email,
@@ -1153,7 +1154,7 @@ class Endpoint(graphene.ObjectType):
             sa.join(
                 EndpointRow,
                 UserRow,
-                EndpointRow.created_user == UserRow.uuid,
+                EndpointRow.session_owner == UserRow.uuid,
                 isouter=True,
             )
         )
@@ -1190,7 +1191,7 @@ class Endpoint(graphene.ObjectType):
                 sa.join(
                     EndpointRow,
                     UserRow,
-                    EndpointRow.created_user == UserRow.uuid,
+                    EndpointRow.session_owner == UserRow.uuid,
                     isouter=True,
                 )
             )
@@ -1199,6 +1200,7 @@ class Endpoint(graphene.ObjectType):
             .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.session_owner_row))
+            .options(joinedload(EndpointRow.created_user_row))
         )
         if project is not None:
             query = query.where(EndpointRow.project == project)
