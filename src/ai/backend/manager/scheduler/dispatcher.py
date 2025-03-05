@@ -20,6 +20,7 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
+    Iterable,
     Optional,
     Union,
     cast,
@@ -199,7 +200,9 @@ def load_agent_selector(
 
 
 async def get_kernel_count_per_agent_at_endpoint(
-    db_sess: SASession, endpoint_id: uuid.UUID
+    db_sess: SASession,
+    endpoint_id: uuid.UUID,
+    filter_by_statuses: Iterable[KernelStatus],
 ) -> dict[AgentId, int]:
     """
     Query the agents to which the kernels of each session belong,
@@ -223,11 +226,9 @@ async def get_kernel_count_per_agent_at_endpoint(
         kernels: list[KernelRow] = session_row.kernels
 
         for kernel in kernels:
-            if kernel.status not in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
-                continue
-
-            if agent_id := kernel.agent:
-                kernel_count_per_agent[agent_id] = kernel_count_per_agent.get(agent_id, 0) + 1
+            if kernel.status in filter_by_statuses:
+                if agent_id := kernel.agent:
+                    kernel_count_per_agent[agent_id] = kernel_count_per_agent.get(agent_id, 0) + 1
 
     log.debug(
         'kernel counts at endpoint {0}: "{1}"',
@@ -509,7 +510,9 @@ class SchedulerDispatcher(aobject):
 
                     dynamic_config[
                         "kernel_counts_at_same_endpoint"
-                    ] = await get_kernel_count_per_agent_at_endpoint(db_sess, endpoint_id)
+                    ] = await get_kernel_count_per_agent_at_endpoint(
+                        db_sess, endpoint_id, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+                    )
 
                 agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
