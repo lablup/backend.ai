@@ -132,13 +132,13 @@ resource_presets = ResourcePresetRow.__table__
 
 
 class ResourcePreset(graphene.ObjectType):
-    id = graphene.UUID(description="Added in 25.03.0. ID of the resource preset.")
+    id = graphene.UUID(description="Added in 25.4.0. ID of the resource preset.")
     name = graphene.String()
     resource_slots = graphene.JSONString()
     shared_memory = BigInt()
     scaling_group_name = graphene.String(
         description=(
-            "Added in 25.03.0. A name of scaling group(=resource group) of the resource preset associated with."
+            "Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with."
         ),
     )
 
@@ -209,7 +209,7 @@ class CreateResourcePresetInput(graphene.InputObjectType):
     scaling_group_name = graphene.String(
         required=False,
         description=(
-            "Added in 25.03.0. A name of scaling group(=resource group) of the resource preset associated with."
+            "Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with."
         ),
     )
 
@@ -224,7 +224,7 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
     scaling_group_name = graphene.String(
         required=False,
         description=(
-            "Added in 25.03.0. A name of scaling group(=resource group) of the resource preset associated with."
+            "Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with."
         ),
     )
 
@@ -283,9 +283,9 @@ class ModifyResourcePreset(graphene.Mutation):
     class Arguments:
         id = graphene.UUID(
             required=True,
-            description=("Added in 25.03.0. ID of the resource preset."),
+            description=("Added in 25.4.0. ID of the resource preset."),
         )
-        # name = graphene.String(required=True)
+        name = graphene.String(required=False, deprecation_reason="Deprecated since 25.4.0.")
         props = ModifyResourcePresetInput(required=True)
 
     ok = graphene.Boolean()
@@ -297,6 +297,7 @@ class ModifyResourcePreset(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         id: UUID,
+        name: str,
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
         graph_ctx: GraphQueryContext = info.context
