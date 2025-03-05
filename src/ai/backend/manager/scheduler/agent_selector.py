@@ -161,6 +161,11 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
 
 
 class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
+    @property
+    @override
+    def config_iv(self) -> t.Dict:
+        return t.Dict({"dispersion": t.Dict(t.String, t.Int())}).allow_extra("*")
+
     @override
     @classmethod
     def get_state_cls(cls) -> type[NullAgentSelectorState]:
@@ -179,7 +184,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         resource_priorities = sort_requested_slots_by_priority(
             requested_slots, self.agent_selection_resource_priority
         )
-        chosen_agent = min(
+        agents = sorted(
             agents,
             key=lambda agent: [
                 get_num_extras(agent, requested_slots),
@@ -189,7 +194,11 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
                 ],
             ],
         )
-        return chosen_agent.id
+
+        if dispersions_at_endpoint := self.config.get("dispersion"):
+            agents = sorted(agents, key=lambda agent: dispersions_at_endpoint.get(agent.id, 0))
+
+        return agents[0].id
 
 
 class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
