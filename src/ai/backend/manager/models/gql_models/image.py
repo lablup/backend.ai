@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import MutableMapping, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -27,10 +28,12 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
+    AgentId,
+    DispatchResult,
     ImageAlias,
-    MultipleResult,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -67,6 +70,7 @@ from ..rbac import ScopeType
 from ..user import UserRole
 from .base import (
     BigInt,
+    ImageRefType,
     KVPair,
     KVPairInput,
     ResourceLimit,
@@ -925,7 +929,7 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> MultipleResult:
+        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
             return await rescan_images(ctx.db, registry, project, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
@@ -1110,3 +1114,73 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+@dataclass
+class PurgeImagesResult:
+    results: PurgeImageResponses
+    reserved_bytes: int
+
+    def __str__(self) -> str:
+        results_str = "\n  ".join(
+            f"{r.image}: {'Success' if not r.error else f'Failed (error: {r.error})'}"
+            for r in self.results.responses
+        )
+        return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
+
+
+class PurgeImages(graphene.Mutation):
+    """
+    Added in 25.4.0.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        agent_id = graphene.String(required=True)
+        images = graphene.List(ImageRefType, required=True)
+
+    task_id = graphene.String()
+
+    @staticmethod
+    async def mutate(
+        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[ImageRefType]
+    ) -> PurgeImages:
+        image_canonicals = [image.name for image in images]
+        log.info(
+            f"purge images ({image_canonicals}) from agent {agent_id} by API request",
+        )
+        ctx: GraphQueryContext = info.context
+
+        async def _purge_images_task(
+            reporter: ProgressReporter,
+        ) -> DispatchResult[PurgeImagesResult]:
+            errors = []
+            task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
+            arch_per_images = {image.name: image.architecture for image in images}
+
+            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
+
+            for result in results.responses:
+                image_canonical = result.image
+                arch = arch_per_images[result.image]
+
+                if not result.error:
+                    image_identifier = ImageIdentifier(image_canonical, arch)
+                    async with ctx.db.begin_session() as session:
+                        image_row = await ImageRow.resolve(session, [image_identifier])
+                        task_result.reserved_bytes += image_row.size_bytes
+                        task_result.results.responses.append(result)
+
+                else:
+                    error_msg = f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
+                    log.error(error_msg)
+                    errors.append(error_msg)
+
+            return DispatchResult(
+                result=task_result,
+                errors=errors,
+            )
+
+        task_id = await ctx.background_task_manager.start(_purge_images_task)
+        return RescanImages(task_id=task_id)

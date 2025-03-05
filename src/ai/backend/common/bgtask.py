@@ -43,7 +43,7 @@ from .events import (
     EventDispatcher,
     EventProducer,
 )
-from .types import AgentId, MultipleResult, Sentinel
+from .types import AgentId, DispatchResult, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -117,7 +117,7 @@ class ProgressReporter:
 
 
 BackgroundTask = Callable[
-    Concatenate[ProgressReporter, ...], Awaitable[str | MultipleResult | None]
+    Concatenate[ProgressReporter, ...], Awaitable[str | DispatchResult | None]
 ]
 
 
@@ -161,7 +161,11 @@ class BackgroundTaskManager:
         event_dispatcher.subscribe(BgtaskUpdatedEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(BgtaskDoneEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(
-            BgtaskPartialSuccessEvent, None, self._enqueue_bgtask_status_update
+            BgtaskPartialSuccessEvent,
+            None,
+            self._enqueue_bgtask_status_update,
+            # TODO: Remove below event name overriding after renaming BgtaskPartialSuccessEvent
+            override_event_name="bgtask_partial_success",
         )
         event_dispatcher.subscribe(BgtaskCancelledEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(BgtaskFailedEvent, None, self._enqueue_bgtask_status_update)
@@ -328,19 +332,19 @@ class BackgroundTaskManager:
         await redis_helper.execute(redis_producer, _pipe_builder)
 
     def _convert_bgtask_to_event(
-        self, task_id: uuid.UUID, bgtask_result: MultipleResult | str | None
+        self, task_id: uuid.UUID, bgtask_result: DispatchResult | str | None
     ) -> AbstractBgtaskDoneEventType:
         # legacy
         if bgtask_result is None or isinstance(bgtask_result, str):
             return BgtaskDoneEvent(task_id, bgtask_result)
 
+        message = bgtask_result.message()
         if bgtask_result.has_error():
-            # TODO: Handle message properly?
             return BgtaskPartialSuccessEvent(
-                task_id=task_id, message="", errors=bgtask_result.errors
+                task_id=task_id, message=message, errors=bgtask_result.errors
             )
         else:
-            return BgtaskDoneEvent(task_id=task_id, message="")
+            return BgtaskDoneEvent(task_id=task_id, message=message)
 
     async def _run_bgtask(
         self,
