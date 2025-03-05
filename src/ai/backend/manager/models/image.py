@@ -17,7 +17,6 @@ from typing import (
 )
 from uuid import UUID
 
-import aiotools
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -128,14 +127,23 @@ async def scan_registries(
     """
     Performs an image rescan for all images in the registries.
     """
-    async with aiotools.TaskGroup() as tg:
-        for registry_key, registry_row in registries.items():
-            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-            log.info('Scanning kernel images from the registry "{0}"', registry_name)
+    images, errors = [], []
 
-            scanner_cls = get_container_registry_cls(registry_row)
-            scanner = scanner_cls(db, registry_name, registry_row)
-            tg.create_task(scanner.rescan_single_registry(reporter))
+    for registry_key, registry_row in registries.items():
+        registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+        log.info('Scanning kernel images from the registry "{0}"', registry_name)
+
+        scanner_cls = get_container_registry_cls(registry_row)
+        scanner = scanner_cls(db, registry_name, registry_row)
+
+        try:
+            scan_result = await scanner.rescan_single_registry(reporter)
+            images.extend(scan_result.result or [])
+            errors.extend(scan_result.errors or [])
+        except Exception as e:
+            errors.append(str(e))
+
+    return DispatchResult(result=images, errors=errors)
 
 
 async def scan_single_image(
