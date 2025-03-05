@@ -13,6 +13,7 @@ from collections.abc import (
     Sequence,
 )
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
@@ -229,12 +230,20 @@ async def get_kernel_count_per_agent_at_endpoint(
                 kernel_count_per_agent[agent_id] = kernel_count_per_agent.get(agent_id, 0) + 1
 
     log.debug(
-        'kernel counts at endpoint "{0}" : "{1}"',
+        'kernel counts at endpoint {0}: "{1}"',
         endpoint_id,
         repr(kernel_count_per_agent),
     )
 
     return kernel_count_per_agent
+
+
+@dataclass
+class LoadAgentSelectorArgs:
+    db_sess: SASession
+    sgroup_name: str
+    pending_session_id: uuid.UUID
+    pending_session_type: SessionTypes
 
 
 class SchedulerDispatcher(aobject):
@@ -475,16 +484,12 @@ class SchedulerDispatcher(aobject):
 
         return load_scheduler(scheduler_name, sgroup_opts, scheduler_config)
 
-    async def _load_agent_selector(
-        self,
-        db_sess: SASession,
-        sgroup_name: str,
-        pending_session: SessionRow,  # TODO: id and session_type?
-    ) -> AbstractAgentSelector:
-        _scheduler_name, sgroup_opts = await self._get_scaling_group_data(db_sess, sgroup_name)
+    async def _load_agent_selector(self, args: LoadAgentSelectorArgs) -> AbstractAgentSelector:
+        db_sess = args.db_sess
+        _scheduler_name, sgroup_opts = await self._get_scaling_group_data(db_sess, args.sgroup_name)
 
-        # TODO: Remove "extra_config after refactoring.
-        extra_config: dict[str, Any] = {}
+        # TODO: Remove "dynamic_config after refactoring.
+        dynamic_config: dict[str, Any] = {}
 
         match sgroup_opts.agent_selection_strategy:
             case AgentSelectionStrategy.LEGACY:
@@ -494,15 +499,15 @@ class SchedulerDispatcher(aobject):
             case AgentSelectionStrategy.CONCENTRATED:
                 if (
                     sgroup_opts.enforce_spreading_endpoint_replica
-                    and pending_session.session_type == SessionTypes.INFERENCE
+                    and args.pending_session_type == SessionTypes.INFERENCE
                 ):
                     endpoint_id = await db_sess.scalar(
                         sa.select(RoutingRow.endpoint).where(
-                            RoutingRow.session == pending_session.id
+                            RoutingRow.session == args.pending_session_id
                         )
                     )
 
-                    extra_config[
+                    dynamic_config[
                         "kernel_counts_at_same_endpoint"
                     ] = await get_kernel_count_per_agent_at_endpoint(db_sess, endpoint_id)
 
@@ -520,7 +525,7 @@ class SchedulerDispatcher(aobject):
                 agselector_name, {}
             )
         agselector_config = {
-            **extra_config,
+            **dynamic_config,
             **global_agselector_opts,
             **sgroup_opts.agent_selector_config,
         }
@@ -585,7 +590,14 @@ class SchedulerDispatcher(aobject):
             log_fmt = "schedule(s:{}, prio:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
 
             async with self.db.begin_readonly_session() as db_sess:
-                agent_selector = await self._load_agent_selector(db_sess, sgroup_name, pending_sess)
+                agent_selector = await self._load_agent_selector(
+                    LoadAgentSelectorArgs(
+                        db_sess,
+                        sgroup_name,
+                        pending_sess.id,
+                        pending_sess.session_type,
+                    )
+                )
 
             log_args = (
                 pending_sess.id,
