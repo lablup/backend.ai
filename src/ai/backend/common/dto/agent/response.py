@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Optional, TypeVar, override
+from typing import Optional, Self, TypeVar, override
 
 T = TypeVar("T")
 
@@ -22,11 +22,11 @@ class PurgeImageResponse(AbstractAgentResponse):
         return asdict(self)
 
     @classmethod
-    def success(cls, image: str) -> "PurgeImageResponse":
+    def success(cls, image: str) -> Self:
         return cls(image)
 
     @classmethod
-    def failure(cls, image: str, error: str) -> "PurgeImageResponse":
+    def failure(cls, image: str, error: str) -> Self:
         return cls(image, error)
 
 
