@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Optional, Self
 from uuid import UUID
 
 import graphene
@@ -25,6 +25,7 @@ from .base import (
     simple_db_mutate,
 )
 from .user import UserRole
+from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -57,6 +58,74 @@ class ResourcePresetRow(Base):
         primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
     )
 
+    __table_args__ = (
+        sa.Index(
+            "ix_resource_presets_name_null_scaling_group_name",
+            name,
+            postgresql_where=scaling_group_name.is_(None),
+            unique=True,
+        ),
+        sa.Index(
+            "ix_resource_presets_name_scaling_group_name",
+            name,
+            scaling_group_name,
+            postgresql_where=scaling_group_name.isnot(None),
+            unique=True,
+        ),
+    )
+
+    @classmethod
+    async def create(
+        cls,
+        name: str,
+        resource_slots: ResourceSlot,
+        scaling_group_name: Optional[str] = None,
+        shared_memory: Optional[int] = None,
+        *,
+        db_session: AsyncSession,
+    ) -> Optional[Self]:
+        insert_stmt = (
+            sa.insert(ResourcePresetRow)
+            .values(
+                name=name,
+                resource_slots=resource_slots,
+                scaling_group_name=scaling_group_name,
+                shared_memory=shared_memory,
+            )
+            .returning(ResourcePresetRow)
+        )
+        stmt = sa.select(ResourcePresetRow).from_statement(insert_stmt)
+
+        try:
+            return await db_session.scalar(stmt)
+        except sa.exc.IntegrityError:
+            # A resource preset with the given name and scaling group name already exists
+            return None
+
+    @classmethod
+    async def update(
+        cls,
+        preset_id: UUID,
+        data: Mapping[str, Any],
+        *,
+        db_session: AsyncSession,
+    ) -> Optional[Self]:
+        update_stmt = (
+            sa.update(ResourcePresetRow)
+            .values(data)
+            .where(ResourcePresetRow.id == preset_id)
+            .returning(ResourcePresetRow)
+        )
+        stmt = (
+            sa.select(ResourcePresetRow)
+            .from_statement(update_stmt)
+            .execution_options(populate_existing=True)
+        )
+        try:
+            return await db_session.scalar(stmt)
+        except sa.exc.IntegrityError:
+            return None
+
 
 # For compatibility
 resource_presets = ResourcePresetRow.__table__
@@ -83,6 +152,7 @@ class ResourcePreset(graphene.ObjectType):
             case ResourcePresetRow():
                 shared_memory = str(row.shared_memory) if row.shared_memory is not None else None
                 return cls(
+                    id=row.id,
                     name=row.name,
                     resource_slots=row.resource_slots.to_json(),
                     shared_memory=shared_memory,
@@ -91,6 +161,7 @@ class ResourcePreset(graphene.ObjectType):
             case Row():
                 shared_memory = str(row["shared_memory"]) if row["shared_memory"] else None
                 return cls(
+                    id=row["id"],
                     name=row["name"],
                     resource_slots=row["resource_slots"].to_json(),
                     shared_memory=shared_memory,
@@ -144,6 +215,10 @@ class CreateResourcePresetInput(graphene.InputObjectType):
 
 
 class ModifyResourcePresetInput(graphene.InputObjectType):
+    name = graphene.String(
+        required=False,
+        description=("Added in 25.4.0. A name of resource preset."),
+    )
     resource_slots = graphene.JSONString(required=False)
     shared_memory = graphene.String(required=False)
     scaling_group_name = graphene.String(
@@ -190,7 +265,7 @@ class CreateResourcePreset(graphene.Mutation):
         props: CreateResourcePresetInput,
     ) -> CreateResourcePreset:
         graph_ctx: GraphQueryContext = info.context
-        data = {
+        data: dict[str, Any] = {
             "name": name,
             "resource_slots": ResourceSlot.from_user_input(props.resource_slots, None),
         }
@@ -200,30 +275,21 @@ class CreateResourcePreset(graphene.Mutation):
         set_if_set(props, data, "scaling_group_name")
         scaling_group_name = cast(Optional[str], data.get("scaling_group_name"))
 
-        async with graph_ctx.db.begin_session() as db_session:
-            if scaling_group_name is None:
-                # Check in global
-                resource_preset_rows = await _query_presets_globally(db_session)
-                for row in resource_preset_rows:
-                    if row.name == name:
-                        raise ValueError(f"Duplicate resource preset name (id:{row.id})")
-            else:
-                # Check in the given scaling group
-                resource_preset_rows = await _query_presets_in_scaling_group(
-                    db_session, scaling_group_name
-                )
-                for row in resource_preset_rows:
-                    if row.name == name:
-                        raise ValueError(
-                            f"Duplicate resource preset name (id:{row.id},scaling_group:{scaling_group_name})"
-                        )
-            insert_stmt = sa.insert(ResourcePresetRow).values(data).returning(ResourcePresetRow)
-            select_stmt = (
-                sa.select(ResourcePresetRow)
-                .from_statement(insert_stmt)
-                .execution_options(populate_existing=True)
+        async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
+            return await ResourcePresetRow.create(
+                name,
+                cast(ResourceSlot, data["resource_slots"]),
+                scaling_group_name,
+                cast(Optional[int], data.get("shared_memory")),
+                db_session=db_session,
             )
-            preset_row = await db_session.scalar(select_stmt)
+
+        async with graph_ctx.db.connect() as db_conn:
+            preset_row = await execute_with_txn_retry(_create, graph_ctx.db.begin_session, db_conn)
+        if preset_row is None:
+            raise ValueError(
+                f"Duplicate resource preset name (name:{name}, scaling_group:{scaling_group_name})"
+            )
         return cls(True, "success", ResourcePreset.from_row(graph_ctx, preset_row))
 
 
@@ -235,7 +301,7 @@ class ModifyResourcePreset(graphene.Mutation):
             required=True,
             description=("Added in 25.03.0. ID of the resource preset."),
         )
-        name = graphene.String(required=True)
+        # name = graphene.String(required=True)
         props = ModifyResourcePresetInput(required=True)
 
     ok = graphene.Boolean()
@@ -247,7 +313,6 @@ class ModifyResourcePreset(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         id: UUID,
-        name: str,
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
         graph_ctx: GraphQueryContext = info.context
@@ -255,6 +320,11 @@ class ModifyResourcePreset(graphene.Mutation):
         data: Dict[str, Any] = {}
         preset_id = id
 
+        set_if_set(
+            props,
+            data,
+            "name",
+        )
         set_if_set(
             props,
             data,
@@ -266,33 +336,13 @@ class ModifyResourcePreset(graphene.Mutation):
         )
         set_if_set(props, data, "scaling_group_name")
 
-        async with graph_ctx.db.begin_session() as db_session:
-            if "scaling_group_name" not in data:
-                # no check
-                pass
-            elif data["scaling_group_name"] is None:
-                # Check in global
-                resource_preset_rows = await _query_presets_globally(db_session)
-                for row in resource_preset_rows:
-                    if row.name == name and row.id != preset_id:
-                        raise ValueError(
-                            f"Cannot set the resource preset as global. The name({name}) already exists (id:{row.id})"
-                        )
-            else:
-                # Check in the given scaling group
-                scaling_group_name = data["scaling_group_name"]
-                resource_preset_rows = await _query_presets_in_scaling_group(
-                    db_session, scaling_group_name
-                )
-                for row in resource_preset_rows:
-                    if row.name == name:
-                        raise ValueError(
-                            f"Cannot set the resource preset to the scaling group({scaling_group_name}). The name({name}) already exists (id:{row.id})"
-                        )
-            update_stmt = (
-                sa.update(ResourcePresetRow).values(data).where(ResourcePresetRow.id == preset_id)
-            )
-            await db_session.execute(update_stmt)
+        async def _update(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
+            return await ResourcePresetRow.update(preset_id, data, db_session=db_session)
+
+        async with graph_ctx.db.connect() as db_conn:
+            preset_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
+            if preset_row is None:
+                raise ValueError("Duplicate resource preset record")
         return cls(True, "success")
 
 
