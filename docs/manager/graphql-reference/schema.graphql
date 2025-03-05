@@ -1942,7 +1942,12 @@ type Mutations {
 
   """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+
+  """Added in 25.4.0"""
+  purge_image_by_id(image_id: String!): PurgeImageById
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
@@ -2496,11 +2501,17 @@ type ForgetImageById {
   image: ImageNode
 }
 
+"""Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
 type ForgetImage {
   ok: Boolean
   msg: String
 
   """Added since 24.03.1."""
+  image: ImageNode
+}
+
+"""Added in 25.4.0."""
+type PurgeImageById {
   image: ImageNode
 }
 

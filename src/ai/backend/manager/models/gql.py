@@ -119,6 +119,7 @@ from .gql_models.image import (
     ImagePermissionValueField,
     ModifyImage,
     PreloadImage,
+    PurgeImageById,
     RescanImages,
     UnloadImage,
     UntagImageFromRegistry,
@@ -296,7 +297,10 @@ class Mutations(graphene.ObjectType):
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
     forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
-    forget_image = ForgetImage.Field()
+    forget_image = ForgetImage.Field(
+        deprecation_reason="Deprecated since 25.4.0. Use `forget_image_by_id` instead."
+    )
+    purge_image_by_id = PurgeImageById.Field(description="Added in 25.4.0")
     untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
