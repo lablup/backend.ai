@@ -50,6 +50,7 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     ResourceSlot,
     RuntimeVariant,
+    SessionId,
     SessionTypes,
     VFolderID,
     VFolderMount,
@@ -74,7 +75,6 @@ from .base import (
     DecimalType,
     EndpointIDColumn,
     EnumValueType,
-    ForeignKeyIDColumn,
     IDColumn,
     InferenceSessionError,
     Item,
@@ -142,12 +142,8 @@ class EndpointRow(Base):
 
     id = EndpointIDColumn()
     name = sa.Column("name", sa.String(length=512), nullable=False)
-    created_user = sa.Column(
-        "created_user", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
-    )
-    session_owner = sa.Column(
-        "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
-    )
+    created_user = sa.Column("created_user", GUID, nullable=False)
+    session_owner = sa.Column("session_owner", GUID, nullable=False)
     # minus session count means this endpoint is requested for removal
     replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
     image = sa.Column("image", GUID)
@@ -239,7 +235,11 @@ class EndpointRow(Base):
     )
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
-    tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
+    tokens = relationship(
+        "EndpointTokenRow",
+        back_populates="endpoint_row",
+        primaryjoin="foreign(EndpointTokenRow.endpoint) == EndpointRow.id",
+    )
     endpoint_auto_scaling_rules = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
     )
@@ -252,10 +252,16 @@ class EndpointRow(Base):
 
     model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
-        "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
+        "UserRow",
+        back_populates="created_endpoints",
+        foreign_keys=[created_user],
+        primaryjoin=lambda: foreign(EndpointRow.created_user) == UserRow.uuid,
     )
     session_owner_row = relationship(
-        "UserRow", back_populates="owned_endpoints", foreign_keys="EndpointRow.session_owner"
+        "UserRow",
+        back_populates="owned_endpoints",
+        foreign_keys=[session_owner],
+        primaryjoin=lambda: foreign(EndpointRow.session_owner) == UserRow.uuid,
     )
 
     def __init__(
@@ -518,16 +524,51 @@ class EndpointRow(Base):
                 RouteStatus.FAILED_TO_START,
             }
 
+    @classmethod
+    async def delegate_ownership(
+        cls,
+        db_session: AsyncSession,
+        owner_user_uuid: UUID,
+        target_user_uuid: UUID,
+        target_access_key: AccessKey,
+    ) -> list[SessionId]:
+        from .kernel import KernelRow
+        from .routing import RoutingRow
+        from .session import KernelLoadingStrategy, SessionRow
+
+        endpoint_rows = await cls.list(
+            db_session,
+            user_uuid=owner_user_uuid,
+            load_session_owner=True,
+            load_tokens=True,
+        )
+        session_ids: list[UUID] = []
+        for row in endpoint_rows:
+            row.session_owner = target_user_uuid
+            for token_row in cast(list[EndpointTokenRow], row.tokens):
+                token_row.session_owner = target_user_uuid
+            for routing_row in cast(list[RoutingRow], row.routings):
+                routing_row.session_owner = target_user_uuid
+                session_ids.append(routing_row.session)
+        session_rows = await SessionRow.list_sessions(
+            db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
+        )
+        for session_row in session_rows:
+            session_row.user_uuid = target_user_uuid
+            session_row.access_key = target_access_key
+            for kernel_row in cast(list[KernelRow], session_row.kernels):
+                kernel_row.user_uuid = target_user_uuid
+                kernel_row.access_key = target_access_key
+        return session_ids
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
     id = IDColumn()
     token = sa.Column("token", sa.String(), nullable=False)
-    endpoint = sa.Column(
-        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="SET NULL"), nullable=True
-    )
-    session_owner = ForeignKeyIDColumn("session_owner", "users.uuid")
+    endpoint = sa.Column("endpoint", GUID, nullable=True)
+    session_owner = sa.Column("session_owner", GUID, nullable=False)
     domain = sa.Column(
         "domain",
         sa.String(length=64),
@@ -544,7 +585,12 @@ class EndpointTokenRow(Base):
         "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
     )
 
-    endpoint_row = relationship("EndpointRow", back_populates="tokens")
+    endpoint_row = relationship(
+        "EndpointRow",
+        back_populates="tokens",
+        foreign_keys=[endpoint],
+        primaryjoin=lambda: foreign(EndpointTokenRow.endpoint) == EndpointRow.id,
+    )
 
     def __init__(
         self,
