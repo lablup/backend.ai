@@ -44,7 +44,7 @@ from .base import (
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .utils import ExtendedAsyncSAEngine
+from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -1069,7 +1069,8 @@ class PurgeUser(graphene.Mutation):
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _pre_func(conn: SAConnection) -> None:
+        async def _delete(db_session: SASession) -> None:
+            conn = await db_session.connection()
             user_uuid = await conn.scalar(
                 sa.select([users.c.uuid]).select_from(users).where(users.c.email == email),
             )
@@ -1080,8 +1081,6 @@ class PurgeUser(graphene.Mutation):
                     "Some of user's virtual folders are mounted to active kernels. "
                     "Terminate those kernels first.",
                 )
-            if await cls.user_has_active_kernels(conn, user_uuid):
-                raise RuntimeError("User has some active kernels. Terminate them first.")
 
             if not props.purge_shared_vfolders:
                 await cls.migrate_shared_vfolders(
@@ -1092,17 +1091,24 @@ class PurgeUser(graphene.Mutation):
                 )
             if props.delegate_endpoints:
                 delegated_session_ids = await cls._delegate_endpoint(
-                    conn, user_uuid, graph_ctx.user["uuid"], graph_ctx.user["access_key"]
+                    db_session, user_uuid, graph_ctx.user["uuid"], graph_ctx.user["main_access_key"]
                 )
+                await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=True)
             else:
-                await cls._delete_endpoint(conn, user_uuid)
+                if await cls.user_has_active_kernels(conn, user_uuid):
+                    raise RuntimeError("User has some active kernels. Terminate them first.")
+                await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=False)
+                delegated_session_ids = []
             await cls._delete_sessions(conn, user_uuid, excluded_session_ids=delegated_session_ids)
             await cls._delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_error_logs(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
-        delete_query = sa.delete(users).where(users.c.email == email)
-        return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
+            await db_session.execute(sa.delete(users).where(users.c.email == email))
+
+        async with graph_ctx.db.connect() as db_conn:
+            await execute_with_txn_retry(_delete, graph_ctx.db.begin_session, db_conn)
+        return PurgeUser(True, "success")
 
     @classmethod
     async def migrate_shared_vfolders(
@@ -1316,7 +1322,7 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def _delegate_endpoint(
         cls,
-        conn: SAConnection,
+        db_session: SASession,
         owner_user_uuid: UUID,
         delegate_target_user_uuid: UUID,
         delegate_target_access_key: AccessKey,
@@ -1326,38 +1332,41 @@ class PurgeUser(graphene.Mutation):
         """
         from .endpoint import EndpointRow
 
-        async with SASession(conn) as db_session:
-            return await EndpointRow.delegate_ownership(
-                db_session, owner_user_uuid, delegate_target_user_uuid, delegate_target_access_key
-            )
+        return await EndpointRow.delegate_ownership(
+            db_session, owner_user_uuid, delegate_target_user_uuid, delegate_target_access_key
+        )
 
     @classmethod
     async def _delete_endpoint(
         cls,
-        conn: SAConnection,
+        db_session: SASession,
         user_uuid: UUID,
-    ) -> int:
+        *,
+        delete_destroyed_only: bool = False,
+    ) -> None:
         """
         Delete user's all endpoint.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID to delete endpoint
-        :return: number of deleted rows
         """
-        from .endpoint import EndpointRow, EndpointTokenRow
+        from .endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 
-        result = await conn.execute(
-            sa.delete(EndpointTokenRow).where(EndpointTokenRow.session_owner == user_uuid)
+        if delete_destroyed_only:
+            status_filter = {EndpointLifecycle.DESTROYED}
+        else:
+            status_filter = {status for status in EndpointLifecycle}
+        endpoint_rows = await EndpointRow.list(
+            db_session, user_uuid=user_uuid, load_tokens=True, status_filter=status_filter
         )
-        if result.rowcount > 0:
-            log.info("deleted {0} user's endpoint tokens ({1})", result.rowcount, user_uuid)
-
-        result = await conn.execute(
-            sa.delete(EndpointRow).where(EndpointRow.session_owner == user_uuid)
+        token_ids_to_delete = []
+        endpoint_ids_to_delete = []
+        for row in endpoint_rows:
+            token_ids_to_delete.extend([token.id for token in row.tokens])
+            endpoint_ids_to_delete.append(row.id)
+        await db_session.execute(
+            sa.delete(EndpointTokenRow).where(EndpointTokenRow.id.in_(token_ids_to_delete))
         )
-        if result.rowcount > 0:
-            log.info("deleted {0} user's endpoint ({1})", result.rowcount, user_uuid)
-        return result.rowcount
+        await db_session.execute(
+            sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
+        )
 
     @classmethod
     async def delete_error_logs(

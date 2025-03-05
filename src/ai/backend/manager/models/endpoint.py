@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    List,
     Optional,
     Self,
     cast,
@@ -531,7 +532,7 @@ class EndpointRow(Base):
         owner_user_uuid: UUID,
         target_user_uuid: UUID,
         target_access_key: AccessKey,
-    ) -> list[SessionId]:
+    ) -> List[SessionId]:
         from .kernel import KernelRow
         from .routing import RoutingRow
         from .session import KernelLoadingStrategy, SessionRow
@@ -540,9 +541,10 @@ class EndpointRow(Base):
             db_session,
             user_uuid=owner_user_uuid,
             load_session_owner=True,
+            load_routes=True,
             load_tokens=True,
         )
-        session_ids: list[UUID] = []
+        session_ids: List[UUID] = []
         for row in endpoint_rows:
             row.session_owner = target_user_uuid
             for token_row in cast(list[EndpointTokenRow], row.tokens):
@@ -559,7 +561,7 @@ class EndpointRow(Base):
             for kernel_row in cast(list[KernelRow], session_row.kernels):
                 kernel_row.user_uuid = target_user_uuid
                 kernel_row.access_key = target_access_key
-        return session_ids
+        return cast(list[SessionId], session_ids)
 
 
 class EndpointTokenRow(Base):
