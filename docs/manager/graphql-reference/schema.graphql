@@ -1186,14 +1186,14 @@ type ProjectResourcePolicy {
 }
 
 type ResourcePreset {
-  """Added in 25.03.0. ID of the resource preset."""
+  """Added in 25.4.0. ID of the resource preset."""
   id: UUID
   name: String
   resource_slots: JSONString
   shared_memory: BigInt
 
   """
-  Added in 25.03.0. A name of scaling group(=resource group) of the resource preset associated with.
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
   """
   scaling_group_name: String
 }
@@ -1987,8 +1987,9 @@ type Mutations {
   delete_project_resource_policy(name: String!): DeleteProjectResourcePolicy
   create_resource_preset(name: String!, props: CreateResourcePresetInput!): CreateResourcePreset
   modify_resource_preset(
-    """Added in 25.03.0. ID of the resource preset."""
+    """Added in 25.4.0. ID of the resource preset."""
     id: UUID!
+    name: String @deprecated(reason: "Deprecated since 25.4.0.")
     props: ModifyResourcePresetInput!
   ): ModifyResourcePreset
   delete_resource_preset(name: String!): DeleteResourcePreset
@@ -2755,7 +2756,7 @@ input CreateResourcePresetInput {
   shared_memory: String
 
   """
-  Added in 25.03.0. A name of scaling group(=resource group) of the resource preset associated with.
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
   """
   scaling_group_name: String
 }
@@ -2772,7 +2773,7 @@ input ModifyResourcePresetInput {
   shared_memory: String
 
   """
-  Added in 25.03.0. A name of scaling group(=resource group) of the resource preset associated with.
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
   """
   scaling_group_name: String
 }
