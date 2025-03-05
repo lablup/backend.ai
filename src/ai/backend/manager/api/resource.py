@@ -91,11 +91,11 @@ async def list_presets(request: web.Request) -> web.Response:
     await root_ctx.shared_config.get_resource_slots()
     async with root_ctx.db.begin_readonly_session() as db_session:
         query = sa.select(ResourcePresetRow)
-        query_condition = sa.is_(ResourcePresetRow.scaling_group_name, sa.null())
+        query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
         scaling_group_name = request.query.get("scaling_group")
         if scaling_group_name is not None:
             query_condition = sa.or_(
-                query_condition, sa.is_(ResourcePresetRow.scaling_group_name, scaling_group_name)
+                query_condition, ResourcePresetRow.scaling_group_name == scaling_group_name
             )
         query = query.where(query_condition)
         resp: MutableMapping[str, Any] = {"presets": []}
@@ -273,11 +273,11 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 
         # Fetch all resource presets in the current scaling group.
         resource_preset_query = sa.select(ResourcePresetRow)
-        query_condition = sa.is_(ResourcePresetRow.scaling_group_name, sa.null())
+        query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
         if params["scaling_group"] is not None:
             query_condition = sa.or_(
                 query_condition,
-                sa.is_(ResourcePresetRow.scaling_group_name, params["scaling_group"]),
+                ResourcePresetRow.scaling_group_name == params["scaling_group"],
             )
         resource_preset_query = resource_preset_query.where(query_condition)
         async for row in await SASession(conn).stream_scalars(resource_preset_query):
@@ -290,7 +290,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                     allocatable = True
                     break
             resp["presets"].append({
-                "id": row.id,
+                "id": str(row.id),
                 "name": row.name,
                 "resource_slots": preset_slots.to_json(),
                 "shared_memory": (
