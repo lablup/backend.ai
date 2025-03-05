@@ -229,22 +229,6 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
     )
 
 
-async def _query_presets_globally(db_session: AsyncSession) -> list[ResourcePresetRow]:
-    query = sa.select(ResourcePresetRow)
-    result = await db_session.scalars(query)
-    return result.all()
-
-
-async def _query_presets_in_scaling_group(
-    db_session: AsyncSession, scaling_group_name: str
-) -> list[ResourcePresetRow]:
-    query = sa.select(ResourcePresetRow).where(
-        ResourcePresetRow.scaling_group_name == scaling_group_name
-    )
-    result = await db_session.scalars(query)
-    return result.all()
-
-
 class CreateResourcePreset(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
