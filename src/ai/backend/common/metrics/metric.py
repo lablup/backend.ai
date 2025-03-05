@@ -194,12 +194,12 @@ class UtilizationMetricObserver:
 
     def __init__(self) -> None:
         self._container_metric = Gauge(
-            name="backendai_container",
+            name="backendai_container_utilization",
             documentation="Container utilization metrics",
             labelnames=["metric_name", "agent_id", "kernel_id", "value_type"],
         )
         self._device_metric = Gauge(
-            name="backendai_device",
+            name="backendai_device_utilization",
             documentation="Device utilization metrics",
             labelnames=["metric_name", "agent_id", "device_id", "value_type"],
         )
@@ -248,14 +248,12 @@ class CommonMetricRegistry:
     event: EventMetricObserver
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
-    utilization: UtilizationMetricObserver
 
     def __init__(self) -> None:
         self.api = APIMetricObserver.instance()
         self.event = EventMetricObserver.instance()
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()
-        self.utilization = UtilizationMetricObserver.instance()
 
     @classmethod
     def instance(cls):

@@ -32,7 +32,7 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
-from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.metric import UtilizationMetricObserver
 from ai.backend.common.types import (
     CAPACITY_METRIC_KEY,
     CURRENT_METRIC_KEY,
@@ -312,7 +312,7 @@ class StatContext:
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
     kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
-    _metric_registry: CommonMetricRegistry
+    _utilization_metric_observer: UtilizationMetricObserver
 
     def __init__(
         self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
@@ -328,7 +328,7 @@ class StatContext:
 
         self._lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
-        self._metric_registry = CommonMetricRegistry.instance()
+        self._utilization_metric_observer = UtilizationMetricObserver.instance()
 
     def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
         """
@@ -419,7 +419,7 @@ class StatContext:
                     )
                 )
 
-        self._metric_registry.utilization.observe_device_metrics(metrics=flattened_metrics)
+        self._utilization_metric_observer.observe_device_metrics(metrics=flattened_metrics)
 
         # push to the Redis server
         redis_agent_updates = {
@@ -537,7 +537,7 @@ class StatContext:
 
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
-        self._metric_registry.utilization.observe_container_metrics(metrics=kernel_updates)
+        self._utilization_metric_observer.observe_container_metrics(metrics=kernel_updates)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
