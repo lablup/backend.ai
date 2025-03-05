@@ -92,6 +92,9 @@ type Queries {
     is_installed: Boolean
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
+
     """
     Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
     """
@@ -121,6 +124,9 @@ type Queries {
 
     """Default is read_attribute."""
     permission: ImagePermissionValueField = "read_attribute"
+
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
     filter: String
     order: String
     offset: Int
@@ -903,6 +909,12 @@ type Image {
   installed: Boolean
   installed_agents: [String]
   hash: String
+}
+
+"""Added in 25.4.0."""
+enum ImageStatus {
+  ALIVE
+  DELETED
 }
 
 """Added in 25.3.0."""
@@ -1949,7 +1961,12 @@ type Mutations {
 
   """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+
+  """Added in 25.4.0"""
+  purge_image_by_id(image_id: String!): PurgeImageById
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
@@ -2508,11 +2525,17 @@ type ForgetImageById {
   image: ImageNode
 }
 
+"""Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
 type ForgetImage {
   ok: Boolean
   msg: String
 
   """Added since 24.03.1."""
+  image: ImageNode
+}
+
+"""Added in 25.4.0."""
+type PurgeImageById {
   image: ImageNode
 }
 
