@@ -521,7 +521,7 @@ class ComputeSessionNode(graphene.ObjectType):
             cond = permission_ctx.query_condition
             if cond is None:
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-            query = query.where(cond)
+            query = query.where(cond).options(selectinload(SessionRow.kernels))
             cnt_query = cnt_query.where(cond)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_rows = (await db_session.scalars(query)).all()
