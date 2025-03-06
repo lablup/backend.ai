@@ -1,0 +1,76 @@
+import json
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Any, AsyncGenerator, Dict, Optional, Self, Union
+
+import msgpack
+
+from ai.backend.common.types import KafkaConnectionInfo, RedisConnectionInfo
+
+
+@dataclass
+class MQMessage:
+    topic: str
+    payload: Dict[bytes, bytes]
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def serialize(self, format: str = "msgpack") -> bytes:
+        message = {
+            "topic": self.topic,
+            "payload": self.payload,
+            "metadata": self.metadata,
+        }
+
+        if format == "msgpack":
+            return msgpack.dumps(message, use_bin_type=True)
+        elif format == "json":
+            return json.dumps(message).encode("utf-8")
+        else:
+            raise ValueError(f"Unsupported serialization format: {format}")
+
+    @classmethod
+    def deserialize(cls, data: bytes, format: str = "msgpack") -> Self:
+        if format == "msgpack":
+            message = msgpack.unpackb(data)
+        elif format == "json":
+            message = json.loads(data.decode("utf-8"))
+        else:
+            raise ValueError(f"Unsupported serialization format: {format}")
+
+        return cls(topic=message["topic"], payload=message["payload"], metadata=message["metadata"])
+
+
+class AbstractMessageQueue(ABC):
+    connect_info: Union[RedisConnectionInfo, KafkaConnectionInfo]
+
+    @abstractmethod
+    async def receive(
+        self,
+        stream_key: str,
+        *,
+        block_timeout: int = 10_000,  # in msec
+    ) -> AsyncGenerator[tuple[bytes, Any], None]: ...
+
+    @abstractmethod
+    async def receive_group(
+        self,
+        stream_key: str,
+        group_name: str,
+        consumer_id: str,
+        *,
+        autoclaim_idle_timeout: int = 1_000,  # in msec
+        block_timeout: int = 10_000,  # in msec
+    ) -> AsyncGenerator[tuple[bytes, Any], None]: ...
+
+    @abstractmethod
+    async def send(
+        self,
+        msg: MQMessage,
+        *,
+        service_name: Optional[str] = None,
+        encoding: Optional[str] = None,
+        command_timeout: Optional[float] = None,
+    ) -> None: ...
+
+    @abstractmethod
+    async def close(self, close_connection_pool: Optional[bool] = None) -> None: ...
