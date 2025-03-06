@@ -103,28 +103,48 @@ class ResourcePresetRow(Base):
             return None
 
     @classmethod
-    async def update(
+    async def update_by_id(
         cls,
         preset_id: UUID,
         data: Mapping[str, Any],
         *,
         db_session: AsyncSession,
     ) -> Optional[Self]:
-        update_stmt = (
-            sa.update(ResourcePresetRow)
-            .values(data)
-            .where(ResourcePresetRow.id == preset_id)
-            .returning(ResourcePresetRow)
+        return await _update_with_condition(
+            ResourcePresetRow.id == preset_id, data, db_session=db_session
         )
-        stmt = (
-            sa.select(ResourcePresetRow)
-            .from_statement(update_stmt)
-            .execution_options(populate_existing=True)
+
+    @classmethod
+    async def update_by_name(
+        cls,
+        preset_name: str,
+        data: Mapping[str, Any],
+        *,
+        db_session: AsyncSession,
+    ) -> Optional[Self]:
+        return await _update_with_condition(
+            ResourcePresetRow.name == preset_name, data, db_session=db_session
         )
-        try:
-            return await db_session.scalar(stmt)
-        except sa.exc.IntegrityError:
-            return None
+
+
+async def _update_with_condition(
+    condition: sa.sql.BinaryExpression,
+    data: Mapping[str, Any],
+    *,
+    db_session: AsyncSession,
+) -> Optional[ResourcePresetRow]:
+    update_stmt = (
+        sa.update(ResourcePresetRow).values(data).where(condition).returning(ResourcePresetRow)
+    )
+    stmt = (
+        sa.select(ResourcePresetRow)
+        .from_statement(update_stmt)
+        .execution_options(populate_existing=True)
+    )
+    try:
+        return await db_session.scalar(stmt)
+    except sa.exc.IntegrityError:
+        return None
 
 
 # For compatibility
@@ -282,10 +302,13 @@ class ModifyResourcePreset(graphene.Mutation):
 
     class Arguments:
         id = graphene.UUID(
-            required=True,
+            required=False,
+            default_value=None,
             description=("Added in 25.4.0. ID of the resource preset."),
         )
-        name = graphene.String(required=False, deprecation_reason="Deprecated since 25.4.0.")
+        name = graphene.String(
+            required=False, default_value=None, deprecation_reason="Deprecated since 25.4.0."
+        )
         props = ModifyResourcePresetInput(required=True)
 
     ok = graphene.Boolean()
@@ -296,14 +319,16 @@ class ModifyResourcePreset(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        id: UUID,
-        name: str,
+        id: Optional[UUID],
+        name: Optional[str],
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
         graph_ctx: GraphQueryContext = info.context
 
         data: Dict[str, Any] = {}
         preset_id = id
+        if preset_id is None and name is None:
+            raise ValueError("One of (`id` or `name`) parameter should be not null")
 
         set_if_set(
             props,
@@ -322,7 +347,12 @@ class ModifyResourcePreset(graphene.Mutation):
         set_if_set(props, data, "scaling_group_name")
 
         async def _update(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
-            return await ResourcePresetRow.update(preset_id, data, db_session=db_session)
+            if preset_id is not None:
+                return await ResourcePresetRow.update_by_id(preset_id, data, db_session=db_session)
+            else:
+                if name is None:
+                    raise ValueError("One of (`id` or `name`) parameter should be not null")
+                return await ResourcePresetRow.update_by_name(name, data, db_session=db_session)
 
         async with graph_ctx.db.connect() as db_conn:
             preset_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
