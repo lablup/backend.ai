@@ -151,11 +151,13 @@ DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
 DEFAULT_PUSH_TIMEOUT = None  # Infinite
 DEFAULT_KERNEL_INIT_POLLING_ATTEMPT = 10
 DEFAULT_KERNEL_INIT_POLLING_TIMEOUT = 60.0  # 60 seconds
+DEFAULT_KERNEL_INIT_TIMEOUT = 60.0  # 60 seconds
 
 default_api_config = {"pull-timeout": DEFAULT_PULL_TIMEOUT, "push-timeout": DEFAULT_PUSH_TIMEOUT}
 default_kernel_lifecycles = {
     "init-polling-attempt": DEFAULT_KERNEL_INIT_POLLING_ATTEMPT,
     "init-polling-timeout-sec": DEFAULT_KERNEL_INIT_POLLING_TIMEOUT,
+    "init-timeout-sec": DEFAULT_KERNEL_INIT_TIMEOUT,
 }
 
 
@@ -176,6 +178,10 @@ agent_etcd_config_iv = t.Dict({
         t.Key(
             "init-polling-timeout-sec",
             default=default_kernel_lifecycles["init-polling-timeout-sec"],
+        ): t.ToFloat,
+        t.Key(
+            "init-timeout-sec",
+            default=default_kernel_lifecycles["init-timeout-sec"],
         ): t.ToFloat,
     }),
 }).allow_extra("*")
