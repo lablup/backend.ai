@@ -123,7 +123,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.rbac import SystemScope
+from ai.backend.manager.models.rbac import ScopeType, SystemScope
+from ai.backend.manager.models.rbac import UserScope as RBACUserScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -522,8 +523,17 @@ class AgentRegistry:
                     user_role=UserRole(user_scope.user_role),
                 )
 
+                scope: ScopeType = SystemScope()
+                if "ai.backend.customized-image.owner" in image_row.labels:
+                    scope = RBACUserScope(
+                        user_id=user_scope.user_uuid, domain_name=user_scope.domain_name
+                    )
+
                 perm_ctx = await get_permission_ctx(
-                    db_conn, client_ctx, SystemScope(), ImagePermission.CREATE_CONTAINER
+                    db_conn,
+                    client_ctx,
+                    scope,
+                    ImagePermission.CREATE_CONTAINER,
                 )
                 perm = await perm_ctx.calculate_final_permission(image_row)
 
