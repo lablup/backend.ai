@@ -12,7 +12,6 @@ class PyroscopeArgs:
     sample_rate: Optional[int]
 
 
-
 class Profiler:
     def __init__(self, pyroscope_args: PyroscopeArgs) -> None:
         if pyroscope_args.enabled:
