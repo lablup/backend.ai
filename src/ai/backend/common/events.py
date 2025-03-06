@@ -37,16 +37,15 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
+from ai.backend.common.message_queue.base import AbstractMessageQueue, MQMessage
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from . import msgpack, redis_helper
+from . import msgpack
 from .types import (
     AgentId,
     KernelId,
     ModelServiceStatus,
     QuotaScopeID,
-    RedisConfig,
-    RedisConnectionInfo,
     SessionId,
     VFolderID,
     VolumeMountableNodeType,
@@ -1114,7 +1113,8 @@ class EventDispatcher(aobject):
 
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
-    redis_client: RedisConnectionInfo
+    # redis_client: RedisConnectionInfo
+    message_queue: AbstractMessageQueue
     consumer_loop_task: asyncio.Task
     subscriber_loop_task: asyncio.Task
     consumer_taskgroup: PersistentTaskGroup
@@ -1126,7 +1126,8 @@ class EventDispatcher(aobject):
 
     def __init__(
         self,
-        redis_config: RedisConfig,
+        # redis_config: RedisConfig,
+        message_queue: AbstractMessageQueue,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -1138,12 +1139,13 @@ class EventDispatcher(aobject):
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
         event_observer: EventObserver = NopEventObserver(),
     ) -> None:
-        _redis_config = redis_config.copy()
-        if service_name:
-            _redis_config["service_name"] = service_name
-        self.redis_client = redis_helper.get_redis_object(
-            _redis_config, name="event_dispatcher.stream", db=db
-        )
+        # _redis_config = redis_config.copy()
+        # if service_name:
+        #     _redis_config["service_name"] = service_name
+        # self.redis_client = redis_helper.get_redis_object(
+        #     _redis_config, name="event_dispatcher.stream", db=db
+        # )
+        self.message_queue = message_queue
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -1181,7 +1183,7 @@ class EventDispatcher(aobject):
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
         finally:
-            await self.redis_client.close()
+            await self.message_queue.close()
 
     def consume(
         self,
@@ -1319,29 +1321,36 @@ class EventDispatcher(aobject):
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
+        # async with aclosing(
+        #     redis_helper.read_stream_by_group(
+        #         self.redis_client,
+        #         self._stream_key,
+        #         self._consumer_group,
+        #         self._consumer_name,
+        #     )
+        # )
         async with aclosing(
-            redis_helper.read_stream_by_group(
-                self.redis_client,
+            self.message_queue.receive_group(
                 self._stream_key,
                 self._consumer_group,
                 self._consumer_name,
             )
         ) as agen:
-            async for msg_id, msg_data in agen:
+            async for msg in agen:
                 if self._closed:
                     return
-                if msg_data is None:
+                if msg.payload is None:
                     continue
                 event_type = "unknown"
                 start = time.perf_counter()
                 try:
-                    decoded = msg_data[b"name"].decode()
+                    decoded = msg.payload[b"name"].decode()
                     if decoded and isinstance(decoded, str):
                         event_type = decoded
                     await self.dispatch_consumers(
                         decoded,
-                        msg_data[b"source"].decode(),
-                        msgpack.unpackb(msg_data[b"args"]),
+                        msg.payload[b"source"].decode(),
+                        msgpack.unpackb(msg.payload[b"args"]),
                     )
                     self._metric_observer.observe_event_success(
                         event_type=event_type,
@@ -1364,27 +1373,28 @@ class EventDispatcher(aobject):
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        async with aclosing(
-            redis_helper.read_stream(
-                self.redis_client,
-                self._stream_key,
-            )
-        ) as agen:
-            async for msg_id, msg_data in agen:
+        # async with aclosing(
+        #     redis_helper.read_stream(
+        #         self.redis_client,
+        #         self._stream_key,
+        #     )
+        # )
+        async with aclosing(self.message_queue.receive(self._stream_key)) as agen:
+            async for msg in agen:
                 if self._closed:
                     return
-                if msg_data is None:
+                if msg.payload is None:
                     continue
                 event_type = "unknown"
                 start = time.perf_counter()
                 try:
-                    decoded = msg_data[b"name"].decode()
+                    decoded = msg.payload[b"name"].decode()
                     if decoded and isinstance(decoded, str):
                         event_type = decoded
                     await self.dispatch_subscribers(
                         decoded,
-                        msg_data[b"source"].decode(),
-                        msgpack.unpackb(msg_data[b"args"]),
+                        msg.payload[b"source"].decode(),
+                        msgpack.unpackb(msg.payload[b"args"]),
                     )
                     self._metric_observer.observe_event_success(
                         event_type=event_type,
@@ -1407,27 +1417,30 @@ class EventDispatcher(aobject):
 
 
 class EventProducer(aobject):
-    redis_client: RedisConnectionInfo
+    # redis_client: RedisConnectionInfo
+    message_queue: AbstractMessageQueue
     _log_events: bool
 
     def __init__(
         self,
-        redis_config: RedisConfig,
+        # redis_config: RedisConfig,
+        message_queue: AbstractMessageQueue,
         db: int = 0,
         *,
         service_name: str | None = None,
         stream_key: str = "events",
         log_events: bool = False,
     ) -> None:
-        _redis_config = redis_config.copy()
-        if service_name:
-            _redis_config["service_name"] = service_name
+        # _redis_config = redis_config.copy()
+        # if service_name:
+        #     _redis_config["service_name"] = service_name
         self._closed = False
-        self.redis_client = redis_helper.get_redis_object(
-            _redis_config,
-            name="event_producer.stream",
-            db=db,
-        )
+        # self.redis_client = redis_helper.get_redis_object(
+        #     _redis_config,
+        #     name="event_producer.stream",
+        #     db=db,
+        # )
+        self.message_queue = message_queue
         self._log_events = log_events
         self._stream_key = stream_key
 
@@ -1436,7 +1449,7 @@ class EventProducer(aobject):
 
     async def close(self) -> None:
         self._closed = True
-        await self.redis_client.close()
+        await self.message_queue.close()
 
     async def produce_event(
         self,
@@ -1446,15 +1459,27 @@ class EventProducer(aobject):
     ) -> None:
         if self._closed:
             return
-        raw_event = {
-            b"name": event.name.encode(),
-            b"source": source.encode(),
-            b"args": msgpack.packb(event.serialize()),
-        }
-        await redis_helper.execute(
-            self.redis_client,
-            lambda r: r.xadd(self._stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
+        # raw_event = {
+        #     b"name": event.name.encode(),
+        #     b"source": source.encode(),
+        #     b"args": msgpack.packb(event.serialize()),
+        # }
+
+        message = MQMessage(
+            topic=self._stream_key,
+            payload={
+                b"name": event.name.encode(),
+                b"source": source.encode(),
+                b"args": msgpack.packb(event.serialize()),
+            },
+            metadata={},
         )
+        # await redis_helper.execute(
+        #     self.redis_client,
+        #     lambda r: r.xadd(self._stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
+        # )
+
+        await self.message_queue.send(message)
 
 
 def _generate_consumer_id(node_id: str | None = None) -> str:

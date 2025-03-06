@@ -11,7 +11,7 @@ from ai.backend.common.types import KafkaConnectionInfo, RedisConnectionInfo
 @dataclass
 class MQMessage:
     topic: str
-    payload: Dict[bytes, bytes]
+    payload: Dict[bytes, Any]
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def serialize(self, format: str = "msgpack") -> bytes:
