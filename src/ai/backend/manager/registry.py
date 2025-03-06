@@ -183,7 +183,7 @@ from .models import (
     verify_vfolder_name,
 )
 from .models.container_registry import ContainerRegistryRow
-from .models.image import ImageIdentifier, bulk_get_image_configs
+from .models.image import bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
