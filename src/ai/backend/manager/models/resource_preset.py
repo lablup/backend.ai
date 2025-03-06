@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Dict, Optional, Self
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Self
 from uuid import UUID
 
 import graphene
@@ -39,6 +39,20 @@ __all__: Sequence[str] = (
     "ModifyResourcePreset",
     "DeleteResourcePreset",
 )
+
+
+type QueryStatement = sa.sql.Select
+
+
+def filter_by_name(name: str) -> Callable[[QueryStatement], QueryStatement]:
+    return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
+
+
+def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
+    return lambda query_stmt: query_stmt.where(ResourcePresetRow.id == id)
+
+
+QueryOption = Callable[[Any], Callable[[QueryStatement], QueryStatement]]
 
 
 class ResourcePresetRow(Base):
@@ -103,48 +117,24 @@ class ResourcePresetRow(Base):
             return None
 
     @classmethod
-    async def update_by_id(
+    async def update(
         cls,
-        preset_id: UUID,
+        query_option: QueryOption,
         data: Mapping[str, Any],
         *,
         db_session: AsyncSession,
     ) -> Optional[Self]:
-        return await _update_with_condition(
-            ResourcePresetRow.id == preset_id, data, db_session=db_session
+        update_stmt = sa.update(ResourcePresetRow).values(data).returning(ResourcePresetRow)
+        update_stmt = query_option(update_stmt)
+        stmt = (
+            sa.select(ResourcePresetRow)
+            .from_statement(update_stmt)
+            .execution_options(populate_existing=True)
         )
-
-    @classmethod
-    async def update_by_name(
-        cls,
-        preset_name: str,
-        data: Mapping[str, Any],
-        *,
-        db_session: AsyncSession,
-    ) -> Optional[Self]:
-        return await _update_with_condition(
-            ResourcePresetRow.name == preset_name, data, db_session=db_session
-        )
-
-
-async def _update_with_condition(
-    condition: sa.sql.BinaryExpression,
-    data: Mapping[str, Any],
-    *,
-    db_session: AsyncSession,
-) -> Optional[ResourcePresetRow]:
-    update_stmt = (
-        sa.update(ResourcePresetRow).values(data).where(condition).returning(ResourcePresetRow)
-    )
-    stmt = (
-        sa.select(ResourcePresetRow)
-        .from_statement(update_stmt)
-        .execution_options(populate_existing=True)
-    )
-    try:
-        return await db_session.scalar(stmt)
-    except sa.exc.IntegrityError:
-        return None
+        try:
+            return await db_session.scalar(stmt)
+        except sa.exc.IntegrityError:
+            return None
 
 
 # For compatibility
@@ -348,11 +338,12 @@ class ModifyResourcePreset(graphene.Mutation):
 
         async def _update(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
             if preset_id is not None:
-                return await ResourcePresetRow.update_by_id(preset_id, data, db_session=db_session)
+                query_option = filter_by_id(preset_id)
             else:
                 if name is None:
                     raise ValueError("One of (`id` or `name`) parameter should be not null")
-                return await ResourcePresetRow.update_by_name(name, data, db_session=db_session)
+                query_option = filter_by_name(name)
+            return await ResourcePresetRow.update(query_option, data, db_session=db_session)
 
         async with graph_ctx.db.connect() as db_conn:
             preset_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
