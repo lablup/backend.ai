@@ -209,10 +209,20 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
             },
             "picked_agent": "i-004",
         },
+        {
+            "kernel_counts_at_same_endpoint": {
+                "i-001": 2,
+                "i-002": 1,
+                "i-003": 2,
+                "i-004": 2,
+            },
+            "picked_agent": "i-002",
+        },
     ],
     ids=[
-        "When there is no session assigned to the same endpoint, should pick the agent with the least resources",
-        "When there are sessions assigned to the same endpoint, priority should be given to availability rather than resources, and the session should be assigned to an agent that has not yet been allocated a kernel.",
+        "When there is no session assigned to the same endpoint, ConcentratedAgentSelector should pick the agent with the least resources",
+        "When there are sessions assigned to the same endpoint, the new pending session should be assigned to an agent with the fewest kernel allocations. (1)",
+        "When there are sessions assigned to the same endpoint, the new pending session should be assigned to an agent with the fewest kernel allocations. (2)",
     ],
 )
 async def test_enforce_spreading_endpoint_replica(test_case) -> None:
