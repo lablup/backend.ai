@@ -2884,7 +2884,9 @@ class GQLMetricMiddleware:
         operation_type = info.operation.operation
         field_name = info.field_name
         parent_type = info.parent_type.name
-        operation_name = info.operation.name.value if info.operation.name else "anonymous"
+        operation_name = (
+            info.operation.name.value if info.operation.name is not None else "anonymous"
+        )
         start = time.perf_counter()
         try:
             info.field_name
