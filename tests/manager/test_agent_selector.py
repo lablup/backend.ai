@@ -262,7 +262,7 @@ async def test_enforce_spreading_endpoint_replica(test_case) -> None:
     mock_session = create_mock_session(
         SessionId(uuid4()),
         ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("100")}),
-        type=SessionTypes.INFERENCE,
+        session_type=SessionTypes.INFERENCE,
     )
 
     picked_agent = await ag_selector.select_agent(agents, mock_session)
