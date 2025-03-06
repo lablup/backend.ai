@@ -13,16 +13,13 @@ from typing import (
 )
 
 import redis.exceptions
-from redis import Redis
+from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import MasterNotFoundError, SlaveNotFoundError
 
 from ai.backend.common.message_queue.base import AbstractMessageQueue, MQMessage
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
-
-# @dataclass
-# class RedisMQMessage: ...
 
 
 class RedisMessageQueue(AbstractMessageQueue):
@@ -37,7 +34,7 @@ class RedisMessageQueue(AbstractMessageQueue):
         stream_key: str,
         *,
         block_timeout: int = 10_000,  # in msec
-    ) -> AsyncGenerator[tuple[bytes, Any], None]:
+    ) -> AsyncGenerator[MQMessage, None]:
         """
         A high-level wrapper for the XREAD command.
         """
@@ -66,7 +63,12 @@ class RedisMessageQueue(AbstractMessageQueue):
                 )
                 for msg_id, msg_data in reply[0][1]:
                     try:
-                        yield msg_id, msg_data
+                        message = MQMessage(
+                            topic=stream_key,
+                            payload=msg_data,
+                            metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
+                        )
+                        yield message
                     finally:
                         last_id = msg_id
             except asyncio.CancelledError:
@@ -80,7 +82,7 @@ class RedisMessageQueue(AbstractMessageQueue):
         *,
         autoclaim_idle_timeout: int = 1_000,  # in msec
         block_timeout: int = 10_000,  # in msec
-    ) -> AsyncGenerator[tuple[bytes, Any], None]:
+    ) -> AsyncGenerator[MQMessage, None]:
         while True:
             try:
                 messages = []
@@ -119,7 +121,7 @@ class RedisMessageQueue(AbstractMessageQueue):
                 for msg_id, msg_data in reply[0][1]:
                     messages.append((msg_id, msg_data))
                 await self._execute(
-                    r,
+                    self._redis_connection_info,
                     lambda r: r.xack(
                         stream_key,
                         group_name,
@@ -127,7 +129,12 @@ class RedisMessageQueue(AbstractMessageQueue):
                     ),
                 )
                 for msg_id, msg_data in messages:
-                    yield msg_id, msg_data
+                    message = MQMessage(
+                        topic=stream_key,
+                        payload=msg_data,
+                        metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
+                    )
+                    yield message
             except asyncio.CancelledError:
                 raise
             except redis.exceptions.ResponseError as e:
@@ -266,7 +273,7 @@ class RedisMessageQueue(AbstractMessageQueue):
         service_name: Optional[str] = None,
         encoding: Optional[str] = None,
         command_timeout: Optional[float] = None,
-    ) -> None:
+    ) -> Any:
         func = (lambda r: r.xadd(self._stream_key, msg.payload),)  # type: ignore # aio-libs/aioredis-py#1182
 
         redis_client = self._redis_connection_info.client

@@ -37,7 +37,9 @@ class MQMessage:
         else:
             raise ValueError(f"Unsupported serialization format: {format}")
 
-        return cls(topic=message["topic"], payload=message["payload"], metadata=message["metadata"])
+        decoded_payload = {k: v if isinstance(v, bytes) else str(v).encode() for k, v in message["payload"].items()}
+
+        return cls(topic=message["topic"], payload=decoded_payload, metadata=message["metadata"])
 
 
 class AbstractMessageQueue(ABC):
@@ -49,7 +51,7 @@ class AbstractMessageQueue(ABC):
         stream_key: str,
         *,
         block_timeout: int = 10_000,  # in msec
-    ) -> AsyncGenerator[tuple[bytes, Any], None]: ...
+    ) -> AsyncGenerator[MQMessage, None]: ...
 
     @abstractmethod
     async def receive_group(
@@ -60,7 +62,7 @@ class AbstractMessageQueue(ABC):
         *,
         autoclaim_idle_timeout: int = 1_000,  # in msec
         block_timeout: int = 10_000,  # in msec
-    ) -> AsyncGenerator[tuple[bytes, Any], None]: ...
+    ) -> AsyncGenerator[MQMessage, None]: ...
 
     @abstractmethod
     async def send(
