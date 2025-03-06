@@ -23,7 +23,7 @@ from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
-from ai.backend.common.types import AccessKey, RedisConnectionInfo, SessionId, VFolderID
+from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import VFolderOperationFailed
@@ -1070,6 +1070,8 @@ class PurgeUser(graphene.Mutation):
         email: str,
         props: PurgeUserInput,
     ) -> PurgeUser:
+        from .endpoint import EndpointRow
+
         graph_ctx: GraphQueryContext = info.context
 
         async def _delete(db_session: SASession) -> None:
@@ -1096,18 +1098,15 @@ class PurgeUser(graphene.Mutation):
                     target_user_email=graph_ctx.user["email"],
                 )
             if props.delegate_endpoint_ownership:
-                delegated_session_ids = await cls._delegate_endpoint(
+                await EndpointRow.delegate_endpoint_ownership(
                     db_session, user_uuid, graph_ctx.user["uuid"], graph_ctx.user["main_access_key"]
                 )
                 await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=True)
             else:
                 await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=False)
-                delegated_session_ids = []
             if await cls._user_has_active_sessions(db_session, user_uuid):
                 raise RuntimeError("User has some active sessions. Terminate them first.")
-            await cls._delete_sessions(
-                db_session, user_uuid, excluded_session_ids=delegated_session_ids
-            )
+            await cls._delete_sessions(db_session, user_uuid)
             await cls._delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_error_logs(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
@@ -1325,23 +1324,6 @@ class PurgeUser(graphene.Mutation):
         return active_session_count > 0
 
     @classmethod
-    async def _delegate_endpoint(
-        cls,
-        db_session: SASession,
-        owner_user_uuid: UUID,
-        delegate_target_user_uuid: UUID,
-        delegate_target_access_key: AccessKey,
-    ) -> list[SessionId]:
-        """
-        Delegate user's all endpoint to the requester.
-        """
-        from .endpoint import EndpointRow
-
-        return await EndpointRow.delegate_ownership(
-            db_session, owner_user_uuid, delegate_target_user_uuid, delegate_target_access_key
-        )
-
-    @classmethod
     async def _delete_endpoint(
         cls,
         db_session: SASession,
@@ -1398,26 +1380,13 @@ class PurgeUser(graphene.Mutation):
         cls,
         db_session: SASession,
         user_uuid: UUID,
-        *,
-        excluded_session_ids: Iterable[SessionId] = tuple(),
     ) -> None:
         """
         Delete user's sessions.
         """
-        from .kernel import KernelRow
         from .session import SessionRow
 
-        kernel_delete_cond = KernelRow.user_uuid == user_uuid
-        session_delete_cond = SessionRow.user_uuid == user_uuid
-        if excluded_session_ids:
-            kernel_delete_cond = sa.and_(
-                kernel_delete_cond, KernelRow.session_id.not_in(excluded_session_ids)
-            )
-            session_delete_cond = sa.and_(
-                session_delete_cond, SessionRow.id.not_in(excluded_session_ids)
-            )
-        await db_session.execute(sa.delete(KernelRow).where(kernel_delete_cond))
-        await db_session.execute(sa.delete(SessionRow).where(session_delete_cond))
+        await SessionRow.delete_by_user_id(user_uuid, db_session=db_session)
 
     @classmethod
     async def delete_keypairs(

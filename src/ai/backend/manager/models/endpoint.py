@@ -51,7 +51,6 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     ResourceSlot,
     RuntimeVariant,
-    SessionId,
     SessionTypes,
     VFolderID,
     VFolderMount,
@@ -525,19 +524,17 @@ class EndpointRow(Base):
                 RouteStatus.FAILED_TO_START,
             }
 
-    @classmethod
-    async def delegate_ownership(
-        cls,
+    @staticmethod
+    async def delegate_endpoint_ownership(
         db_session: AsyncSession,
         owner_user_uuid: UUID,
         target_user_uuid: UUID,
         target_access_key: AccessKey,
-    ) -> List[SessionId]:
-        from .kernel import KernelRow
+    ) -> None:
         from .routing import RoutingRow
         from .session import KernelLoadingStrategy, SessionRow
 
-        endpoint_rows = await cls.list(
+        endpoint_rows = await EndpointRow.list(
             db_session,
             user_uuid=owner_user_uuid,
             load_session_owner=True,
@@ -548,20 +545,15 @@ class EndpointRow(Base):
         for row in endpoint_rows:
             row.session_owner = target_user_uuid
             for token_row in cast(list[EndpointTokenRow], row.tokens):
-                token_row.session_owner = target_user_uuid
+                token_row.delegate_ownership(target_user_uuid)
             for routing_row in cast(list[RoutingRow], row.routings):
-                routing_row.session_owner = target_user_uuid
+                routing_row.delegate_ownership(target_user_uuid)
                 session_ids.append(routing_row.session)
         session_rows = await SessionRow.list_sessions(
             db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
         )
         for session_row in session_rows:
-            session_row.user_uuid = target_user_uuid
-            session_row.access_key = target_access_key
-            for kernel_row in cast(list[KernelRow], session_row.kernels):
-                kernel_row.user_uuid = target_user_uuid
-                kernel_row.access_key = target_access_key
-        return cast(list[SessionId], session_ids)
+            session_row.delegate_ownership(target_user_uuid, target_access_key)
 
 
 class EndpointTokenRow(Base):
@@ -662,6 +654,9 @@ class EndpointTokenRow(Base):
         if not row:
             raise NoResultFound
         return row
+
+    def delegate_ownership(self, user_uuid: UUID) -> None:
+        self.session_owner = user_uuid
 
 
 class EndpointAutoScalingRuleRow(Base):
