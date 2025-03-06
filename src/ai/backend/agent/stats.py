@@ -422,7 +422,7 @@ class StatContext:
                 )
 
         for metric in flattened_metrics:
-            self._utilization_metric_observer.observe_device_metrics(metric=metric)
+            self._utilization_metric_observer.observe_device_metric(metric=metric)
 
         # push to the Redis server
         redis_agent_updates = {
@@ -541,7 +541,7 @@ class StatContext:
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
         for metric in kernel_updates:
-            self._utilization_metric_observer.observe_container_metrics(metric=metric)
+            self._utilization_metric_observer.observe_container_metric(metric=metric)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)

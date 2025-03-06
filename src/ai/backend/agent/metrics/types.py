@@ -6,16 +6,6 @@ from typing import (
 
 from ai.backend.common.types import AgentId, DeviceId, KernelId, MetricKey
 
-__all__ = (
-    "MetricValueFieldKey",
-    "MetricValueFieldPair",
-    "CURRENT_METRIC_KEY",
-    "CAPACITY_METRIC_KEY",
-    "PCT_METRIC_KEY",
-    "FlattenedKernelMetric",
-    "FlattenedDeviceMetric",
-)
-
 MetricValueFieldKey = NewType("MetricValueFieldKey", str)
 MetricValueFieldPair = tuple[MetricValueFieldKey, Optional[str]]
 

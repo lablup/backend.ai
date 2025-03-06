@@ -4,11 +4,6 @@ from prometheus_client import Counter, Gauge, Histogram
 
 from .types import FlattenedDeviceMetric, FlattenedKernelMetric
 
-__all__ = (
-    "RPCMetricObserver",
-    "UtilizationMetricObserver",
-)
-
 
 class RPCMetricObserver:
     _instance: Optional[Self] = None
@@ -78,7 +73,7 @@ class UtilizationMetricObserver:
             cls._instance = cls()
         return cls._instance
 
-    def observe_container_metrics(
+    def observe_container_metric(
         self,
         *,
         metric: FlattenedKernelMetric,
@@ -92,7 +87,7 @@ class UtilizationMetricObserver:
                     value_type=metric_value_type,
                 ).set(float(value))
 
-    def observe_device_metrics(
+    def observe_device_metric(
         self,
         *,
         metric: FlattenedDeviceMetric,
