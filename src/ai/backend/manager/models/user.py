@@ -1105,7 +1105,9 @@ class PurgeUser(graphene.Mutation):
                 delegated_session_ids = []
             if await cls._user_has_active_sessions(db_session, user_uuid):
                 raise RuntimeError("User has some active sessions. Terminate them first.")
-            await cls._delete_sessions(conn, user_uuid, excluded_session_ids=delegated_session_ids)
+            await cls._delete_sessions(
+                db_session, user_uuid, excluded_session_ids=delegated_session_ids
+            )
             await cls._delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_error_logs(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
@@ -1400,17 +1402,13 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def _delete_sessions(
         cls,
-        conn: SAConnection,
+        db_session: SASession,
         user_uuid: UUID,
         *,
         excluded_session_ids: Iterable[SessionId] = tuple(),
     ) -> None:
         """
-        Delete user's all sessions.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID to delete sessions
-        :return: number of deleted rows
+        Delete user's sessions.
         """
         from .kernel import KernelRow
         from .session import SessionRow
@@ -1424,8 +1422,8 @@ class PurgeUser(graphene.Mutation):
             session_delete_cond = sa.and_(
                 session_delete_cond, SessionRow.id.not_in(excluded_session_ids)
             )
-        await conn.execute(sa.delete(KernelRow).where(kernel_delete_cond))
-        await conn.execute(sa.delete(SessionRow).where(session_delete_cond))
+        await db_session.execute(sa.delete(KernelRow).where(kernel_delete_cond))
+        await db_session.execute(sa.delete(SessionRow).where(session_delete_cond))
 
     @classmethod
     async def delete_keypairs(
