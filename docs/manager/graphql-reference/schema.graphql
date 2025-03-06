@@ -2433,7 +2433,7 @@ input PurgeUserInput {
   purge_shared_vfolders: Boolean
 
   """
-  Added in 25.4.0. Indicates whether the user's existing endpoints are delegated to the requester.
+  Added in 25.4.0. The default value is `false`. Indicates whether the user's existing endpoints are delegated to the requester.
   """
   delegate_endpoint_ownership: Boolean
 }
