@@ -1,6 +1,13 @@
 from typing import Optional, Self
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
+
+from .types import FlattenedDeviceMetric, FlattenedKernelMetric
+
+__all__ = (
+    "RPCMetricObserver",
+    "UtilizationMetricObserver",
+)
 
 
 class RPCMetricObserver:
@@ -45,3 +52,56 @@ class RPCMetricObserver:
         self._rpc_requests.labels(method=method).inc()
         self._rpc_failure_requests.labels(method=method, exception=exception_name).inc()
         self._rpc_request_duration.labels(method=method).observe(duration)
+
+
+class UtilizationMetricObserver:
+    _instance: Optional[Self] = None
+
+    _container_metric: Gauge
+    _device_metric: Gauge
+
+    def __init__(self) -> None:
+        self._container_metric = Gauge(
+            name="backendai_container_utilization",
+            documentation="Container utilization metrics",
+            labelnames=["metric_name", "agent_id", "kernel_id", "value_type"],
+        )
+        self._device_metric = Gauge(
+            name="backendai_device_utilization",
+            documentation="Device utilization metrics",
+            labelnames=["metric_name", "agent_id", "device_id", "value_type"],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_container_metrics(
+        self,
+        *,
+        metric: FlattenedKernelMetric,
+    ) -> None:
+        for metric_value_type, value in metric.value_pairs:
+            if value is not None:
+                self._container_metric.labels(
+                    metric_name=metric.key,
+                    agent_id=metric.agent_id,
+                    kernel_id=metric.kernel_id,
+                    value_type=metric_value_type,
+                ).set(float(value))
+
+    def observe_device_metrics(
+        self,
+        *,
+        metric: FlattenedDeviceMetric,
+    ) -> None:
+        for metric_value_type, value in metric.value_pairs:
+            if value is not None:
+                self._device_metric.labels(
+                    metric_name=metric.key,
+                    agent_id=metric.agent_id,
+                    device_id=metric.device_id,
+                    value_type=metric_value_type,
+                ).set(float(value))

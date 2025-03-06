@@ -32,17 +32,11 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
-from ai.backend.common.metrics.metric import UtilizationMetricObserver
 from ai.backend.common.types import (
-    CAPACITY_METRIC_KEY,
-    CURRENT_METRIC_KEY,
-    PCT_METRIC_KEY,
     PID,
     AgentId,
     ContainerId,
     DeviceId,
-    FlattenedDeviceMetric,
-    FlattenedKernelMetric,
     KernelId,
     MetricKey,
     MetricValue,
@@ -50,6 +44,14 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .metrics.metric import UtilizationMetricObserver
+from .metrics.types import (
+    CAPACITY_METRIC_KEY,
+    CURRENT_METRIC_KEY,
+    PCT_METRIC_KEY,
+    FlattenedDeviceMetric,
+    FlattenedKernelMetric,
+)
 from .utils import remove_exponent
 
 if TYPE_CHECKING:
@@ -419,7 +421,8 @@ class StatContext:
                     )
                 )
 
-        self._utilization_metric_observer.observe_device_metrics(metrics=flattened_metrics)
+        for metric in flattened_metrics:
+            self._utilization_metric_observer.observe_device_metrics(metric=metric)
 
         # push to the Redis server
         redis_agent_updates = {
@@ -537,7 +540,8 @@ class StatContext:
 
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
-        self._utilization_metric_observer.observe_container_metrics(metrics=kernel_updates)
+        for metric in kernel_updates:
+            self._utilization_metric_observer.observe_container_metrics(metric=metric)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
