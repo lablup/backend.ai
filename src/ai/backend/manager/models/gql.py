@@ -1,6 +1,7 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional
@@ -8,9 +9,10 @@ from typing import TYPE_CHECKING, Any, Optional
 import attrs
 import graphene
 from graphene.types.inputobjecttype import set_input_object_type_default_value
-from graphql import OperationType, Undefined
+from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 
@@ -257,6 +259,7 @@ class GraphQueryContext:
     storage_manager: StorageSessionManager
     registry: AgentRegistry
     idle_checker_host: IdleCheckerHost
+    metric_observer: GraphQLMetricObserver
 
 
 class Mutations(graphene.ObjectType):
@@ -2860,3 +2863,50 @@ class GQLMutationPrivilegeCheckMiddleware:
             if graph_ctx.user["role"] not in allowed_roles:
                 return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
         return next(root, info, **args)
+
+
+class GQLExceptionMiddleware:
+    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+        try:
+            res = next(root, info, **args)
+        except Exception as e:
+            raise GraphQLError(
+                message=str(e),
+                # TODO: Add extensions (error_code) after BackendError refactoring
+                # extensions={},
+            )
+        return res
+
+
+class GQLMetricMiddleware:
+    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+        graph_ctx: GraphQueryContext = info.context
+        operation_type = info.operation.operation
+        field_name = info.field_name
+        parent_type = info.parent_type.name
+        operation_name = (
+            info.operation.name.value if info.operation.name is not None else "anonymous"
+        )
+        start = time.perf_counter()
+        try:
+            info.field_name
+            res = next(root, info, **args)
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                success=True,
+                duration=time.perf_counter() - start,
+            )
+        except BaseException as e:
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                success=False,
+                duration=time.perf_counter() - start,
+            )
+            raise e
+        return res
