@@ -2432,6 +2432,15 @@ class VFolderPermissionContext(
                     if perm in _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP
                 }
 
+        match vfolder_row.permission:
+            case (
+                VFolderPermission.OWNER_PERM
+                | VFolderPermission.RW_DELETE
+                | VFolderPermission.READ_WRITE
+            ):
+                pass
+            case VFolderPermission.READ_ONLY:
+                permissions -= {VFolderRBACPermission.MOUNT_RW, VFolderRBACPermission.MOUNT_WD}
         return frozenset(permissions)
 
 
