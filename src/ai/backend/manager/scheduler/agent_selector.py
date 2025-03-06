@@ -189,24 +189,27 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         resource_priorities = sort_requested_slots_by_priority(
             requested_slots, self.agent_selection_resource_priority
         )
-        agents = sorted(
+
+        # When not using enforce_spreading_endpoint_replica, treat all agent kernel counts as 0.
+        kernel_counts_at_same_endpoint = (
+            self.config.get("kernel_counts_at_same_endpoint", {})
+            if self.sgroup_opts.enforce_spreading_endpoint_replica
+            else {}
+        )
+
+        chosen_agent = min(
             agents,
-            key=lambda agent: [
+            key=lambda agent: (
+                kernel_counts_at_same_endpoint.get(agent.id, 0),
                 get_num_extras(agent, requested_slots),
                 *[
                     (agent.available_slots - agent.occupied_slots).get(key, sys.maxsize)
                     for key in resource_priorities
                 ],
-            ],
+            ),
         )
 
-        if self.sgroup_opts.enforce_spreading_endpoint_replica:
-            if kernel_counts_at_same_endpoint := self.config.get("kernel_counts_at_same_endpoint"):
-                agents = sorted(
-                    agents, key=lambda agent: kernel_counts_at_same_endpoint.get(agent.id, 0)
-                )
-
-        return agents[0].id
+        return chosen_agent.id
 
 
 class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
