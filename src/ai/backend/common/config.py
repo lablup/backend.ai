@@ -35,7 +35,7 @@ __all__ = (
 )
 
 
-class BaseSchema(BaseModel):
+class BaseConfigModel(BaseModel):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")

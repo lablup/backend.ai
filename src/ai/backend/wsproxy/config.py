@@ -20,7 +20,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
-from ai.backend.common.config import BaseSchema
+from ai.backend.common.config import BaseConfigModel
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config_pydantic import LoggingConfig
 
@@ -172,14 +172,14 @@ class GroupID:
         )
 
 
-class DebugConfig(BaseSchema):
+class DebugConfig(BaseConfigModel):
     enabled: bool = Field(default=False)
     asyncio: bool = Field(default=False)
     enhanced_aiomonitor_task_info: bool = Field(default=False)
     log_events: bool = Field(default=False)
 
 
-class WSProxyConfig(BaseSchema):
+class WSProxyConfig(BaseConfigModel):
     ipc_base_path: Path = Field(
         default=Path("/tmp/backend.ai/ipc"),
         description="Directory to store temporary UNIX sockets.",
@@ -266,14 +266,14 @@ class WSProxyConfig(BaseSchema):
     )
 
 
-class PyroscopeConfig(BaseSchema):
+class PyroscopeConfig(BaseConfigModel):
     enabled: bool = Field(default=False, description="Enable pyroscope profiler.")
     app_name: Optional[str] = Field(default=None, description="Pyroscope app name.")
     server_addr: Optional[str] = Field(default=None, description="Pyroscope server address.")
     sample_rate: Optional[int] = Field(default=None, description="Pyroscope sample rate.")
 
 
-class ServerConfig(BaseSchema):
+class ServerConfig(BaseConfigModel):
     wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
     pyroscope: PyroscopeConfig = Field(default_factory=PyroscopeConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -317,7 +317,7 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseSchema] | types.GenericAlias | types.UnionType, parent: list[str] = []
+    schema: type[BaseConfigModel] | types.GenericAlias | types.UnionType, parent: list[str] = []
 ) -> dict | list:
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
@@ -325,7 +325,7 @@ def generate_example_json(
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    elif issubclass(schema, BaseSchema):
+    elif issubclass(schema, BaseConfigModel):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]

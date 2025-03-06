@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import ByteSize, Field
 
-from ai.backend.common.config import BaseSchema
+from ai.backend.common.config import BaseConfigModel
 
 from .types import LogFormat, LogLevel
 
@@ -30,7 +30,7 @@ class LogstashProtocol(str, enum.Enum):
     UDP = "udp"
 
 
-class HostPortPair(BaseSchema):
+class HostPortPair(BaseConfigModel):
     host: str = Field(examples=["127.0.0.1"])
     port: int = Field(gt=0, lt=65536, examples=[8201])
 
@@ -49,14 +49,14 @@ class HostPortPair(BaseSchema):
             raise KeyError(*args)
 
 
-class ConsoleConfig(BaseSchema):
+class ConsoleConfig(BaseConfigModel):
     colored: Optional[bool] = Field(
         default=None, description="Opt to print colorized log.", examples=[True]
     )
     format: LogFormat = Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
 
 
-class FileConfig(BaseSchema):
+class FileConfig(BaseConfigModel):
     path: Path = Field(description="Path to store log.", examples=["/var/log/backend.ai"])
     filename: str = Field(description="Log file name.", examples=["wsproxy.log"])
     backup_count: int = Field(description="Number of outdated log files to retain.", default=5)
@@ -67,7 +67,7 @@ class FileConfig(BaseSchema):
     format: LogFormat = Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
 
 
-class LogstashConfig(BaseSchema):
+class LogstashConfig(BaseConfigModel):
     endpoint: HostPortPair = Field(
         description="Connection information of logstash node.",
         examples=[HostPortPair(host="127.0.0.1", port=8001)],
@@ -86,7 +86,7 @@ class LogstashConfig(BaseSchema):
     )
 
 
-class GraylogConfig(BaseSchema):
+class GraylogConfig(BaseConfigModel):
     host: str = Field(description="Graylog hostname.", examples=["127.0.0.1"])
     port: int = Field(description="Graylog server port number.", examples=[8000])
     level: LogLevel = Field(description="Log level.", default=LogLevel.INFO)
@@ -111,7 +111,7 @@ class GraylogConfig(BaseSchema):
     )
 
 
-class LoggingConfig(BaseSchema):
+class LoggingConfig(BaseConfigModel):
     level: LogLevel = Field(default=LogLevel.INFO, description="Log level.")
     drivers: list[LogDriver] = Field(
         default=[LogDriver.CONSOLE], description="Array of log drivers to print."
