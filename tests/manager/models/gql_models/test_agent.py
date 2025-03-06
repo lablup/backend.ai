@@ -9,6 +9,7 @@ from graphene.test import Client
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.agent import AgentStatus
@@ -53,6 +54,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
         services_ctx=None,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
     )
 
 

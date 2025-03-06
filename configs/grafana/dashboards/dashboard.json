@@ -501,6 +501,453 @@
                 "x": 0,
                 "y": 17
             },
+            "id": 20,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "pluginVersion": "11.4.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "increase(backendai_graphql_request_count_total{job=\"$jobs\", success=\"True\"}[5m])",
+                    "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "increase(backendai_graphql_request_count_total{job=\"$jobs\", success=\"False\"}[5m])",
+                    "hide": false,
+                    "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Failed",
+                    "range": true,
+                    "refId": "B"
+                }
+            ],
+            "title": "Total GraphQL Request Count",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "P60E43FA14ACD5B4B"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 17
+            },
+            "id": 21,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "pluginVersion": "11.4.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum(increase(backendai_graphql_request_count_total{job=\"$jobs\", success=\"False\"}[5m])) by (parent_type, operation_type, operation_name, field_name)",
+                    "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "GraphQL Failure Request Count",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "P60E43FA14ACD5B4B"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "s"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 25
+            },
+            "id": 22,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "pluginVersion": "11.4.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{job=\"$jobs\", success=\"True\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{job=\"$jobs\", success=\"True\"}[5m]))",
+                    "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{job=\"$jobs\", success=\"False\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{job=\"$jobs\", success=\"False\"}[5m]))",
+                    "hide": false,
+                    "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
+                    "range": true,
+                    "refId": "B"
+                }
+            ],
+            "title": "GraphQL Request Duration (Avg)",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "P60E43FA14ACD5B4B"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "s"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 25
+            },
+            "id": 23,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "pluginVersion": "11.4.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.95, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "hide": false,
+                    "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+                    "range": true,
+                    "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "hide": false,
+                    "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
+                    "range": true,
+                    "refId": "C"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "be3td1qwoaxhcc"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "hide": false,
+                    "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
+                    "range": true,
+                    "refId": "D"
+                }
+            ],
+            "title": "GraphQL Request Duration (P90, P95)",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "P60E43FA14ACD5B4B"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    },
+                    "unit": "none"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 33
+            },
             "id": 7,
             "options": {
                 "legend": {
@@ -596,7 +1043,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 17
+                "y": 33
             },
             "id": 8,
             "options": {
@@ -693,7 +1140,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 25
+                "y": 41
             },
             "id": 9,
             "options": {
@@ -790,7 +1237,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 25
+                "y": 41
             },
             "id": 6,
             "options": {
@@ -899,7 +1346,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 33
+                "y": 49
             },
             "id": 10,
             "options": {
@@ -996,7 +1443,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 33
+                "y": 49
             },
             "id": 11,
             "options": {
@@ -1093,7 +1540,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 41
+                "y": 57
             },
             "id": 12,
             "options": {
@@ -1190,7 +1637,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 41
+                "y": 57
             },
             "id": 13,
             "options": {
@@ -1299,7 +1746,7 @@
                 "h": 8,
                 "w": 24,
                 "x": 0,
-                "y": 49
+                "y": 65
             },
             "id": 14,
             "options": {
@@ -1344,7 +1791,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 57
+                "y": 73
             },
             "id": 19,
             "options": {},
@@ -1414,8 +1861,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1430,7 +1876,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 67
+                "y": 83
             },
             "id": 18,
             "options": {
@@ -1511,8 +1957,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1528,7 +1973,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 67
+                "y": 83
             },
             "id": 15,
             "options": {
@@ -1608,8 +2053,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1625,7 +2069,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 75
+                "y": 91
             },
             "id": 16,
             "options": {
@@ -1705,8 +2149,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1722,7 +2165,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 75
+                "y": 91
             },
             "id": 17,
             "options": {
@@ -1790,6 +2233,6 @@
     "timezone": "browser",
     "title": "Backend.ai half Dashboard",
     "uid": "fe5pw9i1ftb0gc",
-    "version": 3,
+    "version": 2,
     "weekStart": ""
 }
