@@ -2165,6 +2165,10 @@ class AbstractAgent(
                     float,
                     self.local_config["agent"]["kernel-lifecycles"]["init-polling-timeout-sec"],
                 )
+                kernel_init_timeout = cast(
+                    float,
+                    self.local_config["agent"]["kernel-lifecycles"]["init-timeout-sec"],
+                )
                 try:
                     async for attempt in AsyncRetrying(
                         wait=wait_fixed(0.3),
@@ -2178,10 +2182,11 @@ class AbstractAgent(
                             # Wait until bootstrap script is executed.
                             # - Main kernel runner is executed after bootstrap script, and
                             #   check_status is accessible only after kernel runner is loaded.
-                            await kernel_obj.check_status()
-                            # Update the service-ports metadata from the image labels
-                            # with the extended template metadata from the agent and krunner.
-                            live_services = await kernel_obj.get_service_apps()
+                            async with asyncio.timeout(kernel_init_timeout):
+                                await kernel_obj.check_status()
+                                # Update the service-ports metadata from the image labels
+                                # with the extended template metadata from the agent and krunner.
+                                live_services = await kernel_obj.get_service_apps()
                             if live_services["status"] != "failed":
                                 for live_service in live_services["data"]:
                                     for service_port in service_ports:
@@ -2190,9 +2195,28 @@ class AbstractAgent(
                                             break
                     if self.local_config["debug"]["log-kernel-config"]:
                         log.debug("service ports:\n{!r}", pretty(service_ports))
+                except asyncio.TimeoutError:
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
+                    )
+                    raise AgentError(
+                        f"Timeout during container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                    )
                 except asyncio.CancelledError:
-                    log.warning("cancelled waiting of container startup (k:{})", kernel_id)
-                    raise
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
+                    )
+                    raise AgentError(
+                        f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                    )
                 except Exception:
                     log.exception(
                         "unexpected error while waiting container startup (k:{})", kernel_id
