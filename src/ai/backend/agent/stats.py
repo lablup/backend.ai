@@ -408,16 +408,18 @@ class StatContext:
             for device_id, obj in per_device.items():
                 metric_value = obj.to_serializable_dict()
                 device_metrics[metric_key][device_id] = metric_value
+                value_pairs = [
+                    (CURRENT_METRIC_KEY, metric_value["current"]),
+                    (PCT_METRIC_KEY, metric_value["pct"]),
+                ]
+                if (capacity := metric_value["capacity"]) is not None:
+                    value_pairs.append((CAPACITY_METRIC_KEY, capacity))
                 flattened_metrics.append(
                     FlattenedDeviceMetric(
                         agent_id,
                         device_id,
                         metric_key,
-                        [
-                            (CURRENT_METRIC_KEY, metric_value["current"]),
-                            (CAPACITY_METRIC_KEY, metric_value["capacity"]),
-                            (PCT_METRIC_KEY, metric_value["pct"]),
-                        ],
+                        value_pairs,
                     )
                 )
 
@@ -523,16 +525,18 @@ class StatContext:
             for key, obj in metrics.items():
                 metric_value = obj.to_serializable_dict()
                 serializable_metrics[key] = metric_value
+                value_pairs = [
+                    (CURRENT_METRIC_KEY, metric_value["current"]),
+                    (PCT_METRIC_KEY, metric_value["pct"]),
+                ]
+                if (capacity := metric_value["capacity"]) is not None:
+                    value_pairs.append((CAPACITY_METRIC_KEY, capacity))
                 kernel_updates.append(
                     FlattenedKernelMetric(
                         agent_id,
                         kernel_id,
                         key,
-                        [
-                            (CURRENT_METRIC_KEY, metric_value["current"]),
-                            (CAPACITY_METRIC_KEY, metric_value["capacity"]),
-                            (PCT_METRIC_KEY, metric_value["pct"]),
-                        ],
+                        value_pairs,
                     )
                 )
             if self.agent.local_config["debug"]["log-stats"]:

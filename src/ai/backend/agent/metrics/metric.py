@@ -79,13 +79,12 @@ class UtilizationMetricObserver:
         metric: FlattenedKernelMetric,
     ) -> None:
         for metric_value_type, value in metric.value_pairs:
-            if value is not None:
-                self._container_metric.labels(
-                    metric_name=metric.key,
-                    agent_id=metric.agent_id,
-                    kernel_id=metric.kernel_id,
-                    value_type=metric_value_type,
-                ).set(float(value))
+            self._container_metric.labels(
+                metric_name=metric.key,
+                agent_id=metric.agent_id,
+                kernel_id=metric.kernel_id,
+                value_type=metric_value_type,
+            ).set(float(value))
 
     def observe_device_metric(
         self,
@@ -93,10 +92,9 @@ class UtilizationMetricObserver:
         metric: FlattenedDeviceMetric,
     ) -> None:
         for metric_value_type, value in metric.value_pairs:
-            if value is not None:
-                self._device_metric.labels(
-                    metric_name=metric.key,
-                    agent_id=metric.agent_id,
-                    device_id=metric.device_id,
-                    value_type=metric_value_type,
-                ).set(float(value))
+            self._device_metric.labels(
+                metric_name=metric.key,
+                agent_id=metric.agent_id,
+                device_id=metric.device_id,
+                value_type=metric_value_type,
+            ).set(float(value))

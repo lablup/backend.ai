@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from typing import (
     NewType,
-    Optional,
 )
 
 from ai.backend.common.types import AgentId, DeviceId, KernelId, MetricKey
 
 MetricValueFieldKey = NewType("MetricValueFieldKey", str)
-MetricValueFieldPair = tuple[MetricValueFieldKey, Optional[str]]
+MetricValueFieldPair = tuple[MetricValueFieldKey, str]
 
 CURRENT_METRIC_KEY = MetricValueFieldKey("current")
 CAPACITY_METRIC_KEY = MetricValueFieldKey("capacity")
