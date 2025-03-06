@@ -2903,7 +2903,7 @@ class GQLMetricMiddleware:
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
-                success=True,
+                success=False,
                 duration=time.perf_counter() - start,
             )
             raise e
