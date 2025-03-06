@@ -200,7 +200,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
             ],
         )
 
-        if self.config.get("enforce_spreading_endpoint_replica"):
+        if self.sgroup_opts.enforce_spreading_endpoint_replica:
             if kernel_counts_at_same_endpoint := self.config.get("kernel_counts_at_same_endpoint"):
                 agents = sorted(
                     agents, key=lambda agent: kernel_counts_at_same_endpoint.get(agent.id, 0)
