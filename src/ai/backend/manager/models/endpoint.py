@@ -29,9 +29,10 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
+from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack, redis_helper
@@ -129,6 +130,16 @@ class EndpointLifecycle(Enum):
 class EndpointRow(Base):
     __tablename__ = "endpoints"
 
+    __table_args__ = (
+        CheckConstraint(
+            sa.or_(
+                sa.column("lifecycle_stage") == EndpointLifecycle.DESTROYED.value,
+                sa.column("image").isnot(None),
+            ),
+            name="ck_image_required_unless_destroyed",
+        ),
+    )
+
     id = EndpointIDColumn()
     name = sa.Column("name", sa.String(length=512), nullable=False)
     created_user = sa.Column(
@@ -139,9 +150,7 @@ class EndpointRow(Base):
     )
     # minus session count means this endpoint is requested for removal
     replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
-    image = sa.Column(
-        "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
-    )
+    image = sa.Column("image", GUID)
     model = sa.Column(
         "model",
         GUID,
@@ -234,7 +243,13 @@ class EndpointRow(Base):
     endpoint_auto_scaling_rules = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
     )
-    image_row = relationship("ImageRow", back_populates="endpoints")
+    image_row = relationship(
+        "ImageRow",
+        primaryjoin=lambda: foreign(EndpointRow.image) == ImageRow.id,
+        foreign_keys=[image],
+        back_populates="endpoints",
+    )
+
     model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
@@ -487,6 +502,22 @@ class EndpointRow(Base):
         session.add(row)
         return row
 
+    @property
+    def terminatable_route_statuses(self) -> set[RouteStatus]:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
+            return {
+                RouteStatus.PROVISIONING,
+                RouteStatus.HEALTHY,
+                RouteStatus.UNHEALTHY,
+                RouteStatus.FAILED_TO_START,
+            }
+        else:
+            return {
+                RouteStatus.HEALTHY,
+                RouteStatus.UNHEALTHY,
+                RouteStatus.FAILED_TO_START,
+            }
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
@@ -622,13 +653,25 @@ class EndpointAutoScalingRuleRow(Base):
         nullable=False,
     )
 
-    endpoint_row = relationship("EndpointRow", back_populates="endpoint_auto_scaling_rules")
+    endpoint_row = relationship(
+        "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
+    )
 
     @classmethod
-    async def list(cls, session: AsyncSession, load_endpoint=False) -> Sequence[Self]:
+    async def list(
+        cls,
+        session: AsyncSession,
+        endpoint_status_filter: Container[EndpointLifecycle] = frozenset([
+            EndpointLifecycle.CREATED
+        ]),
+    ) -> Sequence[Self]:
         query = sa.select(EndpointAutoScalingRuleRow)
-        if load_endpoint:
-            query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
+        if endpoint_status_filter:
+            query = (
+                query.join(EndpointAutoScalingRuleRow.endpoint_row)
+                .filter(EndpointRow.lifecycle_stage.in_(endpoint_status_filter))
+                .options(contains_eager(EndpointAutoScalingRuleRow.endpoint_row))
+            )
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -799,7 +842,7 @@ class ModelServicePredicateChecker:
                 vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
                 folder_host = model_vfolder_row["host"]
 
-        proxy_name, volume_name = storage_manager.split_host(folder_host)
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
 
         if model_definition_path:
             path = Path(model_definition_path)
@@ -1012,7 +1055,7 @@ class Endpoint(graphene.ObjectType):
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
-            image_object=ImageNode.from_row(row.image_row),
+            image_object=ImageNode.from_row(ctx, row.image_row),
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
@@ -1488,7 +1531,6 @@ class ModifyEndpoint(graphene.Mutation):
                     raise InvalidAPIParameters(
                         "Model mount destination must be /models for non-custom runtimes"
                     )
-                # from AgentRegistry.handle_route_creation()
 
                 async with graph_ctx.db.begin_session() as db_session:
                     image_row = await ImageRow.resolve(

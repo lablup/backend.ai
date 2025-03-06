@@ -70,7 +70,9 @@
     "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu.",
     "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään.",
     "InvalidUrl": "Se ei ole kelvollinen URL-osoite",
-    "AllowsPositiveNumberOnly": "Salli vain positiivinen luku."
+    "AllowsPositiveNumberOnly": "Salli vain positiivinen luku.",
+    "OnlyIntegersAreAllowed": "Vain kokonaisluvut ovat sallittuja.",
+    "OnlyPositiveIntegersAreAllowed": "Vain positiiviset kokonaisluvut ovat sallittuja."
   },
   "agent": {
     "AgentSetting": "Agentin asetukset",
@@ -140,7 +142,8 @@
     "Expand": "Laajentaa",
     "Clear": "Poistaa",
     "Apply": "Hae",
-    "CopySomething": "Kopioi {{name}}"
+    "CopySomething": "Kopioi {{name}}",
+    "ClickForMoreDetails": "Napsauta saadaksesi lisätietoja"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -575,13 +578,15 @@
     "Session": "Istunto",
     "General": "Yleistä",
     "Disabled": "Vammaiset",
-    "NSelected": "Valittu {{count}} kohde(t)",
+    "NSelected": "{{count}} valittu",
     "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti",
     "Change": "Muuta",
     "MaxValueNotification": "{{name}} on oltava maksimi {{max}}",
     "TotalItems": "Yhteensä {{total}} kohteita",
     "ExtendLoginSession": "Sisäänkirjautumisistunnon laajentaminen",
-    "Cores": "ytimet"
+    "Cores": "ytimet",
+    "InvalidJSONFormat": "Väärä JSON-muoto.",
+    "LastUpdated": "Viimeksi päivitetty"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -851,7 +856,10 @@
     "ServiceNameMaxLength": "Anna enintään 24 merkkiä.",
     "ServiceNameCannotStartWithHyphen": "Tavuviivoja (-) ei voi käyttää kummassakaan päässä.",
     "Resources": "Resurssit",
-    "NumberOfReplicas": "Kopioiden määrä"
+    "NumberOfReplicas": "Kopioiden määrä",
+    "AutoScalingRules": "Automaattiset skaalaussäännöt",
+    "AddRules": "Lisää sääntöjä",
+    "RouteError": "Reittivirhe"
   },
   "notification": {
     "Initializing": "Aloitetaan...",
@@ -1323,7 +1331,9 @@
     "FGPU": "fGPU",
     "ReadLess": "Lue vähemmän",
     "ReadMore": "Lue lisää...",
-    "CommitImageName": "Sitoutunut kuvan nimi"
+    "CommitImageName": "Sitoutunut kuvan nimi",
+    "IdleCheckExpirationWarning": "Istunnot voidaan lopettaa joutokäyntitarkastusten tulosten perusteella.",
+    "FailToRenameSession": "Pyyntö istunnon nimen muuttamiseksi epäonnistui."
   },
   "settings": {
     "AllowAgentSideRegistration": "Salli agenttipuolen rekisteröinti",
@@ -1563,7 +1573,9 @@
     "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
     "BootstrapScriptDeleted": "Bootstrap-skripti poistettu",
     "ClassicSessionLauncher": "Classic istunnon käynnistysohjelma",
-    "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia."
+    "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia.",
+    "NEOSessionList": "NEO-istuntoluettelo",
+    "ExperimentalFeatures": "Kokeelliset ominaisuudet"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Edistynyt verkkopäätteen käyttö: Kopioi terminaalin sisältö",
@@ -1645,7 +1657,8 @@
       "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää",
       "MyEnvironments": "Omat ympäristöt",
       "ResourcePolicy": "Resurssipolitiikka",
-      "FullNameUpdated": "Koko nimi on päivitetty onnistuneesti."
+      "FullNameUpdated": "Koko nimi on päivitetty onnistuneesti.",
+      "Chat": "Chat"
     },
     "NetworkSoftTimeout": "Palvelimen vastaus kestää kauemmin. Odota hetki",
     "NotFound": "<p>Oops!<br/>Sivua ei löydy...</p>",
@@ -1713,7 +1726,9 @@
     "Attachments": "Liitteet",
     "DropFileHere": "Pudota tiedosto tähän",
     "UploadFiles": "Lataa tiedostoja",
-    "UploadFilesDescription": "Napsauta tai vedä tiedostoja tälle alueelle ladataksesi"
+    "UploadFilesDescription": "Napsauta tai vedä tiedostoja tälle alueelle ladataksesi",
+    "Thinking": "Ajattelu",
+    "ViewReasoning": "Näytä päättely"
   },
   "time": {
     "Day": "day",
@@ -1754,5 +1769,35 @@
     "ReloadPage": "Lataa sivu uudelleen",
     "ResetErrorBoundary": "Nollaa ErrorBoundary",
     "Title": "On tapahtunut virhe."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Lisää automaattinen skaalaussääntö",
+    "CoolDownSeconds": "Jäähtyä sekuntia",
+    "SuccessfullyUpdated": "Automaattinen skaalaussääntö on päivitetty onnistuneesti.",
+    "SuccessfullyCreated": "Automaattinen skaalaussääntö on luotu onnistuneesti.",
+    "EditAutoScalingRule": "Muokkaa automaattisen skaalaussääntöä",
+    "Comparator": "Vertailu",
+    "Threshold": "Kynnys",
+    "StepSize": "Askelkoko",
+    "MinReplicas": "Min Replicas",
+    "MaxReplicas": "Max replicas",
+    "MetricName": "Metrinen nimi",
+    "MetricSource": "Metrilähde",
+    "MIN/MAXReplicas": "Min / max -kopiot",
+    "LastTriggered": "Viimeksi laukaistu",
+    "CreatedAt": "Luotu aika",
+    "ConditionTooltip": "Voit syöttää vapaasti minkä tahansa ajoympäristön tukeman mittarin.\nEsimerkiksi: \"cuda_mem\", \"cuda_util\".",
+    "ScalingType": "Tyyppi",
+    "ScaleUp": "Laajentaminen",
+    "ScaleDown": "Pienennä mittakaavaa",
+    "Condition": "Kunto"
+  },
+  "kernel": {
+    "KernelId": "Ytimen tunnus",
+    "Role": "Rooli",
+    "Status": "Status",
+    "AgentId": "Agenttitunnus",
+    "ContainerId": "Konttitunnus",
+    "Kernels": "Ytimet"
   }
 }

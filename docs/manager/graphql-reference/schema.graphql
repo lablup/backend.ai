@@ -49,6 +49,15 @@ type Queries {
 
     """Added in 24.09.0."""
     order: String
+
+    """Added in 25.3.0. Default is `system`."""
+    scope: ScopeField
+
+    """Added in 25.3.0."""
+    container_registry_scope: ContainerRegistryScopeField
+
+    """Added in 25.3.0. Default is read_attribute."""
+    permission: GroupPermissionField = "read_attribute"
     offset: Int
     before: String
     after: String
@@ -83,6 +92,9 @@ type Queries {
     is_installed: Boolean
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
+
     """
     Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
     """
@@ -96,6 +108,33 @@ type Queries {
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
+
+  """Added in 25.3.0."""
+  image_node(
+    id: GlobalIDField!
+    scope_id: ScopeField
+
+    """Default is read_attribute."""
+    permission: ImagePermissionValueField = "read_attribute"
+  ): ImageNode
+
+  """Added in 25.3.0."""
+  image_nodes(
+    scope_id: ScopeField!
+
+    """Default is read_attribute."""
+    permission: ImagePermissionValueField = "read_attribute"
+
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): ImageConnection
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -200,8 +239,8 @@ type Queries {
   endpoint_token(token: String!): EndpointToken
   endpoint_token_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): EndpointTokenList
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
-  container_registry(hostname: String!): ContainerRegistry
-  container_registries: [ContainerRegistry]
+  container_registry(hostname: String!): ContainerRegistry @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_node` instead.")
+  container_registries: [ContainerRegistry] @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_nodes_v2` instead.")
 
   """Added in 24.09.0."""
   container_registry_node(id: String!): ContainerRegistryNode
@@ -257,6 +296,9 @@ type Agent implements Item {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   mem_slots: Int
   cpu_slots: Float
   gpu_slots: Float
@@ -288,6 +330,12 @@ Use of this type is *not recommended* as you lose the benefits of having a defin
 schema (one of the key benefits of GraphQL).
 """
 scalar JSONString
+
+"""
+Added in 25.4.0.
+Verifies that the key is a UUID (represented as a string) and the value is a float.
+"""
+scalar UUIDFloatMap
 
 type ComputeContainer implements Item {
   id: ID
@@ -365,11 +413,19 @@ type ImageNode implements Node {
   digest: String
   labels: [KVPair]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
 
   """Added in 24.03.4. The array of image aliases."""
   aliases: [String]
+
+  """
+  Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+  """
+  permissions: [ImagePermissionValueField]
 }
 
 type KVPair {
@@ -388,6 +444,11 @@ type ResourceLimit {
   min: String
   max: String
 }
+
+"""
+Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+"""
+scalar ImagePermissionValueField
 
 type AgentList implements PaginatedList {
   items: [Agent]!
@@ -570,6 +631,9 @@ type AgentNode implements Node {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
   """
@@ -612,6 +676,14 @@ type KernelNode implements Node {
   cluster_hostname: String
   session_id: UUID
   image: ImageNode
+
+  """Added in 25.4.0."""
+  image_reference: String
+
+  """
+  Added in 25.4.0. The architecture that the image of this kernel requires
+  """
+  architecture: String
   status: String
   status_changed: DateTime
   status_info: String
@@ -676,6 +748,9 @@ type GroupNode implements Node {
   """Added in 24.03.7."""
   container_registry: JSONString
   scaling_groups: [String]
+
+  """Added in 25.3.0."""
+  registry_quota: BigInt
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
@@ -770,6 +845,14 @@ type GroupEdge {
   cursor: String!
 }
 
+"""Added in 25.3.0."""
+scalar ContainerRegistryScopeField
+
+"""
+Added in 25.3.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'delete_project', 'associate_with_user'].
+"""
+scalar GroupPermissionField
+
 type Group {
   id: UUID
   name: String
@@ -818,11 +901,41 @@ type Image {
   labels: [KVPair]
   aliases: [String]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
   installed: Boolean
   installed_agents: [String]
   hash: String
+}
+
+"""Added in 25.4.0."""
+enum ImageStatus {
+  ALIVE
+  DELETED
+}
+
+"""Added in 25.3.0."""
+type ImageConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ImageEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 25.3.0. A Relay edge containing a `Image` and its cursor."""
+type ImageEdge {
+  """The item at the end of the edge"""
+  node: ImageNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type User implements Item {
@@ -1073,9 +1186,16 @@ type ProjectResourcePolicy {
 }
 
 type ResourcePreset {
+  """Added in 25.4.0. ID of the resource preset."""
+  id: UUID
   name: String
   resource_slots: JSONString
   shared_memory: BigInt
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type ScalingGroup {
@@ -1107,6 +1227,11 @@ type ScalingGroup {
     """
     status: String = "ALIVE"
   ): JSONString
+
+  """
+  Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. Only includes sessions owned by the user.
+  """
+  own_session_occupied_resource_slots: JSONString
 }
 
 type StorageVolume implements Item {
@@ -1257,6 +1382,12 @@ type ComputeSessionNode implements Node {
   vfolder_mounts: [String]
   occupied_slots: JSONString
   requested_slots: JSONString
+
+  """Added in 25.4.0."""
+  image_references: [String]
+
+  """Added in 25.4.0."""
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
   num_queries: BigInt
   inference_metrics: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
@@ -1563,6 +1694,9 @@ type ContainerRegistryNode implements Node {
 
   """Added in 24.09.3."""
   extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """Added in 24.09.0."""
@@ -1807,6 +1941,12 @@ type Mutations {
   This action cannot be undone.
   """
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
+
+  """Added in 25.4.0."""
+  rescan_gpu_alloc_maps(
+    """Agent ID to rescan GPU alloc map"""
+    agent_id: String!
+  ): RescanGPUAllocMaps
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
@@ -1821,13 +1961,21 @@ type Mutations {
 
   """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+
+  """Added in 25.4.0"""
+  purge_image_by_id(image_id: String!): PurgeImageById
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
+
+  """Added in 25.4.0"""
+  purge_images(agent_id: String!, images: [ImageRefType]!): PurgeImages
 
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
@@ -1841,7 +1989,12 @@ type Mutations {
   modify_project_resource_policy(name: String!, props: ModifyProjectResourcePolicyInput!): ModifyProjectResourcePolicy
   delete_project_resource_policy(name: String!): DeleteProjectResourcePolicy
   create_resource_preset(name: String!, props: CreateResourcePresetInput!): CreateResourcePreset
-  modify_resource_preset(name: String!, props: ModifyResourcePresetInput!): ModifyResourcePreset
+  modify_resource_preset(
+    """Added in 25.4.0. ID of the resource preset."""
+    id: UUID!
+    name: String @deprecated(reason: "Deprecated since 25.4.0.")
+    props: ModifyResourcePresetInput!
+  ): ModifyResourcePreset
   delete_resource_preset(name: String!): DeleteResourcePreset
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
@@ -1905,7 +2058,7 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): CreateContainerRegistryNode
+  ): CreateContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `create_container_registry_node_v2` instead.")
 
   """Added in 24.09.0."""
   modify_container_registry_node(
@@ -1940,13 +2093,34 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): ModifyContainerRegistryNode
+  ): ModifyContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `modify_container_registry_node_v2` instead.")
 
   """Added in 24.09.0."""
   delete_container_registry_node(
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
-  ): DeleteContainerRegistryNode
+  ): DeleteContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `delete_container_registry_node_v2` instead.")
+
+  """Added in 25.3.0."""
+  create_container_registry_node_v2(
+    """Added in 25.3.0."""
+    props: CreateContainerRegistryNodeInputV2!
+  ): CreateContainerRegistryNodeV2
+
+  """Added in 25.3.0."""
+  modify_container_registry_node_v2(
+    """Object id. Can be either global id or object id. Added in 25.3.0."""
+    id: String!
+
+    """Added in 25.3.0."""
+    props: ModifyContainerRegistryNodeInputV2!
+  ): ModifyContainerRegistryNodeV2
+
+  """Added in 25.3.0."""
+  delete_container_registry_node_v2(
+    """Object id. Can be either global id or object id. Added in 25.3.0."""
+    id: String!
+  ): DeleteContainerRegistryNodeV2
 
   """Added in 25.1.0."""
   create_endpoint_auto_scaling_rule_node(endpoint: String!, props: EndpointAutoScalingRuleInput!): CreateEndpointAutoScalingRuleNode
@@ -1957,14 +2131,23 @@ type Mutations {
   """Added in 25.1.0."""
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
+  """Added in 25.3.0."""
+  create_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): CreateContainerRegistryQuota
+
+  """Added in 25.3.0."""
+  update_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): UpdateContainerRegistryQuota
+
+  """Added in 25.3.0."""
+  delete_container_registry_quota(scope_id: ScopeField!): DeleteContainerRegistryQuota
+
   """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
-  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
+  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `create_container_registry_node_v2` instead.")
 
   """Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
-  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
+  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `modify_container_registry_node_v2` instead.")
 
   """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
-  delete_container_registry(hostname: String!): DeleteContainerRegistry
+  delete_container_registry(hostname: String!): DeleteContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `delete_container_registry_node_v2` instead.")
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
   """Added in 24.09.0."""
@@ -2250,6 +2433,11 @@ input PurgeUserInput {
   purge_shared_vfolders: Boolean
 }
 
+"""Added in 25.4.0."""
+type RescanGPUAllocMaps {
+  task_id: UUID
+}
+
 type CreateKeyPair {
   ok: Boolean
   msg: String
@@ -2340,11 +2528,17 @@ type ForgetImageById {
   image: ImageNode
 }
 
+"""Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
 type ForgetImage {
   ok: Boolean
   msg: String
 
   """Added since 24.03.1."""
+  image: ImageNode
+}
+
+"""Added in 25.4.0."""
+type PurgeImageById {
   image: ImageNode
 }
 
@@ -2370,6 +2564,17 @@ type DealiasImage {
 type ClearImages {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.4.0."""
+type PurgeImages {
+  task_id: String
+}
+
+input ImageRefType {
+  name: String!
+  registry: String
+  architecture: String
 }
 
 """Added in 24.09.0."""
@@ -2563,6 +2768,11 @@ type CreateResourcePreset {
 input CreateResourcePresetInput {
   resource_slots: JSONString!
   shared_memory: String
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type ModifyResourcePreset {
@@ -2571,8 +2781,15 @@ type ModifyResourcePreset {
 }
 
 input ModifyResourcePresetInput {
+  """Added in 25.4.0. A name of resource preset."""
+  name: String
   resource_slots: JSONString
   shared_memory: String
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type DeleteResourcePreset {
@@ -2725,6 +2942,96 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
+"""Added in 25.3.0."""
+type CreateContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.3.0."""
+input CreateContainerRegistryNodeInputV2 {
+  """Added in 25.3.0."""
+  url: String!
+
+  """Added in 25.3.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 25.3.0."""
+  registry_name: String!
+
+  """Added in 25.3.0."""
+  is_global: Boolean
+
+  """Added in 25.3.0."""
+  project: String
+
+  """Added in 25.3.0."""
+  username: String
+
+  """Added in 25.3.0."""
+  password: String
+
+  """Added in 25.3.0."""
+  ssl_verify: Boolean
+
+  """Added in 25.3.0."""
+  extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups: AllowedGroups
+}
+
+"""Added in 25.3.0."""
+input AllowedGroups {
+  """List of group_ids to add associations. Added in 25.3.0."""
+  add: [String] = []
+
+  """List of group_ids to remove associations. Added in 25.3.0."""
+  remove: [String] = []
+}
+
+"""Added in 25.3.0."""
+type ModifyContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.3.0."""
+input ModifyContainerRegistryNodeInputV2 {
+  """Added in 25.3.0."""
+  url: String
+
+  """Added in 25.3.0."""
+  type: ContainerRegistryTypeField
+
+  """Added in 25.3.0."""
+  registry_name: String
+
+  """Added in 25.3.0."""
+  is_global: Boolean
+
+  """Added in 25.3.0."""
+  project: String
+
+  """Added in 25.3.0."""
+  username: String
+
+  """Added in 25.3.0."""
+  password: String
+
+  """Added in 25.3.0."""
+  ssl_verify: Boolean
+
+  """Added in 25.3.0."""
+  extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups: AllowedGroups
+}
+
+"""Added in 25.3.0."""
+type DeleteContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
 """Added in 25.1.0."""
 type CreateEndpointAutoScalingRuleNode {
   ok: Boolean
@@ -2765,6 +3072,24 @@ input ModifyEndpointAutoScalingRuleInput {
 
 """Added in 25.1.0."""
 type DeleteEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 25.3.0."""
+type CreateContainerRegistryQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 25.3.0."""
+type UpdateContainerRegistryQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 25.3.0."""
+type DeleteContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
@@ -2847,12 +3172,6 @@ input ModifyEndpointInput {
 
   """Added in 24.03.5."""
   runtime_variant: String
-}
-
-input ImageRefType {
-  name: String!
-  registry: String
-  architecture: String
 }
 
 """Added in 24.03.4."""

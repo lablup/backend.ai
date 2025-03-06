@@ -57,6 +57,7 @@ from yarl import URL
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -122,7 +123,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
@@ -141,7 +141,7 @@ from .api.exceptions import (
 )
 from .config import LocalConfig, SharedConfig
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError, convert_to_status_data
+from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -182,7 +182,7 @@ from .models import (
     verify_vfolder_name,
 )
 from .models.container_registry import ContainerRegistryRow
-from .models.image import bulk_get_image_configs
+from .models.image import ImageIdentifier, bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
@@ -422,7 +422,7 @@ class AgentRegistry:
             return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
-        proxy_name, volume_name = self.storage_manager.split_host(vfolder_host)
+        proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
         async with self.storage_manager.request(
             proxy_name,
             "GET",
@@ -434,6 +434,11 @@ class AgentRegistry:
                 await storage_resp.json(),
                 HardwareMetadata,
             )
+
+    async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
+        agent = await self.get_instance(instance_id, agents.c.addr)
+        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
+            return await rpc.call.scan_gpu_alloc_map()
 
     async def create_session(
         self,
@@ -1129,7 +1134,7 @@ class AgentRegistry:
             "internal_data": internal_data,
             "callback_url": callback_url,
             "occupied_shares": {},
-            "mounts": [mount.name for mount in vfolder_mounts],  # TODO: keep for legacy?
+            "mounts": [*{mount.name for mount in vfolder_mounts}],  # TODO: keep for legacy?
             "vfolder_mounts": vfolder_mounts,
             "repl_in_port": 0,
             "repl_out_port": 0,
@@ -1906,41 +1911,6 @@ class AgentRegistry:
                 )
         except (asyncio.TimeoutError, asyncio.CancelledError):
             log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
-        except Exception as e:
-            ex = e
-            err_info = convert_to_status_data(ex, self.debug)
-
-            # The agent has already cancelled or issued the destruction lifecycle event
-            # for this batch of kernels.
-            for binding in items:
-                kernel_id = binding.kernel.id
-
-                async def _update_failure() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        now = datetime.now(tzutc())
-                        query = (
-                            sa.update(KernelRow)
-                            .where(KernelRow.id == kernel_id)
-                            .values(
-                                status=KernelStatus.ERROR,
-                                status_info=f"other-error ({ex!r})",
-                                status_changed=now,
-                                terminated_at=now,
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.ERROR.name: (
-                                            now.isoformat()
-                                        ),  # ["PULLING", "CREATING"]
-                                    },
-                                ),
-                                status_data=err_info,
-                            )
-                        )
-                        await db_sess.execute(query)
-
-                await execute_with_retry(_update_failure)
             raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
@@ -3673,6 +3643,22 @@ class AgentRegistry:
     ) -> Mapping[str, str]:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
+
+    async def purge_images(
+        self,
+        agent_id: AgentId,
+        images: list[str],
+    ) -> PurgeImageResponses:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            result = await rpc.call.purge_images(images)
+
+            return PurgeImageResponses([
+                PurgeImageResponse(
+                    image=resp["image"],
+                    error=resp.get("error"),
+                )
+                for resp in result["responses"]
+            ])
 
     async def get_abusing_report(
         self,

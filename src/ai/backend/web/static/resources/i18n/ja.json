@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "ユーザーの電子メールが一致しません",
       "MyEnvironments": "私の環境",
       "ResourcePolicy": "リソースポリシー",
-      "FullNameUpdated": "フルネームが正常に更新されました。"
+      "FullNameUpdated": "フルネームが正常に更新されました。",
+      "Chat": "チャット"
     },
     "YouAreOffline": "オフライン：どのネットワークにも接続されていない。",
     "YouAreOnline": "あなたは今オンラインです",
@@ -433,7 +434,9 @@
     "FGPU": "fGPU",
     "ReadLess": "内容折りたたみ",
     "ReadMore": "もっと詳しく...",
-    "CommitImageName": "コミットされたイメージ名"
+    "CommitImageName": "コミットされたイメージ名",
+    "IdleCheckExpirationWarning": "セッションはアイドル状態チェックの結果に基づいて終了される場合があります。",
+    "FailToRenameSession": "セッション名変更要求が失敗しました。"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -476,7 +479,8 @@
     "Expand": "拡大する",
     "Clear": "消去",
     "Apply": "応募する",
-    "CopySomething": "{{name}} をコピー"
+    "CopySomething": "{{name}} をコピー",
+    "ClickForMoreDetails": "詳細については、クリックしてください"
   },
   "agent": {
     "Endpoint": "終点",
@@ -527,13 +531,15 @@
     "Session": "セッション",
     "General": "一般",
     "Disabled": "無効",
-    "NSelected": "選択された{{count}}項目（複数可）",
+    "NSelected": "{count}}を選択",
     "RemainingLoginSessionTime": "自動ログアウトまでの時間",
     "Change": "変更",
     "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
     "TotalItems": "合計{{total}}項目",
     "ExtendLoginSession": "ログインセッションの延長",
-    "Cores": "コア"
+    "Cores": "コア",
+    "InvalidJSONFormat": "JSON形式が間違っています。",
+    "LastUpdated": "最終更新日"
   },
   "credential": {
     "Permission": "許可",
@@ -1016,7 +1022,9 @@
     "BootstrapScriptEmpty": "スクリプトが空です。\nスクリプトを入力してください。",
     "BootstrapScriptDeleted": "ブートストラップ スクリプトが削除されました",
     "ClassicSessionLauncher": "Classic セッションランチャー",
-    "DescClassicSessionLauncher": "NEO セッション ランチャーの代わりに Classic セッション ランチャーを使用します。\nClassic セッション ランチャーには最新の機能が含まれていない可能性があります。"
+    "DescClassicSessionLauncher": "NEO セッション ランチャーの代わりに Classic セッション ランチャーを使用します。\nClassic セッション ランチャーには最新の機能が含まれていない可能性があります。",
+    "NEOSessionList": "NEOセッションリスト",
+    "ExperimentalFeatures": "実験的特徴"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高度なWeb端末の使用法：端末の内容をコピーする",
@@ -1506,7 +1514,9 @@
     "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。",
     "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。",
     "InvalidUrl": "有効な URL ではありません",
-    "AllowsPositiveNumberOnly": "正の数のみを許可します。"
+    "AllowsPositiveNumberOnly": "正の数のみを許可します。",
+    "OnlyIntegersAreAllowed": "整数のみが許可されています。",
+    "OnlyPositiveIntegersAreAllowed": "正の整数のみが許可されています。"
   },
   "maxLength": {
     "64chars": "（最大64文字）",
@@ -1598,7 +1608,10 @@
     "ServiceNameMaxLength": "24文字以内で入力してください。",
     "ServiceNameCannotStartWithHyphen": "両端にハイフン（-）を使用することはできません。",
     "Resources": "リソース",
-    "NumberOfReplicas": "レプリカの数"
+    "NumberOfReplicas": "レプリカの数",
+    "AutoScalingRules": "自動スケーリングルール",
+    "AddRules": "ルールを追加します",
+    "RouteError": "ルートエラー"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1714,7 +1727,9 @@
     "Attachments": "添付ファイル",
     "DropFileHere": "ここにファイルをドロップします",
     "UploadFiles": "ファイルをアップロードする",
-    "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします"
+    "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします",
+    "Thinking": "考え",
+    "ViewReasoning": "推論を見る"
   },
   "time": {
     "Day": "日",
@@ -1755,5 +1770,35 @@
     "ReloadPage": "ページの更新",
     "ResetErrorBoundary": "ErrorBoundaryの初期化",
     "Title": "エラーが発生しました。"
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "自動スケーリングルールを追加します",
+    "CoolDownSeconds": "数秒を冷やします",
+    "SuccessfullyUpdated": "自動スケーリングルールが正常に更新されました。",
+    "SuccessfullyCreated": "自動スケーリングルールが正常に作成されました。",
+    "EditAutoScalingRule": "自動スケーリングルールを編集します",
+    "Comparator": "コンパレータ",
+    "Threshold": "しきい値",
+    "StepSize": "ステップサイズ",
+    "MinReplicas": "最小レプリカ",
+    "MaxReplicas": "マックスレプリカ",
+    "MetricName": "メトリック名",
+    "MetricSource": "メトリックソース",
+    "MIN/MAXReplicas": "min / maxレプリカ",
+    "LastTriggered": "最後にトリガーされました",
+    "CreatedAt": "作成された時間",
+    "ConditionTooltip": "ランタイム環境でサポートされている任意の指標を自由に入力することができる。\nたとえば\"cuda_mem\"、\"cuda_util\"",
+    "ScalingType": "タイプ",
+    "ScaleUp": "スケールアップ",
+    "ScaleDown": "スケールダウン",
+    "Condition": "コンディション"
+  },
+  "kernel": {
+    "KernelId": "カーネルID",
+    "Role": "役割",
+    "Status": "状態",
+    "AgentId": "エージェントID",
+    "ContainerId": "コンテナID",
+    "Kernels": "カーネル"
   }
 }

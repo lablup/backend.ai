@@ -252,18 +252,17 @@ class WSProxyConfig(BaseSchema):
         examples=["50M3G00DL00KING53CR3T"],
         description="API secret",
     )
-
     aiomonitor_termui_port: int = Field(
         gt=0,
         lt=65536,
         description="Port number for aiomonitor termui server.",
-        default=48500,
+        default=38500,
     )
     aiomonitor_webui_port: int = Field(
         gt=0,
         lt=65536,
         description="Port number for aiomonitor webui server.",
-        default=49500,
+        default=39500,
     )
 
 

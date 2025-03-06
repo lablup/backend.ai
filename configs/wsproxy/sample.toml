@@ -24,8 +24,9 @@ jwt-encrypt-key = "50M3G00DL00KING53CR3T"
 permit-hash-key = "50M3G00DL00KING53CR3T"
 api-secret = "50M3G00DL00KING53CR3T"
 
-aiomonitor-termui-port = 48500
-aiomonitor-webui-port = 49500
+aiomonitor-termui-port = 38500
+aiomonitor-webui-port = 39500
+
 
 [pyroscope]
 enabled = true

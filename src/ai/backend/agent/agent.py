@@ -64,8 +64,9 @@ from trafaret import DataError
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.defs import REDIS_STATISTICS_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
@@ -114,6 +115,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    EtcdRedisConfig,
     HardwareMetadata,
     ImageConfig,
     ImageRegistry,
@@ -686,13 +688,15 @@ class AbstractAgent(
         else:
             event_dispatcher_cls = EventDispatcher
 
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
+
         self.event_producer = await EventProducer.new(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
         )
         self.event_dispatcher = await event_dispatcher_cls.new(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
@@ -700,14 +704,14 @@ class AbstractAgent(
             event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             name="stream",
             db=REDIS_STREAM_DB,
         )
         self.redis_stat_pool = redis_helper.get_redis_object(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
 
         self.background_task_manager = BackgroundTaskManager(
@@ -1663,6 +1667,15 @@ class AbstractAgent(
         """
 
     @abstractmethod
+    async def purge_images(
+        self,
+        images: list[str],
+    ) -> PurgeImageResponses:
+        """
+        Purge the given images from the agent.
+        """
+
+    @abstractmethod
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
@@ -2227,10 +2240,20 @@ class AbstractAgent(
                 current_task = asyncio.current_task()
                 assert current_task is not None
                 self._pending_creation_tasks[kernel_id].add(current_task)
+                kernel_init_polling_attempt = cast(
+                    int, self.local_config["agent"]["kernel-lifecycles"]["init-polling-attempt"]
+                )
+                kernel_init_polling_timeout = cast(
+                    float,
+                    self.local_config["agent"]["kernel-lifecycles"]["init-polling-timeout-sec"],
+                )
                 try:
                     async for attempt in AsyncRetrying(
                         wait=wait_fixed(0.3),
-                        stop=(stop_after_attempt(10) | stop_after_delay(60)),
+                        stop=(
+                            stop_after_attempt(kernel_init_polling_attempt)
+                            | stop_after_delay(kernel_init_polling_timeout)
+                        ),
                         retry=retry_if_exception_type(zmq.error.ZMQError),
                     ):
                         with attempt:

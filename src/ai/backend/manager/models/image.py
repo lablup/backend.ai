@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import functools
 import logging
+import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -20,17 +21,18 @@ from typing import (
 )
 from uuid import UUID
 
-import aiotools
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.sql.expression import true
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
+    DispatchResult,
     ImageAlias,
     ImageConfig,
     ImageRegistry,
@@ -38,15 +40,16 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
+from ..models.container_registry import ContainerRegistryRow
 from .base import (
     GUID,
     Base,
     ForeignKeyIDColumn,
     IDColumn,
+    StrEnumType,
     StructuredJSONColumn,
 )
 from .rbac import (
@@ -55,7 +58,6 @@ from .rbac import (
     DomainScope,
     ProjectScope,
     ScopeType,
-    SystemScope,
     UserScope,
     get_predefined_roles_in_scope,
 )
@@ -167,18 +169,27 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> None:
+) -> DispatchResult[list[ImageRow]]:
     """
     Performs an image rescan for all images in the registries.
     """
-    async with aiotools.TaskGroup() as tg:
-        for registry_key, registry_row in registries.items():
-            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-            log.info('Scanning kernel images from the registry "{0}"', registry_name)
+    images, errors = [], []
 
-            scanner_cls = get_container_registry_cls(registry_row)
-            scanner = scanner_cls(db, registry_name, registry_row)
-            tg.create_task(scanner.rescan_single_registry(reporter))
+    for registry_key, registry_row in registries.items():
+        registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+        log.info('Scanning kernel images from the registry "{0}"', registry_name)
+
+        scanner_cls = get_container_registry_cls(registry_row)
+        scanner = scanner_cls(db, registry_name, registry_row)
+
+        try:
+            scan_result = await scanner.rescan_single_registry(reporter)
+            images.extend(scan_result.result or [])
+            errors.extend(scan_result.errors or [])
+        except Exception as e:
+            errors.append(str(e))
+
+    return DispatchResult(result=images, errors=errors)
 
 
 async def scan_single_image(
@@ -186,7 +197,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> None:
+) -> DispatchResult[list[ImageRow]]:
     """
     Performs a scan for a single image.
     """
@@ -197,7 +208,7 @@ async def scan_single_image(
 
     scanner_cls = get_container_registry_cls(registry_row)
     scanner = scanner_cls(db, registry_name, registry_row)
-    await scanner.scan_single_ref(image_name)
+    return await scanner.scan_single_ref(image_name)
 
 
 def filter_registry_dict(
@@ -241,7 +252,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> None:
+) -> DispatchResult[list[ImageRow]]:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
@@ -255,8 +266,7 @@ async def rescan_images(
     registries = await load_configured_registries(db, project)
 
     if registry_or_image is None:
-        await scan_registries(db, registries, reporter=reporter)
-        return
+        return await scan_registries(db, registries, reporter=reporter)
 
     matching_registries = filter_registries_by_img_canonical(registries, registry_or_image)
 
@@ -267,8 +277,7 @@ async def rescan_images(
             )
 
         registry_key, registry_row = next(iter(matching_registries.items()))
-        await scan_single_image(db, registry_key, registry_row, registry_or_image)
-        return
+        return await scan_single_image(db, registry_key, registry_row, registry_or_image)
 
     matching_registries = filter_registries_by_registry_name(registries, registry_or_image)
 
@@ -276,7 +285,7 @@ async def rescan_images(
         raise RuntimeError("It is an unknown registry.", registry_or_image)
 
     log.debug("running a per-registry metadata scan")
-    await scan_registries(db, matching_registries, reporter=reporter)
+    return await scan_registries(db, matching_registries, reporter=reporter)
     # TODO: delete images removed from registry?
 
 
@@ -286,8 +295,26 @@ class ImageType(enum.Enum):
     SERVICE = "service"
 
 
+# Defined for avoiding circular import
+def _get_image_endpoint_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointRow
+
+    return ImageRow.id == foreign(EndpointRow.image)
+
+
+class ImageStatus(enum.StrEnum):
+    ALIVE = "ALIVE"
+    DELETED = "DELETED"
+
+
 class ImageRow(Base):
     __tablename__ = "images"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "registry", "project", "name", "tag", "architecture", name="uq_image_identifier"
+        ),
+    )
+
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
     project = sa.Column("project", sa.String, nullable=True)
@@ -328,9 +355,21 @@ class ImageRow(Base):
         ),
         nullable=False,
     )
+    status = sa.Column(
+        "status",
+        StrEnumType(ImageStatus),
+        default=ImageStatus.ALIVE,
+        server_default=ImageStatus.ALIVE.name,
+        nullable=False,
+    )
+
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
-    endpoints = relationship("EndpointRow", back_populates="image_row")
+    endpoints = relationship(
+        "EndpointRow",
+        primaryjoin=_get_image_endpoint_join_condition,
+        back_populates="image_row",
+    )
 
     registry_row = relationship(
         "ContainerRegistryRow",
@@ -354,6 +393,7 @@ class ImageRow(Base):
         accelerators=None,
         labels=None,
         resources=None,
+        status=ImageStatus.ALIVE,
     ) -> None:
         self.name = name
         self.project = project
@@ -369,6 +409,7 @@ class ImageRow(Base):
         self.accelerators = accelerators
         self.labels = labels
         self.resources = resources
+        self.status = status
 
     @property
     def trimmed_digest(self) -> str:
@@ -395,6 +436,7 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -405,6 +447,9 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
         result = await session.scalar(query)
         if result is not None:
@@ -418,6 +463,7 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -428,6 +474,9 @@ class ImageRow(Base):
 
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
@@ -446,6 +495,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
@@ -458,6 +508,9 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
@@ -479,6 +532,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -529,7 +583,11 @@ class ImageRow(Base):
                 searched_refs.append(f"identifier:{reference!r}")
             try:
                 if row := await resolver_func(
-                    session, reference, load_aliases=load_aliases, loading_options=loading_options
+                    session,
+                    reference,
+                    load_aliases=load_aliases,
+                    filter_by_statuses=filter_by_statuses,
+                    loading_options=loading_options,
                 ):
                     return row
             except UnknownImageReference:
@@ -538,19 +596,34 @@ class ImageRow(Base):
 
     @classmethod
     async def get(
-        cls, session: AsyncSession, image_id: UUID, load_aliases=False
+        cls,
+        session: AsyncSession,
+        image_id: UUID,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        load_aliases: bool = False,
     ) -> ImageRow | None:
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         result = await session.execute(query)
         return result.scalar()
 
     @classmethod
-    async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:
+    async def list(
+        cls,
+        session: AsyncSession,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        load_aliases: bool = False,
+    ) -> List[ImageRow]:
         query = sa.select(ImageRow)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -646,6 +719,10 @@ class ImageRow(Base):
         parsed_image_info["reverse_aliases"] = [x.alias for x in self.aliases]
         return parsed_image_info
 
+    async def mark_as_deleted(self, db_session: AsyncSession) -> None:
+        self.status = ImageStatus.DELETED
+        await db_session.flush()
+
     def set_resource_limit(
         self,
         slot_type: str,
@@ -660,6 +737,9 @@ class ImageRow(Base):
             resources[slot_type]["max"] = str(value_range[1])
 
         self.resources = resources
+
+    def is_customized_by(self, user_id: str) -> bool:
+        return (self.labels or {}).get("ai.backend.customized-image.owner") == f"user:{user_id}"
 
 
 async def bulk_get_image_configs(
@@ -845,14 +925,18 @@ class ImagePermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ImagePermissionContext:
-        permissions = await self.calculate_permission(ctx, SystemScope())
-        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
-
-        for image_row in await self.db_session.scalars(sa.select(ImageRow)):
-            image_id_permission_map[image_row.id] = permissions
-        perm_ctx = ImagePermissionContext(
-            object_id_to_additional_permission_map=image_id_permission_map
+        perm_ctx = ImagePermissionContext()
+        user_accessible_project_scopes = await self._get_user_accessible_project_scopes(
+            ctx, UserScope(ctx.user_id)
         )
+        global_project_scopes_perm_ctx = await self._in_project_scopes_global(
+            ctx, user_accessible_project_scopes
+        )
+        perm_ctx.merge(global_project_scopes_perm_ctx)
+        non_global_project_scopes_perm_ctx = await self._in_project_scopes_non_global(
+            ctx, user_accessible_project_scopes
+        )
+        perm_ctx.merge(non_global_project_scopes_perm_ctx)
         user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
         perm_ctx.merge(user_scope_perm_ctx)
         return perm_ctx
@@ -863,16 +947,107 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ImagePermissionContext:
-        perm_ctx = await self._in_domain_scope(ctx, scope)
+        perm_ctx = ImagePermissionContext()
+        domain_scope_perm_ctx = await self._in_domain_scope(ctx, scope)
+        perm_ctx.merge(domain_scope_perm_ctx)
         user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
         perm_ctx.merge(user_scope_perm_ctx)
+
+        project_scopes = await self._get_domain_accessible_project_scopes(ctx, scope)
+        non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
+            ctx, project_scopes
+        )
+        perm_ctx.merge(non_global_container_registries_perm_ctx)
         return perm_ctx
+
+    @override
+    async def build_ctx_in_project_scope(
+        self,
+        ctx: ClientContext,
+        scope: ProjectScope,
+    ) -> ImagePermissionContext:
+        perm_ctx = ImagePermissionContext()
+        global_container_registries_perm_ctx = await self._in_project_scopes_global(ctx, [scope])
+        perm_ctx.merge(global_container_registries_perm_ctx)
+        non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
+            ctx, [scope]
+        )
+        perm_ctx.merge(non_global_container_registries_perm_ctx)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserScope,
+    ) -> ImagePermissionContext:
+        perm_ctx = ImagePermissionContext()
+        user_scope_perm_ctx = await self._in_user_scope(ctx, scope)
+        perm_ctx.merge(user_scope_perm_ctx)
+
+        project_scopes = await self._get_user_accessible_project_scopes(ctx, scope)
+
+        # We should fetch only customized images
+        non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
+            ctx, project_scopes, True
+        )
+        perm_ctx.merge(non_global_container_registries_perm_ctx)
+        return perm_ctx
+
+    async def _get_allowed_registries_for_user(
+        self, ctx: ClientContext, user_id: uuid.UUID
+    ) -> set[str]:
+        _user_query_stmt = (
+            sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
+        )
+        user_row = cast(Optional[UserRow], await self.db_session.scalar(_user_query_stmt))
+        if user_row is None:
+            raise InvalidScope(f"User not found (id:{user_id})")
+        return set(user_row.domain.allowed_docker_registries)
+
+    def _is_image_accessible_for_user(
+        self, image: ImageRow, allowed_registries: set[str], user_id: uuid.UUID
+    ) -> bool:
+        if image.registry not in allowed_registries:
+            return False
+        labels = cast(dict[str, str], image.labels)
+        if labels.get("ai.backend.customized-image.owner") != f"user:{user_id}":
+            return False
+        return True
+
+    async def _in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserScope,
+    ) -> ImagePermissionContext:
+        allowed_registries = await self._get_allowed_registries_for_user(ctx, scope.user_id)
+
+        permissions = await self.calculate_permission(ctx, scope)
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        _img_query_stmt = (
+            sa.select(ImageRow)
+            .join(ImageRow.registry_row)
+            .options(load_only(ImageRow.id, ImageRow.labels, ImageRow.registry))
+            .where(ContainerRegistryRow.is_global == true())
+        )
+
+        for row in await self.db_session.scalars(_img_query_stmt):
+            image_row = cast(ImageRow, row)
+            if not self._is_image_accessible_for_user(image_row, allowed_registries, scope.user_id):
+                continue
+            image_id_permission_map[image_row.id] = permissions
+
+        return ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
+        )
 
     async def _in_domain_scope(
         self,
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ImagePermissionContext:
+        from .container_registry import ContainerRegistryRow
         from .domain import DomainRow
 
         permissions = await self.calculate_permission(ctx, scope)
@@ -884,7 +1059,14 @@ class ImagePermissionContextBuilder(
             raise InvalidScope(f"Domain not found (n:{scope.domain_name})")
 
         allowed_registries: set[str] = set(domain_row.allowed_docker_registries)
-        _img_query_stmt = sa.select(ImageRow).options(load_only(ImageRow.id, ImageRow.registry))
+
+        _img_query_stmt = (
+            sa.select(ImageRow)
+            .join(ImageRow.registry_row)
+            .options(load_only(ImageRow.id, ImageRow.registry))
+            .where(ContainerRegistryRow.is_global == true())
+        )
+
         for row in await self.db_session.scalars(_img_query_stmt):
             _row = cast(ImageRow, row)
             if _row.registry in allowed_registries:
@@ -894,52 +1076,132 @@ class ImagePermissionContextBuilder(
             object_id_to_additional_permission_map=image_id_permission_map
         )
 
-    @override
-    async def build_ctx_in_project_scope(
-        self,
-        ctx: ClientContext,
-        scope: ProjectScope,
-    ) -> ImagePermissionContext:
-        return ImagePermissionContext()
-
-    @override
-    async def build_ctx_in_user_scope(
+    async def _get_user_accessible_project_scopes(
         self,
         ctx: ClientContext,
         scope: UserScope,
-    ) -> ImagePermissionContext:
-        return await self._in_user_scope(ctx, scope)
+    ) -> list[ProjectScope]:
+        from .group import AssocGroupUserRow
 
-    async def _in_user_scope(
+        get_assoc_group_ids_stmt = sa.select(AssocGroupUserRow.group_id).where(
+            AssocGroupUserRow.user_id == scope.user_id
+        )
+        group_ids = await self.db_session.scalars(get_assoc_group_ids_stmt)
+
+        return [ProjectScope(project_id=group_id) for group_id in group_ids]
+
+    async def _get_domain_accessible_project_scopes(
         self,
         ctx: ClientContext,
-        scope: UserScope,
-    ) -> ImagePermissionContext:
-        _user_query_stmt = (
-            sa.select(UserRow)
-            .where(UserRow.uuid == scope.user_id)
-            .options(joinedload(UserRow.domain))
-        )
-        user_row = cast(Optional[UserRow], await self.db_session.scalar(_user_query_stmt))
-        if user_row is None:
-            raise InvalidScope(f"User not found (id:{scope.user_id})")
+        scope: DomainScope,
+    ) -> list[ProjectScope]:
+        from .group import GroupRow
 
-        permissions = await self.calculate_permission(ctx, scope)
-        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
-        allowed_registries: set[str] = set(user_row.domain.allowed_docker_registries)
-        _img_query_stmt = sa.select(ImageRow).options(
-            load_only(ImageRow.id, ImageRow.labels, ImageRow.registry)
+        stmt = sa.select(GroupRow.id).where(GroupRow.domain_name == scope.domain_name)
+        project_ids = await self.db_session.scalars(stmt)
+        return [ProjectScope(project_id=proj_id) for proj_id in project_ids]
+
+    async def _verify_project_scope_and_calculate_permission(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> frozenset[ImagePermission]:
+        from .group import GroupRow
+
+        group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
+        group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
+        if group_row is None:
+            raise InvalidScope(f"Project not found (project_id: {scope.project_id})")
+
+        return await self.calculate_permission(ctx, scope)
+
+    async def _in_project_scopes_by_registry_condition(
+        self,
+        ctx: ClientContext,
+        scopes: list[ProjectScope],
+        registry_condition_factory: Callable[[list[Any]], Any],
+        filter_global_registry: bool = False,
+        filter_customized_image: bool = False,
+    ) -> ImagePermissionContext:
+        from .container_registry import ContainerRegistryRow
+
+        project_ids = [scope.project_id for scope in scopes]
+        project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
+
+        for scope in scopes:
+            permissions = await self._verify_project_scope_and_calculate_permission(ctx, scope)
+            project_id_to_permission_map[str(scope.project_id)] = permissions
+
+        image_select_stmt = (
+            sa.select(ImageRow)
+            .join(ImageRow.registry_row)
+            .options(
+                joinedload(ImageRow.registry_row).joinedload(
+                    ContainerRegistryRow.association_container_registries_groups_rows
+                )
+            )
+            .where(registry_condition_factory(project_ids))
         )
-        for row in await self.db_session.scalars(_img_query_stmt):
-            _row = cast(ImageRow, row)
-            labels = cast(dict[str, str], _row.labels)
-            if _row.registry not in allowed_registries:
-                continue
-            if labels.get("ai.backend.customized-image.owner") != f"user:{scope.user_id}":
-                continue
-            image_id_permission_map[_row.id] = permissions
+
+        image_id_to_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        result = (await self.db_session.scalars(image_select_stmt)).unique()
+        for row in result:
+            img_row = cast(ImageRow, row)
+
+            if filter_customized_image:
+                allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
+                if not self._is_image_accessible_for_user(img_row, allowed_registries, ctx.user_id):
+                    continue
+
+            if filter_global_registry:
+                # Assumption: permissions for global registry images is same across all projects.
+                image_id_to_permission_map[img_row.id] = list(
+                    project_id_to_permission_map.values()
+                )[0]
+            else:
+                assoc_project_ids = [
+                    assoc.group_id
+                    for assoc in img_row.registry_row.association_container_registries_groups_rows
+                ]
+                for project_id in assoc_project_ids:
+                    image_id_to_permission_map[img_row.id] = project_id_to_permission_map[
+                        str(project_id)
+                    ]
+
         return ImagePermissionContext(
-            object_id_to_additional_permission_map=image_id_permission_map
+            object_id_to_additional_permission_map=image_id_to_permission_map
+        )
+
+    async def _in_project_scopes_global(
+        self,
+        ctx: ClientContext,
+        scopes: list[ProjectScope],
+        filter_customized_image: bool = False,
+    ) -> ImagePermissionContext:
+        from .container_registry import ContainerRegistryRow
+
+        def global_registry_condition(project_ids: list[Any]):
+            return ContainerRegistryRow.is_global == true()
+
+        return await self._in_project_scopes_by_registry_condition(
+            ctx, scopes, global_registry_condition, True, filter_customized_image
+        )
+
+    async def _in_project_scopes_non_global(
+        self,
+        ctx: ClientContext,
+        scopes: list[ProjectScope],
+        filter_customized_image: bool = False,
+    ) -> ImagePermissionContext:
+        from .association_container_registries_groups import AssociationContainerRegistriesGroupsRow
+        from .container_registry import ContainerRegistryRow
+
+        def non_global_registry_condition(project_ids: list[Any]):
+            return ContainerRegistryRow.association_container_registries_groups_rows.any(
+                AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
+            )
+
+        return await self._in_project_scopes_by_registry_condition(
+            ctx, scopes, non_global_registry_condition, False, filter_customized_image
         )
 
     @override

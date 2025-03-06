@@ -44,9 +44,10 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
-    REDIS_STAT_DB,
+    REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
+    RedisRole,
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
@@ -59,10 +60,20 @@ from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    EtcdRedisConfig,
+    HostPortPair,
+)
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
+from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+    PerProjectContainerRegistryQuotaService,
+)
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -176,6 +187,7 @@ public_interface_objs: MutableMapping[str, Any] = {}
 
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
+    ".container_registry",
     ".etcd",
     ".events",
     ".auth",
@@ -194,6 +206,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".image",
     ".userconfig",
     ".domainconfig",
+    ".group",
     ".groupconfig",
     ".logs",
 ]
@@ -360,30 +373,32 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.shared_config.data["redis"]
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
 
     root_ctx.redis_live = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.LIVE),
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STATISTICS),
         name="stat",  # temporary storage for stat snapshots
-        db=REDIS_STAT_DB,
+        db=REDIS_STATISTICS_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.IMAGE),
         name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM_LOCK),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
@@ -426,12 +441,15 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     else:
         event_dispatcher_cls = EventDispatcher
 
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
     root_ctx.event_producer = await EventProducer.new(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
     )
     root_ctx.event_dispatcher = await event_dispatcher_cls.new(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
@@ -691,6 +709,21 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 await task
 
 
+@actxmgr
+async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    db = root_ctx.db
+
+    per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
+        repository=PerProjectRegistryQuotaRepository(db),
+        client_pool=PerProjectContainerRegistryQuotaClientPool(),
+    )
+
+    root_ctx.services_ctx = ServicesContext(
+        per_project_container_registries_quota,
+    )
+    yield None
+
+
 class background_task_ctx:
     def __init__(self, root_ctx: RootContext) -> None:
         self.root_ctx = root_ctx
@@ -817,7 +850,7 @@ def build_root_app(
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config["pyroscope"]["enabled"],
-            app_name=local_config["pyroscope"]["app-name"],
+            application_name=local_config["pyroscope"]["app-name"],
             server_address=local_config["pyroscope"]["server-addr"],
             sample_rate=local_config["pyroscope"]["sample-rate"],
         )
@@ -834,6 +867,14 @@ def build_root_app(
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
+
+    # If the request path starts with the following route, the auth_middleware is bypassed.
+    # In this case, all authentication flags are turned off.
+    # Used in special cases where the request headers cannot be modified.
+    app["auth_middleware_allowlist"] = [
+        "/container-registries/webhook",
+    ]
+
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
@@ -858,6 +899,7 @@ def build_root_app(
             manager_status_ctx,
             redis_ctx,
             database_ctx,
+            services_ctx,
             distributed_lock_ctx,
             event_dispatcher_ctx,
             idle_checker_ctx,

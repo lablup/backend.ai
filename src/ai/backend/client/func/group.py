@@ -1,7 +1,9 @@
+import textwrap
 from typing import Any, Iterable, Optional, Sequence
 
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
+from ai.backend.common.utils import b64encode
 
 from ...cli.types import Undefined, undefined
 from ..session import api_session
@@ -293,3 +295,101 @@ class Group(BaseFunction):
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["modify_group"]
+
+    @api_function
+    @classmethod
+    async def get_container_registry_quota(cls, group_id: str) -> int:
+        """
+        Get Quota Limit for the group's container registry.
+        Currently only HarborV2 registry is supported.
+
+        You need an admin privilege for this operation.
+        """
+        query = textwrap.dedent(
+            """\
+            query($id: String!) {
+                group_node(id: $id) {
+                    registry_quota
+                }
+            }
+        """
+        )
+
+        variables = {"id": b64encode(f"group_node:{group_id}")}
+        data = await api_session.get().Admin._query(query, variables)
+        return data["group_node"]["registry_quota"]
+
+    @api_function
+    @classmethod
+    async def create_container_registry_quota(cls, group_id: str, quota: int) -> dict:
+        """
+        Create Quota Limit for the group's container registry.
+        Currently only HarborV2 registry is supported.
+
+        You need an admin privilege for this operation.
+        """
+        query = textwrap.dedent(
+            """\
+            mutation($scope_id: ScopeField!, $quota: Int!) {
+                create_container_registry_quota(
+                        scope_id: $scope_id, quota: $quota) {
+                    ok msg
+                }
+            }
+        """
+        )
+
+        scope_id = f"project:{group_id}"
+        variables = {"scope_id": scope_id, "quota": quota}
+        data = await api_session.get().Admin._query(query, variables)
+        return data["create_container_registry_quota"]
+
+    @api_function
+    @classmethod
+    async def update_container_registry_quota(cls, group_id: str, quota: int) -> dict:
+        """
+        Update Quota Limit for the group's container registry.
+        Currently only HarborV2 registry is supported.
+
+        You need an admin privilege for this operation.
+        """
+        query = textwrap.dedent(
+            """\
+            mutation($scope_id: ScopeField!, $quota: Int!) {
+                update_container_registry_quota(
+                        scope_id: $scope_id, quota: $quota) {
+                    ok msg
+                }
+            }
+        """
+        )
+
+        scope_id = f"project:{group_id}"
+        variables = {"scope_id": scope_id, "quota": quota}
+        data = await api_session.get().Admin._query(query, variables)
+        return data["update_container_registry_quota"]
+
+    @api_function
+    @classmethod
+    async def delete_container_registry_quota(cls, group_id: str) -> dict:
+        """
+        Delete Quota Limit for the group's container registry.
+        Currently only HarborV2 registry is supported.
+
+        You need an admin privilege for this operation.
+        """
+        query = textwrap.dedent(
+            """\
+            mutation($scope_id: ScopeField!) {
+                delete_container_registry_quota(
+                        scope_id: $scope_id) {
+                    ok msg
+                }
+            }
+        """
+        )
+
+        scope_id = f"project:{group_id}"
+        variables = {"scope_id": scope_id}
+        data = await api_session.get().Admin._query(query, variables)
+        return data["delete_container_registry_quota"]

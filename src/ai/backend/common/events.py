@@ -9,6 +9,7 @@ import secrets
 import socket
 import time
 import uuid
+from abc import abstractmethod
 from collections import defaultdict
 from contextlib import aclosing
 from typing import (
@@ -26,6 +27,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    override,
 )
 
 import attrs
@@ -40,10 +42,10 @@ from ai.backend.logging import BraceStyleAdapter, LogLevel
 from . import msgpack, redis_helper
 from .types import (
     AgentId,
-    EtcdRedisConfig,
     KernelId,
     ModelServiceStatus,
     QuotaScopeID,
+    RedisConfig,
     RedisConnectionInfo,
     SessionId,
     VFolderID,
@@ -633,8 +635,32 @@ class ExecutionCancelledEvent(GenericSessionEventArgs, AbstractEvent):
     name = "execution_cancelled"
 
 
+class AbstractBgtaskEventType(AbstractEvent):
+    @abstractmethod
+    def retry_count(self) -> Optional[int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def should_close(self) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def event_name(self, extra_data: dict) -> str:
+        raise NotImplementedError
+
+
+class AbstractBgtaskDoneEventType(AbstractBgtaskEventType):
+    @override
+    def should_close(self) -> bool:
+        return True
+
+
 @attrs.define(auto_attribs=True, slots=True)
-class BgtaskUpdatedEvent(AbstractEvent):
+class BgtaskUpdatedEvent(AbstractBgtaskEventType):
     name = "bgtask_updated"
 
     task_id: uuid.UUID = attrs.field()
@@ -659,9 +685,34 @@ class BgtaskUpdatedEvent(AbstractEvent):
             value[3],
         )
 
+    @override
+    def retry_count(self) -> Optional[int]:
+        return 5
+
+    @override
+    def should_close(self) -> bool:
+        return False
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {
+            "task_id": str(self.task_id),
+            "message": self.message,
+            "current_progress": self.current_progress,
+            "total_progress": self.total_progress,
+        }
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        return self.name
+
 
 @attrs.define(auto_attribs=True, slots=True)
 class BgtaskDoneEventArgs:
+    """
+    Arguments for events that are triggered when the Bgtask is completed.
+    """
+
     task_id: uuid.UUID = attrs.field()
     message: Optional[str] = attrs.field(default=None)
 
@@ -679,16 +730,105 @@ class BgtaskDoneEventArgs:
         )
 
 
-class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractEvent):
+class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
+    """
+    Event triggered when the Bgtask is successfully completed.
+    """
+
     name = "bgtask_done"
 
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
 
-class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {
+            "task_id": str(self.task_id),
+            "message": self.message,
+            **extra_data,
+        }
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        if extra_data:
+            return f"bgtask_{extra_data['status']}"
+        return self.name
+
+
+class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
     name = "bgtask_cancelled"
 
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
 
-class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {"task_id": str(self.task_id), "message": self.message}
+
+    @override
+    def event_name(self, extra_data):
+        return self.name
+
+
+class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
     name = "bgtask_failed"
+
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {"task_id": str(self.task_id), "message": self.message}
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        return self.name
+
+
+# TODO: Change the event name after handling the `bgtask_partial_success` event in clients such as WebUI.
+# BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_partial_success"
+BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
+    name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
+
+    errors: list[str] = attrs.field(factory=list)
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.task_id),
+            self.message,
+            self.errors,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            uuid.UUID(value[0]),
+            value[1],
+            value[2],
+        )
+
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {
+            "task_id": str(self.task_id),
+            "message": self.message,
+            "errors": self.errors,
+        }
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        return self.name
 
 
 @attrs.define(slots=True)
@@ -943,7 +1083,7 @@ class EventObserver(Protocol):
     def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None: ...
 
 
@@ -952,7 +1092,7 @@ class NopEventObserver:
         pass
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None:
         pass
 
@@ -986,7 +1126,7 @@ class EventDispatcher(aobject):
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -1089,10 +1229,11 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions | None = None,
+        coalescing_opts: Optional[CoalescingOptions] = None,
         *,
-        name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        name: Optional[str] = None,
+        override_event_name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
     ) -> EventHandler[TContext, TEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
@@ -1113,14 +1254,18 @@ class EventDispatcher(aobject):
             CoalescingState(),
             args_matcher,
         )
-        self.subscribers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
+        override_event_name = override_event_name or event_cls.name
+        self.subscribers[override_event_name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
     def unsubscribe(
         self,
         handler: EventHandler[TContext, TEvent],
+        *,
+        override_event_name: Optional[str] = None,
     ) -> None:
-        self.subscribers[handler.event_cls.name].discard(
+        override_event_name = override_event_name or handler.event_cls.name
+        self.subscribers[override_event_name].discard(
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
@@ -1202,8 +1347,6 @@ class EventDispatcher(aobject):
                         event_type=event_type,
                         duration=time.perf_counter() - start,
                     )
-                except asyncio.CancelledError:
-                    raise
                 except Exception as e:
                     self._metric_observer.observe_event_failure(
                         event_type=event_type,
@@ -1211,6 +1354,13 @@ class EventDispatcher(aobject):
                         exception=e,
                     )
                     log.exception("EventDispatcher.consume(): unexpected-error")
+                except BaseException as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
+                    raise
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
@@ -1240,8 +1390,6 @@ class EventDispatcher(aobject):
                         event_type=event_type,
                         duration=time.perf_counter() - start,
                     )
-                except asyncio.CancelledError:
-                    raise
                 except Exception as e:
                     self._metric_observer.observe_event_failure(
                         event_type=event_type,
@@ -1249,6 +1397,13 @@ class EventDispatcher(aobject):
                         exception=e,
                     )
                     log.exception("EventDispatcher.subscribe(): unexpected-error")
+                except BaseException as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
+                    raise
 
 
 class EventProducer(aobject):
@@ -1257,7 +1412,7 @@ class EventProducer(aobject):
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         db: int = 0,
         *,
         service_name: str | None = None,

@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει",
       "MyEnvironments": "Τα περιβάλλοντα μου",
       "ResourcePolicy": "Πολιτική Πόρων",
-      "FullNameUpdated": "Το πλήρες όνομα ενημερώθηκε με επιτυχία."
+      "FullNameUpdated": "Το πλήρες όνομα ενημερώθηκε με επιτυχία.",
+      "Chat": "Συνομιλία"
     },
     "YouAreOffline": "Offline: Δεν είναι συνδεδεμένος σε κανένα δίκτυο.",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
@@ -433,7 +434,9 @@
     "FGPU": "fGPU",
     "ReadLess": "Διαβάστε λιγότερα",
     "ReadMore": "Διαβάστε Περισσότερα...",
-    "CommitImageName": "Όνομα δεσμευμένης εικόνας"
+    "CommitImageName": "Όνομα δεσμευμένης εικόνας",
+    "IdleCheckExpirationWarning": "Οι συνεδρίες ενδέχεται να τερματιστούν με βάση τα αποτελέσματα των Ελέγχων αδράνειας.",
+    "FailToRenameSession": "Η αίτηση αλλαγής του ονόματος συνεδρίας απέτυχε."
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -476,7 +479,8 @@
     "Expand": "Επεκτείνουν",
     "Clear": "Διαγράφω",
     "Apply": "Εφαρμογή",
-    "CopySomething": "Αντιγραφή {{name}}"
+    "CopySomething": "Αντιγραφή {{name}}",
+    "ClickForMoreDetails": "Κάντε κλικ για περισσότερες λεπτομέρειες"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -527,13 +531,15 @@
     "Session": "Σύνοδος",
     "General": "Γενικά",
     "Disabled": "Άτομα με ειδικές ανάγκες",
-    "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
+    "NSelected": "{{count}} selected",
     "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
     "Change": "Αλλαγή",
     "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}",
     "TotalItems": "Σύνολο {{total}} στοιχείων",
     "ExtendLoginSession": "Επέκταση μιας περιόδου σύνδεσης",
-    "Cores": "πυρήνες"
+    "Cores": "πυρήνες",
+    "InvalidJSONFormat": "Μη έγκυρη μορφή JSON.",
+    "LastUpdated": "Τελευταία ενημέρωση"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -1016,7 +1022,9 @@
     "BootstrapScriptEmpty": "Το σενάριο είναι κενό. \nΕισαγάγετε το σενάριο.",
     "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε",
     "ClassicSessionLauncher": "Classic Session Launcher",
-    "DescClassicSessionLauncher": "Χρησιμοποιήστε το πρόγραμμα εκκίνησης συνεδρίας Classic αντί για το πρόγραμμα εκκίνησης συνεδρίας NEO. \nΤο πρόγραμμα εκκίνησης περιόδου λειτουργίας Classic ενδέχεται να μην έχει τις πιο πρόσφατες δυνατότητες."
+    "DescClassicSessionLauncher": "Χρησιμοποιήστε το πρόγραμμα εκκίνησης συνεδρίας Classic αντί για το πρόγραμμα εκκίνησης συνεδρίας NEO. \nΤο πρόγραμμα εκκίνησης περιόδου λειτουργίας Classic ενδέχεται να μην έχει τις πιο πρόσφατες δυνατότητες.",
+    "NEOSessionList": "NEO Κατάλογος συνόδων",
+    "ExperimentalFeatures": "Πειραματικά χαρακτηριστικά"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Σύνθετη χρήση τερματικού Web: Αντιγραφή περιεχομένου τερματικού",
@@ -1506,7 +1514,9 @@
     "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API.",
     "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή.",
     "InvalidUrl": "Δεν είναι έγκυρη διεύθυνση URL",
-    "AllowsPositiveNumberOnly": "Να επιτρέπεται μόνο θετικός αριθμός."
+    "AllowsPositiveNumberOnly": "Να επιτρέπεται μόνο θετικός αριθμός.",
+    "OnlyIntegersAreAllowed": "Επιτρέπονται μόνο ακέραιοι.",
+    "OnlyPositiveIntegersAreAllowed": "Επιτρέπονται μόνο θετικοί ακέραιοι ακέραιοι."
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",
@@ -1598,7 +1608,10 @@
     "ServiceNameMaxLength": "Εισαγάγετε 24 χαρακτήρες ή λιγότερους.",
     "ServiceNameCannotStartWithHyphen": "Οι παύλες (-) δεν μπορούν να χρησιμοποιηθούν σε κανένα άκρο.",
     "Resources": "Πόροι",
-    "NumberOfReplicas": "Αριθμός αντιγράφων"
+    "NumberOfReplicas": "Αριθμός αντιγράφων",
+    "AutoScalingRules": "Κανόνες αυτόματης κλιμάκωσης",
+    "AddRules": "Προσθέστε κανόνες",
+    "RouteError": "Σφάλμα διαδρομής"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1714,7 +1727,9 @@
     "Attachments": "Συνημμένα",
     "DropFileHere": "Αποθέστε το αρχείο εδώ",
     "UploadFiles": "Μεταφόρτωση αρχείων",
-    "UploadFilesDescription": "Κάντε κλικ ή σύρετε αρχεία σε αυτήν την περιοχή για μεταφόρτωση"
+    "UploadFilesDescription": "Κάντε κλικ ή σύρετε αρχεία σε αυτήν την περιοχή για μεταφόρτωση",
+    "Thinking": "Σκέψη",
+    "ViewReasoning": "Προβολή λογικής"
   },
   "time": {
     "Day": "day",
@@ -1755,5 +1770,35 @@
     "ReloadPage": "Επαναφόρτωση της σελίδας",
     "ResetErrorBoundary": "Επαναφορά ErrorBoundary",
     "Title": "Εμφανίστηκε σφάλμα."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Προσθέστε κανόνα αυτόματης κλιμάκωσης",
+    "CoolDownSeconds": "Δροσερό δευτερόλεπτα",
+    "SuccessfullyUpdated": "Ο κανόνας αυτόματης κλιμάκωσης έχει ενημερωθεί με επιτυχία.",
+    "SuccessfullyCreated": "Ο κανόνας αυτόματης κλιμάκωσης έχει δημιουργηθεί με επιτυχία.",
+    "EditAutoScalingRule": "Επεξεργασία κανόνα κλιμάκωσης αυτόματης",
+    "Comparator": "Συγκριτής",
+    "Threshold": "Κατώφλι",
+    "StepSize": "Μέγεθος βήματος",
+    "MinReplicas": "Λεπτά αντίγραφα",
+    "MaxReplicas": "Μέγιστα αντίγραφα",
+    "MetricName": "Μετρικό όνομα",
+    "MetricSource": "Μετρική πηγή",
+    "MIN/MAXReplicas": "Min / Max Replicas",
+    "LastTriggered": "Τελευταία ενεργοποιημένη",
+    "CreatedAt": "Δημιουργήθηκε ώρα",
+    "ConditionTooltip": "Μπορείτε να εισαγάγετε ελεύθερα οποιαδήποτε μετρική που υποστηρίζεται από το περιβάλλον εκτέλεσης.\nΓια παράδειγμα: \"cuda_mem\", \"cuda_util\".",
+    "ScalingType": "Τύπος",
+    "ScaleUp": "Κλιμάκωση",
+    "ScaleDown": "Κλιμάκωση προς τα κάτω",
+    "Condition": "Κατάσταση"
+  },
+  "kernel": {
+    "KernelId": "Αναγνωριστικό πυρήνα",
+    "Role": "Ρόλος",
+    "Status": "Κατάσταση",
+    "AgentId": "Αναγνωριστικό πράκτορα",
+    "ContainerId": "Αναγνωριστικό δοχείου",
+    "Kernels": "Πυρήνες"
   }
 }

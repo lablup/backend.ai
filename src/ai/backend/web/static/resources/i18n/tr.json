@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor",
       "MyEnvironments": "Ortamlarım",
       "ResourcePolicy": "Kaynak Politikası",
-      "FullNameUpdated": "Tam ad başarıyla güncellendi."
+      "FullNameUpdated": "Tam ad başarıyla güncellendi.",
+      "Chat": "Sohbet"
     },
     "YouAreOffline": "Çevrimdışı: Herhangi bir ağa bağlı değil.",
     "YouAreOnline": "artık çevrimiçisin",
@@ -432,7 +433,9 @@
     "FGPU": "fGPU",
     "ReadLess": "Daha az oku",
     "ReadMore": "Daha Fazlasını Oku...",
-    "CommitImageName": "Taahhüt edilen resim adı"
+    "CommitImageName": "Taahhüt edilen resim adı",
+    "IdleCheckExpirationWarning": "Idleness Check sonuçlarına göre oturumlar sonlandırılabilir.",
+    "FailToRenameSession": "Oturum adını değiştirme isteği başarısız oldu."
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -475,7 +478,8 @@
     "Expand": "Genişletmek",
     "Clear": "Silmek",
     "Apply": "Başvurmak",
-    "CopySomething": "Kopyala {{name}}"
+    "CopySomething": "Kopyala {{name}}",
+    "ClickForMoreDetails": "Daha fazla ayrıntı için tıklayın"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -526,13 +530,15 @@
     "Session": "Oturum",
     "General": "Genel",
     "Disabled": "Engelli",
-    "NSelected": "Seçilen {{count}} öğe(ler)",
+    "NSelected": "{{count}} seçildi",
     "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
     "Change": "Değişim",
     "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır",
     "TotalItems": "Toplam {{toplam}} öğe",
     "ExtendLoginSession": "Oturum açma oturumunu uzatma",
-    "Cores": "çekirdek"
+    "Cores": "çekirdek",
+    "InvalidJSONFormat": "Geçersiz JSON biçimi.",
+    "LastUpdated": "Son Güncelleme"
   },
   "credential": {
     "Permission": "izin",
@@ -1015,7 +1021,9 @@
     "BootstrapScriptEmpty": "Senaryo boş. \nLütfen betiği girin.",
     "BootstrapScriptDeleted": "Bootstrap komut dosyası silindi",
     "ClassicSessionLauncher": "Classic Oturum Başlatıcı",
-    "DescClassicSessionLauncher": "NEO oturum başlatıcısı yerine Classic oturum başlatıcıyı kullanın. \nClassic oturum başlatıcı en son özelliklere sahip olmayabilir."
+    "DescClassicSessionLauncher": "NEO oturum başlatıcısı yerine Classic oturum başlatıcıyı kullanın. \nClassic oturum başlatıcı en son özelliklere sahip olmayabilir.",
+    "NEOSessionList": "NEO Oturum listesi",
+    "ExperimentalFeatures": "Deneysel özellikler"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Gelişmiş Web Terminali Kullanımı: Terminal içeriğini kopyalayın",
@@ -1505,7 +1513,9 @@
     "WrongAPIServerAddress": "Yanlış API sunucu adresi.",
     "ReachedResourceLimitPleaseContact": "Kaynak sınırınıza ulaştınız. \nLütfen yöneticiyle iletişime geçin.",
     "InvalidUrl": "Geçerli bir URL değil",
-    "AllowsPositiveNumberOnly": "Yalnızca pozitif sayıya izin ver."
+    "AllowsPositiveNumberOnly": "Yalnızca pozitif sayıya izin ver.",
+    "OnlyIntegersAreAllowed": "Sadece tamsayılara izin verilir.",
+    "OnlyPositiveIntegersAreAllowed": "Sadece pozitif tamsayılara izin verilir."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1597,7 +1607,10 @@
     "ServiceNameMaxLength": "Lütfen 24 veya daha az karakter girin.",
     "ServiceNameCannotStartWithHyphen": "Kısa çizgi (-) her iki uçta da kullanılamaz.",
     "Resources": "Kaynaklar",
-    "NumberOfReplicas": "Kopya sayısı"
+    "NumberOfReplicas": "Kopya sayısı",
+    "AutoScalingRules": "Otomatik Ölçeklendirme Kuralları",
+    "AddRules": "Kurallar Ekle",
+    "RouteError": "Rota Hatası"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1713,7 +1726,9 @@
     "Attachments": "Ekler",
     "DropFileHere": "Dosyayı buraya bırakın",
     "UploadFiles": "Dosyaları yükle",
-    "UploadFilesDescription": "Yüklemek için dosyaları bu alana tıklayın veya sürükleyin"
+    "UploadFilesDescription": "Yüklemek için dosyaları bu alana tıklayın veya sürükleyin",
+    "Thinking": "Düşünme",
+    "ViewReasoning": "Muhakemeyi görüntüleyin"
   },
   "time": {
     "Day": "day",
@@ -1754,5 +1769,35 @@
     "ReloadPage": "Sayfayı yeniden yükle",
     "ResetErrorBoundary": "ErrorBoundary'yi Sıfırla",
     "Title": "Bir hata oluştu."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Otomatik ölçeklendirme kuralı ekleyin",
+    "CoolDownSeconds": "Saniyeler serin",
+    "SuccessfullyUpdated": "Otomatik ölçeklendirme kuralı başarıyla güncellendi.",
+    "SuccessfullyCreated": "Otomatik ölçeklendirme kuralı başarıyla oluşturuldu.",
+    "EditAutoScalingRule": "Otomatik ölçeklendirme kuralını düzenle",
+    "Comparator": "Karşılaştırıcı",
+    "Threshold": "Eşik",
+    "StepSize": "Adım Boyutu",
+    "MinReplicas": "Min kopyalar",
+    "MaxReplicas": "Maksimum kopya",
+    "MetricName": "Metrik adı",
+    "MetricSource": "Metrik kaynağı",
+    "MIN/MAXReplicas": "Min / Max Replicas",
+    "LastTriggered": "Son tetiklendi",
+    "CreatedAt": "Yaratılan Zaman",
+    "ConditionTooltip": "Çalışma zamanı ortamı tarafından desteklenen herhangi bir metriği serbestçe girebilirsiniz.\nÖrneğin: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Tip",
+    "ScaleUp": "Ölçek Büyütme",
+    "ScaleDown": "Ölçek Düşürme",
+    "Condition": "Durum"
+  },
+  "kernel": {
+    "KernelId": "Çekirdek kimliği",
+    "Role": "Rol",
+    "Status": "Durum",
+    "AgentId": "Ajan kimliği",
+    "ContainerId": "Konteyner kimliği",
+    "Kernels": "Çekirdek"
   }
 }

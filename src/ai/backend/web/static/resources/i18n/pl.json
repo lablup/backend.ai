@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Adres e-mail użytkownika nie jest zgodny",
       "MyEnvironments": "Moje Środowiska",
       "ResourcePolicy": "Polityka zasobów",
-      "FullNameUpdated": "Pełna nazwa została pomyślnie zaktualizowana."
+      "FullNameUpdated": "Pełna nazwa została pomyślnie zaktualizowana.",
+      "Chat": "Czat"
     },
     "YouAreOffline": "Offline: Brak połączenia z siecią.",
     "YouAreOnline": "Jesteś teraz online",
@@ -433,7 +434,9 @@
     "FGPU": "fGPU",
     "ReadLess": "Czytaj mniej",
     "ReadMore": "Czytaj więcej...",
-    "CommitImageName": "Zatwierdzona nazwa obrazu"
+    "CommitImageName": "Zatwierdzona nazwa obrazu",
+    "IdleCheckExpirationWarning": "Sesje mogą zostać zakończone na podstawie wyników kontroli bezczynności.",
+    "FailToRenameSession": "Żądanie zmiany nazwy sesji nie powiodło się."
   },
   "button": {
     "Cancel": "Anuluj",
@@ -476,7 +479,8 @@
     "Expand": "Zwiększać",
     "Clear": "Usuwać",
     "Apply": "Zastosuj",
-    "CopySomething": "Kopiuj {{name}}"
+    "CopySomething": "Kopiuj {{name}}",
+    "ClickForMoreDetails": "Kliknij, aby uzyskać więcej informacji"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -527,13 +531,15 @@
     "Session": "Sesja",
     "General": "Ogólne",
     "Disabled": "Wyłączony",
-    "NSelected": "Wybrane elementy {{count}}",
+    "NSelected": "{{count}} wybrany",
     "RemainingLoginSessionTime": "Czas do automatycznego wylogowania",
     "Change": "Zmiana",
     "MaxValueNotification": "{{name}} musi być maksymalna {{max}}.",
     "TotalItems": "Łącznie {{total}} pozycji",
     "ExtendLoginSession": "Przedłużanie sesji logowania",
-    "Cores": "rdzenie"
+    "Cores": "rdzenie",
+    "InvalidJSONFormat": "Nieprawidłowy format JSON.",
+    "LastUpdated": "Ostatnia aktualizacja"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -1016,7 +1022,9 @@
     "BootstrapScriptEmpty": "Skrypt jest pusty. \nProszę wprowadzić skrypt.",
     "BootstrapScriptDeleted": "Usunięto skrypt Bootstrap",
     "ClassicSessionLauncher": "Classic program uruchamiający sesję",
-    "DescClassicSessionLauncher": "Użyj Classic programu uruchamiającego sesję zamiast programu uruchamiającego sesję NEO. \nClassic program uruchamiający sesję może nie mieć najnowszych funkcji."
+    "DescClassicSessionLauncher": "Użyj Classic programu uruchamiającego sesję zamiast programu uruchamiającego sesję NEO. \nClassic program uruchamiający sesję może nie mieć najnowszych funkcji.",
+    "NEOSessionList": "Lista sesji NEO",
+    "ExperimentalFeatures": "Cechy eksperymentalne"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -1506,7 +1514,9 @@
     "WrongAPIServerAddress": "Nieprawidłowy adres serwera API.",
     "ReachedResourceLimitPleaseContact": "Osiągnięto limit zasobów. \nSkontaktuj się z administratorem.",
     "InvalidUrl": "To nie jest prawidłowy adres URL",
-    "AllowsPositiveNumberOnly": "Zezwalaj tylko na liczby dodatnie."
+    "AllowsPositiveNumberOnly": "Zezwalaj tylko na liczby dodatnie.",
+    "OnlyIntegersAreAllowed": "Dozwolone są tylko liczby całkowite.",
+    "OnlyPositiveIntegersAreAllowed": "Dozwolone są tylko pozytywne liczby całkowite."
   },
   "maxLength": {
     "64chars": "(maksymalnie 64 znaki)",
@@ -1598,7 +1608,10 @@
     "ServiceNameMaxLength": "Wprowadź maksymalnie 24 znaki.",
     "ServiceNameCannotStartWithHyphen": "Łączników (-) nie można używać na żadnym końcu.",
     "Resources": "Zasoby",
-    "NumberOfReplicas": "Liczba replik"
+    "NumberOfReplicas": "Liczba replik",
+    "AutoScalingRules": "Reguły automatycznego skalowania",
+    "AddRules": "Dodaj zasady",
+    "RouteError": "Błąd trasy"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1714,7 +1727,9 @@
     "Attachments": "Załączniki",
     "DropFileHere": "Upuść plik tutaj",
     "UploadFiles": "Prześlij pliki",
-    "UploadFilesDescription": "Kliknij lub przeciągnij pliki do tego obszaru, aby je przesłać"
+    "UploadFilesDescription": "Kliknij lub przeciągnij pliki do tego obszaru, aby je przesłać",
+    "Thinking": "Myślący",
+    "ViewReasoning": "Zobacz rozumowanie"
   },
   "time": {
     "Day": "day",
@@ -1755,5 +1770,35 @@
     "ReloadPage": "Przeładuj stronę",
     "ResetErrorBoundary": "Reset ErrorBoundary",
     "Title": "Wystąpił błąd."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Dodaj regułę automatycznego skalowania",
+    "CoolDownSeconds": "Ochłodzić sekundy",
+    "SuccessfullyUpdated": "Reguła automatycznego skalowania została pomyślnie zaktualizowana.",
+    "SuccessfullyCreated": "Z powodzeniem utworzono zasadę skalowania automatycznego.",
+    "EditAutoScalingRule": "Edytuj regułę automatycznego skalowania",
+    "Comparator": "Komparator",
+    "Threshold": "Próg",
+    "StepSize": "Rozmiar kroku",
+    "MinReplicas": "Repliki min",
+    "MaxReplicas": "Max Replicas",
+    "MetricName": "Nazwa metryczna",
+    "MetricSource": "Źródło metryczne",
+    "MIN/MAXReplicas": "Repliki min / max",
+    "LastTriggered": "Ostatni wyzwolenie",
+    "CreatedAt": "Utworzony czas",
+    "ConditionTooltip": "Możesz dowolnie wprowadzić dowolną metrykę obsługiwaną przez środowisko wykonawcze.\nNa przykład: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Typ",
+    "ScaleUp": "Zwiększanie skali",
+    "ScaleDown": "Skalowanie w dół",
+    "Condition": "Stan"
+  },
+  "kernel": {
+    "KernelId": "ID jądra",
+    "Role": "Rola",
+    "Status": "Status",
+    "AgentId": "Identyfikator agenta",
+    "ContainerId": "Identyfikator kontenera",
+    "Kernels": "Jądra"
   }
 }

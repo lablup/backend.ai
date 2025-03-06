@@ -941,7 +941,7 @@ class ComputeContainer(graphene.ObjectType):
             "session_id": row.session_id,
             # image
             "image": row.image,
-            "image_object": ImageNode.from_row(row.image_row),
+            "image_object": ImageNode.from_row(ctx, row.image_row),
             "architecture": row.architecture,
             "registry": row.registry,
             # status
@@ -1609,7 +1609,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+                & (KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
             ),
         )
         sftp_concurrency_used = result.scalar()

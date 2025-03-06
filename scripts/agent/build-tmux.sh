@@ -24,8 +24,8 @@ curl -LO https://github.com/libevent/libevent/releases/download/release-2.0.22-s
 tar -zxvf libevent-2.0.22-stable.tar.gz
 curl -LO https://ftp.kaist.ac.kr/gnu/ncurses/ncurses-6.4.tar.gz
 tar zxvf ncurses-6.4.tar.gz
-curl -LO https://github.com/tmux/tmux/releases/download/3.5a/tmux-3.5a.tar.gz
-tar zxvf tmux-3.5a.tar.gz
+curl -LO https://github.com/tmux/tmux/releases/download/3.4/tmux-3.4.tar.gz
+tar zxvf tmux-3.4.tar.gz
 
 cd libevent-2.0.22-stable
 ./configure --prefix=$TARGETDIR --disable-openssl --enable-shared=no --enable-static=yes --with-pic && make -j$(nproc) && make install
@@ -41,7 +41,7 @@ CPPFLAGS="-P" ./configure --prefix $TARGETDIR \
 && make -j$(nproc) && make install.progs && make install.includes && make install.libs
 make clean
 cd ..
-cd tmux-3.5a
+cd tmux-3.4
 PKG_CONFIG_PATH=$TARGETDIR/lib/pkgconfig \
     CFLAGS="-I$TARGETDIR/include/event2 -I$TARGETDIR/include/ncurses" \
     LDFLAGS="-L$TARGETDIR/lib" \

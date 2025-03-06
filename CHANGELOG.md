@@ -16,6 +16,110 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.3.3 (2025-02-27)
+
+### Features
+* Let endpoints with `PROVISIONING` routes deleted without manual session removal ([#3842](https://github.com/lablup/backend.ai/issues/3842))
+
+### Fixes
+* Fix `CreateNetwork` GQL mutation not working ([#3843](https://github.com/lablup/backend.ai/issues/3843))
+* Fix `EndpointAutoScalingRuleNode` GQL query not working ([#3845](https://github.com/lablup/backend.ai/issues/3845))
+
+
+## 25.3.2 (2025-02-26)
+
+### Fixes
+* Add `service_ports` field resolver to GQL ComputeSessionNode type ([#3782](https://github.com/lablup/backend.ai/issues/3782))
+* Fix the GQL VirtualFolderNode resolver to accept a filter argument ([#3799](https://github.com/lablup/backend.ai/issues/3799))
+* Fix wrong Python interpreter embedded in the installer scie builds ([#3810](https://github.com/lablup/backend.ai/issues/3810))
+* Fix a DB migration script that fails when the system has a default domain with a name other than 'default' ([#3816](https://github.com/lablup/backend.ai/issues/3816))
+* Use correct lock ID for schedulers and event producers ([#3817](https://github.com/lablup/backend.ai/issues/3817))
+* Broken image rescanning on `HarborRegistry_v1` due to type error of credential value. ([#3821](https://github.com/lablup/backend.ai/issues/3821))
+* Ensure that the scie build of install.config also includes the files in the folder and the yaml file. ([#3824](https://github.com/lablup/backend.ai/issues/3824))
+* Fix wrong alembic migration scripts ([#3829](https://github.com/lablup/backend.ai/issues/3829))
+
+
+## 25.3.1 (2025-02-21)
+
+### Features
+* Add New API Logging Aligned with Pydantic ([#3731](https://github.com/lablup/backend.ai/issues/3731))
+* Configurable global lock lifetime ([#3774](https://github.com/lablup/backend.ai/issues/3774))
+* Let metric observers catch base exceptions in event handlers ([#3779](https://github.com/lablup/backend.ai/issues/3779))
+
+### Fixes
+* Fix missing argument in Redis event dispatcher initializer ([#3773](https://github.com/lablup/backend.ai/issues/3773))
+* Fix wrong Python interpreter versions included in the scie builds ([#3793](https://github.com/lablup/backend.ai/issues/3793))
+
+
+## 25.3.0 (2025-02-19)
+
+### Features
+* Add project scope implementation to Image RBAC. ([#3035](https://github.com/lablup/backend.ai/issues/3035))
+* Implement `ImageNode` GQL resolver based on RBAC. ([#3036](https://github.com/lablup/backend.ai/issues/3036))
+* Implement `AssociationContainerRegistriesGroups` as m2m table of `container_registries`, and `groups`. ([#3065](https://github.com/lablup/backend.ai/issues/3065))
+* Implement CRUD API for managing Harbor per-project Quota. ([#3090](https://github.com/lablup/backend.ai/issues/3090))
+* Implement Image Rescanning using Harbor Webhook API. ([#3116](https://github.com/lablup/backend.ai/issues/3116))
+* Create KVS Interface ([#3645](https://github.com/lablup/backend.ai/issues/3645))
+* Add configurable setup for kernel initialization polling ([#3657](https://github.com/lablup/backend.ai/issues/3657))
+* Add a `show_kernel_list` config to webserver to show/hide kernel list in the session detail panel.
+
+  Add configs not specified in sample.toml ([#3671](https://github.com/lablup/backend.ai/issues/3671))
+* Make security policy configurable ([#3680](https://github.com/lablup/backend.ai/issues/3680))
+* Make CSP configurable ([#3682](https://github.com/lablup/backend.ai/issues/3682))
+* Sort vfolder list fields in compute session GQL objects ([#3751](https://github.com/lablup/backend.ai/issues/3751))
+
+### Improvements
+* Add the skeleton interface of vfolder CRUD handlers in storage-proxy ([#3516](https://github.com/lablup/backend.ai/issues/3516))
+* Apply pydantic handling decorator to VFolder APIs in storage-proxy ([#3565](https://github.com/lablup/backend.ai/issues/3565))
+* Move abc.py and storage system modules to volumes package ([#3567](https://github.com/lablup/backend.ai/issues/3567))
+* Extract list_volumes and get_volume into pool.py ([#3569](https://github.com/lablup/backend.ai/issues/3569))
+* Add Service Layer to Avoid Direct Volume and Vfolder Operations in Storage-Proxy Handler ([#3588](https://github.com/lablup/backend.ai/issues/3588))
+* Change Absolute Imports to Relative Imports in Storage-Proxy ([#3685](https://github.com/lablup/backend.ai/issues/3685))
+
+### Fixes
+* Revamp `ContainerRegistryNode` API. ([#3424](https://github.com/lablup/backend.ai/issues/3424))
+* Change port numbers using ephemeral ports ([#3614](https://github.com/lablup/backend.ai/issues/3614))
+* Handle cancel and timeout when creating kernels ([#3648](https://github.com/lablup/backend.ai/issues/3648))
+* Correct the number of concurrent SFTP sessions queried from DB ([#3654](https://github.com/lablup/backend.ai/issues/3654))
+* Increase Backend.AI Kernel's app startup timeout ([#3679](https://github.com/lablup/backend.ai/issues/3679))
+* Fix ContainerRegistry per-project API misc bugs. ([#3701](https://github.com/lablup/backend.ai/issues/3701))
+* Fix model service not removed when auto scaling rules are set ([#3711](https://github.com/lablup/backend.ai/issues/3711))
+* Validate duplicate session names during compute session modification ([#3715](https://github.com/lablup/backend.ai/issues/3715))
+* Revert tmux version upgrade from 3.4 to 3.5a due to compatibility issues on aarch64 architecture ([#3740](https://github.com/lablup/backend.ai/issues/3740))
+* Fix compute session rename API handler to query DB correctly ([#3746](https://github.com/lablup/backend.ai/issues/3746))
+* Suppress `SELECT statement has a cartesian product between FROM element(s) "endpoints" and FROM element "endpoint_auto_scaling_rules"` log ([#3747](https://github.com/lablup/backend.ai/issues/3747))
+
+
+## 25.2.0 (2025-02-07)
+
+### Features
+* Update tmux version from 3.4 to 3.5a ([#3000](https://github.com/lablup/backend.ai/issues/3000))
+* Enable per-user UID/GID set for containers via user creation and update GraphQL APIs ([#3352](https://github.com/lablup/backend.ai/issues/3352))
+* Update SDK and CLI to support per-user UID/GID configuration ([#3361](https://github.com/lablup/backend.ai/issues/3361))
+* Add timeout configuration for Docker image push ([#3412](https://github.com/lablup/backend.ai/issues/3412))
+* Add configurable directory permission for vfolders to support mount vfolders on customized UID/GID containers ([#3510](https://github.com/lablup/backend.ai/issues/3510))
+* Add new Pydantic handling api decorator for Request/Response validation ([#3511](https://github.com/lablup/backend.ai/issues/3511))
+* Add force delete API for VFolder that bypasses the trash bin ([#3546](https://github.com/lablup/backend.ai/issues/3546))
+* Add storage-watcher API to delete VFolders with elevated permissions ([#3548](https://github.com/lablup/backend.ai/issues/3548))
+
+### Improvements
+* Add skeleton vFolder handler Interface of manager ([#3493](https://github.com/lablup/backend.ai/issues/3493))
+
+### Fixes
+* Add reject middleware for web security ([#2937](https://github.com/lablup/backend.ai/issues/2937))
+* Optimize the route selection in App Proxy using `random.choices()` based on the native C implementation in CPython ([#3199](https://github.com/lablup/backend.ai/issues/3199))
+* Fix GQL `vfolder_mounts` field resolver of `compute_session` type ([#3461](https://github.com/lablup/backend.ai/issues/3461))
+* Fix empty tag image scan error in docker registry. ([#3513](https://github.com/lablup/backend.ai/issues/3513))
+* Fixed "permission denied" error by creating the `grafana-data` directory with 757 permissions ([#3570](https://github.com/lablup/backend.ai/issues/3570))
+* Fix Broken CSS by allowing `unsafe-inline` content security policy. ([#3572](https://github.com/lablup/backend.ai/issues/3572))
+* Updated route pattern to allow any path ending with "login/" for POST requests to `/pipeline/{path:.*login/$}` ([#3574](https://github.com/lablup/backend.ai/issues/3574))
+* Fix vfolder delete SDK function to call 'delete by id' API rather than 'delete by name' API ([#3581](https://github.com/lablup/backend.ai/issues/3581))
+* Check intrinsic time files exist before mount ([#3583](https://github.com/lablup/backend.ai/issues/3583))
+* Fixed to ensure unique values in the mount list of the compute session ([#3593](https://github.com/lablup/backend.ai/issues/3593))
+* The installer changes from downloading the checksum files for each package separately to receiving a consolidated checksum file and using them separately. ([#3597](https://github.com/lablup/backend.ai/issues/3597))
+* Remove foreign key constraint from `EndpointRow.image` column. ([#3599](https://github.com/lablup/backend.ai/issues/3599))
+
+
 ## 25.1.1 (2025-01-20)
 No significant changes.
 
