@@ -200,23 +200,29 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
         {
             "kernel_counts_at_same_endpoint": {},
             "picked_agent": "i-001",
+            "agents": [
+                {"agent_id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"agent_id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"agent_id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
         },
         {
-            "kernel_counts_at_same_endpoint": {
-                "i-001": 1,
-                "i-002": 1,
-                "i-003": 1,
-            },
-            "picked_agent": "i-004",
+            "kernel_counts_at_same_endpoint": {"i-001": 1, "i-002": 1},
+            "picked_agent": "i-003",
+            "agents": [
+                {"agent_id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"agent_id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"agent_id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
         },
         {
-            "kernel_counts_at_same_endpoint": {
-                "i-001": 2,
-                "i-002": 1,
-                "i-003": 2,
-                "i-004": 2,
-            },
+            "kernel_counts_at_same_endpoint": {"i-001": 2, "i-002": 1, "i-003": 2},
             "picked_agent": "i-002",
+            "agents": [
+                {"agent_id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"agent_id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"agent_id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
         },
     ],
     ids=[
@@ -228,21 +234,12 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
 async def test_enforce_spreading_endpoint_replica(test_case) -> None:
     agents: Sequence[AgentRow] = [
         create_mock_agent(
-            AgentId("i-001"),
-            available_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("512")}),
-        ),
-        create_mock_agent(
-            AgentId("i-002"),
-            available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("2048")}),
-        ),
-        create_mock_agent(
-            AgentId("i-003"),
-            available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("2048")}),
-        ),
-        create_mock_agent(
-            AgentId("i-004"),
-            available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("2048")}),
-        ),
+            AgentId(agent["agent_id"]),
+            available_slots=ResourceSlot({
+                k: Decimal(v) for k, v in agent["available_slots"].items()
+            }),
+        )
+        for agent in test_case["agents"]
     ]
 
     sgroup_opts = ScalingGroupOpts(
