@@ -892,9 +892,9 @@ async def prepare_vfolder_mounts(
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
     }
     requested_mount_map: dict[uuid.UUID, str] = {
-        name: path
-        for name, path in requested_mount_reference_map.items()
-        if isinstance(name, uuid.UUID)
+        vfolder_uuid: path
+        for vfolder_uuid, path in requested_mount_reference_map.items()
+        if isinstance(vfolder_uuid, uuid.UUID)
     }
     requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
         name: options
