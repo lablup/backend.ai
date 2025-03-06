@@ -45,6 +45,7 @@ from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from ..rbac import (
     ScopeType,
+    SystemScope,
 )
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
@@ -234,18 +235,36 @@ class VirtualFolderNode(graphene.ObjectType):
             )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
+    async def get_node(
+        cls,
+        info: graphene.ResolveInfo,
+        id: str,
+        scope_id: ScopeType = SystemScope(),
+        permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
+    ) -> Optional[Self]:
         graph_ctx: GraphQueryContext = info.context
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = await VFolderRow.get(
-                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+        query = sa.select(VFolderRow).options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
+        async with graph_ctx.db.connect() as db_conn:
+            user = graph_ctx.user
+            client_ctx = ClientContext(
+                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
             )
-            if vfolder_row.status in DEAD_VFOLDER_STATUSES:
-                raise ValueError(
-                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
-                )
-            return cls.from_row(graph_ctx, vfolder_row)
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
+            cond = permission_ctx.query_condition
+            if cond is None:
+                return None
+            query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
+            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
+                vfolder_row = await db_session.scalar(query)
+        return cls.from_row(
+            graph_ctx,
+            vfolder_row,
+            permissions=await permission_ctx.calculate_final_permission(vfolder_row),
+        )
 
     @classmethod
     async def get_connection(
