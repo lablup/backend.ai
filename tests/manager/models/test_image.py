@@ -16,6 +16,7 @@ from ai.backend.common.events import (
     BgtaskFailedEvent,
     EventDispatcher,
 )
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -64,6 +65,7 @@ def get_graphquery_context(
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
         services_ctx=services_ctx,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
     )
 
 

@@ -4,6 +4,7 @@ import pytest
 from graphene import Schema
 from graphene.test import Client
 
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -66,6 +67,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
         services_ctx=None,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
     )
 
 
