@@ -665,12 +665,6 @@ class AgentRegistry:
                 ),
             )
 
-            async with self.db.begin_session() as db_session:
-                image_row = await ImageRow.resolve(
-                    db_session,
-                    [image_ref],
-                )
-
             resp["sessionId"] = str(session_id)  # changed since API v5
             resp["sessionName"] = str(session_name)
             resp["status"] = "PENDING"
@@ -3315,7 +3309,6 @@ class AgentRegistry:
                 is_pulling = kernel_row.transit_status(KernelStatus.PULLING)
                 if is_pulling:
                     session_ids.add(kernel_row.session_id)
-
             return session_ids
 
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
