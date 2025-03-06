@@ -121,7 +121,7 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
             content_type="application/problem+json",
         )
     if file_path.suffix in template_extension_list:
-        nonce = request.app["request_nonce"]
+        nonce = request["request_nonce"]
         return apply_nonce_template(file_path, nonce)
     return apply_cache_headers(web.FileResponse(file_path), request_path)
 
@@ -183,7 +183,7 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         request_path = "index.html"
 
     if file_path.suffix in template_extension_list:
-        nonce = request.app["request_nonce"]
+        nonce = request["request_nonce"]
         return apply_nonce_template(file_path, nonce)
     return apply_cache_headers(web.FileResponse(file_path), request_path)
 
