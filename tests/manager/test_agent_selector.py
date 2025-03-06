@@ -198,31 +198,31 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
     "test_case",
     [
         {
+            "agents": [
+                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
             "kernel_counts_at_same_endpoint": {},
             "picked_agent": "i-001",
-            "agents": [
-                {"agent_id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
-                {"agent_id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
-                {"agent_id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
-            ],
         },
         {
+            "agents": [
+                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
             "kernel_counts_at_same_endpoint": {"i-001": 1, "i-002": 1},
             "picked_agent": "i-003",
-            "agents": [
-                {"agent_id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
-                {"agent_id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
-                {"agent_id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
-            ],
         },
         {
+            "agents": [
+                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
             "kernel_counts_at_same_endpoint": {"i-001": 2, "i-002": 1, "i-003": 2},
             "picked_agent": "i-002",
-            "agents": [
-                {"agent_id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
-                {"agent_id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
-                {"agent_id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
-            ],
         },
     ],
     ids=[
@@ -234,7 +234,7 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
 async def test_enforce_spreading_endpoint_replica(test_case) -> None:
     agents: Sequence[AgentRow] = [
         create_mock_agent(
-            AgentId(agent["agent_id"]),
+            AgentId(agent["id"]),
             available_slots=ResourceSlot({
                 k: Decimal(v) for k, v in agent["available_slots"].items()
             }),
