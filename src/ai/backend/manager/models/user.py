@@ -664,7 +664,10 @@ class PurgeUserInput(graphene.InputObjectType):
     delegate_endpoint_ownership = graphene.Boolean(
         required=False,
         default=False,
-        description="Added in 25.4.0. Indicates whether the user's existing endpoints are delegated to the requester.",
+        description=(
+            "Added in 25.4.0. The default value is `false`. "
+            "Indicates whether the user's existing endpoints are delegated to the requester."
+        ),
     )
 
 
