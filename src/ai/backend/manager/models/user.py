@@ -1308,14 +1308,8 @@ class PurgeUser(graphene.Mutation):
         user_uuid: UUID,
     ) -> bool:
         """
-        Check if the user does not have active kernels.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID
-
-        :return: True if the user has some active kernels.
+        Check if the user does not have active sessions.
         """
-        # from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
         from .session import AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES, SessionRow
 
         active_session_count = await db_session.scalar(
