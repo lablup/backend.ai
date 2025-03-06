@@ -216,15 +216,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
-                    # TODO: Resolve this.
-                    # session.add(
-                    #     AuditLogRow(
-                    #         entity_type=AuditLogEntityType.IMAGE,
-                    #         operation=ImageAuditLogOperationType.UPDATE,
-                    #         entity_id=image_row.id,
-                    #     )
-                    # )
-
                     if (reporter := progress_reporter.get()) is not None:
                         await reporter.update(1, message=progress_msg)
 

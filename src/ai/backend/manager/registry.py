@@ -123,13 +123,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.audit_log import (
-    AuditLogEntityType,
-    ImageAuditLogOperationType,
-)
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.reporter import AuditLogReporter, ReportArgs
 from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
@@ -243,7 +238,6 @@ class AgentRegistry:
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
     webhook_ptask_group: aiotools.PersistentTaskGroup
-    image_audit_log_reporter: AuditLogReporter
 
     def __init__(
         self,
@@ -294,7 +288,6 @@ class AgentRegistry:
             hook_plugin_ctx,
             self,
         )
-        self.image_audit_log_reporter = AuditLogReporter(db)
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
@@ -394,7 +387,6 @@ class AgentRegistry:
         await cancel_tasks(self.pending_waits)
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
-        await self.image_audit_log_reporter.shutdown()
 
     async def get_instance(self, inst_id: AgentId, field=None):
         async with self.db.begin_readonly() as conn:
@@ -679,17 +671,6 @@ class AgentRegistry:
                     [image_ref],
                 )
 
-            report_id = self.image_audit_log_reporter.report_start(
-                ReportArgs(
-                    entity_id=image_row.id,
-                    entity_type=AuditLogEntityType.IMAGE,
-                    operation=ImageAuditLogOperationType.SESSION_CREATE,
-                    description="",
-                    # TODO: Remove this value and enforce the caller to provide the value.
-                    request_id=uuid.UUID(int=0),
-                )
-            )
-
             resp["sessionId"] = str(session_id)  # changed since API v5
             resp["sessionName"] = str(session_name)
             resp["status"] = "PENDING"
@@ -707,18 +688,6 @@ class AgentRegistry:
                         await start_event.wait()
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
-
-                    # TODO: 이 부분이 Image audit log로 들어가는 게 맞나? 세션 audit log로 들어가야 하는게 아닌지?
-                    # self.image_audit_log_reporter.report_done(
-                    #     ReportDoneArgs(
-                    #         # entity_id=image_row.id,
-
-                    #         # operation=ImageAuditLogOperationType.SESSION_CREATE,
-                    #         # entity_type=AuditLogEntityType.IMAGE,
-                    #         # description="Session creation timed out",
-                    #         # status=OperationStatus.FAILURE
-                    #     )
-                    # )
                 else:
                     await asyncio.sleep(0.5)
                     async with self.db.begin_readonly_session() as db_session:
@@ -730,18 +699,6 @@ class AgentRegistry:
                         row = result.first()
                     if row.status == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
-
-                        self.image_audit_log_reporter.report_done(
-                            report_id,
-                            ReportArgs(
-                                entity_id=image_row.id,
-                                entity_type=AuditLogEntityType.IMAGE,
-                                operation=ImageAuditLogOperationType.SESSION_CREATE,
-                                description="Session creation done. Status=RUNNING",
-                                request_id=uuid.UUID(int=0),
-                            ),
-                        )
-
                         for item in row.service_ports:
                             response_dict = {
                                 "name": item["name"],
@@ -759,16 +716,6 @@ class AgentRegistry:
                         resp["status"] = row.status.name
             return resp
         except asyncio.CancelledError:
-            # self.image_audit_log_reporter.report_done(
-            #     ReportDoneArgs(
-            #         # entity_id=image_row.id,
-
-            #         # operation=ImageAuditLogOperationType.SESSION_CREATE,
-            #         # entity_type=AuditLogEntityType.IMAGE,
-            #         # description="Session creation timed out",
-            #         # status=OperationStatus.FAILURE
-            #     )
-            # )
             raise
         finally:
             self.pending_waits.discard(current_task)
@@ -3369,20 +3316,6 @@ class AgentRegistry:
                 if is_pulling:
                     session_ids.add(kernel_row.session_id)
 
-            # Skip log auditing of legacy agent since we don't have image_ref.
-            if image_ref:
-                image_row = await ImageRow.from_image_ref(db_session, image_ref)
-                self.image_audit_log_reporter.report_start(
-                    ReportArgs(
-                        entity_id=image_row.id,
-                        entity_type=AuditLogEntityType.IMAGE,
-                        operation=ImageAuditLogOperationType.PULL,
-                        description="",
-                        # TODO: Remove this value and enforce the caller to provide the value.
-                        request_id=uuid.UUID(int=0),
-                    )
-                )
-
             return session_ids
 
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
@@ -3458,21 +3391,6 @@ class AgentRegistry:
                 )
                 if is_transited:
                     session_ids.add(kernel_row.session_id)
-
-            if image_ref:
-                # TODO: Remove this value and enforce the caller to provide the value.
-                pass
-                # image_row = await ImageRow.from_image_ref(db_session, image_ref)
-                # self.image_audit_log_reporter.report_done(
-                #     ReportDoneArgs(
-                #         entity_id=image_row.id,
-                #         entity_type=AuditLogEntityType.IMAGE,
-                #         operation=ImageAuditLogOperationType.PULL,
-                #         description="",
-                #         # TODO: Remove this value and enforce the caller to provide the value.
-                #         request_id=uuid.UUID(int=0),
-                #     )
-                # )
 
             return session_ids
 
