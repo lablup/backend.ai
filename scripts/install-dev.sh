@@ -701,7 +701,7 @@ wait_for_docker() {
       exit 1
   fi
 
-  until docker info >/dev/null 2>&1
+  until $docker_sudo docker info >/dev/null 2>&1
   do
       count=$((count+1))
       if [ "$count" -ge "$max_wait" ]; then
