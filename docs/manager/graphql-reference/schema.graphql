@@ -2435,7 +2435,7 @@ input PurgeUserInput {
   """
   Added in 25.4.0. Indicates whether the user's existing endpoints are delegated to the requester.
   """
-  delegate_endpoints: Boolean
+  delegate_endpoint_ownership: Boolean
 }
 
 """Added in 25.4.0."""
