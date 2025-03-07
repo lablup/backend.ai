@@ -1,11 +1,11 @@
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Dict, Optional, Self, Union
+from typing import Any, AsyncGenerator, Dict, Generic, Optional, Self, TypeVar
 
 import msgpack
 
-from ai.backend.common.types import KafkaConnectionInfo, RedisConnectionInfo
+from ai.backend.common.types import BaseConnectionInfo
 
 
 @dataclass
@@ -41,9 +41,10 @@ class MQMessage:
 
         return cls(topic=message["topic"], payload=decoded_payload, metadata=message["metadata"])
 
+T = TypeVar("T", bound=BaseConnectionInfo)
 
-class AbstractMessageQueue(ABC):
-    connect_info: Union[RedisConnectionInfo, KafkaConnectionInfo]
+class AbstractMessageQueue(ABC, Generic[T]):
+    connection_info: T
 
     @abstractmethod
     async def receive(
@@ -51,7 +52,7 @@ class AbstractMessageQueue(ABC):
         stream_key: str,
         *,
         block_timeout: int = 10_000,  # in msec
-    ) -> AsyncGenerator[MQMessage, None]: ...
+    ) -> AsyncGenerator[MQMessage, None]:...
 
     @abstractmethod
     async def receive_group(

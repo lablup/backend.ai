@@ -23,10 +23,9 @@ from ai.backend.logging import BraceStyleAdapter
 
 
 class RedisMessageQueue(AbstractMessageQueue):
-    _redis_connection_info: RedisConnectionInfo
 
     def __init__(self, redis_connection_info: RedisConnectionInfo):
-        self._redis_connection_info = redis_connection_info
+        self.connection_info = redis_connection_info
         self._log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
     async def receive(
@@ -38,41 +37,43 @@ class RedisMessageQueue(AbstractMessageQueue):
         """
         A high-level wrapper for the XREAD command.
         """
-        last_id = b"$"
-        while True:
-            try:
-                reply = await self._execute(
-                    self._redis_connection_info,
-                    lambda r: r.xread(
-                        {stream_key: last_id},
-                        block=block_timeout,
-                    ),
-                    command_timeout=block_timeout / 1000,
-                )
-                if not reply:
-                    continue
-                # Keep some latest messages so that other manager
-                # processes to have chances of fetching them.
-                await self._execute(
-                    self._redis_connection_info,
-                    lambda r: r.xtrim(
-                        stream_key,
-                        maxlen=128,
-                        approximate=True,
-                    ),
-                )
-                for msg_id, msg_data in reply[0][1]:
-                    try:
-                        message = MQMessage(
-                            topic=stream_key,
-                            payload=msg_data,
-                            metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
-                        )
-                        yield message
-                    finally:
-                        last_id = msg_id
-            except asyncio.CancelledError:
-                raise
+        async def generator():
+            last_id = b"$"
+            while True:
+                try:
+                    reply = await self._execute(
+                        self.connection_info,
+                        lambda r: r.xread(
+                            {stream_key: last_id},
+                            block=block_timeout,
+                        ),
+                        command_timeout=block_timeout / 1000,
+                    )
+                    if not reply:
+                        continue
+                    # Keep some latest messages so that other manager
+                    # processes to have chances of fetching them.
+                    await self._execute(
+                        self.connection_info,
+                        lambda r: r.xtrim(
+                            stream_key,
+                            maxlen=128,
+                            approximate=True,
+                        ),
+                    )
+                    for msg_id, msg_data in reply[0][1]:
+                        try:
+                            message = MQMessage(
+                                topic=stream_key,
+                                payload=msg_data,
+                                metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
+                            )
+                            yield message
+                        finally:
+                            last_id = msg_id
+                except asyncio.CancelledError:
+                    raise
+        return generator()
 
     async def receive_group(
         self,
@@ -83,79 +84,81 @@ class RedisMessageQueue(AbstractMessageQueue):
         autoclaim_idle_timeout: int = 1_000,  # in msec
         block_timeout: int = 10_000,  # in msec
     ) -> AsyncGenerator[MQMessage, None]:
-        while True:
-            try:
-                messages = []
-                autoclaim_start_id = b"0-0"
-                while True:
-                    reply = await self._execute(
-                        self._redis_connection_info,
-                        lambda r: r.execute_command(
-                            "XAUTOCLAIM",
-                            stream_key,
-                            group_name,
-                            consumer_id,
-                            str(autoclaim_idle_timeout),
-                            autoclaim_start_id,
-                        ),
-                        command_timeout=autoclaim_idle_timeout / 1000,
-                    )
-                    for msg_id, msg_data in reply[1]:
-                        messages.append((msg_id, msg_data))
-                    if reply[0] == b"0-0":
-                        break
-                    autoclaim_start_id = reply[0]
-                reply = await self._execute(
-                    self._redis_connection_info,
-                    lambda r: r.xreadgroup(
-                        group_name,
-                        consumer_id,
-                        {stream_key: b">"},  # fetch messages not seen by other consumers
-                        block=block_timeout,
-                    ),
-                    command_timeout=block_timeout / 1000,
-                )
-                if len(reply) == 0:
-                    continue
-                assert reply[0][0].decode() == stream_key
-                for msg_id, msg_data in reply[0][1]:
-                    messages.append((msg_id, msg_data))
-                await self._execute(
-                    self._redis_connection_info,
-                    lambda r: r.xack(
-                        stream_key,
-                        group_name,
-                        *(msg_id for msg_id, msg_data in reply[0][1]),
-                    ),
-                )
-                for msg_id, msg_data in messages:
-                    message = MQMessage(
-                        topic=stream_key,
-                        payload=msg_data,
-                        metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
-                    )
-                    yield message
-            except asyncio.CancelledError:
-                raise
-            except redis.exceptions.ResponseError as e:
-                if e.args[0].startswith("NOGROUP "):
-                    try:
-                        await self._execute(
-                            self._redis_connection_info,
-                            lambda r: r.xgroup_create(
+        async def generator():
+            while True:
+                try:
+                    messages = []
+                    autoclaim_start_id = b"0-0"
+                    while True:
+                        reply = await self._execute(
+                            self.connection_info,
+                            lambda r: r.execute_command(
+                                "XAUTOCLAIM",
                                 stream_key,
                                 group_name,
-                                "$",
-                                mkstream=True,
+                                consumer_id,
+                                str(autoclaim_idle_timeout),
+                                autoclaim_start_id,
                             ),
+                            command_timeout=autoclaim_idle_timeout / 1000,
                         )
-                    except redis.exceptions.ResponseError as e:
-                        if e.args[0].startswith("BUSYGROUP "):
-                            pass
-                        else:
-                            raise
-                    continue
-                raise
+                        for msg_id, msg_data in reply[1]:
+                            messages.append((msg_id, msg_data))
+                        if reply[0] == b"0-0":
+                            break
+                        autoclaim_start_id = reply[0]
+                    reply = await self._execute(
+                        self.connection_info,
+                        lambda r: r.xreadgroup(
+                            group_name,
+                            consumer_id,
+                            {stream_key: b">"},  # fetch messages not seen by other consumers
+                            block=block_timeout,
+                        ),
+                        command_timeout=block_timeout / 1000,
+                    )
+                    if len(reply) == 0:
+                        continue
+                    assert reply[0][0].decode() == stream_key
+                    for msg_id, msg_data in reply[0][1]:
+                        messages.append((msg_id, msg_data))
+                    await self._execute(
+                        self.connection_info,
+                        lambda r: r.xack(
+                            stream_key,
+                            group_name,
+                            *(msg_id for msg_id, msg_data in reply[0][1]),
+                        ),
+                    )
+                    for msg_id, msg_data in messages:
+                        message = MQMessage(
+                            topic=stream_key,
+                            payload=msg_data,
+                            metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
+                        )
+                        yield message
+                except asyncio.CancelledError:
+                    raise
+                except redis.exceptions.ResponseError as e:
+                    if e.args[0].startswith("NOGROUP "):
+                        try:
+                            await self._execute(
+                                self.connection_info,
+                                lambda r: r.xgroup_create(
+                                    stream_key,
+                                    group_name,
+                                    "$",
+                                    mkstream=True,
+                                ),
+                            )
+                        except redis.exceptions.ResponseError as e:
+                            if e.args[0].startswith("BUSYGROUP "):
+                                pass
+                            else:
+                                raise
+                        continue
+                    raise
+        return generator()
 
 
     async def _execute(
@@ -276,9 +279,9 @@ class RedisMessageQueue(AbstractMessageQueue):
     ) -> Any:
         func = (lambda r: r.xadd(self._stream_key, msg.payload),)  # type: ignore # aio-libs/aioredis-py#1182
 
-        redis_client = self._redis_connection_info.client
-        service_name = service_name or self._redis_connection_info.service_name
-        reconnect_poll_interval = self._redis_connection_info.redis_helper_config.get(
+        redis_client = self.connection_info.client
+        service_name = service_name or self.connection_info.service_name
+        reconnect_poll_interval = self.connection_info.redis_helper_config.get(
             "reconnect_poll_timeout", 0.0
         )
 
@@ -294,7 +297,7 @@ class RedisMessageQueue(AbstractMessageQueue):
                     "Retrying due to interruption of Redis connection "
                     "({}, conn-pool: {}, retrying-for: {:.3f}s)",
                     repr(e),
-                    self._redis_connection_info.name,
+                    self.connection_info.name,
                     now - first_trial,
                 )
                 retry_log_count += 1
@@ -374,9 +377,9 @@ class RedisMessageQueue(AbstractMessageQueue):
         conn = self.connection
         if conn:
             self.connection = None
-            await self._redis_connection_info.client.connection_pool.release(conn)
+            await self.connection_info.client.connection_pool.release(conn)
         if close_connection_pool or (
             close_connection_pool is None
-            and self._redis_connection_info.client.auto_close_connection_pool
+            and self.connection_info.client.auto_close_connection_pool
         ):
-            await self._redis_connection_info.client.connection_pool.disconnect()
+            await self.connection_info.client.connection_pool.disconnect()

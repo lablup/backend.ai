@@ -8,7 +8,7 @@ import math
 import numbers
 import textwrap
 import uuid
-from abc import ABCMeta, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
 from contextvars import ContextVar
@@ -47,6 +47,7 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
@@ -1423,8 +1424,13 @@ class RedisHelperConfig(TypedDict, total=False):
     connection_ready_timeout: float
 
 
+class BaseConnectionInfo(ABC):
+    @abstractmethod
+    async def close(self) -> None: ...
+
+
 @attrs.define(auto_attribs=True)
-class RedisConnectionInfo:
+class RedisConnectionInfo(BaseConnectionInfo):
     client: Redis
     name: str  # connection pool name
     service_name: Optional[str]
@@ -1433,6 +1439,24 @@ class RedisConnectionInfo:
 
     async def close(self, close_connection_pool: Optional[bool] = None) -> None:
         await self.client.close(close_connection_pool)
+
+
+@attrs.define(auto_attribs=True)
+class KafkaConnectionInfo(BaseConnectionInfo):
+    bootstrap_servers: str
+    topic: str
+    group_id: Optional[str]
+    client_id: Optional[str]
+    security_protocol: Optional[str] = "PLAINTEXT"
+
+    producer: Optional[AIOKafkaProducer] = None
+    consumer: Optional[AIOKafkaConsumer] = None
+
+    async def close(self) -> None:
+        if self.producer:
+            await self.producer.stop()
+        if self.consumer:
+            await self.consumer.stop()
 
 
 class AcceleratorNumberFormat(TypedDict):
