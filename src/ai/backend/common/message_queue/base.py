@@ -22,7 +22,10 @@ class MQMessage:
         }
 
         if format == "msgpack":
-            return msgpack.dumps(message, use_bin_type=True)
+            result = msgpack.dumps(message, use_bin_type=True)
+            if result is None:
+                raise ValueError("msgpack.dumps returned None")
+            return result
         elif format == "json":
             return json.dumps(message).encode("utf-8")
         else:
@@ -70,6 +73,7 @@ class AbstractMessageQueue(ABC, Generic[T]):
         self,
         msg: MQMessage,
         *,
+        is_flush: bool = False,
         service_name: Optional[str] = None,
         encoding: Optional[str] = None,
         command_timeout: Optional[float] = None,

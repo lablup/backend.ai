@@ -23,7 +23,12 @@ class KafkaMessageQueue(AbstractMessageQueue):
                 bootstrap_servers=self.connection_info.bootstrap_servers,
                 client_id=self.connection_info.client_id,
             )
-            await self._producer.start()
+            if self._producer is None:
+                self._producer = AIOKafkaProducer(
+                    bootstrap_servers=self.connection_info.bootstrap_servers,
+                    client_id=self.connection_info.client_id,
+                )
+                await self._producer.start()
         return self._producer
 
     async def _get_consumer(self, stream_key: str) -> AIOKafkaConsumer:
@@ -136,10 +141,15 @@ class KafkaMessageQueue(AbstractMessageQueue):
         self,
         msg: MQMessage,
         *,
+        is_flush: bool = False,
         service_name: Optional[str] = None,
         encoding: Optional[str] = None,
         command_timeout: Optional[float] = None,
     ) -> None:
+        if is_flush:
+            await self._flush_kafka_topic(self.connection_info.topic)
+            return
+
         if not self._producer:
             self._producer = AIOKafkaProducer(
                 bootstrap_servers=self.connection_info.bootstrap_servers,
@@ -156,6 +166,40 @@ class KafkaMessageQueue(AbstractMessageQueue):
             payload = str(payload).encode('utf-8')
 
         await self._producer.send_and_wait(msg.topic, payload)
+
+    async def _flush_kafka_topic(self, topic: str) -> None:
+        try:
+            await self._set_topic_retention(topic, 0)
+            await asyncio.sleep(1) # wait for retention to take effect
+            await self._set_topic_retention(topic, 604800000)  #restore default retention
+        except Exception as e:
+            self._log.error(f"Failed to set topic retention to 0: {e}")
+            await self._send_tombstone_message(topic)
+
+    async def _set_topic_retention(self, topic: str, retention_ms: int) -> None:
+        from aiokafka.admin import AIOKafkaAdminClient
+        from aiokafka.admin.config_resource import ConfigResource, ConfigResourceType
+
+        admin_client = AIOKafkaAdminClient(bootstrap_servers=self.connection_info.bootstrap_servers)
+        await admin_client.start()
+
+        try:
+            await admin_client.alter_configs(
+                config_resources=[ConfigResource(resource_type=ConfigResourceType.TOPIC, name=topic, configs={"retention.ms": str(retention_ms)})]
+            )
+        finally:
+            await admin_client.close()
+
+    async def _send_tombstone_message(self, topic: str) -> None:
+        if not self._producer:
+            self._producer = AIOKafkaProducer(
+                bootstrap_servers=self.connection_info.bootstrap_servers,
+                client_id=self.connection_info.client_id,
+            )
+            await self._producer.start()
+
+        await self._producer.send_and_wait(topic, None)  # Null payload = tombstone
+
 
     async def close(self, close_connection_pool: Optional[bool] = None) -> None:
         if self._producer:

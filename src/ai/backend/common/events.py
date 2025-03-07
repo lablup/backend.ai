@@ -1330,7 +1330,7 @@ class EventDispatcher(aobject):
         #     )
         # )
         async with aclosing(
-            self.message_queue.receive_group(
+            await self.message_queue.receive_group(
                 self._stream_key,
                 self._consumer_group,
                 self._consumer_name,
@@ -1379,7 +1379,7 @@ class EventDispatcher(aobject):
         #         self._stream_key,
         #     )
         # )
-        async with aclosing(self.message_queue.receive(self._stream_key)) as agen:
+        async with aclosing(await self.message_queue.receive(self._stream_key)) as agen:
             async for msg in agen:
                 if self._closed:
                     return

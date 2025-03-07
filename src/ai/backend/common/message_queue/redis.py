@@ -273,11 +273,15 @@ class RedisMessageQueue(AbstractMessageQueue):
         self,
         msg: MQMessage,
         *,
+        is_flush: bool = False,
         service_name: Optional[str] = None,
         encoding: Optional[str] = None,
         command_timeout: Optional[float] = None,
     ) -> Any:
-        func = (lambda r: r.xadd(self._stream_key, msg.payload),)  # type: ignore # aio-libs/aioredis-py#1182
+        if is_flush:
+            func = (lambda r: r.flushdb(),)
+        else:
+            func = (lambda r: r.xadd(self._stream_key, msg.payload),)  # type: ignore # aio-libs/aioredis-py#1182
 
         redis_client = self.connection_info.client
         service_name = service_name or self.connection_info.service_name
