@@ -3286,18 +3286,18 @@ class AgentRegistry:
     async def mark_image_pull_started(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
         image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
-            image_canonical = image_ref.canonical if image_ref is not None else image
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image_canonical)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PREPARING)))
                 )
@@ -3318,18 +3318,18 @@ class AgentRegistry:
     async def mark_image_pull_finished(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
         image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
-            image_canonical = image_ref.canonical if image_ref is not None else image
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image_canonical)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (
                         KernelRow.status.in_((
@@ -3356,19 +3356,19 @@ class AgentRegistry:
     async def handle_image_pull_failed(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
         msg: str,
         image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
-            image_canonical = image_ref.canonical if image_ref is not None else image
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image_canonical)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
                 )
