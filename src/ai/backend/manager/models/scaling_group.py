@@ -107,6 +107,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
     agent_selector_config: Mapping[str, Any] = attr.field(factory=dict)
 
+    # Only used in the ConcentratedAgentSelector
+    enforce_spreading_endpoint_replica: bool = False
+
     def to_json(self) -> dict[str, Any]:
         return {
             "allowed_session_types": [item.value for item in self.allowed_session_types],
@@ -114,6 +117,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "config": self.config,
             "agent_selection_strategy": self.agent_selection_strategy,
             "agent_selector_config": self.agent_selector_config,
+            "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
         }
 
     @classmethod
@@ -133,6 +137,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
                 AgentSelectionStrategy
             ),
             t.Key("agent_selector_config", default={}): agent_selector_config_iv,
+            t.Key("enforce_spreading_endpoint_replica", default=False): t.ToBool,
         }).allow_extra("*")
 
 
