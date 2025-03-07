@@ -64,9 +64,6 @@ class ModifyAbusingReportConfig(graphene.Mutation):
         agent_id = graphene.String(required=True)
         props = ModifyAbusingReportConfigInput(required=True)
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
-
     @classmethod
     @privileged_mutation(
         UserRole.SUPERADMIN,
@@ -87,9 +84,5 @@ class ModifyAbusingReportConfig(graphene.Mutation):
         if props.force_terminate_abusing_containers:
             data["force-terminate-abusing-containers"] = props.force_terminate_abusing_containers
 
-        try:
-            await graph_ctx.registry.set_agent_local_config(agent_id, {"agent": data})
-        except Exception as e:
-            return cls(ok=False, msg=str(e))
-
-        return cls(ok=True, msg="")
+        await graph_ctx.registry.set_agent_local_config(agent_id, {"agent": data})
+        return cls()

@@ -3260,10 +3260,7 @@ type DeleteNetwork {
 }
 
 """Added in 25.5.0."""
-type ModifyAbusingReportConfig {
-  ok: Boolean
-  msg: String
-}
+type ModifyAbusingReportConfig
 
 """Added in 25.5.0."""
 input ModifyAbusingReportConfigInput {
