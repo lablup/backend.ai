@@ -247,7 +247,6 @@ class LoadSchedulerArgs:
 
 @dataclass
 class LoadAgentSelectorArgs:
-    db_sess: SASession
     sgroup_opts: ScalingGroupOpts
     pending_session_id: uuid.UUID
     pending_session_type: SessionTypes
@@ -478,7 +477,6 @@ class SchedulerDispatcher(aobject):
         return load_scheduler(args.scheduler_name, args.sgroup_opts, scheduler_config)
 
     async def _load_agent_selector(self, args: LoadAgentSelectorArgs) -> AbstractAgentSelector:
-        db_sess = args.db_sess
         sgroup_opts = args.sgroup_opts
 
         # TODO: Remove "dynamic_config after refactoring.
@@ -490,21 +488,22 @@ class SchedulerDispatcher(aobject):
             case AgentSelectionStrategy.ROUNDROBIN:
                 agselector_name = "roundrobin"
             case AgentSelectionStrategy.CONCENTRATED:
-                if (
-                    sgroup_opts.enforce_spreading_endpoint_replica
-                    and args.pending_session_type == SessionTypes.INFERENCE
-                ):
-                    endpoint_id = await db_sess.scalar(
-                        sa.select(RoutingRow.endpoint).where(
-                            RoutingRow.session == args.pending_session_id
+                async with self.db.begin_readonly_session() as db_sess:
+                    if (
+                        sgroup_opts.enforce_spreading_endpoint_replica
+                        and args.pending_session_type == SessionTypes.INFERENCE
+                    ):
+                        endpoint_id = await db_sess.scalar(
+                            sa.select(RoutingRow.endpoint).where(
+                                RoutingRow.session == args.pending_session_id
+                            )
                         )
-                    )
 
-                    dynamic_config[
-                        "kernel_counts_at_same_endpoint"
-                    ] = await get_kernel_count_per_agent_at_endpoint(
-                        db_sess, endpoint_id, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
-                    )
+                        dynamic_config[
+                            "kernel_counts_at_same_endpoint"
+                        ] = await get_kernel_count_per_agent_at_endpoint(
+                            db_sess, endpoint_id, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+                        )
 
                 agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
@@ -592,16 +591,13 @@ class SchedulerDispatcher(aobject):
                 raise RuntimeError("should not reach here")
             pending_sess = pending_sessions.pop(picked_idx)
             log_fmt = "schedule(s:{}, prio:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
-
-            async with self.db.begin_readonly_session() as db_sess:
-                agent_selector = await self._load_agent_selector(
-                    LoadAgentSelectorArgs(
-                        db_sess,
-                        sgroup_opts,
-                        pending_sess.id,
-                        pending_sess.session_type,
-                    )
+            agent_selector = await self._load_agent_selector(
+                LoadAgentSelectorArgs(
+                    sgroup_opts,
+                    pending_sess.id,
+                    pending_sess.session_type,
                 )
+            )
 
             log_args = (
                 pending_sess.id,
