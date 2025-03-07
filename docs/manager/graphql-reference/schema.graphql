@@ -1991,8 +1991,8 @@ type Mutations {
   create_resource_preset(name: String!, props: CreateResourcePresetInput!): CreateResourcePreset
   modify_resource_preset(
     """Added in 25.4.0. ID of the resource preset."""
-    id: UUID!
-    name: String @deprecated(reason: "Deprecated since 25.4.0.")
+    id: UUID = null
+    name: String = null @deprecated(reason: "Deprecated since 25.4.0.")
     props: ModifyResourcePresetInput!
   ): ModifyResourcePreset
   delete_resource_preset(name: String!): DeleteResourcePreset
