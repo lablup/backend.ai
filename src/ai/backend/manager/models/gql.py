@@ -721,6 +721,7 @@ class Queries(graphene.ObjectType):
     )
     resource_preset_by_id = graphene.Field(
         ResourcePreset,
+        description="Added in 25.4.0.",
         id=graphene.UUID(),
     )
 
