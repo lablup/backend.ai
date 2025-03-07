@@ -2021,7 +2021,6 @@ class Queries(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[ResourcePreset]:
-        print(f"{filter = }, {order = }")
         return await ResourcePreset.load_all(info.context, filter=filter, order=order)
 
     @staticmethod
