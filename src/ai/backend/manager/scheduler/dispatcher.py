@@ -519,9 +519,9 @@ class SchedulerDispatcher(aobject):
                 agselector_name, {}
             )
         agselector_config = {
-            **dynamic_config,
             **global_agselector_opts,
             **sgroup_opts.agent_selector_config,
+            **dynamic_config,
         }
 
         agent_selection_resource_priority = self.local_config["manager"][
