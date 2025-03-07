@@ -240,9 +240,15 @@ async def get_kernel_count_per_agent_at_endpoint(
 
 
 @dataclass
+class LoadSchedulerArgs:
+    scheduler_name: str
+    sgroup_opts: ScalingGroupOpts
+
+
+@dataclass
 class LoadAgentSelectorArgs:
     db_sess: SASession
-    sgroup_name: str
+    sgroup_opts: ScalingGroupOpts
     pending_session_id: uuid.UUID
     pending_session_type: SessionTypes
 
@@ -461,33 +467,19 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
 
-    async def _get_scaling_group_data(
-        self, db_sess: SASession, sgroup_name: str
-    ) -> tuple[str, ScalingGroupOpts]:
-        query = sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
-            ScalingGroupRow.name == sgroup_name
-        )
-        result = await db_sess.execute(query)
-        row = result.first()
-        if row is None:
-            raise ValueError(f"Scaling group '{sgroup_name}' not found.")
-        return row.scheduler, row.scheduler_opts
-
-    async def _load_scheduler(self, db_sess: SASession, sgroup_name: str) -> AbstractScheduler:
-        scheduler_name, sgroup_opts = await self._get_scaling_group_data(db_sess, sgroup_name)
-
+    def _load_scheduler(self, args: LoadSchedulerArgs) -> AbstractScheduler:
         global_scheduler_opts = {}
         if self.shared_config["plugins"]["scheduler"]:
             global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
-                scheduler_name, {}
+                args.scheduler_name, {}
             )
-        scheduler_config = {**global_scheduler_opts, **sgroup_opts.config}
+        scheduler_config = {**global_scheduler_opts, **args.sgroup_opts.config}
 
-        return load_scheduler(scheduler_name, sgroup_opts, scheduler_config)
+        return load_scheduler(args.scheduler_name, args.sgroup_opts, scheduler_config)
 
     async def _load_agent_selector(self, args: LoadAgentSelectorArgs) -> AbstractAgentSelector:
         db_sess = args.db_sess
-        _scheduler_name, sgroup_opts = await self._get_scaling_group_data(db_sess, args.sgroup_name)
+        sgroup_opts = args.sgroup_opts
 
         # TODO: Remove "dynamic_config after refactoring.
         dynamic_config: dict[str, Any] = {}
@@ -552,7 +544,16 @@ class SchedulerDispatcher(aobject):
     ) -> None:
         # Part 0: Load the scheduler and the agent selector.
         async with self.db.begin_readonly_session() as db_sess:
-            scheduler = await self._load_scheduler(db_sess, sgroup_name)
+            result = await db_sess.execute(
+                sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
+                    ScalingGroupRow.name == sgroup_name
+                )
+            )
+            row = result.first()
+            if row is None:
+                raise ValueError(f'Scaling group "{sgroup_name}" not found!')
+            scheduler_name, sgroup_opts = row.scheduler, row.scheduler_opts
+            scheduler = self._load_scheduler(LoadSchedulerArgs(scheduler_name, sgroup_opts))
             existing_sessions, pending_sessions, cancelled_sessions = await _list_managed_sessions(
                 db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout
             )
@@ -596,7 +597,7 @@ class SchedulerDispatcher(aobject):
                 agent_selector = await self._load_agent_selector(
                     LoadAgentSelectorArgs(
                         db_sess,
-                        sgroup_name,
+                        sgroup_opts,
                         pending_sess.id,
                         pending_sess.session_type,
                     )
