@@ -88,7 +88,7 @@ class ProgressReporter:
         # keep the state as local variables because they might be changed
         # due to interleaving at await statements below.
         current, total = self.current_progress, self.total_progress
-        redis_producer = self.event_producer.redis_client
+        redis_producer = self.event_producer.message_queue.connection_info
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
@@ -224,7 +224,7 @@ class BackgroundTaskManager:
         (e.g. progress information of task when callee is trying to poll information of already completed one)
         """
         tracker_key = f"bgtask.{task_id}"
-        redis_producer = self.event_producer.redis_client
+        redis_producer = self.event_producer.message_queue.connection_info
         task_info = await redis_helper.execute(
             redis_producer,
             lambda r: r.hgetall(tracker_key),
@@ -303,7 +303,7 @@ class BackgroundTaskManager:
         status: TaskStatus,
         msg: str = "",
     ) -> None:
-        redis_producer = self.event_producer.redis_client
+        redis_producer = self.event_producer.message_queue.connection_info
         tracker_key = f"bgtask.{task_id}"
 
         async def _pipe_builder(r: Redis) -> Pipeline:
