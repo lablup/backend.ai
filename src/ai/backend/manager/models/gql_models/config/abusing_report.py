@@ -27,7 +27,7 @@ __all__ = ("AbusingReportConfig",)
 class AbusingReportConfig(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
-        description = "Added in 25.1.0."
+        description = "Added in 25.5.0."
 
     abuse_report_path = graphene.String()
     force_terminate_abusing_containers = graphene.Boolean()
@@ -52,11 +52,11 @@ class ModifyAbusingReportConfigInput(graphene.InputObjectType):
     force_terminate_abusing_containers = graphene.Boolean()
 
     class Meta:
-        description = "Added in 25.1.0."
+        description = "Added in 25.5.0."
 
 
 class ModifyAbusingReportConfig(graphene.Mutation):
-    """Added in 25.1.0."""
+    """Added in 25.5.0."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
 

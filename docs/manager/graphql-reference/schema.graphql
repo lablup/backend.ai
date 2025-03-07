@@ -275,7 +275,7 @@ type Queries {
   """Added in 25.1.0."""
   endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
 
-  """Added in 25.1.0."""
+  """Added in 25.5.0."""
   abusing_report_config(agent_id: String!): AbusingReportConfig
 }
 
@@ -1892,7 +1892,7 @@ type EndpointAutoScalingRuleEdge {
   cursor: String!
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.5.0."""
 type AbusingReportConfig implements Node {
   """The ID of the object"""
   id: ID!
@@ -2186,7 +2186,7 @@ type Mutations {
   """Added in 24.12.0."""
   delete_network(network: String!): DeleteNetwork
 
-  """Added in 25.1.0."""
+  """Added in 25.5.0."""
   modify_abusing_report_config(agent_id: String!, props: ModifyAbusingReportConfigInput!): ModifyAbusingReportConfig
 }
 
@@ -3259,13 +3259,13 @@ type DeleteNetwork {
   msg: String
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.5.0."""
 type ModifyAbusingReportConfig {
   ok: Boolean
   msg: String
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.5.0."""
 input ModifyAbusingReportConfigInput {
   abuse_report_path: String
   force_terminate_abusing_containers: Boolean
