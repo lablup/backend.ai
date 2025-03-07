@@ -888,22 +888,23 @@ async def prepare_vfolder_mounts(
     requested_mounts: list[str] = [
         name for name in requested_mount_references if isinstance(name, str)
     ]
-    requested_mount_map: dict[str, str] = {
+    requested_mount_name_map: dict[str, str] = {
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
     }
-    requested_mount_options: dict[str, dict[str, Any]] = {
+    requested_mount_map: dict[uuid.UUID, str] = {
+        vfolder_uuid: path
+        for vfolder_uuid, path in requested_mount_reference_map.items()
+        if isinstance(vfolder_uuid, uuid.UUID)
+    }
+    requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
         name: options
         for name, options in requested_mount_reference_options.items()
         if isinstance(name, str)
     }
 
-    vfolder_ids_to_resolve = [
-        vfid for vfid in requested_mount_references if isinstance(vfid, uuid.UUID)
-    ]
-
-    requested_vfolder_names: dict[str, str] = {}
-    requested_vfolder_subpaths: dict[str, str] = {}
-    requested_vfolder_dstpaths: dict[str, str] = {}
+    requested_vfolder_names: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_subpaths: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_dstpaths: dict[str | uuid.UUID, str] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
     _already_resolved: set[str] = set()
 
@@ -917,7 +918,10 @@ async def prepare_vfolder_mounts(
         requested_vfolder_names[key] = name
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
         _already_resolved.add(name)
-    for key, value in requested_mount_map.items():
+    for vfolder_uuid, value in requested_mount_map.items():
+        requested_vfolder_subpaths[vfolder_uuid] = "."
+        requested_vfolder_dstpaths[vfolder_uuid] = value
+    for key, value in requested_mount_name_map.items():
         requested_vfolder_dstpaths[key] = value
 
     # Check if there are overlapping mount sources
@@ -938,10 +942,10 @@ async def prepare_vfolder_mounts(
         extra_vf_conds = sa.or_(
             extra_vf_conds, vfolders.c.name.in_(requested_vfolder_names.values())
         )
-    if vfolder_ids_to_resolve:
+    if requested_mount_map:
         extra_vf_conds = sa.or_(
             extra_vf_conds,
-            VFolderRow.id.in_(vfolder_ids_to_resolve),
+            VFolderRow.id.in_(requested_mount_map.keys()),
         )
     extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
     accessible_vfolders = await query_accessible_vfolders(
@@ -959,16 +963,21 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound("There is no accessible vfolders at all.")
         else:
             return []
+
+    requested_names = set(requested_vfolder_names.values())
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
         if name in _already_resolved:
             continue
+        if name not in requested_names:
+            requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
         if path := requested_mount_reference_map.get(vfid):
-            requested_mount_map[name] = path
+            requested_mount_name_map[name] = path
         if options := requested_mount_reference_options.get(vfid):
             requested_mount_options[name] = options
+            requested_mount_options[vfid] = options
 
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)
@@ -982,7 +991,7 @@ async def prepare_vfolder_mounts(
 
     # for vfolder in accessible_vfolders:
     accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
-    for key, vfolder_name in requested_vfolder_names.items():
+    for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         await ensure_host_permission_allowed(
@@ -996,7 +1005,7 @@ async def prepare_vfolder_mounts(
             permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
-            kernel_path_raw = requested_vfolder_dstpaths.get(key)
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
             else:
@@ -1022,7 +1031,7 @@ async def prepare_vfolder_mounts(
                 await storage_manager.get_mount_path(
                     vfolder["host"],
                     VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    PurePosixPath(requested_vfolder_subpaths[key]),
+                    PurePosixPath(requested_vfolder_subpaths[requested_key]),
                 ),
             )
         except VFolderOperationFailed as e:
@@ -1057,14 +1066,16 @@ async def prepare_vfolder_mounts(
             )
         else:
             # Normal vfolders
-            kernel_path_raw = requested_vfolder_dstpaths.get(key)
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            match requested_perm := requested_mount_options.get(key, {}).get("permission"):
+            match requested_perm := requested_mount_options.get(requested_key, {}).get(
+                "permission"
+            ):
                 case MountPermission.READ_ONLY:
                     mount_perm = MountPermission.READ_ONLY
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
@@ -1080,8 +1091,8 @@ async def prepare_vfolder_mounts(
                 VFolderMount(
                     name=vfolder["name"],
                     vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
-                    host_path=mount_base_path / requested_vfolder_subpaths[key],
+                    vfsubpath=PurePosixPath(requested_vfolder_subpaths[requested_key]),
+                    host_path=mount_base_path / requested_vfolder_subpaths[requested_key],
                     kernel_path=kernel_path,
                     mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
