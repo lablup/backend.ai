@@ -155,7 +155,16 @@ type Queries {
   user_resource_policies: [UserResourcePolicy]
   project_resource_policies: [ProjectResourcePolicy]
   resource_preset(name: String): ResourcePreset
-  resource_presets: [ResourcePreset]
+
+  """Added in 25.4.0."""
+  resource_preset_by_id(id: UUID): ResourcePreset
+  resource_presets(
+    """Added in 25.4.0."""
+    filter: String
+
+    """Added in 25.4.0."""
+    order: String
+  ): [ResourcePreset]
   scaling_group(name: String): ScalingGroup
   scaling_groups(name: String, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup]
@@ -1995,7 +2004,11 @@ type Mutations {
     name: String = null @deprecated(reason: "Deprecated since 25.4.0.")
     props: ModifyResourcePresetInput!
   ): ModifyResourcePreset
-  delete_resource_preset(name: String!): DeleteResourcePreset
+  delete_resource_preset(
+    """Added in 25.4.0. ID of the resource preset."""
+    id: UUID = null
+    name: String = null @deprecated(reason: "Deprecated since 25.4.0.")
+  ): DeleteResourcePreset
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup

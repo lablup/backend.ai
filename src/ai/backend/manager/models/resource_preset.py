@@ -20,10 +20,12 @@ from .base import (
     IDColumn,
     ResourceSlotColumn,
     batch_result,
+    batch_result_in_scalar_stream,
     cast,
     set_if_set,
-    simple_db_mutate,
 )
+from .minilang.ordering import ColumnMapType, QueryOrderParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import UserRole
 from .utils import execute_with_txn_retry
 
@@ -136,6 +138,17 @@ class ResourcePresetRow(Base):
         except sa.exc.IntegrityError:
             return None
 
+    @classmethod
+    async def delete(
+        cls,
+        query_option: QueryOption,
+        *,
+        db_session: AsyncSession,
+    ) -> None:
+        delete_stmt = sa.delete(ResourcePresetRow)
+        delete_stmt = query_option(delete_stmt)
+        return await db_session.execute(delete_stmt)
+
 
 # For compatibility
 resource_presets = ResourcePresetRow.__table__
@@ -151,6 +164,18 @@ class ResourcePreset(graphene.ObjectType):
             "Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with."
         ),
     )
+
+    _queryfilter_fieldspec: FieldSpecType = {
+        "id": ("id", None),
+        "name": ("name", None),
+        "scaling_group_name": ("scaling_group_name", None),
+    }
+
+    _queryorder_colmap: ColumnMapType = {
+        "id": ("id", None),
+        "name": ("name", None),
+        "scaling_group_name": ("scaling_group_name", None),
+    }
 
     @classmethod
     def from_row(
@@ -181,14 +206,49 @@ class ResourcePreset(graphene.ObjectType):
                 return None
 
     @classmethod
-    async def load_all(cls, ctx: GraphQueryContext) -> Sequence[ResourcePreset]:
-        query = sa.select([resource_presets]).select_from(resource_presets)
-        async with ctx.db.begin_readonly() as conn:
+    async def load_all(
+        cls,
+        ctx: GraphQueryContext,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+    ) -> Sequence[ResourcePreset]:
+        query = sa.select(ResourcePresetRow)
+        if filter is not None:
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
+        if order is not None:
+            order_parser = QueryOrderParser(cls._queryorder_colmap)
+            query = order_parser.append_ordering(query, order)
+        else:
+            query = query.order_by(ResourcePresetRow.name)
+        async with ctx.db.begin_readonly_session() as db_session:
             return [
                 obj
-                async for r in (await conn.stream(query))
+                async for r in (await db_session.stream_scalars(query))
                 if (obj := cls.from_row(ctx, r)) is not None
             ]
+
+    @classmethod
+    async def batch_load_by_id(
+        cls,
+        ctx: GraphQueryContext,
+        ids: Sequence[UUID],
+    ) -> Sequence[ResourcePreset | None]:
+        query = (
+            sa.select(ResourcePresetRow)
+            .where(ResourcePresetRow.id.in_(ids))
+            .order_by(ResourcePresetRow.id)
+        )
+        async with ctx.db.begin_readonly_session() as db_session:
+            return await batch_result_in_scalar_stream(
+                ctx,
+                db_session,
+                query,
+                cls,
+                ids,
+                lambda row: row.id,
+            )
 
     @classmethod
     async def batch_load_by_name(
@@ -356,7 +416,14 @@ class DeleteResourcePreset(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        name = graphene.String(required=True)
+        id = graphene.UUID(
+            required=False,
+            default_value=None,
+            description=("Added in 25.4.0. ID of the resource preset."),
+        )
+        name = graphene.String(
+            required=False, default_value=None, deprecation_reason="Deprecated since 25.4.0."
+        )
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -366,7 +433,24 @@ class DeleteResourcePreset(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        name: str,
+        id: Optional[UUID],
+        name: Optional[str],
     ) -> DeleteResourcePreset:
-        delete_query = sa.delete(resource_presets).where(resource_presets.c.name == name)
-        return await simple_db_mutate(cls, info.context, delete_query)
+        graph_ctx: GraphQueryContext = info.context
+
+        preset_id = id
+        if preset_id is None and name is None:
+            raise ValueError("One of (`id` or `name`) parameter should be not null")
+
+        async def _delete(db_session: AsyncSession) -> None:
+            if preset_id is not None:
+                query_option = filter_by_id(preset_id)
+            else:
+                if name is None:
+                    raise ValueError("One of (`id` or `name`) parameter should be not null")
+                query_option = filter_by_name(name)
+            return await ResourcePresetRow.delete(query_option, db_session=db_session)
+
+        async with graph_ctx.db.connect() as db_conn:
+            await execute_with_txn_retry(_delete, graph_ctx.db.begin_session, db_conn)
+        return cls(True, "success")

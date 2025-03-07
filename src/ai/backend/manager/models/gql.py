@@ -719,9 +719,20 @@ class Queries(graphene.ObjectType):
         ResourcePreset,
         name=graphene.String(),
     )
+    resource_preset_by_id = graphene.Field(
+        ResourcePreset,
+        description="Added in 25.4.0.",
+        id=graphene.UUID(),
+    )
 
     resource_presets = graphene.List(
         ResourcePreset,
+        filter=graphene.String(
+            description="Added in 25.4.0.",
+        ),
+        order=graphene.String(
+            description="Added in 25.4.0.",
+        ),
     )
 
     # super-admin only
@@ -1993,11 +2004,24 @@ class Queries(graphene.ObjectType):
         return await loader.load(name)
 
     @staticmethod
+    async def resolve_resource_preset_by_id(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: uuid.UUID,
+    ) -> ResourcePreset:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(ctx, "ResourcePreset.by_id")
+        return await loader.load(id)
+
+    @staticmethod
     async def resolve_resource_presets(
         root: Any,
         info: graphene.ResolveInfo,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[ResourcePreset]:
-        return await ResourcePreset.load_all(info.context)
+        return await ResourcePreset.load_all(info.context, filter=filter, order=order)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
