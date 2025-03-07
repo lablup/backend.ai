@@ -155,6 +155,8 @@ type Queries {
   user_resource_policies: [UserResourcePolicy]
   project_resource_policies: [ProjectResourcePolicy]
   resource_preset(name: String): ResourcePreset
+
+  """Added in 25.4.0."""
   resource_preset_by_id(id: UUID): ResourcePreset
   resource_presets(
     """Added in 25.4.0."""
