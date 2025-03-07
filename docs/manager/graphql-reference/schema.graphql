@@ -306,7 +306,7 @@ type Agent implements Item {
   compute_plugins: JSONString
   hardware_metadata: JSONString
   auto_terminate_abusing_kernel: Boolean
-  local_config: JSONString @deprecated(reason: "Deprecated since 25.1.0; use `AbusingReportConfig` instead")
+  local_config: JSONString @deprecated(reason: "Deprecated since 25.5.0; use `AbusingReportConfig` instead")
   container_count: Int
 
   """Added in 25.4.0."""
@@ -641,7 +641,7 @@ type AgentNode implements Node {
   compute_plugins: JSONString
   hardware_metadata: JSONString
   auto_terminate_abusing_kernel: Boolean
-  local_config: JSONString @deprecated(reason: "Deprecated since 25.1.0; use `AbusingReportConfig` instead")
+  local_config: JSONString @deprecated(reason: "Deprecated since 25.5.0; use `AbusingReportConfig` instead")
   container_count: Int
 
   """Added in 25.4.0."""
