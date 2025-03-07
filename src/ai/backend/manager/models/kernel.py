@@ -696,6 +696,10 @@ class KernelRow(Base):
         if status_data is not None:
             self.status_data = status_data
 
+    def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
+        self.user_uuid = user_uuid
+        self.access_key = access_key
+
     @classmethod
     async def set_kernel_status(
         cls,

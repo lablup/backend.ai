@@ -630,7 +630,17 @@ def delete(ctx: CLIContext, email):
         "and migrated the ownership to the requested admin."
     ),
 )
-def purge(ctx: CLIContext, email, purge_shared_vfolders):
+@click.option(
+    "--delegate-endpoint-ownership",
+    is_flag=True,
+    default=False,
+    help=(
+        "Delegate user's all alive endpoints. "
+        "If True, user's endpoints will not be deleted "
+        "and delegate the ownership to the requested admin."
+    ),
+)
+def purge(ctx: CLIContext, email, purge_shared_vfolders, delegate_endpoint_ownership):
     """
     Delete an existing user. This action cannot be undone.
 
@@ -642,7 +652,7 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
             if not ask_yn():
                 print_info("Cancelled")
                 sys.exit(ExitCode.FAILURE)
-            data = session.User.purge(email, purge_shared_vfolders)
+            data = session.User.purge(email, purge_shared_vfolders, delegate_endpoint_ownership)
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
