@@ -1650,7 +1650,7 @@ class AbstractAgent(
                     if result["exitCode"] == 0:
                         await self.produce_event(
                             SessionSuccessEvent(
-                                session_id, KernelLifecycleEventReason.TASK_DONE, 0
+                                session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
                             ),
                         )
                     else:
