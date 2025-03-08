@@ -239,6 +239,7 @@ class AgentRegistry:
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
     webhook_ptask_group: aiotools.PersistentTaskGroup
+    agent_installed_images: dict[AgentId, set[str]]
 
     def __init__(
         self,
@@ -289,6 +290,7 @@ class AgentRegistry:
             hook_plugin_ctx,
             self,
         )
+        self.agent_installed_images = {}
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
@@ -3160,18 +3162,21 @@ class AgentRegistry:
 
             # Update the mapping of kernel images to agents.
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
+            loaded_image_canonicals = set(img_info[0] for img_info in loaded_images)
+            old_image_canonicals = self.agent_installed_images.get(agent_id, set())
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
-                for image, _ in loaded_images:
-                    try:
-                        await pipe.sadd(ImageRef.parse_image_str(image, "*").canonical, agent_id)
-                    except ValueError:
-                        # Skip opaque (non-Backend.AI) image.
-                        continue
+                for image in loaded_image_canonicals:
+                    await pipe.sadd(image, agent_id)
+
+                # Remove old images that are not in the new list.
+                for image in old_image_canonicals - loaded_image_canonicals:
+                    await pipe.srem(image, agent_id)
                 return pipe
 
             await redis_helper.execute(self.redis_image, _pipe_builder)
+            self.agent_installed_images[agent_id] = loaded_image_canonicals
 
         await self.hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
