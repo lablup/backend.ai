@@ -16,6 +16,7 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import (
     EventDispatcher,
@@ -33,6 +34,7 @@ from .plugin import (
     StorageManagerWebappPluginContext,
     StoragePluginContext,
 )
+from .services.service import VolumeService
 from .types import VolumeInfo
 from .volumes.abc import AbstractVolume
 from .volumes.cephfs import CephFSVolume
@@ -40,6 +42,8 @@ from .volumes.ddn import EXAScalerFSVolume
 from .volumes.dellemc import DellEMCOneFSVolume
 from .volumes.gpfs import GPFSVolume
 from .volumes.netapp import NetAppVolume
+from .volumes.noop import NoopVolume, init_noop_volume
+from .volumes.pool import VolumePool
 from .volumes.purestorage import FlashBladeVolume
 from .volumes.vast import VASTVolume
 from .volumes.vfs import BaseVolume
@@ -65,6 +69,7 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
+    NoopVolume.name: NoopVolume,
 }
 
 
@@ -94,6 +99,25 @@ def _init_subapp(
     root_app.middlewares.extend(global_middlewares)
 
 
+class ServiceContext:
+    volume_service: VolumeService
+
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+    ) -> None:
+        volume_pool = VolumePool(
+            local_config=local_config,
+            etcd=etcd,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+        )
+        self.volume_service = VolumeService(volume_pool)
+
+
 class RootContext:
     volumes: dict[str, AbstractVolume]
     pid: int
@@ -103,6 +127,7 @@ class RootContext:
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
     watcher: WatcherClient | None
+    service_context: ServiceContext
     metric_registry: CommonMetricRegistry
 
     def __init__(
@@ -119,7 +144,9 @@ class RootContext:
         dsn: Optional[str] = None,
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
     ) -> None:
-        self.volumes = {}
+        self.volumes = {
+            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
+        }
         self.pid = pid
         self.pidx = pidx
         self.node_id = node_id
@@ -134,9 +161,16 @@ class RootContext:
                 allow_credentials=False, expose_headers="*", allow_headers="*"
             ),
         }
+        self.service_context = ServiceContext(
+            local_config=self.local_config,
+            etcd=self.etcd,
+            event_dispatcher=self.event_dispatcher,
+            event_producer=self.event_producer,
+        )
         self.metric_registry = metric_registry
 
     async def __aenter__(self) -> None:
+        # TODO: Setup the apps outside of the context.
         self.client_api_app = await init_client_app(self)
         self.manager_api_app = await init_manager_app(self)
         self.backends = {

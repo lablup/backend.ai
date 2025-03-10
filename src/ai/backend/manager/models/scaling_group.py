@@ -107,6 +107,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
     agent_selector_config: Mapping[str, Any] = attr.field(factory=dict)
 
+    # Only used in the ConcentratedAgentSelector
+    enforce_spreading_endpoint_replica: bool = False
+
     def to_json(self) -> dict[str, Any]:
         return {
             "allowed_session_types": [item.value for item in self.allowed_session_types],
@@ -114,6 +117,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "config": self.config,
             "agent_selection_strategy": self.agent_selection_strategy,
             "agent_selector_config": self.agent_selector_config,
+            "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
         }
 
     @classmethod
@@ -133,6 +137,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
                 AgentSelectionStrategy
             ),
             t.Key("agent_selector_config", default={}): agent_selector_config_iv,
+            t.Key("enforce_spreading_endpoint_replica", default=False): t.ToBool,
         }).allow_extra("*")
 
 
@@ -276,6 +281,11 @@ class ScalingGroupRow(Base):
     sgroup_for_keypairs_rows = relationship(
         "ScalingGroupForKeypairsRow",
         back_populates="sgroup_row",
+    )
+    resource_preset_rows = relationship(
+        "ResourcePresetRow",
+        back_populates="scaling_group_row",
+        primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
     )
 
 
@@ -439,6 +449,15 @@ class ScalingGroup(graphene.ObjectType):
         ),
     )
 
+    # TODO: Replace this field with a generic resource slot query API
+    own_session_occupied_resource_slots = graphene.Field(
+        graphene.JSONString,
+        description=(
+            "Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. "
+            "Only includes sessions owned by the user."
+        ),
+    )
+
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
     ) -> int:
@@ -478,6 +497,34 @@ class ScalingGroup(graphene.ObjectType):
                 "occupied_slots": total_occupied_slots.to_json(),
                 "available_slots": total_available_slots.to_json(),
             }
+
+    # TODO: Replace this field with a generic resource slot query API
+    async def resolve_own_session_occupied_resource_slots(
+        self, info: graphene.ResolveInfo
+    ) -> Mapping[str, Any]:
+        from .agent import AgentRow
+        from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+
+        graph_ctx: GraphQueryContext = info.context
+        user = graph_ctx.user
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(KernelRow)
+                .join(KernelRow.agent_row)
+                .where(
+                    sa.and_(
+                        KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        KernelRow.user_uuid == user["uuid"],
+                        AgentRow.scaling_group == self.name,
+                    )
+                )
+            )
+            result = await db_session.scalars(query)
+        kernel_rows = cast(list[KernelRow], result.all())
+        occupied_slots = ResourceSlot()
+        for kernel in kernel_rows:
+            occupied_slots += kernel.occupied_slots
+        return occupied_slots.to_json()
 
     @classmethod
     def from_row(

@@ -188,7 +188,9 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
     """
 
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
-    config: Mapping[str, Any]  # agent-selector-specific config
+    config: Mapping[
+        str, Any
+    ]  # agent-selector-specific config, Do not use this. this will be removed after refactoring.
     agent_selection_resource_priority: list[str]
     state_store: AbstractResourceGroupStateStore[T_ResourceGroupState]
 

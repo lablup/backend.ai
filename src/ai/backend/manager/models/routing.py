@@ -198,6 +198,9 @@ class RoutingRow(Base):
         self.status = status
         self.traffic_ratio = traffic_ratio
 
+    def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
+        self.session_owner = user_uuid
+
 
 class Routing(graphene.ObjectType):
     class Meta:
