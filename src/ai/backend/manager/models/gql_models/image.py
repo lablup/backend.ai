@@ -17,7 +17,6 @@ from typing import (
 from uuid import UUID
 
 import graphene
-import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphql import Undefined
@@ -393,22 +392,7 @@ class Image(graphene.ObjectType):
         return is_valid
 
 
-class ImagePermissionValueField(graphene.Scalar):
-    class Meta:
-        description = f"Added in 25.3.0. One of {[val.value for val in ImagePermission]}."
-
-    @staticmethod
-    def serialize(val: ImagePermission) -> str:
-        return val.value
-
-    @staticmethod
-    def parse_literal(node: Any, _variables=None):
-        if isinstance(node, graphql.language.ast.StringValueNode):
-            return ImagePermission(node.value)
-
-    @staticmethod
-    def parse_value(value: str) -> ImagePermission:
-        return ImagePermission(value)
+ImagePermissionValueField = graphene.Enum.from_enum(ImagePermission, description="Added in 25.3.0.")
 
 
 class ImageNode(graphene.ObjectType):

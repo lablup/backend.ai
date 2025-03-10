@@ -115,7 +115,7 @@ type Queries {
     scope_id: ScopeField
 
     """Default is read_attribute."""
-    permission: ImagePermissionValueField = "read_attribute"
+    permission: ImagePermission = READ_ATTRIBUTE
   ): ImageNode
 
   """Added in 25.3.0."""
@@ -123,7 +123,7 @@ type Queries {
     scope_id: ScopeField!
 
     """Default is read_attribute."""
-    permission: ImagePermissionValueField = "read_attribute"
+    permission: ImagePermission = READ_ATTRIBUTE
 
     """Added in 25.4.0."""
     filter_by_statuses: [ImageStatus] = [ALIVE]
@@ -434,7 +434,7 @@ type ImageNode implements Node {
   """
   Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
   """
-  permissions: [ImagePermissionValueField]
+  permissions: [ImagePermission]
 }
 
 type KVPair {
@@ -454,10 +454,13 @@ type ResourceLimit {
   max: String
 }
 
-"""
-Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
-"""
-scalar ImagePermissionValueField
+"""Added in 25.3.0."""
+enum ImagePermission {
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  CREATE_CONTAINER
+  FORGET_IMAGE
+}
 
 type AgentList implements PaginatedList {
   items: [Agent]!
