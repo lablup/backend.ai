@@ -78,38 +78,14 @@ DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
 }
 
 
-def _ext_hook(code: int, data: bytes) -> Any:
-    match code:
-        case ExtTypes.UUID:
-            return uuid.UUID(bytes=data)
-        case ExtTypes.DATETIME:
-            return temporenc.unpackb(data).datetime()
-        case ExtTypes.DECIMAL:
-            return pickle.loads(data)
-        case ExtTypes.POSIX_PATH:
-            return PosixPath(os.fsdecode(data))
-        case ExtTypes.PURE_POSIX_PATH:
-            return PurePosixPath(os.fsdecode(data))
-        case ExtTypes.ENUM:
-            return pickle.loads(data)
-        case ExtTypes.RESOURCE_SLOT:
-            return pickle.loads(data)
-        case ExtTypes.BACKENDAI_BINARY_SIZE:
-            return pickle.loads(data)
-        case ExtTypes.IMAGE_REF:
-            return pickle.loads(data)
-    return _msgpack.ExtType(code, data)
-
-
-class Deserializer:
+class _Deserializer:
     def __init__(self, mapping: Optional[Mapping[int, ExtFunc]] = None):
         self._ext_hook: dict[int, ExtFunc] = {}
         mapping = mapping or {}
-        for ext_type, hook in DEFAULT_EXT_HOOK.items():
-            if ext_type not in mapping:
-                self._ext_hook[ext_type] = hook
-            else:
-                self._ext_hook[ext_type] = mapping[ext_type]
+        self._ext_hook = {**mapping}
+        for ext_type, func in DEFAULT_EXT_HOOK.items():
+            if ext_type not in self._ext_hook:
+                self._ext_hook[ext_type] = func
 
     @property
     def ext_hook(self) -> Callable[[int, bytes], Any]:
@@ -121,8 +97,7 @@ class Deserializer:
         return _hook_callable
 
 
-_default_deserializer_hook = Deserializer().ext_hook
-uuid_to_str_hook = Deserializer({ExtTypes.UUID: lambda data: str(uuid.UUID(bytes=data))}).ext_hook
+uuid_to_str: Mapping[int, ExtFunc] = {ExtTypes.UUID: lambda data: str(uuid.UUID(bytes=data))}
 
 DEFAULT_PACK_OPTS = {
     "use_bin_type": True,  # bytes -> bin type (default for Python 3)
@@ -134,7 +109,7 @@ DEFAULT_UNPACK_OPTS = {
     "raw": False,  # assume str as UTF-8 (default for Python 3)
     "strict_map_key": False,  # allow using UUID as map keys
     "use_list": False,  # array -> tuple
-    "ext_hook": _default_deserializer_hook,
+    "ext_hook": _Deserializer().ext_hook,
 }
 
 
@@ -146,6 +121,10 @@ def packb(data: Any, **kwargs) -> bytes:
     return ret
 
 
-def unpackb(packed: bytes, **kwargs) -> Any:
+def unpackb(
+    packed: bytes, ext_hook_mapping: Optional[Mapping[int, ExtFunc]] = None, **kwargs
+) -> Any:
     opts = {**DEFAULT_UNPACK_OPTS, **kwargs}
+    if ext_hook_mapping is not None:
+        opts["ext_hook"] = _Deserializer(ext_hook_mapping).ext_hook
     return _msgpack.unpackb(packed, **opts)
