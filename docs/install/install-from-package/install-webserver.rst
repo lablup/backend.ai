@@ -66,7 +66,6 @@ would be:
    # allowlist = ""
 
    [ui]
-   brand = "Backend.AI"
    menu_blocklist = "pipeline"
 
    [api]
