@@ -1169,11 +1169,6 @@ class PurgeImages(graphene.Mutation):
                     image_identifier = ImageIdentifier(image_canonical, arch)
                     async with ctx.db.begin_session() as session:
                         image_row = await ImageRow.resolve(session, [image_identifier])
-
-                        await redis_helper.execute(
-                            ctx.redis_image, lambda r: r.srem(image_canonical, agent_id)
-                        )
-
                         task_result.reserved_bytes += image_row.size_bytes
                         task_result.results.responses.append(result)
 
