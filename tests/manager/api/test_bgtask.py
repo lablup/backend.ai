@@ -8,7 +8,6 @@ from typing import Any, TypeAlias
 import attr
 import pytest
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.events import (
     BgtaskDoneEvent,
@@ -17,6 +16,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.message_queue.base import MQMessage
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import background_task_ctx, event_dispatcher_ctx, shared_config_ctx
@@ -44,7 +44,14 @@ async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[B
     await root_ctx.background_task_manager.shutdown()
     await producer.close()
     await dispatcher.close()
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await producer.message_queue.send(
+        MQMessage(
+            topic="bgtask",
+            payload={},
+            metadata={},
+        ),
+        is_flush=True,
+    )
 
 
 @pytest.mark.timeout(60)
