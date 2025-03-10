@@ -860,24 +860,42 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     if default_host not in allowed_hosts:
         default_host = None
 
+    volumes = [
+        (proxy_name, volume_data)
+        for proxy_name, volume_data in all_volumes
+        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+    ]
+
+    fetch_exposed_volume_fields_tasks = [
+        fetch_exposed_volume_fields(
+            storage_manager=root_ctx.storage_manager,
+            redis_connection=root_ctx.redis_stat,
+            proxy_name=proxy_name,
+            volume_name=volume_data["name"],
+        )
+        for proxy_name, volume_data in volumes
+    ]
+    get_sftp_scaling_groups_tasks = [
+        root_ctx.storage_manager.get_sftp_scaling_groups(proxy_name)
+        for proxy_name, volume_data in volumes
+    ]
+
+    fetch_exposed_volume_fields_results, get_sftp_scaling_groups_results = await asyncio.gather(
+        asyncio.gather(*fetch_exposed_volume_fields_tasks),
+        asyncio.gather(*get_sftp_scaling_groups_tasks),
+    )
+
     volume_info = {
         f"{proxy_name}:{volume_data['name']}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
-            "usage": await fetch_exposed_volume_fields(
-                storage_manager=root_ctx.storage_manager,
-                redis_connection=root_ctx.redis_stat,
-                proxy_name=proxy_name,
-                volume_name=volume_data["name"],
-            ),
-            "sftp_scaling_groups": await root_ctx.storage_manager.get_sftp_scaling_groups(
-                proxy_name
-            ),
+            "usage": usage,
+            "sftp_scaling_groups": sftp_scaling_groups,
         }
-        for proxy_name, volume_data in all_volumes
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
+            volumes, fetch_exposed_volume_fields_results, get_sftp_scaling_groups_results
+        )
     }
-
     resp = {
         "default": default_host,
         "allowed": sorted(allowed_hosts),
