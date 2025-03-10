@@ -10,7 +10,6 @@ from typing import (
 )
 
 import graphene
-import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -50,22 +49,9 @@ if TYPE_CHECKING:
     from .scaling_group import ScalingGroupNode
 
 
-class DomainPermissionValueField(graphene.Scalar):
-    class Meta:
-        description = f"Added in 24.12.0. One of {[val.value for val in DomainPermission]}."
-
-    @staticmethod
-    def serialize(val: DomainPermission) -> str:
-        return val.value
-
-    @staticmethod
-    def parse_literal(node: Any, _variables=None):
-        if isinstance(node, graphql.language.ast.StringValueNode):
-            return DomainPermission(node.value)
-
-    @staticmethod
-    def parse_value(value: str) -> DomainPermission:
-        return DomainPermission(value)
+DomainPermissionValueField = graphene.Enum.from_enum(
+    DomainPermission, description="Added in 24.12.0."
+)
 
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {

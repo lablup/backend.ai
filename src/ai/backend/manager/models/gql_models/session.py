@@ -12,7 +12,6 @@ from typing import (
 )
 
 import graphene
-import graphql
 import more_itertools
 import sqlalchemy as sa
 import trafaret as t
@@ -125,22 +124,9 @@ _queryorder_colmap: ColumnMapType = {
 }
 
 
-class SessionPermissionValueField(graphene.Scalar):
-    class Meta:
-        description = f"Added in 24.09.0. One of {[val.value for val in ComputeSessionPermission]}."
-
-    @staticmethod
-    def serialize(val: ComputeSessionPermission) -> str:
-        return val.value
-
-    @staticmethod
-    def parse_literal(node: Any, _variables=None):
-        if isinstance(node, graphql.language.ast.StringValueNode):
-            return ComputeSessionPermission(node.value)
-
-    @staticmethod
-    def parse_value(value: str) -> ComputeSessionPermission:
-        return ComputeSessionPermission(value)
+SessionPermissionValueField = graphene.Enum.from_enum(
+    ComputeSessionPermission, description="Added in 24.09.0."
+)
 
 
 class ComputeSessionNode(graphene.ObjectType):

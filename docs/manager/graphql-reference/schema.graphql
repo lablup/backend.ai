@@ -16,10 +16,10 @@ type Queries {
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
 
   """Added in 24.12.0."""
-  domain_node(id: GlobalIDField!, permission: DomainPermissionValueField = "read_attribute"): DomainNode
+  domain_node(id: GlobalIDField!, permission: DomainPermission = READ_ATTRIBUTE): DomainNode
 
   """Added in 24.12.0."""
-  domain_nodes(filter: String, order: String, permission: DomainPermissionValueField = "read_attribute", offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
+  domain_nodes(filter: String, order: String, permission: DomainPermission = READ_ATTRIBUTE, offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
 
   """Added in 24.12.0."""
   agent_nodes(
@@ -115,7 +115,7 @@ type Queries {
     scope_id: ScopeField
 
     """Default is read_attribute."""
-    permission: ImagePermissionValueField = "read_attribute"
+    permission: ImagePermission = READ_ATTRIBUTE
   ): ImageNode
 
   """Added in 25.3.0."""
@@ -123,7 +123,7 @@ type Queries {
     scope_id: ScopeField!
 
     """Default is read_attribute."""
-    permission: ImagePermissionValueField = "read_attribute"
+    permission: ImagePermission = READ_ATTRIBUTE
 
     """Added in 25.4.0."""
     filter_by_statuses: [ImageStatus] = [ALIVE]
@@ -186,7 +186,7 @@ type Queries {
     project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0."""
-    permission: VFolderPermissionValueField
+    permission: VFolderPermission
     filter: String
     order: String
     offset: Int
@@ -213,7 +213,7 @@ type Queries {
     project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
-    permission: SessionPermissionValueField = "read_attribute"
+    permission: ComputeSessionPermission = READ_ATTRIBUTE
   ): ComputeSessionNode
 
   """Added in 24.09.0."""
@@ -225,7 +225,7 @@ type Queries {
     project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
-    permission: SessionPermissionValueField = "read_attribute"
+    permission: ComputeSessionPermission = READ_ATTRIBUTE
     filter: String
     order: String
     offset: Int
@@ -434,7 +434,7 @@ type ImageNode implements Node {
   """
   Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
   """
-  permissions: [ImagePermissionValueField]
+  permissions: [ImagePermission]
 }
 
 type KVPair {
@@ -454,10 +454,13 @@ type ResourceLimit {
   max: String
 }
 
-"""
-Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
-"""
-scalar ImagePermissionValueField
+"""Added in 25.3.0."""
+enum ImagePermission {
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  CREATE_CONTAINER
+  FORGET_IMAGE
+}
 
 type AgentList implements PaginatedList {
   items: [Agent]!
@@ -568,10 +571,14 @@ Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node 
 """
 scalar GlobalIDField
 
-"""
-Added in 24.12.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'create_user', 'create_project'].
-"""
-scalar DomainPermissionValueField
+"""Added in 24.12.0."""
+enum DomainPermission {
+  READ_ATTRIBUTE
+  READ_SENSITIVE_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  CREATE_USER
+  CREATE_PROJECT
+}
 
 """Added in 24.12.0"""
 type DomainConnection {
@@ -1296,13 +1303,23 @@ type VirtualFolderNode implements Node {
   """
   Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
   """
-  permissions: [VFolderPermissionValueField]
+  permissions: [VFolderPermission]
 }
 
-"""
-Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
-"""
-scalar VFolderPermissionValueField
+"""Added in 24.09.0."""
+enum VFolderPermission {
+  CLONE
+  ASSIGN_PERMISSION_TO_OTHERS
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  DELETE_VFOLDER
+  READ_CONTENT
+  WRITE_CONTENT
+  DELETE_CONTENT
+  MOUNT_RO
+  MOUNT_RW
+  MOUNT_WD
+}
 
 """Added in 24.03.4"""
 type VirtualFolderConnection {
@@ -1370,7 +1387,7 @@ type ComputeSessionNode implements Node {
   """
   One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
   """
-  permissions: [SessionPermissionValueField]
+  permissions: [ComputeSessionPermission]
   status: String
   status_info: String
   status_data: JSONString
@@ -1411,10 +1428,15 @@ type ComputeSessionNode implements Node {
   graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
 }
 
-"""
-Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
-"""
-scalar SessionPermissionValueField
+"""Added in 24.09.0."""
+enum ComputeSessionPermission {
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  DELETE_SESSION
+  START_APP
+  EXECUTE
+  CONVERT_TO_IMAGE
+}
 
 """Added in 24.09.0."""
 type ComputeSessionConnection {
