@@ -69,7 +69,6 @@ config_iv = t.Dict({
         t.Key("directory_based_usage", default=False): t.ToBool(),
         t.Key("allow_custom_resource_allocation", default=True): t.ToBool(),
         t.Key("edu_appname_prefix", default=""): t.String(allow_blank=True),
-        t.Key("enable_model_store", default=True): t.ToBool(),
         t.Key("enable_extend_login_session", default=False): t.ToBool(),
         t.Key("is_directory_size_visible", default=True): t.ToBool(),
     }).allow_extra("*"),
@@ -123,18 +122,15 @@ config_iv = t.Dict({
         },
     ).allow_extra("*"),
     t.Key("ui"): t.Dict({
-        t.Key("brand"): t.String,
         t.Key("default_environment", default=None): t.Null | t.String,
         t.Key("default_import_environment", default=None): t.Null | t.String,
         t.Key("menu_blocklist", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
         t.Key("menu_inactivelist", default=None): t.Null
         | tx.StringList(empty_str_as_empty_list=True),
-        t.Key("enable_LLM_playground", default=False): t.ToBool,
     }).allow_extra("*"),
     t.Key("api"): t.Dict({
         t.Key("domain"): t.String,
         t.Key("endpoint"): tx.DelimiterSeperatedList[yarl.URL](tx.URL, min_length=1),
-        t.Key("text"): t.String,
         tx.AliasedKey(["ssl_verify", "ssl-verify"], default=True): t.ToBool,
         t.Key("auth_token_name", default="sToken"): t.String,
     }).allow_extra("*"),
