@@ -65,7 +65,7 @@ class ExtFunc(Protocol):
         pass
 
 
-DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
+_DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
     ExtTypes.UUID: lambda data: uuid.UUID(bytes=data),
     ExtTypes.DATETIME: lambda data: temporenc.unpackb(data).datetime(),
     ExtTypes.DECIMAL: lambda data: pickle.loads(data),
@@ -83,7 +83,7 @@ class _Deserializer:
         self._ext_hook: dict[int, ExtFunc] = {}
         mapping = mapping or {}
         self._ext_hook = {**mapping}
-        for ext_type, func in DEFAULT_EXT_HOOK.items():
+        for ext_type, func in _DEFAULT_EXT_HOOK.items():
             if ext_type not in self._ext_hook:
                 self._ext_hook[ext_type] = func
 
