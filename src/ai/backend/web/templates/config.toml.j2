@@ -3,8 +3,6 @@
 {% toml_field "apiEndpointText" config["api"]["text"] %}
 {% toml_field "defaultSessionEnvironment" config["ui"]["default_environment"] %}
 {% toml_field "defaultImportEnvironment" config["ui"]["default_import_environment"] %}
-{% toml_field "siteDescription" config["ui"]["brand"] %}
-{% toml_field "enableLLMPlayground" config["ui"]["enable_LLM_playground"] %}
 connectionMode = "SESSION"
 {% toml_field "signupSupport" config["service"]["enable_signup"] %}
 {% toml_field "allowChangeSigninMode" config["service"]["allow_change_signin_mode"] %}
@@ -31,7 +29,6 @@ connectionMode = "SESSION"
 {% toml_field "allowCustomResourceAllocation" config["service"]["allow_custom_resource_allocation"] %}
 {% toml_field "isDirectorySizeVisible" config["service"]["is_directory_size_visible"] %}
 {% toml_field "eduAppNamePrefix" config["service"]["edu_appname_prefix"] %}
-{% toml_field "enableModelStore" config["service"]["enable_model_store"] %}
 {% toml_field "enableExtendLoginSession" config["service"]["enable_extend_login_session"] %}
 {% toml_field "enableInteractiveLoginAccountSwitch" config["service"]["enable_interactive_login_account_switch"] %}
 
