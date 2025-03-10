@@ -238,7 +238,7 @@ class AgentNode(graphene.ObjectType):
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
             if stat is not None:
-                ret.append(msgpack.unpackb(stat))
+                ret.append(msgpack.unpackb(stat, ext_hook=msgpack.uuid_key_to_str_hook))
             else:
                 ret.append(None)
 
@@ -602,7 +602,7 @@ class Agent(graphene.ObjectType):
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
             if stat is not None:
-                ret.append(msgpack.unpackb(stat))
+                ret.append(msgpack.unpackb(stat, ext_hook=msgpack.uuid_key_to_str_hook))
             else:
                 ret.append(None)
 

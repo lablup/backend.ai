@@ -7,9 +7,10 @@ import enum
 import os
 import pickle
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import PosixPath, PurePosixPath
-from typing import Any
+from typing import Any, Callable, Optional, Protocol
 
 import msgpack as _msgpack
 import temporenc
@@ -59,6 +60,24 @@ def _default(obj: object) -> _msgpack.ExtType:
     raise TypeError(f"Unknown type: {obj!r} ({type(obj)})")
 
 
+class ExtFunc(Protocol):
+    def __call__(self, data: bytes) -> Any:
+        pass
+
+
+DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
+    ExtTypes.UUID: lambda data: uuid.UUID(bytes=data),
+    ExtTypes.DATETIME: lambda data: temporenc.unpackb(data).datetime(),
+    ExtTypes.DECIMAL: lambda data: pickle.loads(data),
+    ExtTypes.POSIX_PATH: lambda data: PosixPath(os.fsdecode(data)),
+    ExtTypes.PURE_POSIX_PATH: lambda data: PurePosixPath(os.fsdecode(data)),
+    ExtTypes.ENUM: lambda data: pickle.loads(data),
+    ExtTypes.RESOURCE_SLOT: lambda data: pickle.loads(data),
+    ExtTypes.BACKENDAI_BINARY_SIZE: lambda data: pickle.loads(data),
+    ExtTypes.IMAGE_REF: lambda data: pickle.loads(data),
+}
+
+
 def _ext_hook(code: int, data: bytes) -> Any:
     match code:
         case ExtTypes.UUID:
@@ -82,6 +101,31 @@ def _ext_hook(code: int, data: bytes) -> Any:
     return _msgpack.ExtType(code, data)
 
 
+class Deserializer:
+    def __init__(self, mapping: Optional[Mapping[int, ExtFunc]] = None):
+        self._ext_hook: dict[int, ExtFunc] = {}
+        mapping = mapping or {}
+        for ext_type, hook in DEFAULT_EXT_HOOK.items():
+            if ext_type not in mapping:
+                self._ext_hook[ext_type] = hook
+            else:
+                self._ext_hook[ext_type] = mapping[ext_type]
+
+    @property
+    def ext_hook(self) -> Callable[[int, bytes], Any]:
+        def _hook_callable(code: int, data: bytes) -> Any:
+            if code in self._ext_hook:
+                return self._ext_hook[code](data)
+            return _msgpack.ExtType(code, data)
+
+        return _hook_callable
+
+
+_default_deserializer_hook = Deserializer().ext_hook
+uuid_key_to_str_hook = Deserializer({
+    ExtTypes.UUID: lambda data: str(uuid.UUID(bytes=data))
+}).ext_hook
+
 DEFAULT_PACK_OPTS = {
     "use_bin_type": True,  # bytes -> bin type (default for Python 3)
     "strict_types": True,  # do not serialize subclasses using superclasses
@@ -92,7 +136,7 @@ DEFAULT_UNPACK_OPTS = {
     "raw": False,  # assume str as UTF-8 (default for Python 3)
     "strict_map_key": False,  # allow using UUID as map keys
     "use_list": False,  # array -> tuple
-    "ext_hook": _ext_hook,
+    "ext_hook": _default_deserializer_hook,
 }
 
 
