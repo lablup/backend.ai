@@ -3163,7 +3163,7 @@ class AgentRegistry:
             # Update the mapping of kernel images to agents.
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
             loaded_image_canonicals = set(img_info[0] for img_info in loaded_images)
-            old_image_canonicals = self.agent_installed_images.get(agent_id, set())
+            prev_image_canonicals = self.agent_installed_images.get(agent_id, set())
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
@@ -3171,7 +3171,7 @@ class AgentRegistry:
                     await pipe.sadd(image, agent_id)
 
                 # Remove old images that are not in the new list.
-                for image in old_image_canonicals - loaded_image_canonicals:
+                for image in prev_image_canonicals - loaded_image_canonicals:
                     await pipe.srem(image, agent_id)
                 return pipe
 
