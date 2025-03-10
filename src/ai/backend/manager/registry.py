@@ -3170,7 +3170,6 @@ class AgentRegistry:
                 for image in image_canonicals:
                     await pipe.sadd(image, agent_id)
 
-                # Remove old images that are not in the new list.
                 for image in prev_image_canonicals - image_canonicals:
                     await pipe.srem(image, agent_id)
                 return pipe
