@@ -186,7 +186,7 @@ type Queries {
     project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0."""
-    permission: VFolderPermissionValueField
+    permission: VFolderPermission
     filter: String
     order: String
     offset: Int
@@ -1303,13 +1303,23 @@ type VirtualFolderNode implements Node {
   """
   Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
   """
-  permissions: [VFolderPermissionValueField]
+  permissions: [VFolderPermission]
 }
 
-"""
-Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
-"""
-scalar VFolderPermissionValueField
+"""Added in 24.09.0."""
+enum VFolderPermission {
+  CLONE
+  ASSIGN_PERMISSION_TO_OTHERS
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  DELETE_VFOLDER
+  READ_CONTENT
+  WRITE_CONTENT
+  DELETE_CONTENT
+  MOUNT_RO
+  MOUNT_RW
+  MOUNT_WD
+}
 
 """Added in 24.03.4"""
 type VirtualFolderConnection {

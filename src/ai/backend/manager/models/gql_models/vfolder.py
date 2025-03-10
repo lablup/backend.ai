@@ -11,7 +11,6 @@ from typing import (
 )
 
 import graphene
-import graphql
 import sqlalchemy as sa
 import trafaret as t
 import yaml
@@ -65,22 +64,9 @@ if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
 
-class VFolderPermissionValueField(graphene.Scalar):
-    class Meta:
-        description = f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}."
-
-    @staticmethod
-    def serialize(val: VFolderRBACPermission) -> str:
-        return val.value
-
-    @staticmethod
-    def parse_literal(node: Any, _variables=None):
-        if isinstance(node, graphql.language.ast.StringValueNode):
-            return VFolderRBACPermission(node.value)
-
-    @staticmethod
-    def parse_value(value: str) -> VFolderRBACPermission:
-        return VFolderRBACPermission(value)
+VFolderPermissionValueField = graphene.Enum.from_enum(
+    VFolderRBACPermission, description="Added in 24.09.0."
+)
 
 
 class VirtualFolderNode(graphene.ObjectType):
