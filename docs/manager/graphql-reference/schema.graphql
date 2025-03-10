@@ -16,10 +16,10 @@ type Queries {
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
 
   """Added in 24.12.0."""
-  domain_node(id: GlobalIDField!, permission: DomainPermissionValueField = "read_attribute"): DomainNode
+  domain_node(id: GlobalIDField!, permission: DomainPermission = READ_ATTRIBUTE): DomainNode
 
   """Added in 24.12.0."""
-  domain_nodes(filter: String, order: String, permission: DomainPermissionValueField = "read_attribute", offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
+  domain_nodes(filter: String, order: String, permission: DomainPermission = READ_ATTRIBUTE, offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
 
   """Added in 24.12.0."""
   agent_nodes(
@@ -571,10 +571,14 @@ Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node 
 """
 scalar GlobalIDField
 
-"""
-Added in 24.12.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'create_user', 'create_project'].
-"""
-scalar DomainPermissionValueField
+"""Added in 24.12.0."""
+enum DomainPermission {
+  READ_ATTRIBUTE
+  READ_SENSITIVE_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  CREATE_USER
+  CREATE_PROJECT
+}
 
 """Added in 24.12.0"""
 type DomainConnection {
