@@ -3161,22 +3161,22 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
-            loaded_image_canonicals = set(img_info[0] for img_info in loaded_images)
+            images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
+            image_canonicals = set(img_info[0] for img_info in images)
             prev_image_canonicals = self.agent_installed_images.get(agent_id, set())
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
-                for image in loaded_image_canonicals:
+                for image in image_canonicals:
                     await pipe.sadd(image, agent_id)
 
                 # Remove old images that are not in the new list.
-                for image in prev_image_canonicals - loaded_image_canonicals:
+                for image in prev_image_canonicals - image_canonicals:
                     await pipe.srem(image, agent_id)
                 return pipe
 
             await redis_helper.execute(self.redis_image, _pipe_builder)
-            self.agent_installed_images[agent_id] = loaded_image_canonicals
+            self.agent_installed_images[agent_id] = image_canonicals
 
         await self.hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
