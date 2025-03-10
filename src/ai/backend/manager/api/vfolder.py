@@ -890,9 +890,9 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
             "usage": usage,
-            "sftp_scaling_groups": sftp,
+            "sftp_scaling_groups": sftp_scaling_groups,
         }
-        for (proxy_name, volume_data), usage, sftp in zip(
+        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
             volumes, fetch_exposed_volume_fields_results, get_sftp_scaling_groups_results
         )
     }
