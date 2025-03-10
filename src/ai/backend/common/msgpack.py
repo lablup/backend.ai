@@ -122,9 +122,7 @@ class Deserializer:
 
 
 _default_deserializer_hook = Deserializer().ext_hook
-uuid_key_to_str_hook = Deserializer({
-    ExtTypes.UUID: lambda data: str(uuid.UUID(bytes=data))
-}).ext_hook
+uuid_to_str_hook = Deserializer({ExtTypes.UUID: lambda data: str(uuid.UUID(bytes=data))}).ext_hook
 
 DEFAULT_PACK_OPTS = {
     "use_bin_type": True,  # bytes -> bin type (default for Python 3)
