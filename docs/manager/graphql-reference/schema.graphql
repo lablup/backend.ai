@@ -213,7 +213,7 @@ type Queries {
     project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
-    permission: SessionPermissionValueField = "read_attribute"
+    permission: ComputeSessionPermission = READ_ATTRIBUTE
   ): ComputeSessionNode
 
   """Added in 24.09.0."""
@@ -225,7 +225,7 @@ type Queries {
     project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
-    permission: SessionPermissionValueField = "read_attribute"
+    permission: ComputeSessionPermission = READ_ATTRIBUTE
     filter: String
     order: String
     offset: Int
@@ -1377,7 +1377,7 @@ type ComputeSessionNode implements Node {
   """
   One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
   """
-  permissions: [SessionPermissionValueField]
+  permissions: [ComputeSessionPermission]
   status: String
   status_info: String
   status_data: JSONString
@@ -1418,10 +1418,15 @@ type ComputeSessionNode implements Node {
   graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
 }
 
-"""
-Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
-"""
-scalar SessionPermissionValueField
+"""Added in 24.09.0."""
+enum ComputeSessionPermission {
+  READ_ATTRIBUTE
+  UPDATE_ATTRIBUTE
+  DELETE_SESSION
+  START_APP
+  EXECUTE
+  CONVERT_TO_IMAGE
+}
 
 """Added in 24.09.0."""
 type ComputeSessionConnection {
