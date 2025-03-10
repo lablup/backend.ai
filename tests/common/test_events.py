@@ -15,6 +15,7 @@ from ai.backend.common.events import (
     EventProducer,
 )
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.message_queue.base import MQMessage
 from ai.backend.common.types import AgentId, RedisConfig
 
 
@@ -79,7 +80,14 @@ async def test_dispatch(
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await producer.message_queue.send(
+        MQMessage(
+            topic="bgtask",
+            payload={},
+            metadata={},
+        ),
+        is_flush=True,
+    )
     await producer.close()
     await dispatcher.close()
 
@@ -132,7 +140,7 @@ async def test_error_on_dispatch(
     assert "ZeroDivisionError" in exception_log
     assert "OverflowError" in exception_log
 
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(producer.message_queue.connection_info, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 
