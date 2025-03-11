@@ -1069,7 +1069,7 @@ class ImagePermissionContextBuilder(
         img_query_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
-            .options(load_only(ImageRow.id, ImageRow.registry))
+            .options(load_only(ImageRow.id, ImageRow.registry, ImageRow.labels))
             .where(ContainerRegistryRow.is_global == true())
         )
 
