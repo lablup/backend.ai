@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Dict, Generic, Optional, Self, TypeVar
+from typing import Any, AsyncGenerator, Dict, Generic, Literal, Optional, Self, TypeVar
 
 import msgpack
 
@@ -32,7 +32,7 @@ class MQMessage:
             raise ValueError(f"Unsupported serialization format: {format}")
 
     @classmethod
-    def deserialize(cls, data: bytes, format: str = "msgpack") -> Self:
+    def deserialize(cls, data: bytes, format: Literal["msgpack", "json"] = "msgpack") -> Self:
         if format == "msgpack":
             message = msgpack.unpackb(data)
         elif format == "json":
