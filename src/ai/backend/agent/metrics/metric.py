@@ -59,12 +59,12 @@ class UtilizationMetricObserver:
         self._container_metric = Gauge(
             name="backendai_container_utilization",
             documentation="Container utilization metrics",
-            labelnames=["metric_name", "agent_id", "kernel_id", "value_type"],
+            labelnames=["container_metric_name", "agent_id", "kernel_id", "value_type"],
         )
         self._device_metric = Gauge(
             name="backendai_device_utilization",
             documentation="Device utilization metrics",
-            labelnames=["metric_name", "agent_id", "device_id", "value_type"],
+            labelnames=["device_metric_name", "agent_id", "device_id", "value_type"],
         )
 
     @classmethod
@@ -80,7 +80,7 @@ class UtilizationMetricObserver:
     ) -> None:
         for metric_value_type, value in metric.value_pairs:
             self._container_metric.labels(
-                metric_name=metric.key,
+                container_metric_name=metric.key,
                 agent_id=metric.agent_id,
                 kernel_id=metric.kernel_id,
                 value_type=metric_value_type,
@@ -93,7 +93,7 @@ class UtilizationMetricObserver:
     ) -> None:
         for metric_value_type, value in metric.value_pairs:
             self._device_metric.labels(
-                metric_name=metric.key,
+                device_metric_name=metric.key,
                 agent_id=metric.agent_id,
                 device_id=metric.device_id,
                 value_type=metric_value_type,
