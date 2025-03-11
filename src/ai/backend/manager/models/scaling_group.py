@@ -429,9 +429,9 @@ class ScalingGroup(graphene.ObjectType):
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
-    accelerator_quantum_size_map = graphene.Field(
-        graphene.JSONString,
-        description="Added in 25.5.0. The key is accelerator name and the value is string typed the quantum size.",
+    accelerator_quantum_size = graphene.Field(
+        graphene.Float,
+        description="Added in 25.5.0.",
     )
 
     # Dynamic fields.
@@ -530,21 +530,10 @@ class ScalingGroup(graphene.ObjectType):
             occupied_slots += kernel.occupied_slots
         return occupied_slots.to_json()
 
-    async def resolve_accelerator_quantum_size_map(
-        self, info: graphene.ResolveInfo
-    ) -> Mapping[str, Any]:
-        result: dict[str, str] = {}
+    async def resolve_accelerator_quantum_size(self, info: graphene.ResolveInfo) -> Optional[float]:
         graph_ctx: GraphQueryContext = info.context
-        accelerator_config = await graph_ctx.etcd.get_prefix("config/plugins/accelerator")
-        for accelerator_name, conf in accelerator_config.items():
-            match conf:
-                case str() | None:
-                    continue
-                case _:
-                    if (quantum_size := conf.get("quantum_size")) is not None:
-                        quantum_size = cast(str, quantum_size)
-                        result[accelerator_name] = quantum_size
-        return result
+        result = await graph_ctx.etcd.get("config/plugins/accelerator/cuda/quantum_size")
+        return float(result) if result is not None else None
 
     @classmethod
     def from_row(
