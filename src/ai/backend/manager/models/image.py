@@ -738,8 +738,10 @@ class ImageRow(Base):
 
         self.resources = resources
 
-    def is_customized_by(self, user_id: str) -> bool:
-        return (self.labels or {}).get("ai.backend.customized-image.owner") == f"user:{user_id}"
+    def is_customized_by(self, user_id: uuid.UUID) -> bool:
+        return (self.labels or {}).get(
+            "ai.backend.customized-image.owner"
+        ) == f"user:{str(user_id)}"
 
 
 async def bulk_get_image_configs(
@@ -1012,9 +1014,8 @@ class ImagePermissionContextBuilder(
             return False
         labels = cast(dict[str, str], image.labels)
         owner_label = labels.get("ai.backend.customized-image.owner")
-        if owner_label is not None:
-            if owner_label != f"user:{user_id}":
-                return False
+        if owner_label is not None and owner_label != f"user:{user_id}":
+            return False
         return True
 
     async def _in_user_scope(
@@ -1036,9 +1037,9 @@ class ImagePermissionContextBuilder(
 
         for row in await self.db_session.scalars(_img_query_stmt):
             image_row = cast(ImageRow, row)
-            if image_row.labels.get(
-                "ai.backend.customized-image.owner"
-            ) is None or not self._is_image_accessible_for_user(
+            if not image_row.is_customized_by(
+                scope.user_id
+            ) or not self._is_image_accessible_for_user(
                 image_row, allowed_registries, scope.user_id
             ):
                 continue
