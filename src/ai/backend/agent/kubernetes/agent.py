@@ -58,7 +58,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
+from ..agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ComputerContext,
+    ScanImagesResult,
+)
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
@@ -1001,9 +1007,9 @@ class KubernetesAgent(
             return distro
         raise NotImplementedError
 
-    async def scan_images(self) -> Mapping[str, str]:
+    async def scan_images(self) -> ScanImagesResult:
         # Retrieving image label from registry api is not possible
-        return {}
+        return ScanImagesResult(scanned_images={}, removed_images={})
 
     async def handle_agent_socket(self):
         # TODO: Add support for remote agent socket mechanism

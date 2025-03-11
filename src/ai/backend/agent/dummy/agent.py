@@ -39,7 +39,13 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 
-from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
+from ..agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ComputerContext,
+    ScanImagesResult,
+)
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
@@ -274,10 +280,10 @@ class DummyAgent(
         await asyncio.sleep(delay)
         return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
 
-    async def scan_images(self) -> Mapping[str, str]:
+    async def scan_images(self) -> ScanImagesResult:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
-        return {}
+        return ScanImagesResult(scanned_images={}, removed_images={})
 
     async def pull_image(
         self,
