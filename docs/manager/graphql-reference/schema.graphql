@@ -1221,10 +1221,8 @@ type ScalingGroup {
   scheduler_opts: JSONString
   use_host_network: Boolean
 
-  """
-  Added in 25.5.0. The key is accelerator name and the value is string typed the quantum size.
-  """
-  accelerator_quantum_size_map: JSONString
+  """Added in 25.5.0."""
+  accelerator_quantum_size: Float
 
   """Added in 24.03.7."""
   agent_count_by_status(
