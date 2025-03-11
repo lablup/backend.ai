@@ -27,6 +27,7 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
+from dataclasses import dataclass
 from decimal import Decimal
 from io import SEEK_END, BytesIO
 from pathlib import Path
@@ -71,6 +72,7 @@ from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
     AgentHeartbeatEvent,
+    AgentPurgeImagesEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -205,6 +207,12 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
     else:
         additional_gids = set(gids)
     environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
+
+
+@dataclass
+class ScanImagesResult:
+    scanned_images: Mapping[str, str]
+    removed_images: Mapping[str, str]
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -754,7 +762,7 @@ class AbstractAgent(
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
-            self.images = await self.scan_images()
+            self.images = (await self.scan_images()).scanned_images
             self.timer_tasks.append(aiotools.create_timer(self._scan_images_wrapper, 20.0))
             await self.scan_running_kernels()
 
@@ -1661,7 +1669,7 @@ class AbstractAgent(
             )
 
     @abstractmethod
-    async def scan_images(self) -> Mapping[str, str]:
+    async def scan_images(self) -> ScanImagesResult:
         """
         Scan the available kernel images/templates and update ``self.images``.
         This is called periodically to keep the image list up-to-date and allow
@@ -1669,7 +1677,11 @@ class AbstractAgent(
         """
 
     async def _scan_images_wrapper(self, interval: float) -> None:
-        self.images = await self.scan_images()
+        result = await self.scan_images()
+        self.images = result.scanned_images
+        await self.produce_event(
+            AgentPurgeImagesEvent(image_canonicals=list(result.removed_images.keys()))
+        )
 
     @abstractmethod
     async def push_image(
