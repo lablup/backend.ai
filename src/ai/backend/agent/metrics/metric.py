@@ -2,6 +2,8 @@ from typing import Optional, Self
 
 from prometheus_client import Counter, Gauge, Histogram
 
+from ai.backend.common.metrics.types import UNDEFINED
+
 from .types import FlattenedDeviceMetric, FlattenedKernelMetric
 
 
@@ -91,9 +93,9 @@ class UtilizationMetricObserver:
                 container_metric_name=metric.key,
                 agent_id=metric.agent_id,
                 kernel_id=metric.kernel_id,
-                session_id=metric.session_id,
-                owner_user_id=metric.owner_user_id,
-                owner_project_id=metric.owner_project_id,
+                session_id=metric.session_id or UNDEFINED,
+                owner_user_id=metric.owner_user_id or UNDEFINED,
+                owner_project_id=metric.owner_project_id or UNDEFINED,
                 value_type=metric_value_type,
             ).set(float(value))
 
