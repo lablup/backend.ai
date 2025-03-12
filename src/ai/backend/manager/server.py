@@ -51,6 +51,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.message_queue.redis import RedisMessageQueue
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
@@ -444,8 +445,15 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
         root_ctx.shared_config.data["redis"]
     )
-    root_ctx.event_producer = await EventProducer.new(
+
+    redis_connect_info = redis_helper.get_redis_object(
         etcd_redis_config.get_override_config(RedisRole.STREAM),
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
+    root_ctx.event_producer = await EventProducer.new(
+        # etcd_redis_config.get_override_config(RedisRole.STREAM),
+        RedisMessageQueue(redis_connect_info),
         db=REDIS_STREAM_DB,
     )
     root_ctx.event_dispatcher = await event_dispatcher_cls.new(
@@ -731,6 +739,7 @@ class background_task_ctx:
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
             self.root_ctx.event_producer,
+            # self.root_ctx.redis_stream,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
 

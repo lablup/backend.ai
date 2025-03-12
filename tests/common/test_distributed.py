@@ -16,7 +16,7 @@ import attrs
 import pytest
 from redis.asyncio import Redis
 
-from ai.backend.common import config
+from ai.backend.common import config, redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
@@ -29,6 +29,7 @@ from ai.backend.common.lock import (
     FileLock,
     RedisLock,
 )
+from ai.backend.common.message_queue.redis import RedisMessageQueue
 from ai.backend.common.types import AgentId, HostPortPair, RedisConfig, RedisConnectionInfo
 
 
@@ -94,14 +95,20 @@ async def run_timer(
     redis_config = RedisConfig(
         addr=redis_addr, redis_helper_config=config.redis_helper_default_config
     )
+    redis_connect_info = redis_helper.get_redis_object(
+        redis_config, name="event_producer.stream", db=0
+    )
+
     event_dispatcher = await dispatcher_cls.new(
-        redis_config,
+        # redis_config,
+        RedisMessageQueue(redis_connect_info),
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,
         stream_key=f"events-{test_case_ns}",
     )
     event_producer = await EventProducer.new(
-        redis_config,
+        # redis_config,
+        RedisMessageQueue(redis_connect_info),
         stream_key=f"events-{test_case_ns}",
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
@@ -139,14 +146,19 @@ def etcd_timer_node_process(
         redis_config = RedisConfig(
             addr=timer_ctx.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
+        redis_connect_info = redis_helper.get_redis_object(
+            redis_config, name="event_producer.stream", db=0
+        )
         event_dispatcher = await dispatcher_cls.new(
-            redis_config,
+            RedisMessageQueue(redis_connect_info),
+            # redis_config,
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=timer_ctx.test_case_ns,
             stream_key=f"events-{timer_ctx.test_case_ns}",
         )
         event_producer = await EventProducer.new(
-            redis_config,
+            # redis_config,
+            RedisMessageQueue(redis_connect_info),
             stream_key=f"events-{timer_ctx.test_case_ns}",
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
@@ -223,14 +235,19 @@ class TimerNode(threading.Thread):
         redis_config = RedisConfig(
             addr=self.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
+        redis_connect_info = redis_helper.get_redis_object(
+            redis_config, name="event_producer.stream", db=0
+        )
         event_dispatcher = await self.dispatcher_cls.new(
-            redis_config,
+            # redis_config,
+            redis_connect_info,
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=self.test_case_ns,
             stream_key=f"events-{self.test_case_ns}",
         )
         event_producer = await EventProducer.new(
-            redis_config,
+            # redis_config,
+            redis_connect_info,
             stream_key=f"events-{self.test_case_ns}",
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
@@ -436,14 +453,19 @@ async def test_global_timer_join_leave(
     redis_config = RedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
+    redis_connect_info = redis_helper.get_redis_object(
+        redis_config, name="event_producer.stream", db=0
+    )
     event_dispatcher = await dispatcher_cls.new(
-        redis_config,
+        # redis_config,
+        RedisMessageQueue(redis_connect_info),
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,
         stream_key=f"events-{test_case_ns}",
     )
     event_producer = await EventProducer.new(
-        redis_config,
+        # redis_config,
+        RedisMessageQueue(redis_connect_info),
         stream_key=f"events-{test_case_ns}",
     )
     event_dispatcher.consume(NoopEvent, None, _tick)

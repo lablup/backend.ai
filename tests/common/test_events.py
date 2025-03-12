@@ -16,6 +16,7 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.message_queue.base import MQMessage
+from ai.backend.common.message_queue.redis import RedisMessageQueue
 from ai.backend.common.types import AgentId, RedisConfig
 
 
@@ -50,7 +51,13 @@ async def test_dispatch(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
     )
-    producer = await EventProducer.new(redis_config)
+    redis_connect_info = redis_helper.get_redis_object(
+        redis_config, name="event_producer.stream", db=0
+    )
+    producer = await EventProducer.new(
+        # redis_config
+        RedisMessageQueue(redis_connect_info)
+    )
 
     records = set()
 

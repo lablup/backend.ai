@@ -99,6 +99,7 @@ from ai.backend.common.events import (
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
+from ai.backend.common.message_queue.redis import RedisMessageQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -690,13 +691,22 @@ class AbstractAgent(
 
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
 
+        redis_config = etcd_redis_config.get_override_config(RedisRole.STATISTICS)
+        redis_connect_info = redis_helper.get_redis_object(
+            redis_config, name="event_producer.stream", db=0
+        )
+
         self.event_producer = await EventProducer.new(
-            etcd_redis_config.get_override_config(RedisRole.STREAM),
+            # etcd_redis_config.get_override_config(RedisRole.STREAM),
+            # RedisMessageQueue(etcd_redis_config.get_override_config(RedisRole.STREAM)),
+            RedisMessageQueue(redis_connect_info),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
         )
         self.event_dispatcher = await event_dispatcher_cls.new(
-            etcd_redis_config.get_override_config(RedisRole.STREAM),
+            # etcd_redis_config.get_override_config(RedisRole.STREAM),
+            # RedisMessageQueue(etcd_redis_config.get_override_config(RedisRole.STREAM)),
+            RedisMessageQueue(redis_connect_info),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],

@@ -10,13 +10,14 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
+from ai.backend.common.message_queue.base import AbstractMessageQueue
 from ai.backend.logging import BraceStyleAdapter
 
 from . import msgpack
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
 from .redis_client import RedisClient, RedisConnection
-from .types import AgentId, RedisConfig
+from .types import AgentId
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -176,7 +177,8 @@ class NopEventObserver:
 
 
 class EventDispatcher(_EventDispatcher):
-    redis_config: RedisConfig
+    # redis_config: RedisConfig
+    message_queue: AbstractMessageQueue
     db: int
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
@@ -184,7 +186,8 @@ class EventDispatcher(_EventDispatcher):
 
     def __init__(
         self,
-        redis_config: RedisConfig,
+        # redis_config: RedisConfig,
+        message_queue: AbstractMessageQueue,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -196,10 +199,11 @@ class EventDispatcher(_EventDispatcher):
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
         event_observer: EventObserver = NopEventObserver(),
     ) -> None:
-        _redis_config = redis_config.copy()
-        if service_name:
-            _redis_config["service_name"] = service_name
-        self.redis_config = redis_config.copy()
+        # _redis_config = redis_config.copy()
+        # if service_name:
+        #     _redis_config["service_name"] = service_name
+        # self.redis_config = redis_config.copy()
+        self.message_queue = message_queue
         self._log_events = True
         self.db = db
         self._closed = False
@@ -247,7 +251,11 @@ class EventDispatcher(_EventDispatcher):
 
         while True:
             try:
-                async with RedisConnection(self.redis_config, db=self.db) as client:
+                # this is supposed to be redis config but ur passing in the info
+                async with RedisConnection(
+                    redis_config=self.message_queue.connection_info, db=self.db
+                ) as client:
+                    # async with RedisConnection(self.redis_config, db=self.db) as client:
                     async for msg_id, msg_data in read_stream(
                         client,
                         self._stream_key,
@@ -301,7 +309,10 @@ class EventDispatcher(_EventDispatcher):
 
         while True:
             try:
-                async with RedisConnection(self.redis_config, db=self.db) as client:
+                # async with RedisConnection(self.redis_config, db=self.db) as client:
+                async with RedisConnection(
+                    self.message_queue.connection_info, db=self.db
+                ) as client:
                     async for msg_id, msg_data in read_stream_by_group(
                         client,
                         self._stream_key,

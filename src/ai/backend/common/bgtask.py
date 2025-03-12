@@ -69,6 +69,7 @@ class ProgressReporter:
 
     def __init__(
         self,
+        # redis_config: RedisConfig,
         event_dispatcher: EventProducer,
         task_id: uuid.UUID,
         current_progress: int = 0,
@@ -78,6 +79,7 @@ class ProgressReporter:
         self.task_id = task_id
         self.current_progress = current_progress
         self.total_progress = total_progress
+        # redis_client = redis_helper.get_redis_object
 
     async def update(
         self,
@@ -87,6 +89,9 @@ class ProgressReporter:
         self.current_progress += increment
         # keep the state as local variables because they might be changed
         # due to interleaving at await statements below.
+        # todo: group all this inside the producer
+        # this should use redis instead
+
         current, total = self.current_progress, self.total_progress
         redis_producer = self.event_producer.message_queue.connection_info
 

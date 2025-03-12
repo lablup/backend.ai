@@ -13,6 +13,7 @@ from typing import (
 )
 
 import redis.exceptions
+from redis import Connection
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import MasterNotFoundError, SlaveNotFoundError
@@ -23,10 +24,10 @@ from ai.backend.logging import BraceStyleAdapter
 
 
 class RedisMessageQueue(AbstractMessageQueue):
-
     def __init__(self, redis_connection_info: RedisConnectionInfo):
         self.connection_info = redis_connection_info
         self._log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+        self.connection: Optional[Connection] = None
 
     async def receive(
         self,
@@ -37,6 +38,7 @@ class RedisMessageQueue(AbstractMessageQueue):
         """
         A high-level wrapper for the XREAD command.
         """
+
         async def generator():
             last_id = b"$"
             while True:
@@ -66,13 +68,16 @@ class RedisMessageQueue(AbstractMessageQueue):
                             message = MQMessage(
                                 topic=stream_key,
                                 payload=msg_data,
-                                metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
+                                metadata={
+                                    "message_id": msg_id.decode()
+                                },  # store msg_id in metadata
                             )
                             yield message
                         finally:
                             last_id = msg_id
                 except asyncio.CancelledError:
                     raise
+
         return generator()
 
     async def receive_group(
@@ -134,7 +139,7 @@ class RedisMessageQueue(AbstractMessageQueue):
                         message = MQMessage(
                             topic=stream_key,
                             payload=msg_data,
-                            metadata={"message_id": msg_id.decode()}  # store msg_id in metadata
+                            metadata={"message_id": msg_id.decode()},  # store msg_id in metadata
                         )
                         yield message
                 except asyncio.CancelledError:
@@ -158,8 +163,8 @@ class RedisMessageQueue(AbstractMessageQueue):
                                 raise
                         continue
                     raise
-        return generator()
 
+        return generator()
 
     async def _execute(
         self,
@@ -383,7 +388,6 @@ class RedisMessageQueue(AbstractMessageQueue):
             self.connection = None
             await self.connection_info.client.connection_pool.release(conn)
         if close_connection_pool or (
-            close_connection_pool is None
-            and self.connection_info.client.auto_close_connection_pool
+            close_connection_pool is None and self.connection_info.client.auto_close_connection_pool
         ):
             await self.connection_info.client.connection_pool.disconnect()

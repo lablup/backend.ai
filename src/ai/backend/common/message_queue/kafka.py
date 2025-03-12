@@ -56,14 +56,14 @@ class KafkaMessageQueue(AbstractMessageQueue):
                     stream_key,
                     bootstrap_servers=self.connection_info.bootstrap_servers,
                     security_protocol=self.connection_info.security_protocol,
-                    enable_auto_commit=False
+                    enable_auto_commit=False,
                 )
                 await self._consumer.start()
             try:
                 while True:
                     msgs_by_topic = await self._consumer.getmany(timeout_ms=block_timeout)
 
-                    if not msgs_by_topic: # no messages
+                    if not msgs_by_topic:  # no messages
                         continue
 
                     for tp, msgs in msgs_by_topic.items():
@@ -73,19 +73,16 @@ class KafkaMessageQueue(AbstractMessageQueue):
                             except (json.JSONDecodeError, TypeError):
                                 payload = msg.value
 
-                            message =  MQMessage(
+                            message = MQMessage(
                                 topic=msg.topic,
                                 payload=payload if payload is not None else {},
-                                metadata={
-                                    "partition": msg.partition,
-                                    "offset": msg.offset
-                                }
+                                metadata={"partition": msg.partition, "offset": msg.offset},
                             )
                             yield message
             except asyncio.CancelledError:
                 raise
             finally:
-                pass # let close handle the cleanup
+                pass  # let close handle the cleanup
 
         return generator()
 
@@ -106,7 +103,7 @@ class KafkaMessageQueue(AbstractMessageQueue):
                     client_id=consumer_id,
                     bootstrap_servers=self.connection_info.bootstrap_servers,
                     security_protocol=self.connection_info.security_protocol,
-                    enable_auto_commit=False
+                    enable_auto_commit=False,
                 )
                 await self._group_consumer.start()
 
@@ -126,15 +123,13 @@ class KafkaMessageQueue(AbstractMessageQueue):
                             yield MQMessage(
                                 topic=msg.topic,
                                 payload=payload if payload is not None else {},
-                                metadata={
-                                    "partition": msg.partition,
-                                    "offset": msg.offset
-                                }
+                                metadata={"partition": msg.partition, "offset": msg.offset},
                             )
             except asyncio.CancelledError:
                 raise
             finally:
                 pass
+
         return generator()
 
     async def send(
@@ -158,20 +153,20 @@ class KafkaMessageQueue(AbstractMessageQueue):
             await self._producer.start()
 
         payload = msg.payload
-        if isinstance(payload, dict):
-            payload = json.dumps(payload)
-        elif isinstance(payload, str):
-            payload = payload.encode('utf-8')
-        elif not isinstance(payload, (bytes, bytearray)):
-            payload = str(payload).encode('utf-8')
+        # if isinstance(payload, dict):
+        #     payload = json.dumps(payload)
+        # elif isinstance(payload, str):
+        #     payload = payload.encode("utf-8")
+        # elif not isinstance(payload, (bytes, bytearray)):
+        #     payload = str(payload).encode("utf-8")
 
         await self._producer.send_and_wait(msg.topic, payload)
 
     async def _flush_kafka_topic(self, topic: str) -> None:
         try:
             await self._set_topic_retention(topic, 0)
-            await asyncio.sleep(1) # wait for retention to take effect
-            await self._set_topic_retention(topic, 604800000)  #restore default retention
+            await asyncio.sleep(1)  # wait for retention to take effect
+            await self._set_topic_retention(topic, 604800000)  # restore default retention
         except Exception as e:
             self._log.error(f"Failed to set topic retention to 0: {e}")
             await self._send_tombstone_message(topic)
@@ -185,7 +180,13 @@ class KafkaMessageQueue(AbstractMessageQueue):
 
         try:
             await admin_client.alter_configs(
-                config_resources=[ConfigResource(resource_type=ConfigResourceType.TOPIC, name=topic, configs={"retention.ms": str(retention_ms)})]
+                config_resources=[
+                    ConfigResource(
+                        resource_type=ConfigResourceType.TOPIC,
+                        name=topic,
+                        configs={"retention.ms": str(retention_ms)},
+                    )
+                ]
             )
         finally:
             await admin_client.close()
@@ -199,7 +200,6 @@ class KafkaMessageQueue(AbstractMessageQueue):
             await self._producer.start()
 
         await self._producer.send_and_wait(topic, None)  # Null payload = tombstone
-
 
     async def close(self, close_connection_pool: Optional[bool] = None) -> None:
         if self._producer:
