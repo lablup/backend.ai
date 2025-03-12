@@ -158,6 +158,22 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
+    async def purge_image_by_id(cls, image_id: str):
+        q = _d("""
+            mutation($image_id: String!) {
+                purge_image_by_id(image_id: $image_id) {
+                    ok msg
+                }
+            }
+        """)
+        variables = {
+            "image_id": image_id,
+        }
+        data = await api_session.get().Admin._query(q, variables)
+        return data["purge_image_by_id"]
+
+    @api_function
+    @classmethod
     async def untag_image_from_registry(cls, id: str):
         q = _d("""
             mutation($image_id: String!) {
