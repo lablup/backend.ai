@@ -227,10 +227,16 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
     environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
 
 
+ImageCanonical = str
+ImageDigest = str
+
+ScannedImage = Mapping[ImageCanonical, ImageDigest]
+
+
 @dataclass
 class ScanImagesResult:
-    scanned_images: Mapping[str, str]
-    removed_images: Mapping[str, str]
+    scanned_images: ScannedImage
+    removed_images: ScannedImage
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
