@@ -939,7 +939,14 @@ class ImagePermissionContextBuilder(
             ctx, user_accessible_project_scopes
         )
         perm_ctx.merge(non_global_project_scopes_perm_ctx)
-        user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+
+        if ctx.user_role in [UserRole.ADMIN, UserRole.SUPERADMIN]:
+            user_scope_perm_ctx = await self._in_user_scope(
+                ctx, UserScope(ctx.user_id), has_admin_privilege=True
+            )
+        else:
+            user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+
         perm_ctx.merge(user_scope_perm_ctx)
         return perm_ctx
 
@@ -1022,27 +1029,33 @@ class ImagePermissionContextBuilder(
         self,
         ctx: ClientContext,
         scope: UserScope,
+        has_admin_privilege: bool = False,
     ) -> ImagePermissionContext:
         allowed_registries = await self._get_allowed_registries_for_user(ctx, scope.user_id)
 
         permissions = await self.calculate_permission(ctx, scope)
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
 
-        _img_query_stmt = (
+        img_query_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
             .options(load_only(ImageRow.id, ImageRow.labels, ImageRow.registry))
             .where(ContainerRegistryRow.is_global == true())
         )
 
-        for row in await self.db_session.scalars(_img_query_stmt):
+        for row in await self.db_session.scalars(img_query_stmt):
             image_row = cast(ImageRow, row)
-            if not image_row.is_customized_by(
-                scope.user_id
-            ) or not self._is_image_accessible_for_user(
-                image_row, allowed_registries, scope.user_id
-            ):
-                continue
+            if has_admin_privilege:
+                if image_row.registry not in allowed_registries:
+                    continue
+            else:
+                if not image_row.is_customized_by(
+                    scope.user_id
+                ) or not self._is_image_accessible_for_user(
+                    image_row, allowed_registries, scope.user_id
+                ):
+                    continue
+
             image_id_permission_map[image_row.id] = permissions
 
         return ImagePermissionContext(
