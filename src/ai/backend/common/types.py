@@ -747,17 +747,19 @@ class ResourceSlot(UserDict):
         obj: Mapping[str, Any],
         slot_types: Optional[Mapping[SlotName, SlotTypes]],
     ) -> "ResourceSlot":
+        pruned_obj = {k: v for k, v in obj.items() if v != 0}
+
         try:
             if slot_types is None:
                 data = {
                     k: cls._normalize_value(k, v, cls._guess_slot_type(k))
-                    for k, v in obj.items()
+                    for k, v in pruned_obj.items()
                     if v is not None
                 }
             else:
                 data = {
                     k: cls._normalize_value(k, v, slot_types[SlotName(k)])
-                    for k, v in obj.items()
+                    for k, v in pruned_obj.items()
                     if v is not None
                 }
                 # fill missing
