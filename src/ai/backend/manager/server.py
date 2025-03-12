@@ -739,7 +739,7 @@ class background_task_ctx:
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
             self.root_ctx.event_producer,
-            # self.root_ctx.redis_stream,
+            self.root_ctx.redis_stream,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
 

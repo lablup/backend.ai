@@ -151,10 +151,12 @@ class BackgroundTaskManager:
     def __init__(
         self,
         event_producer: EventProducer,
+        redis_connection: RedisConnectionInfo,
         *,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
         self.event_producer = event_producer
+        self.redis_connection = redis_connection
         self.ongoing_tasks = weakref.WeakSet()
         self.task_update_queues = defaultdict(set)
         self.dict_lock = asyncio.Lock()

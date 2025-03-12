@@ -1,11 +1,9 @@
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Dict, Generic, Literal, Optional, Self, TypeVar
+from typing import Any, AsyncGenerator, Dict, Literal, Optional, Self
 
 import msgpack
-
-from ai.backend.common.types import BaseConnectionInfo
 
 
 @dataclass
@@ -47,12 +45,7 @@ class MQMessage:
         return cls(topic=message["topic"], payload=decoded_payload, metadata=message["metadata"])
 
 
-T = TypeVar("T", bound=BaseConnectionInfo)
-
-
-class AbstractMessageQueue(ABC, Generic[T]):
-    connection_info: T
-
+class AbstractMessageQueue(ABC):
     @abstractmethod
     async def receive(
         self,
@@ -85,6 +78,3 @@ class AbstractMessageQueue(ABC, Generic[T]):
 
     @abstractmethod
     async def close(self, close_connection_pool: Optional[bool] = None) -> None: ...
-
-    # @abstractmethod
-    # async def get_connection_info(self) -> T: ...

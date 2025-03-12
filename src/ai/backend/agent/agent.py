@@ -126,6 +126,7 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
+    RedisConnectionInfo,
     RuntimeVariant,
     Sentinel,
     ServicePort,
@@ -614,6 +615,7 @@ class AbstractAgent(
     port_pool: set[int]
 
     redis: Redis
+    _redis_connection: RedisConnectionInfo
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
     timer_tasks: MutableSequence[asyncio.Task]
@@ -639,6 +641,7 @@ class AbstractAgent(
         self,
         etcd: AsyncEtcd,
         local_config: Mapping[str, Any],
+        redis_connection: RedisConnectionInfo,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
@@ -669,6 +672,7 @@ class AbstractAgent(
         )
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
+        self._redis_connection = redis_connection
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
@@ -726,6 +730,7 @@ class AbstractAgent(
 
         self.background_task_manager = BackgroundTaskManager(
             self.event_producer,
+            self._redis_connection,
             bgtask_observer=self._metric_registry.bgtask,
         )
 

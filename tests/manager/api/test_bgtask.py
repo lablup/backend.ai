@@ -44,7 +44,7 @@ async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[B
     await root_ctx.background_task_manager.shutdown()
     await producer.close()
     await dispatcher.close()
-    await producer.message_queue.send(
+    await producer.send(
         MQMessage(
             topic="bgtask",
             payload={},

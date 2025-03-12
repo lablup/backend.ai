@@ -51,6 +51,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SlotName,
@@ -816,6 +817,7 @@ class KubernetesAgent(
         self,
         etcd: AsyncEtcd,
         local_config: Mapping[str, Any],
+        redis_connection: RedisConnectionInfo,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
@@ -825,6 +827,7 @@ class KubernetesAgent(
         super().__init__(
             etcd,
             local_config,
+            redis_connection,
             stats_monitor=stats_monitor,
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,

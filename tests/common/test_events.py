@@ -87,7 +87,7 @@ async def test_dispatch(
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
-    await producer.message_queue.send(
+    await producer.send(
         MQMessage(
             topic="bgtask",
             payload={},
@@ -147,7 +147,15 @@ async def test_error_on_dispatch(
     assert "ZeroDivisionError" in exception_log
     assert "OverflowError" in exception_log
 
-    await redis_helper.execute(producer.message_queue.connection_info, lambda r: r.flushdb())
+    # await redis_helper.execute(producer.message_queue.connection_info, lambda r: r.flushdb())
+    await producer.send(
+        MQMessage(
+            topic="bgtask",
+            payload={},
+            metadata={},
+        ),
+        is_flush=True,
+    )
     await producer.close()
     await dispatcher.close()
 

@@ -8,7 +8,7 @@ import math
 import numbers
 import textwrap
 import uuid
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
 from contextvars import ContextVar
@@ -1424,13 +1424,8 @@ class RedisHelperConfig(TypedDict, total=False):
     connection_ready_timeout: float
 
 
-class BaseConnectionInfo(ABC):
-    @abstractmethod
-    async def close(self) -> None: ...
-
-
 @attrs.define(auto_attribs=True)
-class RedisConnectionInfo(BaseConnectionInfo):
+class RedisConnectionInfo:
     client: Redis
     name: str  # connection pool name
     service_name: Optional[str]
@@ -1442,7 +1437,7 @@ class RedisConnectionInfo(BaseConnectionInfo):
 
 
 @attrs.define(auto_attribs=True)
-class KafkaConnectionInfo(BaseConnectionInfo):
+class KafkaConnectionInfo:
     bootstrap_servers: str
     topic: str
     group_id: Optional[str]

@@ -1114,7 +1114,7 @@ class EventDispatcher(aobject):
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     # redis_client: RedisConnectionInfo
-    message_queue: AbstractMessageQueue
+    _message_queue: AbstractMessageQueue
     consumer_loop_task: asyncio.Task
     subscriber_loop_task: asyncio.Task
     consumer_taskgroup: PersistentTaskGroup
@@ -1145,7 +1145,7 @@ class EventDispatcher(aobject):
         # self.redis_client = redis_helper.get_redis_object(
         #     _redis_config, name="event_dispatcher.stream", db=db
         # )
-        self.message_queue = message_queue
+        self._message_queue = message_queue
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -1183,7 +1183,7 @@ class EventDispatcher(aobject):
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
         finally:
-            await self.message_queue.close()
+            await self._message_queue.close()
 
     def consume(
         self,
@@ -1330,7 +1330,7 @@ class EventDispatcher(aobject):
         #     )
         # )
         async with aclosing(
-            await self.message_queue.receive_group(
+            await self._message_queue.receive_group(
                 self._stream_key,
                 self._consumer_group,
                 self._consumer_name,
@@ -1379,7 +1379,7 @@ class EventDispatcher(aobject):
         #         self._stream_key,
         #     )
         # )
-        async with aclosing(await self.message_queue.receive(self._stream_key)) as agen:
+        async with aclosing(await self._message_queue.receive(self._stream_key)) as agen:
             async for msg in agen:
                 if self._closed:
                     return
@@ -1418,13 +1418,13 @@ class EventDispatcher(aobject):
 
 class EventProducer(aobject):
     # redis_client: RedisConnectionInfo
-    message_queue: AbstractMessageQueue
+    _message_queue: AbstractMessageQueue
     _log_events: bool
 
     def __init__(
         self,
         # redis_config: RedisConfig,
-        message_queue: AbstractMessageQueue,
+        _message_queue: AbstractMessageQueue,
         db: int = 0,
         *,
         service_name: str | None = None,
@@ -1440,7 +1440,7 @@ class EventProducer(aobject):
         #     name="event_producer.stream",
         #     db=db,
         # )
-        self.message_queue = message_queue
+        self._message_queue = _message_queue
         self._log_events = log_events
         self._stream_key = stream_key
 
@@ -1449,7 +1449,7 @@ class EventProducer(aobject):
 
     async def close(self) -> None:
         self._closed = True
-        await self.message_queue.close()
+        await self._message_queue.close()
 
     async def produce_event(
         self,
@@ -1479,7 +1479,10 @@ class EventProducer(aobject):
         #     lambda r: r.xadd(self._stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
         # )
 
-        await self.message_queue.send(message)
+        await self._message_queue.send(message)
+
+    async def send(self, message: MQMessage, is_flush: bool = False) -> None:
+        await self._message_queue.send(message, is_flush=is_flush)
 
 
 def _generate_consumer_id(node_id: str | None = None) -> str:

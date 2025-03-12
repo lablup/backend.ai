@@ -16,7 +16,7 @@ from ai.backend.logging import BraceStyleAdapter
 from . import msgpack
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
-from .redis_client import RedisClient, RedisConnection
+from .redis_client import RedisClient
 from .types import AgentId
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -251,22 +251,20 @@ class EventDispatcher(_EventDispatcher):
 
         while True:
             try:
-                pass
-                # async for msg_id, msg_data in self.message_queue.receive(
-                #     self._stream_key,
-                # ):
-                #     if self._closed:
-                #         return
-                #     if msg_data is None:
-                #         continue
-                #     try:
-                #         await self.dispatch_subscribers(
-                #             msg_data[b"name"].decode(),
-                #             AgentId(msg_data[b"source"].decode()),
-                #             msgpack.unpackb(msg_data[b"args"]),
-                #         )
-                #     except asyncio.CancelledError:
-                #         raise
+                async for message in await self._message_queue.receive(self._stream_key):
+                    msg_data = message.payload
+                    if self._closed:
+                        return
+                    if msg_data is None:
+                        continue
+                    try:
+                        await self.dispatch_subscribers(
+                            msg_data[b"name"].decode(),
+                            AgentId(msg_data[b"source"].decode()),
+                            msgpack.unpackb(msg_data[b"args"]),
+                        )
+                    except asyncio.CancelledError:
+                        raise
             except hiredis.HiredisError as e:
                 if "READONLY" in e.args[0]:
                     self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
@@ -305,27 +303,30 @@ class EventDispatcher(_EventDispatcher):
         while True:
             try:
                 # async with RedisConnection(self.redis_config, db=self.db) as client:
-                async with RedisConnection(
-                    self.message_queue.connection_info, db=self.db
-                ) as client:
-                    async for msg_id, msg_data in read_stream_by_group(
-                        client,
-                        self._stream_key,
-                        self._consumer_group,
-                        self._consumer_name,
-                    ):
-                        if self._closed:
-                            return
-                        if msg_data is None:
-                            continue
-                        try:
-                            await self.dispatch_consumers(
-                                msg_data[b"name"].decode(),
-                                AgentId(msg_data[b"source"].decode()),
-                                msgpack.unpackb(msg_data[b"args"]),
-                            )
-                        except asyncio.CancelledError:
-                            raise
+                # async for msg_id, msg_data in read_stream_by_group(
+                #     client,
+                #     self._stream_key,
+                #     self._consumer_group,
+                #     self._consumer_name,
+                # ):
+                async for message in await self._message_queue.receive_group(
+                    self._stream_key,
+                    self._consumer_group,
+                    self._consumer_name,
+                ):
+                    msg_data = message.payload
+                    if self._closed:
+                        return
+                    if msg_data is None:
+                        continue
+                    try:
+                        await self.dispatch_consumers(
+                            msg_data[b"name"].decode(),
+                            AgentId(msg_data[b"source"].decode()),
+                            msgpack.unpackb(msg_data[b"args"]),
+                        )
+                    except asyncio.CancelledError:
+                        raise
             except hiredis.HiredisError as e:
                 if "READONLY" in e.args[0]:
                     self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
