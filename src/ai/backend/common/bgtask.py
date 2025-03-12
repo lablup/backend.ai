@@ -43,7 +43,7 @@ from .events import (
     EventDispatcher,
     EventProducer,
 )
-from .types import AgentId, DispatchResult, Sentinel
+from .types import AgentId, DispatchResult, RedisConnectionInfo, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -63,6 +63,7 @@ MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
 class ProgressReporter:
     event_producer: Final[EventProducer]
+    redis_connection: RedisConnectionInfo
     task_id: Final[uuid.UUID]
     total_progress: Union[int, float]
     current_progress: Union[int, float]
@@ -93,7 +94,6 @@ class ProgressReporter:
         # this should use redis instead
 
         current, total = self.current_progress, self.total_progress
-        redis_producer = self.event_producer.message_queue.connection_info
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
@@ -110,7 +110,7 @@ class ProgressReporter:
             await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis_helper.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(self.redis_connection, _pipe_builder)
         await self.event_producer.produce_event(
             BgtaskUpdatedEvent(
                 self.task_id,
@@ -140,6 +140,7 @@ class NopBackgroundTaskObserver:
 
 
 class BackgroundTaskManager:
+    redis_connection: RedisConnectionInfo
     event_producer: EventProducer
     ongoing_tasks: weakref.WeakSet[asyncio.Task]
     task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
@@ -229,9 +230,8 @@ class BackgroundTaskManager:
         (e.g. progress information of task when callee is trying to poll information of already completed one)
         """
         tracker_key = f"bgtask.{task_id}"
-        redis_producer = self.event_producer.message_queue.connection_info
         task_info = await redis_helper.execute(
-            redis_producer,
+            self.redis_connection,
             lambda r: r.hgetall(tracker_key),
             encoding="utf-8",
         )
@@ -308,7 +308,6 @@ class BackgroundTaskManager:
         status: TaskStatus,
         msg: str = "",
     ) -> None:
-        redis_producer = self.event_producer.message_queue.connection_info
         tracker_key = f"bgtask.{task_id}"
 
         async def _pipe_builder(r: Redis) -> Pipeline:
@@ -334,7 +333,7 @@ class BackgroundTaskManager:
             pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis_helper.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(self.redis_connection, _pipe_builder)
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult | str | None

@@ -178,7 +178,7 @@ class NopEventObserver:
 
 class EventDispatcher(_EventDispatcher):
     # redis_config: RedisConfig
-    message_queue: AbstractMessageQueue
+    _message_queue: AbstractMessageQueue
     db: int
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
@@ -203,7 +203,7 @@ class EventDispatcher(_EventDispatcher):
         # if service_name:
         #     _redis_config["service_name"] = service_name
         # self.redis_config = redis_config.copy()
-        self.message_queue = message_queue
+        self._message_queue = message_queue
         self._log_events = True
         self.db = db
         self._closed = False
@@ -251,27 +251,22 @@ class EventDispatcher(_EventDispatcher):
 
         while True:
             try:
-                # this is supposed to be redis config but ur passing in the info
-                async with RedisConnection(
-                    redis_config=self.message_queue.connection_info, db=self.db
-                ) as client:
-                    # async with RedisConnection(self.redis_config, db=self.db) as client:
-                    async for msg_id, msg_data in read_stream(
-                        client,
-                        self._stream_key,
-                    ):
-                        if self._closed:
-                            return
-                        if msg_data is None:
-                            continue
-                        try:
-                            await self.dispatch_subscribers(
-                                msg_data[b"name"].decode(),
-                                AgentId(msg_data[b"source"].decode()),
-                                msgpack.unpackb(msg_data[b"args"]),
-                            )
-                        except asyncio.CancelledError:
-                            raise
+                pass
+                # async for msg_id, msg_data in self.message_queue.receive(
+                #     self._stream_key,
+                # ):
+                #     if self._closed:
+                #         return
+                #     if msg_data is None:
+                #         continue
+                #     try:
+                #         await self.dispatch_subscribers(
+                #             msg_data[b"name"].decode(),
+                #             AgentId(msg_data[b"source"].decode()),
+                #             msgpack.unpackb(msg_data[b"args"]),
+                #         )
+                #     except asyncio.CancelledError:
+                #         raise
             except hiredis.HiredisError as e:
                 if "READONLY" in e.args[0]:
                     self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
