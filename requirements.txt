@@ -38,6 +38,7 @@ inquirer~=3.3.0
 janus~=1.0.0
 Jinja2~=3.1.4
 jupyter-client>=6.0
+aiokafka>=0.10.1
 kubernetes~=10.0.0
 kubernetes-asyncio~=9.1.0
 lark~=1.1.5
