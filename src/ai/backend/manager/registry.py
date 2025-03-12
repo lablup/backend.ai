@@ -1078,7 +1078,7 @@ class AgentRegistry:
             if (resources := creation_config.get("resources")) is not None:
                 # Sanitize user input: does it have "known" resource slots only?
                 for slot_key, slot_value in resources.items():
-                    if slot_key not in known_slot_types:
+                    if slot_value != 0 and slot_key not in known_slot_types:
                         raise InvalidAPIParameters(f"Unknown requested resource slot: {slot_key}")
                 try:
                     requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
