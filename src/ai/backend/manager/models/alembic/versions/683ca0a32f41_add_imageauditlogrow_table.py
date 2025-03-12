@@ -1,7 +1,7 @@
 """Add AuditLogs table
 
 Revision ID: 683ca0a32f41
-Revises: 9fc0e92ea510
+Revises: 70e0533aa49a
 Create Date: 2025-02-14 10:56:10.191119
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "683ca0a32f41"
-down_revision = "9fc0e92ea510"
+down_revision = "70e0533aa49a"
 branch_labels = None
 depends_on = None
 
