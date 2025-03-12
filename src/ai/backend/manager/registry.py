@@ -123,6 +123,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
@@ -182,7 +183,7 @@ from .models import (
     verify_vfolder_name,
 )
 from .models.container_registry import ContainerRegistryRow
-from .models.image import ImageIdentifier, bulk_get_image_configs
+from .models.image import bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
@@ -531,16 +532,16 @@ class AgentRegistry:
         try:
             # NOTE: We can reuse the session IDs of TERMINATED sessions only.
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-            async with self.db.begin_readonly_session() as db_sess:
+            async with self.db.begin_readonly_session() as db_session:
                 sess = await SessionRow.get_session(
-                    db_sess,
+                    db_session,
                     session_name,
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
                 running_image_ref = (
                     await ImageRow.resolve(
-                        db_sess,
+                        db_session,
                         [
                             ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
                         ],
@@ -596,12 +597,12 @@ class AgentRegistry:
         start_event = asyncio.Event()
         self.session_creation_tracker[session_creation_id] = start_event
 
-        async with self.db.begin_readonly_session() as db_sess:
-            conn = await db_sess.connection()
+        async with self.db.begin_readonly_session() as db_session:
+            conn = await db_session.connection()
             assert conn
             # check if network exists
             if _network_id := config.get("attach_network"):
-                network = await NetworkRow.get(db_sess, _network_id)
+                network = await NetworkRow.get(db_session, _network_id)
             else:
                 network = None
 
@@ -610,7 +611,7 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
-            user_row = await db_sess.scalar(
+            user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
             )
             user_row = cast(UserRow, user_row)
@@ -663,6 +664,7 @@ class AgentRegistry:
                     )
                 ),
             )
+
             resp["sessionId"] = str(session_id)  # changed since API v5
             resp["sessionName"] = str(session_name)
             resp["status"] = "PENDING"
@@ -682,12 +684,12 @@ class AgentRegistry:
                     resp["status"] = "TIMEOUT"
                 else:
                     await asyncio.sleep(0.5)
-                    async with self.db.begin_readonly_session() as db_sess:
+                    async with self.db.begin_readonly_session() as db_session:
                         query = sa.select(KernelRow.status, KernelRow.service_ports).where(
                             (KernelRow.session_id == session_id)
                             & (KernelRow.cluster_role == DEFAULT_ROLE)
                         )
-                        result = await db_sess.execute(query)
+                        result = await db_session.execute(query)
                         row = result.first()
                     if row.status == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
@@ -3284,16 +3286,18 @@ class AgentRegistry:
     async def mark_image_pull_started(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PREPARING)))
                 )
@@ -3314,16 +3318,18 @@ class AgentRegistry:
     async def mark_image_pull_finished(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (
                         KernelRow.status.in_((
@@ -3350,17 +3356,19 @@ class AgentRegistry:
     async def handle_image_pull_failed(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
         msg: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
                 )
@@ -3376,6 +3384,7 @@ class AgentRegistry:
                 )
                 if is_transited:
                     session_ids.add(kernel_row.session_id)
+
             return session_ids
 
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
@@ -3780,7 +3789,7 @@ async def handle_image_pull_started(
     dt = datetime.fromtimestamp(ev.timestamp)
     log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
-        await context.mark_image_pull_started(ev.agent_id, ev.image, db_conn=db_conn)
+        await context.mark_image_pull_started(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
 
 
 async def handle_image_pull_finished(
@@ -3789,7 +3798,7 @@ async def handle_image_pull_finished(
     dt = datetime.fromtimestamp(ev.timestamp)
     log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
-        await context.mark_image_pull_finished(ev.agent_id, ev.image, db_conn=db_conn)
+        await context.mark_image_pull_finished(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
 
 
 async def handle_image_pull_failed(
@@ -3799,7 +3808,9 @@ async def handle_image_pull_failed(
 ) -> None:
     log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)
     async with context.db.connect() as db_conn:
-        await context.handle_image_pull_failed(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
+        await context.handle_image_pull_failed(
+            ev.agent_id, ev.image, ev.msg, ev.image_ref, db_conn=db_conn
+        )
 
 
 async def handle_kernel_creation_lifecycle(
