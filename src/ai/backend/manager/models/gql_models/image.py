@@ -806,6 +806,9 @@ class PurgeImageById(graphene.Mutation):
             if client_role != UserRole.SUPERADMIN:
                 if not image_row.is_customized_by(ctx.user["uuid"]):
                     raise GenericForbidden("Image is not owned by your account.")
+            await session.execute(
+                sa.delete(ImageAliasRow).where(ImageAliasRow.image_id == image_id)
+            )
             await session.delete(image_row)
             return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
 
