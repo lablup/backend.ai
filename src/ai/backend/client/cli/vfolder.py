@@ -81,7 +81,19 @@ def list_allowed_types():
     "host_path",
     is_flag=True,
     help=(
+        "Deprecated since 25.4.0. Use `--unmanaged-path` instead. "
         "Treats HOST as a mount point of unmanaged virtual folder. "
+        "This option can only be used by Admin or Superadmin."
+    ),
+)
+@click.option(
+    "--unmanaged-path",
+    "unmanaged_path",
+    metavar="UNMANAGED_PATH",
+    type=str,
+    default=None,
+    help=(
+        "Map a given host path to a virtual folder. "
         "This option can only be used by Admin or Superadmin."
     ),
 )
@@ -115,7 +127,7 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, usage_mode, permission, cloneable):
+def create(name, host, group, host_path, unmanaged_path, usage_mode, permission, cloneable):
     """Create a new virtual folder.
 
     \b
@@ -124,24 +136,15 @@ def create(name, host, group, host_path, usage_mode, permission, cloneable):
     """
     with Session() as session:
         try:
-            if host_path:
-                result = session.VFolder.create(
-                    name=name,
-                    unmanaged_path=host,
-                    group=group,
-                    usage_mode=usage_mode,
-                    permission=permission,
-                    cloneable=cloneable,
-                )
-            else:
-                result = session.VFolder.create(
-                    name=name,
-                    host=host,
-                    group=group,
-                    usage_mode=usage_mode,
-                    permission=permission,
-                    cloneable=cloneable,
-                )
+            result = session.VFolder.create(
+                name=name,
+                host=host,
+                unmanaged_path=unmanaged_path,
+                group=group,
+                usage_mode=usage_mode,
+                permission=permission,
+                cloneable=cloneable,
+            )
             print('Virtual folder "{0}" is created.'.format(result["name"]))
         except Exception as e:
             print_error(e)
@@ -853,6 +856,14 @@ def clone(name, target_name, target_host, usage_mode, permission):
                                 "The operation has been cancelled in the middle. "
                                 "(This may be due to server shutdown.)",
                             )
+                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
+                            issues = data.get("issues")
+                            if issues:
+                                for issue in issues:
+                                    print_fail(f"Issue reported: {issue}")
+                                completion_msg_func = lambda: print_warn(
+                                    f"Task finished with {len(issues)} issues."
+                                )
             finally:
                 completion_msg_func()
 

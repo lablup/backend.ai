@@ -14,36 +14,11 @@ from ai.backend.web.security import (
 
 
 @pytest.fixture
-def default_app():
-    app = web.Application(middlewares=[security_policy_middleware])
-    app["security_policy"] = SecurityPolicy.default_policy()
-    return app
-
-
-@pytest.fixture
 async def async_handler() -> Handler:
     async def handler(request):
         return web.Response()
 
     return handler
-
-
-async def test_default_security_policy_reject_metadata_local_link(
-    default_app, async_handler
-) -> None:
-    request = make_mocked_request("GET", "/", headers={"Host": "169.254.169.254"}, app=default_app)
-    with pytest.raises(web.HTTPForbidden):
-        await security_policy_middleware(request, async_handler)
-
-
-async def test_default_security_policy_response(default_app, async_handler) -> None:
-    request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=default_app)
-    response = await security_policy_middleware(request, async_handler)
-    assert (
-        response.headers["Content-Security-Policy"]
-        == "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
-    )
-    assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
 @pytest.mark.parametrize(

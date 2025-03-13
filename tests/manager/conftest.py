@@ -174,6 +174,8 @@ def local_config(
     redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
 
+    build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+
     # Establish a self-contained config.
     cfg = LocalConfig({
         **etcd_config_iv.check({
@@ -188,6 +190,22 @@ def local_config(
                 "port": redis_addr.port,
             },
             "redis_helper_config": config.redis_helper_default_config,
+            "override_configs": {
+                "stat": {
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": config.redis_helper_default_config,
+                },
+                "stream": {
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": config.redis_helper_default_config,
+                },
+            },
         }),
         "db": {
             "addr": postgres_addr,
@@ -208,6 +226,7 @@ def local_config(
             "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
+            "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
         },
         "pyroscope": {
             "enabled": False,
@@ -262,10 +281,19 @@ def etcd_fixture(
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
+            "manager": {"status": "running"},
             "volumes": {
                 "_mount": str(vfolder_mount),
                 "_fsprefix": str(vfolder_fsprefix),
-                "_default_host": str(vfolder_host),
+                "default_host": str(vfolder_host),
+                "proxies": {
+                    "local": {
+                        "client_api": "http://127.0.0.1:6021",
+                        "manager_api": "https://127.0.0.1:6022",
+                        "secret": "some-secret-shared-with-storage-proxy",
+                        "ssl_verify": "false",
+                    }
+                },
             },
             "nodes": {},
             "config": {

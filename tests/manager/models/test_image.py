@@ -16,6 +16,7 @@ from ai.backend.common.events import (
     BgtaskFailedEvent,
     EventDispatcher,
 )
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -28,6 +29,7 @@ from ai.backend.manager.server import (
     hook_plugin_ctx,
     monitoring_ctx,
     redis_ctx,
+    services_ctx,
     shared_config_ctx,
 )
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
@@ -39,7 +41,9 @@ def client() -> Client:
 
 
 def get_graphquery_context(
-    background_task_manager, database_engine: ExtendedAsyncSAEngine
+    background_task_manager,
+    services_ctx,
+    database_engine: ExtendedAsyncSAEngine,
 ) -> GraphQueryContext:
     return GraphQueryContext(
         schema=None,  # type: ignore
@@ -60,6 +64,8 @@ def get_graphquery_context(
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
+        services_ctx=services_ctx,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
     )
 
 
@@ -175,6 +181,7 @@ async def test_image_rescan_on_docker_registry(
             hook_plugin_ctx,
             redis_ctx,
             event_dispatcher_ctx,
+            services_ctx,
             background_task_ctx,
         ],
         [".events", ".auth"],
@@ -271,7 +278,9 @@ async def test_image_rescan_on_docker_registry(
     with aioresponses() as mocked:
         setup_dockerhub_mocking(mocked)
 
-        context = get_graphquery_context(root_ctx.background_task_manager, root_ctx.db)
+        context = get_graphquery_context(
+            root_ctx.background_task_manager, root_ctx.services_ctx, root_ctx.db
+        )
         image_rescan_query = """
             mutation ($registry: String, $project: String) {
                 rescan_images(registry: $registry, project: $project) {

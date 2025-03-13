@@ -7,11 +7,12 @@ import itertools
 import math
 import numbers
 import textwrap
+import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
@@ -49,6 +50,7 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
+from .defs import RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
@@ -916,17 +918,19 @@ class ResourceSlot(UserDict):
         obj: Mapping[str, Any],
         slot_types: Optional[Mapping[SlotName, SlotTypes]],
     ) -> "ResourceSlot":
+        pruned_obj = {k: v for k, v in obj.items() if v != 0}
+
         try:
             if slot_types is None:
                 data = {
                     k: cls._normalize_value(k, v, cls._guess_slot_type(k))
-                    for k, v in obj.items()
+                    for k, v in pruned_obj.items()
                     if v is not None
                 }
             else:
                 data = {
                     k: cls._normalize_value(k, v, slot_types[SlotName(k)])
-                    for k, v in obj.items()
+                    for k, v in pruned_obj.items()
                     if v is not None
                 }
                 # fill missing
@@ -972,6 +976,9 @@ class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
     def as_trafaret(cls) -> t.Trafaret:
         raise NotImplementedError
+
+
+type VolumeID = uuid.UUID
 
 
 @attrs.define(slots=True, frozen=True)
@@ -1293,15 +1300,117 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
     return result
 
 
-class EtcdRedisConfig(TypedDict, total=False):
-    addr: Optional[HostPortPair]
-    sentinel: Optional[Union[str, List[HostPortPair]]]
-    service_name: Optional[str]
-    password: Optional[str]
-    redis_helper_config: RedisHelperConfig
+@dataclass
+class RedisConfig:
+    addr: Optional[HostPortPair] = None
+    sentinel: Optional[Union[str, List[HostPortPair]]] = None
+    service_name: Optional[str] = None
+    password: Optional[str] = None
+    redis_helper_config: Optional[RedisHelperConfig] = None
+
+    def __init__(
+        self,
+        addr: Optional[HostPortPair] = None,
+        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
+        service_name: Optional[str] = None,
+        password: Optional[str] = None,
+        redis_helper_config: Optional[RedisHelperConfig] = None,
+    ) -> None:
+        self.addr = addr
+        self.sentinel = sentinel
+        self.service_name = service_name
+        self.password = password
+        self.redis_helper_config = redis_helper_config
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def copy(self) -> "RedisConfig":
+        return RedisConfig(
+            addr=self.addr,
+            sentinel=self.sentinel,
+            service_name=self.service_name,
+            password=self.password,
+            redis_helper_config=self.redis_helper_config,
+        )
 
 
-def safe_print_redis_config(config: EtcdRedisConfig) -> str:
+@dataclass
+class EtcdRedisConfig:
+    _base_config: RedisConfig
+    _override_configs: Optional[Mapping[str, RedisConfig]]
+
+    def __init__(
+        self,
+        *,
+        addr: Optional[HostPortPair] = None,
+        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
+        service_name: Optional[str] = None,
+        password: Optional[str] = None,
+        redis_helper_config: Optional[RedisHelperConfig] = None,
+        override_configs: Optional[Mapping[str, RedisConfig]] = None,
+    ) -> None:
+        self._base_config = RedisConfig(
+            addr=addr,
+            sentinel=sentinel,
+            service_name=service_name,
+            password=password,
+            redis_helper_config=redis_helper_config,
+        )
+        self._override_configs = override_configs
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self._base_config, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self._base_config, key, value)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self._base_config, key)
+
+    def get_override_config(self, role: RedisRole) -> Any:
+        if self._override_configs and (role in self._override_configs):
+            return self._override_configs[role]
+        return self._base_config
+
+    def copy(self) -> "EtcdRedisConfig":
+        return EtcdRedisConfig(
+            addr=self._base_config.get("addr"),
+            sentinel=self._base_config.get("sentinel"),
+            service_name=self._base_config.get("service_name"),
+            password=self._base_config.get("password"),
+            redis_helper_config=self._base_config.get("redis_helper_config"),
+            override_configs=dict(self._override_configs) if self._override_configs else None,
+        )
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        override_configs = None
+        if data.get("override_configs"):
+            override_configs = {
+                target: RedisConfig(**cfg) for target, cfg in data["override_configs"].items()
+            }
+
+        return cls(
+            addr=data.get("addr"),
+            sentinel=data.get("sentinel"),
+            service_name=data.get("service_name"),
+            password=data.get("password"),
+            redis_helper_config=data.get("redis_helper_config"),
+            override_configs=override_configs,
+        )
+
+
+def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = config.copy()
     if "password" in safe_config:
         safe_config["password"] = "********"
@@ -1470,3 +1579,32 @@ class AutoScalingMetricComparator(CIUpperStrEnum):
     LESS_THAN_OR_EQUAL = enum.auto()
     GREATER_THAN = enum.auto()
     GREATER_THAN_OR_EQUAL = enum.auto()
+
+
+ResultType = TypeVar("ResultType")
+
+
+@dataclass
+class DispatchResult(Generic[ResultType]):
+    result: Optional[ResultType] = None
+    errors: list[str] = field(default_factory=list)
+
+    def is_success(self) -> bool:
+        return not self.errors
+
+    def has_error(self) -> bool:
+        return not self.is_success()
+
+    def message(self) -> str:
+        if self.is_success():
+            return str(self.result)
+        if self.result is not None:
+            return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
+        else:
+            return "errors: " + "\n".join(self.errors)
+
+
+class PurgeImageResult(TypedDict):
+    image: str
+    result: Optional[list[Any]]
+    error: Optional[str]

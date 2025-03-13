@@ -52,6 +52,93 @@ class APIMetricObserver:
         )
 
 
+class GraphQLMetricObserver:
+    _instance: Optional[Self] = None
+
+    _request_count: Counter
+    _request_duration_sec: Histogram
+
+    def __init__(self) -> None:
+        self._request_count = Counter(
+            name="backendai_graphql_request_count",
+            documentation="Total number of API requests",
+            labelnames=["operation_type", "field_name", "parent_type", "operation_name", "success"],
+        )
+        self._request_duration_sec = Histogram(
+            name="backendai_graphql_request_duration_sec",
+            documentation="Duration of API requests in milliseconds",
+            labelnames=["operation_type", "field_name", "parent_type", "operation_name", "success"],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def _inc_request_total(
+        self,
+        *,
+        operation_type: str,
+        field_name: str,
+        parent_type: str,
+        operation_name: str,
+        success: bool,
+    ) -> None:
+        self._request_count.labels(
+            operation_type=operation_type,
+            field_name=field_name,
+            parent_type=parent_type,
+            operation_name=operation_name,
+            success=success,
+        ).inc()
+
+    def _observe_request_duration(
+        self,
+        *,
+        operation_type: str,
+        field_name: str,
+        parent_type: str,
+        operation_name: str,
+        success: bool,
+        duration: float,
+    ) -> None:
+        self._request_duration_sec.labels(
+            operation_type=operation_type,
+            field_name=field_name,
+            parent_type=parent_type,
+            operation_name=operation_name,
+            success=success,
+        ).observe(duration)
+
+    def observe_request(
+        self,
+        *,
+        operation_type: str,
+        field_name: str,
+        parent_type: str,
+        operation_name: str,
+        success: bool,
+        duration: float,
+    ) -> None:
+        self._inc_request_total(
+            operation_type=operation_type,
+            field_name=field_name,
+            parent_type=parent_type,
+            operation_name=operation_name,
+            success=success,
+        )
+        self._observe_request_duration(
+            operation_type=operation_type,
+            field_name=field_name,
+            parent_type=parent_type,
+            operation_name=operation_name,
+            success=success,
+            duration=duration,
+        )
+
+
 class EventMetricObserver:
     _instance: Optional[Self] = None
 
@@ -184,12 +271,14 @@ class CommonMetricRegistry:
     _instance: Optional[Self] = None
 
     api: APIMetricObserver
+    gql: GraphQLMetricObserver
     event: EventMetricObserver
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
 
     def __init__(self) -> None:
         self.api = APIMetricObserver.instance()
+        self.gql = GraphQLMetricObserver.instance()
         self.event = EventMetricObserver.instance()
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()

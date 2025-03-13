@@ -16,7 +16,7 @@ from . import msgpack
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
 from .redis_client import RedisClient, RedisConnection
-from .types import AgentId, EtcdRedisConfig
+from .types import AgentId, RedisConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -161,7 +161,7 @@ class EventObserver(Protocol):
     def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None: ...
 
 
@@ -170,20 +170,21 @@ class NopEventObserver:
         pass
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None:
         pass
 
 
 class EventDispatcher(_EventDispatcher):
-    redis_config: EtcdRedisConfig
+    redis_config: RedisConfig
     db: int
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
+    _metric_observer: EventObserver
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -193,6 +194,7 @@ class EventDispatcher(_EventDispatcher):
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
+        event_observer: EventObserver = NopEventObserver(),
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
@@ -206,6 +208,7 @@ class EventDispatcher(_EventDispatcher):
         self._stream_key = stream_key
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
+        self._metric_observer = event_observer
         self.consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,

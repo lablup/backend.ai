@@ -11,7 +11,17 @@ import logging
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+    cast,
+)
 from uuid import UUID
 
 import aiohttp
@@ -48,9 +58,9 @@ from ..models import (
     groups,
     kernels,
     query_allowed_sgroups,
-    resource_presets,
     users,
 )
+from ..models.resource_preset import ResourcePresetRow
 from ..models.resource_usage import (
     ProjectResourceUsage,
     fetch_resource_usage,
@@ -79,18 +89,23 @@ async def list_presets(request: web.Request) -> web.Response:
     log.info("LIST_PRESETS (ak:{})", request["keypair"]["access_key"])
     root_ctx: RootContext = request.app["_root.context"]
     await root_ctx.shared_config.get_resource_slots()
-    async with root_ctx.db.begin_readonly() as conn:
-        query = sa.select([resource_presets]).select_from(resource_presets)
-        # TODO: uncomment when we implement scaling group.
-        # scaling_group = request.query.get('scaling_group')
-        # if scaling_group is not None:
-        #     query = query.where(resource_presets.c.scaling_group == scaling_group)
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        query = sa.select(ResourcePresetRow)
+        query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
+        scaling_group_name = request.query.get("scaling_group")
+        if scaling_group_name is not None:
+            query_condition = sa.or_(
+                query_condition, ResourcePresetRow.scaling_group_name == scaling_group_name
+            )
+        query = query.where(query_condition)
         resp: MutableMapping[str, Any] = {"presets": []}
-        async for row in await conn.stream(query):
-            preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
+        async for row in await db_session.stream_scalars(query):
+            row = cast(ResourcePresetRow, row)
+            preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
             resp["presets"].append({
-                "name": row["name"],
-                "shared_memory": str(row["shared_memory"]) if row["shared_memory"] else None,
+                "id": row.id,
+                "name": row.name,
+                "shared_memory": str(row.shared_memory) if row.shared_memory else None,
                 "resource_slots": preset_slots.to_json(),
             })
         return web.json_response(resp, status=200)
@@ -257,20 +272,29 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             sgroup_remaining[slot] = min(keypair_remaining[slot], sgroup_remaining[slot])
 
         # Fetch all resource presets in the current scaling group.
-        query = sa.select([resource_presets]).select_from(resource_presets)
-        async for row in await conn.stream(query):
+        resource_preset_query = sa.select(ResourcePresetRow)
+        query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
+        if params["scaling_group"] is not None:
+            query_condition = sa.or_(
+                query_condition,
+                ResourcePresetRow.scaling_group_name == params["scaling_group"],
+            )
+        resource_preset_query = resource_preset_query.where(query_condition)
+        async for row in await SASession(conn).stream_scalars(resource_preset_query):
             # Check if there are any agent that can allocate each preset.
+            row = cast(ResourcePresetRow, row)
             allocatable = False
-            preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
+            preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
             for agent_slot in agent_slots:
                 if agent_slot >= preset_slots and keypair_remaining >= preset_slots:
                     allocatable = True
                     break
             resp["presets"].append({
-                "name": row["name"],
+                "id": str(row.id),
+                "name": row.name,
                 "resource_slots": preset_slots.to_json(),
                 "shared_memory": (
-                    str(row["shared_memory"]) if row["shared_memory"] is not None else None
+                    str(row.shared_memory) if row.shared_memory is not None else None
                 ),
                 "allocatable": allocatable,
             })

@@ -96,6 +96,15 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
                             completion_msg_func = lambda: print_warn(
                                 "Registry scanning has been cancelled in the middle."
                             )
+                        # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
+                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
+                            issues = data.get("issues")
+                            if issues:
+                                for issue in issues:
+                                    print_fail(f"Issue reported: {issue}")
+                                completion_msg_func = lambda: print_warn(
+                                    f"Finished registry scanning with {len(issues)} issues."
+                                )
             finally:
                 completion_msg_func()
 
