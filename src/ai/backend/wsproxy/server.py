@@ -309,9 +309,6 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
     cors.add(app.router.add_route("GET", "/status", status))
-    cors.add(
-        app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
-    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
@@ -324,7 +321,8 @@ def build_root_app(
 
 def build_internal_app() -> web.Application:
     app = web.Application()
-    app.on_response_prepare.append(on_prepare)
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
 

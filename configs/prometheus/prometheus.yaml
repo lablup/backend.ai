@@ -26,9 +26,6 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:8087']
   - job_name: backendai-half-storage-proxy
-    scheme: https
-    tls_config:
-      insecure_skip_verify: true
     static_configs:
       - targets: ['host.docker.internal:6023']
   - job_name: backendai-half-wsproxy
