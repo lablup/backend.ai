@@ -44,6 +44,7 @@ from ..agent import (
     AbstractAgent,
     AbstractKernelCreationContext,
     ComputerContext,
+    ImageCanonicalDigestDict,
     ScanImagesResult,
 )
 from ..exception import UnsupportedResource
@@ -283,7 +284,9 @@ class DummyAgent(
     async def scan_images(self) -> ScanImagesResult:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
-        return ScanImagesResult(scanned_images={}, removed_images={})
+        return ScanImagesResult(
+            scanned_images=ImageCanonicalDigestDict(), removed_images=ImageCanonicalDigestDict()
+        )
 
     async def pull_image(
         self,
