@@ -31,7 +31,7 @@ def user() -> None:
 @click.option("-e", "--email", type=str, default=None, help="Email of a user to display.")
 def info(ctx: CLIContext, email: str) -> None:
     """
-    Show the information about the given user by email. If email is not give,
+    Show the information about the given user by email. If email is not given,
     requester's information will be displayed.
     """
     fields = [
@@ -40,6 +40,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["role"],
         user_fields["email"],
         user_fields["full_name"],
+        user_fields["description"],
         user_fields["need_password_change"],
         user_fields["status"],
         user_fields["status_info"],
@@ -427,7 +428,9 @@ def add(
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
-@click.option("--description", type=str, default="", help="Description of the user.")
+@click.option(
+    "--description", type=OptionalType(str), default=undefined, help="Description of the user."
+)
 @click.option(
     "--sudo-session-enabled",
     type=OptionalType(BoolExprType),
@@ -627,7 +630,17 @@ def delete(ctx: CLIContext, email):
         "and migrated the ownership to the requested admin."
     ),
 )
-def purge(ctx: CLIContext, email, purge_shared_vfolders):
+@click.option(
+    "--delegate-endpoint-ownership",
+    is_flag=True,
+    default=False,
+    help=(
+        "Delegate user's all alive endpoints. "
+        "If True, user's endpoints will not be deleted "
+        "and delegate the ownership to the requested admin."
+    ),
+)
+def purge(ctx: CLIContext, email, purge_shared_vfolders, delegate_endpoint_ownership):
     """
     Delete an existing user. This action cannot be undone.
 
@@ -639,7 +652,7 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
             if not ask_yn():
                 print_info("Cancelled")
                 sys.exit(ExitCode.FAILURE)
-            data = session.User.purge(email, purge_shared_vfolders)
+            data = session.User.purge(email, purge_shared_vfolders, delegate_endpoint_ownership)
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,

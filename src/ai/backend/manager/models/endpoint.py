@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    List,
     Optional,
     Self,
     cast,
@@ -32,7 +33,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
+from sqlalchemy.orm import contains_eager, foreign, joinedload, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack, redis_helper
@@ -74,7 +75,6 @@ from .base import (
     DecimalType,
     EndpointIDColumn,
     EnumValueType,
-    ForeignKeyIDColumn,
     IDColumn,
     InferenceSessionError,
     Item,
@@ -142,12 +142,8 @@ class EndpointRow(Base):
 
     id = EndpointIDColumn()
     name = sa.Column("name", sa.String(length=512), nullable=False)
-    created_user = sa.Column(
-        "created_user", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
-    )
-    session_owner = sa.Column(
-        "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
-    )
+    created_user = sa.Column("created_user", GUID, nullable=False)
+    session_owner = sa.Column("session_owner", GUID, nullable=False)
     # minus session count means this endpoint is requested for removal
     replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
     image = sa.Column("image", GUID)
@@ -239,7 +235,11 @@ class EndpointRow(Base):
     )
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
-    tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
+    tokens = relationship(
+        "EndpointTokenRow",
+        back_populates="endpoint_row",
+        primaryjoin="foreign(EndpointTokenRow.endpoint) == EndpointRow.id",
+    )
     endpoint_auto_scaling_rules = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
     )
@@ -252,10 +252,16 @@ class EndpointRow(Base):
 
     model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
-        "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
+        "UserRow",
+        back_populates="created_endpoints",
+        foreign_keys=[created_user],
+        primaryjoin=lambda: foreign(EndpointRow.created_user) == UserRow.uuid,
     )
     session_owner_row = relationship(
-        "UserRow", back_populates="owned_endpoints", foreign_keys="EndpointRow.session_owner"
+        "UserRow",
+        back_populates="owned_endpoints",
+        foreign_keys=[session_owner],
+        primaryjoin=lambda: foreign(EndpointRow.session_owner) == UserRow.uuid,
     )
 
     def __init__(
@@ -502,16 +508,61 @@ class EndpointRow(Base):
         session.add(row)
         return row
 
+    @property
+    def terminatable_route_statuses(self) -> set[RouteStatus]:
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
+            return {
+                RouteStatus.PROVISIONING,
+                RouteStatus.HEALTHY,
+                RouteStatus.UNHEALTHY,
+                RouteStatus.FAILED_TO_START,
+            }
+        else:
+            return {
+                RouteStatus.HEALTHY,
+                RouteStatus.UNHEALTHY,
+                RouteStatus.FAILED_TO_START,
+            }
+
+    @staticmethod
+    async def delegate_endpoint_ownership(
+        db_session: AsyncSession,
+        owner_user_uuid: UUID,
+        target_user_uuid: UUID,
+        target_access_key: AccessKey,
+    ) -> None:
+        from .routing import RoutingRow
+        from .session import KernelLoadingStrategy, SessionRow
+
+        endpoint_rows = await EndpointRow.list(
+            db_session,
+            user_uuid=owner_user_uuid,
+            load_session_owner=True,
+            load_routes=True,
+            load_tokens=True,
+        )
+        session_ids: List[UUID] = []
+        for row in endpoint_rows:
+            row.session_owner = target_user_uuid
+            for token_row in cast(list[EndpointTokenRow], row.tokens):
+                token_row.delegate_ownership(target_user_uuid)
+            for routing_row in cast(list[RoutingRow], row.routings):
+                routing_row.delegate_ownership(target_user_uuid)
+                session_ids.append(routing_row.session)
+        session_rows = await SessionRow.list_sessions(
+            db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
+        )
+        for session_row in session_rows:
+            session_row.delegate_ownership(target_user_uuid, target_access_key)
+
 
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
     id = IDColumn()
     token = sa.Column("token", sa.String(), nullable=False)
-    endpoint = sa.Column(
-        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="SET NULL"), nullable=True
-    )
-    session_owner = ForeignKeyIDColumn("session_owner", "users.uuid")
+    endpoint = sa.Column("endpoint", GUID, nullable=True)
+    session_owner = sa.Column("session_owner", GUID, nullable=False)
     domain = sa.Column(
         "domain",
         sa.String(length=64),
@@ -528,7 +579,12 @@ class EndpointTokenRow(Base):
         "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
     )
 
-    endpoint_row = relationship("EndpointRow", back_populates="tokens")
+    endpoint_row = relationship(
+        "EndpointRow",
+        back_populates="tokens",
+        foreign_keys=[endpoint],
+        primaryjoin=lambda: foreign(EndpointTokenRow.endpoint) == EndpointRow.id,
+    )
 
     def __init__(
         self,
@@ -598,6 +654,9 @@ class EndpointTokenRow(Base):
         if not row:
             raise NoResultFound
         return row
+
+    def delegate_ownership(self, user_uuid: UUID) -> None:
+        self.session_owner = user_uuid
 
 
 class EndpointAutoScalingRuleRow(Base):
@@ -826,7 +885,7 @@ class ModelServicePredicateChecker:
                 vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
                 folder_host = model_vfolder_row["host"]
 
-        proxy_name, volume_name = storage_manager.split_host(folder_host)
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
 
         if model_definition_path:
             path = Path(model_definition_path)
@@ -1036,10 +1095,11 @@ class Endpoint(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
+        creator = cast(Optional[UserRow], row.created_user_row)
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
-            image_object=ImageNode.from_row(row.image_row),
+            image_object=ImageNode.from_row(ctx, row.image_row),
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
@@ -1051,7 +1111,7 @@ class Endpoint(graphene.ObjectType):
             model_mount_destination=row.model_mount_destination,
             created_user=row.created_user,
             created_user_id=row.created_user,
-            created_user_email=row.created_user_row.email,
+            created_user_email=creator.email if creator is not None else None,
             session_owner=row.session_owner,
             session_owner_id=row.session_owner,
             session_owner_email=row.session_owner_row.email,
@@ -1089,7 +1149,7 @@ class Endpoint(graphene.ObjectType):
             sa.join(
                 EndpointRow,
                 UserRow,
-                EndpointRow.created_user == UserRow.uuid,
+                EndpointRow.session_owner == UserRow.uuid,
                 isouter=True,
             )
         )
@@ -1126,7 +1186,7 @@ class Endpoint(graphene.ObjectType):
                 sa.join(
                     EndpointRow,
                     UserRow,
-                    EndpointRow.created_user == UserRow.uuid,
+                    EndpointRow.session_owner == UserRow.uuid,
                     isouter=True,
                 )
             )
@@ -1135,6 +1195,7 @@ class Endpoint(graphene.ObjectType):
             .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.session_owner_row))
+            .options(joinedload(EndpointRow.created_user_row))
         )
         if project is not None:
             query = query.where(EndpointRow.project == project)

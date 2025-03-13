@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
+    Final,
     Optional,
     Self,
 )
@@ -18,12 +21,14 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     BinarySize,
     HardwareMetadata,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..agent import (
     AgentRow,
@@ -55,11 +60,14 @@ from ..rbac import (
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import AgentPermission
 from ..user import UserRole, users
+from .base import UUIDFloatMap
 from .fields import AgentPermissionField
 from .kernel import KernelConnection, KernelNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "Agent",
@@ -95,6 +103,20 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
+
+
+async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
+    raw_alloc_map = await redis_helper.execute(
+        ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{agent_id}")
+    )
+
+    if raw_alloc_map:
+        alloc_map = json.loads(raw_alloc_map)
+        return UUIDFloatMap.parse_value({k: float(v) for k, v in alloc_map.items()})
+    return {}
+
+
 class AgentNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -119,6 +141,7 @@ class AgentNode(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
+    gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     kernel_nodes = PaginatedConnectionField(
         KernelConnection,
@@ -178,6 +201,9 @@ class AgentNode(graphene.ObjectType):
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
         return await loader.load(self.id)
 
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
+        return await _resolve_gpu_alloc_map(info.context, self.id)
+
     async def resolve_hardware_metadata(
         self,
         info: graphene.ResolveInfo,
@@ -212,7 +238,7 @@ class AgentNode(graphene.ObjectType):
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
             if stat is not None:
-                ret.append(msgpack.unpackb(stat))
+                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
             else:
                 ret.append(None)
 
@@ -330,6 +356,7 @@ class Agent(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
+    gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -426,6 +453,9 @@ class Agent(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_container_count)
         return await loader.load(self.id)
+
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
+        return await _resolve_gpu_alloc_map(info.context, self.id)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
@@ -572,7 +602,7 @@ class Agent(graphene.ObjectType):
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
             if stat is not None:
-                ret.append(msgpack.unpackb(stat))
+                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
             else:
                 ret.append(None)
 
@@ -868,3 +898,65 @@ class ModifyAgent(graphene.Mutation):
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
+
+
+class RescanGPUAllocMaps(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Meta:
+        description = "Added in 25.4.0."
+
+    class Arguments:
+        agent_id = graphene.String(
+            description="Agent ID to rescan GPU alloc map",
+            required=True,
+        )
+
+    task_id = graphene.UUID()
+
+    @classmethod
+    @privileged_mutation(
+        UserRole.SUPERADMIN,
+        lambda id, **kwargs: (None, id),
+    )
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        agent_id: str,
+    ) -> RescanGPUAllocMaps:
+        log.info("rescanning GPU alloc maps")
+        graph_ctx: GraphQueryContext = info.context
+
+        async def _rescan_alloc_map_task(reporter: ProgressReporter) -> None:
+            await reporter.update(message=f"Agent {agent_id} GPU alloc map scanning...")
+
+            reporter_msg = ""
+            try:
+                alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
+                    AgentId(agent_id)
+                )
+                key = f"gpu_alloc_map.{agent_id}"
+                await redis_helper.execute(
+                    graph_ctx.registry.redis_stat,
+                    lambda r: r.setex(
+                        name=key,
+                        value=json.dumps(alloc_map),
+                        time=GPU_ALLOC_MAP_CACHE_PERIOD,
+                    ),
+                )
+            except Exception as e:
+                reporter_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"
+                log.error(reporter_msg)
+            else:
+                reporter_msg = f"Agent {agent_id} GPU alloc map scanned."
+
+            await reporter.update(
+                increment=1,
+                message=reporter_msg,
+            )
+
+            await reporter.update(message="GPU alloc map scanning completed")
+
+        task_id = await graph_ctx.background_task_manager.start(_rescan_alloc_map_task)
+        return RescanGPUAllocMaps(task_id=task_id)

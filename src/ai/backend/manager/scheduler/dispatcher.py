@@ -4,6 +4,7 @@ import asyncio
 import itertools
 import json
 import logging
+import uuid
 from collections import defaultdict
 from collections.abc import (
     Awaitable,
@@ -12,12 +13,14 @@ from collections.abc import (
     Sequence,
 )
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
+    Iterable,
     Optional,
     Union,
     cast,
@@ -35,7 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -64,13 +67,16 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
+    EtcdRedisConfig,
     KernelId,
     RedisConnectionInfo,
     ResourceSlot,
     SessionId,
+    SessionTypes,
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -193,6 +199,59 @@ def load_agent_selector(
     raise ImportError("Cannot load the agent-selector plugin", name)
 
 
+async def get_kernel_count_per_agent_at_endpoint(
+    db_sess: SASession,
+    endpoint_id: uuid.UUID,
+    filter_by_statuses: Iterable[KernelStatus],
+) -> dict[AgentId, int]:
+    """
+    Query the agents to which the kernels of each session belong,
+    and calculate the number of kernels for each agent at a specific endpoint.
+    """
+
+    routing_rows: list[RoutingRow] = (
+        await db_sess.scalars(
+            sa.select(RoutingRow)
+            .options(selectinload(RoutingRow.session_row).options(selectinload(SessionRow.kernels)))
+            .where(
+                RoutingRow.endpoint == endpoint_id,
+            )
+        )
+    ).all()
+
+    kernel_count_per_agent: dict[AgentId, int] = {}
+
+    for routing_row in routing_rows:
+        session_row: SessionRow = routing_row.session_row
+        kernels: list[KernelRow] = session_row.kernels
+
+        for kernel in kernels:
+            if kernel.status in filter_by_statuses:
+                if agent_id := kernel.agent:
+                    kernel_count_per_agent[agent_id] = kernel_count_per_agent.get(agent_id, 0) + 1
+
+    log.debug(
+        'kernel counts at endpoint {0}: "{1}"',
+        endpoint_id,
+        repr(kernel_count_per_agent),
+    )
+
+    return kernel_count_per_agent
+
+
+@dataclass
+class LoadSchedulerArgs:
+    scheduler_name: str
+    sgroup_opts: ScalingGroupOpts
+
+
+@dataclass
+class LoadAgentSelectorArgs:
+    sgroup_opts: ScalingGroupOpts
+    pending_session_id: uuid.UUID
+    pending_session_type: SessionTypes
+
+
 class SchedulerDispatcher(aobject):
     config: LocalConfig
     shared_config: SharedConfig
@@ -226,15 +285,18 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            self.shared_config.data["redis"]
+        )
         self.redis_live = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.LIVE),
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
         self.redis_stat = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
 
     async def __ainit__(self) -> None:
@@ -264,7 +326,7 @@ class SchedulerDispatcher(aobject):
             task_name="schedule_timer",
         )
         self.session_start_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
+            self.lock_factory(LockID.LOCKID_START_TIMER, 10.0),
             self.event_producer,
             lambda: DoStartSessionEvent(),
             interval=10.0,
@@ -404,25 +466,45 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
 
-    async def _load_scheduler(
-        self,
-        db_sess: SASession,
-        sgroup_name: str,
-    ) -> tuple[AbstractScheduler, AbstractAgentSelector]:
-        query = sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
-            ScalingGroupRow.name == sgroup_name
-        )
-        result = await db_sess.execute(query)
-        row = result.first()
-        scheduler_name = row.scheduler
-        sgroup_opts: ScalingGroupOpts = row.scheduler_opts
+    def _load_scheduler(self, args: LoadSchedulerArgs) -> AbstractScheduler:
+        global_scheduler_opts = {}
+        if self.shared_config["plugins"]["scheduler"]:
+            global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
+                args.scheduler_name, {}
+            )
+        scheduler_config = {**global_scheduler_opts, **args.sgroup_opts.config}
+
+        return load_scheduler(args.scheduler_name, args.sgroup_opts, scheduler_config)
+
+    async def _load_agent_selector(self, args: LoadAgentSelectorArgs) -> AbstractAgentSelector:
+        sgroup_opts = args.sgroup_opts
+
+        # TODO: Remove "dynamic_config after refactoring.
+        dynamic_config: dict[str, Any] = {}
+
         match sgroup_opts.agent_selection_strategy:
-            # The names correspond to the entrypoint names (backendai_agentselector_v10).
             case AgentSelectionStrategy.LEGACY:
                 agselector_name = "legacy"
             case AgentSelectionStrategy.ROUNDROBIN:
                 agselector_name = "roundrobin"
             case AgentSelectionStrategy.CONCENTRATED:
+                async with self.db.begin_readonly_session() as db_sess:
+                    if (
+                        sgroup_opts.enforce_spreading_endpoint_replica
+                        and args.pending_session_type == SessionTypes.INFERENCE
+                    ):
+                        endpoint_id = await db_sess.scalar(
+                            sa.select(RoutingRow.endpoint).where(
+                                RoutingRow.session == args.pending_session_id
+                            )
+                        )
+
+                        dynamic_config[
+                            "kernel_counts_at_same_endpoint"
+                        ] = await get_kernel_count_per_agent_at_endpoint(
+                            db_sess, endpoint_id, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+                        )
+
                 agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
                 agselector_name = "dispersed"
@@ -431,35 +513,28 @@ class SchedulerDispatcher(aobject):
                     f"Unknown agent selection strategy: {unknown!r}. Possible values: {[*AgentSelectionStrategy.__members__.keys()]}"
                 )
 
-        global_scheduler_opts = {}
         global_agselector_opts = {}
-        if self.shared_config["plugins"]["scheduler"]:
-            global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
-                scheduler_name, {}
-            )
-        scheduler_config = {**global_scheduler_opts, **sgroup_opts.config}
         if self.shared_config["plugins"]["agent-selector"]:
             global_agselector_opts = self.shared_config["plugins"]["agent-selector"].get(
                 agselector_name, {}
             )
-        agselector_config = {**global_agselector_opts, **sgroup_opts.agent_selector_config}
+        agselector_config = {
+            **global_agselector_opts,
+            **sgroup_opts.agent_selector_config,
+            **dynamic_config,
+        }
+
         agent_selection_resource_priority = self.local_config["manager"][
             "agent-selection-resource-priority"
         ]
 
-        scheduler = load_scheduler(
-            scheduler_name,
-            sgroup_opts,
-            scheduler_config,
-        )
-        agent_selector = load_agent_selector(
+        return load_agent_selector(
             agselector_name,
             sgroup_opts,
             agselector_config,
             agent_selection_resource_priority,
             self.shared_config,
         )
-        return scheduler, agent_selector
 
     async def _schedule_in_sgroup(
         self,
@@ -467,9 +542,17 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
     ) -> None:
         # Part 0: Load the scheduler and the agent selector.
-
         async with self.db.begin_readonly_session() as db_sess:
-            scheduler, agent_selector = await self._load_scheduler(db_sess, sgroup_name)
+            result = await db_sess.execute(
+                sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
+                    ScalingGroupRow.name == sgroup_name
+                )
+            )
+            row = result.first()
+            if row is None:
+                raise ValueError(f'Scaling group "{sgroup_name}" not found!')
+            scheduler_name, sgroup_opts = row.scheduler, row.scheduler_opts
+            scheduler = self._load_scheduler(LoadSchedulerArgs(scheduler_name, sgroup_opts))
             existing_sessions, pending_sessions, cancelled_sessions = await _list_managed_sessions(
                 db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout
             )
@@ -508,6 +591,14 @@ class SchedulerDispatcher(aobject):
                 raise RuntimeError("should not reach here")
             pending_sess = pending_sessions.pop(picked_idx)
             log_fmt = "schedule(s:{}, prio:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
+            agent_selector = await self._load_agent_selector(
+                LoadAgentSelectorArgs(
+                    sgroup_opts,
+                    pending_sess.id,
+                    pending_sess.session_type,
+                )
+            )
+
             log_args = (
                 pending_sess.id,
                 pending_sess.priority,
@@ -1320,7 +1411,7 @@ class SchedulerDispatcher(aobject):
         )
         lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_START_TIMER, lock_lifetime):
+            async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
                 known_slot_types = await self.shared_config.get_resource_slots()
                 sched_ctx = SchedulingContext(
@@ -1619,15 +1710,16 @@ class SchedulerDispatcher(aobject):
             if len(active_routings) > replicas:
                 # We need to scale down!
                 destroy_count = len(active_routings) - replicas
+
+                # we do not expect sessions to be spawned when the endpoint is about to be destroyed
+                # so also delete routes in provisioning status
+
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
                             for route in active_routings
-                            if (
-                                route.status != RouteStatus.PROVISIONING
-                                and route.status != RouteStatus.TERMINATING
-                            )
+                            if route.status in endpoint.terminatable_route_statuses
                         ],
                         key=lambda r: r.status == RouteStatus.UNHEALTHY,
                     )

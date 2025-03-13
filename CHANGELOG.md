@@ -16,6 +16,73 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.4.0 (2025-03-12)
+
+### Features
+* Implement GQL API for scanning GPU allocation map ([#2273](https://github.com/lablup/backend.ai/issues/2273))
+* Add image_node and vfolder_node fields to ComputeSession schema ([#2987](https://github.com/lablup/backend.ai/issues/2987))
+* Cache `gpu_alloc_map` in Redis, and Add `RescanGPUAllocMaps` mutation for update the `gpu_alloc_map`s. ([#3293](https://github.com/lablup/backend.ai/issues/3293))
+* Collect metrics for the RPC server ([#3555](https://github.com/lablup/backend.ai/issues/3555))
+* Add `status` Column to the `Image` table, and `ImageRow` unique constraint. ([#3619](https://github.com/lablup/backend.ai/issues/3619))
+* Add `status` to `Image`, `ImageNode` GQL Fields. ([#3620](https://github.com/lablup/backend.ai/issues/3620))
+* Update `ForgetImage`, `ForgetImageById`, `ClearImages` to perform soft delete and add `PurgeImageById` API for hard delete. ([#3628](https://github.com/lablup/backend.ai/issues/3628))
+* Implement noop storage backend ([#3629](https://github.com/lablup/backend.ai/issues/3629))
+* Assign the noop storage host to unmanaged vfolders ([#3630](https://github.com/lablup/backend.ai/issues/3630))
+* Update vfolder CLI cmd to support unmanaged vfolders ([#3631](https://github.com/lablup/backend.ai/issues/3631))
+* Implement `Image` status filtering logics. (e.g. adding an optional argument to the `Image`, `ImageNode` GQL resolvers to enable querying deleted images as well.) ([#3647](https://github.com/lablup/backend.ai/issues/3647))
+* Add `enforce_spreading_endpoint_replica` scheduling option to the `ConcentratedAgentSelector`, which prioritizes availability over available resource slots when selecting an agent for inference sessions. ([#3693](https://github.com/lablup/backend.ai/issues/3693))
+* Implement `PurgeImages` API for securing storage space on a specific agent. ([#3704](https://github.com/lablup/backend.ai/issues/3704))
+* Add sum of resource slots field to scaling group schema ([#3707](https://github.com/lablup/backend.ai/issues/3707))
+* Add `scaling_group_name` column to `resource_presets` table. ([#3718](https://github.com/lablup/backend.ai/issues/3718))
+* Update resource preset APIs to support mapping a resource group ([#3719](https://github.com/lablup/backend.ai/issues/3719))
+* Split redis config for each connection pool ([#3725](https://github.com/lablup/backend.ai/issues/3725))
+* Register v2 volume handler to router in storage-proxy ([#3785](https://github.com/lablup/backend.ai/issues/3785))
+* Support `application/vnd.oci.image.manifest.v1+json` type images. ([#3814](https://github.com/lablup/backend.ai/issues/3814))
+* Add `enable_interactive_login_account_switch` webserver option to control the visibility of the "Sign in with a different account" button on the interactive login page ([#3835](https://github.com/lablup/backend.ai/issues/3835))
+* Add centralized action processor design ([#3859](https://github.com/lablup/backend.ai/issues/3859))
+* Export utilization metrics to Prometheus ([#3878](https://github.com/lablup/backend.ai/issues/3878))
+* Add kernel bootstrap timeout config ([#3880](https://github.com/lablup/backend.ai/issues/3880))
+* Add GQL exception and metric middleware ([#3891](https://github.com/lablup/backend.ai/issues/3891))
+* Allow delegation of service ownership when purge user ([#3898](https://github.com/lablup/backend.ai/issues/3898))
+* Add filter/order argument to GQL `resource_presets` query ([#3916](https://github.com/lablup/backend.ai/issues/3916))
+
+### Fixes
+* Fix failure of the whole image rescanning task when there is a misconfigured container registry. ([#3652](https://github.com/lablup/backend.ai/issues/3652))
+* Insert default `domain_name` value to vfolders ([#3767](https://github.com/lablup/backend.ai/issues/3767))
+* Let Auth API handler check all keypairs owned by user ([#3780](https://github.com/lablup/backend.ai/issues/3780))
+* Fix `description` field in user update CLI command, ensuring it is properly omitted when not provided ([#3831](https://github.com/lablup/backend.ai/issues/3831))
+* Add missing vfolder mount permission mapping in new RBAC implementation ([#3851](https://github.com/lablup/backend.ai/issues/3851))
+* Aggregate multi-kernel session utilization in idle checker ([#3861](https://github.com/lablup/backend.ai/issues/3861))
+* Fix rescan only the latest tag in `HarborRegistryV2`. ([#3871](https://github.com/lablup/backend.ai/issues/3871))
+* Retry zmq socket connections from kernel ([#3880](https://github.com/lablup/backend.ai/issues/3880))
+* Fix intermittent image rescan DB serialization error due to parallel DB access of `rescan_single_registry()` calls. ([#3883](https://github.com/lablup/backend.ai/issues/3883))
+* GQL `vfolder_node` query does not resolve `permissions` field ([#3900](https://github.com/lablup/backend.ai/issues/3900))
+* Fix GQL Agent `live_stat` resolver to properly parse UUID keys in JSON data as strings ([#3928](https://github.com/lablup/backend.ai/issues/3928))
+
+
+## 25.3.3 (2025-02-27)
+
+### Features
+* Let endpoints with `PROVISIONING` routes deleted without manual session removal ([#3842](https://github.com/lablup/backend.ai/issues/3842))
+
+### Fixes
+* Fix `CreateNetwork` GQL mutation not working ([#3843](https://github.com/lablup/backend.ai/issues/3843))
+* Fix `EndpointAutoScalingRuleNode` GQL query not working ([#3845](https://github.com/lablup/backend.ai/issues/3845))
+
+
+## 25.3.2 (2025-02-26)
+
+### Fixes
+* Add `service_ports` field resolver to GQL ComputeSessionNode type ([#3782](https://github.com/lablup/backend.ai/issues/3782))
+* Fix the GQL VirtualFolderNode resolver to accept a filter argument ([#3799](https://github.com/lablup/backend.ai/issues/3799))
+* Fix wrong Python interpreter embedded in the installer scie builds ([#3810](https://github.com/lablup/backend.ai/issues/3810))
+* Fix a DB migration script that fails when the system has a default domain with a name other than 'default' ([#3816](https://github.com/lablup/backend.ai/issues/3816))
+* Use correct lock ID for schedulers and event producers ([#3817](https://github.com/lablup/backend.ai/issues/3817))
+* Broken image rescanning on `HarborRegistry_v1` due to type error of credential value. ([#3821](https://github.com/lablup/backend.ai/issues/3821))
+* Ensure that the scie build of install.config also includes the files in the folder and the yaml file. ([#3824](https://github.com/lablup/backend.ai/issues/3824))
+* Fix wrong alembic migration scripts ([#3829](https://github.com/lablup/backend.ai/issues/3829))
+
+
 ## 25.3.1 (2025-02-21)
 
 ### Features

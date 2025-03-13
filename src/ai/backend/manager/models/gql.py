@@ -1,6 +1,7 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional
@@ -8,9 +9,10 @@ from typing import TYPE_CHECKING, Any, Optional
 import attrs
 import graphene
 from graphene.types.inputobjecttype import set_input_object_type_default_value
-from graphql import OperationType, Undefined
+from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 
@@ -84,6 +86,7 @@ from .gql_models.agent import (
     AgentSummary,
     AgentSummaryList,
     ModifyAgent,
+    RescanGPUAllocMaps,
 )
 from .gql_models.container_registry import (
     CreateContainerRegistryQuota,
@@ -116,8 +119,11 @@ from .gql_models.image import (
     ImageConnection,
     ImageNode,
     ImagePermissionValueField,
+    ImageStatusType,
     ModifyImage,
     PreloadImage,
+    PurgeImageById,
+    PurgeImages,
     RescanImages,
     UnloadImage,
     UntagImageFromRegistry,
@@ -147,6 +153,7 @@ from .group import (
 )
 from .image import (
     ImageLoadFilter,
+    ImageStatus,
     PublicImageLoadFilter,
 )
 from .kernel import (
@@ -252,6 +259,7 @@ class GraphQueryContext:
     storage_manager: StorageSessionManager
     registry: AgentRegistry
     idle_checker_host: IdleCheckerHost
+    metric_observer: GraphQLMetricObserver
 
 
 class Mutations(graphene.ObjectType):
@@ -282,6 +290,7 @@ class Mutations(graphene.ObjectType):
     modify_user = ModifyUser.Field()
     delete_user = DeleteUser.Field()
     purge_user = PurgeUser.Field()
+    rescan_gpu_alloc_maps = RescanGPUAllocMaps.Field(description="Added in 25.4.0.")
 
     # admin only
     create_keypair = CreateKeyPair.Field()
@@ -294,11 +303,15 @@ class Mutations(graphene.ObjectType):
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
     forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
-    forget_image = ForgetImage.Field()
+    forget_image = ForgetImage.Field(
+        deprecation_reason="Deprecated since 25.4.0. Use `forget_image_by_id` instead."
+    )
+    purge_image_by_id = PurgeImageById.Field(description="Added in 25.4.0")
     untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
     clear_images = ClearImages.Field()
+    purge_images = PurgeImages.Field(description="Added in 25.4.0")
 
     # super-admin only
     modify_compute_session = ModifyComputeSession.Field()
@@ -575,6 +588,11 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(
             deprecation_reason="Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null."
         ),
+        filter_by_statuses=graphene.List(
+            ImageStatusType,
+            default_value=[ImageStatus.ALIVE],
+            description="Added in 25.4.0.",
+        ),
         load_filters=graphene.List(
             graphene.String,
             default_value=None,
@@ -607,6 +625,11 @@ class Queries(graphene.ObjectType):
         permission=ImagePermissionValueField(
             default_value=ImagePermission.READ_ATTRIBUTE,
             description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
+        ),
+        filter_by_statuses=graphene.List(
+            ImageStatusType,
+            default_value=[ImageStatus.ALIVE],
+            description="Added in 25.4.0.",
         ),
     )
 
@@ -696,9 +719,20 @@ class Queries(graphene.ObjectType):
         ResourcePreset,
         name=graphene.String(),
     )
+    resource_preset_by_id = graphene.Field(
+        ResourcePreset,
+        description="Added in 25.4.0.",
+        id=graphene.UUID(),
+    )
 
     resource_presets = graphene.List(
         ResourcePreset,
+        filter=graphene.String(
+            description="Added in 25.4.0.",
+        ),
+        order=graphene.String(
+            description="Added in 25.4.0.",
+        ),
     )
 
     # super-admin only
@@ -1467,13 +1501,15 @@ class Queries(graphene.ObjectType):
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         if id:
-            item = await Image.load_item_by_id(info.context, uuid.UUID(id))
+            item = await Image.load_item_by_id(info.context, uuid.UUID(id), filter_by_statuses=None)
         else:
             if not (reference and architecture):
                 raise InvalidAPIParameters(
                     "reference/architecture and id can't be omitted at the same time!"
                 )
-            item = await Image.load_item(info.context, reference, architecture)
+            item = await Image.load_item(
+                info.context, reference, architecture, filter_by_statuses=None
+            )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1522,6 +1558,7 @@ class Queries(graphene.ObjectType):
         *,
         is_installed: bool | None = None,
         is_operation=False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
@@ -1553,7 +1590,9 @@ class Queries(graphene.ObjectType):
                 # but to conform with previous implementation...
                 image_load_types.add(ImageLoadFilter.OPERATIONAL)
 
-        items = await Image.load_all(ctx, types=image_load_types)
+        items = await Image.load_all(
+            ctx, types=image_load_types, filter_by_statuses=filter_by_statuses
+        )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1741,6 +1780,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         scope_id: ScopeType,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
         filter: Optional[str] = None,
         order: Optional[str] = None,
@@ -1754,6 +1794,7 @@ class Queries(graphene.ObjectType):
             info,
             scope_id,
             permission,
+            filter_by_statuses,
             filter_expr=filter,
             order_expr=order,
             offset=offset,
@@ -1963,11 +2004,24 @@ class Queries(graphene.ObjectType):
         return await loader.load(name)
 
     @staticmethod
+    async def resolve_resource_preset_by_id(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: uuid.UUID,
+    ) -> ResourcePreset:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(ctx, "ResourcePreset.by_id")
+        return await loader.load(id)
+
+    @staticmethod
     async def resolve_resource_presets(
         root: Any,
         info: graphene.ResolveInfo,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[ResourcePreset]:
-        return await ResourcePreset.load_all(info.context)
+        return await ResourcePreset.load_all(info.context, filter=filter, order=order)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2833,3 +2887,50 @@ class GQLMutationPrivilegeCheckMiddleware:
             if graph_ctx.user["role"] not in allowed_roles:
                 return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
         return next(root, info, **args)
+
+
+class GQLExceptionMiddleware:
+    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+        try:
+            res = next(root, info, **args)
+        except Exception as e:
+            raise GraphQLError(
+                message=str(e),
+                # TODO: Add extensions (error_code) after BackendError refactoring
+                # extensions={},
+            )
+        return res
+
+
+class GQLMetricMiddleware:
+    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+        graph_ctx: GraphQueryContext = info.context
+        operation_type = info.operation.operation
+        field_name = info.field_name
+        parent_type = info.parent_type.name
+        operation_name = (
+            info.operation.name.value if info.operation.name is not None else "anonymous"
+        )
+        start = time.perf_counter()
+        try:
+            info.field_name
+            res = next(root, info, **args)
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                success=True,
+                duration=time.perf_counter() - start,
+            )
+        except BaseException as e:
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                success=False,
+                duration=time.perf_counter() - start,
+            )
+            raise e
+        return res

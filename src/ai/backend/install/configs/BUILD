@@ -2,5 +2,5 @@ python_sources(name="src")
 
 resources(
     name="templates",
-    sources=["*.toml", "*.conf", "*.ini", "*.yml"],
+    sources=["**/*.toml", "**/*.conf", "**/*.ini", "**/*.yml", "**/*.yaml", "**/*.json"],
 )
