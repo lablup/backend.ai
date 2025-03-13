@@ -50,6 +50,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -1692,18 +1693,23 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResponse:
+    async def _purge_image(
+        self, docker: Docker, image: str, force: bool, noprune: bool
+    ) -> PurgeImageResponse:
         try:
-            await docker.images.delete(image)
+            await docker.images.delete(image, force=force, noprune=noprune)
             return PurgeImageResponse.success(image=image)
         except Exception as e:
             log.error(f'Failed to purge image "{image}": {e}')
             return PurgeImageResponse.failure(image=image, error=str(e))
 
-    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImageResponses:
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
-                tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
+                tasks = [
+                    tg.create_task(self._purge_image(docker, image, request.force, request.noprune))
+                    for image in request.images
+                ]
 
         results = []
         for task in tasks:

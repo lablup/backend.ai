@@ -58,6 +58,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -3658,13 +3659,10 @@ class AgentRegistry:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
 
-    async def purge_images(
-        self,
-        agent_id: AgentId,
-        images: list[str],
-    ) -> PurgeImageResponses:
+    async def purge_images(self, agent_id: AgentId, request: PurgeImagesReq) -> PurgeImageResponses:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            result = await rpc.call.purge_images(images)
+            # TODO: PurgeImagesReq를 타입 보존하면서 agent에 그대로 넘길 수 있는 방법?
+            result = await rpc.call.purge_images(request.images, request.force, request.noprune)
 
             return PurgeImageResponses([
                 PurgeImageResponse(

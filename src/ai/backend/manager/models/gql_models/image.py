@@ -29,6 +29,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponses
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AgentId,
@@ -1136,6 +1137,12 @@ class PurgeImagesResult:
         return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
 
 
+# TODO: breaking change...?
+class PurgeImageProps(graphene.InputObjectType):
+    force = graphene.Boolean(default_value=False)
+    noprune = graphene.Boolean(default_value=True)
+
+
 class PurgeImages(graphene.Mutation):
     """
     Added in 25.4.0.
@@ -1146,12 +1153,17 @@ class PurgeImages(graphene.Mutation):
     class Arguments:
         agent_id = graphene.String(required=True)
         images = graphene.List(ImageRefType, required=True)
+        props = PurgeImageProps(required=False)
 
     task_id = graphene.String()
 
     @staticmethod
     async def mutate(
-        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[ImageRefType]
+        root: Any,
+        info: graphene.ResolveInfo,
+        agent_id: str,
+        images: list[ImageRefType],
+        props: PurgeImageProps,
     ) -> PurgeImages:
         image_canonicals = [image.name for image in images]
         log.info(
@@ -1166,7 +1178,10 @@ class PurgeImages(graphene.Mutation):
             task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
             arch_per_images = {image.name: image.architecture for image in images}
 
-            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
+            results = await ctx.registry.purge_images(
+                AgentId(agent_id),
+                PurgeImagesReq(images=image_canonicals, force=props.force, noprune=props.noprune),
+            )
 
             for result in results.responses:
                 image_canonical = result.image
