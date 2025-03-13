@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.models.gql import GraphQueryContext
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VirtualFolder
@@ -30,6 +31,8 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
+        services_ctx=None,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
     )
 
 

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, cast
+from typing import Any, AsyncIterator, Mapping, Optional, cast
 
 import aiohttp_cors
 import aiotools
@@ -29,7 +29,9 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.types import EtcdRedisConfig
 from ai.backend.common.web.session import (
     extra_config_headers,
     get_session,
@@ -609,7 +611,12 @@ async def server_main(
         middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
     )
     app["config"] = config
-    app["security_policy"] = SecurityPolicy.default_policy()
+    request_policy_config: list[str] = config["security"]["request_policies"]
+    response_policy_config: list[str] = config["security"]["response_policies"]
+    csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = config["security"]["csp"]
+    app["security_policy"] = SecurityPolicy.from_config(
+        request_policy_config, response_policy_config, csp_policy_config
+    )
     j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",
@@ -628,8 +635,9 @@ async def server_main(
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
 
+    etcd_resdis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(config["session"]["redis"])
     app["redis"] = redis_helper.get_redis_object(
-        config["session"]["redis"],
+        etcd_resdis_config.get_override_config(RedisRole.STATISTICS),
         name="web.session",
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,

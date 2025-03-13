@@ -11,6 +11,8 @@ from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
 
+from .volumes.types import LoggingInternalMeta
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -127,3 +129,27 @@ async def log_manager_api_entry(
         "ManagerAPI::{}()",
         name.upper(),
     )
+
+
+async def log_manager_api_entry_new(
+    log: Union[logging.Logger, BraceStyleAdapter],
+    name: str,
+    params: Any,
+) -> None:
+    if params is None:
+        log.info(
+            "ManagerAPI::{}()",
+            name.upper(),
+        )
+    elif isinstance(params, LoggingInternalMeta):
+        log.info(
+            "ManagerAPI::{}({})",
+            name.upper(),
+            params.to_logging_str(),
+        )
+    else:
+        log.info(
+            "ManagerAPI::{}({})",
+            name.upper(),
+            str(params),
+        )

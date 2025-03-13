@@ -57,6 +57,7 @@ from yarl import URL
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -141,7 +142,7 @@ from .api.exceptions import (
 )
 from .config import LocalConfig, SharedConfig
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError, convert_to_status_data
+from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -422,7 +423,7 @@ class AgentRegistry:
             return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
-        proxy_name, volume_name = self.storage_manager.split_host(vfolder_host)
+        proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
         async with self.storage_manager.request(
             proxy_name,
             "GET",
@@ -434,6 +435,11 @@ class AgentRegistry:
                 await storage_resp.json(),
                 HardwareMetadata,
             )
+
+    async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
+        agent = await self.get_instance(instance_id, agents.c.addr)
+        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
+            return await rpc.call.scan_gpu_alloc_map()
 
     async def create_session(
         self,
@@ -526,16 +532,16 @@ class AgentRegistry:
         try:
             # NOTE: We can reuse the session IDs of TERMINATED sessions only.
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-            async with self.db.begin_readonly_session() as db_sess:
+            async with self.db.begin_readonly_session() as db_session:
                 sess = await SessionRow.get_session(
-                    db_sess,
+                    db_session,
                     session_name,
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
                 running_image_ref = (
                     await ImageRow.resolve(
-                        db_sess,
+                        db_session,
                         [
                             ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
                         ],
@@ -591,12 +597,12 @@ class AgentRegistry:
         start_event = asyncio.Event()
         self.session_creation_tracker[session_creation_id] = start_event
 
-        async with self.db.begin_readonly_session() as db_sess:
-            conn = await db_sess.connection()
+        async with self.db.begin_readonly_session() as db_session:
+            conn = await db_session.connection()
             assert conn
             # check if network exists
             if _network_id := config.get("attach_network"):
-                network = await NetworkRow.get(db_sess, _network_id)
+                network = await NetworkRow.get(db_session, _network_id)
             else:
                 network = None
 
@@ -605,7 +611,7 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
-            user_row = await db_sess.scalar(
+            user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
             )
             user_row = cast(UserRow, user_row)
@@ -658,6 +664,7 @@ class AgentRegistry:
                     )
                 ),
             )
+
             resp["sessionId"] = str(session_id)  # changed since API v5
             resp["sessionName"] = str(session_name)
             resp["status"] = "PENDING"
@@ -677,12 +684,12 @@ class AgentRegistry:
                     resp["status"] = "TIMEOUT"
                 else:
                     await asyncio.sleep(0.5)
-                    async with self.db.begin_readonly_session() as db_sess:
+                    async with self.db.begin_readonly_session() as db_session:
                         query = sa.select(KernelRow.status, KernelRow.service_ports).where(
                             (KernelRow.session_id == session_id)
                             & (KernelRow.cluster_role == DEFAULT_ROLE)
                         )
-                        result = await db_sess.execute(query)
+                        result = await db_session.execute(query)
                         row = result.first()
                     if row.status == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
@@ -1219,7 +1226,7 @@ class AgentRegistry:
             if (resources := creation_config.get("resources")) is not None:
                 # Sanitize user input: does it have "known" resource slots only?
                 for slot_key, slot_value in resources.items():
-                    if slot_key not in known_slot_types:
+                    if slot_value != 0 and slot_key not in known_slot_types:
                         raise InvalidAPIParameters(f"Unknown requested resource slot: {slot_key}")
                 try:
                     requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
@@ -1906,41 +1913,6 @@ class AgentRegistry:
                 )
         except (asyncio.TimeoutError, asyncio.CancelledError):
             log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
-        except Exception as e:
-            ex = e
-            err_info = convert_to_status_data(ex, self.debug)
-
-            # The agent has already cancelled or issued the destruction lifecycle event
-            # for this batch of kernels.
-            for binding in items:
-                kernel_id = binding.kernel.id
-
-                async def _update_failure() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        now = datetime.now(tzutc())
-                        query = (
-                            sa.update(KernelRow)
-                            .where(KernelRow.id == kernel_id)
-                            .values(
-                                status=KernelStatus.ERROR,
-                                status_info=f"other-error ({ex!r})",
-                                status_changed=now,
-                                terminated_at=now,
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.ERROR.name: (
-                                            now.isoformat()
-                                        ),  # ["PULLING", "CREATING"]
-                                    },
-                                ),
-                                status_data=err_info,
-                            )
-                        )
-                        await db_sess.execute(query)
-
-                await execute_with_retry(_update_failure)
             raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
@@ -3314,16 +3286,18 @@ class AgentRegistry:
     async def mark_image_pull_started(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PREPARING)))
                 )
@@ -3344,16 +3318,18 @@ class AgentRegistry:
     async def mark_image_pull_finished(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (
                         KernelRow.status.in_((
@@ -3380,17 +3356,19 @@ class AgentRegistry:
     async def handle_image_pull_failed(
         self,
         agent_id: AgentId,
-        image: str,
+        image_canonical: str,
         msg: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            canonical = image_ref.canonical if image_ref is not None else image_canonical
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
                 )
@@ -3406,6 +3384,7 @@ class AgentRegistry:
                 )
                 if is_transited:
                     session_ids.add(kernel_row.session_id)
+
             return session_ids
 
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
@@ -3674,6 +3653,22 @@ class AgentRegistry:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
 
+    async def purge_images(
+        self,
+        agent_id: AgentId,
+        images: list[str],
+    ) -> PurgeImageResponses:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            result = await rpc.call.purge_images(images)
+
+            return PurgeImageResponses([
+                PurgeImageResponse(
+                    image=resp["image"],
+                    error=resp.get("error"),
+                )
+                for resp in result["responses"]
+            ])
+
     async def get_abusing_report(
         self,
         kernel_id: KernelId,
@@ -3794,7 +3789,7 @@ async def handle_image_pull_started(
     dt = datetime.fromtimestamp(ev.timestamp)
     log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
-        await context.mark_image_pull_started(ev.agent_id, ev.image, db_conn=db_conn)
+        await context.mark_image_pull_started(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
 
 
 async def handle_image_pull_finished(
@@ -3803,7 +3798,7 @@ async def handle_image_pull_finished(
     dt = datetime.fromtimestamp(ev.timestamp)
     log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
-        await context.mark_image_pull_finished(ev.agent_id, ev.image, db_conn=db_conn)
+        await context.mark_image_pull_finished(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
 
 
 async def handle_image_pull_failed(
@@ -3813,7 +3808,9 @@ async def handle_image_pull_failed(
 ) -> None:
     log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)
     async with context.db.connect() as db_conn:
-        await context.handle_image_pull_failed(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
+        await context.handle_image_pull_failed(
+            ev.agent_id, ev.image, ev.msg, ev.image_ref, db_conn=db_conn
+        )
 
 
 async def handle_kernel_creation_lifecycle(

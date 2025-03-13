@@ -45,11 +45,10 @@ from ai.backend.common.events import (
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import ExecutionError
-from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
+    ExecutionError,
     ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
@@ -60,10 +59,12 @@ from ..exception import (
 )
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
+from ..watcher import ChownTask, MountTask, UmountTask
+from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
-    from ..abc import AbstractVolume
-    from ..context import RootContext
+    from ..context import RootContext, ServiceContext
+    from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -966,7 +967,8 @@ async def rename_file(request: web.Request) -> web.Response:
                     t.Key("vfid"): tx.VFolderID(),
                     t.Key("relpath"): tx.PurePath(relative_only=True),
                     t.Key("new_name"): t.String(),
-                    t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
+                    # ignored since 22.03
+                    t.Key("is_dir", default=False): t.ToBool,
                 },
             ),
         ),
@@ -1157,6 +1159,49 @@ async def _shutdown(app: web.Application) -> None:
             await task
 
 
+def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
+    app = web.Application()
+    handler = VFolderHandler(service_ctx.volume_service)
+    app.router.add_route("GET", "/volumes", handler.get_volumes)
+    app.router.add_route("GET", "/volumes/{volume_id}", handler.get_volume)
+    app.router.add_route(
+        "GET", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.get_quota_scope
+    )
+    app.router.add_route(
+        "POST", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.create_quota_scope
+    )
+    app.router.add_route(
+        "PUT", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.update_quota_scope
+    )
+    app.router.add_route(
+        "DELETE",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}",
+        handler.delete_quota_scope,
+    )
+    app.router.add_route(
+        "POST",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.create_vfolder,
+    )
+    app.router.add_route(
+        "GET",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.get_vfolder_info,
+    )
+    app.router.add_route(
+        "PUT",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}/clone",
+        handler.clone_vfolder,
+    )
+    app.router.add_route(
+        "DELETE",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.delete_vfolder,
+    )
+
+    return app
+
+
 async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
@@ -1198,6 +1243,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
+    app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
     # passive events
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")

@@ -190,7 +190,10 @@ class Context(metaclass=ABCMeta):
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = self.dist_info.target_path / template_name
             dst_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(src_path, dst_path)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy(src_path, dst_path)
         return dst_path
 
     @staticmethod
@@ -255,11 +258,15 @@ class Context(metaclass=ABCMeta):
 
     async def install_halfstack(self) -> None:
         dst_compose_path = self.copy_config("docker-compose.yml")
+        self.copy_config("prometheus.yaml")
+        self.copy_config("grafana-dashboards")
+        self.copy_config("grafana-provisioning")
 
         volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "etcd-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "redis-data").mkdir(parents=True, exist_ok=True)
+        (volume_path / "grafana-data").mkdir(parents=True, exist_ok=True)
 
         # TODO: implement ha setup
         assert self.install_info.halfstack_config.redis_addr
@@ -838,11 +845,11 @@ class DevContext(Context):
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
-            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
             storage_proxy_client_facing_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 6022),
-                face=HostPortPair(public_facing_address, 6022),
+                bind=HostPortPair(public_component_bind_address, 6021),
+                face=HostPortPair(public_facing_address, 6021),
             ),
+            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
             storage_proxy_random=secrets.token_hex(32),
@@ -944,11 +951,11 @@ class PackageContext(Context):
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
-            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
             storage_proxy_client_facing_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 6022),
-                face=HostPortPair(public_facing_address, 6022),
+                bind=HostPortPair(public_component_bind_address, 6021),
+                face=HostPortPair(public_facing_address, 6021),
             ),
+            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
             storage_proxy_random=secrets.token_urlsafe(32),

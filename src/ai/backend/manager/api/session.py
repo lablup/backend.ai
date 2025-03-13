@@ -50,9 +50,8 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier, rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -108,6 +107,7 @@ from ..models.session import (
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
 )
+from ..models.vfolder import is_unmanaged
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -1162,6 +1162,8 @@ class ConvertSessionToImageResponseModel(BaseResponseModel):
 async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
 ) -> ConvertSessionToImageResponseModel:
+    from ..models.container_registry import ContainerRegistryRow
+
     root_ctx: RootContext = request.app["_root.context"]
     background_task_manager = root_ctx.background_task_manager
 
@@ -1259,6 +1261,7 @@ async def convert_session_to_image(
                             == f"{params.image_visibility.value}:{image_owner_id}"
                         )
                     )
+                    .where(ImageRow.status == ImageStatus.ALIVE)
                 )
                 existing_image_count = await sess.scalar(query)
 
@@ -1276,14 +1279,13 @@ async def convert_session_to_image(
 
                 # check if image with same name exists and reuse ID it if is
                 query = sa.select(ImageRow).where(
-                    ImageRow.name.like(f"{new_canonical}%")
-                    & (
+                    sa.and_(
+                        ImageRow.name.like(f"{new_canonical}%"),
                         ImageRow.labels[LabelName.CUSTOMIZED_OWNER.value].as_string()
-                        == f"{params.image_visibility.value}:{image_owner_id}"
-                    )
-                    & (
+                        == f"{params.image_visibility.value}:{image_owner_id}",
                         ImageRow.labels[LabelName.CUSTOMIZED_NAME.value].as_string()
-                        == params.image_name
+                        == params.image_name,
+                        ImageRow.status == ImageStatus.ALIVE,
                     )
                 )
                 existing_row = await sess.scalar(query)
@@ -1474,7 +1476,6 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
             session_name,
             owner_access_key,
             allow_stale=True,
-            for_update=True,
             kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
         )
         if compute_session.status != SessionStatus.RUNNING:
@@ -2373,7 +2374,9 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             )
         log_vfolder = matched_vfolders[0]
 
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(log_vfolder["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
+    )
     response = web.StreamResponse(status=200)
     response.headers[hdrs.CONTENT_TYPE] = "text/plain"
     prepared = False

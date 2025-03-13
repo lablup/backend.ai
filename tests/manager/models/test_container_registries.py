@@ -2,6 +2,7 @@ import pytest
 from graphene import Schema
 from graphene.test import Client
 
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -45,6 +46,8 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         storage_manager=None,  # type: ignore
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
+        services_ctx=None,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
     )
 
 

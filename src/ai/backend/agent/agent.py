@@ -64,7 +64,7 @@ from trafaret import DataError
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.defs import REDIS_STATISTICS_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
     MAX_KERNELSPEC,
@@ -73,6 +73,7 @@ from ai.backend.common.docker import (
     KernelFeatures,
     LabelName,
 )
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
@@ -121,6 +122,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    EtcdRedisConfig,
     HardwareMetadata,
     ImageConfig,
     ImageRegistry,
@@ -693,13 +695,15 @@ class AbstractAgent(
         else:
             event_dispatcher_cls = EventDispatcher
 
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
+
         self.event_producer = await EventProducer.new(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
         )
         self.event_dispatcher = await event_dispatcher_cls.new(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
@@ -707,14 +711,14 @@ class AbstractAgent(
             event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             name="stream",
             db=REDIS_STREAM_DB,
         )
         self.redis_stat_pool = redis_helper.get_redis_object(
-            self.local_config["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
 
         self.background_task_manager = BackgroundTaskManager(
@@ -1670,6 +1674,15 @@ class AbstractAgent(
         """
 
     @abstractmethod
+    async def purge_images(
+        self,
+        images: list[str],
+    ) -> PurgeImageResponses:
+        """
+        Purge the given images from the agent.
+        """
+
+    @abstractmethod
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
@@ -2234,20 +2247,35 @@ class AbstractAgent(
                 current_task = asyncio.current_task()
                 assert current_task is not None
                 self._pending_creation_tasks[kernel_id].add(current_task)
+                kernel_init_polling_attempt = cast(
+                    int, self.local_config["agent"]["kernel-lifecycles"]["init-polling-attempt"]
+                )
+                kernel_init_polling_timeout = cast(
+                    float,
+                    self.local_config["agent"]["kernel-lifecycles"]["init-polling-timeout-sec"],
+                )
+                kernel_init_timeout = cast(
+                    float,
+                    self.local_config["agent"]["kernel-lifecycles"]["init-timeout-sec"],
+                )
                 try:
                     async for attempt in AsyncRetrying(
                         wait=wait_fixed(0.3),
-                        stop=(stop_after_attempt(10) | stop_after_delay(60)),
+                        stop=(
+                            stop_after_attempt(kernel_init_polling_attempt)
+                            | stop_after_delay(kernel_init_polling_timeout)
+                        ),
                         retry=retry_if_exception_type(zmq.error.ZMQError),
                     ):
                         with attempt:
                             # Wait until bootstrap script is executed.
                             # - Main kernel runner is executed after bootstrap script, and
                             #   check_status is accessible only after kernel runner is loaded.
-                            await kernel_obj.check_status()
-                            # Update the service-ports metadata from the image labels
-                            # with the extended template metadata from the agent and krunner.
-                            live_services = await kernel_obj.get_service_apps()
+                            async with asyncio.timeout(kernel_init_timeout):
+                                await kernel_obj.check_status()
+                                # Update the service-ports metadata from the image labels
+                                # with the extended template metadata from the agent and krunner.
+                                live_services = await kernel_obj.get_service_apps()
                             if live_services["status"] != "failed":
                                 for live_service in live_services["data"]:
                                     for service_port in service_ports:
@@ -2256,9 +2284,28 @@ class AbstractAgent(
                                             break
                     if self.local_config["debug"]["log-kernel-config"]:
                         log.debug("service ports:\n{!r}", pretty(service_ports))
+                except asyncio.TimeoutError:
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
+                    )
+                    raise AgentError(
+                        f"Timeout during container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                    )
                 except asyncio.CancelledError:
-                    log.warning("cancelled waiting of container startup (k:{})", kernel_id)
-                    raise
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
+                    )
+                    raise AgentError(
+                        f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                    )
                 except Exception:
                     log.exception(
                         "unexpected error while waiting container startup (k:{})", kernel_id

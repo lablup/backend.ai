@@ -11,11 +11,15 @@ from ai.backend.common.types import (
     AgentSelectionStrategy,
     ResourceSlot,
     SessionId,
+    SessionTypes,
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.scheduler.agent_selector import RoundRobinAgentSelector
+from ai.backend.manager.scheduler.agent_selector import (
+    ConcentratedAgentSelector,
+    RoundRobinAgentSelector,
+)
 from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler
 from ai.backend.manager.scheduler.types import InMemoryResourceGroupStateStore
 
@@ -187,3 +191,79 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
         ("i-001", scheduled_sessions[6].id),
         (None, scheduled_sessions[7].id),
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "agents": [
+                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
+            "kernel_counts_at_same_endpoint": {},
+            "picked_agent": "i-001",
+        },
+        {
+            "agents": [
+                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
+            "kernel_counts_at_same_endpoint": {"i-001": 1, "i-002": 1},
+            "picked_agent": "i-003",
+        },
+        {
+            "agents": [
+                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+            ],
+            "kernel_counts_at_same_endpoint": {"i-001": 2, "i-002": 1, "i-003": 2},
+            "picked_agent": "i-002",
+        },
+    ],
+    ids=[
+        "When there is no session assigned to the same endpoint, ConcentratedAgentSelector should pick the agent with the least resources",
+        "When there are sessions assigned to the same endpoint, the new pending session should be assigned to an agent with the fewest kernel allocations. (1)",
+        "When there are sessions assigned to the same endpoint, the new pending session should be assigned to an agent with the fewest kernel allocations. (2)",
+    ],
+)
+async def test_enforce_spreading_endpoint_replica(test_case) -> None:
+    agents: Sequence[AgentRow] = [
+        create_mock_agent(
+            AgentId(agent["id"]),
+            available_slots=ResourceSlot({
+                k: Decimal(v) for k, v in agent["available_slots"].items()
+            }),
+        )
+        for agent in test_case["agents"]
+    ]
+
+    sgroup_opts = ScalingGroupOpts(
+        agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+        enforce_spreading_endpoint_replica=True,
+    )
+
+    config = {
+        "kernel_counts_at_same_endpoint": test_case["kernel_counts_at_same_endpoint"],
+    }
+
+    agstate_cls = ConcentratedAgentSelector.get_state_cls()
+    ag_selector = ConcentratedAgentSelector(
+        sgroup_opts,
+        config,
+        agent_selection_resource_priority,
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
+    )
+
+    mock_session = create_mock_session(
+        SessionId(uuid4()),
+        ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("100")}),
+        session_type=SessionTypes.INFERENCE,
+    )
+
+    picked_agent = await ag_selector.select_agent(agents, mock_session)
+    assert picked_agent == test_case["picked_agent"]
