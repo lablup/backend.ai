@@ -1025,6 +1025,19 @@ class ImagePermissionContextBuilder(
             return False
         return True
 
+    def _is_image_accessible_for_user_in_user_scope(
+        self,
+        image: ImageRow,
+        allowed_registries: set,
+        user_id: UUID,
+        has_admin_privilege: bool,
+    ) -> bool:
+        if has_admin_privilege:
+            return image.registry in allowed_registries
+        return image.is_customized_by(user_id) and self._is_image_accessible_for_user(
+            image, allowed_registries, user_id
+        )
+
     async def _in_user_scope(
         self,
         ctx: ClientContext,
@@ -1045,16 +1058,10 @@ class ImagePermissionContextBuilder(
 
         for row in await self.db_session.scalars(img_query_stmt):
             image_row = cast(ImageRow, row)
-            if has_admin_privilege:
-                if image_row.registry not in allowed_registries:
-                    continue
-            else:
-                if not image_row.is_customized_by(
-                    scope.user_id
-                ) or not self._is_image_accessible_for_user(
-                    image_row, allowed_registries, scope.user_id
-                ):
-                    continue
+            if not self._is_image_accessible_for_user_in_user_scope(
+                image_row, allowed_registries, ctx.user_id, has_admin_privilege=has_admin_privilege
+            ):
+                continue
 
             image_id_permission_map[image_row.id] = permissions
 
