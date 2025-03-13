@@ -171,7 +171,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.size_bytes = update["size_bytes"]
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
-                        image_row.resources = update["resources"]
+
+                        resources = dict(image_row.resources)
+                        for resource_name, value in update["resources"].items():
+                            if resource_name not in image_row.resources:
+                                resources[resource_name] = value
+
+                        image_row.resources = resources
                         image_row.is_local = is_local
                         scanned_images.append(image_row.to_dataclass())
 
