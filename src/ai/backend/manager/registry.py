@@ -61,7 +61,7 @@ from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
-    AgentPurgeImagesEvent,
+    AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -373,7 +373,7 @@ class AgentRegistry:
         evd.consume(AgentStartedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
-        evd.consume(AgentPurgeImagesEvent, self, handle_agent_purge_images)
+        evd.consume(AgentImagesRemoveEvent, self, handle_agent_purge_images)
         evd.consume(RouteCreatedEvent, self, handle_route_creation)
 
         evd.consume(VFolderDeletionSuccessEvent, self, handle_vfolder_deletion_success)
@@ -4227,7 +4227,7 @@ async def handle_agent_heartbeat(
 async def handle_agent_purge_images(
     context: AgentRegistry,
     source: AgentId,
-    event: AgentPurgeImagesEvent,
+    event: AgentImagesRemoveEvent,
 ) -> None:
     await context.handle_purge_images(source, event.image_canonicals)
 

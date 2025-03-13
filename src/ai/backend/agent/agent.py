@@ -80,7 +80,7 @@ from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
     AgentHeartbeatEvent,
-    AgentPurgeImagesEvent,
+    AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -1702,7 +1702,7 @@ class AbstractAgent(
         result = await self.scan_images()
         self.images = result.scanned_images
         await self.produce_event(
-            AgentPurgeImagesEvent(image_canonicals=list(result.removed_images.keys()))
+            AgentImagesRemoveEvent(image_canonicals=list(result.removed_images.keys()))
         )
 
     @abstractmethod
