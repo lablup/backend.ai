@@ -21,19 +21,19 @@ scrape_configs:
       - targets: ['backendai-half-prometheus:9090']
   - job_name: backendai-half-manager
     static_configs:
-      - targets: ['host.docker.internal:8091']
+      - targets: ['host.docker.internal:8092']
   - job_name: backendai-half-account-manager
     static_configs:
-      - targets: ['host.docker.internal:8088']
+      - targets: ['host.docker.internal:8087']
   - job_name: backendai-half-storage-proxy
     scheme: https
     tls_config:
       insecure_skip_verify: true
     static_configs:
-      - targets: ['host.docker.internal:6022']
+      - targets: ['host.docker.internal:6023']
   - job_name: backendai-half-wsproxy
     static_configs:
-      - targets: ['host.docker.internal:5050']
+      - targets: ['host.docker.internal:5051']
   - job_name: backendai-half-agent
     static_configs:
       - targets: ['host.docker.internal:6003']
