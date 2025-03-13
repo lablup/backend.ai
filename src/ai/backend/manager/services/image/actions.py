@@ -1,6 +1,7 @@
 import uuid
 from typing import Optional
 
+from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult, BaseBatchAction
 from ai.backend.manager.models.user import UserRole
 
@@ -43,9 +44,6 @@ class ForgetImageAction(ImageAction):
     client_role: UserRole
     image_uuid: uuid.UUID
 
-    def __init__(self, image_id: uuid.UUID):
-        self.image_id = image_id
-
     def entity_id(self) -> str:
         return str(self.image_uuid)
 
@@ -61,9 +59,7 @@ class ForgetImageActionResult(BaseActionResult):
 class PurgeImagesAction(ImageBatchAction):
     agent_id: str
     images: list[ImageRef]
-
-    def __init__(self, image_id: uuid.UUID):
-        self.image_id = image_id
+    image_canonicals: list[str]
 
     def entity_ids(self):
         return [image_ref.image_id() for image_ref in self.images]
@@ -73,5 +69,8 @@ class PurgeImagesAction(ImageBatchAction):
 
 
 class PurgeImagesActionResult(BaseActionResult):
+    reserved_bytes: int
+    results: list[PurgeImageResponse]  # TODO: Don't use DTO here
+
     def entity_id(self) -> Optional[str]:
         return None

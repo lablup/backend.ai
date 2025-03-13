@@ -4,19 +4,19 @@ from ai.backend.manager.services.image.actions import (
     CreateImageActionResult,
     ForgetImageAction,
     ForgetImageActionResult,
-    PurgeImageAction,
-    PurgeImageActionResult,
+    PurgeImagesAction,
+    PurgeImagesActionResult,
 )
 
 from .service import ImageService
 
 
 class ImageProcessors:
-    create: ActionProcessor[CreateImageAction, CreateImageActionResult]
-    forget: ActionProcessor[ForgetImageAction, ForgetImageActionResult]
-    purge: ActionProcessor[PurgeImageAction, PurgeImageActionResult]
+    create_image: ActionProcessor[CreateImageAction, CreateImageActionResult]
+    forget_image: ActionProcessor[ForgetImageAction, ForgetImageActionResult]
+    purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
 
     def __init__(self, service: ImageService) -> None:
-        self.create = ActionProcessor(service.create_image)
-        self.forget = ActionProcessor(service.forget_image)
-        self.purge = ActionProcessor(service.purge_image)
+        self.create_image = ActionProcessor(service.create_image)
+        self.forget_image = ActionProcessor(service.forget_image)
+        self.purge_images = ActionProcessor(service.purge_images)
