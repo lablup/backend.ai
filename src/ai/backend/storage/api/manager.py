@@ -1214,7 +1214,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app["app_ctx"] = app_ctx
     app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
-    app.router.add_route("GET", "/metrics", prometheus_metrics_handler)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
@@ -1248,6 +1247,12 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
     evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
+    return app
+
+
+def init_internal_app() -> web.Application:
+    app = web.Application()
+    app.router.add_route("GET", "/metrics", prometheus_metrics_handler)
     return app
 
 
