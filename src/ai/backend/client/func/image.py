@@ -66,7 +66,7 @@ class Image(BaseFunction):
         q = _d("""
             query($reference: String!, $architecture: String!) {
                 image(reference: $reference, architecture: $architecture) {
-                    $fields"
+                    $fields
                 }
             }
         """)
