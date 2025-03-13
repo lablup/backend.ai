@@ -14,7 +14,7 @@ import traceback
 import weakref
 import zlib
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict
+from collections import UserDict, defaultdict
 from collections.abc import (
     AsyncGenerator,
     Awaitable,
@@ -227,14 +227,17 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
     environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
 
 
-ImageCanonical = str
-ImageDigest = str
+class ImageCanonicalDigestDict(UserDict):
+    def __setitem__(self, image_canonical: str, image_digest: str) -> None:
+        if not isinstance(image_canonical, str) or not isinstance(image_digest, str):
+            raise TypeError("image_canonical, image_digest must be str")
+        super().__setitem__(image_canonical, image_digest)
 
 
 @dataclass
 class ScanImagesResult:
-    scanned_images: Mapping[ImageCanonical, ImageDigest]
-    removed_images: Mapping[ImageCanonical, ImageDigest]
+    scanned_images: ImageCanonicalDigestDict
+    removed_images: ImageCanonicalDigestDict
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
