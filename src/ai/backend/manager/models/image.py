@@ -1019,9 +1019,9 @@ class ImagePermissionContextBuilder(
     ) -> bool:
         if image.registry not in allowed_registries:
             return False
-        labels = cast(dict[str, str], image.labels)
-        owner_label = labels.get("ai.backend.customized-image.owner")
-        if owner_label is not None and owner_label != f"user:{user_id}":
+        if image.labels.get(
+            "ai.backend.customized-image.owner"
+        ) is not None and not image.is_customized_by(user_id):
             return False
         return True
 
