@@ -199,8 +199,8 @@ class AgentHeartbeatEvent(AbstractEvent):
 
 
 @attrs.define(slots=True, frozen=True)
-class AgentPurgeImagesEvent(AbstractEvent):
-    name = "agent_purge_images"
+class AgentImagesRemoveEvent(AbstractEvent):
+    name = "agent_images_remove"
     image_canonicals: list[str] = attrs.field()
 
     def serialize(self) -> tuple:
