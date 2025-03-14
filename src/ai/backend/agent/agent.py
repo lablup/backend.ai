@@ -14,7 +14,7 @@ import traceback
 import weakref
 import zlib
 from abc import ABCMeta, abstractmethod
-from collections import UserDict, defaultdict
+from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
     Awaitable,
@@ -227,17 +227,16 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
     environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
 
 
-class ImageCanonicalDigestDict(UserDict):
-    def __setitem__(self, image_canonical: str, image_digest: str) -> None:
-        if not isinstance(image_canonical, str) or not isinstance(image_digest, str):
-            raise TypeError("image_canonical, image_digest must be str")
-        super().__setitem__(image_canonical, image_digest)
+@dataclass
+class ScannedImage:
+    canonical: str
+    digest: str
 
 
 @dataclass
 class ScanImagesResult:
-    scanned_images: ImageCanonicalDigestDict
-    removed_images: ImageCanonicalDigestDict
+    scanned_images: Mapping[str, ScannedImage]
+    removed_images: Mapping[str, ScannedImage]
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -647,7 +646,7 @@ class AbstractAgent(
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
-    images: Mapping[str, str]
+    images: Mapping[str, ScannedImage]
     port_pool: set[int]
 
     redis: Redis
@@ -691,7 +690,7 @@ class AbstractAgent(
         self.agent_public_key = agent_public_key
         self.kernel_registry = {}
         self.computers = {}
-        self.images = {}  # repoTag -> digest
+        self.images = {}
         self.restarting_kernels = {}
         self.stat_ctx = StatContext(
             self,

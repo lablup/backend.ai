@@ -94,7 +94,6 @@ from ..agent import (
     AbstractAgent,
     AbstractKernelCreationContext,
     ComputerContext,
-    ImageCanonicalDigestDict,
     ScanImagesResult,
 )
 from ..exception import ContainerCreationError, UnsupportedResource
@@ -1536,7 +1535,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def scan_images(self) -> ScanImagesResult:
         async with closing_async(Docker()) as docker:
             all_images = await docker.images.list()
-            scanned_images, removed_images = ImageCanonicalDigestDict(), ImageCanonicalDigestDict()
+            scanned_images, removed_images = {}, {}
             for image in all_images:
                 if image["RepoTags"] is None:
                     continue
