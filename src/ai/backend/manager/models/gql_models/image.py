@@ -22,19 +22,17 @@ from dateutil.parser import parse as dtparse
 from graphql import Undefined, UndefinedType
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
+from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     DispatchResult,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -796,22 +794,6 @@ class ForgetImage(graphene.Mutation):
         )
 
 
-# TODO: 이거 다른 곳으로 옮기기
-async def untag_image_from_registry(
-    ctx: GraphQueryContext, session: SASession, image_row: ImageRow
-) -> None:
-    from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-
-    query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == image_row.registry_id)
-
-    registry_info: ContainerRegistryRow = (await session.execute(query)).scalar()
-    if registry_info.type != ContainerRegistryType.HARBOR2:
-        raise NotImplementedError("This feature is only supported for Harbor 2 registries")
-
-    scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
-    await scanner.untag(image_row.image_ref)
-
-
 class PurgeImageByIdOptions(graphene.InputObjectType):
     """
     Added in 25.5.0.
@@ -874,7 +856,7 @@ class PurgeImageById(graphene.Mutation):
             await session.delete(image_row)
 
             if options.remove_from_registry:
-                await untag_image_from_registry(ctx, session, image_row)
+                await image_row.untag_image_from_registry(ctx.db, session)
 
             return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
 
@@ -915,7 +897,7 @@ class UntagImageFromRegistry(graphene.Mutation):
                 if not image_row.is_customized_by(ctx.user["uuid"]):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 
-            await untag_image_from_registry(ctx, session, image_row)
+            await image_row.untag_image_from_registry(ctx.db, session)
 
         return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
