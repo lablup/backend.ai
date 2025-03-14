@@ -56,6 +56,7 @@ ssl-enabled = false
 [api.manager]
 # Manager-facing API
 service-addr = { host = "0.0.0.0", port = 6022 }
+internal-addr = { host = "0.0.0.0", port = 6023 }
 ssl-enabled = false
 # ssl-cert = "configs/storage-proxy/ssl/manager-api-selfsigned.cert.pem"
 # ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"

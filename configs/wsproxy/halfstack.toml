@@ -3,6 +3,8 @@ bind_host = "0.0.0.0"
 advertised_host = "127.0.0.1"
 
 bind_api_port = 5050
+internal_api_port = 5051
+
 advertised_api_port = 5050
 
 # replace these values with your passphrase
