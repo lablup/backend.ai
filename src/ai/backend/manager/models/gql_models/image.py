@@ -793,7 +793,7 @@ class PurgeImageById(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> PurgeImageById:
-        log.info("purge image {0} by API request", image_id)
+        log.info("purge image row {0} by API request", image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
@@ -806,6 +806,9 @@ class PurgeImageById(graphene.Mutation):
             if client_role != UserRole.SUPERADMIN:
                 if not image_row.is_customized_by(ctx.user["uuid"]):
                     raise GenericForbidden("Image is not owned by your account.")
+            for alias in image_row.aliases:
+                await session.delete(alias)
+
             await session.delete(image_row)
             return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
 
