@@ -164,8 +164,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.config_digest = update["config_digest"]
                         image_row.size_bytes = update["size_bytes"]
                         image_row.accelerators = update.get("accels")
+
+                        if image_row.labels != update["labels"]:
+                            image_row.resources = update["resources"]
+
                         image_row.labels = update["labels"]
-                        image_row.resources = update["resources"]
                         image_row.is_local = is_local
                         scanned_images.append(image_row)
 
