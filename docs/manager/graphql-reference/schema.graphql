@@ -2635,7 +2635,12 @@ input ImageRefType {
 
 """Added in 25.5.0."""
 input PurgeImagesOptions {
+  """
+  Remove the images even if it is being used by stopped containers or has other tags, Added in 25.5.0.
+  """
   force: Boolean = false
+
+  """Don't delete untagged parent images, Added in 25.5.0."""
   noprune: Boolean = false
 }
 
