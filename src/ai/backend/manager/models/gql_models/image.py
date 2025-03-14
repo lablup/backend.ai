@@ -1160,7 +1160,7 @@ class PurgeImagesOptions(graphene.InputObjectType):
     )
 
 
-class PurgeImagesResponse(graphene.ObjectType):
+class PurgeImagesPayload(graphene.ObjectType):
     """
     Added in 25.5.0.
     """
@@ -1178,7 +1178,7 @@ class PurgeImages(graphene.Mutation):
         key = PurgeImagesKey(required=True)
         options = PurgeImagesOptions(default_value={"force": False, "noprune": False})
 
-    Output = PurgeImagesResponse
+    Output = PurgeImagesPayload
 
     @staticmethod
     async def mutate(
