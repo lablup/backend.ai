@@ -331,9 +331,15 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.local_config["etcd"]["password"],
         root_ctx.local_config["etcd"]["namespace"],
     )
-    await root_ctx.shared_config.reload()
-    yield
-    await root_ctx.shared_config.close()
+    try:
+        await root_ctx.shared_config.reload()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to connect to etcd (error: {0})", repr(e))
+        raise
+    try:
+        yield
+    finally:
+        await root_ctx.shared_config.close()
 
 
 @actxmgr
@@ -353,8 +359,10 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
             log.info("Loading webapp plugin: {0}", plugin_name)
         subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
         _init_subapp(plugin_name, root_app, subapp, global_middlewares)
-    yield
-    await plugin_ctx.cleanup()
+    try:
+        yield
+    finally:
+        await plugin_ctx.cleanup()
 
 
 @actxmgr
@@ -409,13 +417,21 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     ):
-        await redis_helper.ping_redis_connection(redis_info.client)
-    yield
-    await root_ctx.redis_stream.close()
-    await root_ctx.redis_image.close()
-    await root_ctx.redis_stat.close()
-    await root_ctx.redis_live.close()
-    await root_ctx.redis_lock.close()
+        try:
+            await redis_helper.ping_redis_connection(redis_info.client)
+        except (Exception, asyncio.CancelledError) as e:
+            log.error(
+                "Failed to connect to redis (redis-name: {0}, error: {1})", redis_info.name, repr(e)
+            )
+            raise
+    try:
+        yield
+    finally:
+        await root_ctx.redis_stream.close()
+        await root_ctx.redis_image.close()
+        await root_ctx.redis_stat.close()
+        await root_ctx.redis_live.close()
+        await root_ctx.redis_lock.close()
 
 
 @actxmgr
@@ -448,6 +464,11 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
     )
+    try:
+        await root_ctx.event_producer.ping()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to initiate event producer (error: {0})", repr(e))
+        raise
     root_ctx.event_dispatcher = await event_dispatcher_cls.new(
         etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
@@ -456,10 +477,17 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         node_id=root_ctx.local_config["manager"]["id"],
         event_observer=root_ctx.metrics.event,
     )
-    yield
-    await root_ctx.event_producer.close()
-    await asyncio.sleep(0.2)
-    await root_ctx.event_dispatcher.close()
+    try:
+        await root_ctx.event_dispatcher.ping()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to initiate event dispatcher (error: {0})", repr(e))
+        raise
+    try:
+        yield
+    finally:
+        await root_ctx.event_producer.close()
+        await asyncio.sleep(0.2)
+        await root_ctx.event_dispatcher.close()
 
 
 @actxmgr
@@ -474,8 +502,10 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.distributed_lock_factory,
     )
     await root_ctx.idle_checker_host.start()
-    yield
-    await root_ctx.idle_checker_host.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.idle_checker_host.shutdown()
 
 
 @actxmgr
@@ -485,8 +515,10 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     raw_vol_config = await root_ctx.shared_config.etcd.get_prefix("volumes")
     config = volume_config_iv.check(raw_vol_config)
     root_ctx.storage_manager = StorageSessionManager(config)
-    yield
-    await root_ctx.storage_manager.aclose()
+    try:
+        yield
+    finally:
+        await root_ctx.storage_manager.aclose()
 
 
 @actxmgr
@@ -498,8 +530,10 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
         blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
     )
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
 @actxmgr
@@ -518,8 +552,10 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     if hook_result.status != PASSED:
         raise RuntimeError("Could not activate the manager instance.")
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
 @actxmgr
@@ -554,8 +590,10 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         manager_secret_key=manager_secret_key,
     )
     await root_ctx.registry.init()
-    yield
-    await root_ctx.registry.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.registry.shutdown()
 
 
 @actxmgr
@@ -570,8 +608,10 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.distributed_lock_factory,
         root_ctx.registry,
     )
-    yield
-    await sched_dispatcher.close()
+    try:
+        yield
+    finally:
+        await sched_dispatcher.close()
 
 
 @actxmgr
@@ -593,10 +633,12 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         init_success = True
         root_ctx.error_monitor = ectx
         root_ctx.stats_monitor = sctx
-    yield
-    if init_success:
-        await sctx.cleanup()
-        await ectx.cleanup()
+    try:
+        yield
+    finally:
+        if init_success:
+            await sctx.cleanup()
+            await ectx.cleanup()
 
 
 @actxmgr
@@ -700,13 +742,14 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             )
         )
 
-    yield
-
-    for task in session_force_termination_tasks:
-        if not task.done():
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+    try:
+        yield
+    finally:
+        for task in session_force_termination_tasks:
+            if not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
 
 
 @actxmgr
@@ -920,9 +963,9 @@ def build_root_app(
         try:
             async with cctx_instance:
                 yield
-        except Exception as e:
-            exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+        except Exception:
+            # Let each context instance handle its own errors to reduce misleading error logs
+            pass
 
     async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
         for cctx in app["_cctx_instances"]:
@@ -1031,7 +1074,12 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=ssl_ctx,
             )
-            await site.start()
+            try:
+                await site.start()
+            except BaseException as e:
+                log.error("Failed to start server (error: {0})", repr(e))
+                await runner.cleanup()
+                raise
             public_metrics_port = cast(
                 Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
             )
