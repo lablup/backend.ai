@@ -22,6 +22,7 @@ from dateutil.parser import parse as dtparse
 from graphql import Undefined, UndefinedType
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
@@ -795,6 +796,32 @@ class ForgetImage(graphene.Mutation):
         )
 
 
+# TODO: 이거 다른 곳으로 옮기기
+async def untag_image_from_registry(
+    ctx: GraphQueryContext, session: SASession, image_row: ImageRow
+) -> None:
+    from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
+
+    query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == image_row.registry_id)
+
+    registry_info: ContainerRegistryRow = (await session.execute(query)).scalar()
+    if registry_info.type != ContainerRegistryType.HARBOR2:
+        raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+
+    scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
+    await scanner.untag(image_row.image_ref)
+
+
+class PurgeImageByIdOptions(graphene.InputObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    remove_from_registry = graphene.Boolean(
+        default_value=False, description="Only available in the HarborV2 registry."
+    )
+
+
 class PurgeImageById(graphene.Mutation):
     """Added in 25.4.0."""
 
@@ -806,6 +833,11 @@ class PurgeImageById(graphene.Mutation):
 
     class Arguments:
         image_id = graphene.String(required=True)
+        options = PurgeImageByIdOptions(
+            required=False,
+            default_value={"remove_from_registry": False},
+            description="Added in 25.5.0.",
+        )
 
     image = graphene.Field(ImageNode)
 
@@ -814,6 +846,7 @@ class PurgeImageById(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         image_id: str,
+        options: PurgeImageByIdOptions,
     ) -> PurgeImageById:
         log.info("purge image row {0} by API request", image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")
@@ -827,11 +860,27 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
-        return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
+        async with ctx.db.begin_session() as session:
+            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
+            if not image_row:
+                raise ObjectNotFound("image")
+            if client_role != UserRole.SUPERADMIN:
+                if not image_row.is_customized_by(ctx.user["uuid"]):
+                    raise GenericForbidden("Image is not owned by your account.")
+
+            for alias in image_row.aliases:
+                await session.delete(alias)
+
+            await session.delete(image_row)
+
+            if options.remove_from_registry:
+                await untag_image_from_registry(ctx, session, image_row)
+
+            return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Added in 24.03.1"""
+    """Deprecated since 25.5.0. Use `purge_image_by_id`, and `remove_from_registry` option instead."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
@@ -856,17 +905,19 @@ class UntagImageFromRegistry(graphene.Mutation):
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context
-        result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
-            UntagImageFromRegistryAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
-                image_id=image_uuid,
-            )
-        )
+        client_role = ctx.user["role"]
 
-        return UntagImageFromRegistry(
-            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
-        )
+        async with ctx.db.begin_readonly_session() as session:
+            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
+            if not image_row:
+                raise ImageNotFound
+            if client_role != UserRole.SUPERADMIN:
+                if not image_row.is_customized_by(ctx.user["uuid"]):
+                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
+
+            await untag_image_from_registry(ctx, session, image_row)
+
+        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
 class PreloadImage(graphene.Mutation):
