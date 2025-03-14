@@ -97,7 +97,8 @@ def forget(reference_or_id, arch):
 @image.command()
 @click.argument("reference_or_id", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
-def purge(reference_or_id, arch):
+@click.option("--remove-from-registry", is_flag=True, help="Remove image from registry.")
+def purge(reference_or_id, arch, remove_from_registry):
     """Delete image deleted from server. This command will only work for image customized by user
     unless callee has superadmin privileges.
 
@@ -113,8 +114,9 @@ def purge(reference_or_id, arch):
                 )
             sys.exit(ExitCode.FAILURE)
         try:
-            result = session.Image.untag_image_from_registry(image_id)
-            result = session.Image.purge_image_by_id(image_id)
+            result = session.Image.purge_image_by_id(
+                image_id, remove_from_registry=remove_from_registry
+            )
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
