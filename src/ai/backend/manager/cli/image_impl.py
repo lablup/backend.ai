@@ -126,7 +126,7 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def purge_image(cli_ctx, canonical_or_alias, architecture):
+async def purge_image(cli_ctx, canonical_or_alias, architecture, remove_from_registry):
     async with (
         connect_database(cli_ctx.local_config) as db,
         db.begin_session() as session,
@@ -141,6 +141,10 @@ async def purge_image(cli_ctx, canonical_or_alias, architecture):
                 filter_by_statuses=None,
             )
             await session.delete(image_row)
+
+            if remove_from_registry:
+                await image_row.untag_image_from_registry(db=db, session=session)
+
         except UnknownImageReference:
             log.exception("Image not found.")
         except Exception as e:
