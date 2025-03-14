@@ -29,6 +29,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponses
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AgentId,
@@ -1129,26 +1130,59 @@ class PurgeImagesResult:
         return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
 
 
+class PurgeImagesKey(graphene.InputObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    agent_id = graphene.String(required=True)
+    images = graphene.List(ImageRefType, required=True)
+
+
+class PurgeImagesOptions(graphene.InputObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    force = graphene.Boolean(
+        default_value=False,
+        description="Remove the images even if it is being used by stopped containers or has other tags, Added in 25.5.0.",
+    )
+    noprune = graphene.Boolean(
+        default_value=False, description="Don't delete untagged parent images, Added in 25.5.0."
+    )
+
+
+class PurgeImagesPayload(graphene.ObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    task_id = graphene.String()
+    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
+
+
 class PurgeImages(graphene.Mutation):
     """
     Added in 25.4.0.
     """
 
-    allowed_roles = (UserRole.SUPERADMIN,)
-
     class Arguments:
-        agent_id = graphene.String(required=True)
-        images = graphene.List(ImageRefType, required=True)
+        key = PurgeImagesKey(required=True)
+        options = PurgeImagesOptions(default_value={"force": False, "noprune": False})
 
-    task_id = graphene.String()
+    Output = PurgeImagesPayload
 
     @staticmethod
     async def mutate(
-        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[ImageRefType]
+        root: Any,
+        info: graphene.ResolveInfo,
+        key: PurgeImagesKey,
+        options: PurgeImagesOptions,
     ) -> PurgeImages:
-        image_canonicals = [image.name for image in images]
+        image_canonicals = [image.name for image in key.images]
         log.info(
-            f"purge images ({image_canonicals}) from agent {agent_id} by API request",
+            f"purge images ({image_canonicals}) from agent {key.agent_id} by API request",
         )
         ctx: GraphQueryContext = info.context
 
@@ -1157,9 +1191,14 @@ class PurgeImages(graphene.Mutation):
         ) -> DispatchResult[PurgeImagesResult]:
             errors = []
             task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
-            arch_per_images = {image.name: image.architecture for image in images}
+            arch_per_images = {image.name: image.architecture for image in key.images}
 
-            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
+            results = await ctx.registry.purge_images(
+                AgentId(key.agent_id),
+                PurgeImagesReq(
+                    images=image_canonicals, force=options.force, noprune=options.noprune
+                ),
+            )
 
             for result in results.responses:
                 image_canonical = result.image
@@ -1173,7 +1212,7 @@ class PurgeImages(graphene.Mutation):
                         task_result.results.responses.append(result)
 
                 else:
-                    error_msg = f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
+                    error_msg = f"Failed to purge image {image_canonical} from agent {key.agent_id}: {result.error}"
                     log.error(error_msg)
                     errors.append(error_msg)
 

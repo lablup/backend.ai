@@ -58,6 +58,7 @@ from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import AbstractAgentResponse, PurgeImageResponses
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     ImagePullFailedEvent,
@@ -935,9 +936,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function_v2
     @collect_error
-    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
-        log.info("rpc::purge_images(images:{0})", images)
-        return await self.agent.purge_images(images)
+    async def purge_images(
+        self, image_canonicals: list[str], force: bool, noprune: bool
+    ) -> PurgeImageResponses:
+        request = PurgeImagesReq(images=image_canonicals, force=force, noprune=noprune)
+        log.info("rpc::purge_images(request:{0})", request)
+        return await self.agent.purge_images(request)
 
     @rpc_function
     @collect_error
