@@ -429,6 +429,10 @@ class ScalingGroup(graphene.ObjectType):
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
+    accelerator_quantum_size = graphene.Field(
+        graphene.Float,
+        description="Added in 25.5.0.",
+    )
 
     # Dynamic fields.
     agent_count_by_status = graphene.Field(
@@ -525,6 +529,11 @@ class ScalingGroup(graphene.ObjectType):
         for kernel in kernel_rows:
             occupied_slots += kernel.occupied_slots
         return occupied_slots.to_json()
+
+    async def resolve_accelerator_quantum_size(self, info: graphene.ResolveInfo) -> Optional[float]:
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.etcd.get("config/plugins/accelerator/cuda/quantum_size")
+        return float(result) if result is not None else None
 
     @classmethod
     def from_row(
