@@ -2016,7 +2016,7 @@ type Mutations {
   clear_images(registry: String): ClearImages
 
   """Added in 25.4.0"""
-  purge_images(agent_id: String!, images: [ImageRefType]!, props: PurgeImageProps): PurgeImages
+  purge_images(key: PurgeImagesKey!, options: PurgeImagesOptions): PurgeImages
 
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
@@ -2621,15 +2621,22 @@ type PurgeImages {
   task_id: String
 }
 
+"""Added in 25.5.0."""
+input PurgeImagesKey {
+  agent_id: String!
+  images: [ImageRefType]!
+}
+
 input ImageRefType {
   name: String!
   registry: String
   architecture: String
 }
 
-input PurgeImageProps {
+"""Added in 25.5.0."""
+input PurgeImagesOptions {
   force: Boolean = false
-  noprune: Boolean = true
+  noprune: Boolean = false
 }
 
 """Added in 24.09.0."""

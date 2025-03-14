@@ -1137,10 +1137,22 @@ class PurgeImagesResult:
         return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
 
 
-# TODO: breaking change...?
-class PurgeImageProps(graphene.InputObjectType):
+class PurgeImagesKey(graphene.InputObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    agent_id = graphene.String(required=True)
+    images = graphene.List(ImageRefType, required=True)
+
+
+class PurgeImagesOptions(graphene.InputObjectType):
+    """
+    Added in 25.5.0.
+    """
+
     force = graphene.Boolean(default_value=False)
-    noprune = graphene.Boolean(default_value=True)
+    noprune = graphene.Boolean(default_value=False)
 
 
 class PurgeImages(graphene.Mutation):
@@ -1151,9 +1163,8 @@ class PurgeImages(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        agent_id = graphene.String(required=True)
-        images = graphene.List(ImageRefType, required=True)
-        props = PurgeImageProps(required=False)
+        key = PurgeImagesKey(required=True)
+        options = PurgeImagesOptions(required=False)
 
     task_id = graphene.String()
 
@@ -1161,13 +1172,12 @@ class PurgeImages(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        agent_id: str,
-        images: list[ImageRefType],
-        props: PurgeImageProps,
+        key: PurgeImagesKey,
+        options: PurgeImagesOptions,
     ) -> PurgeImages:
-        image_canonicals = [image.name for image in images]
+        image_canonicals = [image.name for image in key.images]
         log.info(
-            f"purge images ({image_canonicals}) from agent {agent_id} by API request",
+            f"purge images ({image_canonicals}) from agent {key.agent_id} by API request",
         )
         ctx: GraphQueryContext = info.context
 
@@ -1176,11 +1186,13 @@ class PurgeImages(graphene.Mutation):
         ) -> DispatchResult[PurgeImagesResult]:
             errors = []
             task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
-            arch_per_images = {image.name: image.architecture for image in images}
+            arch_per_images = {image.name: image.architecture for image in key.images}
 
             results = await ctx.registry.purge_images(
-                AgentId(agent_id),
-                PurgeImagesReq(images=image_canonicals, force=props.force, noprune=props.noprune),
+                AgentId(key.agent_id),
+                PurgeImagesReq(
+                    images=image_canonicals, force=options.force, noprune=options.noprune
+                ),
             )
 
             for result in results.responses:
@@ -1195,7 +1207,7 @@ class PurgeImages(graphene.Mutation):
                         task_result.results.responses.append(result)
 
                 else:
-                    error_msg = f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
+                    error_msg = f"Failed to purge image {image_canonical} from agent {key.agent_id}: {result.error}"
                     log.error(error_msg)
                     errors.append(error_msg)
 
