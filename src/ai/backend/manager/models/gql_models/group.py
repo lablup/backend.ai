@@ -41,28 +41,6 @@ if TYPE_CHECKING:
     from ..rbac import ContainerRegistryScope, ScopeType
     from ..scaling_group import ScalingGroup
 
-_queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-    "id": ("id", None),
-    "row_id": ("id", None),
-    "name": ("name", None),
-    "is_active": ("is_active", None),
-    "created_at": ("created_at", dtparse),
-    "modified_at": ("modified_at", dtparse),
-    "domain_name": ("domain_name", None),
-    "resource_policy": ("resource_policy", None),
-}
-
-_queryorder_colmap: Mapping[str, OrderSpecItem] = {
-    "id": ("id", None),
-    "row_id": ("id", None),
-    "name": ("name", None),
-    "is_active": ("is_active", None),
-    "created_at": ("created_at", None),
-    "modified_at": ("modified_at", None),
-    "domain_name": ("domain_name", None),
-    "resource_policy": ("resource_policy", None),
-}
-
 
 class GroupInput(graphene.InputObjectType):
     type = graphene.String(
@@ -126,6 +104,26 @@ class GroupNode(graphene.ObjectType):
     user_nodes = PaginatedConnectionField(
         UserConnection,
     )
+
+    queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "id": ("id", None),
+        "name": ("name", None),
+        "is_active": ("is_active", None),
+        "created_at": ("created_at", dtparse),
+        "modified_at": ("modified_at", dtparse),
+        "domain_name": ("domain_name", None),
+        "resource_policy": ("resource_policy", None),
+    }
+
+    queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "name": ("name", None),
+        "is_active": ("is_active", None),
+        "created_at": ("created_at", None),
+        "modified_at": ("modified_at", None),
+        "domain_name": ("domain_name", None),
+        "resource_policy": ("resource_policy", None),
+    }
 
     @classmethod
     def from_row(
@@ -249,12 +247,12 @@ class GroupNode(graphene.ObjectType):
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
+            FilterExprArg(filter_expr, QueryFilterParser(cls.queryfilter_fieldspec))
             if filter_expr is not None
             else None
         )
         _order_expr = (
-            OrderExprArg(order_expr, QueryOrderParser(_queryorder_colmap))
+            OrderExprArg(order_expr, QueryOrderParser(cls.queryorder_colmap))
             if order_expr is not None
             else None
         )
