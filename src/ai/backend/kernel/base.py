@@ -817,7 +817,7 @@ class BaseRunner(metaclass=ABCMeta):
                         _cwd = Path(cwd)
 
                     if not _cwd.exists():
-                        error_reason = f"the model directory does not exist: {cwd}"
+                        error_reason = f"the model directory does not exist: {_cwd}"
                         return {
                             "status": "failed",
                             "error": error_reason,
