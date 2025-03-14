@@ -815,6 +815,14 @@ class BaseRunner(metaclass=ABCMeta):
                     _cwd = Path.cwd()
                     if cwd:
                         _cwd = Path(cwd)
+
+                    if not _cwd.exists():
+                        error_reason = f"the model directory does not exist: {cwd}"
+                        return {
+                            "status": "failed",
+                            "error": error_reason,
+                        }
+
                     cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
                     env: Mapping[str, str]
                     cmdargs, env = None, {}
