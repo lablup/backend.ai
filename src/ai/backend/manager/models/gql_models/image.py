@@ -1155,18 +1155,25 @@ class PurgeImagesOptions(graphene.InputObjectType):
     noprune = graphene.Boolean(default_value=False)
 
 
+class PurgeImagesResponse(graphene.ObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    task_id = graphene.String()
+    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
+
+
 class PurgeImages(graphene.Mutation):
     """
     Added in 25.4.0.
     """
 
-    allowed_roles = (UserRole.SUPERADMIN,)
-
     class Arguments:
         key = PurgeImagesKey(required=True)
-        options = PurgeImagesOptions(required=False)
+        options = PurgeImagesOptions(default_value={"force": False, "noprune": False})
 
-    task_id = graphene.String()
+    Output = PurgeImagesResponse
 
     @staticmethod
     async def mutate(
