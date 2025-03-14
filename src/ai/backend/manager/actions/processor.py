@@ -1,8 +1,10 @@
 import asyncio
+from abc import ABC
 from datetime import datetime
 from typing import Callable, Generic, Optional
 
 from .action import (
+    BaseAction,
     BaseActionResultMeta,
     ProcessResult,
     TAction,
@@ -11,9 +13,16 @@ from .action import (
 from .monitors.monitor import ActionMonitor
 
 
+class ActionValidator(ABC):
+    async def validate(self, action: BaseAction) -> None:
+        pass
+
+
 class ActionProcessor(Generic[TAction, TActionResult]):
     _monitors: list[ActionMonitor]
+    validates: list[ActionValidator]
     _func: Callable[[TAction], TActionResult]
+    rollback: Callable[[TAction], None]
 
     def __init__(
         self,
