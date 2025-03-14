@@ -62,7 +62,6 @@ from ..agent import (
     AbstractAgent,
     AbstractKernelCreationContext,
     ComputerContext,
-    ImageCanonicalDigestDict,
     ScanImagesResult,
 )
 from ..exception import K8sError, UnsupportedResource
@@ -1009,9 +1008,7 @@ class KubernetesAgent(
 
     async def scan_images(self) -> ScanImagesResult:
         # Retrieving image label from registry api is not possible
-        return ScanImagesResult(
-            scanned_images=ImageCanonicalDigestDict(), removed_images=ImageCanonicalDigestDict()
-        )
+        return ScanImagesResult(scanned_images={}, removed_images={})
 
     async def handle_agent_socket(self):
         # TODO: Add support for remote agent socket mechanism
