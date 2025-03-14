@@ -3661,7 +3661,6 @@ class AgentRegistry:
 
     async def purge_images(self, agent_id: AgentId, request: PurgeImagesReq) -> PurgeImageResponses:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            # TODO: PurgeImagesReq를 타입 보존하면서 agent에 그대로 넘길 수 있는 방법?
             result = await rpc.call.purge_images(request.images, request.force, request.noprune)
 
             return PurgeImageResponses([

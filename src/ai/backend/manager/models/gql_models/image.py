@@ -1151,8 +1151,13 @@ class PurgeImagesOptions(graphene.InputObjectType):
     Added in 25.5.0.
     """
 
-    force = graphene.Boolean(default_value=False)
-    noprune = graphene.Boolean(default_value=False)
+    force = graphene.Boolean(
+        default_value=False,
+        description="Remove the images even if it is being used by stopped containers or has other tags, Added in 25.5.0.",
+    )
+    noprune = graphene.Boolean(
+        default_value=False, description="Don't delete untagged parent images, Added in 25.5.0."
+    )
 
 
 class PurgeImagesResponse(graphene.ObjectType):

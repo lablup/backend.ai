@@ -5,14 +5,13 @@ from ai.backend.common.api_handlers import BaseRequestModel
 
 class PurgeImagesReq(BaseRequestModel):
     images: list[str] = Field(
-        description="List of image names to be purged",
+        description="List of image canonical names to be purged",
     )
-    # TODO: Add proper description
     force: bool = Field(
-        description="Force purge the images",
+        description="Remove the images even if it is being used by stopped containers or has other tags",
         default=False,
     )
     noprune: bool = Field(
-        description="Do not prune the images",
+        description="Don't delete untagged parent images",
         default=False,
     )
