@@ -24,39 +24,23 @@ from .models.session import KernelStatus, SessionStatus
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-# class Cleaner(abc.ABC):
-#     _root_ctx: RootContext
-
-#     def __init__(self, root_ctx: RootContext) -> None:
-#         self._root_ctx = root_ctx
-
-#     @abc.abstractmethod
-#     async def clean(
-#         self,
-#         status: StrEnum,
-#         threshold: relativedelta | timedelta,
-#         interval: float,  # NOTE: `aiotools.create_timer()` passes the interval value to its callable.
-#     ) -> None:
-#         raise NotImplementedError
-
-# @abc.abstractmethod
-# async def fetch(self, status: str, threshold: relativedelta | timedelta) -> Iterable:
-#     raise NotImplementedError
-
-
 class Cleaner(Protocol):
     async def clean(
         self,
         root_ctx: RootContext,
         status: KernelStatus | SessionStatus,
         threshold: relativedelta | timedelta,
-        interval: float,
+        interval: float,  # NOTE: `aiotools.create_timer()` passes the interval as an argument to its `callback`.
     ) -> None: ...
 
 
 class SessionCleaner:
     async def clean(
-        self, status: StrEnum, threshold: relativedelta | timedelta, interval: float
+        self,
+        root_ctx: RootContext,
+        status: StrEnum,
+        threshold: relativedelta | timedelta,
+        interval: float,
     ) -> None:
         query = (
             sa.select(SessionRow)
@@ -75,7 +59,7 @@ class SessionCleaner:
                 load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
             )
         )
-        async with self._root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             sessions = result.fetchall()
         log.warning(f"[SessionCleaner] [{datetime.now()}] {len(sessions)} items")
@@ -83,7 +67,7 @@ class SessionCleaner:
         results_and_exceptions = await asyncio.gather(
             *[
                 asyncio.create_task(
-                    self._root_ctx.registry.destroy_session(
+                    root_ctx.registry.destroy_session(
                         session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
                     ),
                 )
@@ -102,7 +86,11 @@ class SessionCleaner:
 
 class KernelCleaner:
     async def clean(
-        self, status: StrEnum, threshold: relativedelta | timedelta, interval: float
+        self,
+        root_ctx: RootContext,
+        status: StrEnum,
+        threshold: relativedelta | timedelta,
+        interval: float,
     ) -> None:
         query = (
             sa.select(SessionRow)
@@ -124,7 +112,7 @@ class KernelCleaner:
         )
 
         try:
-            async with self._root_ctx.db.begin_readonly() as conn:
+            async with root_ctx.db.begin_readonly() as conn:
                 result = await conn.execute(query)
                 sessions = result.fetchall()
             log.warning(f"[KernelCleaner] sessions = {sessions}")
@@ -135,7 +123,7 @@ class KernelCleaner:
         results_and_exceptions = await asyncio.gather(
             *[
                 asyncio.create_task(
-                    self._root_ctx.registry.destroy_session(
+                    root_ctx.registry.destroy_session(
                         session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
                     ),
                 )
@@ -188,7 +176,8 @@ async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterat
         stale_container_cleaner_tasks.append(
             aiotools.create_timer(
                 functools.partial(
-                    SessionCleaner(root_ctx).clean,
+                    SessionCleaner().clean,
+                    root_ctx,
                     session_status,
                     threshold,
                 ),
@@ -205,7 +194,8 @@ async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterat
         stale_container_cleaner_tasks.append(
             aiotools.create_timer(
                 functools.partial(
-                    KernelCleaner(root_ctx).clean,
+                    KernelCleaner().clean,
+                    root_ctx,
                     kernel_status,
                     threshold,
                 ),
