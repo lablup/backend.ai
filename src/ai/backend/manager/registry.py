@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import asyncio
 import base64
 import copy
@@ -32,6 +33,7 @@ from typing import (
     TypeAlias,
     Union,
     cast,
+    override,
 )
 from urllib.parse import urlparse
 
@@ -222,7 +224,27 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 SESSION_NAME_LEN_LIMIT = 10
 
 
-class AgentRegistry:
+class SessionDestroyer(abc.ABC):
+    @abc.abstractmethod
+    async def destroy_session(
+        self,
+        session: SessionRow,
+        *,
+        forced: bool = False,
+        reason: Optional[KernelLifecycleEventReason] = None,
+        user_role: UserRole | None = None,
+    ) -> Mapping[str, Any]:
+        """
+        Destroy session kernels. Do not destroy
+        CREATING/TERMINATING/ERROR and PULLING sessions.
+
+        :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
+        :param reason: Reason to destroy a session if client wants to specify it manually.
+        """
+        raise NotImplementedError
+
+
+class AgentRegistry(SessionDestroyer):
     """
     Provide a high-level API to create, destroy, and query the computation
     kernels.
@@ -2284,6 +2306,7 @@ class AgentRegistry:
                     )
                 await asyncio.gather(*rpc_coros)
 
+    @override
     async def destroy_session(
         self,
         session: SessionRow,
@@ -2292,13 +2315,6 @@ class AgentRegistry:
         reason: Optional[KernelLifecycleEventReason] = None,
         user_role: UserRole | None = None,
     ) -> Mapping[str, Any]:
-        """
-        Destroy session kernels. Do not destroy
-        CREATING/TERMINATING/ERROR and PULLING sessions.
-
-        :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
-        :param reason: Reason to destroy a session if client wants to specify it manually.
-        """
         session_id = session.id
         if not reason:
             reason = (
@@ -2314,7 +2330,7 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        async def _force_destroy_for_suadmin(
+        async def _force_destroy_for_superadmin(
             target_status: Literal[SessionStatus.CANCELLED, SessionStatus.TERMINATED],
         ) -> None:
             current_time = datetime.now(tzutc())
@@ -2439,7 +2455,7 @@ class AgentRegistry:
                     if user_role == UserRole.SUPERADMIN:
                         # Exceptionally let superadmins set the session status to 'TERMINATED' and finish the function.
                         # TODO: refactor Session/Kernel status management and remove this.
-                        await _force_destroy_for_suadmin(SessionStatus.TERMINATED)
+                        await _force_destroy_for_superadmin(SessionStatus.TERMINATED)
                         return {}
                     else:
                         await SessionRow.set_session_status(

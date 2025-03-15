@@ -1,3 +1,4 @@
+import abc
 import asyncio
 import functools
 import logging
@@ -5,7 +6,7 @@ from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import AsyncIterator, Protocol
+from typing import AsyncIterator
 
 import aiotools
 import sqlalchemy as sa
@@ -20,27 +21,36 @@ from .api.context import RootContext
 from .config import session_hang_tolerance_iv
 from .models import KernelRow, SessionRow
 from .models.session import KernelStatus, SessionStatus
+from .models.utils import ExtendedAsyncSAEngine
+from .registry import SessionDestroyer
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class Cleaner(Protocol):
+class AbstractCleaner(abc.ABC):
+    _db: ExtendedAsyncSAEngine
+    _lifecycle_manager: SessionDestroyer
+
+    def __init__(self, db: ExtendedAsyncSAEngine, lifecycle_manager: SessionDestroyer) -> None:
+        self._db = db
+        self._lifecycle_manager = lifecycle_manager
+
+    @abc.abstractmethod
     async def clean(
         self,
-        root_ctx: RootContext,
         status: KernelStatus | SessionStatus,
         threshold: relativedelta | timedelta,
-        interval: float,  # NOTE: `aiotools.create_timer()` passes the interval as an argument to its `callback`.
-    ) -> None: ...
+        interval: float = 0,  # NOTE: `aiotools.create_timer()` passes the interval as an argument to its `callback`.
+    ) -> None:
+        raise NotImplementedError
 
 
-class SessionCleaner:
+class SessionCleaner(AbstractCleaner):
     async def clean(
         self,
-        root_ctx: RootContext,
         status: StrEnum,
         threshold: relativedelta | timedelta,
-        interval: float,
+        interval: float = 0,
     ) -> None:
         query = (
             sa.select(SessionRow)
@@ -52,22 +62,23 @@ class SessionCleaner:
                         sa.types.DateTime(timezone=True)
                     )
                 )
-                > threshold
+                >= threshold
             )
             .options(
                 noload("*"),
                 load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
             )
         )
-        async with root_ctx.db.begin_readonly() as conn:
+        async with self._db.begin_readonly() as conn:
             result = await conn.execute(query)
             sessions = result.fetchall()
+        log.warning(f"sessions: {sessions} (type: {type(sessions)})")
         log.warning(f"[SessionCleaner] [{datetime.now()}] {len(sessions)} items")
 
         results_and_exceptions = await asyncio.gather(
             *[
                 asyncio.create_task(
-                    root_ctx.registry.destroy_session(
+                    self._lifecycle_manager.destroy_session(
                         session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
                     ),
                 )
@@ -84,13 +95,12 @@ class SessionCleaner:
                 )
 
 
-class KernelCleaner:
+class KernelCleaner(AbstractCleaner):
     async def clean(
         self,
-        root_ctx: RootContext,
         status: StrEnum,
         threshold: relativedelta | timedelta,
-        interval: float,
+        interval: float = 0,
     ) -> None:
         query = (
             sa.select(SessionRow)
@@ -101,7 +111,7 @@ class KernelCleaner:
                 - KernelRow.status_history[status.name].astext.cast(
                     sa.types.DateTime(timezone=True)
                 )
-                > threshold
+                >= threshold
             )
             .where(KernelRow.session_id == SessionRow.id)
             .distinct(SessionRow.id)
@@ -112,7 +122,7 @@ class KernelCleaner:
         )
 
         try:
-            async with root_ctx.db.begin_readonly() as conn:
+            async with self._db.begin_readonly() as conn:
                 result = await conn.execute(query)
                 sessions = result.fetchall()
             log.warning(f"[KernelCleaner] sessions = {sessions}")
@@ -123,7 +133,7 @@ class KernelCleaner:
         results_and_exceptions = await asyncio.gather(
             *[
                 asyncio.create_task(
-                    root_ctx.registry.destroy_session(
+                    self._lifecycle_manager.destroy_session(
                         session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
                     ),
                 )
@@ -154,8 +164,6 @@ def get_interval(
 @actxmgr
 async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     log.warning("stale_session_kernel_cleaner_ctx")
-    # xxx = await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
-    # log.warning(f"xxxxxxxx = {xxx.items()}")
     try:
         session_hang_tolerance = session_hang_tolerance_iv.check(
             await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
@@ -176,8 +184,8 @@ async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterat
         stale_container_cleaner_tasks.append(
             aiotools.create_timer(
                 functools.partial(
-                    SessionCleaner().clean,
-                    root_ctx,
+                    SessionCleaner(root_ctx.db, root_ctx.registry).clean,
+                    root_ctx.registry,
                     session_status,
                     threshold,
                 ),
@@ -194,8 +202,7 @@ async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterat
         stale_container_cleaner_tasks.append(
             aiotools.create_timer(
                 functools.partial(
-                    KernelCleaner().clean,
-                    root_ctx,
+                    KernelCleaner(root_ctx.db, root_ctx.registry).clean,
                     kernel_status,
                     threshold,
                 ),

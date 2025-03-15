@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 from pathlib import Path
 from typing import (
@@ -35,6 +35,7 @@ import pytest
 import sqlalchemy as sa
 from aiohttp import web
 from dateutil.tz import tzutc
+from faker import Faker
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common import config
@@ -449,7 +450,7 @@ def database(request, local_config, test_db) -> None:
         cli_schema_oneshot.invoke(click_ctx)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 async def database_engine(local_config, database):
     async with connect_database(local_config) as db:
         yield db
@@ -902,17 +903,17 @@ async def registry_ctx(mocker):
 
 @pytest.fixture(scope="function")
 async def session_info(database_engine):
-    user_uuid = str(uuid.uuid4()).replace("-", "")
-    user_password = str(uuid.uuid4()).replace("-", "")
-    postfix = str(uuid.uuid4()).split("-")[1]
-    domain_name = str(uuid.uuid4()).split("-")[0]
-    group_id = str(uuid.uuid4()).replace("-", "")
-    group_name = str(uuid.uuid4()).split("-")[0]
-    sgroup_name = str(uuid.uuid4()).split("-")[0]
-    session_id = str(uuid.uuid4()).replace("-", "")
-    session_creation_id = str(uuid.uuid4()).replace("-", "")
+    user_uuid = uuid.uuid4().hex
+    user_password = uuid.uuid4().hex
+    postfix = uuid.uuid4().hex[8:12]
+    domain_name = uuid.uuid4().hex[:8]
+    group_id = uuid.uuid4().hex
+    group_name = uuid.uuid4().hex[:8]
+    sgroup_name = uuid.uuid4().hex[:8]
+    session_id = uuid.uuid4().hex
+    session_creation_id = uuid.uuid4().hex
 
-    resource_policy_name = str(uuid.uuid4()).replace("-", "")
+    resource_policy_name = uuid.uuid4().hex
 
     async with database_engine.begin_session() as db_sess:
         scaling_group = ScalingGroupRow(
@@ -1009,3 +1010,169 @@ async def session_info(database_engine):
         )
         await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
         await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))
+
+
+@pytest.fixture(scope="function")
+async def domain(database_engine):
+    domain_name = Faker().unique.word()
+    async with database_engine.begin_session() as db_sess:
+        domain = DomainRow(name=domain_name, total_resource_slots={})
+        db_sess.add(domain)
+        await db_sess.commit()
+
+    yield domain
+
+    async with database_engine.begin_session() as db_sess:
+        await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain.name))
+
+
+@pytest.fixture(scope="function")
+async def resource_policy(database_engine):
+    resource_policy_name = Faker().unique.word()
+    async with database_engine.begin_session() as db_sess:
+        user_resource_policy = UserResourcePolicyRow(
+            name=resource_policy_name,
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_session_count_per_model_session=10,
+            max_customized_image_count=10,
+        )
+        db_sess.add(user_resource_policy)
+
+        project_resource_policy = ProjectResourcePolicyRow(
+            name=resource_policy_name,
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_network_count=3,
+        )
+        db_sess.add(project_resource_policy)
+
+        await db_sess.commit()
+
+    yield user_resource_policy, project_resource_policy
+
+    async with database_engine.begin_session() as db_sess:
+        await db_sess.execute(
+            sa.delete(ProjectResourcePolicyRow).where(
+                ProjectResourcePolicyRow.name == project_resource_policy.name
+            )
+        )
+        await db_sess.execute(
+            sa.delete(UserResourcePolicyRow).where(
+                UserResourcePolicyRow.name == user_resource_policy.name
+            )
+        )
+
+
+@pytest.fixture(scope="function")
+async def group(database_engine, domain, resource_policy):
+    group_name = Faker().unique.word()
+    user_resource_policy, _ = resource_policy
+    async with database_engine.begin_session() as db_sess:
+        group = GroupRow(
+            name=group_name,
+            domain_name=domain.name,
+            total_resource_slots={},
+            resource_policy=user_resource_policy.name,
+        )
+        db_sess.add(group)
+        await db_sess.commit()
+
+    yield group
+
+    async with database_engine.begin_session() as db_sess:
+        await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group.id))
+
+
+@pytest.fixture(scope="function")
+async def scaling_group(database_engine):
+    sgroup_name = Faker().unique.word()
+    async with database_engine.begin_session() as db_sess:
+        sgroup = ScalingGroupRow(
+            name=sgroup_name,
+            driver="test",
+            scheduler="test",
+            scheduler_opts=ScalingGroupOpts(),
+        )
+        db_sess.add(sgroup)
+        await db_sess.commit()
+
+    yield sgroup
+
+    async with database_engine.begin_session() as db_sess:
+        await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup.name))
+
+
+@pytest.fixture(scope="function")
+async def user(database_engine, domain, resource_policy):
+    fake = Faker()
+    user_email = fake.email()
+    username = fake.unique.word()
+    user_resource_policy, _ = resource_policy
+    async with database_engine.begin_session() as db_sess:
+        user = UserRow(
+            uuid=uuid.uuid4().hex,
+            email=user_email,
+            username=username,
+            password=fake.password(64),
+            domain_name=domain.name,
+            resource_policy=user_resource_policy.name,
+        )
+        db_sess.add(user)
+        await db_sess.commit()
+
+    yield user
+
+    async with database_engine.begin_session() as db_sess:
+        await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user.uuid))
+
+
+@pytest.fixture(scope="function")
+async def stable_single_container_session(database_engine, domain, scaling_group, group, user):
+    fake = Faker()
+    created_at = datetime.now(tz=tzutc()) - timedelta(hours=2)
+    async with database_engine.begin_session() as db_sess:
+        session = SessionRow(
+            id=uuid.uuid4().hex,
+            name=fake.unique.word(),
+            user_uuid=user.uuid,
+            # access_key=user.get_main_keypair_row().access_key,
+            domain_name=domain.name,
+            group_id=group.id,
+            scaling_group_name=scaling_group.name,
+            cluster_size=1,
+            vfolder_mounts={},
+            created_at=created_at,
+        )
+        db_sess.add(session)
+
+        kernel = KernelRow(
+            user_uuid=user.uuid,
+            domain_name=domain.name,
+            group_id=group.id,
+            session_id=session.id,
+            cluster_role="main",
+            occupied_slots={},
+            repl_in_port=0,
+            repl_out_port=0,
+            stdin_port=0,
+            stdout_port=0,
+            vfolder_mounts={},
+            created_at=created_at,
+        )
+        db_sess.add(kernel)
+
+        await db_sess.commit()
+
+    yield session, kernel
+
+    async with database_engine.begin_session() as db_sess:
+        await db_sess.execute(sa.delete(KernelRow).where(KernelRow.id == kernel.id))
+        await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session.id))
+
+
+@pytest.fixture(scope="function")
+def registry(database_engine, registry_ctx) -> AgentRegistry:
+    registry, *_ = registry_ctx
+    registry.db = database_engine
+    return registry
