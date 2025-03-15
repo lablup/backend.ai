@@ -1,4 +1,3 @@
-import abc
 import asyncio
 import functools
 import logging
@@ -6,7 +5,7 @@ from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import AsyncIterator, override
+from typing import AsyncIterator, Protocol
 
 import aiotools
 import sqlalchemy as sa
@@ -25,28 +24,37 @@ from .models.session import KernelStatus, SessionStatus
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class Cleaner(abc.ABC):
-    _root_ctx: RootContext
+# class Cleaner(abc.ABC):
+#     _root_ctx: RootContext
 
-    def __init__(self, root_ctx: RootContext) -> None:
-        self._root_ctx = root_ctx
+#     def __init__(self, root_ctx: RootContext) -> None:
+#         self._root_ctx = root_ctx
 
-    @abc.abstractmethod
+#     @abc.abstractmethod
+#     async def clean(
+#         self,
+#         status: StrEnum,
+#         threshold: relativedelta | timedelta,
+#         interval: float,  # NOTE: `aiotools.create_timer()` passes the interval value to its callable.
+#     ) -> None:
+#         raise NotImplementedError
+
+# @abc.abstractmethod
+# async def fetch(self, status: str, threshold: relativedelta | timedelta) -> Iterable:
+#     raise NotImplementedError
+
+
+class Cleaner(Protocol):
     async def clean(
         self,
-        status: StrEnum,
+        root_ctx: RootContext,
+        status: KernelStatus | SessionStatus,
         threshold: relativedelta | timedelta,
-        interval: float,  # NOTE: `aiotools.create_timer()` passes the interval value to its callable.
-    ) -> None:
-        raise NotImplementedError
-
-    # @abc.abstractmethod
-    # async def fetch(self, status: str, threshold: relativedelta | timedelta) -> Iterable:
-    #     raise NotImplementedError
+        interval: float,
+    ) -> None: ...
 
 
-class SessionCleaner(Cleaner):
-    @override
+class SessionCleaner:
     async def clean(
         self, status: StrEnum, threshold: relativedelta | timedelta, interval: float
     ) -> None:
@@ -92,15 +100,12 @@ class SessionCleaner(Cleaner):
                 )
 
 
-class KernelCleaner(Cleaner):
-    @override
+class KernelCleaner:
     async def clean(
         self, status: StrEnum, threshold: relativedelta | timedelta, interval: float
     ) -> None:
         query = (
             sa.select(SessionRow)
-            # .join(KernelRow.session)
-            # .join(SessionRow)
             .join(KernelRow)
             .where(KernelRow.status == status)
             .where(
@@ -114,7 +119,6 @@ class KernelCleaner(Cleaner):
             .distinct(SessionRow.id)
             .options(
                 noload("*"),
-                # load_only(KernelRow.id, KernelRow.session_id),
                 load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
             )
         )
