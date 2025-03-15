@@ -242,7 +242,7 @@ class SessionDestroyer(Protocol):
         ...
 
 
-class AgentRegistry(SessionDestroyer):
+class AgentRegistry:
     """
     Provide a high-level API to create, destroy, and query the computation
     kernels.
