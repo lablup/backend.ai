@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import asyncio
 import base64
 import copy
@@ -29,11 +28,11 @@ from typing import (
     List,
     Literal,
     Optional,
+    Protocol,
     Tuple,
     TypeAlias,
     Union,
     cast,
-    override,
 )
 from urllib.parse import urlparse
 
@@ -224,8 +223,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 SESSION_NAME_LEN_LIMIT = 10
 
 
-class SessionDestroyer(abc.ABC):
-    @abc.abstractmethod
+class SessionDestroyer(Protocol):
     async def destroy_session(
         self,
         session: SessionRow,
@@ -241,7 +239,7 @@ class SessionDestroyer(abc.ABC):
         :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
         :param reason: Reason to destroy a session if client wants to specify it manually.
         """
-        raise NotImplementedError
+        ...
 
 
 class AgentRegistry(SessionDestroyer):
@@ -2306,7 +2304,6 @@ class AgentRegistry(SessionDestroyer):
                     )
                 await asyncio.gather(*rpc_coros)
 
-    @override
     async def destroy_session(
         self,
         session: SessionRow,
@@ -2315,6 +2312,13 @@ class AgentRegistry(SessionDestroyer):
         reason: Optional[KernelLifecycleEventReason] = None,
         user_role: UserRole | None = None,
     ) -> Mapping[str, Any]:
+        """
+        Destroy session kernels. Do not destroy
+        CREATING/TERMINATING/ERROR and PULLING sessions.
+
+        :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
+        :param reason: Reason to destroy a session if client wants to specify it manually.
+        """
         session_id = session.id
         if not reason:
             reason = (

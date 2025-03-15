@@ -72,8 +72,6 @@ class SessionCleaner(AbstractCleaner):
         async with self._db.begin_readonly() as conn:
             result = await conn.execute(query)
             sessions = result.fetchall()
-        log.warning(f"sessions: {sessions} (type: {type(sessions)})")
-        log.warning(f"[SessionCleaner] [{datetime.now()}] {len(sessions)} items")
 
         results_and_exceptions = await asyncio.gather(
             *[
@@ -125,8 +123,6 @@ class KernelCleaner(AbstractCleaner):
             async with self._db.begin_readonly() as conn:
                 result = await conn.execute(query)
                 sessions = result.fetchall()
-            log.warning(f"[KernelCleaner] sessions = {sessions}")
-            log.warning(f"[KernelCleaner] {len(sessions)} items")
         except Exception as e:
             log.error(e)
 
@@ -163,14 +159,13 @@ def get_interval(
 
 @actxmgr
 async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    log.warning("stale_session_kernel_cleaner_ctx")
     try:
         session_hang_tolerance = session_hang_tolerance_iv.check(
             await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
         )
     except Exception as e:
         log.error(e)
-    # log.warning(f"session_hang_tolerance: {session_hang_tolerance}")
+        raise e
 
     stale_container_cleaner_tasks = []
     threshold: relativedelta | timedelta
