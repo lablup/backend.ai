@@ -92,7 +92,7 @@ from .api.types import (
     CleanupContext,
     WebRequestHandler,
 )
-from .cleaner import hanging_session_cleaner_ctx
+from .cleaner import stale_session_kernel_cleaner_ctx
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
@@ -800,7 +800,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            hanging_session_cleaner_ctx,
+            stale_session_kernel_cleaner_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:

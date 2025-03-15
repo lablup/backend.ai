@@ -962,6 +962,7 @@ async def session_info(database_engine):
         )
         db_sess.add(user)
 
+        # TODO: ref
         sess = SessionRow(
             id=session_id,
             creation_id=session_creation_id,
