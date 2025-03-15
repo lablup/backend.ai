@@ -1,9 +1,11 @@
+import uuid
 from dataclasses import dataclass
 from typing import (
     NewType,
+    Optional,
 )
 
-from ai.backend.common.types import AgentId, DeviceId, KernelId, MetricKey
+from ai.backend.common.types import AgentId, DeviceId, KernelId, MetricKey, SessionId
 
 MetricValueFieldKey = NewType("MetricValueFieldKey", str)
 MetricValueFieldPair = tuple[MetricValueFieldKey, str]
@@ -17,6 +19,9 @@ PCT_METRIC_KEY = MetricValueFieldKey("pct")
 class FlattenedKernelMetric:
     agent_id: AgentId
     kernel_id: KernelId
+    session_id: Optional[SessionId]
+    owner_user_id: Optional[uuid.UUID]
+    owner_project_id: Optional[uuid.UUID]  # TODO: Implement project-owned sessions
     key: MetricKey
     value_pairs: list[MetricValueFieldPair]
 

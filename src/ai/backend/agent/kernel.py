@@ -58,7 +58,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .exception import InvalidSocket, UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
-from .types import AgentEventData, KernelLifecycleStatus
+from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -165,6 +165,7 @@ class NextResult(TypedDict):
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     version: int
+    ownership_data: KernelOwnershipData
     agent_config: Mapping[str, Any]
     session_id: SessionId
     kernel_id: KernelId
@@ -189,9 +190,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         network_id: str,
         image: ImageRef,
         version: int,
@@ -203,9 +202,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         environ: Mapping[str, Any],
     ) -> None:
         self.agent_config = agent_config
-        self.kernel_id = kernel_id
-        self.session_id = session_id
-        self.agent_id = agent_id
+        self.ownership_data = ownership_data
+        self.kernel_id = ownership_data.kernel_id
+        self.session_id = ownership_data.session_id
+        self.agent_id = ownership_data.agent_id
         self.network_id = network_id
         self.image = image
         self.version = version
@@ -244,6 +244,12 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
+        if "ownership_data" not in props:
+            props["ownership_data"] = KernelOwnershipData(
+                props["kernel_id"],
+                props["session_id"],
+                props["agent_id"],
+            )
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None

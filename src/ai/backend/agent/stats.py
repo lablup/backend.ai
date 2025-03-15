@@ -13,7 +13,6 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Callable,
-    Dict,
     FrozenSet,
     List,
     Mapping,
@@ -56,6 +55,7 @@ from .utils import remove_exponent
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
+    from .kernel import AbstractKernel
 
 __all__ = (
     "StatContext",
@@ -457,7 +457,8 @@ class StatContext:
         Intended to be used by the agent and triggered by container cgroup synchronization processes.
         """
         async with self._lock:
-            kernel_id_map: Dict[ContainerId, KernelId] = {}
+            kernel_id_map: dict[ContainerId, KernelId] = {}
+            kernel_obj_map: dict[KernelId, AbstractKernel] = {}
             for kid, info in self.agent.kernel_registry.items():
                 try:
                     cid = info["container_id"]
@@ -465,6 +466,7 @@ class StatContext:
                     log.warning("collect_container_stat(): no container for kernel {}", kid)
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
+                    kernel_obj_map[kid] = info
             unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
             for unused_kernel_id in unused_kernel_ids:
                 log.debug("removing kernel_metric for {}", unused_kernel_id)
@@ -520,6 +522,16 @@ class StatContext:
         kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
         agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
         for kernel_id in updated_kernel_ids:
+            kernel_obj = kernel_obj_map.get(kernel_id)
+            if kernel_obj is not None:
+                ownership_data = kernel_obj.ownership_data
+                session_id = ownership_data.session_id
+                owner_user_id = ownership_data.owner_user_id
+                owner_project_id = ownership_data.owner_project_id
+            else:
+                session_id = None
+                owner_user_id = None
+                owner_project_id = None
             metrics = self.kernel_metrics[kernel_id]
             serializable_metrics: dict[MetricKey, MetricValue] = {}
             for key, obj in metrics.items():
@@ -535,6 +547,9 @@ class StatContext:
                     FlattenedKernelMetric(
                         agent_id,
                         kernel_id,
+                        session_id,
+                        owner_user_id,
+                        owner_project_id,
                         key,
                         value_pairs,
                     )

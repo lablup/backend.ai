@@ -1,5 +1,7 @@
 import asyncio
 import enum
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
 
@@ -8,7 +10,7 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.common.events import KernelLifecycleEventReason
-from ai.backend.common.types import ContainerId, KernelId, MountTypes, SessionId
+from ai.backend.common.types import AgentId, ContainerId, KernelId, MountTypes, SessionId
 
 
 class AgentBackend(enum.StrEnum):
@@ -107,6 +109,30 @@ class ContainerLifecycleEvent:
             f"c:{cid}, "
             f"reason:{self.reason!r})"
         )
+
+
+@dataclass
+class KernelOwnershipData:
+    kernel_id: KernelId
+    session_id: SessionId
+    agent_id: AgentId
+    owner_user_id: Optional[uuid.UUID] = None
+    owner_project_id: Optional[uuid.UUID] = None
+
+    def __post_init__(self):
+        def to_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
+            return uuid.UUID(value) if value is not None else None
+
+        self.owner_user_id = to_uuid(self.owner_user_id)
+        self.owner_project_id = to_uuid(self.owner_project_id)
+
+    @property
+    def owner_user_id_to_str(self) -> Optional[str]:
+        return str(self.owner_user_id) if self.owner_user_id is not None else None
+
+    @property
+    def owner_project_id_to_str(self) -> Optional[str]:
+        return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 
 WebMiddleware = Callable[
