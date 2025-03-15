@@ -449,7 +449,7 @@ def database(request, local_config, test_db) -> None:
         cli_schema_oneshot.invoke(click_ctx)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 async def database_engine(local_config, database):
     async with connect_database(local_config) as db:
         yield db
@@ -902,17 +902,17 @@ async def registry_ctx(mocker):
 
 @pytest.fixture(scope="function")
 async def session_info(database_engine):
-    user_uuid = uuid.uuid4().hex
-    user_password = uuid.uuid4().hex
-    postfix = uuid.uuid4().hex[8:12]
-    domain_name = uuid.uuid4().hex[:8]
-    group_id = uuid.uuid4().hex
-    group_name = uuid.uuid4().hex[:8]
-    sgroup_name = uuid.uuid4().hex[:8]
-    session_id = uuid.uuid4().hex
-    session_creation_id = uuid.uuid4().hex
+    user_uuid = str(uuid.uuid4()).replace("-", "")
+    user_password = str(uuid.uuid4()).replace("-", "")
+    postfix = str(uuid.uuid4()).split("-")[1]
+    domain_name = str(uuid.uuid4()).split("-")[0]
+    group_id = str(uuid.uuid4()).replace("-", "")
+    group_name = str(uuid.uuid4()).split("-")[0]
+    sgroup_name = str(uuid.uuid4()).split("-")[0]
+    session_id = str(uuid.uuid4()).replace("-", "")
+    session_creation_id = str(uuid.uuid4()).replace("-", "")
 
-    resource_policy_name = uuid.uuid4().hex
+    resource_policy_name = str(uuid.uuid4()).replace("-", "")
 
     async with database_engine.begin_session() as db_sess:
         scaling_group = ScalingGroupRow(
@@ -962,7 +962,6 @@ async def session_info(database_engine):
         )
         db_sess.add(user)
 
-        # TODO: ref
         sess = SessionRow(
             id=session_id,
             creation_id=session_creation_id,
