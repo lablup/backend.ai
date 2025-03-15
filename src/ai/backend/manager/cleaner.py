@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime, timedelta
+from enum import StrEnum
 from typing import AsyncIterator, override
 
 import aiotools
@@ -33,7 +34,7 @@ class Cleaner(abc.ABC):
     @abc.abstractmethod
     async def clean(
         self,
-        status: KernelStatus | SessionStatus,
+        status: StrEnum,
         threshold: relativedelta | timedelta,
         interval: float,  # NOTE: `aiotools.create_timer()` passes the interval value to its callable.
     ) -> None:
@@ -47,7 +48,7 @@ class Cleaner(abc.ABC):
 class SessionCleaner(Cleaner):
     @override
     async def clean(
-        self, status: SessionStatus, threshold: relativedelta | timedelta, interval: float
+        self, status: StrEnum, threshold: relativedelta | timedelta, interval: float
     ) -> None:
         query = (
             sa.select(SessionRow)
@@ -94,7 +95,7 @@ class SessionCleaner(Cleaner):
 class KernelCleaner(Cleaner):
     @override
     async def clean(
-        self, status: KernelStatus, threshold: relativedelta | timedelta, interval: float
+        self, status: StrEnum, threshold: relativedelta | timedelta, interval: float
     ) -> None:
         query = (
             sa.select(SessionRow)
@@ -173,23 +174,23 @@ async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterat
 
     stale_container_cleaner_tasks = []
     threshold: relativedelta | timedelta
-    # for status, threshold in session_hang_tolerance["threshold"].items():
-    #     try:
-    #         session_status = SessionStatus[status]
-    #     except KeyError:
-    #         log.warning(f"Invalid session status for hang-threshold: '{status}'")
-    #         continue
-    #     interval = get_interval(threshold)
-    #     stale_container_cleaner_tasks.append(
-    #         aiotools.create_timer(
-    #             functools.partial(
-    #                 SessionCleaner(root_ctx).clean,
-    #                 session_status,
-    #                 threshold,
-    #             ),
-    #             interval,
-    #         )
-    #     )
+    for status, threshold in session_hang_tolerance["threshold"].items():
+        try:
+            session_status = SessionStatus[status]
+        except KeyError:
+            log.warning(f"Invalid session status for hang-threshold: '{status}'")
+            continue
+        interval = get_interval(threshold)
+        stale_container_cleaner_tasks.append(
+            aiotools.create_timer(
+                functools.partial(
+                    SessionCleaner(root_ctx).clean,
+                    session_status,
+                    threshold,
+                ),
+                interval,
+            )
+        )
     for status, threshold in session_hang_tolerance["threshold"].items():
         try:
             kernel_status = KernelStatus[status]
