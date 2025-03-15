@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.manager.cleaner import SessionCleaner
-from ai.backend.manager.models.session import SessionStatus, SessionRow
+from ai.backend.manager.models.session import SessionRow, SessionStatus
 
 
 @pytest.mark.asyncio

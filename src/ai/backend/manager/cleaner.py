@@ -185,7 +185,6 @@ async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterat
             aiotools.create_timer(
                 functools.partial(
                     SessionCleaner(root_ctx.db, root_ctx.registry).clean,
-                    root_ctx.registry,
                     session_status,
                     threshold,
                 ),
