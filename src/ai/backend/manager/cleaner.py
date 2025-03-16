@@ -112,7 +112,7 @@ async def collect_and_terminate(
 
 
 @actxmgr
-async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         session_hang_tolerance = session_hang_tolerance_iv.check(
             await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
