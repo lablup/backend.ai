@@ -1,20 +1,20 @@
-import abc
 import asyncio
 import functools
 import logging
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime, timedelta
-from enum import StrEnum
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional, Union
 
 import aiotools
 import sqlalchemy as sa
 from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
 
 from .api.context import RootContext
@@ -27,127 +27,8 @@ from .registry import SessionDestroyer
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AbstractCleaner(abc.ABC):
-    _db: ExtendedAsyncSAEngine
-    _lifecycle_manager: SessionDestroyer
-
-    def __init__(self, db: ExtendedAsyncSAEngine, lifecycle_manager: SessionDestroyer) -> None:
-        self._db = db
-        self._lifecycle_manager = lifecycle_manager
-
-    @abc.abstractmethod
-    async def clean(
-        self,
-        status: KernelStatus | SessionStatus,
-        threshold: relativedelta | timedelta,
-        interval: float = 0,  # NOTE: `aiotools.create_timer()` passes the interval as an argument to its `callback`.
-    ) -> None:
-        raise NotImplementedError
-
-
-class SessionCleaner(AbstractCleaner):
-    async def clean(
-        self,
-        status: StrEnum,
-        threshold: relativedelta | timedelta,
-        interval: float = 0,
-    ) -> None:
-        query = (
-            sa.select(SessionRow)
-            .where(SessionRow.status == status)
-            .where(
-                (
-                    datetime.now(tz=tzutc())
-                    - SessionRow.status_history[status.name].astext.cast(
-                        sa.types.DateTime(timezone=True)
-                    )
-                )
-                >= threshold
-            )
-            .options(
-                noload("*"),
-                load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
-            )
-        )
-        async with self._db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            sessions = result.fetchall()
-
-        results_and_exceptions = await asyncio.gather(
-            *[
-                asyncio.create_task(
-                    self._lifecycle_manager.destroy_session(
-                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
-                    ),
-                )
-                for session in sessions
-            ],
-            return_exceptions=True,
-        )
-        for result_or_exception in results_and_exceptions:
-            if isinstance(result_or_exception, (BaseException, Exception)):
-                log.error(
-                    "hanging session force-termination error: {}",
-                    repr(result_or_exception),
-                    exc_info=result_or_exception,
-                )
-
-
-class KernelCleaner(AbstractCleaner):
-    async def clean(
-        self,
-        status: StrEnum,
-        threshold: relativedelta | timedelta,
-        interval: float = 0,
-    ) -> None:
-        query = (
-            sa.select(SessionRow)
-            .join(KernelRow)
-            .where(KernelRow.status == status)
-            .where(
-                datetime.now(tz=tzutc())
-                - KernelRow.status_history[status.name].astext.cast(
-                    sa.types.DateTime(timezone=True)
-                )
-                >= threshold
-            )
-            .where(KernelRow.session_id == SessionRow.id)
-            .distinct(SessionRow.id)
-            .options(
-                noload("*"),
-                load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
-            )
-        )
-
-        try:
-            async with self._db.begin_readonly() as conn:
-                result = await conn.execute(query)
-                sessions = result.fetchall()
-        except Exception as e:
-            log.error(e)
-
-        results_and_exceptions = await asyncio.gather(
-            *[
-                asyncio.create_task(
-                    self._lifecycle_manager.destroy_session(
-                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
-                    ),
-                )
-                for session in sessions
-            ],
-            return_exceptions=True,
-        )
-        for result_or_exception in results_and_exceptions:
-            if isinstance(result_or_exception, (BaseException, Exception)):
-                log.error(
-                    "hanging session force-termination error: {}",
-                    repr(result_or_exception),
-                    exc_info=result_or_exception,
-                )
-
-
 def get_interval(
-    threshold: relativedelta | timedelta,
+    threshold: TimeDelta,
     *,
     max_interval: float = timedelta(hours=1).total_seconds(),
     heuristic_interval_weight: float = 0.4,  # NOTE: to repeat more than twice within the same time window.
@@ -155,6 +36,79 @@ def get_interval(
     if isinstance(threshold, relativedelta):  # months, years
         return max_interval
     return min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
+
+
+async def collect_and_terminate(
+    db: ExtendedAsyncSAEngine,
+    lifecycle_manager: SessionDestroyer,
+    status: SessionStatus | KernelStatus,
+    threshold: TimeDelta,
+    /,
+    interval: float,
+):
+    now = datetime.now(tz=tzutc())
+    query = (
+        sa.select(SessionRow)
+        .join(KernelRow, KernelRow.session_id == SessionRow.id)
+        .where(
+            or_(
+                # Condition for session-level
+                and_(
+                    SessionRow.status == status,
+                    (
+                        now
+                        - SessionRow.status_history[status.name].astext.cast(
+                            sa.types.DateTime(timezone=True)
+                        )
+                        >= threshold
+                    ),
+                ),
+                # Condition for kernel-level
+                and_(
+                    KernelRow.status == status,
+                    (
+                        now
+                        - KernelRow.status_history[status.name].astext.cast(
+                            sa.types.DateTime(timezone=True)
+                        )
+                        >= threshold
+                    ),
+                ),
+            )
+        )
+        .distinct(SessionRow.id)
+        .options(
+            noload("*"),
+            load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
+        )
+    )
+
+    try:
+        async with db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            sessions = result.fetchall()
+    except Exception as e:
+        log.error(e)
+        raise e
+
+    results_and_exceptions = await asyncio.gather(
+        *[
+            asyncio.create_task(
+                lifecycle_manager.destroy_session(
+                    session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
+                ),
+            )
+            for session in sessions
+        ],
+        return_exceptions=True,
+    )
+    for result_or_exception in results_and_exceptions:
+        if isinstance(result_or_exception, (BaseException, Exception)):
+            log.error(
+                "hanging session force-termination error: {}",
+                repr(result_or_exception),
+                exc_info=result_or_exception,
+            )
 
 
 @actxmgr
@@ -168,36 +122,29 @@ async def stale_session_kernel_cleaner_ctx(root_ctx: RootContext) -> AsyncIterat
         raise e
 
     stale_container_cleaner_tasks = []
-    threshold: relativedelta | timedelta
-    for status, threshold in session_hang_tolerance["threshold"].items():
-        try:
-            session_status = SessionStatus[status]
-        except KeyError:
-            log.warning(f"Invalid session status for hang-threshold: '{status}'")
+    threshold: TimeDelta
+
+    def _verify_status_validity(status: str) -> Optional[Union[SessionStatus, KernelStatus]]:
+        for status_cls in {SessionStatus, KernelStatus}:
+            try:
+                return status_cls[status]  # type: ignore
+            except ValueError:
+                pass
+        return None
+
+    for raw_status, threshold in session_hang_tolerance["threshold"].items():
+        if not (status := _verify_status_validity(raw_status)):
+            log.warning(f"Invalid session or kernel status for hang-threshold: '{status}'")
             continue
+
         interval = get_interval(threshold)
         stale_container_cleaner_tasks.append(
             aiotools.create_timer(
                 functools.partial(
-                    SessionCleaner(root_ctx.db, root_ctx.registry).clean,
-                    session_status,
-                    threshold,
-                ),
-                interval,
-            )
-        )
-    for status, threshold in session_hang_tolerance["threshold"].items():
-        try:
-            kernel_status = KernelStatus[status]
-        except KeyError:
-            log.warning(f"Invalid kernel status for hang-threshold: '{status}'")
-            continue
-        interval = get_interval(threshold)
-        stale_container_cleaner_tasks.append(
-            aiotools.create_timer(
-                functools.partial(
-                    KernelCleaner(root_ctx.db, root_ctx.registry).clean,
-                    kernel_status,
+                    collect_and_terminate,
+                    root_ctx.db,
+                    root_ctx.registry,
+                    status,
                     threshold,
                 ),
                 interval,

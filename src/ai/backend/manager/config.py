@@ -167,6 +167,7 @@ Alias keys are also URL-quoted in the same way.
 
 from __future__ import annotations
 
+import itertools
 import logging
 import os
 import secrets
@@ -213,6 +214,7 @@ from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ServerMisconfiguredError
+from .models.kernel import KernelStatus
 from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock
 
@@ -395,12 +397,9 @@ session_hang_tolerance_iv = t.Dict(
         t.Key(
             "threshold", default=_config_defaults["session"]["hang-tolerance"]["threshold"]
         ): t.Dict({
-            # t.Key(session_status.name, optional=True): tx.TimeDuration()
-            # for session_status in SessionStatus.,
-            t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
-            t.Key(SessionStatus.RUNNING.name, optional=True): tx.TimeDuration(),
-            t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
-        }).ignore_extra("*"),
+            t.Key(status, optional=True): tx.TimeDuration()
+            for status in itertools.chain(SessionStatus, KernelStatus)
+        }).allow_extra("*"),
     },
 )
 
