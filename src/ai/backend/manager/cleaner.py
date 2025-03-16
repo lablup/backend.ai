@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime, timedelta
-from typing import AsyncIterator, Optional, Union
+from typing import Any, AsyncIterator, Mapping, Optional, Protocol, Union
 
 import aiotools
 import sqlalchemy as sa
@@ -19,12 +19,22 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .api.context import RootContext
 from .config import session_hang_tolerance_iv
-from .models import KernelRow, SessionRow
+from .models import KernelRow, SessionRow, UserRole
 from .models.session import KernelStatus, SessionStatus
 from .models.utils import ExtendedAsyncSAEngine
-from .registry import SessionDestroyer
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class SessionDestroyer(Protocol):
+    async def destroy_session(
+        self,
+        session: SessionRow,
+        *,
+        forced: bool = False,
+        reason: Optional[KernelLifecycleEventReason] = None,
+        user_role: UserRole | None = None,
+    ) -> Mapping[str, Any]: ...
 
 
 def get_interval(
@@ -38,13 +48,12 @@ def get_interval(
     return min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
 
 
-async def collect_and_terminate(
+async def terminate_hanging_session_kernels(
     db: ExtendedAsyncSAEngine,
     lifecycle_manager: SessionDestroyer,
     status: SessionStatus | KernelStatus,
     threshold: TimeDelta,
-    /,
-    interval: float,
+    interval: float = 0,  # NOTE: `aiotools.create_timer()` passes `interval` to its `cb`.
 ):
     now = datetime.now(tz=tzutc())
     query = (
@@ -124,7 +133,9 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     stale_container_cleaner_tasks = []
     threshold: TimeDelta
 
-    def _verify_status_validity(status: str) -> Optional[Union[SessionStatus, KernelStatus]]:
+    def _validate_session_kernel_status(
+        status: str,
+    ) -> Optional[Union[SessionStatus, KernelStatus]]:
         for status_cls in {SessionStatus, KernelStatus}:
             try:
                 return status_cls[status]  # type: ignore
@@ -133,7 +144,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         return None
 
     for raw_status, threshold in session_hang_tolerance["threshold"].items():
-        if not (status := _verify_status_validity(raw_status)):
+        if not (status := _validate_session_kernel_status(raw_status)):
             log.warning(f"Invalid session or kernel status for hang-threshold: '{status}'")
             continue
 
@@ -141,7 +152,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         stale_container_cleaner_tasks.append(
             aiotools.create_timer(
                 functools.partial(
-                    collect_and_terminate,
+                    terminate_hanging_session_kernels,
                     root_ctx.db,
                     root_ctx.registry,
                     status,

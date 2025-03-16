@@ -28,7 +28,6 @@ from typing import (
     List,
     Literal,
     Optional,
-    Protocol,
     Tuple,
     TypeAlias,
     Union,
@@ -221,25 +220,6 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
-
-
-class SessionDestroyer(Protocol):
-    async def destroy_session(
-        self,
-        session: SessionRow,
-        *,
-        forced: bool = False,
-        reason: Optional[KernelLifecycleEventReason] = None,
-        user_role: UserRole | None = None,
-    ) -> Mapping[str, Any]:
-        """
-        Destroy session kernels. Do not destroy
-        CREATING/TERMINATING/ERROR and PULLING sessions.
-
-        :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
-        :param reason: Reason to destroy a session if client wants to specify it manually.
-        """
-        ...
 
 
 class AgentRegistry:
