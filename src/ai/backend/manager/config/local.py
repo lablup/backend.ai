@@ -1,10 +1,17 @@
 import enum
 import os
+import secrets
 import socket
+import sys
 from pathlib import Path
-from typing import Any, List, Literal, Optional
+from pprint import pformat
+from typing import Any, List, Literal, Optional, Self
 
+import click
 from pydantic import AliasChoices, BaseModel, DirectoryPath, Field, FilePath
+
+from ai.backend.common import config
+from ai.backend.logging.types import LogLevel
 
 
 class HostPortPair(BaseModel):
@@ -124,7 +131,7 @@ class DatabaseConfig(BaseModel):
     )
 
 
-_max_cpu_count = os.cpu_count()
+_max_num_proc = os.cpu_count() or 8
 _file_perm = (Path(__file__).parent / "server.py").stat()
 
 
@@ -182,7 +189,7 @@ class EtcdConfig(BaseModel):
 
 class ManagerConfig(BaseModel):
     ipc_base_path: DirectoryPath = Field(
-        "/tmp/backend.ai/ipc",
+        Path("/tmp/backend.ai/ipc"),
         description="""
         Base directory path for inter-process communication files.
         Used for Unix domain sockets and other IPC mechanisms.
@@ -192,7 +199,7 @@ class ManagerConfig(BaseModel):
         examples=["/var/run/backend.ai/ipc"],
     )
     num_proc: int = Field(
-        default=_max_cpu_count,
+        default=_max_num_proc,
         ge=1,
         le=os.cpu_count(),
         description="""
@@ -240,7 +247,7 @@ class ManagerConfig(BaseModel):
         examples=[{"host": "127.0.0.1", "port": 8080}],
     )
     rpc_auth_manager_keypair: FilePath = Field(
-        default="fixtures/manager/manager.key_secret",
+        default=Path("fixtures/manager/manager.key_secret"),
         description="""
         Path to the keypair file used for RPC authentication.
         This file contains key pairs used for secure communication between manager components.
@@ -344,7 +351,7 @@ class ManagerConfig(BaseModel):
         examples=[30.0, 60.0],
     )
     pid_file: FilePath = Field(
-        default=os.devnull,
+        default=Path(os.devnull),
         description="""
         Path to the file where the manager process ID will be written.
         Useful for service management and monitoring.
@@ -583,6 +590,7 @@ class DebugConfig(BaseModel):
 
 
 class ManagerLocalConfig(BaseModel):
+    _src_config_path: Path
     db: DatabaseConfig = Field(
         description="""
         Database configuration settings.
@@ -632,3 +640,72 @@ class ManagerLocalConfig(BaseModel):
         Should typically be disabled in production environments.
         """,
     )
+
+    @classmethod
+    def load(
+        cls,
+        config_path: Optional[Path] = None,
+        log_level: LogLevel = LogLevel.NOTSET,
+    ) -> Self:
+        # Determine where to read configuration.
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
+
+        # Override the read config with environment variables (for legacy).
+        config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+        config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+        config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+        config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+        config.override_with_env(raw_cfg, ("db", "addr"), "BACKEND_DB_ADDR")
+        config.override_with_env(raw_cfg, ("db", "name"), "BACKEND_DB_NAME")
+        config.override_with_env(raw_cfg, ("db", "user"), "BACKEND_DB_USER")
+        config.override_with_env(raw_cfg, ("db", "password"), "BACKEND_DB_PASSWORD")
+        config.override_with_env(raw_cfg, ("manager", "num-proc"), "BACKEND_MANAGER_NPROC")
+        config.override_with_env(raw_cfg, ("manager", "ssl-cert"), "BACKEND_SSL_CERT")
+        config.override_with_env(raw_cfg, ("manager", "ssl-privkey"), "BACKEND_SSL_KEY")
+        config.override_with_env(raw_cfg, ("manager", "pid-file"), "BACKEND_PID_FILE")
+        config.override_with_env(
+            raw_cfg, ("manager", "api-listen-addr", "host"), "BACKEND_SERVICE_IP"
+        )
+        config.override_with_env(
+            raw_cfg, ("manager", "api-listen-addr", "port"), "BACKEND_SERVICE_PORT"
+        )
+        config.override_with_env(
+            raw_cfg, ("manager", "event-listen-addr", "host"), "BACKEND_ADVERTISED_MANAGER_HOST"
+        )
+        config.override_with_env(
+            raw_cfg, ("manager", "event-listen-addr", "port"), "BACKEND_EVENTS_PORT"
+        )
+        config.override_with_env(
+            raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
+        )
+
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+        if log_level != LogLevel.NOTSET:
+            config.override_key(raw_cfg, ("logging", "level"), log_level)
+            config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+            config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
+
+        # Validate and fill configurations
+        # (allow_extra will make configs to be forward-compatible)
+        try:
+            cfg = cls(**raw_cfg)
+            if cfg.debug.enabled:
+                print("== Manager configuration ==", file=sys.stderr)
+                print(pformat(cfg), file=sys.stderr)
+            cfg._src_config_path = cfg_src_path
+
+            if cfg.manager.secret is None:
+                cfg.manager.secret = secrets.token_urlsafe(16)
+        except config.ConfigurationError as e:
+            print(
+                "ConfigurationError: Could not read or validate the manager local config:",
+                file=sys.stderr,
+            )
+            print(pformat(e.invalid_data), file=sys.stderr)
+            # TODO: Instead of cli error, raise custom exception
+            raise click.Abort()
+        else:
+            return cfg
+
+    async def reload(self) -> None:
+        raise NotImplementedError

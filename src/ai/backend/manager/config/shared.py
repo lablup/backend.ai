@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from ipaddress import IPv4Network
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, IPvAnyNetwork
@@ -180,14 +181,14 @@ class DockerImageAutoPullPolicy(enum.StrEnum):
 
 class DockerImageConfig(BaseModel):
     auto_pull: DockerImageAutoPullPolicy = Field(
-        default="digest",
+        default=DockerImageAutoPullPolicy.digest,
         description="""
         Policy for automatically pulling Docker images.
         'digest': Pull if image digest has changed (most secure)
         'tag': Pull if image tag has changed
         'none': Never pull automatically (manual control)
         """,
-        examples=["digest", "tag", "none"],
+        examples=[item.value for item in DockerImageAutoPullPolicy],
     )
 
 
@@ -245,7 +246,7 @@ class InterContainerNetworkConfig(BaseModel):
 
 class SubnetConfig(BaseModel):
     agent: IPvAnyNetwork = Field(
-        default="0.0.0.0/0",
+        default=IPv4Network("0.0.0.0/0"),
         description="""
         IP subnet for agent communications.
         Specifies which subnet is used for agent-to-agent and agent-to-manager traffic.
@@ -254,7 +255,7 @@ class SubnetConfig(BaseModel):
         examples=["0.0.0.0/0", "192.168.0.0/24"],
     )
     container: IPvAnyNetwork = Field(
-        default="0.0.0.0/0",
+        default=IPv4Network("0.0.0.0/0"),
         description="""
         IP subnet for containers.
         Specifies which subnet is used for container networks.
