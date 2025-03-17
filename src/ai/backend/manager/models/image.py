@@ -738,7 +738,7 @@ class ImageRow(Base):
 
         self.resources = resources
 
-    def is_customized_by(self, user_id: str) -> bool:
+    def is_customized_by(self, user_id: UUID) -> bool:
         return (self.labels or {}).get("ai.backend.customized-image.owner") == f"user:{user_id}"
 
 

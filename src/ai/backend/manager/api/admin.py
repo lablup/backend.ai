@@ -92,6 +92,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         registry=root_ctx.registry,
         idle_checker_host=root_ctx.idle_checker_host,
         metric_observer=root_ctx.metrics.gql,
+        processors=root_ctx.processors,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],
