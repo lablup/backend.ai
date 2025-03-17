@@ -1102,7 +1102,7 @@ class ModifyImage(graphene.Mutation):
                 if limit_option.max is not Undefined and len(limit_option.max) > 0:
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
-            data["resources"] = resources_data
+            data["_resources"] = resources_data
 
         try:
             async with ctx.db.begin_session() as session:
@@ -1121,6 +1121,52 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    image_canonical = graphene.String(required=True)
+    architecture = graphene.String(required=True)
+
+
+class ClearImageCustomResourceLimit(graphene.Mutation):
+    """
+    Added in 25.5.0.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        key = ClearImageCustomResourceLimitKey(required=True)
+
+    # TODO: How to remove this??
+    ok = graphene.Boolean()
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        key: ClearImageCustomResourceLimitKey,
+    ) -> ClearImageCustomResourceLimit:
+        log.info(
+            f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
+        )
+        ctx: GraphQueryContext = info.context
+        async with ctx.db.begin_session() as db_sess:
+            query = (
+                sa.update(ImageRow)
+                .where(
+                    ImageRow.name == key.image_canonical,
+                    ImageRow.architecture == key.architecture,
+                )
+                .values(_resources={})
+            )
+
+            await db_sess.execute(query)
+        return ClearImageCustomResourceLimit(ok=True)
 
 
 @dataclass
