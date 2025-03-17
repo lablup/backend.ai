@@ -13,6 +13,7 @@ from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.manager.models.gql_models.audit_log import AuditLogConnection, AuditLogNode
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 
@@ -446,6 +447,12 @@ class Queries(graphene.ObjectType):
     """
 
     node = AsyncNode.Field()
+
+    # super-admin only
+    audit_log_nodes = PaginatedConnectionField(
+        AuditLogConnection,
+        description="Added in 25.5.0.",
+    )
 
     # super-admin only
     agent = graphene.Field(
@@ -2855,6 +2862,31 @@ class Queries(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         return await ContainerRegistryNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_audit_log_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult:
+        return await AuditLogNode.get_connection(
             info,
             filter,
             order,

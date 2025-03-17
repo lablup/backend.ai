@@ -279,6 +279,9 @@ type Queries {
   """Added in 24.09.0."""
   container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
 
+  """Added in 25.5.0."""
+  audit_log_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AuditLogConnection
+
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
 
@@ -1764,6 +1767,44 @@ type ContainerRegistryEdge {
 
   """A cursor for use in pagination"""
   cursor: String!
+}
+
+"""Added in 25.5.0."""
+type AuditLogConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AuditLogEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 25.5.0. A Relay edge containing a `AuditLog` and its cursor."""
+type AuditLogEdge {
+  """The item at the end of the edge"""
+  node: AuditLogNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.5.0."""
+type AuditLogNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 25.5.0"""
+  row_id: UUID
+  name: String
+  operation: String
+  status: String
+  created_at: DateTime
+  duration: String
+  description: String
+  entity_type: String
+  entity_id: String
 }
 
 type ModelCard implements Node {
