@@ -1040,9 +1040,9 @@ class ImagePermissionContextBuilder(
         """
         Determine the effective user ID for permission checks.
 
-        For admin-level users (ADMIN, SUPERADMIN), the user_id from the scope is used,
-        allowing them to access customized images of other users.
-        For regular users, the user_id from the client context is used.
+        For admin-level users (ADMIN, SUPERADMIN), return the user_id from the UserScope object,
+        for allowing them to access customized images of the users.
+        For regular users, return the user_id from the client context for permission check.
         """
         if ctx.user_role in [UserRole.ADMIN, UserRole.SUPERADMIN]:
             return scope.user_id
