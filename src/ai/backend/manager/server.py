@@ -92,10 +92,10 @@ from .api.types import (
     CleanupContext,
     WebRequestHandler,
 )
-from .cleanup import stale_kernel_collection_ctx, stale_session_collection_ctx
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
+from .sweeper import stale_kernel_collection_ctx, stale_session_collection_ctx
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset([
