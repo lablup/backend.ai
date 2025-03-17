@@ -333,13 +333,17 @@ async def connect_database(
     url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
 
     version_check_db = create_async_engine(url)
-    async with version_check_db.begin() as conn:
-        result = await conn.execute(sa.text("show server_version"))
-        version_str = result.scalar()
-        major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
-        if (major, minor) < (11, 0):
-            pgsql_connect_opts["server_settings"].pop("jit")
-    await version_check_db.dispose()
+    try:
+        async with version_check_db.begin() as conn:
+            result = await conn.execute(sa.text("show server_version"))
+            version_str = result.scalar()
+            major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
+            if (major, minor) < (11, 0):
+                pgsql_connect_opts["server_settings"].pop("jit")
+        await version_check_db.dispose()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to connect and check db version (error: {0})", repr(e))
+        raise
 
     db = create_async_engine(
         url,
