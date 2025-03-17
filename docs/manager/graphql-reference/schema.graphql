@@ -2745,7 +2745,9 @@ input ResourceLimitInput {
 }
 
 """Added in 25.5.0."""
-type ClearImageCustomResourceLimit
+type ClearImageCustomResourceLimit {
+  ok: Boolean
+}
 
 """Added in 25.5.0."""
 input ClearImageCustomResourceLimitKey {
