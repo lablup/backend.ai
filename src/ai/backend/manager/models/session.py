@@ -192,7 +192,7 @@ DEAD_SESSION_STATUSES = frozenset([
 DEAD_KERNEL_STATUSES = frozenset([
     KernelStatus.CANCELLED,
     KernelStatus.TERMINATED,
-    KernelStatus.CANCELLED,
+    KernelStatus.ERROR,
 ])
 
 # statuses to consider when calculating current resource usage
