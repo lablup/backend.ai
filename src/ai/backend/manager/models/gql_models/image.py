@@ -1132,41 +1132,42 @@ class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
     architecture = graphene.String(required=True)
 
 
+class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
+    """
+    Added in 25.5.0.
+    """
+
+    image_node = graphene.Field(ImageNode)
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+
 class ClearImageCustomResourceLimit(graphene.Mutation):
     """
     Added in 25.5.0.
     """
 
-    allowed_roles = (UserRole.SUPERADMIN,)
-
     class Arguments:
         key = ClearImageCustomResourceLimitKey(required=True)
 
-    # TODO: How to remove this??
-    ok = graphene.Boolean()
+    Output = ClearImageCustomResourceLimitPayload
 
     @staticmethod
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
         key: ClearImageCustomResourceLimitKey,
-    ) -> ClearImageCustomResourceLimit:
+    ) -> ClearImageCustomResourceLimitPayload:
         log.info(
             f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
         )
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_session() as db_sess:
-            query = (
-                sa.update(ImageRow)
-                .where(
-                    ImageRow.name == key.image_canonical,
-                    ImageRow.architecture == key.architecture,
-                )
-                .values(_resources={})
+            image_row = await ImageRow.resolve(
+                db_sess, [ImageIdentifier(key.image_canonical, key.architecture)]
             )
-
-            await db_sess.execute(query)
-        return ClearImageCustomResourceLimit(ok=True)
+            image_row._resources = {}
+            await db_sess.flush()
+        return ClearImageCustomResourceLimitPayload(image_node=ImageNode.from_row(ctx, image_row))
 
 
 @dataclass
