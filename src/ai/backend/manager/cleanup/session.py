@@ -102,7 +102,6 @@ async def stale_session_collection_ctx(root_ctx: RootContext) -> AsyncIterator[N
     )
     tasks: list[asyncio.Task] = []
     threshold: TimeDelta
-
     for raw_status, threshold in session_hang_tolerance["threshold"].items():
         try:
             status = SessionStatus[raw_status]

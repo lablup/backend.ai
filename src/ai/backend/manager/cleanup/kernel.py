@@ -12,9 +12,11 @@ from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
+from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
+from ..config import session_hang_tolerance_iv
 from ..models import KernelRow, SessionRow, DEAD_SESSION_STATUSES, DEAD_KERNEL_STATUSES
 from ..models.utils import ExtendedAsyncSAEngine
 
@@ -97,13 +99,23 @@ async def handle_stale_kernels(
 
 @actxmgr
 async def stale_kernel_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    session_hang_tolerance = session_hang_tolerance_iv.check(
+        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
+    )
+    default_interval_sec = 60.0
+    interval_sec: float = float("inf")
+    threshold: TimeDelta
+    for threshold in session_hang_tolerance["threshold"].values():
+        interval_sec = min(interval_sec, threshold.total_seconds())
+    if interval_sec == float("inf"):
+        interval_sec = default_interval_sec
     task = aiotools.create_timer(
         functools.partial(
             handle_stale_kernels,
             root_ctx.db,
             root_ctx.registry,
         ),
-        interval=30,
+        interval=interval_sec,
     )
 
     yield
