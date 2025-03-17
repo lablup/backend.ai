@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
-from typing import AsyncIterator, Any, Mapping, Protocol, Sequence
+from typing import Any, AsyncIterator, Mapping, Protocol, Sequence
 
 import aiotools
 import sqlalchemy as sa
@@ -17,10 +17,8 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
 from ..config import session_hang_tolerance_iv
-from ..models import KernelRow, SessionRow, DEAD_SESSION_STATUSES, DEAD_KERNEL_STATUSES
+from ..models import DEAD_KERNEL_STATUSES, DEAD_SESSION_STATUSES, KernelRow, SessionRow
 from ..models.utils import ExtendedAsyncSAEngine
-
-__all__ = ("stale_kernel_collection_ctx",)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -103,10 +101,10 @@ async def stale_kernel_collection_ctx(root_ctx: RootContext) -> AsyncIterator[No
         await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
     default_interval_sec = 60.0
-    interval_sec: float = float("inf")
+    interval_sec = float("inf")
     threshold: TimeDelta
     for threshold in session_hang_tolerance["threshold"].values():
-        interval_sec = min(interval_sec, threshold.total_seconds())
+        interval_sec = min(interval_sec, threshold.seconds)
     if interval_sec == float("inf"):
         interval_sec = default_interval_sec
     task = aiotools.create_timer(
@@ -120,7 +118,7 @@ async def stale_kernel_collection_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
     yield
 
-    if not task.done:
+    if not task.done():
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task

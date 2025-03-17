@@ -7,7 +7,7 @@ import textwrap
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -1310,6 +1310,10 @@ class SessionRow(Base):
                 return network_row.ref_name
             case _:
                 return None
+
+    @classmethod
+    def get_status_elapsed_time(cls, status: SessionStatus, now: datetime) -> timedelta:
+        return now - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
 
 
 class SessionLifecycleManager:

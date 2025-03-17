@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
 from datetime import datetime, timedelta
-from typing import Any, AsyncIterator, Mapping, Optional, Protocol, Sequence
+from typing import Any, AsyncIterator, Mapping, Optional, Protocol
 
 import aiotools
 import sqlalchemy as sa
@@ -22,8 +22,6 @@ from ..models import SessionRow, UserRole
 from ..models.session import SessionStatus
 from ..models.utils import ExtendedAsyncSAEngine
 
-__all__ = ("stale_session_collection_ctx",)
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -38,7 +36,7 @@ class SessionDestroyer(Protocol):
     ) -> Mapping[str, Any]: ...
 
 
-def get_interval(
+def _get_interval(
     threshold: TimeDelta,
     *,
     max_interval: float = timedelta(hours=1).total_seconds(),
@@ -60,11 +58,7 @@ async def handle_stale_sessions(
     query = (
         sa.select(SessionRow)
         .where(SessionRow.status == status)
-        .where(
-            now
-            - SessionRow.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
-            > threshold
-        )
+        .where(SessionRow.get_status_elapsed_time(status, now).total_seconds() > threshold.seconds)
         .options(
             noload("*"),
             load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
@@ -109,7 +103,7 @@ async def stale_session_collection_ctx(root_ctx: RootContext) -> AsyncIterator[N
             log.warning(f"Invalid session status for hang-threshold: '{raw_status}'")
             continue
 
-        interval = get_interval(threshold)
+        interval = _get_interval(threshold)
         tasks.append(
             aiotools.create_timer(
                 functools.partial(
@@ -126,7 +120,7 @@ async def stale_session_collection_ctx(root_ctx: RootContext) -> AsyncIterator[N
     yield
 
     for task in tasks:
-        if not task.done:
+        if not task.done():
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
