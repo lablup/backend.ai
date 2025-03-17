@@ -57,7 +57,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import AbstractAgentResponse, PurgeImageResponses
+from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImageResponses
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
@@ -213,7 +213,7 @@ class RPCFunctionRegistryV2:
 
     def __call__(
         self,
-        meth: Callable[..., Coroutine[None, None, AbstractAgentResponse]],
+        meth: Callable[..., Coroutine[None, None, AbstractAgentResp]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
         @_collect_metrics(self._metric_observer)

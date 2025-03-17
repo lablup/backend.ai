@@ -1126,15 +1126,16 @@ class ModifyImage(graphene.Mutation):
 
 @dataclass
 class PurgeImagesResult:
+    agent_id: AgentId
     results: PurgeImageResponses
     reserved_bytes: int
 
     def __str__(self) -> str:
-        results_str = "\n  ".join(
+        results_str = ", ".join(
             f"{r.image}: {'Success' if not r.error else f'Failed (error: {r.error})'}"
             for r in self.results.responses
         )
-        return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
+        return f'Purge images on "{self.agent_id}", Reserved Bytes: {self.reserved_bytes}, Details: [{results_str}]'
 
 
 class PurgeImagesKey(graphene.InputObjectType):
@@ -1175,7 +1176,7 @@ class PurgeImages(graphene.Mutation):
     """
 
     class Arguments:
-        key = PurgeImagesKey(required=True)
+        keys = graphene.List(PurgeImagesKey, required=True)
         options = PurgeImagesOptions(default_value={"force": False, "noprune": False})
 
     Output = PurgeImagesPayload
@@ -1184,47 +1185,58 @@ class PurgeImages(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        key: PurgeImagesKey,
+        keys: list[PurgeImagesKey],
         options: PurgeImagesOptions,
     ) -> PurgeImages:
-        image_canonicals = [image.name for image in key.images]
-        log.info(
-            f"purge images ({image_canonicals}) from agent {key.agent_id} by API request",
-        )
         ctx: GraphQueryContext = info.context
+        agent_images = ", ".join(
+            f"{key.agent_id}: [{', '.join(img.name for img in key.images)}]" for key in keys
+        )
+
+        log.info(f"purge images ({agent_images}) by API request")
 
         async def _purge_images_task(
             reporter: ProgressReporter,
-        ) -> DispatchResult[PurgeImagesResult]:
+        ) -> DispatchResult[list[PurgeImagesResult]]:
             errors = []
-            task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
-            arch_per_images = {image.name: image.architecture for image in key.images}
+            task_results: list[PurgeImagesResult] = []
+            for key in keys:
+                task_result = PurgeImagesResult(
+                    results=PurgeImageResponses([]), reserved_bytes=0, agent_id=key.agent_id
+                )
+                image_canonicals = [image.name for image in key.images]
+                arch_per_images = {image.name: image.architecture for image in key.images}
 
-            results = await ctx.registry.purge_images(
-                AgentId(key.agent_id),
-                PurgeImagesReq(
-                    images=image_canonicals, force=options.force, noprune=options.noprune
-                ),
-            )
+                results = await ctx.registry.purge_images(
+                    AgentId(key.agent_id),
+                    PurgeImagesReq(
+                        images=image_canonicals, force=options.force, noprune=options.noprune
+                    ),
+                )
 
-            for result in results.responses:
-                image_canonical = result.image
-                arch = arch_per_images[result.image]
+                for result in results.responses:
+                    image_canonical = result.image
+                    arch = arch_per_images[result.image]
 
-                if not result.error:
-                    image_identifier = ImageIdentifier(image_canonical, arch)
-                    async with ctx.db.begin_session() as session:
-                        image_row = await ImageRow.resolve(session, [image_identifier])
-                        task_result.reserved_bytes += image_row.size_bytes
-                        task_result.results.responses.append(result)
+                    if not result.error:
+                        image_identifier = ImageIdentifier(image_canonical, arch)
+                        async with ctx.db.begin_session() as session:
+                            image_row = await ImageRow.resolve(session, [image_identifier])
+                            task_result.reserved_bytes += image_row.size_bytes
+                            task_result.results.responses.append(result)
 
-                else:
-                    error_msg = f"Failed to purge image {image_canonical} from agent {key.agent_id}: {result.error}"
-                    log.error(error_msg)
-                    errors.append(error_msg)
+                    else:
+                        error_msg = f"Failed to purge image {image_canonical} from agent {key.agent_id}: {result.error}"
+                        log.error(error_msg)
+                        errors.append(error_msg)
+
+                log.info(
+                    f"purge images done, Task result: {task_result}",
+                )
+                task_results.append(task_result)
 
             return DispatchResult(
-                result=task_result,
+                result=task_results,
                 errors=errors,
             )
 

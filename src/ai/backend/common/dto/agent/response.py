@@ -6,14 +6,14 @@ T = TypeVar("T")
 
 
 @dataclass
-class AbstractAgentResponse(ABC):
+class AbstractAgentResp(ABC):
     @abstractmethod
     def as_dict(self) -> dict:
         raise NotImplementedError
 
 
 @dataclass
-class PurgeImageResponse(AbstractAgentResponse):
+class PurgeImageResp(AbstractAgentResp):
     image: str
     error: Optional[str] = None
 
@@ -31,8 +31,8 @@ class PurgeImageResponse(AbstractAgentResponse):
 
 
 @dataclass
-class PurgeImageResponses(AbstractAgentResponse):
-    responses: list[PurgeImageResponse]
+class PurgeImageResponses(AbstractAgentResp):
+    responses: list[PurgeImageResp]
 
     @override
     def as_dict(self) -> dict:

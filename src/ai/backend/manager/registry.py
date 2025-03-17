@@ -57,7 +57,7 @@ from yarl import URL
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImageResponses
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
@@ -3663,13 +3663,15 @@ class AgentRegistry:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             result = await rpc.call.purge_images(request.images, request.force, request.noprune)
 
-            return PurgeImageResponses([
-                PurgeImageResponse(
-                    image=resp["image"],
-                    error=resp.get("error"),
-                )
-                for resp in result["responses"]
-            ])
+            return PurgeImageResponses(
+                responses=[
+                    PurgeImageResp(
+                        image=resp["image"],
+                        error=resp.get("error"),
+                    )
+                    for resp in result["responses"]
+                ],
+            )
 
     async def get_abusing_report(
         self,
