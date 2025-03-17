@@ -3,7 +3,6 @@ from __future__ import annotations
 import enum
 import functools
 import logging
-import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -738,7 +737,7 @@ class ImageRow(Base):
 
         self.resources = resources
 
-    def is_customized_by(self, user_id: uuid.UUID) -> bool:
+    def is_customized_by(self, user_id: UUID) -> bool:
         return (self.labels or {}).get(
             "ai.backend.customized-image.owner"
         ) == f"user:{str(user_id)}"
@@ -894,6 +893,33 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
         return frozenset(permissions)
 
 
+@dataclass
+class ImageAccessCriteria:
+    user_id: UUID
+    allowed_registries: set[str]
+
+    def is_accessible_image(self, image: ImageRow) -> bool:
+        """
+        Check if the image is accessible by the user.
+        """
+        if image.registry not in self.allowed_registries:
+            return False
+        if image.labels.get(
+            "ai.backend.customized-image.owner"
+        ) is not None and not image.is_customized_by(self.user_id):
+            return False
+        return True
+
+    def is_accessible_customized_image(self, image: ImageRow) -> bool:
+        """
+        Check if the image is a customized image accessible by the user.
+        """
+        if image.labels.get("ai.backend.customized-image.owner") is None:
+            return False
+
+        return image.is_customized_by(self.user_id) and self.is_accessible_image(image)
+
+
 class ImagePermissionContextBuilder(
     AbstractPermissionContextBuilder[ImagePermission, ImagePermissionContext]
 ):
@@ -940,12 +966,10 @@ class ImagePermissionContextBuilder(
         )
         perm_ctx.merge(non_global_project_scopes_perm_ctx)
 
-        if ctx.user_role in [UserRole.ADMIN, UserRole.SUPERADMIN]:
-            user_scope_perm_ctx = await self._in_user_scope(
-                ctx, UserScope(ctx.user_id), has_admin_privilege=True
-            )
-        else:
-            user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+        user_scope_perm_ctx = await self._in_user_scope(
+            ctx,
+            UserScope(ctx.user_id),
+        )
 
         perm_ctx.merge(user_scope_perm_ctx)
         return perm_ctx
@@ -1003,46 +1027,31 @@ class ImagePermissionContextBuilder(
         perm_ctx.merge(non_global_container_registries_perm_ctx)
         return perm_ctx
 
-    async def _get_allowed_registries_for_user(
-        self, ctx: ClientContext, user_id: uuid.UUID
-    ) -> set[str]:
-        _user_query_stmt = (
+    async def _get_allowed_registries_for_user(self, ctx: ClientContext, user_id: UUID) -> set[str]:
+        user_query_stmt = (
             sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
         )
-        user_row = cast(Optional[UserRow], await self.db_session.scalar(_user_query_stmt))
+        user_row = cast(Optional[UserRow], await self.db_session.scalar(user_query_stmt))
         if user_row is None:
             raise InvalidScope(f"User not found (id:{user_id})")
         return set(user_row.domain.allowed_docker_registries)
 
-    def _is_image_accessible_for_user(
-        self, image: ImageRow, allowed_registries: set[str], user_id: uuid.UUID
-    ) -> bool:
-        if image.registry not in allowed_registries:
-            return False
-        if image.labels.get(
-            "ai.backend.customized-image.owner"
-        ) is not None and not image.is_customized_by(user_id):
-            return False
-        return True
+    def _get_effective_user_id_in_user_scope(self, ctx: ClientContext, scope: UserScope) -> UUID:
+        """
+        Determine the effective user ID for permission checks.
 
-    def _is_image_accessible_for_user_in_user_scope(
-        self,
-        image: ImageRow,
-        allowed_registries: set,
-        user_id: UUID,
-        has_admin_privilege: bool,
-    ) -> bool:
-        if has_admin_privilege:
-            return image.registry in allowed_registries
-        return image.is_customized_by(user_id) and self._is_image_accessible_for_user(
-            image, allowed_registries, user_id
-        )
+        For admin-level users (ADMIN, SUPERADMIN), the user_id from the scope is used,
+        allowing them to access customized images of other users.
+        For regular users, the user_id from the client context is used.
+        """
+        if ctx.user_role in [UserRole.ADMIN, UserRole.SUPERADMIN]:
+            return scope.user_id
+        return ctx.user_id
 
     async def _in_user_scope(
         self,
         ctx: ClientContext,
         scope: UserScope,
-        has_admin_privilege: bool = False,
     ) -> ImagePermissionContext:
         allowed_registries = await self._get_allowed_registries_for_user(ctx, scope.user_id)
 
@@ -1056,11 +1065,14 @@ class ImagePermissionContextBuilder(
             .where(ContainerRegistryRow.is_global == true())
         )
 
+        access_criteria = ImageAccessCriteria(
+            user_id=self._get_effective_user_id_in_user_scope(ctx, scope),
+            allowed_registries=allowed_registries,
+        )
+
         for row in await self.db_session.scalars(img_query_stmt):
             image_row = cast(ImageRow, row)
-            if not self._is_image_accessible_for_user_in_user_scope(
-                image_row, allowed_registries, ctx.user_id, has_admin_privilege=has_admin_privilege
-            ):
+            if not access_criteria.is_accessible_customized_image(image_row):
                 continue
 
             image_id_permission_map[image_row.id] = permissions
@@ -1094,9 +1106,14 @@ class ImagePermissionContextBuilder(
             .where(ContainerRegistryRow.is_global == true())
         )
 
+        access_criteria = ImageAccessCriteria(
+            user_id=ctx.user_id,
+            allowed_registries=allowed_registries,
+        )
+
         for row in await self.db_session.scalars(img_query_stmt):
             image_row = cast(ImageRow, row)
-            if not self._is_image_accessible_for_user(image_row, allowed_registries, ctx.user_id):
+            if not access_criteria.is_accessible_image(image_row):
                 continue
 
             image_id_permission_map[image_row.id] = permissions
@@ -1176,7 +1193,12 @@ class ImagePermissionContextBuilder(
             img_row = cast(ImageRow, row)
 
             allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
-            if not self._is_image_accessible_for_user(img_row, allowed_registries, ctx.user_id):
+            access_criteria = ImageAccessCriteria(
+                user_id=ctx.user_id,
+                allowed_registries=allowed_registries,
+            )
+
+            if not access_criteria.is_accessible_image(img_row):
                 continue
 
             if filter_global_registry:
