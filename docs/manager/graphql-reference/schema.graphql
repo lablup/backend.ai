@@ -9,6 +9,9 @@ type Queries {
     """The ID of the object"""
     id: ID!
   ): Node
+
+  """Added in 25.5.0."""
+  audit_log_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AuditLogConnection
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
@@ -279,9 +282,6 @@ type Queries {
   """Added in 24.09.0."""
   container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
 
-  """Added in 25.5.0."""
-  audit_log_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AuditLogConnection
-
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
 
@@ -309,6 +309,72 @@ interface Node {
   """The ID of the object"""
   id: ID!
 }
+
+"""Added in 25.5.0."""
+type AuditLogConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AuditLogEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""Added in 25.5.0. A Relay edge containing a `AuditLog` and its cursor."""
+type AuditLogEdge {
+  """The item at the end of the edge"""
+  node: AuditLogNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.5.0."""
+type AuditLogNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  row_id: UUID
+  name: String
+  operation: String
+  status: String
+  created_at: DateTime
+  duration: String
+  description: String
+  entity_type: String
+  entity_id: String
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
 
 type Agent implements Item {
   id: ID
@@ -349,13 +415,6 @@ type Agent implements Item {
 interface Item {
   id: ID
 }
-
-"""
-The `DateTime` scalar type represents a DateTime
-value as specified by
-[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
-"""
-scalar DateTime
 
 """
 Allows use of a JSON String for input / output from the GraphQL schema.
@@ -410,12 +469,6 @@ type ComputeContainer implements Item {
   last_stat: JSONString
   preopen_ports: [Int]
 }
-
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
 
 type ImageNode implements Node {
   """The ID of the object"""
@@ -540,23 +593,6 @@ type ScalinGroupConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """
@@ -1767,44 +1803,6 @@ type ContainerRegistryEdge {
 
   """A cursor for use in pagination"""
   cursor: String!
-}
-
-"""Added in 25.5.0."""
-type AuditLogConnection {
-  """Pagination data for this connection."""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection."""
-  edges: [AuditLogEdge]!
-
-  """Total count of the GQL nodes of the query."""
-  count: Int
-}
-
-"""Added in 25.5.0. A Relay edge containing a `AuditLog` and its cursor."""
-type AuditLogEdge {
-  """The item at the end of the edge"""
-  node: AuditLogNode
-
-  """A cursor for use in pagination"""
-  cursor: String!
-}
-
-"""Added in 25.5.0."""
-type AuditLogNode implements Node {
-  """The ID of the object"""
-  id: ID!
-
-  """Added in 25.5.0"""
-  row_id: UUID
-  name: String
-  operation: String
-  status: String
-  created_at: DateTime
-  duration: String
-  description: String
-  entity_type: String
-  entity_id: String
 }
 
 type ModelCard implements Node {
