@@ -44,7 +44,7 @@ from sqlalchemy.engine import Row
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
-from ai.backend.common.config import BaseSchema, config_key_to_snake_case
+from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
@@ -880,7 +880,7 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
         )
 
 
-class UtilizationConfig(BaseSchema):
+class UtilizationConfig(BaseConfigModel):
     time_window: tv.TimeDuration
     initial_grace_period: tv.TimeDuration
     thresholds_check_operator: Annotated[
