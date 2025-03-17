@@ -45,6 +45,11 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.services.image.actions.forget import (
+    ForgetImageAction,
+    ForgetImageActionGenericForbiddenError,
+    ForgetImageActionSuccess,
+)
 
 from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -756,21 +761,26 @@ class ForgetImage(graphene.Mutation):
     ) -> ForgetImage:
         log.info("forget image {0} by API request", reference)
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
 
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageIdentifier(reference, architecture),
-                    ImageAlias(reference),
-                ],
+        result = await ctx.processors.image.forget_image.wait_for_complete(
+            ForgetImageAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                reference=reference,
+                architecture=architecture,
             )
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    return ForgetImage(ok=False, msg="Forbidden")
-            await image_row.mark_as_deleted(session)
-            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
+        )
+
+        match result:
+            case ForgetImageActionSuccess(image_row=image_row):
+                return ForgetImage(
+                    ok=True, msg=result.description(), image=ImageNode.from_row(ctx, image_row)
+                )
+            case ForgetImageActionGenericForbiddenError():
+                return ForgetImage(ok=False, msg=result.description())
+            case _:
+                log.error("Failed to forget image due to unknown error.")
+                return ForgetImage(ok=False, msg="Unknown error")
 
 
 class PurgeImageById(graphene.Mutation):
