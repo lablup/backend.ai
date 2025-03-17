@@ -34,6 +34,10 @@ class RouteStatus(Enum):
     PROVISIONING = "provisioning"
     FAILED_TO_START = "failed_to_start"
 
+    @property
+    def active_route_statuses() -> set["RouteStatus"]:
+        return {RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.PROVISIONING}
+
 
 class RoutingRow(Base):
     __tablename__ = "routings"
