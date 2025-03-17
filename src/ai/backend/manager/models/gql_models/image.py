@@ -1187,7 +1187,7 @@ class PurgeImages(graphene.Mutation):
         info: graphene.ResolveInfo,
         keys: list[PurgeImagesKey],
         options: PurgeImagesOptions,
-    ) -> PurgeImages:
+    ) -> PurgeImagesPayload:
         ctx: GraphQueryContext = info.context
         agent_images = ", ".join(
             f"{key.agent_id}: [{', '.join(img.name for img in key.images)}]" for key in keys
@@ -1241,4 +1241,4 @@ class PurgeImages(graphene.Mutation):
             )
 
         task_id = await ctx.background_task_manager.start(_purge_images_task)
-        return RescanImages(task_id=task_id)
+        return PurgeImagesPayload(task_id=task_id)
