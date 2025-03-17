@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
-from typing import Callable, Generic, Optional
+from inspect import isawaitable
+from typing import Awaitable, Callable, Generic, Optional
 
 from .action import (
     BaseActionResultMeta,
@@ -13,11 +14,11 @@ from .monitors.monitor import ActionMonitor
 
 class ActionProcessor(Generic[TAction, TActionResult]):
     _monitors: list[ActionMonitor]
-    _func: Callable[[TAction], TActionResult]
+    _func: Callable[[TAction], TActionResult | Awaitable[TActionResult]]
 
     def __init__(
         self,
-        func: Callable[[TAction], TActionResult],
+        func: Callable[[TAction], TActionResult | Awaitable[TActionResult]],
         monitors: Optional[list[ActionMonitor]] = None,
     ) -> None:
         self._func = func
@@ -27,7 +28,11 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         started_at = datetime.now()
         status: str
         try:
-            result = self._func(action)
+            func_result = self._func(action)
+            if isawaitable(func_result):
+                result = await func_result
+            else:
+                result = func_result
             status = "success"
             description = "Success"
         except Exception as e:
