@@ -265,9 +265,13 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
-    cors.add(
-        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
-    )
+    return app
+
+
+def build_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
 
@@ -278,6 +282,7 @@ async def server_main(
     _args: list[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
     local_cfg = cast(ServerConfig, root_ctx.local_config)
@@ -327,7 +332,9 @@ async def server_main(
             )
 
         runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+        internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
         await runner.setup()
+        await internal_runner.setup()
         service_addr = am_cfg.service_addr
         site = web.TCPSite(
             runner,
@@ -337,7 +344,15 @@ async def server_main(
             reuse_port=True,
             ssl_context=ssl_ctx,
         )
+        internal_site = web.TCPSite(
+            internal_runner,
+            str(am_cfg.internal_addr.host),
+            am_cfg.internal_addr.port,
+            backlog=1024,
+            reuse_port=True,
+        )
         await site.start()
+        await internal_site.start()
 
         if os.geteuid() == 0:
             uid = am_cfg.user
