@@ -79,6 +79,8 @@ from ai.backend.manager.service.container_registry.harbor import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
@@ -438,14 +440,10 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # image_service = ImageService(
-    #     db=root_ctx.db,
-    #     agent_registry=root_ctx.registry,
-    # )
-
-    # root_ctx.processors = Processors(
-    #     image_service=image_service,
-    # )
+    image_service = ImageService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+    )
 
     user_service = UserService(
         db=root_ctx.db,
@@ -457,9 +455,13 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     domain_service = DomainService(root_ctx.db)
     domain_processor = DomainProcessors(domain_service)
 
+    image_service = ImageService(root_ctx.db, root_ctx.registry)
+    image_processor = ImageProcessors(image_service)
+
     root_ctx.processors = Processors(
         domain=domain_processor,
         user=user_processor,
+        image=image_processor,
     )
 
     yield
@@ -834,6 +836,7 @@ def build_root_app(
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
+
     default_scheduler_opts = {
         "limit": 2048,
         "close_timeout": 30,
