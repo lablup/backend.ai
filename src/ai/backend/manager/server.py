@@ -826,6 +826,7 @@ def build_root_app(
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
+
     default_scheduler_opts = {
         "limit": 2048,
         "close_timeout": 30,

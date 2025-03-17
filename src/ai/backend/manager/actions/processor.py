@@ -1,11 +1,13 @@
 import asyncio
 import uuid
+from abc import ABC
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
 from ai.backend.manager.models.audit_log import OperationStatus
 
 from .action import (
+    BaseAction,
     BaseActionResultMeta,
     BaseActionTriggerMeta,
     ProcessResult,
@@ -13,6 +15,11 @@ from .action import (
     TActionResult,
 )
 from .monitors.monitor import ActionMonitor
+
+
+class ActionValidator(ABC):
+    async def validate(self, action: BaseAction) -> None:
+        pass
 
 
 class ActionProcessor(Generic[TAction, TActionResult]):
