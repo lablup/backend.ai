@@ -183,10 +183,17 @@ LEADING_SESSION_STATUSES = tuple(
     if s not in FOLLOWING_SESSION_STATUSES
 )
 
-DEAD_SESSION_STATUSES = (
+DEAD_SESSION_STATUSES = frozenset([
     SessionStatus.CANCELLED,
     SessionStatus.TERMINATED,
-)
+    SessionStatus.ERROR,
+])
+
+DEAD_KERNEL_STATUSES = frozenset([
+    KernelStatus.CANCELLED,
+    KernelStatus.TERMINATED,
+    KernelStatus.CANCELLED,
+])
 
 # statuses to consider when calculating current resource usage
 AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
