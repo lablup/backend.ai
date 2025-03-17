@@ -2250,6 +2250,7 @@ class AgentRegistry:
         kernels: Sequence[
             Mapping[str, Any]
         ],  # should have (id, agent, agent_addr, container_id) columns
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.FAILED_TO_START,
     ) -> None:
         """
         Destroy the kernels that belongs the to given session unconditionally
@@ -2278,7 +2279,7 @@ class AgentRegistry:
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
                             str(session_id),
-                            KernelLifecycleEventReason.FAILED_TO_START,
+                            reason,
                             suppress_events=True,
                         ),
                     )
