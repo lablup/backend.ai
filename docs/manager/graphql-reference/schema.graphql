@@ -2173,7 +2173,7 @@ type Mutations {
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
 
   """Added in 25.5.0"""
-  clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimit
+  clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload
 
   """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
@@ -2745,8 +2745,8 @@ input ResourceLimitInput {
 }
 
 """Added in 25.5.0."""
-type ClearImageCustomResourceLimit {
-  ok: Boolean
+type ClearImageCustomResourceLimitPayload {
+  image_node: ImageNode
 }
 
 """Added in 25.5.0."""

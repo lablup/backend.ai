@@ -674,12 +674,13 @@ class ImageRow(Base):
         for label_key, value in label_resources.items():
             if label_key not in resources:
                 resources[label_key] = value
-            else:
-                pass
 
         return ImageRow._resources.type._schema.check(resources)
 
     def get_resources_from_labels(self) -> dict[SlotName, dict[str, Decimal]]:
+        if self.labels is None:
+            raise RuntimeError(f"Labels not loaded in the image {self}")
+
         RESOURCE_LABEL_PREFIX = "ai.backend.resource.min."
 
         resources = {  # default fallback if not defined
@@ -700,9 +701,6 @@ class ImageRow(Base):
         slot_units = await shared_config.get_resource_slots()
         min_slot = ResourceSlot()
         max_slot = ResourceSlot()
-        # When the original image does not have any metadata label, self.resources is already filled
-        # with the intrinsic resource slots with their defualt minimums (defs.INTRINSIC_SLOTS_MIN)
-        # during rescanning the registry.
 
         for slot_key, resource in self.resources.items():
             slot_unit = slot_units.get(slot_key)
