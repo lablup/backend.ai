@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Mapping, Optional, Self, cast
 
 import graphene
 
-from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.audit_log import AuditLogOperationType, AuditLogRow, OperationStatus
 from ai.backend.manager.models.base import (
     FilterExprArg,
     OrderExprArg,
@@ -18,6 +18,12 @@ from ..gql_relay import Connection
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
+AuditLogOperationTypeGQLEnum = graphene.Enum.from_enum(
+    AuditLogOperationType, description="Added in 25.5.0."
+)
+
+OperationStatusGQLEnum = graphene.Enum.from_enum(OperationStatus, description="Added in 25.5.0.")
+
 
 class AuditLogNode(graphene.ObjectType):
     """
@@ -28,36 +34,36 @@ class AuditLogNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
         description = "Added in 25.5.0."
 
-    row_id = graphene.UUID()
-    name = graphene.String()
-    operation = graphene.String()
-    status = graphene.String()
-    created_at = graphene.DateTime()
-    duration = graphene.String()
-    description = graphene.String()
-    entity_type = graphene.String()
-    entity_id = graphene.String()
+    row_id = graphene.UUID(required=True)
+    entity_type = graphene.String(required=True)
+    operation = graphene.Field(AuditLogOperationTypeGQLEnum, required=True)
+    entity_id = graphene.String(required=True)
+    created_at = graphene.DateTime(required=True)
+    request_id = graphene.UUID(required=True)
+    description = graphene.String(required=True)
+    duration = graphene.String(required=True)
+    status = graphene.Field(OperationStatusGQLEnum, required=True)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "name": ("name", None),
-        "operation": ("operation", None),
-        "status": ("status", None),
-        "created_at": ("created_at", None),
-        "duration": ("duration", None),
-        "description": ("description", None),
         "entity_type": ("entity_type", None),
+        "operation": ("operation", None),
         "entity_id": ("entity_id", None),
+        "created_at": ("created_at", None),
+        "request_id": ("request_id", None),
+        "description": ("description", None),
+        "duration": ("duration", None),
+        "status": ("status", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
-        "name": ("name", None),
-        "operation": ("operation", None),
-        "status": ("status", None),
-        "created_at": ("created_at", None),
-        "duration": ("duration", None),
-        "description": ("description", None),
         "entity_type": ("entity_type", None),
+        "operation": ("operation", None),
         "entity_id": ("entity_id", None),
+        "created_at": ("created_at", None),
+        "request_id": ("request_id", None),
+        "description": ("description", None),
+        "duration": ("duration", None),
+        "status": ("status", None),
     }
 
     @classmethod
@@ -65,13 +71,14 @@ class AuditLogNode(graphene.ObjectType):
         return cls(
             id=row.id,
             row_id=row.id,
-            operation=row.operation,
-            status=row.status,
-            created_at=row.created_at,
-            duration=row.duration,
-            description=row.description,
             entity_type=row.entity_type,
+            operation=row.operation,
             entity_id=row.entity_id,
+            created_at=row.created_at,
+            request_id=row.request_id,
+            description=row.description,
+            duration=row.duration,
+            status=row.status,
         )
 
     @classmethod

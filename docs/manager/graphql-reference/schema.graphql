@@ -352,15 +352,15 @@ type AuditLogEdge {
 type AuditLogNode implements Node {
   """The ID of the object"""
   id: ID!
-  row_id: UUID
-  name: String
-  operation: String
-  status: String
-  created_at: DateTime
-  duration: String
-  description: String
-  entity_type: String
-  entity_id: String
+  row_id: UUID!
+  entity_type: String!
+  operation: ImageAuditLogOperationType!
+  entity_id: String!
+  created_at: DateTime!
+  request_id: UUID!
+  description: String!
+  duration: String!
+  status: OperationStatus!
 }
 
 """
@@ -369,12 +369,25 @@ in fields, resolvers and input.
 """
 scalar UUID
 
+"""Added in 25.5.0."""
+enum ImageAuditLogOperationType {
+  SESSION_CREATE
+  UPDATE
+  PULL
+}
+
 """
 The `DateTime` scalar type represents a DateTime
 value as specified by
 [iso8601](https://en.wikipedia.org/wiki/ISO_8601).
 """
 scalar DateTime
+
+"""Added in 25.5.0."""
+enum OperationStatus {
+  SUCCESS
+  ERROR
+}
 
 type Agent implements Item {
   id: ID
