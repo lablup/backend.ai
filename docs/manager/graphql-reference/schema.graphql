@@ -1527,7 +1527,6 @@ type LegacyComputeSession implements Item {
 """Added in 25.5.0."""
 type TotalResourceSlot implements Item {
   id: ID
-  occupying_slots: JSONString
   occupied_slots: JSONString
   requested_slots: JSONString
 }
