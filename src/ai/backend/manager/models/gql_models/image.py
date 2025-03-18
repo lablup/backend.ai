@@ -794,7 +794,7 @@ class ForgetImage(graphene.Mutation):
         )
 
 
-class PurgeImageByIdOptions(graphene.InputObjectType):
+class PurgeImageOptions(graphene.InputObjectType):
     """
     Added in 25.5.0.
     """
@@ -815,7 +815,7 @@ class PurgeImageById(graphene.Mutation):
 
     class Arguments:
         image_id = graphene.String(required=True)
-        options = PurgeImageByIdOptions(
+        options = PurgeImageOptions(
             required=False,
             default_value={"remove_from_registry": False},
             description="Added in 25.5.0.",
@@ -828,7 +828,7 @@ class PurgeImageById(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         image_id: str,
-        options: PurgeImageByIdOptions,
+        options: PurgeImageOptions,
     ) -> PurgeImageById:
         log.info("purge image row {0} by API request", image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")

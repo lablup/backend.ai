@@ -2270,7 +2270,7 @@ type Mutations {
     image_id: String!
 
     """Added in 25.5.0."""
-    options: PurgeImageByIdOptions = {remove_from_registry: false}
+    options: PurgeImageOptions = {remove_from_registry: false}
   ): PurgeImageById
 
   """Added in 24.03.1"""
@@ -2874,7 +2874,7 @@ type PurgeImageById {
 }
 
 """Added in 25.5.0."""
-input PurgeImageByIdOptions {
+input PurgeImageOptions {
   """Only available in the HarborV2 registry."""
   remove_from_registry: Boolean = false
 }
