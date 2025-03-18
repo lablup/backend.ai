@@ -353,7 +353,7 @@ type AuditLogNode implements Node {
   """The ID of the object"""
   id: ID!
   row_id: UUID!
-  entity_type: String!
+  entity_type: AuditLogEntityType!
   operation: ImageAuditLogOperationType!
   entity_id: String!
   created_at: DateTime!
@@ -368,6 +368,11 @@ Leverages the internal Python implementation of UUID (uuid.UUID) to provide nati
 in fields, resolvers and input.
 """
 scalar UUID
+
+"""Added in 25.5.0."""
+enum AuditLogEntityType {
+  IMAGE
+}
 
 """Added in 25.5.0."""
 enum ImageAuditLogOperationType {
