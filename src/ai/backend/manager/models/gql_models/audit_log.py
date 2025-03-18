@@ -124,9 +124,9 @@ class AuditLogNode(graphene.ObjectType):
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            reg_rows = await db_session.scalars(query)
+            auditlog_rows = await db_session.scalars(query)
             total_cnt = await db_session.scalar(cnt_query)
-        result = [cls.from_row(graph_ctx, cast(AuditLogRow, row)) for row in reg_rows]
+        result = [cls.from_row(graph_ctx, cast(AuditLogRow, row)) for row in auditlog_rows]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
