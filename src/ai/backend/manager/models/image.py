@@ -910,15 +910,6 @@ class ImageAccessCriteria:
             return False
         return True
 
-    def is_accessible_customized_image(self, image: ImageRow) -> bool:
-        """
-        Check if the image is a customized image accessible by the user.
-        """
-        if not image.customized:
-            return False
-
-        return image.is_owned_by(self.user_id) and self.is_accessible_image(image)
-
 
 class ImagePermissionContextBuilder(
     AbstractPermissionContextBuilder[ImagePermission, ImagePermissionContext]
@@ -1072,7 +1063,7 @@ class ImagePermissionContextBuilder(
 
         for row in await self.db_session.scalars(img_query_stmt):
             image_row = cast(ImageRow, row)
-            if not access_criteria.is_accessible_customized_image(image_row):
+            if not image_row.customized or not access_criteria.is_accessible_image(image_row):
                 continue
 
             image_id_permission_map[image_row.id] = permissions
