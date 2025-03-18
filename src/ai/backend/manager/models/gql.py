@@ -959,7 +959,7 @@ class Queries(graphene.ObjectType):
 
     total_resource_slot = graphene.Field(
         TotalResourceSlot,
-        description="Added in 24.03.10.",
+        description="Added in 25.5.0.",
         statuses=graphene.List(
             graphene.String,
             default_value=[SessionStatus.RUNNING.name],
