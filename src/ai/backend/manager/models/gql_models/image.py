@@ -28,7 +28,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -1127,7 +1127,7 @@ class ModifyImage(graphene.Mutation):
 @dataclass
 class PurgeImagesResult:
     agent_id: AgentId
-    results: PurgeImageResponses
+    results: PurgeImagesResp
     reserved_bytes: int
 
     def __str__(self) -> str:
@@ -1202,7 +1202,7 @@ class PurgeImages(graphene.Mutation):
             task_results: list[PurgeImagesResult] = []
             for key in keys:
                 task_result = PurgeImagesResult(
-                    results=PurgeImageResponses([]), reserved_bytes=0, agent_id=key.agent_id
+                    results=PurgeImagesResp([]), reserved_bytes=0, agent_id=key.agent_id
                 )
                 image_canonicals = [image.name for image in key.images]
                 arch_per_images = {image.name: image.architecture for image in key.images}

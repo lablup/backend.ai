@@ -31,7 +31,7 @@ class PurgeImageResp(AbstractAgentResp):
 
 
 @dataclass
-class PurgeImageResponses(AbstractAgentResp):
+class PurgeImagesResp(AbstractAgentResp):
     responses: list[PurgeImageResp]
 
     @override
