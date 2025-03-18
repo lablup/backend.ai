@@ -2,22 +2,10 @@ import uuid
 
 import pytest
 
-from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image import ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.server import (
     agent_registry_ctx,
-    background_task_ctx,
-    database_ctx,
-    event_dispatcher_ctx,
-    hook_plugin_ctx,
-    monitoring_ctx,
-    network_plugin_ctx,
-    processors_ctx,
-    redis_ctx,
-    services_ctx,
-    shared_config_ctx,
-    storage_manager_ctx,
 )
 from ai.backend.manager.services.image.actions.forget import (
     ForgetImageAction,
@@ -25,12 +13,13 @@ from ai.backend.manager.services.image.actions.forget import (
     ForgetImageActionSuccess,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
 
 from .conftest import TestScenario
 
 IMAGE_ROW_FIXTURE = ImageRow(
-    name="stable/python",
-    image="cr.backend.ai/stable/python:3.9-ubuntu20.04",
+    name="cr.backend.ai/stable/python:3.9-ubuntu20.04",
+    image="stable/python",
     project="stable",
     registry="cr.backend.ai",
     registry_id="11111111-1111-1111-1111-111111111111",
@@ -38,12 +27,18 @@ IMAGE_ROW_FIXTURE = ImageRow(
     config_digest="sha256:abcdefgh0123456789abcdefgh0123456789abcdefgh0123456789abcd",
     size_bytes=12345678,
     is_local=False,
-    type="COMPUTE",
+    type=ImageType.COMPUTE,
     labels={},
     resources={"cpu": {"min": "500m", "max": None}},
-    status="ALIVE",
+    status=ImageStatus.ALIVE,
 )
 IMAGE_ROW_FIXTURE.id = uuid.uuid4()
+
+
+@pytest.fixture
+def processors(extra_fixtures, database_fixture, database_engine):
+    image_service = ImageService(db=database_engine, agent_registry=agent_registry_ctx)
+    return ImageProcessors(image_service)
 
 
 @pytest.mark.asyncio
@@ -81,10 +76,10 @@ IMAGE_ROW_FIXTURE.id = uuid.uuid4()
                     "config_digest": IMAGE_ROW_FIXTURE.config_digest,
                     "size_bytes": IMAGE_ROW_FIXTURE.size_bytes,
                     "is_local": IMAGE_ROW_FIXTURE.is_local,
-                    "type": str(IMAGE_ROW_FIXTURE.type),
+                    "type": IMAGE_ROW_FIXTURE.type._name_,
                     "labels": IMAGE_ROW_FIXTURE.labels,
                     "resources": IMAGE_ROW_FIXTURE.resources,
-                    "status": str(IMAGE_ROW_FIXTURE.status),
+                    "status": IMAGE_ROW_FIXTURE.status.value,
                 }
             ]
         }
@@ -92,32 +87,9 @@ IMAGE_ROW_FIXTURE.id = uuid.uuid4()
     ids=[""],
 )
 async def test_forget_images(
+    processors: ImageProcessors,
     test_scenario: TestScenario[ForgetImageAction, ForgetImageActionResult],
-    etcd_fixture,
-    extra_fixtures,
-    database_fixture,
-    create_app_and_client,
 ):
-    app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            database_ctx,
-            monitoring_ctx,
-            hook_plugin_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            storage_manager_ctx,
-            network_plugin_ctx,
-            agent_registry_ctx,
-            services_ctx,
-            processors_ctx,
-            background_task_ctx,
-        ],
-        [".events", ".auth"],
-    )
-    root_ctx: RootContext = app["_root.context"]
-    processors: ImageProcessors = root_ctx.processors.image
-
     await test_scenario.test(processors.forget_image.wait_for_complete)
 
 
