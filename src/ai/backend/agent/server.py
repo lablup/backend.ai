@@ -98,7 +98,7 @@ from .config import (
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, LifecycleEvent, VolumeInfo
+from .types import AgentBackend, KernelOwnershipData, LifecycleEvent, VolumeInfo
 from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
@@ -605,6 +605,7 @@ class AgentRPCServer(aobject):
                 await self.agent.produce_event(
                     ImagePullStartedEvent(
                         image=str(img_ref),
+                        image_ref=img_ref,
                         agent_id=self.agent.id,
                         timestamp=datetime.now(timezone.utc).timestamp(),
                     )
@@ -623,6 +624,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             msg=f"timeout (s:{image_pull_timeout})",
                         )
@@ -632,6 +634,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             msg=repr(e),
                         )
@@ -641,6 +644,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             timestamp=datetime.now(timezone.utc).timestamp(),
                         )
@@ -650,6 +654,7 @@ class AgentRPCServer(aobject):
                 await self.agent.produce_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
+                        image_ref=img_ref,
                         agent_id=self.agent.id,
                         timestamp=datetime.now(timezone.utc).timestamp(),
                         msg="Image already exists",
@@ -686,8 +691,13 @@ class AgentRPCServer(aobject):
             kernel_config = cast(KernelCreationConfig, raw_config)
             coros.append(
                 self.agent.create_kernel(
-                    session_id,
-                    kernel_id,
+                    KernelOwnershipData(
+                        kernel_id,
+                        session_id,
+                        self.agent.id,
+                        raw_config.get("owner_user_id"),
+                        raw_config.get("owner_project_id"),
+                    ),
                     kernel_image_refs[kernel_id],
                     kernel_config,
                     cluster_info,
@@ -774,8 +784,11 @@ class AgentRPCServer(aobject):
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
-            SessionId(UUID(session_id)),
-            KernelId(UUID(kernel_id)),
+            KernelOwnershipData(
+                KernelId(UUID(kernel_id)),
+                SessionId(UUID(session_id)),
+                self.agent.id,
+            ),
             kernel_image,
             cast(KernelCreationConfig, updated_config),
         )

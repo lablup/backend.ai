@@ -160,6 +160,7 @@ from .types import (
     ContainerLifecycleEvent,
     ContainerStatus,
     KernelLifecycleStatus,
+    KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
 )
@@ -205,6 +206,7 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
     distro: str
+    ownership_data: KernelOwnershipData
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
@@ -221,9 +223,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         event_producer: EventProducer,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
@@ -237,9 +237,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.kernel_features = frozenset(
             self.image_labels.get("ai.backend.features", "uid-match").split()
         )
-        self.kernel_id = kernel_id
-        self.session_id = session_id
-        self.agent_id = agent_id
+        self.ownership_data = ownership_data
+        self.session_id = ownership_data.session_id
+        self.kernel_id = ownership_data.kernel_id
+        self.agent_id = ownership_data.agent_id
         self.event_producer = event_producer
         self.kernel_config = kernel_config
         self.image_ref = kernel_image
@@ -1757,8 +1758,7 @@ class AbstractAgent(
     @abstractmethod
     async def init_kernel_context(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
@@ -1858,8 +1858,7 @@ class AbstractAgent(
 
     async def create_kernel(
         self,
-        session_id: SessionId,
-        kernel_id: KernelId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
@@ -1870,6 +1869,8 @@ class AbstractAgent(
         """
         Create a new kernel.
         """
+        kernel_id = ownership_data.kernel_id
+        session_id = ownership_data.session_id
         if throttle_sema is None:
             # make a local semaphore
             throttle_sema = asyncio.Semaphore(1)
@@ -1883,8 +1884,7 @@ class AbstractAgent(
             if self.local_config["debug"]["log-kernel-config"]:
                 log.debug("Kernel creation config: {0}", pretty(kernel_config))
             ctx = await self.init_kernel_context(
-                kernel_id,
-                session_id,
+                ownership_data,
                 kernel_image,
                 kernel_config,
                 restarting=restarting,
@@ -2609,11 +2609,12 @@ class AbstractAgent(
 
     async def restart_kernel(
         self,
-        session_id: SessionId,
-        kernel_id: KernelId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         updating_kernel_config: KernelCreationConfig,
     ):
+        kernel_id = ownership_data.kernel_id
+        session_id = ownership_data.session_id
         tracker = self.restarting_kernels.get(kernel_id)
         if tracker is None:
             tracker = RestartTracker(
@@ -2657,8 +2658,7 @@ class AbstractAgent(
             else:
                 try:
                     await self.create_kernel(
-                        session_id,
-                        kernel_id,
+                        ownership_data,
                         kernel_image,
                         kernel_config,
                         existing_cluster_info,
