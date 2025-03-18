@@ -429,6 +429,10 @@ class ImageRow(Base):
             image_name, self.project, tag, self.registry, self.architecture, self.is_local
         )
 
+    @property
+    def customized(self) -> bool:
+        return self.labels.get("ai.backend.customized-image.owner") is not None
+
     @classmethod
     async def from_alias(
         cls,
@@ -737,10 +741,8 @@ class ImageRow(Base):
 
         self.resources = resources
 
-    def is_customized_by(self, user_id: UUID) -> bool:
-        return (self.labels or {}).get(
-            "ai.backend.customized-image.owner"
-        ) == f"user:{str(user_id)}"
+    def is_owned_by(self, user_id: UUID) -> bool:
+        return self.customized and self.labels["ai.backend.customized-image.owner"] == str(user_id)
 
 
 async def bulk_get_image_configs(
@@ -904,9 +906,7 @@ class ImageAccessCriteria:
         """
         if image.registry not in self.allowed_registries:
             return False
-        if image.labels.get(
-            "ai.backend.customized-image.owner"
-        ) is not None and not image.is_customized_by(self.user_id):
+        if image.customized and not image.is_owned_by(self.user_id):
             return False
         return True
 
@@ -914,10 +914,10 @@ class ImageAccessCriteria:
         """
         Check if the image is a customized image accessible by the user.
         """
-        if image.labels.get("ai.backend.customized-image.owner") is None:
+        if not image.customized:
             return False
 
-        return image.is_customized_by(self.user_id) and self.is_accessible_image(image)
+        return image.is_owned_by(self.user_id) and self.is_accessible_image(image)
 
 
 class ImagePermissionContextBuilder(
