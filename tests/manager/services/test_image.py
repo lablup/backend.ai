@@ -7,7 +7,7 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.server import (
     agent_registry_ctx,
 )
-from ai.backend.manager.services.image.actions.forget import (
+from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionResult,
     ForgetImageActionSuccess,
@@ -86,7 +86,7 @@ def processors(extra_fixtures, database_fixture, database_engine):
     ],
     ids=[""],
 )
-async def test_forget_images(
+async def test_forget_image(
     processors: ImageProcessors,
     test_scenario: TestScenario[ForgetImageAction, ForgetImageActionResult],
 ):
