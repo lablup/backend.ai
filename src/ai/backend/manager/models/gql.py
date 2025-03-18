@@ -13,7 +13,11 @@ from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
-from ai.backend.manager.models.gql_models.audit_log import AuditLogConnection, AuditLogNode
+from ai.backend.manager.models.gql_models.audit_log import (
+    AuditLogConnection,
+    AuditLogNode,
+    AuditLogSchema,
+)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 
@@ -449,9 +453,32 @@ class Queries(graphene.ObjectType):
     node = AsyncNode.Field()
 
     # super-admin only
+    audit_log_schema = graphene.Field(
+        AuditLogSchema,
+        description="Added in 25.5.0.",
+    )
     audit_log_nodes = PaginatedConnectionField(
         AuditLogConnection,
         description="Added in 25.5.0.",
+        filter=graphene.String(
+            description="Specifies the criteria used to narrow down the query results based on certain conditions."
+        ),
+        order=graphene.String(description="Specifies the sorting order of the query result."),
+        offset=graphene.Int(
+            description="Specifies how many items to skip before beginning to return result."
+        ),
+        before=graphene.String(
+            description="If this value is provided, the query will be limited to that value."
+        ),
+        after=graphene.String(
+            description="Queries the `last` number of results from the query result from last."
+        ),
+        first=graphene.Int(
+            description="Queries the `first` number of results from the query result from first."
+        ),
+        last=graphene.Int(
+            description="If the given value is provided, the query will start from that value."
+        ),
     )
 
     # super-admin only
@@ -2871,6 +2898,14 @@ class Queries(graphene.ObjectType):
             before,
             last,
         )
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_audit_log_schema(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> AuditLogSchema:
+        return AuditLogSchema()
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

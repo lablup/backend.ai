@@ -22,11 +22,27 @@ from ..gql_relay import Connection
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
-AuditLogEntityTypeGQLEnum = graphene.Enum.from_enum(
-    AuditLogEntityType, description="Added in 25.5.0."
-)
 
-OperationStatusGQLEnum = graphene.Enum.from_enum(OperationStatus, description="Added in 25.5.0.")
+class AuditLogSchema(graphene.ObjectType):
+    """
+    A schema that contains metadata related to the AuditLogNode.
+    It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
+
+    Added in 25.5.0.
+    """
+
+    entity_type_variants = graphene.List(
+        graphene.String, description='Possible values of "AuditLogNode.entity_type"'
+    )
+    status_variants = graphene.List(
+        graphene.String, description='Possible values of "AuditLogNode.status"'
+    )
+
+    async def resolve_entity_type_variants(self, info: graphene.ResolveInfo) -> list[str]:
+        return list(AuditLogEntityType.__members__.values())
+
+    async def resolve_status_variants(self, info: graphene.ResolveInfo) -> list[str]:
+        return list(OperationStatus.__members__.values())
 
 
 class AuditLogNode(graphene.ObjectType):
@@ -38,15 +54,15 @@ class AuditLogNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
         description = "Added in 25.5.0."
 
-    row_id = graphene.UUID(required=True)
-    entity_type = graphene.Field(AuditLogEntityTypeGQLEnum, required=True)
-    operation = graphene.String(required=True)
-    entity_id = graphene.String(required=True)
-    created_at = graphene.DateTime(required=True)
-    request_id = graphene.UUID(required=True)
-    description = graphene.String(required=True)
-    duration = graphene.String(required=True)
-    status = graphene.Field(OperationStatusGQLEnum, required=True)
+    row_id = graphene.UUID(required=True, description="UUID of the audit log row")
+    entity_type = graphene.String(required=True, description="Entity ID of the AuditLog")
+    operation = graphene.String(required=True, description="Entity type of the AuditLog")
+    entity_id = graphene.String(required=True, description="Operation type of the AuditLog")
+    created_at = graphene.DateTime(required=True, description="The time the AuditLog was reported")
+    request_id = graphene.UUID(required=True, description="RequestID of the AuditLog")
+    description = graphene.String(required=True, description="Description of the AuditLog")
+    duration = graphene.String(required=True, description="Duration taken to perform the operation")
+    status = graphene.String(required=True, description="Status of the AuditLog")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "entity_type": ("entity_type", None),

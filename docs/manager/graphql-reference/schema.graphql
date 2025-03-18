@@ -11,7 +11,35 @@ type Queries {
   ): Node
 
   """Added in 25.5.0."""
-  audit_log_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AuditLogConnection
+  audit_log_schema: AuditLogSchema
+
+  """Added in 25.5.0."""
+  audit_log_nodes(
+    """
+    Specifies the criteria used to narrow down the query results based on certain conditions.
+    """
+    filter: String
+
+    """Specifies the sorting order of the query result."""
+    order: String
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): AuditLogConnection
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
@@ -310,6 +338,24 @@ interface Node {
   id: ID!
 }
 
+"""
+A schema that contains metadata related to the AuditLogNode.
+It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
+
+Added in 25.5.0.
+"""
+type AuditLogSchema {
+  """
+  Possible values of "AuditLogNode.entity_type"
+  """
+  entity_type_variants: [String]
+
+  """
+  Possible values of "AuditLogNode.status"
+  """
+  status_variants: [String]
+}
+
 """Added in 25.5.0."""
 type AuditLogConnection {
   """Pagination data for this connection."""
@@ -352,15 +398,33 @@ type AuditLogEdge {
 type AuditLogNode implements Node {
   """The ID of the object"""
   id: ID!
+
+  """UUID of the audit log row"""
   row_id: UUID!
-  entity_type: AuditLogEntityType!
+
+  """Entity ID of the AuditLog"""
+  entity_type: String!
+
+  """Entity type of the AuditLog"""
   operation: String!
+
+  """Operation type of the AuditLog"""
   entity_id: String!
+
+  """The time the AuditLog was reported"""
   created_at: DateTime!
+
+  """RequestID of the AuditLog"""
   request_id: UUID!
+
+  """Description of the AuditLog"""
   description: String!
+
+  """Duration taken to perform the operation"""
   duration: String!
-  status: OperationStatus!
+
+  """Status of the AuditLog"""
+  status: String!
 }
 
 """
@@ -369,23 +433,12 @@ in fields, resolvers and input.
 """
 scalar UUID
 
-"""Added in 25.5.0."""
-enum AuditLogEntityType {
-  IMAGE
-}
-
 """
 The `DateTime` scalar type represents a DateTime
 value as specified by
 [iso8601](https://en.wikipedia.org/wiki/ISO_8601).
 """
 scalar DateTime
-
-"""Added in 25.5.0."""
-enum OperationStatus {
-  SUCCESS
-  ERROR
-}
 
 type Agent implements Item {
   id: ID
