@@ -241,7 +241,7 @@ type Queries {
   legacy_compute_session_list(limit: Int!, offset: Int!, order_key: String, order_asc: Boolean, domain_name: String, group_id: String, access_key: String, status: String): LegacyComputeSessionList
   legacy_compute_session(sess_id: String!, domain_name: String, access_key: String): LegacyComputeSession
 
-  """Added in 24.03.10."""
+  """Added in 25.5.0."""
   total_resource_slot(
     """
     `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
