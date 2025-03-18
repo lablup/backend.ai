@@ -65,6 +65,8 @@ class ImageProcessors:
     purge_image: ActionProcessor[PurgeImageAction, PurgeImageActionResult]
     purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
 
+    # purge_image_by_id: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
+
     def __init__(self, service: ImageService) -> None:
         self.forget_image = ActionProcessor(service.forget_image)
         self.forget_image_by_id = ActionProcessor(service.forget_image_by_id)
