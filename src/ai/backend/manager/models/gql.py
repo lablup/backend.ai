@@ -213,6 +213,9 @@ from .scaling_group import (
     DisassociateScalingGroupWithUserGroup,
     ModifyScalingGroup,
     ScalingGroup,
+    ScalingGroupRow,
+    and_names,
+    query_allowed_sgroups,
 )
 from .session import ComputeSession, ComputeSessionList
 from .storage import StorageVolume, StorageVolumeList
@@ -746,6 +749,16 @@ class Queries(graphene.ObjectType):
         ScalingGroup,
         name=graphene.String(),
         is_active=graphene.Boolean(),
+    )
+
+    accessible_scaling_groups = graphene.List(
+        ScalingGroup,
+        description=(
+            "Added in 25.5.0. This query is available for all users. "
+            "It returns the resource groups(=scaling groups) that the user has access to. "
+            "Only name, is_active, own_session_occupied_resource_slots and accelerator_quantum_size fields are returned."
+        ),
+        project_id=graphene.UUID(required=True),
     )
 
     # super-admin only
@@ -2045,6 +2058,25 @@ class Queries(graphene.ObjectType):
         is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_all(info.context, is_active=is_active)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_accessible_scaling_groups(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        domain_name: Optional[str],
+        project_id: uuid.UUID,
+        group_id: uuid.UUID,  # Not used. `scoped_query()` injects this parameter.
+        access_key: AccessKey,
+    ) -> Sequence[ScalingGroup]:
+        ctx: GraphQueryContext = info.context
+        domain_name = domain_name or ctx.user["domain_name"]
+        async with ctx.db.begin() as db_conn:
+            sgroup_rows = await query_allowed_sgroups(db_conn, domain_name, project_id, access_key)
+        conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
+        sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
+        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

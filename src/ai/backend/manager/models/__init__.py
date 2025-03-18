@@ -74,7 +74,6 @@ from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
 from .network import *  # noqa
-from .rbac import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
