@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
 from typing import (
     TYPE_CHECKING,
@@ -19,7 +19,7 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionId, SessionResult
@@ -53,9 +53,15 @@ from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import (
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
+    QueryCondition,
+    SessionQueryConditions,
     SessionRow,
     SessionStatus,
     SessionTypes,
+    and_domain_name,
+    and_raw_fileter,
+    and_resource_group_name,
+    and_status,
     get_permission_ctx,
 )
 from ..user import UserRole
@@ -547,7 +553,7 @@ class ComputeSessionConnection(Connection):
 class TotalResourceSlot(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
-        description = "Added in 24.03.10."
+        description = "Added in 25.5.0."
 
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()
@@ -557,40 +563,25 @@ class TotalResourceSlot(graphene.ObjectType):
     async def get_data(
         cls,
         ctx: GraphQueryContext,
-        statuses: Iterable[SessionStatus],
-        filter: Optional[str],
-        project_id: Optional[uuid.UUID],
-        domain_name: Optional[str],
-        resource_group_name: Optional[str],
+        conditions: SessionQueryConditions,
     ) -> Self:
-        stmt = (
-            sa.select(SessionRow)
-            .where(SessionRow.status.in_(statuses))
-            .options(load_only(SessionRow.occupying_slots, SessionRow.requested_slots))
-        )
-        if project_id is not None:
-            stmt = stmt.where(SessionRow.group_id == project_id)
-        if domain_name is not None:
-            stmt = stmt.where(SessionRow.domain_name == domain_name)
-        if resource_group_name is not None:
-            stmt = stmt.where(SessionRow.scaling_group_name == domain_name)
-        if filter is not None:
-            qfparser = QueryFilterParser(_queryfilter_fieldspec)
-            stmt = qfparser.append_filter(stmt, filter)
+        query_conditions: list[QueryCondition] = []
+        if conditions.raw_filter is not None:
+            query_conditions.append(and_raw_fileter(_queryfilter_fieldspec, conditions.raw_filter))
+        if conditions.statuses is not None:
+            query_conditions.append(and_status(conditions.statuses))
+        if conditions.domain_name is not None:
+            query_conditions.append(and_domain_name(conditions.domain_name))
+        if conditions.resource_group_name is not None:
+            query_conditions.append(and_resource_group_name(conditions.resource_group_name))
 
-        async def _fetch(db_sess: AsyncSession) -> tuple[Mapping[str, str], Mapping[str, str]]:
-            occupied_slots = ResourceSlot()
-            requested_slots = ResourceSlot()
-            for row in await db_sess.scalars(stmt):
-                row = cast(SessionRow, row)
-                occupied_slots += row.occupying_slots
-                requested_slots += row.requested_slots
-            return occupied_slots.to_json(), requested_slots.to_json()
-
-        async with ctx.db.connect() as db_conn:
-            occupied, requested = await execute_with_txn_retry(
-                _fetch, ctx.db.begin_readonly_session, db_conn
-            )
+        session_rows = await SessionRow.list_session_by_condition(query_conditions, db=ctx.db)
+        occupied_slots = ResourceSlot()
+        requested_slots = ResourceSlot()
+        for row in session_rows:
+            occupied_slots += row.occupying_slots
+            requested_slots += row.requested_slots
+        occupied, requested = occupied_slots.to_json(), requested_slots.to_json()
 
         return TotalResourceSlot(
             occupying_slots=occupied,

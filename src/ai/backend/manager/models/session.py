@@ -13,9 +13,11 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Callable,
     Final,
     List,
     Optional,
+    Self,
     TypeAlias,
     Union,
     cast,
@@ -953,6 +955,20 @@ class SessionRow(Base):
         self.set_status(determined_status, status_info, status_data, status_changed_at)
         return True
 
+    @classmethod
+    async def list_session_by_condition(
+        cls, conditions: Iterable[QueryCondition], *, db: ExtendedAsyncSAEngine
+    ) -> list[Self]:
+        stmt = sa.select(SessionRow)
+        for cond in conditions:
+            stmt = cond(stmt)
+
+        async def fetch(db_session: SASession) -> list[SessionRow]:
+            return (await db_session.scalars(stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
+
     def set_status(
         self,
         status: SessionStatus,
@@ -1303,6 +1319,46 @@ class SessionRow(Base):
                 return network_row.ref_name
             case _:
                 return None
+
+
+@dataclass
+class SessionQueryConditions:
+    statuses: Optional[Iterable[SessionStatus]] = None
+    user_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
+    domain_name: Optional[str] = None
+    resource_group_name: Optional[str] = None
+    raw_filter: Optional[str] = None
+
+
+type QueryCondition = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
+
+
+def and_status(statuses: Iterable[SessionStatus]) -> Callable[[sa.sql.Select], sa.sql.Select]:
+    return lambda query_stmt: query_stmt.where(SessionRow.status.in_(statuses))
+
+
+def and_user_id(user_id: UUID) -> Callable[[sa.sql.Select], sa.sql.Select]:
+    return lambda query_stmt: query_stmt.where(SessionRow.user_uuid == user_id)
+
+
+def and_project_id(project_id: UUID) -> Callable[[sa.sql.Select], sa.sql.Select]:
+    return lambda query_stmt: query_stmt.where(SessionRow.group_id == project_id)
+
+
+def and_domain_name(domain_name: str) -> Callable[[sa.sql.Select], sa.sql.Select]:
+    return lambda query_stmt: query_stmt.where(SessionRow.domain_name == domain_name)
+
+
+def and_resource_group_name(resource_group_name: str) -> Callable[[sa.sql.Select], sa.sql.Select]:
+    return lambda query_stmt: query_stmt.where(SessionRow.scaling_group_name == resource_group_name)
+
+
+def and_raw_fileter(
+    filter_spec: FieldSpecType, raw_filter: str
+) -> Callable[[sa.sql.Select], sa.sql.Select]:
+    qfparser = QueryFilterParser(filter_spec)
+    return lambda query_stmt: qfparser.append_filter(query_stmt, raw_filter)
 
 
 class SessionLifecycleManager:

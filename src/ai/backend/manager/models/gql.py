@@ -218,6 +218,7 @@ from .scaling_group import (
 from .session import (
     ComputeSession,
     ComputeSessionList,
+    SessionQueryConditions,
     SessionStatus,
 )
 from .storage import StorageVolume, StorageVolumeList
@@ -977,7 +978,6 @@ class Queries(graphene.ObjectType):
                 "Default value is `null`."
             ),
         ),
-        project_id=graphene.UUID(),
         domain_name=graphene.String(),
         resource_group_name=graphene.String(),
     )
@@ -2568,7 +2568,6 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         statuses: list[str],
         filter: Optional[str] = None,
-        project_id: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         resource_group_name: Optional[str] = None,
     ) -> TotalResourceSlot:
@@ -2576,7 +2575,13 @@ class Queries(graphene.ObjectType):
 
         status_list = [SessionStatus[s] for s in statuses]
         return await TotalResourceSlot.get_data(
-            graph_ctx, status_list, filter, project_id, domain_name, resource_group_name
+            graph_ctx,
+            SessionQueryConditions(
+                statuses=status_list,
+                domain_name=domain_name,
+                resource_group_name=resource_group_name,
+                raw_filter=filter,
+            ),
         )
 
     @staticmethod
