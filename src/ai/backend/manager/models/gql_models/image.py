@@ -47,8 +47,6 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
-    ForgetImageActionGenericForbiddenError,
-    ForgetImageActionSuccess,
 )
 
 from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
@@ -771,16 +769,9 @@ class ForgetImage(graphene.Mutation):
             )
         )
 
-        match result:
-            case ForgetImageActionSuccess(image_row=image_row):
-                return ForgetImage(
-                    ok=True, msg=result.description(), image=ImageNode.from_row(ctx, image_row)
-                )
-            case ForgetImageActionGenericForbiddenError():
-                return ForgetImage(ok=False, msg=result.description())
-            case _:
-                log.error("Failed to forget image due to unknown error.")
-                return ForgetImage(ok=False, msg="Unknown error")
+        return ForgetImage(
+            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
+        )
 
 
 class PurgeImageById(graphene.Mutation):

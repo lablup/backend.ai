@@ -30,15 +30,17 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         self._func = func
         self._monitors = monitors or []
 
+    # TODO: 리팩토링 필요
     async def _run(self, action: TAction) -> ProcessResult[TActionResult]:
         started_at = datetime.now()
         status: str
+        exc: Optional[Exception] = None
         try:
             result = await self._func(action)
             status = "success"
             description = "Success"
         except Exception as e:
-            # TODO: 여기서 FailResult를 반환해야 할 듯.
+            exc = e
             result = None
             status = "error"
             description = str(e)
@@ -52,9 +54,15 @@ class ActionProcessor(Generic[TAction, TActionResult]):
                 end_at=end_at,
                 duration=duration,
             )
-            return ProcessResult(meta, result)
+            if result:
+                return ProcessResult(meta, result)
+            else:
+                # 이 부분은 예외가 발생했을 때만 발생.
+                ...
+                assert exc is not None
+                raise exc
 
-    async def wait_for_complete(self, action: TAction) -> Optional[TActionResult]:
+    async def wait_for_complete(self, action: TAction) -> TActionResult:
         for monitor in self._monitors:
             await monitor.prepare(action)
         result = await self._run(action)
