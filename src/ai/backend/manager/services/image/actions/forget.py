@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.image import ImageRow
@@ -46,7 +46,7 @@ class ForgetImageActionSuccess(ForgetImageActionResult):
         return "The image has been forgotten."
 
     # TODO: eq 직접 정의보다 나은 방법?
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, ForgetImageActionSuccess):
             return False
         return self.image_row.id == other.image_row.id
