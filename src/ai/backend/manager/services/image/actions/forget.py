@@ -45,6 +45,12 @@ class ForgetImageActionSuccess(ForgetImageActionResult):
     def description(self) -> Optional[str]:
         return "The image has been forgotten."
 
+    # TODO: eq 직접 정의보다 나은 방법?
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ForgetImageActionSuccess):
+            return False
+        return self.image_row.id == other.image_row.id
+
 
 @dataclass
 class ForgetImageActionGenericForbiddenError(ForgetImageActionResult):
