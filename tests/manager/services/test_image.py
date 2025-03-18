@@ -9,8 +9,8 @@ from ai.backend.manager.server import (
 )
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
+    ForgetImageActionGenericForbiddenError,
     ForgetImageActionResult,
-    ForgetImageActionSuccess,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
@@ -53,11 +53,18 @@ def processors(extra_fixtures, database_fixture, database_engine):
                 reference=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
             ),
-            ForgetImageActionSuccess(image_row=IMAGE_ROW_FIXTURE),
+            ForgetImageActionResult(image_row=IMAGE_ROW_FIXTURE),
         ),
-        # TestScenario.failure(
-        #     "When No Image exists, raise Image Not Found Error", ForgetImageAction(), BackendError
-        # ),
+        TestScenario.failure(
+            "When the user is not SUPERADMIN, and the user is not the image's owner, raise Generic Forbidden Error",
+            ForgetImageAction(
+                user_id=uuid.uuid4(),
+                client_role=UserRole.USER,
+                reference=IMAGE_ROW_FIXTURE.name,
+                architecture=IMAGE_ROW_FIXTURE.architecture,
+            ),
+            ForgetImageActionGenericForbiddenError,
+        ),
     ],
 )
 @pytest.mark.parametrize(
