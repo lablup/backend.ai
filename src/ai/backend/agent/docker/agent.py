@@ -12,6 +12,7 @@ import signal
 import struct
 import sys
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -189,6 +190,13 @@ def _DockerContainerError_reduce(self):
         type(self),
         (self.status, {"message": self.message}, self.container_id, *self.args),
     )
+
+
+@dataclass
+class DockerPurgeImageReq:
+    image: str
+    force: bool
+    noprune: bool
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
@@ -1693,21 +1701,26 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def _purge_image(
-        self, docker: Docker, image: str, force: bool, noprune: bool
-    ) -> PurgeImageResp:
+    async def _purge_image(self, docker: Docker, request: DockerPurgeImageReq) -> PurgeImageResp:
         try:
-            await docker.images.delete(image, force=force, noprune=noprune)
-            return PurgeImageResp.success(image=image)
+            await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
+            return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error(f'Failed to purge image "{image}": {e}')
-            return PurgeImageResp.failure(image=image, error=str(e))
+            log.error(f'Failed to purge image "{request.image}": {e}')
+            return PurgeImageResp.failure(image=request.image, error=str(e))
 
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImageResponses:
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
                 tasks = [
-                    tg.create_task(self._purge_image(docker, image, request.force, request.noprune))
+                    tg.create_task(
+                        self._purge_image(
+                            docker,
+                            DockerPurgeImageReq(
+                                image=image, force=request.force, noprune=request.noprune
+                            ),
+                        )
+                    )
                     for image in request.images
                 ]
 
