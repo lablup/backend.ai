@@ -354,7 +354,7 @@ type AuditLogNode implements Node {
   id: ID!
   row_id: UUID!
   entity_type: AuditLogEntityType!
-  operation: ImageAuditLogOperationType!
+  operation: String!
   entity_id: String!
   created_at: DateTime!
   request_id: UUID!
@@ -372,13 +372,6 @@ scalar UUID
 """Added in 25.5.0."""
 enum AuditLogEntityType {
   IMAGE
-}
-
-"""Added in 25.5.0."""
-enum ImageAuditLogOperationType {
-  SESSION_CREATE
-  UPDATE
-  PULL
 }
 
 """

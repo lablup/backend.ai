@@ -4,7 +4,6 @@ import graphene
 
 from ai.backend.manager.models.audit_log import (
     AuditLogEntityType,
-    AuditLogOperationType,
     AuditLogRow,
     OperationStatus,
 )
@@ -27,10 +26,6 @@ AuditLogEntityTypeGQLEnum = graphene.Enum.from_enum(
     AuditLogEntityType, description="Added in 25.5.0."
 )
 
-AuditLogOperationTypeGQLEnum = graphene.Enum.from_enum(
-    AuditLogOperationType, description="Added in 25.5.0."
-)
-
 OperationStatusGQLEnum = graphene.Enum.from_enum(OperationStatus, description="Added in 25.5.0.")
 
 
@@ -45,7 +40,7 @@ class AuditLogNode(graphene.ObjectType):
 
     row_id = graphene.UUID(required=True)
     entity_type = graphene.Field(AuditLogEntityTypeGQLEnum, required=True)
-    operation = graphene.Field(AuditLogOperationTypeGQLEnum, required=True)
+    operation = graphene.String(required=True)
     entity_id = graphene.String(required=True)
     created_at = graphene.DateTime(required=True)
     request_id = graphene.UUID(required=True)
