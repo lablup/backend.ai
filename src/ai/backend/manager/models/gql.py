@@ -973,7 +973,7 @@ class Queries(graphene.ObjectType):
         filter=graphene.String(
             description=(
                 "`filter` argument is a string that is parsed into query conditions. "
-                "It works in the same way as the `fileter` argument in the `compute_session` query schema, "
+                "It works in the same way as the `filter` argument in the `compute_session` query schema, "
                 "meaning the values are parsed into an identical SQL query expression.\n"
                 "Default value is `null`."
             ),

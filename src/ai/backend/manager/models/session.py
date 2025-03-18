@@ -1354,7 +1354,7 @@ def and_resource_group_name(resource_group_name: str) -> Callable[[sa.sql.Select
     return lambda query_stmt: query_stmt.where(SessionRow.scaling_group_name == resource_group_name)
 
 
-def and_raw_fileter(
+def and_raw_filter(
     filter_spec: FieldSpecType, raw_filter: str
 ) -> Callable[[sa.sql.Select], sa.sql.Select]:
     qfparser = QueryFilterParser(filter_spec)

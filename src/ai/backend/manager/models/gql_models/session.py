@@ -59,7 +59,7 @@ from ..session import (
     SessionStatus,
     SessionTypes,
     and_domain_name,
-    and_raw_fileter,
+    and_raw_filter,
     and_resource_group_name,
     and_status,
     get_permission_ctx,
@@ -566,7 +566,7 @@ class TotalResourceSlot(graphene.ObjectType):
     ) -> Self:
         query_conditions: list[QueryCondition] = []
         if conditions.raw_filter is not None:
-            query_conditions.append(and_raw_fileter(_queryfilter_fieldspec, conditions.raw_filter))
+            query_conditions.append(and_raw_filter(_queryfilter_fieldspec, conditions.raw_filter))
         if conditions.statuses is not None:
             query_conditions.append(and_status(conditions.statuses))
         if conditions.domain_name is not None:
