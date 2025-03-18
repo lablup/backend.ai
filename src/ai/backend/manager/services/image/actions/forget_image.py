@@ -25,11 +25,7 @@ class ForgetImageAction(ImageAction):
 
 
 @dataclass
-class ForgetImageActionResult(BaseActionResult): ...
-
-
-@dataclass
-class ForgetImageActionSuccess(ForgetImageActionResult):
+class ForgetImageActionResult(BaseActionResult):
     # TODO: 여기서 ImageRow 타입을 그대로 써도 되는지?
     image_row: ImageRow
 
@@ -47,21 +43,27 @@ class ForgetImageActionSuccess(ForgetImageActionResult):
 
     # TODO: eq 직접 정의보다 나은 방법?
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, ForgetImageActionSuccess):
+        if not isinstance(other, ForgetImageActionResult):
             return False
         return self.image_row.id == other.image_row.id
 
 
-@dataclass
-class ForgetImageActionGenericForbiddenError(ForgetImageActionResult):
-    @override
-    def entity_id(self) -> Optional[str]:
-        return None
+class ForgetImageActionGenericForbiddenError(Exception):
+    """
+    Indicates that forgetting an image action is forbidden by policy or configuration.
+    """
 
-    @override
-    def status(self) -> str:
-        return "forbidden error"
+    pass
+    # error_type: str = "https://api.backend.ai/probs/forget-image-action-generic-forbidden"
+    # error_title: str = "Forbidden to forget image"
 
-    @override
-    def description(self) -> Optional[str]:
-        return "The user role is not allowed to forget the image."
+    # def __init__(
+    #     self,
+    #     extra_msg: Optional[str] = None,
+    #     extra_data: Optional[Any] = None,
+    #     **kwargs
+    # ):
+    #     kwargs.setdefault("status", 403)
+    #     kwargs.setdefault("reason", "Forbidden")
+
+    #     super().__init__(extra_msg=extra_msg, extra_data=extra_data, **kwargs)

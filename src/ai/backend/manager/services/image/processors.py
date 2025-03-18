@@ -22,6 +22,6 @@ class ImageProcessors:
 
     def __init__(self, service: ImageService) -> None:
         self.forget_image = ActionProcessor(service.forget_image)
-        self.forget_image_by_id = ActionProcessor(service.forget_image_by_id)
+        # self.forget_image_by_id = ActionProcessor(service.forget_image_by_id)
         # self.purge_images = ActionProcessor(service.purge_images)
         # self.purge_image_by_id = ActionProcessor(service.purge_images)
