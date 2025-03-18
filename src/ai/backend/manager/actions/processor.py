@@ -38,6 +38,8 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             status = "success"
             description = "Success"
         except Exception as e:
+            # TODO: 여기서 FailResult를 반환해야 할 듯.
+            result = None
             status = "error"
             description = str(e)
         finally:
@@ -52,7 +54,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             )
             return ProcessResult(meta, result)
 
-    async def wait_for_complete(self, action: TAction) -> TActionResult:
+    async def wait_for_complete(self, action: TAction) -> Optional[TActionResult]:
         for monitor in self._monitors:
             await monitor.prepare(action)
         result = await self._run(action)
