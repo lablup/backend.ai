@@ -88,6 +88,14 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdActionResult,
 )
 
+# from ai.backend.manager.services.image.actions.forget_image_by_id import (
+#     ForgetImageActionByIdGenericForbiddenError,
+#     ForgetImageActionByIdObjectNotFoundError,
+#     ForgetImageActionByIdSuccess,
+#     ForgetImageByIdAction,
+#     ForgetImageByIdActionResult,
+# )
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 

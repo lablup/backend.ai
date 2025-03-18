@@ -103,4 +103,4 @@ TActionResult = TypeVar("TActionResult", bound=BaseActionResult)
 @dataclass
 class ProcessResult(Generic[TActionResult]):
     meta: BaseActionResultMeta
-    result: Optional[TActionResult]
+    result: TActionResult
