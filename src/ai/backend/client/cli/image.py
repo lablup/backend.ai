@@ -98,7 +98,7 @@ def forget(reference_or_id, arch):
 @click.argument("reference_or_id", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
 @click.option("--remove-from-registry", is_flag=True, help="Remove image from registry.")
-def purge(reference_or_id, arch, remove_from_registry):
+def purge(reference_or_id: str, arch: str, remove_from_registry: bool):
     """Delete image deleted from server. This command will only work for image customized by user
     unless callee has superadmin privileges.
 
