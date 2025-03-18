@@ -555,7 +555,6 @@ class TotalResourceSlot(graphene.ObjectType):
         interfaces = (Item,)
         description = "Added in 25.5.0."
 
-    occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()
     requested_slots = graphene.JSONString()
 
@@ -584,7 +583,6 @@ class TotalResourceSlot(graphene.ObjectType):
         occupied, requested = occupied_slots.to_json(), requested_slots.to_json()
 
         return TotalResourceSlot(
-            occupying_slots=occupied,
             occupied_slots=occupied,
             requested_slots=requested,
         )
