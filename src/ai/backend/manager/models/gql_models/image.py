@@ -46,7 +46,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
-from ai.backend.manager.services.image.actions.forget import (
+from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionGenericForbiddenError,
     ForgetImageActionSuccess,
