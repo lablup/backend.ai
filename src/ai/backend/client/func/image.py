@@ -5,6 +5,7 @@ from ai.backend.client.output.types import FieldSpec
 
 from ..request import Request
 from ..session import api_session
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Image",)
@@ -37,13 +38,13 @@ class Image(BaseFunction):
         """
         Fetches the list of registered images in this cluster.
         """
-        q = (
-            "query($is_operation: Boolean) {"
-            "  images(is_operation: $is_operation) {"
-            "    $fields"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            query($is_operation: Boolean) {
+                images(is_operation: $is_operation) {
+                    $fields
+                }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "is_operation": operation,
@@ -62,13 +63,13 @@ class Image(BaseFunction):
         """
         Fetches the information about registered image in this cluster.
         """
-        q = (
-            "query($reference: String!, $architecture: String!) {"
-            "  image(reference: $reference, architecture: $architecture) {"
-            "    $fields"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            query($reference: String!, $architecture: String!) {
+                image(reference: $reference, architecture: $architecture) {
+                    $fields
+                }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "reference": reference,
@@ -87,7 +88,13 @@ class Image(BaseFunction):
         """
         Fetches the information about registered image in this cluster.
         """
-        q = "query($id: String!) {" "  image(id: $id) {" "    $fields" "  }" "}"
+        q = _d("""
+            query($id: String!) {
+                image(id: $id) {
+                    $fields
+                }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "id": id,
@@ -104,37 +111,46 @@ class Image(BaseFunction):
         """
         Fetches the list of customized images in this cluster.
         """
-        q = "query {" "  customized_images {" "    $fields" "  }" "}"
+        q = _d("""
+            query {
+                customized_images {
+                    $fields
+                }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q, {})
         return data["customized_images"]
 
     @api_function
     @classmethod
-    async def rescan_images(cls, registry: str):
-        q = (
-            "mutation($registry: String) {"
-            "  rescan_images(registry:$registry) {"
-            "   ok msg task_id"
-            "  }"
-            "}"
-        )
+    async def rescan_images(cls, registry: str, project: Optional[str] = None):
+        q = _d("""
+            mutation($registry: String, $project: String) {
+                rescan_images(registry:$registry, project: $project) {
+                   ok msg task_id
+                }
+            }
+        """)
+
         variables = {
             "registry": registry,
+            "project": project,
         }
+
         data = await api_session.get().Admin._query(q, variables)
         return data["rescan_images"]
 
     @api_function
     @classmethod
     async def forget_image_by_id(cls, image_id: str):
-        q = (
-            "mutation($image_id: String!) {"
-            "  forget_image_by_id(image_id: $image_id) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($image_id: String!) {
+                forget_image_by_id(image_id: $image_id) {
+                    ok msg
+                }
+            }
+        """)
         variables = {
             "image_id": image_id,
         }
@@ -144,13 +160,13 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def untag_image_from_registry(cls, id: str):
-        q = (
-            "mutation($id: String!) {"
-            "  untag_image_from_registry(id: $id) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($id: String!) {
+                untag_image_from_registry(id: $id) {
+                    ok msg
+                }
+            }
+        """)
         variables = {
             "id": id,
         }
@@ -160,13 +176,13 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def forget_image(cls, reference: str, architecture: str):
-        q = (
-            "mutation($reference: String!, $architecture: String!) {"
-            "  forget_image(reference: $reference, architecture: $architecture) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($reference: String!, $architecture: String!) {
+                forget_image(reference: $reference, architecture: $architecture) {
+                   ok msg
+                }
+            }
+        """)
         variables = {
             "reference": reference,
             "architecture": architecture,
@@ -182,13 +198,13 @@ class Image(BaseFunction):
         target: str,
         arch: Optional[str] = None,
     ) -> dict:
-        q = (
-            "mutation($alias: String!, $target: String!) {"
-            "  alias_image(alias: $alias, target: $target) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($alias: String!, $target: String!) {
+                alias_image(alias: $alias, target: $target) {
+                   ok msg
+                }
+            }
+        """)
         variables = {
             "alias": alias,
             "target": target,
@@ -201,7 +217,13 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def dealias_image(cls, alias: str) -> dict:
-        q = "mutation($alias: String!) {  dealias_image(alias: $alias) {   ok msg  }}"
+        q = _d("""
+            mutation($alias: String!) {
+                dealias_image(alias: $alias) {
+                    ok msg
+                }
+            }
+        """)
         variables = {
             "alias": alias,
         }

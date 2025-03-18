@@ -5,6 +5,7 @@ from ..output.fields import keypair_resource_policy_fields
 from ..output.types import FieldSpec
 from ..session import api_session
 from ..types import set_if_set
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("KeypairResourcePolicy",)
@@ -68,13 +69,13 @@ class KeypairResourcePolicy(BaseFunction):
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
-        q = (
-            "mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {"
-            + "  create_keypair_resource_policy(name: $name, props: $input) {"
-            "    ok msg resource_policy { $fields }"
-            "  }"
-            "}"
-        )
+        q = _d("""
+            mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {
+                create_keypair_resource_policy(name: $name, props: $input) {
+                    ok msg resource_policy { $fields }
+                }
+            }
+        """)
         resolved_fields = resolve_fields(
             fields, keypair_resource_policy_fields, (keypair_resource_policy_fields["name"],)
         )
@@ -120,10 +121,13 @@ class KeypairResourcePolicy(BaseFunction):
         Updates an existing keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
-        q = (
-            "mutation($name: String!, $input: ModifyKeyPairResourcePolicyInput!) {"
-            + "  modify_keypair_resource_policy(name: $name, props: $input) {    ok msg  }}"
-        )
+        q = _d("""
+            mutation($name: String!, $input: ModifyKeyPairResourcePolicyInput!) {
+                modify_keypair_resource_policy(name: $name, props: $input) {
+                    ok msg
+                }
+            }
+        """)
         inputs: dict[str, Any] = {}
         set_if_set(inputs, "default_for_unspecified", default_for_unspecified)
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
@@ -149,10 +153,13 @@ class KeypairResourcePolicy(BaseFunction):
         Deletes an existing keypair resource policy with given name.
         You need an admin privilege for this operation.
         """
-        q = (
-            "mutation($name: String!) {"
-            + "  delete_keypair_resource_policy(name: $name) {    ok msg  }}"
-        )
+        q = _d("""
+            mutation($name: String!) {
+                delete_keypair_resource_policy(name: $name) {
+                    ok msg
+                }
+            }
+        """)
         variables = {
             "name": name,
         }
@@ -169,7 +176,7 @@ class KeypairResourcePolicy(BaseFunction):
         Lists the keypair resource policies.
         You need an admin privilege for this operation.
         """
-        q = "query {  keypair_resource_policies {    $fields  }}"
+        q = "query { keypair_resource_policies { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
         return data["keypair_resource_policies"]
@@ -187,7 +194,11 @@ class KeypairResourcePolicy(BaseFunction):
 
         .. versionadded:: 19.03
         """
-        q = "query($name: String) {  keypair_resource_policy(name: $name) {    $fields  }}"
+        q = _d("""
+            query($name: String) {
+                keypair_resource_policy(name: $name) { $fields }
+            }
+        """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,

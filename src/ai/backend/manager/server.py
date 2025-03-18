@@ -11,6 +11,12 @@ import pwd
 import ssl
 import sys
 import traceback
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from pathlib import Path
@@ -18,12 +24,8 @@ from typing import (
     Any,
     AsyncIterator,
     Final,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     cast,
 )
 
@@ -32,6 +34,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -41,18 +44,36 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
-    REDIS_STAT_DB,
+    REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
+    RedisRole,
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import AgentSelectionStrategy
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    EtcdRedisConfig,
+    HostPortPair,
+)
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
+from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+    PerProjectContainerRegistryQuotaService,
+)
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -69,7 +90,6 @@ from .api.exceptions import (
 from .api.types import (
     AppCreator,
     CleanupContext,
-    WebMiddleware,
     WebRequestHandler,
 )
 from .config import LocalConfig, SharedConfig, volume_config_iv
@@ -119,10 +139,15 @@ VALID_VERSIONS: Final = frozenset([
     # set pending deprecation for the legacy /folders API set
     # added vfolder trash bin APIs
     # changed the image registry management API to allow per-project registry configs (BREAKING)
-    # TODO: added an initial version of RBAC for projects and vfolders
+    "v8.20240315",
+    # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
+    # added dependents/dependees/graph query fields to ComputeSessioNode
+    "v8.20240915",
+    # added explicit attach_network option to session creation config
+    # <future>
     # TODO: replaced keypair-based resource policies to user-based resource policies
     # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
-    "v8.20240315",
+    # TODO: added an initial version of RBAC for projects and vfolders
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",
@@ -132,9 +157,9 @@ LATEST_REV_DATES: Final = {
     5: "20191215",
     6: "20230315",
     7: "20230615",
-    8: "20240315",
+    8: "20240915",
 }
-LATEST_API_VERSION: Final = "v8.20240315"
+LATEST_API_VERSION: Final = "v8.20240915"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -162,6 +187,7 @@ public_interface_objs: MutableMapping[str, Any] = {}
 
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
+    ".container_registry",
     ".etcd",
     ".events",
     ".auth",
@@ -180,9 +206,12 @@ global_subapp_pkgs: Final[list[str]] = [
     ".image",
     ".userconfig",
     ".domainconfig",
+    ".group",
     ".groupconfig",
     ".logs",
 ]
+
+global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -245,9 +274,10 @@ async def exception_middleware(
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
+    # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
         elif len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
         else:
@@ -343,30 +373,32 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.shared_config.data["redis"]
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
 
     root_ctx.redis_live = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.LIVE),
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STATISTICS),
         name="stat",  # temporary storage for stat snapshots
-        db=REDIS_STAT_DB,
+        db=REDIS_STATISTICS_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.IMAGE),
         name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM_LOCK),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
@@ -409,16 +441,20 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     else:
         event_dispatcher_cls = EventDispatcher
 
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
     root_ctx.event_producer = await EventProducer.new(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
     )
     root_ctx.event_dispatcher = await event_dispatcher_cls.new(
-        root_ctx.shared_config.data["redis"],
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
+        event_observer=root_ctx.metrics.event,
     )
     yield
     await root_ctx.event_producer.close()
@@ -451,6 +487,19 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.storage_manager = StorageSessionManager(config)
     yield
     await root_ctx.storage_manager.aclose()
+
+
+@actxmgr
+async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    ctx = NetworkPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    root_ctx.network_plugin_ctx = ctx
+    await ctx.init(
+        context=root_ctx,
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
+    yield
+    await ctx.cleanup()
 
 
 @actxmgr
@@ -499,6 +548,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        root_ctx.network_plugin_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
@@ -659,12 +709,30 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 await task
 
 
+@actxmgr
+async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    db = root_ctx.db
+
+    per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
+        repository=PerProjectRegistryQuotaRepository(db),
+        client_pool=PerProjectContainerRegistryQuotaClientPool(),
+    )
+
+    root_ctx.services_ctx = ServicesContext(
+        per_project_container_registries_quota,
+    )
+    yield None
+
+
 class background_task_ctx:
     def __init__(self, root_ctx: RootContext) -> None:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
-        self.root_ctx.background_task_manager = BackgroundTaskManager(self.root_ctx.event_producer)
+        self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.event_producer,
+            bgtask_observer=self.root_ctx.metrics.bgtask,
+        )
 
     async def __aexit__(self, *exc_info) -> None:
         pass
@@ -697,7 +765,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: Iterable[WebMiddleware],
+    global_middlewares: Iterable[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
@@ -779,17 +847,34 @@ def build_root_app(
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            application_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
+    root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
     app = web.Application(
         middlewares=[
             exception_middleware,
             api_middleware,
+            build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
-    root_ctx = RootContext()
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
+
+    # If the request path starts with the following route, the auth_middleware is bypassed.
+    # In this case, all authentication flags are turned off.
+    # Used in special cases where the request headers cannot be modified.
+    app["auth_middleware_allowlist"] = [
+        "/container-registries/webhook",
+    ]
+
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
@@ -814,10 +899,12 @@ def build_root_app(
             manager_status_ctx,
             redis_ctx,
             database_ctx,
+            services_ctx,
             distributed_lock_ctx,
             event_dispatcher_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
@@ -869,6 +956,29 @@ def build_root_app(
     return app
 
 
+def build_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    return app
+
+
+def build_public_app(
+    root_ctx: RootContext,
+    subapp_pkgs: Iterable[str] | None = None,
+) -> web.Application:
+    app = web.Application()
+    app["_root.context"] = root_ctx
+    if subapp_pkgs is None:
+        subapp_pkgs = []
+    for pkg_name in subapp_pkgs:
+        if root_ctx.pidx == 0:
+            log.info("Loading module: {0}", pkg_name[1:])
+        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
+        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+    return app
+
+
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -876,6 +986,7 @@ async def server_main(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
@@ -915,8 +1026,11 @@ async def server_main(
                 )
 
             runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+            internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
             await runner.setup()
-            service_addr = root_ctx.local_config["manager"]["service-addr"]
+            await internal_runner.setup()
+            service_addr = cast(HostPortPair, root_ctx.local_config["manager"]["service-addr"])
+            internal_addr = cast(HostPortPair, root_ctx.local_config["manager"]["internal-addr"])
             site = web.TCPSite(
                 runner,
                 str(service_addr.host),
@@ -925,7 +1039,35 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=ssl_ctx,
             )
+            internal_site = web.TCPSite(
+                internal_runner,
+                str(internal_addr.host),
+                internal_addr.port,
+                backlog=1024,
+                reuse_port=True,
+            )
             await site.start()
+            await internal_site.start()
+            public_metrics_port = cast(
+                Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
+            )
+            if public_metrics_port is not None:
+                _app = build_public_app(
+                    root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
+                )
+                _runner = web.AppRunner(_app, keepalive_timeout=30.0)
+                await _runner.setup()
+                _site = web.TCPSite(
+                    _runner,
+                    str(service_addr.host),
+                    public_metrics_port,
+                    backlog=1024,
+                    reuse_port=True,
+                )
+                await _site.start()
+                log.info(
+                    f"started handling public metric API requests at {service_addr.host}:{public_metrics_port}"
+                )
 
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]
@@ -948,7 +1090,7 @@ async def server_main(
             m.close()
 
 
-@actxmgr
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,

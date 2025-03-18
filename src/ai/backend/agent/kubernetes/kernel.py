@@ -18,14 +18,13 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
-from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ..types import AgentEventData, KernelOwnershipData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -35,9 +34,8 @@ class KubernetesKernel(AbstractKernel):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
+        network_id: str,
         image: ImageRef,
         version: int,
         *,
@@ -48,9 +46,8 @@ class KubernetesKernel(AbstractKernel):
         environ: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
+            network_id,
             image,
             version,
             agent_config=agent_config,
@@ -60,7 +57,7 @@ class KubernetesKernel(AbstractKernel):
             environ=environ,
         )
 
-        self.deployment_name = f"kernel-{kernel_id}"
+        self.deployment_name = f"kernel-{ownership_data.kernel_id}"
 
     async def close(self) -> None:
         await self.scale(0)

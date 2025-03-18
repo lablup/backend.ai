@@ -3,6 +3,8 @@ bind_host = "0.0.0.0"
 advertised_host = "127.0.0.1"
 
 bind_api_port = 5050
+internal_api_port = 5051
+
 advertised_api_port = 5050
 
 # replace these values with your passphrase
@@ -10,3 +12,9 @@ jwt_encrypt_key = "QRX/ZX2nwKKpuTSD3ZycPA"
 permit_hash_key = "gHNAohmntRV0t9zlwTVQeQ"
 
 api_secret = "v625xZLOgbMHhl0s49VuqQ"
+
+[pyroscope]
+enabled = true
+app_name = "backendai-half-wsproxy"
+server_addr = "http://localhost:4040"
+sample_rate = 100

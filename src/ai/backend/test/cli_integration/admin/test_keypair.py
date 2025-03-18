@@ -99,17 +99,17 @@ def test_add_keypair(
     for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
         keypair = get_keypair_from_list(keypair_list, user.email)
         assert "access_key" in keypair, f"Keypair#{i + 1} doesn't exist"
-        assert (
-            keypair.get("is_active") is keypair_option.is_active
-        ), f"Keypair#{i + 1} is_active mismatch"
-        assert (
-            keypair.get("is_admin") is keypair_option.is_admin
-        ), f"Keypair#{i + 1} is_admin mismatch"
+        assert keypair.get("is_active") is keypair_option.is_active, (
+            f"Keypair#{i + 1} is_active mismatch"
+        )
+        assert keypair.get("is_admin") is keypair_option.is_admin, (
+            f"Keypair#{i + 1} is_admin mismatch"
+        )
         if (rate_limit := keypair_option.rate_limit) is not None:
             assert keypair.get("rate_limit") == rate_limit, f"Keypair#{i + 1} rate_limit mismatch"
-        assert (
-            keypair.get("resource_policy") == keypair_option.resource_policy
-        ), f"Keypair#{i + 1} resource_policy mismatch"
+        assert keypair.get("resource_policy") == keypair_option.resource_policy, (
+            f"Keypair#{i + 1} resource_policy mismatch"
+        )
 
 
 def test_update_keypair(
@@ -163,18 +163,18 @@ def test_update_keypair(
     for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
         updated_keypair = get_keypair_from_list(updated_keypair_list, user.email)
         assert "access_key" in updated_keypair, f"Keypair#{i + 1} doesn't exist"
-        assert (
-            updated_keypair.get("is_active") is new_keypair_option.is_active
-        ), f"Keypair#{i + 1} is_active mismatch"
-        assert (
-            updated_keypair.get("is_admin") is new_keypair_option.is_admin
-        ), f"Keypair#{i + 1} is_admin mismatch"
-        assert (
-            updated_keypair.get("rate_limit") == new_keypair_option.rate_limit
-        ), f"Keypair#{i + 1} rate_limit mismatch"
-        assert (
-            updated_keypair.get("resource_policy") == new_keypair_option.resource_policy
-        ), f"Keypair#{i + 1} resource_policy mismatch"
+        assert updated_keypair.get("is_active") is new_keypair_option.is_active, (
+            f"Keypair#{i + 1} is_active mismatch"
+        )
+        assert updated_keypair.get("is_admin") is new_keypair_option.is_admin, (
+            f"Keypair#{i + 1} is_admin mismatch"
+        )
+        assert updated_keypair.get("rate_limit") == new_keypair_option.rate_limit, (
+            f"Keypair#{i + 1} rate_limit mismatch"
+        )
+        assert updated_keypair.get("resource_policy") == new_keypair_option.resource_policy, (
+            f"Keypair#{i + 1} resource_policy mismatch"
+        )
 
 
 def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):

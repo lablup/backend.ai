@@ -40,8 +40,8 @@ from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
 
 if TYPE_CHECKING:
-    from ..abc import AbstractVolume
     from ..context import RootContext
+    from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -156,7 +156,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = vfpath / dst_dir
                 file_path = parent_dir / token_data["relpath"]
-                file_path.relative_to(vfpath)
+                file_path.resolve().relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
             except (ValueError, FileNotFoundError):
@@ -189,8 +189,8 @@ async def download(request: web.Request) -> web.StreamResponse:
                         hdrs.ACCEPT_RANGES: "bytes",
                         hdrs.CONTENT_LENGTH: str(file_path.stat().st_size),
                         hdrs.LAST_MODIFIED: (
-                            f'{last_mdt.strftime("%a")}, {last_mdt.day} '
-                            f'{last_mdt.strftime("%b")} {last_mdt.year} '
+                            f"{last_mdt.strftime('%a')}, {last_mdt.day} "
+                            f"{last_mdt.strftime('%b')} {last_mdt.year} "
                             f"{last_mdt.hour}:{last_mdt.minute}:{last_mdt.second} GMT"
                         ),
                     },
@@ -446,7 +446,8 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
-    r = app.router.add_resource("/upload")  # tus handlers handle CORS by themselves
+    # tus handlers handle CORS by themselves
+    r = app.router.add_resource("/upload")
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)

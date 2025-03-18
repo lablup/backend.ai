@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import itertools
 import logging
-import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
@@ -22,6 +21,7 @@ from typing import (
     Tuple,
     TypedDict,
     cast,
+    override,
 )
 
 import aiohttp
@@ -32,6 +32,7 @@ import yarl
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.types import (
     HardwareMetadata,
     VFolderHostPermission,
@@ -46,14 +47,13 @@ from .base import Item, PaginatedList
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
+    ScopeType,
     UserScope,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
 from .rbac.permission_defs import StorageHostPermission
 from .resource_policy import KeyPairResourcePolicyRow
 from .user import UserRow
@@ -119,9 +119,26 @@ class StorageSessionManager:
         await asyncio.gather(*close_aws, return_exceptions=True)
 
     @staticmethod
-    def split_host(vfolder_host: str) -> Tuple[str, str]:
+    def _split_host(vfolder_host: str) -> Tuple[str, str]:
         proxy_name, _, volume_name = vfolder_host.partition(":")
         return proxy_name, volume_name
+
+    @classmethod
+    def get_proxy_and_volume(
+        cls, vfolder_host: str, should_be_noop: bool = False
+    ) -> tuple[str, str]:
+        proxy_name, volume_name = cls._split_host(vfolder_host)
+        if should_be_noop:
+            volume_name = NOOP_STORAGE_VOLUME_NAME
+        return proxy_name, volume_name
+
+    @staticmethod
+    def parse_host(proxy_name: str, volume_name: str) -> str:
+        return f"{proxy_name}:{volume_name}"
+
+    @classmethod
+    def is_noop_host(cls, vfolder_host: str) -> bool:
+        return cls._split_host(vfolder_host)[1] == NOOP_STORAGE_VOLUME_NAME
 
     async def get_all_volumes(self) -> Iterable[Tuple[str, VolumeInfo]]:
         """
@@ -170,7 +187,7 @@ class StorageSessionManager:
             "GET",
             "folder/mount",
             json={
-                "volume": self.split_host(vfolder_host)[1],
+                "volume": self.get_proxy_and_volume(vfolder_host)[1],
                 "vfid": str(vfolder_id),
                 "subpath": str(subpath),
             },
@@ -187,7 +204,7 @@ class StorageSessionManager:
         *args,
         **kwargs,
     ) -> AsyncIterator[Tuple[yarl.URL, aiohttp.ClientResponse]]:
-        proxy_name, _ = self.split_host(vfolder_host_or_proxy_name)
+        proxy_name, _ = self.get_proxy_and_volume(vfolder_host_or_proxy_name)
         try:
             proxy_info = self._proxies[proxy_name]
         except KeyError:
@@ -248,7 +265,7 @@ class StorageVolume(graphene.ObjectType):
 
     async def resolve_performance_metric(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = ctx.storage_manager.split_host(self.id)
+        proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
         except KeyError:
@@ -268,7 +285,7 @@ class StorageVolume(graphene.ObjectType):
 
     async def resolve_usage(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = ctx.storage_manager.split_host(self.id)
+        proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
         except KeyError:
@@ -289,7 +306,7 @@ class StorageVolume(graphene.ObjectType):
     @classmethod
     def from_info(cls, proxy_name: str, volume_info: VolumeInfo) -> StorageVolume:
         return cls(
-            id=f"{proxy_name}:{volume_info["name"]}",
+            id=f"{proxy_name}:{volume_info['name']}",
             backend=volume_info["backend"],
             path=volume_info["path"],
             fsprefix=volume_info["fsprefix"],
@@ -333,7 +350,7 @@ class StorageVolume(graphene.ObjectType):
         ctx: GraphQueryContext,
         id: str,
     ) -> StorageVolume:
-        proxy_name, volume_name = ctx.storage_manager.split_host(id)
+        proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
         except KeyError:
@@ -443,39 +460,46 @@ class PermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build(
+    @override
+    async def calculate_permission(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: StorageHostPermission,
-    ) -> PermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-            case UserScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
+        target_scope: ScopeType,
+    ) -> frozenset[StorageHostPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
 
-    async def build_in_domain_scope(
+    @override
+    async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
-        domain_name: str,
     ) -> PermissionContext:
         from .domain import DomainRow
 
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        if not roles:
+        perm_ctx = PermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> PermissionContext:
+        from .domain import DomainRow
+
+        permissions = await self.calculate_permission(ctx, scope)
+        if not permissions:
             # User is not part of the domain.
             return PermissionContext()
 
         stmt = (
             sa.select(DomainRow)
-            .where(DomainRow.name == domain_name)
+            .where(DomainRow.name == scope.domain_name)
             .options(load_only(DomainRow.allowed_vfolder_hosts))
         )
         domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
@@ -484,26 +508,28 @@ class PermissionContextBuilder(
         host_permissions = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
         result = PermissionContext(
             object_id_to_additional_permission_map={
-                host: _legacy_vf_perms_to_host_rbac_perms(perms) for host, perms in host_permissions
+                host: _legacy_vf_perms_to_host_rbac_perms(perms)
+                for host, perms in host_permissions.items()
             }
         )
         return result
 
-    async def build_in_project_scope(
+    @override
+    async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
-        project_id: uuid.UUID,
+        scope: ProjectScope,
     ) -> PermissionContext:
         from .group import GroupRow
 
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        if not roles:
-            # User is not part of the project.
+        permissions = await self.calculate_permission(ctx, scope)
+        if not permissions:
+            # User is not part of the domain.
             return PermissionContext()
 
         stmt = (
             sa.select(GroupRow)
-            .where(GroupRow.id == project_id)
+            .where(GroupRow.id == scope.project_id)
             .options(load_only(GroupRow.allowed_vfolder_hosts))
         )
         project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
@@ -518,19 +544,21 @@ class PermissionContextBuilder(
         )
         return result
 
-    async def build_in_user_scope(
+    @override
+    async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
-        user_id: uuid.UUID,
+        scope: UserScope,
     ) -> PermissionContext:
         from .keypair import KeyPairRow
 
-        roles = await get_roles_in_scope(ctx, UserScope(user_id), self.db_session)
-        if not roles:
+        permissions = await self.calculate_permission(ctx, scope)
+        if not permissions:
+            # User is not part of the domain.
             return PermissionContext()
         stmt = (
             sa.select(UserRow)
-            .where(UserRow.uuid == user_id)
+            .where(UserRow.uuid == scope.user_id)
             .options(
                 selectinload(UserRow.keypairs).options(
                     joinedload(KeyPairRow.resource_policy).options(
@@ -562,30 +590,35 @@ class PermissionContextBuilder(
         )
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,

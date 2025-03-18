@@ -21,7 +21,7 @@ class VFolderPermission(BasePermission):
 
     MOUNT_RO = enum.auto()
     MOUNT_RW = enum.auto()
-    MOUNT_WD = enum.auto()
+    MOUNT_WD = enum.auto()  # Legacy
 
 
 class StorageHostPermission(BasePermission):
@@ -55,8 +55,13 @@ class ComputeSessionPermission(BasePermission):
 
 
 class ScalingGroupPermission(BasePermission):
-    READ_ATTRIBUTE = enum.auto()
+    # super-admin only
+    ASSOCIATE_WITH_SCOPES = enum.auto()
+    ASSIGN_AGENTS = enum.auto()
     UPDATE_ATTRIBUTE = enum.auto()
+
+    # admin only
+    READ_ATTRIBUTE = enum.auto()
 
     # Permission set of bindings and sub-scopes
     AGENT_PERMISSIONS = enum.auto()
@@ -64,3 +69,39 @@ class ScalingGroupPermission(BasePermission):
     INFERENCE_SERVICE_PERMISSIONS = enum.auto()
 
     STORAGE_HOST_PERMISSIONS = enum.auto()
+
+
+class AgentPermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    CREATE_COMPUTE_SESSION = enum.auto()
+    CREATE_SERVICE = enum.auto()
+
+
+class DomainPermission(BasePermission):
+    # These permissions limit actions taken directly to domains
+    READ_ATTRIBUTE = enum.auto()
+    READ_SENSITIVE_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    CREATE_USER = enum.auto()
+    CREATE_PROJECT = enum.auto()
+
+
+class ProjectPermission(BasePermission):
+    # These permissions limit actions taken directly to projects(groups)
+    READ_ATTRIBUTE = enum.auto()
+    READ_SENSITIVE_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    DELETE_PROJECT = enum.auto()
+
+    ASSOCIATE_WITH_USER = enum.auto()
+
+
+class ImagePermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    CREATE_CONTAINER = enum.auto()
+
+    FORGET_IMAGE = enum.auto()

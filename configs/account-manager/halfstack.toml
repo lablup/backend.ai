@@ -18,6 +18,7 @@ pool-pre-ping = false
 [account-manager]
 num-proc = 1
 service-addr = { host = "0.0.0.0", port = 8088 }
+internal-addr = { host = "0.0.0.0", port = 8087 }
 #user = "nobody"
 #group = "nobody"
 ssl-enabled = false
@@ -26,6 +27,13 @@ ssl-enabled = false
 # ipc-base-path = "/tmp/backend.ai/ipc"
 #id = ""
 pid-file = "./account-manager.pid"             # env: BACKEND_PID_FILE
+
+
+[pyroscope]
+enabled = true
+app_name = "backendai-half-account-manager"
+server_addr = "http://localhost:4040"
+sample-rate = 100
 
 
 [logging]

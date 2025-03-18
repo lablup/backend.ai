@@ -1,4 +1,5 @@
 {
+  "$schema": "./device_metadata.schema.json",
   "deviceInfo": {
     "cpu": {
       "slot_name": "cpu",
@@ -115,6 +116,17 @@
       "description": "Furiosa Warboy",
       "human_readable_name": "Warboy Device",
       "display_unit": "Warboy",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "furiosa"
+    },
+    "rngd.device": {
+      "slot_name": "rngd.device",
+      "description": "Furiosa RNGD",
+      "human_readable_name": "RNGD Device",
+      "display_unit": "RNGD",
       "number_format": {
         "binary": false,
         "round_length": 0

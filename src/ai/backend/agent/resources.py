@@ -8,22 +8,22 @@ import pprint
 import textwrap
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from collections.abc import (
+    Collection,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Collection,
-    Iterator,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
     TextIO,
-    Tuple,
     Type,
+    TypeAlias,
     cast,
 )
 
@@ -66,8 +66,9 @@ if TYPE_CHECKING:
 
     from .agent import ComputerContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
 
@@ -81,9 +82,6 @@ class KernelResourceSpec:
     while kernel containers are running.
     """
 
-    container_id: str
-    """The container ID to refer inside containers."""
-
     slots: Mapping[SlotName, str]
     """Stores the original user-requested resource slots."""
 
@@ -95,7 +93,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: List["Mount"] = attrs.Factory(list)
+    mounts: list["Mount"] = attrs.Factory(list)
     """The mounted vfolder list."""
 
     def freeze(self) -> None:
@@ -114,7 +112,7 @@ class KernelResourceSpec:
         mounts_str = ",".join(map(str, self.mounts))
         slots_str = json.dumps({k: str(v) for k, v in self.slots.items()})
 
-        resource_str = f"CID={self.container_id}\n"
+        resource_str = ""
         resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"
         resource_str += f"MOUNTS={mounts_str}\n"
         resource_str += f"SLOTS={slots_str}\n"
@@ -180,7 +178,6 @@ class KernelResourceSpec:
                 allocations[device_name][slot_name] = per_device_alloc
         mounts = [Mount.from_str(m) for m in kvpairs["MOUNTS"].split(",") if m]
         return cls(
-            container_id=kvpairs.get("CID", "unknown"),
             scratch_disk_size=BinarySize.finite_from_str(kvpairs["SCRATCH_SIZE"]),
             allocations=dict(allocations),
             slots=ResourceSlot(json.loads(kvpairs["SLOTS"])),
@@ -264,8 +261,8 @@ class AbstractComputeDevice:
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     key: DeviceName = DeviceName("accelerator")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]]
-    exclusive_slot_types: Set[str]
+    slot_types: Sequence[tuple[SlotName, SlotTypes]]
+    exclusive_slot_types: set[str]
 
     @abstractmethod
     def get_metadata(self) -> AcceleratorMetadata:
@@ -359,7 +356,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
-        device_alloc,
+        device_alloc: DeviceAllocation,
     ) -> Mapping[str, Any]:
         """
         When starting a new container, generate device-specific options for the
@@ -368,7 +365,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return {}
 
-    async def generate_resource_data(self, device_alloc) -> Mapping[str, str]:
+    async def generate_resource_data(self, device_alloc: DeviceAllocation) -> Mapping[str, str]:
         """
         Generate extra resource.txt key-value pair sets to be used by the plugin's
         own hook libraries in containers.
@@ -390,7 +387,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def get_attached_devices(
         self,
-        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        device_alloc: DeviceAllocation,
     ) -> Sequence[DeviceModelInfo]:
         """
         Make up container-attached device information with allocated device id.
@@ -402,8 +399,9 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
     @abstractmethod
     async def get_docker_networks(
-        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+        self,
+        device_alloc: DeviceAllocation,
+    ) -> list[str]:
         """
         Returns reference string (e.g. Id, name, ...) of docker networks
         to attach to container for accelerator to work properly.
@@ -412,12 +410,30 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
     @abstractmethod
     async def generate_mounts(
-        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+        self,
+        source_path: Path,
+        device_alloc: DeviceAllocation,
+    ) -> list[MountInfo]:
         """
         Populates additional files/directories under `source_path`
         to mount to container and returns `MountInfo`.
         Agent will then read this `MountInfo`s and mount files/directories.
+        """
+        return []
+
+    def get_additional_gids(self) -> list[int]:
+        """
+        Override this function to pass the additional GIDs the 'work' user will belong to in the container.
+        This is useful when the accelerator plugin assumes that the 'work' is part of a specific group.
+        """
+        return []
+
+    def get_additional_allowed_syscalls(self) -> list[str]:
+        """
+        Returns system calls allowed within the container.
+        These system calls will be additionally allowed in addition to those allowed by the default seccomp profile.
+
+        e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
         return []
 
@@ -431,7 +447,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
         plugin_group: str,
         allowlist: Optional[set[str]] = None,
         blocklist: Optional[set[str]] = None,
-    ) -> Iterator[Tuple[str, Type[AbstractComputePlugin]]]:
+    ) -> Iterator[tuple[str, Type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
         def accel_lt_intrinsic(item):
@@ -514,6 +530,66 @@ async def scan_resource_usage_per_slot(
             )
             tg.create_task(_wrap_future(fut))
     return slot_allocs
+
+
+async def scan_gpu_alloc_map(
+    kernel_ids: Sequence[KernelId], scratch_root: Path
+) -> dict[DeviceId, Decimal]:
+    """
+    Fetch the current allocated amounts for fractional gpu from
+    ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+    """
+
+    async def _read_kernel_resource_spec(kernel_id: KernelId) -> dict[DeviceId, Decimal]:
+        path = scratch_root / str(kernel_id) / "config" / "resource.txt"
+        alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
+
+        try:
+            loop = asyncio.get_running_loop()
+            content = await loop.run_in_executor(None, path.read_text)
+            resource_spec = KernelResourceSpec.read_from_string(content)
+
+            if cuda := resource_spec.allocations.get(DeviceName("cuda")):
+                if cuda_shares := cuda.get(SlotName("cuda.shares")):
+                    for device_id, shares in cuda_shares.items():
+                        alloc_map[device_id] += Decimal(shares)
+
+                if cuda_device := cuda.get(SlotName("cuda.device")):
+                    for device_id, device in cuda_device.items():
+                        alloc_map[device_id] += Decimal(device)
+
+        except FileNotFoundError:
+            return {}
+
+        except Exception as e:
+            setattr(e, "kernel_id", kernel_id)
+            raise e
+
+        return alloc_map
+
+    tasks = [
+        asyncio.create_task(
+            _read_kernel_resource_spec(kernel_id),
+        )
+        for kernel_id in kernel_ids
+    ]
+
+    gpu_alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
+
+    for task in asyncio.as_completed(tasks):
+        try:
+            alloc_map = await task
+        except Exception as e:
+            kernel_id = getattr(e, "kernel_id", "(unknown)")
+            log.error(
+                f"GPU alloc map scanning for kernel_id '{kernel_id}' resulted in exception: {e}"
+            )
+            break
+
+        for device_id, alloc in alloc_map.items():
+            gpu_alloc_map[device_id] += alloc
+
+    return gpu_alloc_map
 
 
 def allocate(

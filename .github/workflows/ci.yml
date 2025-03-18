@@ -4,15 +4,17 @@ on:
   push:
     branches:
       - 'main'
-      - '[0-9][0-9].0[39]'
+      - '[0-9][0-9].[0-9]'
+      - '[0-9][0-9].[0-9][0-9]'
     tags:
-      - '[0-9][0-9].0[39].*'
+      - '[0-9][0-9].[0-9].*'
+      - '[0-9][0-9].[0-9][0-9].*'
   pull_request:
-    types: [labeled, unlabeled, opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]
   merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -26,38 +28,86 @@ jobs:
       contents: read
       pull-requests: write
     outputs:
-      skip: ${{ steps.check_skip.outputs.SKIP }}
+      skip: ${{ steps.check_skip.outputs.SKIP_CI }}
+      graphite-labels: ${{ steps.graphite_labels.outputs.GRAPHITE_LABELS }}
+      release: ${{ steps.release.outputs.IS_RELEASE }}
+      alembic: ${{ steps.alembic.outputs.ALEMBIC }}
     steps:
-      - name: Optimize CI
-        if: ${{ github.event_name == 'pull_request' }}
-        id: graphite-ci-action
-        uses: withgraphite/graphite-ci-action@main
-        with:
-          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
-      - name: Check if should skip the CI
-        id: check_skip
+      - name: Debug action trigger
         run: |
-          if [ "${{ steps.graphite-ci-action.outputs.skip }}" == "true" ]; then
-            echo "SKIP=true" >> $GITHUB_OUTPUT
-          else
-            echo "SKIP=false" >> $GITHUB_OUTPUT
-          fi
+          echo "github.action: ${{ github.action }}"
+          echo "github.run_id: ${{ github.run_id }}"
+          echo "github.actor: ${{ github.actor }}"
+          echo "github.job: ${{ github.job }}"
+          echo "github.head_ref: ${{ github.head_ref }}"
+          echo "github.ref: ${{ github.ref }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
+          echo "github.ref_type: ${{ github.ref_type }}"
+          echo "github.event_name: ${{ github.event_name }}"
+          echo "github.event_path: ${{ github.event_path }}"
+          echo "github.event.action: ${{ github.event.action }}"
+          echo "merge_group:"
+          echo "  github.event.merge_group.head_ref: ${{ github.event.merge_group.head_ref }}"
+          echo "  github.event.merge_group.base_ref: ${{ github.event.merge_group.base_ref }}"
+          echo "pull_request:"
+          echo "  github.event.number: ${{ github.event.number }}"
+          echo "  github.event.pull_request.head.ref: ${{ github.event.pull_request.head.ref }}"
+          echo "  github.event.pull_request.base.ref: ${{ github.event.pull_request.base.ref }}"
+          echo "push:"
+          echo "  github.event.after: ${{ github.event.after }}"
+          echo "  github.event.before: ${{ github.event.before }}"
+          echo "  github.event.base_ref: ${{ github.event.base_ref }}"
+          echo "  github.event.ref: ${{ github.event.ref }}"
+          echo "---"
+          echo "concurrency-group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
       - name: labeler
-        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'syncrhonize'
-        uses: lablup/auto-labeler@main # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
+        id: labeler
+        if: github.event_name == 'pull_request'
+        uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
+      - name: Optimize CI
+        id: check_stacked_pr
+        run: |
+          echo "NON_TOP_BOTTOM=false" >> $GITHUB_OUTPUT
+          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
+          if [[ "$BASE_BRANCH" != "main" && ! "$BASE_BRANCH" =~ ^[0-9]{2}\.[0-9]{1,2}$ ]]; then
+            response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=base_${{ github.event.pull_request.head }}" \
+            -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
+            if [ "$response" == "200" ]; then
+              echo "NON_TOP_BOTTOM=true" >> $GITHUB_OUTPUT
+            fi
+          fi
+      - name: Skip CI
+        id: check_skip
+        if: |
+          contains(toJSON(github.event.head_commit.message), 'skip:ci')
+          || contains(github.event.pull_request.labels.*.name, 'skip:ci')
+          || steps.check_stacked_pr.outputs.NON_TOP_BOTTOM == 'true'
+        run: echo "SKIP_CI=true" >> $GITHUB_OUTPUT
+      - name: Graphite labels
+        id: graphite_labels
+        if: contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.pull_request.labels.*.name)
+        run: |
+          echo "GRAPHITE_LABELS=true" >> $GITHUB_OUTPUT
+      - name: Release
+        id: release
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+      - name: Alembic
+        id: alembic
+        if: contains(github.event.pull_request.labels.*.name, 'comp:manager')
+        run: echo "ALEMBIC=true" >> $GITHUB_OUTPUT
+
+
 
 
   lint:
     if: |
-      !(
-        contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
+    - run: echo ${{ needs.optimize-ci.outputs.skip }}
     - name: Calculate the fetch depth
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
@@ -126,12 +176,12 @@ jobs:
   check-alembic-migrations:
     if: |
       (
-        contains(github.event.pull_request.labels.*.name, 'require:db-migration')
-        || (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
+        needs.optimize-ci.outputs.alembic == 'true'
+        || needs.optimize-ci.outputs.release == 'true'
       )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
-      && needs.optimize-ci.outputs.skip == 'false'
+      && needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels !=
+      'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -150,16 +200,42 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Check for multiple heads
       run: python scripts/check-multiple-alembic-heads.py
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: ./actions/init-pants
+      with:
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Prepare DB
+      run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Prepare the alembic configuration file
+      run: cp configs/manager/halfstack.alembic.ini alembic.ini
+    - name: Prepare database schema
+      run: ./backend.ai mgr schema oneshot
+    - name: Try creating alembic migration
+      id: create-revision
+      run: |
+        output=$(./py -m alembic revision --autogenerate)
+        revision_file=$(echo "$output" | grep -oP '(?<=Generating ).*\.py')
+        echo "REVISION_FILE=$revision_file" >> $GITHUB_OUTPUT
+    - name: Verify that revision is empty
+      run: python scripts/check-alembic-revision.py ${{ steps.create-revision.outputs.REVISION_FILE }}
 
 
   typecheck:
     if: |
-      !(
-        contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -226,12 +302,8 @@ jobs:
 
   test:
     if: |
-      !(
-        contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
@@ -287,7 +359,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
+        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -v
     - name: Upload pants log
       uses: actions/upload-artifact@v4
       with:
@@ -297,17 +369,19 @@ jobs:
 
 
   build-scies:
-    needs: [lint, typecheck, test, check-alembic-migrations]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-latest: x86-64
+        # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm64: aarch64
-        # macos-12: intel
-        # macos-13: apple silicon
-        os: [ubuntu-latest, ubuntu-22.04-arm64, macos-13-xlarge, macos-12-large]
+        # macos-14-large: intel
+        # self-hosted-macos-14: apple silicon
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
+    env:
+      SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Check out the revision
       uses: actions/checkout@v4
@@ -334,14 +408,20 @@ jobs:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
-    - name: Build fat packages
+    - name: Build both lazy and fat packages
       run: |
         pants --tag="scie" package '::'
-        # 'pants run' does not support parallelization
+        # Rename artifacts to have the platform suffix
+        platform_suffix="$(python scripts/get-platform-suffix.py)"
+        for artifact in dist/backendai-*; do
+          mv "${artifact}" "${artifact}-${platform_suffix}"
+        done
+        # Generate checksums. NOTE: 'pants run' does not support parallelization
         pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
-    - name: Clean up intermediate pex files
-      run: |
-        rm -rf dist/src.*/
+        # Merge checksums into a single file
+        cat dist/*.sha256 > dist/checksum.txt
+        mv dist/checksum.txt dist/checksum-${platform_suffix}.txt
+        rm dist/*.sha256
     - name: Upload scies
       uses: actions/upload-artifact@v4
       with:
@@ -356,9 +436,9 @@ jobs:
 
 
   build-wheels:
-    needs: [lint, typecheck, test, check-alembic-migrations]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
       uses: actions/checkout@v4
@@ -423,14 +503,14 @@ jobs:
 
 
   build-sbom:
-    needs: [lint, typecheck, test, check-alembic-migrations]
-    if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
+    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     uses: ./.github/workflows/sbom.yml
 
 
   make-final-release:
-    needs: [build-scies, build-wheels, build-sbom]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -442,18 +522,14 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Install towncrier requirements
-      run: |
-        pip install -U -r tools/towncrier-requirements.txt
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=5.0' 'packaging>=21.3'
+        pip install -U 'twine~=5.0'
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
@@ -469,6 +545,10 @@ jobs:
         pattern: scies-*
         path: dist
         merge-multiple: true
+    - name: Merge checksum files into one
+      run: |
+        cat dist/checksum-*.txt > dist/checksum.txt
+        sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
       uses: actions/download-artifact@v4
       with:
@@ -535,7 +615,7 @@ jobs:
         release_version=$(git branch -r | grep -E 'origin/[0-9]{2}\.[0-9]{2}$' | awk -F'/' '{print $2}' | sort -V | tail -n 1)
         echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
     - name: Update edge installer shorten URL
-      if: ${{ github.ref_name == steps.extract_edge_release_version.outputs.RELEASE_VERSION }}
+      if: ${{ startsWith(github.ref_name, steps.extract_edge_release_version.outputs.RELEASE_VERSION) }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
@@ -572,8 +652,8 @@ jobs:
 
 
   build-conda-pack-for-windows:
-    needs: [make-final-release]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    needs: [make-final-release, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -588,7 +668,6 @@ jobs:
       run: |
         export LANG=C.UTF-8
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
       uses: actions/setup-python@v5

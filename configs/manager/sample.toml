@@ -73,6 +73,9 @@ group = "nobody"
 
 # Set the service hostname/port to accept API requests.
 service-addr = { host = "0.0.0.0", port = 8080 }
+
+# Set the internal hostname/port to accept internal API requests.
+internal-addr = { host = "0.0.0.0", port = 8082 }
 # env: BACKEND_SERVICE_IP, BACKEND_SERVICE_PORT
 
 # Set the SSL certificate chain and the private keys used for serving the API requests.
@@ -148,13 +151,19 @@ importer-image = "lablup/importer:manylinux2010"
 # The starting port number for aiomonitor.
 # Since the manager is composed of multiple processes, each process will be exposed
 # via the port number of this base port number + pidx.
-# aiomonitor-termui-port = 48100
-# aiomonitor-webui-port = 49100
+# aiomonitor-termui-port = 38100
+# aiomonitor-webui-port = 39100
 
 
 [docker-registry]
 # Enable or disable SSL certificate verification when accessing Docker registries.
 ssl-verify = false                       # env: BACKEND_SKIP_SSLCERT_VALIDATION
+
+[pyroscope]
+enabled = true
+app-name = "backendai-half-manager"
+server-addr = "http://localhost:4040"
+sample-rate = 100
 
 
 [logging]

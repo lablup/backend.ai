@@ -19,7 +19,7 @@ class RelayHandler(logging.Handler):
         super().__init__()
         self.endpoint = endpoint
         self.msgpack_options = msgpack_options
-        self._zctx = zmq.Context()
+        self._zctx = zmq.Context[zmq.Socket]()
         # We should use PUSH-PULL socket pairs to avoid
         # lost of synchronization sentinel messages.
         if endpoint:

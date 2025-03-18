@@ -121,18 +121,18 @@ async def web_handler(request):
     try:
         # We treat all requests and responses as streaming universally
         # to be a transparent proxy.
-        api_rqst = Request(
+        api_request = Request(
             request.method,
             path,
             request.content,
             params=request.query,
         )
-        _translate_headers(api_rqst, request)
+        _translate_headers(api_request, request)
         if "Content-Type" in request.headers:
-            api_rqst.content_type = request.content_type  # set for signing
+            api_request.content_type = request.content_type  # set for signing
         # Uploading request body happens at the entering of the block,
         # and downloading response body happens in the read loop inside.
-        async with api_rqst.fetch() as up_resp:
+        async with api_request.fetch() as up_resp:
             down_resp = web.StreamResponse()
             down_resp.set_status(up_resp.status, up_resp.reason)
             down_resp.headers.update(up_resp.headers)
@@ -164,15 +164,15 @@ async def web_handler(request):
 async def websocket_handler(request):
     path = re.sub(r"^/?v(\d+)/", "/", request.path)
     try:
-        api_rqst = Request(
+        api_request = Request(
             request.method,
             path,
             request.content,
             params=request.query,
             content_type=request.content_type,
         )
-        _translate_headers(api_rqst, request)
-        async with api_rqst.connect_websocket() as up_conn:
+        _translate_headers(api_request, request)
+        async with api_request.connect_websocket() as up_conn:
             down_conn = web.WebSocketResponse()
             await down_conn.prepare(request)
             web_socket_proxy = WebSocketProxy(up_conn, down_conn)

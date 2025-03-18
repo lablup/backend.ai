@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import AsyncIterator, Optional, cast
+from typing import AsyncIterator, Optional, cast, override
 
 import aiohttp
 import typing_extensions
@@ -8,6 +8,7 @@ import yarl
 
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import BaseContainerRegistry
 
@@ -18,6 +19,7 @@ class DockerHubRegistry(BaseContainerRegistry):
     @typing_extensions.deprecated(
         "Rescanning a whole Docker Hub account is disabled due to the API rate limit."
     )
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
@@ -33,7 +35,7 @@ class DockerHubRegistry(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         params = {"page_size": "30"}
-        username = self.registry_info["username"]
+        username = self.registry_info.username
         hub_url = yarl.URL("https://hub.docker.com")
         repo_list_url: Optional[yarl.URL]
         repo_list_url = hub_url / f"v2/repositories/{username}/"
@@ -45,7 +47,7 @@ class DockerHubRegistry(BaseContainerRegistry):
                         # skip legacy images
                         if item["name"].startswith("kernel-"):
                             continue
-                        yield f"{username}/{item["name"]}"
+                        yield f"{username}/{item['name']}"
                 else:
                     log.error(
                         "Failed to fetch repository list from {0} (status={1})",
@@ -63,10 +65,14 @@ class DockerHubRegistry(BaseContainerRegistry):
 
 
 class DockerRegistry_v2(BaseContainerRegistry):
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
+        if not self.registry_info.project:
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
+
         # The credential should have the catalog search privilege.
         rqst_args = await registry_login(
             sess,
@@ -83,7 +89,8 @@ class DockerRegistry_v2(BaseContainerRegistry):
                 if resp.status == 200:
                     data = json.loads(await resp.read())
                     for item in data["repositories"]:
-                        yield item
+                        if item.startswith(self.registry_info.project):
+                            yield item
                     log.debug("found {} repositories", len(data["repositories"]))
                 else:
                     log.warning(

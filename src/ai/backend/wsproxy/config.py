@@ -234,7 +234,7 @@ class FileLogConfig(BaseSchema):
         int, Field(description="Number of outdated log files to retain.", default=5)
     ]
     rotation_size: Annotated[
-        ByteSize, Field(description="Maximum size for a single log file.", default="10M")
+        ByteSize, Field(description="Maximum size for a single log file.", default=10 * 1024 * 1024)
     ]
     format: Annotated[
         LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
@@ -303,6 +303,13 @@ class GraylogConfig(BaseSchema):
             default=None,
         ),
     ]
+
+
+class PyroscopeConfig(BaseSchema):
+    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
+    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
+    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
+    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
 
 
 class LoggingConfig(BaseSchema):
@@ -383,6 +390,9 @@ class WSProxyConfig(BaseSchema):
     bind_api_port: Annotated[
         int, Field(default=5050, description="Port number to bind for API server")
     ]
+    internal_api_port: Annotated[
+        int, Field(default=5051, description="Port number to bind for internal API server")
+    ]
     advertised_api_port: Annotated[
         int | None,
         Field(default=None, examples=[15050], description="API port number reachable from client"),
@@ -417,21 +427,22 @@ class WSProxyConfig(BaseSchema):
     aiomonitor_termui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=48500
+            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=38500
         ),
     ]
     aiomonitor_webui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=49500
+            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=39500
         ),
     ]
 
 
 class ServerConfig(BaseSchema):
-    wsproxy: WSProxyConfig
-    logging: LoggingConfig
-    debug: DebugConfig
+    wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
+    logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
+    debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
@@ -453,10 +464,10 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             print(pformat(cfg.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
-            "ConfigurationError: Could not read or validate the manager local config:",
+            "ConfigurationError: Could not read or validate the wsproxy local config:",
             file=sys.stderr,
         )
-        print(pformat(e), file=sys.stderr)
+        print(pformat(e.errors()), file=sys.stderr)
         raise click.Abort()
     else:
         return cfg

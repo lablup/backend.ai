@@ -4,22 +4,32 @@ from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
+    Self,
+    cast,
 )
 
 import graphene
+import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import AgentId, KernelId, SessionId
+from ai.backend.manager.models.base import batch_multiresult_in_scalar_stream
 
 from ..gql_relay import AsyncNode, Connection
-from ..image import ImageNode
 from ..kernel import KernelRow, KernelStatus
 from ..user import UserRole
+from .image import ImageNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+
+__all__ = (
+    "KernelNode",
+    "KernelConnection",
+)
 
 
 class KernelNode(graphene.ObjectType):
@@ -37,6 +47,10 @@ class KernelNode(graphene.ObjectType):
 
     # image
     image = graphene.Field(ImageNode)
+    image_reference = graphene.String(description="Added in 25.4.0.")
+    architecture = graphene.String(
+        description="Added in 25.4.0. The architecture that the image of this kernel requires"
+    )
 
     # status
     status = graphene.String()
@@ -59,9 +73,41 @@ class KernelNode(graphene.ObjectType):
     preopen_ports = graphene.List(lambda: graphene.Int)
 
     @classmethod
-    def from_row(cls, info: graphene.ResolveInfo, row: KernelRow) -> KernelNode:
-        ctx: GraphQueryContext = info.context
+    async def batch_load_by_session_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        session_ids: Sequence[SessionId],
+    ) -> Sequence[Sequence[Self]]:
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                session_ids,
+                lambda row: row.session_id,
+            )
 
+    @classmethod
+    async def batch_load_by_agent_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+    ) -> Sequence[Sequence[Self]]:
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelRow).where(KernelRow.agent.in_(agent_ids))
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                agent_ids,
+                lambda row: row.agent,
+            )
+
+    @classmethod
+    def from_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Self:
         # TODO: Replace 'hide-agents' option to RBAC
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         if is_superadmin:
@@ -70,13 +116,15 @@ class KernelNode(graphene.ObjectType):
             hide_agents = ctx.local_config["manager"]["hide-agents"]
         status_history = row.status_history or {}
         return KernelNode(
-            id=row.id,
+            id=row.id,  # auto-converted to Relay global ID
             row_id=row.id,
             cluster_idx=row.cluster_idx,
             cluster_hostname=row.cluster_hostname,
             local_rank=row.local_rank,
             cluster_role=row.cluster_role,
             session_id=row.session_id,
+            architecture=row.architecture,
+            image_reference=row.image,
             status=row.status,
             status_changed=row.status_changed,
             status_info=row.status_info,
@@ -92,6 +140,17 @@ class KernelNode(graphene.ObjectType):
             resource_opts=row.resource_opts,
             preopen_ports=row.preopen_ports,
         )
+
+    async def resolve_image(self, info: graphene.ResolveInfo) -> Optional[ImageNode]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, ImageNode.batch_load_by_name_and_arch
+        )
+        images = cast(list[ImageNode], await loader.load((self.image_reference, self.architecture)))
+        try:
+            return images[0]
+        except IndexError:
+            return None
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context

@@ -261,7 +261,7 @@ def rescan_images(cli_ctx: CLIContext, registry: str) -> None:
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
     log.warning("etcd rescan-images command is deprecated, use image rescan instead")
-    asyncio.run(rescan_images_impl(cli_ctx, registry, False))
+    asyncio.run(rescan_images_impl(cli_ctx, registry))
 
 
 @cli.command()

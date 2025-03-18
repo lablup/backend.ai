@@ -28,6 +28,7 @@ from typing import (
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote_plus as urlquote
 
+import aiofiles.os
 import aiohttp
 import asyncpg
 import pytest
@@ -55,6 +56,7 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
     GroupRow,
+    ImageRow,
     KernelRow,
     ProjectResourcePolicyRow,
     ScalingGroupRow,
@@ -73,8 +75,10 @@ from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -150,19 +154,27 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
+def ipc_base_path() -> Path:
+    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
+    ipc_base_path.mkdir(parents=True, exist_ok=True)
+    return ipc_base_path
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    ipc_base_path: Path,
     logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
     test_db,
 ) -> Iterator[LocalConfig]:
-    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
-    ipc_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
     redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
+
+    build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
     # Establish a self-contained config.
     cfg = LocalConfig({
@@ -178,6 +190,22 @@ def local_config(
                 "port": redis_addr.port,
             },
             "redis_helper_config": config.redis_helper_default_config,
+            "override_configs": {
+                "stat": {
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": config.redis_helper_default_config,
+                },
+                "stream": {
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": config.redis_helper_default_config,
+                },
+            },
         }),
         "db": {
             "addr": postgres_addr,
@@ -198,6 +226,13 @@ def local_config(
             "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
+            "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
+        },
+        "pyroscope": {
+            "enabled": False,
+            "app-name": "backend.ai-test",
+            "server-addr": "http://localhost:4040",
+            "sample-rate": 100,
         },
         "debug": {
             "enabled": False,
@@ -246,22 +281,23 @@ def etcd_fixture(
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
+            "manager": {"status": "running"},
             "volumes": {
                 "_mount": str(vfolder_mount),
                 "_fsprefix": str(vfolder_fsprefix),
-                "_default_host": str(vfolder_host),
+                "default_host": str(vfolder_host),
+                "proxies": {
+                    "local": {
+                        "client_api": "http://127.0.0.1:6021",
+                        "manager_api": "https://127.0.0.1:6022",
+                        "secret": "some-secret-shared-with-storage-proxy",
+                        "ssl_verify": "false",
+                    }
+                },
             },
             "nodes": {},
             "config": {
-                "docker": {
-                    "registry": {
-                        "cr.backend.ai": {
-                            "": "https://cr.backend.ai",
-                            "type": "harbor2",
-                            "project": "stable",
-                        },
-                    },
-                },
+                "docker": {},
                 "redis": {
                     "addr": f"{redis_addr.host}:{redis_addr.port}",
                 },
@@ -420,7 +456,12 @@ async def database_engine(local_config, database):
 
 
 @pytest.fixture()
-def database_fixture(local_config, test_db, database) -> Iterator[None]:
+def extra_fixtures():
+    return {}
+
+
+@pytest.fixture()
+def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
@@ -431,11 +472,20 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+
+    extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
+    extra_fixture_file_path = Path(extra_fixture_file.name)
+
+    with open(extra_fixture_file_path, "w") as f:
+        json.dump(extra_fixtures, f)
+
     fixture_paths = [
         build_root / "fixtures" / "manager" / "example-users.json",
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
+        build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
+        extra_fixture_file_path,
     ]
 
     async def init_fixture() -> None:
@@ -460,6 +510,9 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
     yield
 
     async def clean_fixture() -> None:
+        if extra_fixture_file_path.exists():
+            await aiofiles.os.remove(extra_fixture_file_path)
+
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -473,6 +526,8 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ImageRow.__table__.delete()))
+                await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
             await engine.dispose()
 
@@ -480,9 +535,12 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
 
 
 @pytest.fixture
-def file_lock_factory(local_config, request) -> Callable[[str], FileLock]:
+def file_lock_factory(
+    ipc_base_path: Path,
+    request: pytest.FixtureRequest,
+) -> Callable[[str], FileLock]:
     def _make_lock(lock_id: str) -> FileLock:
-        lock_path = local_config["manager"]["ipc-base-path"] / f"testing.{lock_id}.lock"
+        lock_path = ipc_base_path / f"testing.{lock_id}.lock"
         lock = FileLock(lock_path, timeout=0)
         request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
         return lock
@@ -541,7 +599,7 @@ class Client:
 
 
 @pytest.fixture
-async def app(local_config, event_loop):
+async def app(local_config):
     """
     Create an empty application with the test configuration.
     """
@@ -554,7 +612,7 @@ async def app(local_config, event_loop):
 
 
 @pytest.fixture
-async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
+async def create_app_and_client(local_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
@@ -665,7 +723,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -709,7 +767,7 @@ def get_headers(app, default_keypair):
         signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
         headers["Authorization"] = (
             f"BackendAI signMethod=HMAC-{hash_type.upper()}, "
-            + f'credential={keypair["access_key"]}:{signature}'
+            + f"credential={keypair['access_key']}:{signature}"
         )
         return headers
 
@@ -808,6 +866,7 @@ async def registry_ctx(mocker):
     mock_event_producer.produce_event = AsyncMock()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
+    network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
         local_config=mock_local_config,
@@ -821,6 +880,7 @@ async def registry_ctx(mocker):
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
+        network_plugin_ctx=network_plugin_ctx,
         agent_cache=mock_agent_cache,
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
@@ -876,7 +936,10 @@ async def session_info(database_engine):
         db_sess.add(user_resource_policy)
 
         project_resource_policy = ProjectResourcePolicyRow(
-            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+            name=resource_policy_name,
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_network_count=3,
         )
         db_sess.add(project_resource_policy)
 

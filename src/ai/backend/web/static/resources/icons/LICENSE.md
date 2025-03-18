@@ -25,6 +25,10 @@ Icons from wikimedia ( https://upload.wikimedia.org/wikipedia/commons/8/83/tpu.s
 
  * tpu.svg
 
+Icons from Graphcore ( https://www.graphcore.ai/hubfs/assets/images/social/gc-dev-icon-01.svg )
+
+ * ipu.svg
+
 Icons from www.flaticon.com made by https://www.flaticon.com/authors/dave-gandy ( licensed under the Creative Commons Attribution 3.0 Unported license.)
 
  * terminal.svg (as code form)
@@ -40,3 +44,6 @@ Icon from flaticon by Pixel perfect ( https://www.flaticon.com/authors/pixel-per
 
 Icon from flaticon by Freepik ( https://www.flaticon.com/free-icon/check-list_1721929?related_id=1721929 )
  * check-list.svg
+
+Icon from flaticon by Techicons ( https://techicons.dev/icons/anaconda )
+ * anaconda.svg

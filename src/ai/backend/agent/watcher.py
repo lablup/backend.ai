@@ -5,8 +5,10 @@ import signal
 import ssl
 import subprocess
 import sys
+from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 from pprint import pformat, pprint
+from typing import Any
 
 import aiofiles
 import aiotools
@@ -252,8 +254,12 @@ async def prepare_hook(request, response):
     response.headers["Server"] = "BackendAI-AgentWatcher"
 
 
-@aiotools.server
-async def watcher_server(loop, pidx, args):
+@aiotools.server_context
+async def watcher_server(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    args: Sequence[Any],
+) -> AsyncIterator[Any]:
     global shutdown_enabled
 
     app = web.Application()
@@ -323,7 +329,7 @@ async def watcher_server(loop, pidx, args):
     "--config",
     type=click.Path(exists=True, dir_okay=False),
     default=None,
-    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.toml and /etc/backend.ai/agent.toml)",
 )
 @click.option(
     "--debug",
@@ -409,7 +415,7 @@ def main(
         fn = Path(cfg["logging"]["file"]["filename"])
         cfg["logging"]["file"]["filename"] = f"{fn.stem}-watcher{fn.suffix}"
 
-    setproctitle(f"backend.ai: watcher {cfg["etcd"]["namespace"]}")
+    setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
     with logger:
         log.info("Backend.AI Agent Watcher {0}", VERSION)
         log.info("runtime: {0}", utils.env_info())

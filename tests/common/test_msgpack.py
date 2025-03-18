@@ -6,6 +6,7 @@ from pathlib import PosixPath
 from dateutil.tz import gettz, tzutc
 
 from ai.backend.common import msgpack
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import BinarySize, ResourceSlot, SlotTypes
 
 
@@ -53,6 +54,16 @@ def test_msgpack_uuid_as_map_key():
     unpacked = msgpack.unpackb(packed)
     assert isinstance(next(iter(unpacked.keys())), uuid.UUID)
     assert unpacked[device_id] == 1234
+
+
+def test_msgpack_uuid_to_str():
+    device_id = uuid.uuid4()
+    str_device_id = str(device_id)
+    data = {device_id: 1234}
+    packed = msgpack.packb(data)
+    unpacked = msgpack.unpackb(packed, ext_hook_mapping=msgpack.uuid_to_str)
+    assert isinstance(next(iter(unpacked.keys())), str)
+    assert unpacked[str_device_id] == 1234
 
 
 def test_msgpack_datetime():
@@ -125,6 +136,20 @@ def test_msgpack_posixpath():
     unpacked = msgpack.unpackb(packed)
     assert isinstance(unpacked["path"], PosixPath)
     assert unpacked["path"] == path
+
+
+def test_msgpack_image_ref():
+    imgref = ImageRef(
+        name="python",
+        project="lablup",
+        tag="3.9-ubuntu20.04",
+        registry="index.docker.io",
+        architecture="x86_64",
+        is_local=False,
+    )
+    packed = msgpack.packb(imgref)
+    unpacked = msgpack.unpackb(packed)
+    assert imgref == unpacked
 
 
 def test_msgpack_resource_slot():

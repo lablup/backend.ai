@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 import sys
 from decimal import Decimal
-from typing import Optional, Self, Sequence, override
+from typing import Optional, Sequence, override
 
-import pydantic
 import trafaret as t
 
 from ai.backend.common.types import (
@@ -13,12 +12,14 @@ from ai.backend.common.types import (
     ArchName,
     ResourceSlot,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
     NullAgentSelectorState,
-    ResourceGroupState,
+    RoundRobinState,
+    RRAgentSelectorState,
     T_ResourceGroupState,
 )
 from .utils import (
@@ -26,7 +27,7 @@ from .utils import (
     sort_requested_slots_by_priority,
 )
 
-log = logging.Logger(__spec__.name)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
@@ -108,19 +109,6 @@ class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         return chosen_agent.id
 
 
-class RoundRobinState(pydantic.BaseModel):
-    next_index: int = 0
-
-
-class RRAgentSelectorState(ResourceGroupState):
-    roundrobin_states: dict[ArchName, RoundRobinState]
-
-    @override
-    @classmethod
-    def create_empty_state(cls) -> Self:
-        return cls(roundrobin_states={})
-
-
 class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
     @override
     @classmethod
@@ -174,6 +162,15 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
 
 
 class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
+    @property
+    @override
+    def config_iv(self) -> t.Dict:
+        return t.Dict({
+            # Only used when "enforce_spreading_endpoint_replica" flag is True.
+            t.Key("kernel_counts_at_same_endpoint", optional=True, default=None): t.Null
+            | t.Mapping(t.String, t.Int()),
+        }).allow_extra("*")
+
     @override
     @classmethod
     def get_state_cls(cls) -> type[NullAgentSelectorState]:
@@ -192,16 +189,26 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         resource_priorities = sort_requested_slots_by_priority(
             requested_slots, self.agent_selection_resource_priority
         )
+
+        # When not using enforce_spreading_endpoint_replica, treat all agent kernel counts as 0.
+        kernel_counts_at_same_endpoint = (
+            self.config.get("kernel_counts_at_same_endpoint", {})
+            if self.sgroup_opts.enforce_spreading_endpoint_replica
+            else {}
+        )
+
         chosen_agent = min(
             agents,
-            key=lambda agent: [
+            key=lambda agent: (
+                kernel_counts_at_same_endpoint.get(agent.id, 0),
                 get_num_extras(agent, requested_slots),
                 *[
                     (agent.available_slots - agent.occupied_slots).get(key, sys.maxsize)
                     for key in resource_priorities
                 ],
-            ],
+            ),
         )
+
         return chosen_agent.id
 
 

@@ -2,9 +2,11 @@
 {% toml_field "apiEndpoint" endpoint_url %}
 {% toml_field "apiEndpointText" config["api"]["text"] %}
 {% toml_field "defaultSessionEnvironment" config["ui"]["default_environment"] %}
-{% toml_field "siteDescription" config["ui"]["brand"] %}
-{% toml_field "enableLLMPlayground" config["ui"]["enable_LLM_playground"] %}
 connectionMode = "SESSION"
+
+[environments]
+{% toml_strlist_field "allowlist" config["environments"]["allowlist"] %}
+{% toml_field "showNonInstalledImages" config["environments"]["show_non_installed_images"] %}
 
 [wsproxy]
 {% toml_field "proxyURL" config["service"]["wsproxy"]["url"] %}

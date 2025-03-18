@@ -294,6 +294,13 @@ class AccountManagerConfig(BaseSchema):
             examples=[HostPortPair(host="127.0.0.1", port=8099)],
         ),
     ]
+    internal_addr: Annotated[
+        HostPortPair,
+        Field(
+            description="Address of account-manager internal service for internal infra communication.",
+            examples=[HostPortPair(host="127.0.0.1", port=8098)],
+        ),
+    ]
     ipc_base_path: Annotated[
         Path,
         Field(
@@ -356,15 +363,22 @@ class AccountManagerConfig(BaseSchema):
     aiomonitor_termui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=48500
+            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=38500
         ),
     ]
     aiomonitor_webui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=49500
+            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=39500
         ),
     ]
+
+
+class PyroscopeConfig(BaseSchema):
+    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
+    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
+    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
+    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
 
 
 class DebugConfig(BaseSchema):
@@ -378,6 +392,7 @@ class ServerConfig(BaseSchema):
     etcd: EtcdConfig
     db: DBConfig
     account_manager: AccountManagerConfig
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
     debug: DebugConfig
     # logging
 

@@ -55,7 +55,7 @@ if [ $USER_ID -eq 0 ]; then
     /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
-    echo "work:$ALPHA_NUMERIC_VAL" | chpasswd
+    echo "work:$ALPHA_NUMERIC_VAL" | chpasswd -c SHA512
   fi
 
   echo "Executing the main program..."
@@ -132,12 +132,12 @@ else
     /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
-    echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
+    echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd -c SHA512
   fi
 
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
   # Note that we also need to use our own patched version of su-exec to support multiple gids.
-  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
-  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
+  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42\" \"$@\"..."
+  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42" "$@"
 
 fi

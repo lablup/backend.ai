@@ -7,11 +7,11 @@ from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
-from ai.backend.common.types import AgentId, CommitStatus, KernelId, SessionId
+from ai.backend.common.types import CommitStatus
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ..types import AgentEventData, KernelOwnershipData
 
 
 class DummyKernel(AbstractKernel):
@@ -19,9 +19,8 @@ class DummyKernel(AbstractKernel):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
+        network_id: str,
         image: ImageRef,
         version: int,
         *,
@@ -33,9 +32,8 @@ class DummyKernel(AbstractKernel):
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
+            network_id,
             image,
             version,
             agent_config=agent_config,
@@ -314,7 +312,12 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         return
 
     async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
-        return {}
+        return {
+            "runId": self.current_run_id,
+            "status": "finished",
+            "exitCode": None,
+            "options": None,
+        }
 
     async def attach_output_queue(self, run_id: str | None) -> None:
         return

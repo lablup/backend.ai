@@ -581,9 +581,9 @@ class TimeDuration(t.Trafaret):
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
     _negative_head_patterns = {
         # allow_space, allow_dot
-        (True, True): re.compile(r"^[\s._-]+"),
+        (True, True): re.compile(r"^([\s_-]+|\.{2,})"),
         (True, False): re.compile(r"^[\s_-]+"),
-        (False, True): re.compile(r"^[._-]+"),
+        (False, True): re.compile(r"^([_-]+|\.{2,})"),
         (False, False): re.compile(r"^[_-]+"),
     }
     _negative_tail_patterns = {
@@ -710,6 +710,19 @@ class ToSet(t.Trafaret):
             self._failure("value must be Iterable")
 
 
+class ToNone(t.Trafaret):
+    allowed_values = ("none", "null", "nil")
+
+    def check_and_return(self, value: Any) -> None:
+        if value is None:
+            return None
+        _value = str(value).strip().lower()
+        if _value in self.allowed_values:
+            return None
+        else:
+            self._failure(f"value must one of {self.allowed_values}")
+
+
 class Delay(t.Trafaret):
     """
     Convert a float or a tuple of 2 floats into a random generated float value
@@ -726,3 +739,10 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
+
+
+class SessionName(t.Regexp):
+    _re = r"^(?=.{4,64}$)\w[\w.-]*\w$"
+
+    def __init__(self) -> None:
+        super().__init__(self._re, re.ASCII)
