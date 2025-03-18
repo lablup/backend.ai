@@ -3166,8 +3166,8 @@ class AgentRegistry:
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
-                for image in image_canonicals:
-                    await pipe.sadd(image, agent_id)
+                for image_canonical in image_canonicals:
+                    await pipe.sadd(image_canonical, agent_id)
                 return pipe
 
             await redis_helper.execute(self.redis_image, _pipe_builder)
@@ -3182,8 +3182,8 @@ class AgentRegistry:
     ) -> None:
         async def _pipe_builder(r: Redis):
             pipe = r.pipeline()
-            for image in image_canonicals:
-                await pipe.srem(image, agent_id)
+            for image_canonical in image_canonicals:
+                await pipe.srem(image_canonical, agent_id)
             return pipe
 
         await redis_helper.execute(self.redis_image, _pipe_builder)

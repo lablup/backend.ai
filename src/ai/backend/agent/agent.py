@@ -1703,9 +1703,10 @@ class AbstractAgent(
     async def _scan_images_wrapper(self, interval: float) -> None:
         result = await self.scan_images()
         self.images = result.scanned_images
-        await self.produce_event(
-            AgentImagesRemoveEvent(image_canonicals=list(result.removed_images.keys()))
-        )
+        if result.removed_images:
+            await self.produce_event(
+                AgentImagesRemoveEvent(image_canonicals=list(result.removed_images.keys()))
+            )
 
     @abstractmethod
     async def push_image(
