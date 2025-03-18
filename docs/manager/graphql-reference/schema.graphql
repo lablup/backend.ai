@@ -244,7 +244,7 @@ type Queries {
   """Added in 24.03.10."""
   total_resource_slot(
     """
-    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'SCHEDULED', 'PULLING', 'PREPARING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
+    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
     Default value is ['RUNNING'].
     """
     statuses: [String] = ["RUNNING"]
@@ -254,7 +254,6 @@ type Queries {
     Default value is `null`.
     """
     filter: String
-    project_id: UUID
     domain_name: String
     resource_group_name: String
   ): TotalResourceSlot
@@ -1525,7 +1524,7 @@ type LegacyComputeSession implements Item {
   io_cur_scratch_size: BigInt
 }
 
-"""Added in 24.03.10."""
+"""Added in 25.5.0."""
 type TotalResourceSlot implements Item {
   id: ID
   occupying_slots: JSONString
