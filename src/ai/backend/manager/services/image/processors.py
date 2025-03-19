@@ -19,6 +19,10 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.modify_image import (
+    ModifyImageAction,
+    ModifyImageActionResult,
+)
 
 from .service import ImageService
 
@@ -29,6 +33,7 @@ class ImageProcessors:
     alias_image: ActionProcessor[AliasImageAction, AliasImageActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
     clear_images: ActionProcessor[ClearImagesAction, ClearImagesActionResult]
+    modify_image: ActionProcessor[ModifyImageAction, ModifyImageActionResult]
 
     # TODO: Batch action 지원 추가 필요
     # purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
@@ -41,6 +46,7 @@ class ImageProcessors:
         self.alias_image = ActionProcessor(service.alias_image)
         self.dealias_image = ActionProcessor(service.dealias_image)
         self.clear_images = ActionProcessor(service.clear_images)
+        self.modify_image = ActionProcessor(service.modify_image)
 
         # self.purge_images = ActionProcessor(service.purge_images)
         # self.purge_image_by_id = ActionProcessor(service.purge_images)

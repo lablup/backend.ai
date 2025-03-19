@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import MutableMapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
@@ -20,7 +20,6 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
@@ -53,6 +52,7 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.modify_image import ModifyImageAction
 
 from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -61,7 +61,6 @@ from ..base import (
     OrderExprArg,
     batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
-    set_if_set,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
 from ..image import (
@@ -1071,53 +1070,16 @@ class ModifyImage(graphene.Mutation):
         props: ModifyImageInput,
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
-        data: MutableMapping[str, Any] = {}
-        set_if_set(props, data, "name")
-        set_if_set(props, data, "registry")
-        set_if_set(props, data, "image")
-        set_if_set(props, data, "tag")
-        set_if_set(props, data, "architecture")
-        set_if_set(props, data, "is_local")
-        set_if_set(props, data, "size_bytes")
-        set_if_set(props, data, "type")
-        set_if_set(props, data, "digest", target_key="config_digest")
-        set_if_set(
-            props,
-            data,
-            "supported_accelerators",
-            clean_func=lambda v: ",".join(v),
-            target_key="accelerators",
+        log.info("modify image {0} by API request", target)
+        result = await ctx.processors.image.modify_image.wait_for_complete(
+            ModifyImageAction(
+                image_canonical=target,
+                architecture=architecture,
+                props=props,
+            )
         )
-        set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
 
-        if props.resource_limits is not Undefined:
-            resources_data = {}
-            for limit_option in props.resource_limits:
-                limit_data = {}
-                if limit_option.min is not Undefined and len(limit_option.min) > 0:
-                    limit_data["min"] = limit_option.min
-                if limit_option.max is not Undefined and len(limit_option.max) > 0:
-                    limit_data["max"] = limit_option.max
-                resources_data[limit_option.key] = limit_data
-            data["resources"] = resources_data
-
-        try:
-            async with ctx.db.begin_session() as session:
-                try:
-                    image_row = await ImageRow.resolve(
-                        session,
-                        [
-                            ImageIdentifier(target, architecture),
-                            ImageAlias(target),
-                        ],
-                    )
-                except UnknownImageReference:
-                    return ModifyImage(ok=False, msg="Image not found")
-                for k, v in data.items():
-                    setattr(image_row, k, v)
-        except ValueError as e:
-            return ModifyImage(ok=False, msg=str(e))
-        return ModifyImage(ok=True, msg="")
+        return ModifyImage(ok=True, msg=result.description())
 
 
 @dataclass
