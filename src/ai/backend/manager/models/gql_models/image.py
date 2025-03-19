@@ -29,8 +29,6 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
-    AgentId,
-    DispatchResult,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -51,6 +49,10 @@ from ai.backend.manager.services.image.actions.forget_image import (
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import ModifyImageAction
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import (
+    ImageRefInputType,
+    PurgeImagesAction,
+)
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
@@ -86,8 +88,6 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import ProgressReporter
-
     from ..gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1103,42 +1103,17 @@ class PurgeImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        # result = await ctx.processors.image.purge_images.fire_and_forget(
-        #     PurgeImagesAction(
-        #         agent_id=agent_id,
-        #         image_canonicals=image_canonicals,
-        #     )
-        # )
+        task_id = await ctx.processors.image.purge_images.fire_and_forget(
+            ctx.background_task_manager,
+            PurgeImagesAction(
+                agent_id=agent_id,
+                images=[
+                    ImageRefInputType(
+                        name=image.name, architecture=image.architecture, registry=image.registry
+                    )
+                    for image in images
+                ],
+            ),
+        )
 
-        async def _purge_images_task(
-            reporter: ProgressReporter,
-        ) -> DispatchResult[PurgeImagesResult]:
-            errors = []
-            task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
-            arch_per_images = {image.name: image.architecture for image in images}
-
-            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
-
-            for result in results.responses:
-                image_canonical = result.image
-                arch = arch_per_images[result.image]
-
-                if not result.error:
-                    image_identifier = ImageIdentifier(image_canonical, arch)
-                    async with ctx.db.begin_session() as session:
-                        image_row = await ImageRow.resolve(session, [image_identifier])
-                        task_result.reserved_bytes += image_row.size_bytes
-                        task_result.results.responses.append(result)
-
-                else:
-                    error_msg = f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
-                    log.error(error_msg)
-                    errors.append(error_msg)
-
-            return DispatchResult(
-                result=task_result,
-                errors=errors,
-            )
-
-        task_id = await ctx.background_task_manager.start(_purge_images_task)
         return RescanImages(task_id=task_id)
