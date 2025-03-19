@@ -2,12 +2,19 @@ import logging
 
 import sqlalchemy as sa
 
+from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.services.image.actions.alias_image import (
+    AliasImageAction,
+    AliasImageActionResult,
+    AliasImageActionValueError,
+)
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
     DealiasImageActionNoSuchAliasError,
@@ -64,6 +71,22 @@ class ImageService:
                     raise ForgetImageActionByIdGenericForbiddenError()
             await image_row.mark_as_deleted(session)
             return ForgetImageByIdActionResult(image_row=image_row)
+
+    async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
+        try:
+            async with self._db.begin_session() as session:
+                try:
+                    image_row = await ImageRow.resolve(
+                        session, [ImageIdentifier(action.image_canonical, action.architecture)]
+                    )
+                except UnknownImageReference:
+                    raise ImageNotFound
+                else:
+                    image_alias = ImageAliasRow(alias=action.alias, image_id=image_row.id)
+                    image_row.aliases.append(image_alias)
+        except ValueError:
+            raise AliasImageActionValueError
+        return AliasImageActionResult(image_alias=image_alias)
 
     async def dealias_image(self, action: DealiasImageAction) -> DealiasImageActionResult:
         try:
