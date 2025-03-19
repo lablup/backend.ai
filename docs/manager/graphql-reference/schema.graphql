@@ -250,7 +250,7 @@ type Queries {
     statuses: [String] = ["RUNNING"]
 
     """
-    `filter` argument is a string that is parsed into query conditions. It works in the same way as the `fileter` argument in the `compute_session` query schema, meaning the values are parsed into an identical SQL query expression.
+    `filter` argument is a string that is parsed into query conditions. It works in the same way as the `filter` argument in the `compute_session` query schema, meaning the values are parsed into an identical SQL query expression.
     Default value is `null`.
     """
     filter: String
