@@ -31,6 +31,10 @@ from ai.backend.manager.services.image.actions.purge_image_by_id import (
     PurgeImageByIdAction,
     PurgeImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.rescan_images import (
+    RescanImagesAction,
+    RescanImagesActionResult,
+)
 from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
     UnloadImageActionResult,
@@ -56,11 +60,10 @@ class ImageProcessors:
     untag_image_from_registry: ActionProcessor[
         UntagImageFromRegistryAction, UntagImageFromRegistryActionResult
     ]
+    rescan_images: ActionProcessor[RescanImagesAction, RescanImagesActionResult]
 
     # TODO: Batch action 지원 추가 필요
     # purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
-
-    # purge_image_by_id: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
 
     def __init__(self, service: ImageService) -> None:
         self.forget_image = ActionProcessor(service.forget_image)
@@ -73,6 +76,6 @@ class ImageProcessors:
         self.preload_image = ActionProcessor(service.preload_image)
         self.unload_image = ActionProcessor(service.unload_image)
         self.untag_image_from_registry = ActionProcessor(service.untag_image_from_registry)
+        self.rescan_images = ActionProcessor(service.rescan_images)
 
         # self.purge_images = ActionProcessor(service.purge_images)
-        # self.purge_image_by_id = ActionProcessor(service.purge_images)

@@ -52,6 +52,7 @@ from ai.backend.manager.services.image.actions.forget_image import (
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import ModifyImageAction
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -72,7 +73,6 @@ from ..image import (
     ImageStatus,
     ImageType,
     get_permission_ctx,
-    rescan_images,
 )
 from ..rbac import ScopeType
 from ..user import UserRole
@@ -922,14 +922,15 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
-            result = await rescan_images(ctx.db, registry, project, reporter=reporter)
-            for error in result.errors:
-                log.error(error)
+        # TODO: 이렇게 고쳐도 될지?
+        task_id = await ctx.processors.image.rescan_images.fire_and_forget(
+            ctx.background_task_manager,
+            RescanImagesAction(
+                registry=registry,
+                project=project,
+            ),
+        )
 
-            return result
-
-        task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
@@ -1137,6 +1138,13 @@ class PurgeImages(graphene.Mutation):
         )
 
         log.info(f"purge images ({agent_images}) by API request")
+
+        # result = await ctx.processors.image.purge_images.fire_and_forget(
+        #     PurgeImagesAction(
+        #         agent_id=agent_id,
+        #         image_canonicals=image_canonicals,
+        #     )
+        # )
 
         async def _purge_images_task(
             reporter: ProgressReporter,
