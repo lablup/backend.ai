@@ -6,7 +6,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow, ImageStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -14,6 +14,11 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
     AliasImageActionValueError,
+)
+from ai.backend.manager.services.image.actions.clear_images import (
+    ClearImagesAction,
+    ClearImagesActionResult,
+    ClearImagesActionValueError,
 )
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
@@ -100,6 +105,19 @@ class ImageService:
         except ValueError:
             raise DealiasImageActionValueError()
         return DealiasImageActionResult(image_alias=existing_alias)
+
+    async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
+        try:
+            async with self._db.begin_session() as session:
+                await session.execute(
+                    sa.update(ImageRow)
+                    .where(ImageRow.registry == action.registry)
+                    .where(ImageRow.status != ImageStatus.DELETED)
+                    .values(status=ImageStatus.DELETED)
+                )
+        except ValueError:
+            raise ClearImagesActionValueError()
+        return ClearImagesActionResult()
 
     # async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
     #     errors = []
