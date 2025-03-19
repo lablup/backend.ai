@@ -3,10 +3,14 @@ import uuid
 import pytest
 
 from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.models.image import ImageRow, ImageStatus, ImageType
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.server import (
     agent_registry_ctx,
+)
+from ai.backend.manager.services.image.actions.dealias_image import (
+    DealiasImageAction,
+    DealiasImageActionResult,
 )
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
@@ -40,6 +44,12 @@ IMAGE_ROW_FIXTURE = ImageRow(
     status=ImageStatus.ALIVE,
 )
 IMAGE_ROW_FIXTURE.id = uuid.uuid4()
+
+IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
+    id=uuid.uuid4(),
+    alias="python",
+    image_id=IMAGE_ROW_FIXTURE.id,
+)
 
 
 @pytest.fixture
@@ -116,6 +126,7 @@ async def test_forget_image(
     processors: ImageProcessors,
     test_scenario: TestScenario[ForgetImageAction, ForgetImageActionResult],
 ):
+    # TODO: forget_image가 성공했을 때 DB에 내용 반영된 것은 여기에 별도로 로직 넣어 확인해야 하는지?
     await test_scenario.test(processors.forget_image.wait_for_complete)
 
 
@@ -183,6 +194,59 @@ async def test_forget_image_by_id(
     test_scenario: TestScenario[ForgetImageByIdAction, ForgetImageByIdActionResult],
 ):
     await test_scenario.test(processors.forget_image_by_id.wait_for_complete)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "test_scenario",
+    [
+        TestScenario.success(
+            "Success Case",
+            DealiasImageAction(
+                alias=IMAGE_ALIAS_ROW_FIXTURE.alias,
+            ),
+            DealiasImageActionResult(image_alias=IMAGE_ALIAS_ROW_FIXTURE),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    [
+        {
+            "images": [
+                {
+                    "id": str(IMAGE_ROW_FIXTURE.id),
+                    "name": IMAGE_ROW_FIXTURE.name,
+                    "image": IMAGE_ROW_FIXTURE.image,
+                    "project": IMAGE_ROW_FIXTURE.project,
+                    "registry": IMAGE_ROW_FIXTURE.registry,
+                    "registry_id": IMAGE_ROW_FIXTURE.registry_id,
+                    "architecture": IMAGE_ROW_FIXTURE.architecture,
+                    "config_digest": IMAGE_ROW_FIXTURE.config_digest,
+                    "size_bytes": IMAGE_ROW_FIXTURE.size_bytes,
+                    "is_local": IMAGE_ROW_FIXTURE.is_local,
+                    "type": IMAGE_ROW_FIXTURE.type._name_,
+                    "labels": IMAGE_ROW_FIXTURE.labels,
+                    "resources": IMAGE_ROW_FIXTURE.resources,
+                    "status": IMAGE_ROW_FIXTURE.status.value,
+                }
+            ],
+            "image_aliases": [
+                {
+                    "id": str(IMAGE_ALIAS_ROW_FIXTURE.id),
+                    "alias": IMAGE_ALIAS_ROW_FIXTURE.alias,
+                    "image": str(IMAGE_ROW_FIXTURE.id),
+                }
+            ],
+        }
+    ],
+    ids=[""],
+)
+async def test_dealias_image(
+    processors: ImageProcessors,
+    test_scenario: TestScenario[DealiasImageAction, DealiasImageActionResult],
+):
+    await test_scenario.test(processors.dealias_image.wait_for_complete)
 
 
 # @pytest.mark.parametrize(
