@@ -50,6 +50,12 @@ from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
     PreloadImageActionResult,
 )
+from ai.backend.manager.services.image.actions.purge_image_by_id import (
+    PurgeImageActionByIdGenericForbiddenError,
+    PurgeImageActionByIdObjectNotFoundError,
+    PurgeImageByIdAction,
+    PurgeImageByIdActionResult,
+)
 from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
     UnloadImageActionResult,
@@ -202,6 +208,17 @@ class ImageService:
 
     async def unload_image(self, action: UnloadImageAction) -> UnloadImageActionResult:
         raise NotImplementedError
+
+    async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
+        async with self._db.begin_session() as db_session:
+            image_row = await ImageRow.get(db_session, action.image_id, load_aliases=True)
+            if not image_row:
+                raise PurgeImageActionByIdObjectNotFoundError()
+            if action.client_role != UserRole.SUPERADMIN:
+                if not image_row.is_customized_by(action.user_id):
+                    raise PurgeImageActionByIdGenericForbiddenError()
+            await db_session.delete(image_row)
+            return PurgeImageByIdActionResult(image_row=image_row)
 
     # async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
     #     errors = []
