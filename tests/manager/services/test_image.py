@@ -13,6 +13,12 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageActionGenericForbiddenError,
     ForgetImageActionResult,
 )
+from ai.backend.manager.services.image.actions.forget_image_by_id import (
+    ForgetImageActionByIdGenericForbiddenError,
+    ForgetImageActionByIdObjectNotFoundError,
+    ForgetImageByIdAction,
+    ForgetImageByIdActionResult,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 
@@ -111,6 +117,72 @@ async def test_forget_image(
     test_scenario: TestScenario[ForgetImageAction, ForgetImageActionResult],
 ):
     await test_scenario.test(processors.forget_image.wait_for_complete)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "test_scenario",
+    [
+        TestScenario.success(
+            "Success Case",
+            ForgetImageByIdAction(
+                user_id=uuid.uuid4(),
+                client_role=UserRole.SUPERADMIN,
+                image_id=IMAGE_ROW_FIXTURE.id,
+            ),
+            ForgetImageByIdActionResult(image_row=IMAGE_ROW_FIXTURE),
+        ),
+        TestScenario.failure(
+            "When the user is not SUPERADMIN, and the user is not the image's owner, raise Generic Forbidden Error",
+            ForgetImageByIdAction(
+                user_id=uuid.uuid4(),
+                client_role=UserRole.USER,
+                image_id=IMAGE_ROW_FIXTURE.id,
+            ),
+            ForgetImageActionByIdGenericForbiddenError,
+        ),
+        TestScenario.failure(
+            "Image not found",
+            ForgetImageByIdAction(
+                user_id=uuid.uuid4(),
+                client_role=UserRole.SUPERADMIN,
+                image_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),  # wrong image_id
+            ),
+            ForgetImageActionByIdObjectNotFoundError,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    [
+        {
+            "images": [
+                {
+                    "id": str(IMAGE_ROW_FIXTURE.id),
+                    "name": IMAGE_ROW_FIXTURE.name,
+                    "image": IMAGE_ROW_FIXTURE.image,
+                    "project": IMAGE_ROW_FIXTURE.project,
+                    "registry": IMAGE_ROW_FIXTURE.registry,
+                    "registry_id": IMAGE_ROW_FIXTURE.registry_id,
+                    "architecture": IMAGE_ROW_FIXTURE.architecture,
+                    "config_digest": IMAGE_ROW_FIXTURE.config_digest,
+                    "size_bytes": IMAGE_ROW_FIXTURE.size_bytes,
+                    "is_local": IMAGE_ROW_FIXTURE.is_local,
+                    "type": IMAGE_ROW_FIXTURE.type._name_,
+                    "labels": IMAGE_ROW_FIXTURE.labels,
+                    "resources": IMAGE_ROW_FIXTURE.resources,
+                    "status": IMAGE_ROW_FIXTURE.status.value,
+                }
+            ]
+        }
+    ],
+    ids=[""],
+)
+async def test_forget_image_by_id(
+    processors: ImageProcessors,
+    test_scenario: TestScenario[ForgetImageByIdAction, ForgetImageByIdActionResult],
+):
+    await test_scenario.test(processors.forget_image_by_id.wait_for_complete)
 
 
 # @pytest.mark.parametrize(
