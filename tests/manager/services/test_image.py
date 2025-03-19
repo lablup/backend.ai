@@ -302,6 +302,60 @@ async def test_dealias_image(
     await test_scenario.test(processors.dealias_image.wait_for_complete)
 
 
+# TODO: 일단 ClearImages에서 뭔가를 리턴해야...?
+# @pytest.mark.asyncio
+# @pytest.mark.parametrize(
+#     "test_scenario",
+#     [
+#         TestScenario.success(
+#             "Success Case",
+#             ClearImagesAction(
+#                 registry=IMAGE_ROW_FIXTURE.registry,
+#             ),
+#             ClearImagesActionResult(),
+#         ),
+#     ],
+# )
+# @pytest.mark.parametrize(
+#     "extra_fixtures",
+#     [
+#         {
+#             "images": [
+#                 {
+#                     "id": str(IMAGE_ROW_FIXTURE.id),
+#                     "name": IMAGE_ROW_FIXTURE.name,
+#                     "image": IMAGE_ROW_FIXTURE.image,
+#                     "project": IMAGE_ROW_FIXTURE.project,
+#                     "registry": IMAGE_ROW_FIXTURE.registry,
+#                     "registry_id": IMAGE_ROW_FIXTURE.registry_id,
+#                     "architecture": IMAGE_ROW_FIXTURE.architecture,
+#                     "config_digest": IMAGE_ROW_FIXTURE.config_digest,
+#                     "size_bytes": IMAGE_ROW_FIXTURE.size_bytes,
+#                     "is_local": IMAGE_ROW_FIXTURE.is_local,
+#                     "type": IMAGE_ROW_FIXTURE.type._name_,
+#                     "labels": IMAGE_ROW_FIXTURE.labels,
+#                     "resources": IMAGE_ROW_FIXTURE.resources,
+#                     "status": IMAGE_ROW_FIXTURE.status.value,
+#                 }
+#             ],
+#             "image_aliases": [
+#                 {
+#                     "id": str(IMAGE_ALIAS_ROW_FIXTURE.id),
+#                     "alias": IMAGE_ALIAS_ROW_FIXTURE.alias,
+#                     "image": str(IMAGE_ROW_FIXTURE.id),
+#                 }
+#             ],
+#         }
+#     ],
+#     ids=[""],
+# )
+# async def test_clear_images(
+#     processors: ImageProcessors,
+#     test_scenario: TestScenario[ClearImagesAction, ClearImagesActionResult],
+# ):
+#     await test_scenario.test(processors.clear_images.wait_for_complete)
+
+
 # @pytest.mark.parametrize(
 #     "test_scenario",
 #     [
