@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, Optional, TypeVar
 
+from ai.backend.common.types import DispatchResult
+
 
 @dataclass
 class BaseAction(ABC):
