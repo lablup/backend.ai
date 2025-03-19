@@ -30,7 +30,6 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         self._func = func
         self._monitors = monitors or []
 
-    # TODO: 리팩토링 필요
     async def _run(self, action: TAction) -> ProcessResult[TActionResult]:
         started_at = datetime.now()
         status: str
@@ -44,23 +43,22 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             result = None
             status = "error"
             description = str(e)
-        finally:
-            end_at = datetime.now()
-            duration = (end_at - started_at).total_seconds()
-            meta = BaseActionResultMeta(
-                status=status,
-                description=description,
-                started_at=started_at,
-                end_at=end_at,
-                duration=duration,
-            )
-            if result:
-                return ProcessResult(meta, result)
-            else:
-                # 이 부분은 예외가 발생했을 때만 발생.
-                ...
-                assert exc is not None
-                raise exc
+
+        end_at = datetime.now()
+        duration = (end_at - started_at).total_seconds()
+        meta = BaseActionResultMeta(
+            status=status,
+            description=description,
+            started_at=started_at,
+            end_at=end_at,
+            duration=duration,
+        )
+
+        if result:
+            return ProcessResult(meta, result)
+        else:
+            assert exc is not None
+            raise exc
 
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         for monitor in self._monitors:

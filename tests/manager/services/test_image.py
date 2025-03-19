@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.models.image import ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.server import (
@@ -64,6 +65,18 @@ def processors(extra_fixtures, database_fixture, database_engine):
                 architecture=IMAGE_ROW_FIXTURE.architecture,
             ),
             ForgetImageActionGenericForbiddenError,
+        ),
+        TestScenario.failure(
+            "Image not found",
+            ForgetImageAction(
+                user_id=uuid.uuid4(),
+                client_role=UserRole.SUPERADMIN,
+                reference="wrong-image",
+                architecture=IMAGE_ROW_FIXTURE.architecture,
+            ),
+            # TODO: 여기서 ImageNotFound를 사용하는게 맞는지?
+            # 아니면 새로운 Exception을 만들어야 하는지?
+            ImageNotFound,
         ),
     ],
 )
