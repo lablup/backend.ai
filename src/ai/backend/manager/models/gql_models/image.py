@@ -53,8 +53,9 @@ from ai.backend.manager.services.image.actions.forget_image import (
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import ModifyImageAction
+from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 
-from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
+from ...api.exceptions import ImageNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
@@ -802,20 +803,17 @@ class PurgeImageById(graphene.Mutation):
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
+        result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
+            PurgeImageByIdAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                image_id=image_uuid,
+            )
+        )
 
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ObjectNotFound("image")
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_owned_by(ctx.user["uuid"]):
-                    raise GenericForbidden("Image is not owned by your account.")
-            for alias in image_row.aliases:
-                await session.delete(alias)
-
-            await session.delete(image_row)
-            return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
+        return PurgeImageById(
+            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
+        )
 
 
 class UntagImageFromRegistry(graphene.Mutation):
