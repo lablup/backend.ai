@@ -1,7 +1,9 @@
 import functools
 import logging
+from typing import Any, MutableMapping
 
 import sqlalchemy as sa
+from graphql import Undefined
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
