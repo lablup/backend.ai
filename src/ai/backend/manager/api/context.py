@@ -61,6 +61,7 @@ class RootContext(BaseContext):
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
     metrics: CommonMetricRegistry
+    processors: Processors
 
     processors: Processors
 
