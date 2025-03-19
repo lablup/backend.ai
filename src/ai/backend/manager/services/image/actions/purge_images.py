@@ -1,22 +1,35 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.dto.agent.response import PurgeImageResponse
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
+from ai.backend.common.types import DispatchResult
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.image.base import ImageBatchAction, ImageRef
+from ai.backend.manager.services.image.base import ImageAction
+
+
+# TODO: 타입 위치 이동
+@dataclass
+class ImageRefInputType:
+    """
+    DTO for ImageRefType.
+    """
+
+    name: str
+    registry: str
+    architecture: str
 
 
 @dataclass
-class PurgeImagesAction(ImageBatchAction):
+class PurgeImagesAction(ImageAction):
     agent_id: str
-    images: list[ImageRef]
+    images: list[ImageRefInputType]
 
     @override
-    def entity_ids(self):
-        return [image_ref.image_id() for image_ref in self.images]
+    def entity_id(self) -> str:
+        return f"{self.agent_id}, {self.images}"
 
     @override
-    def operation_type(self):
+    def operation_type(self) -> str:
         return "purge_images"
 
 
@@ -24,6 +37,7 @@ class PurgeImagesAction(ImageBatchAction):
 class PurgeImagesActionResult(BaseActionResult):
     reserved_bytes: int
     results: list[PurgeImageResponse]  # TODO: Don't use DTO here
+    errors: list[str]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -34,5 +48,17 @@ class PurgeImagesActionResult(BaseActionResult):
         return "success"
 
     @override
-    def description(self):
+    def description(self) -> str:
         return ""
+
+    @override
+    def to_bgtask_result(self) -> DispatchResult:
+        from ai.backend.manager.models.gql_models.image import PurgeImagesResult
+
+        return DispatchResult(
+            result=PurgeImagesResult(
+                results=PurgeImageResponses(self.results),
+                reserved_bytes=self.reserved_bytes,
+            ),
+            errors=self.errors,
+        )

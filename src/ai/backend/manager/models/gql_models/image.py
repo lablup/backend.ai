@@ -25,12 +25,12 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
-    AgentId,
     DispatchResult,
     ImageAlias,
 )
@@ -87,8 +87,6 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import ProgressReporter
-
     from ..gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1138,13 +1136,6 @@ class PurgeImages(graphene.Mutation):
         )
 
         log.info(f"purge images ({agent_images}) by API request")
-
-        # result = await ctx.processors.image.purge_images.fire_and_forget(
-        #     PurgeImagesAction(
-        #         agent_id=agent_id,
-        #         image_canonicals=image_canonicals,
-        #     )
-        # )
 
         async def _purge_images_task(
             reporter: ProgressReporter,

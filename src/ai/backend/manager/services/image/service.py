@@ -293,7 +293,9 @@ class ImageService:
                 log.error(error_msg)
                 errors.append(error_msg)
 
-        return PurgeImagesActionResult(reserved_bytes=reserved_bytes, results=responses)
+        return PurgeImagesActionResult(
+            reserved_bytes=reserved_bytes, results=responses, errors=errors
+        )
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
         result = await rescan_images(self._db, action.registry, action.project)
