@@ -22,12 +22,7 @@ class ImageBatchAction(BaseBatchAction):
     def entity_type(self):
         return "image"
 
-
-class ImageRef:
-    """
-    DTO for ImageRefType.
-    """
-
-    name: str
-    registry: str
-    architecture: str
+    @override
+    def request_id(self):
+        # TODO: request_id는 어떻게 생성?
+        return "..."
