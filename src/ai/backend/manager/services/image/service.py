@@ -1,11 +1,14 @@
 import logging
+from typing import Any, MutableMapping
 
 import sqlalchemy as sa
+from graphql import Undefined
 
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
+from ai.backend.manager.models.base import set_if_set
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow, ImageStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -36,6 +39,12 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageActionByIdObjectNotFoundError,
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
+)
+from ai.backend.manager.services.image.actions.modify_image import (
+    ModifyImageAction,
+    ModifyImageActionResult,
+    ModifyImageActionUnknownImageReferenceError,
+    ModifyImageActionValueError,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -118,6 +127,67 @@ class ImageService:
         except ValueError:
             raise ClearImagesActionValueError()
         return ClearImagesActionResult()
+
+    async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
+        data: MutableMapping[str, Any] = {}
+        props = action.props
+
+        set_if_set(props, data, "name")
+        set_if_set(props, data, "registry")
+        set_if_set(props, data, "image")
+        set_if_set(props, data, "tag")
+        set_if_set(props, data, "architecture")
+        set_if_set(props, data, "is_local")
+        set_if_set(props, data, "size_bytes")
+        set_if_set(props, data, "type")
+        set_if_set(props, data, "digest", target_key="config_digest")
+        set_if_set(
+            props,
+            data,
+            "supported_accelerators",
+            clean_func=lambda v: ",".join(v),
+            target_key="accelerators",
+        )
+        set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
+
+        # TODO: graphql Undefined를 여기서 쓰면 안 될 듯.
+        if props.resource_limits is not Undefined:
+            resources_data = {}
+            for limit_option in props.resource_limits:
+                limit_data = {}
+                if (
+                    limit_option.min is not None
+                    and limit_option.min is not Undefined
+                    and len(limit_option.min) > 0
+                ):
+                    limit_data["min"] = limit_option.min
+                if (
+                    limit_option.max is not None
+                    and limit_option.max is not Undefined
+                    and len(limit_option.max) > 0
+                ):
+                    limit_data["max"] = limit_option.max
+                resources_data[limit_option.key] = limit_data
+            data["resources"] = resources_data
+
+        try:
+            async with self._db.begin_session() as db_sess:
+                try:
+                    image_row = await ImageRow.resolve(
+                        db_sess,
+                        [
+                            ImageIdentifier(action.image_canonical, action.architecture),
+                            ImageAlias(action.image_canonical),
+                        ],
+                    )
+                except UnknownImageReference:
+                    raise ModifyImageActionUnknownImageReferenceError
+                for k, v in data.items():
+                    setattr(image_row, k, v)
+        except ValueError:
+            raise ModifyImageActionValueError
+
+        return ModifyImageActionResult(image_row=image_row)
 
     # async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
     #     errors = []
