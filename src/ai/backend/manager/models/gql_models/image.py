@@ -25,7 +25,6 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -36,7 +35,6 @@ from ai.backend.common.types import (
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -54,6 +52,9 @@ from ai.backend.manager.services.image.actions.forget_image import (
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import ModifyImageAction
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.untag_image_from_registry import (
+    UntagImageFromRegistryAction,
+)
 
 from ...api.exceptions import ImageNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -838,35 +839,21 @@ class UntagImageFromRegistry(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> UntagImageFromRegistry:
-        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-
-        async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ImageNotFound
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_owned_by(ctx.user["uuid"]):
-                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
-
-            query = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == image_row.image_ref.registry
+        result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+            UntagImageFromRegistryAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                image_id=image_uuid,
             )
+        )
 
-            registry_info = (await session.execute(query)).scalar()
-
-            if registry_info.type != ContainerRegistryType.HARBOR2:
-                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
-
-        scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
-        await scanner.untag(image_row.image_ref)
-
-        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
+        return UntagImageFromRegistry(
+            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
+        )
 
 
 class PreloadImage(graphene.Mutation):

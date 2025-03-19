@@ -35,6 +35,10 @@ from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
     UnloadImageActionResult,
 )
+from ai.backend.manager.services.image.actions.untag_image_from_registry import (
+    UntagImageFromRegistryAction,
+    UntagImageFromRegistryActionResult,
+)
 
 from .service import ImageService
 
@@ -49,6 +53,9 @@ class ImageProcessors:
     modify_image: ActionProcessor[ModifyImageAction, ModifyImageActionResult]
     preload_image: ActionProcessor[PreloadImageAction, PreloadImageActionResult]
     unload_image: ActionProcessor[UnloadImageAction, UnloadImageActionResult]
+    untag_image_from_registry: ActionProcessor[
+        UntagImageFromRegistryAction, UntagImageFromRegistryActionResult
+    ]
 
     # TODO: Batch action 지원 추가 필요
     # purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
@@ -65,6 +72,7 @@ class ImageProcessors:
         self.modify_image = ActionProcessor(service.modify_image)
         self.preload_image = ActionProcessor(service.preload_image)
         self.unload_image = ActionProcessor(service.unload_image)
+        self.untag_image_from_registry = ActionProcessor(service.untag_image_from_registry)
 
         # self.purge_images = ActionProcessor(service.purge_images)
         # self.purge_image_by_id = ActionProcessor(service.purge_images)
