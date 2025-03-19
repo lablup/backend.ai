@@ -72,3 +72,11 @@ class PurgeImagesActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return None
+
+    @override
+    def status(self) -> str:
+        return "success"
+
+    @override
+    def description(self):
+        return ""
