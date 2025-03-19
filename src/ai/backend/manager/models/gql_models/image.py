@@ -47,6 +47,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
+from ai.backend.manager.services.image.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
@@ -1024,17 +1025,14 @@ class ClearImages(graphene.Mutation):
         registry: str,
     ) -> ClearImages:
         ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                await session.execute(
-                    sa.update(ImageRow)
-                    .where(ImageRow.registry == registry)
-                    .where(ImageRow.status != ImageStatus.DELETED)
-                    .values(status=ImageStatus.DELETED)
-                )
-        except ValueError as e:
-            return ClearImages(ok=False, msg=str(e))
-        return ClearImages(ok=True, msg="")
+        log.info("clear images from registry {0} by API request", registry)
+        result = await ctx.processors.image.clear_images.wait_for_complete(
+            ClearImagesAction(
+                registry=registry,
+            )
+        )
+
+        return ClearImages(ok=True, msg=result.description())
 
 
 class ModifyImageInput(graphene.InputObjectType):
