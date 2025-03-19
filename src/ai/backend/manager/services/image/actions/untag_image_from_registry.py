@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.image import ImageRow
@@ -40,11 +40,10 @@ class UntagImageFromRegistryActionResult(BaseActionResult):
     def description(self) -> Optional[str]:
         return "The image has been untagged from registry"
 
-    # def __eq__(self, other: Any) -> bool:
-    #     if not isinstance(other, AliasImageActionResult):
-    #         return False
-    #     # TODO: 여기선 id로 비교못할 듯.
-    #     return self.image_alias.alias == other.image_alias.alias
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, UntagImageFromRegistryActionResult):
+            return False
+        return self.image_row.id == other.image_row.id
 
 
 class UntagImageFromRegistryActionGenericForbiddenError(Exception):

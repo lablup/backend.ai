@@ -49,6 +49,7 @@ class PurgeImagesActionResult(BaseActionResult):
 
     @override
     def description(self) -> str:
+        # TODO: PurgeImagesResult의 description을 얻어올 방법?
         return ""
 
     @override
