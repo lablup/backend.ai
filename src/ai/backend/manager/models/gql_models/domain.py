@@ -16,19 +16,28 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.manager.services.vfolder.actions.create_domain_node import (
+    CreateDomainNodeAction,
+    CreateDomainNodeActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.modify_domain_node import (
+    ModifyDomainNodeAction,
+    ModifyDomainNodeActionResult,
+)
+from ai.backend.manager.services.vfolder.base import UserInfo
+
 from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
 )
-from ..domain import DomainRow, get_domains, get_permission_ctx
+from ..domain import DomainRow, get_permission_ctx
 from ..gql_relay import (
     AsyncNode,
     Connection,
     ConnectionResolverResult,
     GlobalIDField,
-    ResolvedGlobalID,
 )
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
@@ -38,9 +47,8 @@ from ..rbac import (
     SystemScope,
 )
 from ..rbac.permission_defs import DomainPermission, ScalingGroupPermission
-from ..scaling_group import ScalingGroupForDomainRow, get_scaling_groups
+from ..scaling_group import get_scaling_groups
 from ..user import UserRole
-from ..utils import execute_with_txn_retry
 from .base import Bytes
 from .scaling_group import ScalinGroupConnection
 
@@ -298,6 +306,20 @@ class CreateDomainNodeInput(graphene.InputObjectType):
 
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
+    def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
+        return CreateDomainNodeAction(
+            name=self.name,
+            description=self.description,
+            is_active=self.is_active,
+            total_resource_slots=self.total_resource_slots,
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
+            allowed_docker_registries=self.allowed_docker_registries,
+            integration_id=self.integration_id,
+            dotfiles=self.dotfiles,
+            scaling_groups=self.scaling_groups,
+            user_info=user_info,
+        )
+
 
 class CreateDomainNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -322,38 +344,19 @@ class CreateDomainNode(graphene.Mutation):
     ) -> CreateDomainNode:
         graph_ctx: GraphQueryContext = info.context
 
-        if (raw_scaling_groups := input.pop("scaling_groups")) is not None:
-            scaling_groups = cast(list[str], raw_scaling_groups)
-        else:
-            scaling_groups = None
+        user_info: UserInfo = UserInfo(
+            id=graph_ctx.user["uuid"],
+            role=graph_ctx.user["role"],
+            domain_name=graph_ctx.user["domain_name"],
+        )
 
-        async def _insert(db_session: AsyncSession) -> DomainRow:
-            if scaling_groups is not None:
-                await _ensure_sgroup_permission(graph_ctx, scaling_groups, db_session=db_session)
-            _insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(**input).returning(DomainRow)
+        res: CreateDomainNodeActionResult = (
+            await graph_ctx.processors.vfolder.create_domain_node.wait_for_complete(
+                input.to_action(user_info=user_info)
             )
-            domain_row = await db_session.scalar(_insert_and_returning)
-            if scaling_groups is not None:
-                await db_session.execute(
-                    sa.insert(ScalingGroupForDomainRow),
-                    [
-                        {"scaling_group": sgroup_name, "domain": input.name}
-                        for sgroup_name in scaling_groups
-                    ],
-                )
-            return domain_row
+        )
 
-        async with graph_ctx.db.connect() as db_conn:
-            try:
-                domain_row = await execute_with_txn_retry(
-                    _insert, graph_ctx.db.begin_session, db_conn
-                )
-            except sa.exc.IntegrityError as e:
-                raise ValueError(
-                    f"Cannot create the domain with given arguments. (arg:{input}, e:{str(e)})"
-                )
-        return CreateDomainNode(True, "", DomainNode.from_orm_model(graph_ctx, domain_row))
+        return CreateDomainNode(True, "", DomainNode.from_orm_model(graph_ctx, res.domain_row))
 
 
 class ModifyDomainNodeInput(graphene.InputObjectType):
@@ -371,6 +374,22 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
     sgroups_to_add = graphene.List(lambda: graphene.String, required=False)
     sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
     client_mutation_id = graphene.String(required=False)
+
+    def to_action(self, user_info: UserInfo) -> ModifyDomainNodeAction:
+        return ModifyDomainNodeAction(
+            id=self.id,
+            description=self.description,
+            is_active=self.is_active,
+            total_resource_slots=self.total_resource_slots,
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
+            allowed_docker_registries=self.allowed_docker_registries,
+            integration_id=self.integration_id,
+            dotfiles=self.dotfiles,
+            sgroups_to_add=self.sgroups_to_add,
+            sgroups_to_remove=self.sgroups_to_remove,
+            client_mutation_id=self.client_mutation_id,
+            user_info=user_info,
+        )
 
 
 class ModifyDomainNode(graphene.Mutation):
@@ -394,78 +413,18 @@ class ModifyDomainNode(graphene.Mutation):
         input: ModifyDomainNodeInput,
     ) -> ModifyDomainNode:
         graph_ctx: GraphQueryContext = info.context
-        _, domain_name = cast(ResolvedGlobalID, input["id"])
-
-        if (raw_sgroups_to_add := input.pop("sgroups_to_add")) is not None:
-            sgroups_to_add = set(raw_sgroups_to_add)
-        else:
-            sgroups_to_add = None
-        if (raw_sgroups_to_remove := input.pop("sgroups_to_remove")) is not None:
-            sgroups_to_remove = set(raw_sgroups_to_remove)
-        else:
-            sgroups_to_remove = None
-
-        if sgroups_to_add is not None and sgroups_to_remove is not None:
-            if union := sgroups_to_add | sgroups_to_remove:
-                raise ValueError(
-                    "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
-                    f"(sg:{union})."
-                )
-
-        async def _update(db_session: AsyncSession) -> Optional[DomainRow]:
-            user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+        user_info: UserInfo = UserInfo(
+            id=graph_ctx.user["uuid"],
+            role=graph_ctx.user["role"],
+            domain_name=graph_ctx.user["domain_name"],
+        )
+        res: ModifyDomainNodeActionResult = (
+            await graph_ctx.processors.vfolder.modify_domain_node.wait_for_complete(
+                input.to_action(user_info=user_info)
             )
-            domain_models = await get_domains(
-                SystemScope(),
-                DomainPermission.UPDATE_ATTRIBUTE,
-                [domain_name],
-                ctx=client_ctx,
-                db_session=db_session,
-            )
-            if not domain_models:
-                raise ValueError(f"Not allowed to update domain (id:{domain_name})")
+        )
 
-            if sgroups_to_add is not None:
-                await _ensure_sgroup_permission(graph_ctx, sgroups_to_add, db_session=db_session)
-                await db_session.execute(
-                    sa.insert(ScalingGroupForDomainRow),
-                    [
-                        {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
-                    ],
-                )
-            if sgroups_to_remove is not None:
-                await _ensure_sgroup_permission(graph_ctx, sgroups_to_remove, db_session=db_session)
-                await db_session.execute(
-                    sa.delete(ScalingGroupForDomainRow).where(
-                        (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
-                    ),
-                )
-            _update_stmt = (
-                sa.update(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .values(input)
-                .returning(DomainRow)
-            )
-            _stmt = sa.select(DomainRow).from_statement(_update_stmt)
-
-            return await db_session.scalar(_stmt)
-
-        async with graph_ctx.db.connect() as db_conn:
-            try:
-                domain_row = await execute_with_txn_retry(
-                    _update, graph_ctx.db.begin_session, db_conn
-                )
-            except sa.exc.IntegrityError as e:
-                raise ValueError(
-                    f"Cannot modify the domain with given arguments. (arg:{input}, e:{str(e)})"
-                )
-        if domain_row is None:
-            raise ValueError(f"Domain not found (id:{domain_name})")
         return ModifyDomainNode(
-            DomainNode.from_orm_model(graph_ctx, domain_row),
+            DomainNode.from_orm_model(graph_ctx, res.domain_row),
             input.get("client_mutation_id"),
         )

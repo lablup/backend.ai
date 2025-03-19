@@ -31,6 +31,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
+    AgentId,
     DispatchResult,
     ImageAlias,
 )
@@ -44,7 +45,6 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
-from ai.backend.manager.services.image.actions import PurgeImagesAction
 
 from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -1155,10 +1155,37 @@ class PurgeImages(graphene.Mutation):
         async def _purge_images_task(
             reporter: ProgressReporter,
         ) -> DispatchResult[PurgeImagesResult]:
-            # TODO: Fill me
-            res = ctx.processors.image.purge_images.wait_for_complete(PurgeImagesAction())
+            # # TODO: Fill me
+            # res = ctx.processors.image.purge_images.wait_for_complete(PurgeImagesAction())
 
-            return DispatchResult(res)
+            errors = []
+            task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
+            arch_per_images = {image.name: image.architecture for image in images}
+
+            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
+
+            for result in results.responses:
+                image_canonical = result.image
+                arch = arch_per_images[result.image]
+
+                if not result.error:
+                    image_identifier = ImageIdentifier(image_canonical, arch)
+                    async with ctx.db.begin_session() as session:
+                        image_row = await ImageRow.resolve(session, [image_identifier])
+                        task_result.reserved_bytes += image_row.size_bytes
+                        task_result.results.responses.append(result)
+
+                else:
+                    error_msg = f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
+                    log.error(error_msg)
+                    errors.append(error_msg)
+
+            return DispatchResult(
+                result=task_result,
+                errors=errors,
+            )
+
+            # return DispatchResult(res)
 
         task_id = await ctx.background_task_manager.start(_purge_images_task)
         return RescanImages(task_id=task_id)
