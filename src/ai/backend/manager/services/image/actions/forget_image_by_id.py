@@ -24,11 +24,7 @@ class ForgetImageByIdAction(ImageAction):
 
 
 @dataclass
-class ForgetImageByIdActionResult(BaseActionResult): ...
-
-
-@dataclass
-class ForgetImageActionByIdSuccess(ForgetImageByIdActionResult):
+class ForgetImageByIdActionResult(BaseActionResult):
     # TODO: 여기서 ImageRow 타입을 그대로 써도 되는지?
     image_row: ImageRow
 
@@ -46,36 +42,14 @@ class ForgetImageActionByIdSuccess(ForgetImageByIdActionResult):
 
     # TODO: eq 직접 정의보다 나은 방법?
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, ForgetImageActionByIdSuccess):
+        if not isinstance(other, ForgetImageByIdActionResult):
             return False
         return self.image_row.id == other.image_row.id
 
 
-@dataclass
-class ForgetImageActionByIdGenericForbiddenError(ForgetImageByIdActionResult):
-    @override
-    def entity_id(self) -> Optional[str]:
-        return None
-
-    @override
-    def status(self) -> str:
-        return "forbidden error"
-
-    @override
-    def description(self) -> Optional[str]:
-        return "The user role is not allowed to forget the image."
+class ForgetImageActionByIdGenericForbiddenError(Exception):
+    pass
 
 
-@dataclass
-class ForgetImageActionByIdObjectNotFoundError(ForgetImageByIdActionResult):
-    @override
-    def entity_id(self) -> Optional[str]:
-        return None
-
-    @override
-    def status(self) -> str:
-        return "object not found"
-
-    @override
-    def description(self) -> Optional[str]:
-        return "The image does not exist."
+class ForgetImageActionByIdObjectNotFoundError(Exception):
+    pass
