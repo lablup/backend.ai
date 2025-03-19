@@ -45,6 +45,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
@@ -62,7 +63,6 @@ from ..base import (
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
 from ..image import (
-    ImageAliasRow,
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
@@ -964,19 +964,16 @@ class AliasImage(graphene.Mutation):
     ) -> AliasImage:
         log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                try:
-                    image_row = await ImageRow.resolve(
-                        session, [ImageIdentifier(target, architecture)]
-                    )
-                except UnknownImageReference:
-                    raise ImageNotFound
-                else:
-                    image_row.aliases.append(ImageAliasRow(alias=alias, image_id=image_row.id))
-        except ValueError as e:
-            return AliasImage(ok=False, msg=str(e))
-        return AliasImage(ok=True, msg="")
+
+        result = await ctx.processors.image.alias_image.wait_for_complete(
+            AliasImageAction(
+                image_canonical=target,
+                architecture=architecture,
+                alias=alias,
+            )
+        )
+
+        return AliasImage(ok=True, msg=result.description())
 
 
 class DealiasImage(graphene.Mutation):

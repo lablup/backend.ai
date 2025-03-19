@@ -34,7 +34,7 @@ class DealiasImageActionResult(BaseActionResult):
 
     @override
     def description(self) -> Optional[str]:
-        return "The image has been forgotten."
+        return "The image has been dealiased."
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, DealiasImageActionResult):
