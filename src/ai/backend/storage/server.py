@@ -146,7 +146,7 @@ async def server_main(
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
-            event_observer=metric_registry,
+            event_observer=metric_registry.event,
         )
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
