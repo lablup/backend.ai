@@ -196,6 +196,59 @@ async def test_forget_image_by_id(
     await test_scenario.test(processors.forget_image_by_id.wait_for_complete)
 
 
+# TODO: 아래 테스트는 작동하지만, image 삭제할 때 image alias fk 위반 에러 발생함.
+# @pytest.mark.asyncio
+# @pytest.mark.parametrize(
+#     "test_scenario",
+#     [
+#         TestScenario.success(
+#             "Success Case",
+#             AliasImageAction(
+#                 image_canonical=IMAGE_ROW_FIXTURE.name,
+#                 architecture=IMAGE_ROW_FIXTURE.architecture,
+#                 alias="new-alias",
+#             ),
+#             AliasImageActionResult(image_alias=ImageAliasRow(
+#                 id=uuid.uuid4(),
+#                 alias="new-alias",
+#                 image_id=IMAGE_ROW_FIXTURE.id,
+#             )),
+#         ),
+#     ],
+# )
+# @pytest.mark.parametrize(
+#     "extra_fixtures",
+#     [
+#         {
+#             "images": [
+#                 {
+#                     "id": str(IMAGE_ROW_FIXTURE.id),
+#                     "name": IMAGE_ROW_FIXTURE.name,
+#                     "image": IMAGE_ROW_FIXTURE.image,
+#                     "project": IMAGE_ROW_FIXTURE.project,
+#                     "registry": IMAGE_ROW_FIXTURE.registry,
+#                     "registry_id": IMAGE_ROW_FIXTURE.registry_id,
+#                     "architecture": IMAGE_ROW_FIXTURE.architecture,
+#                     "config_digest": IMAGE_ROW_FIXTURE.config_digest,
+#                     "size_bytes": IMAGE_ROW_FIXTURE.size_bytes,
+#                     "is_local": IMAGE_ROW_FIXTURE.is_local,
+#                     "type": IMAGE_ROW_FIXTURE.type._name_,
+#                     "labels": IMAGE_ROW_FIXTURE.labels,
+#                     "resources": IMAGE_ROW_FIXTURE.resources,
+#                     "status": IMAGE_ROW_FIXTURE.status.value,
+#                 }
+#             ],
+#         }
+#     ],
+#     ids=[""],
+# )
+# async def test_alias_image(
+#     processors: ImageProcessors,
+#     test_scenario: TestScenario[AliasImageAction, AliasImageActionResult],
+# ):
+#     await test_scenario.test(processors.alias_image.wait_for_complete)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "test_scenario",
