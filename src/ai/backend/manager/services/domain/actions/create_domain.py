@@ -12,7 +12,7 @@ class CreateDomainAction(DomainAction):
     _name: str
     _description: Optional[str]
     _is_active: Optional[bool]
-    _total_resource_slots: Optional[dict[str, str]]
+    _total_resource_slots: Optional[ResourceSlot]
     _allowed_vfolder_hosts: Optional[dict[str, str]]
     _allowed_docker_registries: Optional[list[str]]
     _integration_id: Optional[str]
@@ -22,7 +22,7 @@ class CreateDomainAction(DomainAction):
         name: str,
         description: Optional[str],
         is_active: Optional[bool],
-        total_resource_slots: Optional[dict[str, str]],
+        total_resource_slots: Optional[ResourceSlot],
         allowed_vfolder_hosts: Optional[dict[str, str]],
         allowed_docker_registries: Optional[list[str]],
         integration_id: Optional[str],
@@ -50,7 +50,7 @@ class CreateDomainAction(DomainAction):
             "name": self._name,
             "description": self._description,
             "is_active": self._is_active,
-            "total_resource_slots": ResourceSlot.from_user_input(self._total_resource_slots, None),
+            "total_resource_slots": self._total_resource_slots,
             "allowed_vfolder_hosts": self._allowed_vfolder_hosts,
             "allowed_docker_registries": self._allowed_docker_registries,
             "integration_id": self._integration_id,

@@ -16,15 +16,15 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.manager.services.vfolder.actions.create_domain_node import (
+from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
     CreateDomainNodeActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.modify_domain_node import (
+from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeAction,
     ModifyDomainNodeActionResult,
 )
-from ai.backend.manager.services.vfolder.base import UserInfo
+from ai.backend.manager.services.domain.base import UserInfo
 
 from ..base import (
     FilterExprArg,

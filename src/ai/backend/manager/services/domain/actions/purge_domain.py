@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from ai.backend.manager.services.vfolder.base import DomainAction
+from ai.backend.manager.services.domain.base import DomainAction
 
 
 @dataclass

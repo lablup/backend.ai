@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Awaitable, Callable, Iterable, Optional, TypeVar, cast
+from typing import Any, Awaitable, Callable, Iterable, Optional, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine.result import Result
@@ -8,6 +8,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.domain import Domain, DomainRow, get_domains
 from ai.backend.manager.models.rbac import SystemScope
@@ -27,6 +28,10 @@ from ai.backend.manager.services.domain.actions import (
     CreateDomainNodeActionResult,
     ModifyDomainNodeAction,
     ModifyDomainNodeActionResult,
+)
+from ai.backend.manager.services.domain.actions.modify_domain import (
+    ModifyDomainAction,
+    ModifyDomainActionResult,
 )
 from ai.backend.manager.services.domain.base import UserInfo
 
@@ -77,6 +82,42 @@ class DomainService:
         status = "success" if sucess else "failed"
 
         return CreateDomainActionResult(domain_row=row, status=status, description=message)
+
+    async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
+        data: dict[str, Any] = {}
+        if action.new_name is not None:
+            data["name"] = action.new_name
+        if action.description is not None:
+            data["description"] = action.description
+        if action.is_active is not None:
+            data["is_active"] = action.is_active
+        if action.total_resource_slots is not None:
+            data["total_resource_slots"] = ResourceSlot.from_user_input(
+                action.total_resource_slots, None
+            )
+        if action.allowed_vfolder_hosts is not None:
+            data["allowed_vfolder_hosts"] = action.allowed_vfolder_hosts
+        if action.allowed_docker_registries is not None:
+            data["allowed_docker_registries"] = action.allowed_docker_registries
+        if action.integration_id is not None:
+            data["integration_id"] = action.integration_id
+
+        base_query = sa.update(DomainRow).values(data).where(DomainRow.name == action.name)
+
+        async def _do_mutate() -> tuple[bool, str, Optional[Row]]:
+            async with self._db.begin() as conn:
+                query = base_query.returning(base_query.table)
+                result = await conn.execute(query)
+                row = result.first()
+                if result.rowcount > 0:
+                    return True, "domain creation succeed", row
+                else:
+                    return False, f"no matching {DomainRow.__name__.lower()}", None
+
+        sucess, message, row = await self._db_mutation_wrapper(_do_mutate)
+        status = "success" if sucess else "failed"
+
+        return ModifyDomainActionResult(domain_row=row, status=status, description=message)
 
     async def create_domain_node(
         self, action: CreateDomainNodeAction
