@@ -4,11 +4,14 @@ from typing import Any, MutableMapping
 import sqlalchemy as sa
 from graphql import Undefined
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
+from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.models.base import set_if_set
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow, ImageStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -59,6 +62,11 @@ from ai.backend.manager.services.image.actions.purge_image_by_id import (
 from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
     UnloadImageActionResult,
+)
+from ai.backend.manager.services.image.actions.untag_image_from_registry import (
+    UntagImageFromRegistryAction,
+    UntagImageFromRegistryActionGenericForbiddenError,
+    UntagImageFromRegistryActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -219,6 +227,30 @@ class ImageService:
                     raise PurgeImageActionByIdGenericForbiddenError()
             await db_session.delete(image_row)
             return PurgeImageByIdActionResult(image_row=image_row)
+
+    async def untag_image_from_registry(
+        self, action: UntagImageFromRegistryAction
+    ) -> UntagImageFromRegistryActionResult:
+        async with self._db.begin_readonly_session() as db_session:
+            image_row = await ImageRow.get(db_session, action.image_id, load_aliases=True)
+            if not image_row:
+                raise ImageNotFound
+            if action.client_role != UserRole.SUPERADMIN:
+                if not image_row.is_customized_by(action.user_id):
+                    raise UntagImageFromRegistryActionGenericForbiddenError()
+
+            query = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == image_row.image_ref.registry
+            )
+
+            registry_info = (await db_session.execute(query)).scalar()
+
+            if registry_info.type != ContainerRegistryType.HARBOR2:
+                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+
+        scanner = HarborRegistry_v2(self._db, image_row.image_ref.registry, registry_info)
+        await scanner.untag(image_row.image_ref)
+        return UntagImageFromRegistryActionResult(image_row=image_row)
 
     # async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
     #     errors = []
