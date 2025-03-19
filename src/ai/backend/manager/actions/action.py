@@ -92,6 +92,17 @@ class BaseBatchActionResult(ABC):
     def statuses(self) -> Mapping[str, str]:
         raise NotImplementedError
 
+    @abstractmethod
+    def description(self) -> Optional[str]:
+        raise NotImplementedError
+
+    def to_bgtask_result(self) -> DispatchResult:
+        """
+        Implement this method to convert the Result to DispatchResult.
+        You should implment this method for running the action as bgtask.
+        """
+        raise NotImplementedError
+
 
 class BaseBatchActionResult(ABC):
     @abstractmethod

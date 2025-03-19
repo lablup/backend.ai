@@ -72,6 +72,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         return await self._run(action)
 
+    # TODO: background_task_manager를 ActionProcessor 생성자에서 받아오는 게 나은지?
     async def fire_and_forget(
         self, background_task_manager: BackgroundTaskManager, action: TAction
     ) -> uuid.UUID:
