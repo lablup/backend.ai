@@ -94,7 +94,9 @@ jobs:
         run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
       - name: Alembic
         id: alembic
-        if: contains(github.event.pull_request.labels.*.name, 'comp:manager')
+        if: |
+          contains(github.event.pull_request.labels.*.name, 'comp:manager')
+          || github.event_name == 'merge_group'
         run: echo "ALEMBIC=true" >> $GITHUB_OUTPUT
 
 
