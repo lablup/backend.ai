@@ -20,7 +20,7 @@ class PurgeImageByIdAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "purge_by_id"
+        return "purge_image_by_id"
 
 
 @dataclass
