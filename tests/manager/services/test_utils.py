@@ -12,14 +12,14 @@ class TestScenario(Generic[TInput, TResult]):
     description: str
     input: TInput
     expected: Optional[TResult]
-    expected_exception: TException
+    expected_exception: Optional[TException]
 
     def __init__(
         self,
         description: str,
         input: TInput,
         expected: Optional[TResult],
-        expected_exception: TException,
+        expected_exception: Optional[TException],
     ):
         self.description = description
         self.input = input
