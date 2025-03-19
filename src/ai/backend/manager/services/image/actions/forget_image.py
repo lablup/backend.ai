@@ -48,22 +48,7 @@ class ForgetImageActionResult(BaseActionResult):
         return self.image_row.id == other.image_row.id
 
 
+# TODO: BackendError를 상속해야함?
+# BackendError를 상속하면 생성자 호출될 때 에러남.
 class ForgetImageActionGenericForbiddenError(Exception):
-    """
-    Indicates that forgetting an image action is forbidden by policy or configuration.
-    """
-
     pass
-    # error_type: str = "https://api.backend.ai/probs/forget-image-action-generic-forbidden"
-    # error_title: str = "Forbidden to forget image"
-
-    # def __init__(
-    #     self,
-    #     extra_msg: Optional[str] = None,
-    #     extra_data: Optional[Any] = None,
-    #     **kwargs
-    # ):
-    #     kwargs.setdefault("status", 403)
-    #     kwargs.setdefault("reason", "Forbidden")
-
-    #     super().__init__(extra_msg=extra_msg, extra_data=extra_data, **kwargs)
