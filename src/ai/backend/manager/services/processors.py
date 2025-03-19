@@ -1,7 +1,7 @@
-from ai.backend.manager.services.image.processors import ImageProcessors
-from ai.backend.manager.services.vfolder.processors import VFolderProcessors
+# from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.domain.processors import DomainProcessors
 
 
 class Processors:
-    image: ImageProcessors
-    vfolder: VFolderProcessors
+    # image: ImageProcessors
+    vfolder: DomainProcessors
