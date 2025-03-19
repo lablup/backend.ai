@@ -36,14 +36,14 @@ class RescanImagesActionResult(BaseActionResult):
 
     @override
     def description(self) -> Optional[str]:
-        return ""
+        return self.result.message()
 
     @override
     def to_bgtask_result(self) -> DispatchResult:
         return self.result
 
+    # TODO: 여기선 어떻게 비교?
     # def __eq__(self, other: Any) -> bool:
     #     if not isinstance(other, AliasImageActionResult):
     #         return False
-    #     # TODO: 여기선 어떻게 비교?
     #     return self.image_alias.alias == other.image_alias.alias
