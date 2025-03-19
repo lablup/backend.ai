@@ -1,9 +1,7 @@
 import functools
 import logging
-from typing import Any, MutableMapping
 
 import sqlalchemy as sa
-from graphql import Undefined
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -28,11 +26,6 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageActionDBError,
     AliasImageActionResult,
     AliasImageActionValueError,
-)
-from ai.backend.manager.services.image.actions.clear_images import (
-    ClearImagesAction,
-    ClearImagesActionResult,
-    ClearImagesActionValueError,
 )
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
@@ -86,13 +79,6 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
     UntagImageFromRegistryActionGenericForbiddenError,
     UntagImageFromRegistryActionResult,
-)
-from ai.backend.manager.services.image.actions.forget_image_by_id import (
-    ForgetImageActionByIdGenericForbiddenError,
-    ForgetImageActionByIdObjectNotFoundError,
-    ForgetImageActionByIdSuccess,
-    ForgetImageByIdAction,
-    ForgetImageByIdActionResult,
 )
 
 # from ai.backend.manager.services.image.actions.forget_image_by_id import (

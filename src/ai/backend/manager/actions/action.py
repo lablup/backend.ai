@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Generic, Mapping, Optional, TypeVar
 
 from ai.backend.manager.models.audit_log import OperationStatus
+from ai.backend.common.types import DispatchResult
 
 
 @dataclass
@@ -56,6 +57,13 @@ class BaseActionResult(ABC):
 
     @abstractmethod
     def description(self) -> Optional[str]:
+        raise NotImplementedError
+
+    def to_bgtask_result(self) -> DispatchResult:
+        """
+        Implement this method to convert the Result to DispatchResult.
+        You should implment this method for running the action as bgtask.
+        """
         raise NotImplementedError
 
 
