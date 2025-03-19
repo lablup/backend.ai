@@ -46,9 +46,11 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
 )
+from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 
 from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -719,17 +721,18 @@ class ForgetImageById(graphene.Mutation):
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
 
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ObjectNotFound("image")
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_owned_by(ctx.user["uuid"]):
-                    return ForgetImageById(ok=False, msg="Forbidden")
-            await image_row.mark_as_deleted(session)
-            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
+        result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
+            ForgetImageByIdAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                image_id=image_uuid,
+            )
+        )
+
+        return ForgetImageById(
+            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
+        )
 
 
 class ForgetImage(graphene.Mutation):
@@ -998,17 +1001,14 @@ class DealiasImage(graphene.Mutation):
     ) -> DealiasImage:
         log.info("dealias image {0} by API request", alias)
         ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                existing_alias = await session.scalar(
-                    sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
-                )
-                if existing_alias is None:
-                    raise DealiasImage(ok=False, msg=str("No such alias"))
-                await session.delete(existing_alias)
-        except ValueError as e:
-            return DealiasImage(ok=False, msg=str(e))
-        return DealiasImage(ok=True, msg="")
+
+        result = await ctx.processors.image.dealias_image.wait_for_complete(
+            DealiasImageAction(
+                alias=alias,
+            )
+        )
+
+        return DealiasImage(ok=True, msg=result.description())
 
 
 class ClearImages(graphene.Mutation):

@@ -1,4 +1,8 @@
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.services.image.actions.dealias_image import (
+    DealiasImageAction,
+    DealiasImageActionResult,
+)
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionResult,
@@ -14,6 +18,7 @@ from .service import ImageService
 class ImageProcessors:
     forget_image: ActionProcessor[ForgetImageAction, ForgetImageActionResult]
     forget_image_by_id: ActionProcessor[ForgetImageByIdAction, ForgetImageByIdActionResult]
+    dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
 
     # TODO: Batch action 지원 추가 필요
     # purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
@@ -23,5 +28,7 @@ class ImageProcessors:
     def __init__(self, service: ImageService) -> None:
         self.forget_image = ActionProcessor(service.forget_image)
         self.forget_image_by_id = ActionProcessor(service.forget_image_by_id)
+        self.dealias_image = ActionProcessor(service.dealias_image)
+
         # self.purge_images = ActionProcessor(service.purge_images)
         # self.purge_image_by_id = ActionProcessor(service.purge_images)

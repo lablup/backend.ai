@@ -1,11 +1,19 @@
 import logging
 
+import sqlalchemy as sa
+
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.services.image.actions.dealias_image import (
+    DealiasImageAction,
+    DealiasImageActionNoSuchAliasError,
+    DealiasImageActionResult,
+    DealiasImageActionValueError,
+)
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionGenericForbiddenError,
@@ -56,6 +64,19 @@ class ImageService:
                     raise ForgetImageActionByIdGenericForbiddenError()
             await image_row.mark_as_deleted(session)
             return ForgetImageByIdActionResult(image_row=image_row)
+
+    async def dealias_image(self, action: DealiasImageAction) -> DealiasImageActionResult:
+        try:
+            async with self._db.begin_session() as session:
+                existing_alias = await session.scalar(
+                    sa.select(ImageAliasRow).where(ImageAliasRow.alias == action.alias),
+                )
+                if existing_alias is None:
+                    raise DealiasImageActionNoSuchAliasError()
+                await session.delete(existing_alias)
+        except ValueError:
+            raise DealiasImageActionValueError()
+        return DealiasImageActionResult(image_alias=existing_alias)
 
     # async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
     #     errors = []
