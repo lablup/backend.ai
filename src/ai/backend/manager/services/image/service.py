@@ -11,14 +11,12 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageActionGenericForbiddenError,
     ForgetImageActionResult,
 )
-
-# from ai.backend.manager.services.image.actions.forget_image_by_id import (
-#     ForgetImageActionByIdGenericForbiddenError,
-#     ForgetImageActionByIdObjectNotFoundError,
-#     ForgetImageActionByIdSuccess,
-#     ForgetImageByIdAction,
-#     ForgetImageByIdActionResult,
-# )
+from ai.backend.manager.services.image.actions.forget_image_by_id import (
+    ForgetImageActionByIdGenericForbiddenError,
+    ForgetImageActionByIdObjectNotFoundError,
+    ForgetImageByIdAction,
+    ForgetImageByIdActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -46,18 +44,18 @@ class ImageService:
             await image_row.mark_as_deleted(session)
         return ForgetImageActionResult(image_row=image_row)
 
-    # async def forget_image_by_id(
-    #     self, action: ForgetImageByIdAction
-    # ) -> ForgetImageByIdActionResult:
-    #     async with self._db.begin_session() as session:
-    #         image_row = await ImageRow.get(session, action.image_id, load_aliases=True)
-    #         if not image_row:
-    #             return ForgetImageActionByIdObjectNotFoundError()
-    #         if action.client_role != UserRole.SUPERADMIN:
-    #             if not image_row.is_customized_by(action.user_id):
-    #                 return ForgetImageActionByIdGenericForbiddenError()
-    #         await image_row.mark_as_deleted(session)
-    #         return ForgetImageActionByIdSuccess(image_row=image_row)
+    async def forget_image_by_id(
+        self, action: ForgetImageByIdAction
+    ) -> ForgetImageByIdActionResult:
+        async with self._db.begin_session() as session:
+            image_row = await ImageRow.get(session, action.image_id, load_aliases=True)
+            if not image_row:
+                raise ForgetImageActionByIdObjectNotFoundError()
+            if action.client_role != UserRole.SUPERADMIN:
+                if not image_row.is_customized_by(action.user_id):
+                    raise ForgetImageActionByIdGenericForbiddenError()
+            await image_row.mark_as_deleted(session)
+            return ForgetImageByIdActionResult(image_row=image_row)
 
     # async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
     #     errors = []
