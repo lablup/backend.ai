@@ -351,7 +351,7 @@ class CreateDomainNode(graphene.Mutation):
         )
 
         res: CreateDomainNodeActionResult = (
-            await graph_ctx.processors.vfolder.create_domain_node.wait_for_complete(
+            await graph_ctx.processors.domain.create_domain_node.wait_for_complete(
                 input.to_action(user_info=user_info)
             )
         )
@@ -419,7 +419,7 @@ class ModifyDomainNode(graphene.Mutation):
             domain_name=graph_ctx.user["domain_name"],
         )
         res: ModifyDomainNodeActionResult = (
-            await graph_ctx.processors.vfolder.modify_domain_node.wait_for_complete(
+            await graph_ctx.processors.domain.modify_domain_node.wait_for_complete(
                 input.to_action(user_info=user_info)
             )
         )

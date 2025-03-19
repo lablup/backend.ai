@@ -4,4 +4,4 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 
 class Processors:
     # image: ImageProcessors
-    vfolder: DomainProcessors
+    domain: DomainProcessors
