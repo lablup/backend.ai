@@ -46,6 +46,14 @@ from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageActionUnknownImageReferenceError,
     ModifyImageActionValueError,
 )
+from ai.backend.manager.services.image.actions.preload_image import (
+    PreloadImageAction,
+    PreloadImageActionResult,
+)
+from ai.backend.manager.services.image.actions.unload_image import (
+    UnloadImageAction,
+    UnloadImageActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -188,6 +196,12 @@ class ImageService:
             raise ModifyImageActionValueError
 
         return ModifyImageActionResult(image_row=image_row)
+
+    async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
+        raise NotImplementedError
+
+    async def unload_image(self, action: UnloadImageAction) -> UnloadImageActionResult:
+        raise NotImplementedError
 
     # async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
     #     errors = []
