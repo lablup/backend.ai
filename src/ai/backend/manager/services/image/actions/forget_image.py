@@ -22,7 +22,7 @@ class ForgetImageAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "forget"
+        return "forget_image"
 
 
 @dataclass
