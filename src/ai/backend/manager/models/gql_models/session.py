@@ -19,7 +19,6 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionId, SessionResult
@@ -54,6 +53,8 @@ from ..session import (
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
     QueryCondition,
+    QueryOption,
+    RelatedFields,
     SessionQueryConditions,
     SessionRow,
     SessionStatus,
@@ -63,6 +64,8 @@ from ..session import (
     and_resource_group_name,
     and_status,
     get_permission_ctx,
+    join_related_field,
+    load_related_field,
 )
 from ..user import UserRole, UserRow
 from ..utils import execute_with_txn_retry
@@ -242,14 +245,20 @@ class ComputeSessionNode(graphene.ObjectType):
     def _add_basic_options_to_query(
         cls, stmt: sa.sql.Select, is_count: bool = False
     ) -> sa.sql.Select:
-        new_stmt = stmt.join(SessionRow.user).join(SessionRow.group)
+        options = [
+            join_related_field(RelatedFields.USER),
+            join_related_field(RelatedFields.PROJECT),
+        ]
         if not is_count:
-            new_stmt = (
-                new_stmt.options(selectinload(SessionRow.kernels))
-                .options(contains_eager(SessionRow.user))
-                .options(contains_eager(SessionRow.group))
-            )
-        return new_stmt
+            options = [
+                *options,
+                load_related_field(RelatedFields.KERNEL),
+                load_related_field(RelatedFields.USER, already_joined=True),
+                load_related_field(RelatedFields.PROJECT, already_joined=True),
+            ]
+        for option in options:
+            stmt = option(stmt)
+        return stmt
 
     @classmethod
     def from_row(
@@ -588,7 +597,15 @@ class TotalResourceSlot(graphene.ObjectType):
         if conditions.resource_group_name is not None:
             query_conditions.append(and_resource_group_name(conditions.resource_group_name))
 
-        session_rows = await SessionRow.list_session_by_condition(query_conditions, db=ctx.db)
+        query_options: list[QueryOption] = [
+            load_related_field(RelatedFields.KERNEL),
+            join_related_field(RelatedFields.USER),
+            join_related_field(RelatedFields.PROJECT),
+        ]
+
+        session_rows = await SessionRow.list_session_by_condition(
+            query_conditions, query_options, db=ctx.db
+        )
         occupied_slots = ResourceSlot()
         requested_slots = ResourceSlot()
         for row in session_rows:

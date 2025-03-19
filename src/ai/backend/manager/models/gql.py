@@ -962,12 +962,12 @@ class Queries(graphene.ObjectType):
         description="Added in 25.5.0.",
         statuses=graphene.List(
             graphene.String,
-            default_value=[SessionStatus.RUNNING.name],
+            default_value=None,
             description=(
                 "`statuses` argument is an array of session statuses. "
                 "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
                 f"The argument should be an array of the following valid status values: {[s.name for s in SessionStatus]}.\n"
-                f"Default value is {[SessionStatus.RUNNING.name]}."
+                f"Default value is null."
             ),
         ),
         filter=graphene.String(
@@ -2566,14 +2566,17 @@ class Queries(graphene.ObjectType):
     async def resolve_total_resource_slot(
         root: Any,
         info: graphene.ResolveInfo,
-        statuses: list[str],
+        statuses: Optional[list[str]] = None,
         filter: Optional[str] = None,
         domain_name: Optional[str] = None,
         resource_group_name: Optional[str] = None,
     ) -> TotalResourceSlot:
         graph_ctx: GraphQueryContext = info.context
 
-        status_list = [SessionStatus[s] for s in statuses]
+        if statuses is not None:
+            status_list = [SessionStatus[s] for s in statuses]
+        else:
+            status_list = None
         return await TotalResourceSlot.get_data(
             graph_ctx,
             SessionQueryConditions(

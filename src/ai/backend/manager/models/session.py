@@ -35,7 +35,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
+from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
@@ -957,11 +957,21 @@ class SessionRow(Base):
 
     @classmethod
     async def list_session_by_condition(
-        cls, conditions: Iterable[QueryCondition], *, db: ExtendedAsyncSAEngine
+        cls,
+        conditions: Iterable[QueryCondition],
+        options: Iterable[QueryOption] = tuple(),
+        *,
+        db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
         stmt = sa.select(SessionRow)
-        for cond in conditions:
-            stmt = cond(stmt)
+        condition: Optional[sa.sql.expression.BinaryExpression] = None
+        for cond_callable in conditions:
+            condition = cond_callable(condition)
+        if condition is not None:
+            stmt = stmt.where(condition)
+
+        for option in options:
+            stmt = option(stmt)
 
         async def fetch(db_session: SASession) -> list[SessionRow]:
             return (await db_session.scalars(stmt)).all()
@@ -1331,34 +1341,115 @@ class SessionQueryConditions:
     raw_filter: Optional[str] = None
 
 
-type QueryCondition = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
+type QueryConditionCallable = Callable[
+    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
+]
+type QueryCondition = Callable[..., QueryConditionCallable]
 
 
-def and_status(statuses: Iterable[SessionStatus]) -> Callable[[sa.sql.Select], sa.sql.Select]:
-    return lambda query_stmt: query_stmt.where(SessionRow.status.in_(statuses))
+def and_status(statuses: Iterable[SessionStatus]) -> QueryConditionCallable:
+    def _and_status(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.status.in_(statuses)
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_status
 
 
-def and_user_id(user_id: UUID) -> Callable[[sa.sql.Select], sa.sql.Select]:
-    return lambda query_stmt: query_stmt.where(SessionRow.user_uuid == user_id)
+def and_user_id(user_id: UUID) -> QueryConditionCallable:
+    def _and_user_id(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.user_uuid == user_id
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_user_id
 
 
-def and_project_id(project_id: UUID) -> Callable[[sa.sql.Select], sa.sql.Select]:
-    return lambda query_stmt: query_stmt.where(SessionRow.group_id == project_id)
+def and_project_id(project_id: UUID) -> QueryConditionCallable:
+    def _and_project_id(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.group_id == project_id
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_project_id
 
 
-def and_domain_name(domain_name: str) -> Callable[[sa.sql.Select], sa.sql.Select]:
-    return lambda query_stmt: query_stmt.where(SessionRow.domain_name == domain_name)
+def and_domain_name(domain_name: str) -> QueryConditionCallable:
+    def _and_domain_name(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return (
+            sa.and_(cond, SessionRow.domain_name == domain_name)
+            if cond is not None
+            else SessionRow.domain_name == domain_name
+        )
+
+    return _and_domain_name
 
 
-def and_resource_group_name(resource_group_name: str) -> Callable[[sa.sql.Select], sa.sql.Select]:
-    return lambda query_stmt: query_stmt.where(SessionRow.scaling_group_name == resource_group_name)
+def and_resource_group_name(resource_group_name: str) -> QueryConditionCallable:
+    def _and_resource_group_name(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.scaling_group_name == resource_group_name
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_resource_group_name
 
 
-def and_raw_filter(
-    filter_spec: FieldSpecType, raw_filter: str
-) -> Callable[[sa.sql.Select], sa.sql.Select]:
-    qfparser = QueryFilterParser(filter_spec)
-    return lambda query_stmt: qfparser.append_filter(query_stmt, raw_filter)
+def and_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryConditionCallable:
+    def _and_raw_filter(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        qfparser = QueryFilterParser(filter_spec)
+        new_cond = qfparser.parse_filter(SessionRow, raw_filter)
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_raw_filter
+
+
+type QueryOptionCallable = Callable[[sa.sql.Select], sa.sql.Select]
+type QueryOption = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
+
+
+class RelatedFields(enum.StrEnum):
+    KERNEL = enum.auto()
+    USER = enum.auto()
+    PROJECT = enum.auto()
+
+    def loading_option(self, already_joined: bool = False) -> Callable:
+        match self:
+            case RelatedFields.KERNEL:
+                return selectinload(SessionRow.kernels)
+            case RelatedFields.USER:
+                if already_joined:
+                    return contains_eager(SessionRow.user)
+                return joinedload(SessionRow.user)
+            case RelatedFields.PROJECT:
+                if already_joined:
+                    return contains_eager(SessionRow.group)
+                return joinedload(SessionRow.group)
+
+    @property
+    def orm_field(self) -> sa.orm.attributes.InstrumentedAttribute:
+        match self:
+            case RelatedFields.KERNEL:
+                return SessionRow.kernels
+            case RelatedFields.USER:
+                return SessionRow.user
+            case RelatedFields.PROJECT:
+                return SessionRow.group
+
+
+def load_related_field(field: RelatedFields, already_joined: bool = False) -> QueryOptionCallable:
+    return lambda stmt: stmt.options(field.loading_option(already_joined))
+
+
+def join_related_field(field: RelatedFields) -> QueryOptionCallable:
+    return lambda stmt: stmt.join(field.orm_field)
 
 
 class SessionLifecycleManager:
