@@ -4,7 +4,7 @@ from typing import Optional, override
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.services.vfolder.base import DomainAction
+from ai.backend.manager.services.domain.base import DomainAction
 
 
 @dataclass
