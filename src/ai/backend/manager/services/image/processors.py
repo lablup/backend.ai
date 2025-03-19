@@ -3,6 +3,10 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
 )
+from ai.backend.manager.services.image.actions.clear_images import (
+    ClearImagesAction,
+    ClearImagesActionResult,
+)
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
     DealiasImageActionResult,

@@ -27,6 +27,11 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageActionResult,
     AliasImageActionValueError,
 )
+from ai.backend.manager.services.image.actions.clear_images import (
+    ClearImagesAction,
+    ClearImagesActionResult,
+    ClearImagesActionValueError,
+)
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
     DealiasImageActionNoSuchAliasError,
