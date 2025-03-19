@@ -19,7 +19,7 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionId, SessionResult
@@ -44,7 +44,7 @@ from ..gql_relay import (
     ResolvedGlobalID,
 )
 from ..kernel import KernelRow
-from ..minilang import ArrayFieldItem, JSONFieldItem
+from ..minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from ..rbac import ScopeType
@@ -64,8 +64,9 @@ from ..session import (
     and_status,
     get_permission_ctx,
 )
-from ..user import UserRole
+from ..user import UserRole, UserRow
 from ..utils import execute_with_txn_retry
+from .group import GroupRow
 from .kernel import KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
@@ -88,6 +89,9 @@ _queryfilter_fieldspec: FieldSpecType = {
     "domain_name": ("domain_name", None),
     "project_id": ("project_id", None),
     "user_id": ("user_uuid", None),
+    "full_name": (ORMFieldItem(UserRow.full_name), None),
+    "group_name": (ORMFieldItem(GroupRow.name), None),
+    "user_email": (ORMFieldItem(UserRow.email), None),
     "access_key": ("access_key", None),
     "scaling_group": ("scaling_group_name", None),
     "cluster_mode": ("cluster_mode", lambda s: ClusterMode[s]),
@@ -233,6 +237,19 @@ class ComputeSessionNode(graphene.ObjectType):
         "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
         description="Added in 24.09.0.",
     )
+
+    @classmethod
+    def _add_basic_options_to_query(
+        cls, stmt: sa.sql.Select, is_count: bool = False
+    ) -> sa.sql.Select:
+        new_stmt = stmt.join(SessionRow.user).join(SessionRow.group)
+        if not is_count:
+            new_stmt = (
+                new_stmt.options(selectinload(SessionRow.kernels))
+                .options(contains_eager(SessionRow.user))
+                .options(contains_eager(SessionRow.group))
+            )
+        return new_stmt
 
     @classmethod
     def from_row(
@@ -461,11 +478,8 @@ class ComputeSessionNode(graphene.ObjectType):
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = (
-                sa.select(SessionRow)
-                .where(cond & (SessionRow.id == uuid.UUID(session_id)))
-                .options(selectinload(SessionRow.kernels))
-            )
+            query = sa.select(SessionRow).where(cond & (SessionRow.id == uuid.UUID(session_id)))
+            query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
         result = cls.from_row(
@@ -528,8 +542,8 @@ class ComputeSessionNode(graphene.ObjectType):
             cond = permission_ctx.query_condition
             if cond is None:
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-            query = query.where(cond).options(selectinload(SessionRow.kernels))
-            cnt_query = cnt_query.where(cond)
+            query = cls._add_basic_options_to_query(query.where(cond))
+            cnt_query = cls._add_basic_options_to_query(cnt_query.where(cond), is_count=True)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
