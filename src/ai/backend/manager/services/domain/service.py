@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.domain import Domain, DomainRow, domains, get_domains
+from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
@@ -63,12 +63,12 @@ class DomainService:
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
         data = action.get_insert_data()
-        base_query = sa.insert(DomainRow).values(data)
+        base_query = sa.insert(domains).values(data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
-            from ai.backend.manager.models.group import GroupRow, ProjectType
+            from ai.backend.manager.models.group import ProjectType, groups
 
-            model_store_insert_query = sa.insert(GroupRow).values({
+            model_store_insert_query = sa.insert(groups).values({
                 "name": "model-store",
                 "description": "Model Store",
                 "is_active": True,
@@ -90,7 +90,7 @@ class DomainService:
                 if result.rowcount > 0:
                     return True, "domain creation succeed", row
                 else:
-                    return False, f"no matching {Domain.__name__.lower()}", None
+                    return False, f"no matching {action.domain_name}", None
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
@@ -117,7 +117,7 @@ class DomainService:
         if action.integration_id is not None:
             data["integration_id"] = action.integration_id
 
-        base_query = sa.update(DomainRow).values(data).where(DomainRow.name == action.name)
+        base_query = sa.update(domains).values(data).where(domains.c.name == action.name)
 
         async def _do_mutate() -> tuple[bool, str, Optional[Row]]:
             async with self._db.begin() as conn:
@@ -127,7 +127,7 @@ class DomainService:
                 if result.rowcount > 0:
                     return True, "domain creation succeed", row
                 else:
-                    return False, f"no matching {DomainRow.__name__.lower()}", None
+                    return False, f"no matching {action.name}", None
 
         res = await self._db_mutation_wrapper(_do_mutate)
 
@@ -136,9 +136,7 @@ class DomainService:
         )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
-        base_query = (
-            sa.update(DomainRow).values(is_active=False).where(DomainRow.name == action.name)
-        )
+        base_query = sa.update(domains).values(is_active=False).where(domains.c.name == action.name)
 
         async def _do_mutate() -> tuple[bool, str, Optional[Row]]:
             async with self._db.begin() as conn:
@@ -146,7 +144,7 @@ class DomainService:
                 if result.rowcount > 0:
                     return True, f"domain {action.name} deleted successfully", None
                 else:
-                    return False, f"no matching {DomainRow.__name__.lower()}", None
+                    return False, f"no matching {action.name}", None
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
