@@ -31,7 +31,6 @@ import trafaret as t
 import yarl
 from aiohttp import web
 from async_timeout import timeout as _timeout
-from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
@@ -44,6 +43,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.services.resource.actions.check_presets import CheckResourcePresetsAction
 from ai.backend.manager.services.resource.actions.list_presets import ListResourcePresetsAction
 from ai.backend.manager.services.resource.actions.recalculate_usage import RecalculateUsageAction
+from ai.backend.manager.services.resource.actions.usage_per_month import UsagePerMonthAction
 
 from ..models import (
     LIVE_STATUS,

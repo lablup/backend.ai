@@ -11,6 +11,10 @@ from ai.backend.manager.services.resource.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
 )
+from ai.backend.manager.services.resource.actions.usage_per_month import (
+    UsagePerMonthAction,
+    UsagePerMonthActionResult,
+)
 from ai.backend.manager.services.resource.service import ResourceService
 
 
@@ -18,8 +22,10 @@ class ResourceProcessors:
     list_presets: ActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
     check_presets: ActionProcessor[CheckResourcePresetsAction, CheckResourcePresetsActionResult]
     recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
+    usage_per_month: ActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
 
     def __init__(self, service: ResourceService) -> None:
         self.list_presets = ActionProcessor(service.list_presets)
         self.check_presets = ActionProcessor(service.check_presets)
         self.recalculate_usage = ActionProcessor(service.recalculate_usage)
+        self.usage_per_month = ActionProcessor(service.usage_per_month)
