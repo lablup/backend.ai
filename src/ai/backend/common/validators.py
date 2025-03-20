@@ -505,6 +505,9 @@ class TimeZone(t.Trafaret):
         return tz
 
 
+TimeDelta = Union[datetime.timedelta, relativedelta]
+
+
 class TimeDuration(t.Trafaret):
     """
     Represent the relative difference between two datetime objects,
@@ -533,7 +536,7 @@ class TimeDuration(t.Trafaret):
     def __init__(self, *, allow_negative: bool = False) -> None:
         self._allow_negative = allow_negative
 
-    def check_and_return(self, value: Any) -> Union[datetime.timedelta, relativedelta]:
+    def check_and_return(self, value: Any) -> TimeDelta:
         if not isinstance(value, (int, float, str)):
             self._failure("value must be a number or string", value=value)
         if isinstance(value, (int, float)):

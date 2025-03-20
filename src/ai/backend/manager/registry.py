@@ -2250,6 +2250,7 @@ class AgentRegistry:
         kernels: Sequence[
             Mapping[str, Any]
         ],  # should have (id, agent, agent_addr, container_id) columns
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.FAILED_TO_START,
     ) -> None:
         """
         Destroy the kernels that belongs the to given session unconditionally
@@ -2278,7 +2279,7 @@ class AgentRegistry:
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
                             str(session_id),
-                            KernelLifecycleEventReason.FAILED_TO_START,
+                            reason,
                             suppress_events=True,
                         ),
                     )
@@ -2314,7 +2315,7 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        async def _force_destroy_for_suadmin(
+        async def _force_destroy_for_superadmin(
             target_status: Literal[SessionStatus.CANCELLED, SessionStatus.TERMINATED],
         ) -> None:
             current_time = datetime.now(tzutc())
@@ -2439,7 +2440,7 @@ class AgentRegistry:
                     if user_role == UserRole.SUPERADMIN:
                         # Exceptionally let superadmins set the session status to 'TERMINATED' and finish the function.
                         # TODO: refactor Session/Kernel status management and remove this.
-                        await _force_destroy_for_suadmin(SessionStatus.TERMINATED)
+                        await _force_destroy_for_superadmin(SessionStatus.TERMINATED)
                         return {}
                     else:
                         await SessionRow.set_session_status(
