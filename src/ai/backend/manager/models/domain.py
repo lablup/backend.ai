@@ -37,7 +37,6 @@ from .base import (
     VFolderHostPermissionColumn,
     batch_result,
     mapper_registry,
-    simple_db_mutate,
 )
 from .rbac import (
     AbstractPermissionContext,
@@ -63,6 +62,8 @@ if TYPE_CHECKING:
         DeleteDomainActionResult,
         ModifyDomainAction,
         ModifyDomainActionResult,
+        PurgeDomainAction,
+        PurgeDomainActionResult,
     )
 
     from .gql import GraphQueryContext
@@ -421,26 +422,13 @@ class PurgeDomain(graphene.Mutation):
 
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
-        from . import groups, users
-
         ctx: GraphQueryContext = info.context
 
-        async def _pre_func(conn: SAConnection) -> None:
-            if await cls.domain_has_active_kernels(conn, name):
-                raise RuntimeError("Domain has some active kernels. Terminate them first.")
-            query = sa.select([sa.func.count()]).where(users.c.domain_name == name)
-            user_count = await conn.scalar(query)
-            if user_count > 0:
-                raise RuntimeError("There are users bound to the domain. Remove users first.")
-            query = sa.select([sa.func.count()]).where(groups.c.domain_name == name)
-            group_count = await conn.scalar(query)
-            if group_count > 0:
-                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
+        res: PurgeDomainActionResult = await ctx.processors.domain.purge_domain.wait_for_complete(
+            action=PurgeDomainAction(name=name)
+        )
 
-            await cls.delete_kernels(conn, name)
-
-        delete_query = sa.delete(domains).where(domains.c.name == name)
-        return await simple_db_mutate(cls, ctx, delete_query, pre_func=_pre_func)
+        return cls(ok=res.ok, msg=res.description())
 
     @classmethod
     async def delete_kernels(

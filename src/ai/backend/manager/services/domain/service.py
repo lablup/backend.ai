@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.domain import Domain, DomainRow, get_domains
+from ai.backend.manager.models.domain import Domain, DomainRow, domains, get_domains
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
@@ -27,16 +27,14 @@ from ai.backend.manager.services.domain.actions import (
     CreateDomainActionResult,
     CreateDomainNodeAction,
     CreateDomainNodeActionResult,
-    ModifyDomainNodeAction,
-    ModifyDomainNodeActionResult,
-)
-from ai.backend.manager.services.domain.actions.delete_domain import (
     DeleteDomainAction,
     DeleteDomainActionResult,
-)
-from ai.backend.manager.services.domain.actions.modify_domain import (
     ModifyDomainAction,
     ModifyDomainActionResult,
+    ModifyDomainNodeAction,
+    ModifyDomainNodeActionResult,
+    PurgeDomainAction,
+    PurgeDomainActionResult,
 )
 from ai.backend.manager.services.domain.base import UserInfo
 
@@ -153,6 +151,65 @@ class DomainService:
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
         return DeleteDomainActionResult(status=res.status, description=res.message)
+
+    async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
+        from ai.backend.manager.models import groups, users
+
+        name = action.name
+
+        async def _pre_func(conn: SAConnection) -> None:
+            if await self._domain_has_active_kernels(conn, name):
+                raise RuntimeError("Domain has some active kernels. Terminate them first.")
+            query = sa.select([sa.func.count()]).where(users.c.domain_name == name)
+            user_count = await conn.scalar(query)
+            if user_count > 0:
+                raise RuntimeError("There are users bound to the domain. Remove users first.")
+            query = sa.select([sa.func.count()]).where(groups.c.domain_name == name)
+            group_count = await conn.scalar(query)
+            if group_count > 0:
+                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
+
+            await self._delete_kernels(conn, name)
+
+        async def _do_mutate() -> tuple[bool, str, None]:
+            async with self._db.begin() as conn:
+                await _pre_func(conn)
+                delete_query = sa.delete(domains).where(domains.c.name == name)
+                result = await conn.execute(delete_query)
+                if result.rowcount > 0:
+                    return True, f"domain {name} purged successfully", None
+                else:
+                    return False, f"no matching {DomainRow.__name__.lower()}", None
+
+        res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
+
+        return PurgeDomainActionResult(status=res.status, description=res.message)
+
+    async def _delete_kernels(self, conn: SAConnection, domain_name: str) -> int:
+        from ai.backend.manager.models.kernel import kernels
+
+        delete_query = sa.delete(kernels).where(kernels.c.domain_name == domain_name)
+        result = await conn.execute(delete_query)
+        if result.rowcount > 0:
+            log.info('deleted {0} domain"s kernels ({1})', result.rowcount, domain_name)
+        return result.rowcount
+
+    async def _domain_has_active_kernels(self, conn: SAConnection, domain_name: str) -> bool:
+        from ai.backend.manager.models.kernel import (
+            AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+            kernels,
+        )
+
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(kernels)
+            .where(
+                (kernels.c.domain_name == domain_name)
+                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            )
+        )
+        active_kernel_count = await conn.scalar(query)
+        return active_kernel_count > 0
 
     async def create_domain_node(
         self, action: CreateDomainNodeAction

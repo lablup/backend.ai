@@ -18,6 +18,10 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeAction,
     ModifyDomainNodeActionResult,
 )
+from ai.backend.manager.services.domain.actions.purge_domain import (
+    PurgeDomainAction,
+    PurgeDomainActionResult,
+)
 
 __all__ = [
     "CreateDomainAction",
@@ -30,5 +34,6 @@ __all__ = [
     "ModifyDomainNodeActionResult",
     "DeleteDomainAction",
     "DeleteDomainActionResult",
-    "UserInfo",
+    "PurgeDomainAction",
+    "PurgeDomainActionResult",
 ]
