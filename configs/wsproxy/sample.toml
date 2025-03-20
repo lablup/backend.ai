@@ -8,6 +8,8 @@ group = 501
 bind_host = "0.0.0.0"
 advertised_host = "example.com"
 bind_api_port = 5050
+# Set the internal hostname/port to accept internal API requests.
+internal_api_port = 5051
 advertised_api_port = 15050
 bind_proxy_port_range = [
     10200,
