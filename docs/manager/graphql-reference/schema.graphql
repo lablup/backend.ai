@@ -245,9 +245,9 @@ type Queries {
   total_resource_slot(
     """
     `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
-    Default value is ['RUNNING'].
+    Default value is null.
     """
-    statuses: [String] = ["RUNNING"]
+    statuses: [String] = null
 
     """
     `filter` argument is a string that is parsed into query conditions. It works in the same way as the `filter` argument in the `compute_session` query schema, meaning the values are parsed into an identical SQL query expression.
