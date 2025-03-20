@@ -1049,7 +1049,7 @@ def scoped_query(
                 client_user_id = ctx.user["uuid"]
             client_domain = ctx.user["domain_name"]
             domain_name = kwargs.get("domain_name", None)
-            group_id = kwargs.get("group_id", None)
+            group_id = kwargs.get("group_id", None) or kwargs.get("project_id", None)
             user_id = kwargs.get(user_key, None)
             if client_role == UserRole.SUPERADMIN:
                 if autofill_user:

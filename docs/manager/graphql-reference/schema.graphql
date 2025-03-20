@@ -167,6 +167,11 @@ type Queries {
   ): [ResourcePreset]
   scaling_group(name: String): ScalingGroup
   scaling_groups(name: String, is_active: Boolean): [ScalingGroup]
+
+  """
+  Added in 25.5.0. This query is available for all users. It returns the resource groups(=scaling groups) that the user has access to. Only name, is_active, own_session_occupied_resource_slots and accelerator_quantum_size fields are returned.
+  """
+  accessible_scaling_groups(project_id: UUID!): [ScalingGroup]
   scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_user_group(user_group: String!, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_keypair(access_key: String!, is_active: Boolean): [ScalingGroup]
@@ -1220,6 +1225,9 @@ type ScalingGroup {
   scheduler: String
   scheduler_opts: JSONString
   use_host_network: Boolean
+
+  """Added in 25.5.0."""
+  accelerator_quantum_size: Float
 
   """Added in 24.03.7."""
   agent_count_by_status(
