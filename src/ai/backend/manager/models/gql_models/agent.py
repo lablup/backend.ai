@@ -31,6 +31,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..agent import (
+    ADMIN_PERMISSIONS,
     AgentRow,
     AgentStatus,
     agents,
@@ -305,21 +306,28 @@ class AgentNode(graphene.ObjectType):
         )
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
-            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope, permission)
-            cond = permission_ctx.query_condition
-            if cond is None:
-                return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-            query = query.where(cond)
-            cnt_query = cnt_query.where(cond)
+            if user["role"] != UserRole.SUPERADMIN:
+                client_ctx = ClientContext(
+                    graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+                )
+                permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope, permission)
+                cond = permission_ctx.query_condition
+                if cond is None:
+                    return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
+                permission_getter = permission_ctx.calculate_final_permission
+                query = query.where(cond)
+                cnt_query = cnt_query.where(cond)
+            else:
+
+                async def all_permissions(row):
+                    return ADMIN_PERMISSIONS
+
+                permission_getter = all_permissions
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 agent_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
         result: list[AgentNode] = [
-            cls.parse(info, row, await permission_ctx.calculate_final_permission(row))
-            for row in agent_rows
+            cls.parse(info, row, await permission_getter(row)) for row in agent_rows
         ]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)

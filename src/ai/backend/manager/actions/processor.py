@@ -20,9 +20,7 @@ class ActionValidator(ABC):
 
 class ActionProcessor(Generic[TAction, TActionResult]):
     _monitors: list[ActionMonitor]
-    validates: list[ActionValidator]
     _func: Callable[[TAction], Awaitable[TActionResult]]
-    rollback: Callable[[TAction], None]
 
     def __init__(
         self,
