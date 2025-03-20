@@ -17,10 +17,6 @@ class BaseAction(ABC):
     def operation_type(self) -> str:
         raise NotImplementedError
 
-    @abstractmethod
-    def request_id(self) -> str:
-        raise NotImplementedError
-
 
 class BaseActionResult(ABC):
     @abstractmethod
