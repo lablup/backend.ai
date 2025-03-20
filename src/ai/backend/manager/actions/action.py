@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Generic, Optional, TypeVar
 
 
-
 class BaseAction(ABC):
     @abstractmethod
     def entity_id(self) -> Optional[str]:
@@ -17,7 +16,6 @@ class BaseAction(ABC):
     @abstractmethod
     def operation_type(self) -> str:
         raise NotImplementedError
-
 
 
 class BaseActionResult(ABC):
