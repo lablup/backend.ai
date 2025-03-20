@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, Optional, TypeVar
+from typing import Generic, Mapping, Optional, TypeVar
 
 
 class BaseAction(ABC):
@@ -18,12 +18,6 @@ class BaseAction(ABC):
         raise NotImplementedError
 
 
-class BaseActionResult(ABC):
-    @abstractmethod
-    def entity_id(self) -> Optional[str]:
-        raise NotImplementedError
-
-
 class BaseBatchAction(ABC):
     @abstractmethod
     def entity_ids(self) -> list[str]:
@@ -35,6 +29,11 @@ class BaseBatchAction(ABC):
 
     @abstractmethod
     def operation_type(self) -> str:
+        raise NotImplementedError
+
+class BaseActionResult(ABC):
+    @abstractmethod
+    def entity_id(self) -> Optional[str]:
         raise NotImplementedError
 
 
