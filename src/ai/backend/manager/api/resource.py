@@ -45,6 +45,7 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.services.resource.actions.list_presets import ListResourcePresetsAction
 
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
