@@ -59,6 +59,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.domain.actions import (
         CreateDomainAction,
         CreateDomainActionResult,
+        DeleteDomainAction,
+        DeleteDomainActionResult,
         ModifyDomainAction,
         ModifyDomainActionResult,
     )
@@ -343,9 +345,8 @@ class CreateDomain(graphene.Mutation):
         res: CreateDomainActionResult = await ctx.processors.domain.create_domain.wait_for_complete(
             action=action
         )
-        ok = True if res.status == "success" else False
 
-        return cls(ok=ok, msg=res.description(), domain=Domain.from_row(ctx, res.domain_row))
+        return cls(ok=res.ok, msg=res.description(), domain=Domain.from_row(ctx, res.domain_row))
 
 
 class ModifyDomain(graphene.Mutation):
@@ -374,9 +375,8 @@ class ModifyDomain(graphene.Mutation):
         res: ModifyDomainActionResult = await ctx.processors.domain.modify_domain.wait_for_complete(
             action=action
         )
-        ok = True if res.status == "success" else False
 
-        return cls(ok=ok, msg=res.description(), domain=Domain.from_row(ctx, res.domain_row))
+        return cls(ok=res.ok, msg=res.description(), domain=Domain.from_row(ctx, res.domain_row))
 
 
 class DeleteDomain(graphene.Mutation):
@@ -395,8 +395,12 @@ class DeleteDomain(graphene.Mutation):
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
         ctx: GraphQueryContext = info.context
-        update_query = sa.update(domains).values(is_active=False).where(domains.c.name == name)
-        return await simple_db_mutate(cls, ctx, update_query)
+
+        res: DeleteDomainActionResult = await ctx.processors.domain.delete_domain.wait_for_complete(
+            action=DeleteDomainAction(name=name)
+        )
+
+        return cls(ok=res.ok, msg=res.description())
 
 
 class PurgeDomain(graphene.Mutation):

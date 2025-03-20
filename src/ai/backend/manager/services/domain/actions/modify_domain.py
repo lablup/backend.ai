@@ -108,3 +108,7 @@ class ModifyDomainActionResult(BaseActionResult):
     @property
     def domain_row(self) -> Optional[DomainRow]:
         return self._domain
+
+    @property
+    def ok(self) -> bool:
+        return self._status == "success"

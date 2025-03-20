@@ -87,3 +87,7 @@ class CreateDomainActionResult(BaseActionResult):
     @property
     def domain_row(self):
         return self._domain_row
+
+    @property
+    def ok(self):
+        return self._status == "success"

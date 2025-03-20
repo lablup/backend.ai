@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Iterable, Optional, TypeVar, cast
 
 import sqlalchemy as sa
@@ -29,6 +30,10 @@ from ai.backend.manager.services.domain.actions import (
     ModifyDomainNodeAction,
     ModifyDomainNodeActionResult,
 )
+from ai.backend.manager.services.domain.actions.delete_domain import (
+    DeleteDomainAction,
+    DeleteDomainActionResult,
+)
 from ai.backend.manager.services.domain.actions.modify_domain import (
     ModifyDomainAction,
     ModifyDomainActionResult,
@@ -37,6 +42,17 @@ from ai.backend.manager.services.domain.base import UserInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 ResultType = TypeVar("ResultType")
+
+
+@dataclass
+class MutationResult:
+    success: bool
+    message: str
+    data: Optional[Any]
+
+    @property
+    def status(self) -> str:
+        return "success" if self.success else "failed"
 
 
 class DomainService:
@@ -78,10 +94,11 @@ class DomainService:
                 else:
                     return False, f"no matching {Domain.__name__.lower()}", None
 
-        sucess, message, row = await self._db_mutation_wrapper(_do_mutate)
-        status = "success" if sucess else "failed"
+        res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return CreateDomainActionResult(domain_row=row, status=status, description=message)
+        return CreateDomainActionResult(
+            domain_row=res.data, status=res.status, description=res.message
+        )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
         data: dict[str, Any] = {}
@@ -114,10 +131,28 @@ class DomainService:
                 else:
                     return False, f"no matching {DomainRow.__name__.lower()}", None
 
-        sucess, message, row = await self._db_mutation_wrapper(_do_mutate)
-        status = "success" if sucess else "failed"
+        res = await self._db_mutation_wrapper(_do_mutate)
 
-        return ModifyDomainActionResult(domain_row=row, status=status, description=message)
+        return ModifyDomainActionResult(
+            domain_row=res.data, status=res.status, description=res.message
+        )
+
+    async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
+        base_query = (
+            sa.update(DomainRow).values(is_active=False).where(DomainRow.name == action.name)
+        )
+
+        async def _do_mutate() -> tuple[bool, str, Optional[Row]]:
+            async with self._db.begin() as conn:
+                result = await conn.execute(base_query)
+                if result.rowcount > 0:
+                    return True, f"domain {action.name} deleted successfully", None
+                else:
+                    return False, f"no matching {DomainRow.__name__.lower()}", None
+
+        res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
+
+        return DeleteDomainActionResult(status=res.status, description=res.message)
 
     async def create_domain_node(
         self, action: CreateDomainNodeAction
@@ -259,13 +294,23 @@ class DomainService:
 
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[ResultType]]
-    ) -> tuple[bool, str, Optional[Row]]:
+    ) -> MutationResult:
         try:
             result = await execute_with_retry(_do_mutate)
-            return True, "success", result
+            # result should be tuple of (success, message, data) or (success, message)
+            if isinstance(result, tuple) and len(result) == 3:
+                success, message, data = result
+            elif isinstance(result, tuple) and len(result) == 2:
+                success, message = result
+                data = None
+            else:
+                success = True
+                message = "success"
+                data = result
+            return MutationResult(success=success, message=message, data=data)
         except sa.exc.IntegrityError as e:
             log.warning("db_mutation_wrapper(): integrity error ({})", repr(e))
-            return False, f"integrity error: {e}", None
+            return MutationResult(success=False, message=f"integrity error: {e}", data=None)
         except sa.exc.StatementError as e:
             log.warning(
                 "db_mutation_wrapper(): statement error ({})\n{}",
@@ -273,9 +318,9 @@ class DomainService:
                 e.statement or "(unknown)",
             )
             orig_exc = e.orig
-            return False, str(orig_exc), None
+            return MutationResult(success=False, message=str(orig_exc), data=None)
         except (asyncio.CancelledError, asyncio.TimeoutError):
             raise
         except Exception as e:
             log.exception("db_mutation_wrapper(): other error")
-            return False, f"unexpected error: {e}", None
+            return MutationResult(success=False, message=f"unexpected error: {e}", data=None)
