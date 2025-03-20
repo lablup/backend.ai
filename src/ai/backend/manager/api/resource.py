@@ -4,61 +4,37 @@ Resource preset APIs.
 
 from __future__ import annotations
 
-import copy
 import functools
 import json
 import logging
 import re
-from datetime import datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
     Iterable,
-    Mapping,
-    Optional,
-    Sequence,
     Tuple,
 )
-from uuid import UUID
 
 import aiohttp
 import aiohttp_cors
-import msgpack
-import sqlalchemy as sa
 import trafaret as t
 import yarl
 from aiohttp import web
 from async_timeout import timeout as _timeout
-from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.services.resource.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.resource.actions.check_presets import CheckResourcePresetsAction
 from ai.backend.manager.services.resource.actions.list_presets import ListResourcePresetsAction
 from ai.backend.manager.services.resource.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.resource.actions.usage_per_month import UsagePerMonthAction
 from ai.backend.manager.services.resource.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.resource.actions.user_month_stats import UserMonthStatsAction
 
-from ..models import (
-    LIVE_STATUS,
-    RESOURCE_USAGE_KERNEL_STATUSES,
-    groups,
-    kernels,
-    users,
-)
-from ..models.resource_usage import (
-    ProjectResourceUsage,
-    fetch_resource_usage,
-    parse_resource_usage_groups,
-    parse_total_resource_group,
-)
 from .auth import auth_required, superadmin_required
 from .exceptions import InvalidAPIParameters
 from .manager import READ_ALLOWED, server_status_required
@@ -363,133 +339,6 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
     return web.json_response(resp, status=HTTPStatus.OK)
-
-
-async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
-    """
-    Generate time-binned (15 min) stats for the last one month (2880 points).
-    The structure of the result would be:
-
-        [
-          # [
-          #     timestamp, num_sessions,
-          #     cpu_allocated, mem_allocated, gpu_allocated,
-          #     io_read, io_write, scratch_used,
-          # ]
-            [1562083808.657106, 1, 1.2, 1073741824, ...],
-            [1562084708.657106, 2, 4.0, 1073741824, ...],
-        ]
-
-    Note that the timestamp is in UNIX-timestamp.
-    """
-    # Get all or user kernels for the last month from DB.
-    time_window = 900  # 15 min
-    stat_length = 2880  # 15 * 4 * 24 * 30
-    now = datetime.now(tzutc())
-    start_date = now - timedelta(days=30)
-    root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin_readonly() as conn:
-        query = (
-            sa.select([
-                kernels.c.id,
-                kernels.c.created_at,
-                kernels.c.terminated_at,
-                kernels.c.occupied_slots,
-            ])
-            .select_from(kernels)
-            .where(
-                (kernels.c.terminated_at >= start_date)
-                & (kernels.c.status.in_(RESOURCE_USAGE_KERNEL_STATUSES)),
-            )
-            .order_by(sa.asc(kernels.c.created_at))
-        )
-        if user_uuid is not None:
-            query = query.where(kernels.c.user_uuid == user_uuid)
-        result = await conn.execute(query)
-        rows = result.fetchall()
-
-    # Build time-series of time-binned stats.
-    start_date_ts = start_date.timestamp()
-    time_series_list: list[dict[str, Any]] = [
-        {
-            "date": start_date_ts + (idx * time_window),
-            "num_sessions": {
-                "value": 0,
-                "unit_hint": "count",
-            },
-            "cpu_allocated": {
-                "value": 0,
-                "unit_hint": "count",
-            },
-            "mem_allocated": {
-                "value": 0,
-                "unit_hint": "bytes",
-            },
-            "gpu_allocated": {
-                "value": 0,
-                "unit_hint": "count",
-            },
-            "io_read_bytes": {
-                "value": 0,
-                "unit_hint": "bytes",
-            },
-            "io_write_bytes": {
-                "value": 0,
-                "unit_hint": "bytes",
-            },
-            "disk_used": {
-                "value": 0,
-                "unit_hint": "bytes",
-            },
-        }
-        for idx in range(stat_length)
-    ]
-
-    async def _pipe_builder(r: Redis) -> RedisPipeline:
-        pipe = r.pipeline()
-        for row in rows:
-            await pipe.get(str(row["id"]))
-        return pipe
-
-    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
-
-    for row, raw_stat in zip(rows, raw_stats):
-        if raw_stat is not None:
-            last_stat = msgpack.unpackb(raw_stat)
-            io_read_byte = int(nmget(last_stat, "io_read.current", 0))
-            io_write_byte = int(nmget(last_stat, "io_write.current", 0))
-            disk_used = int(nmget(last_stat, "io_scratch_size.stats.max", 0, "/"))
-        else:
-            io_read_byte = 0
-            io_write_byte = 0
-            disk_used = 0
-
-        occupied_slots: Mapping[str, Any] = row.occupied_slots
-        kernel_created_at: float = row.created_at.timestamp()
-        kernel_terminated_at: float = row.terminated_at.timestamp()
-        cpu_value = int(occupied_slots.get("cpu", 0))
-        mem_value = int(occupied_slots.get("mem", 0))
-        cuda_device_value = int(occupied_slots.get("cuda.devices", 0))
-        cuda_share_value = Decimal(occupied_slots.get("cuda.shares", 0))
-
-        start_index = int((kernel_created_at - start_date_ts) // time_window)
-        end_index = int((kernel_terminated_at - start_date_ts) // time_window) + 1
-        if start_index < 0:
-            start_index = 0
-        for time_series in time_series_list[start_index:end_index]:
-            time_series["num_sessions"]["value"] += 1
-            time_series["cpu_allocated"]["value"] += cpu_value
-            time_series["mem_allocated"]["value"] += mem_value
-            time_series["gpu_allocated"]["value"] += cuda_device_value
-            time_series["gpu_allocated"]["value"] += cuda_share_value
-            time_series["io_read_bytes"]["value"] += io_read_byte
-            time_series["io_write_bytes"]["value"] += io_write_byte
-            time_series["disk_used"]["value"] += disk_used
-
-    # Change Decimal type to float to serialize to JSON
-    for time_series in time_series_list:
-        time_series["gpu_allocated"]["value"] = float(time_series["gpu_allocated"]["value"])
-    return time_series_list
 
 
 @server_status_required(READ_ALLOWED)
