@@ -88,6 +88,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "type": ("session_type", enum_field_getter(SessionTypes)),
     "name": ("name", None),
     "priority": ("priority", None),
+    "images": (ArrayFieldItem("images"), None),
     "agent_ids": (ArrayFieldItem("agent_ids"), None),
     "domain_name": ("domain_name", None),
     "project_id": ("project_id", None),
