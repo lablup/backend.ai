@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Iterable, Optional, TypeVar, cast
+from typing import Any, Awaitable, Callable, Iterable, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine.result import Result
@@ -39,7 +39,6 @@ from ai.backend.manager.services.domain.actions import (
 from ai.backend.manager.services.domain.base import UserInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-ResultType = TypeVar("ResultType")
 
 
 @dataclass
@@ -81,16 +80,18 @@ class DomainService:
             })
             await conn.execute(model_store_insert_query)
 
-        async def _do_mutate() -> tuple[bool, str, Optional[Row]]:
+        async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
                 query = base_query.returning(base_query.table)
                 result = await conn.execute(query)
                 row = result.first()
                 await _post_func(conn, result)
                 if result.rowcount > 0:
-                    return True, "domain creation succeed", row
+                    return MutationResult(success=True, message="domain creation succeed", data=row)
                 else:
-                    return False, f"no matching {action.domain_name}", None
+                    return MutationResult(
+                        success=False, message=f"no matching {action.domain_name}", data=None
+                    )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
@@ -119,15 +120,17 @@ class DomainService:
 
         base_query = sa.update(domains).values(data).where(domains.c.name == action.name)
 
-        async def _do_mutate() -> tuple[bool, str, Optional[Row]]:
+        async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
                 query = base_query.returning(base_query.table)
                 result = await conn.execute(query)
                 row = result.first()
                 if result.rowcount > 0:
-                    return True, "domain creation succeed", row
+                    return MutationResult(success=True, message="domain creation succeed", data=row)
                 else:
-                    return False, f"no matching {action.name}", None
+                    return MutationResult(
+                        success=False, message=f"no matching {action.name}", data=None
+                    )
 
         res = await self._db_mutation_wrapper(_do_mutate)
 
@@ -138,13 +141,19 @@ class DomainService:
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
         base_query = sa.update(domains).values(is_active=False).where(domains.c.name == action.name)
 
-        async def _do_mutate() -> tuple[bool, str, Optional[Row]]:
+        async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
                 result = await conn.execute(base_query)
                 if result.rowcount > 0:
-                    return True, f"domain {action.name} deleted successfully", None
+                    return MutationResult(
+                        success=True,
+                        message=f"domain {action.name} deleted successfully",
+                        data=None,
+                    )
                 else:
-                    return False, f"no matching {action.name}", None
+                    return MutationResult(
+                        success=False, message=f"no matching {action.name}", data=None
+                    )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
@@ -169,15 +178,21 @@ class DomainService:
 
             await self._delete_kernels(conn, name)
 
-        async def _do_mutate() -> tuple[bool, str, None]:
+        async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
                 await _pre_func(conn)
                 delete_query = sa.delete(domains).where(domains.c.name == name)
                 result = await conn.execute(delete_query)
                 if result.rowcount > 0:
-                    return True, f"domain {name} purged successfully", None
+                    return MutationResult(
+                        success=True, message=f"domain {name} purged successfully", data=None
+                    )
                 else:
-                    return False, f"no matching {DomainRow.__name__.lower()}", None
+                    return MutationResult(
+                        success=False,
+                        message=f"no matching {DomainRow.__name__.lower()}",
+                        data=None,
+                    )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
@@ -348,21 +363,10 @@ class DomainService:
             )
 
     async def _db_mutation_wrapper(
-        self, _do_mutate: Callable[[], Awaitable[ResultType]]
+        self, _do_mutate: Callable[[], Awaitable[MutationResult]]
     ) -> MutationResult:
         try:
-            result = await execute_with_retry(_do_mutate)
-            # result should be tuple of (success, message, data) or (success, message)
-            if isinstance(result, tuple) and len(result) == 3:
-                success, message, data = result
-            elif isinstance(result, tuple) and len(result) == 2:
-                success, message = result
-                data = None
-            else:
-                success = True
-                message = "success"
-                data = result
-            return MutationResult(success=success, message=message, data=data)
+            return await execute_with_retry(_do_mutate)
         except sa.exc.IntegrityError as e:
             log.warning("db_mutation_wrapper(): integrity error ({})", repr(e))
             return MutationResult(success=False, message=f"integrity error: {e}", data=None)
