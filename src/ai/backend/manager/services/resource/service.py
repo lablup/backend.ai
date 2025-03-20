@@ -1,5 +1,5 @@
 import copy
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional, Sequence, cast
 from uuid import UUID
@@ -55,6 +55,7 @@ from ai.backend.manager.services.resource.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
 )
+from ai.backend.manager.services.resource.actions.usage_per_period import UsagePerPeriodAction, UsagePerPeriodActionResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -507,3 +508,28 @@ class ResourceService:
         result = await self._get_container_stats_for_period(start_date, end_date, action.group_ids)
         log.debug("container list are retrieved for month {0}", month)
         return UsagePerMonthActionResult(result=result)
+
+
+    async def usage_per_period(self, action: UsagePerPeriodAction) -> UsagePerPeriodActionResult:
+        local_tz = self._shared_config["system"]["timezone"]
+        project_id = action.project_id
+
+        try:
+            start_date = datetime.strptime(action.start_date, "%Y%m%d").replace(tzinfo=local_tz)
+            end_date = datetime.strptime(action.end_date, "%Y%m%d").replace(tzinfo=local_tz)
+            end_date = end_date + timedelta(days=1)  # include sessions in end_date
+            if end_date - start_date > timedelta(days=100):
+                raise InvalidAPIParameters("Cannot query more than 100 days")
+        except ValueError:
+            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        if end_date <= start_date:
+            raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
+        log.info("USAGE_PER_MONTH (p:{}, start_date:{}, end_date:{})", project_id, start_date, end_date)
+        project_ids = [project_id] if project_id is not None else None
+        usage_map = await self._get_project_stats_for_period(
+            start_date, end_date, project_ids=project_ids
+        )
+        result = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
+        log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
+        return UsagePerPeriodActionResult(result=result)
+
