@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .vfolder import VirtualFolder
 
-from ..defs import RESERVED_DOTFILES
+from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, RESERVED_DOTFILES
 from .base import (
     Base,
     ForeignKeyIDColumn,
@@ -81,7 +81,13 @@ keypairs = sa.Table(
         onupdate=sa.func.current_timestamp(),
     ),
     sa.Column("last_used", sa.DateTime(timezone=True), nullable=True),
-    sa.Column("rate_limit", sa.Integer),
+    sa.Column(
+        "rate_limit",
+        sa.Integer,
+        nullable=False,
+        default=DEFAULT_KEYPAIR_RATE_LIMIT,
+        server_default=sa.text(str(DEFAULT_KEYPAIR_RATE_LIMIT)),
+    ),
     sa.Column("num_queries", sa.Integer, server_default="0"),
     # SSH Keypairs.
     sa.Column("ssh_public_key", sa.Text, nullable=True),
