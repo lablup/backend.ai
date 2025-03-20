@@ -23,14 +23,6 @@ class BaseActionResult(ABC):
     def entity_id(self) -> Optional[str]:
         raise NotImplementedError
 
-    @abstractmethod
-    def status(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def description(self) -> str:
-        raise NotImplementedError
-
 
 @dataclass
 class BaseActionResultMeta:
