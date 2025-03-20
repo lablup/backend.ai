@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, Optional, TypeVar
 
-from ai.backend.common.types import DispatchResult
 
 
 class BaseAction(ABC):
@@ -19,9 +18,6 @@ class BaseAction(ABC):
     def operation_type(self) -> str:
         raise NotImplementedError
 
-    @abstractmethod
-    def request_id(self) -> str:
-        raise NotImplementedError
 
 
 class BaseActionResult(ABC):
@@ -34,14 +30,7 @@ class BaseActionResult(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def description(self) -> Optional[str]:
-        raise NotImplementedError
-
-    def to_bgtask_result(self) -> DispatchResult:
-        """
-        Implement this method to convert the Result to DispatchResult.
-        You should implment this method for running the action as bgtask.
-        """
+    def description(self) -> str:
         raise NotImplementedError
 
 
