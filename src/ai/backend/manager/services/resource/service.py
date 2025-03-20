@@ -24,6 +24,10 @@ from ai.backend.manager.services.resource.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
+from ai.backend.manager.services.resource.actions.recalculate_usage import (
+    RecalculateUsageAction,
+    RecalculateUsageActionResult,
+)
 
 
 class ResourceService:
@@ -256,3 +260,9 @@ class ResourceService:
                 scaling_group_remaining=sgroup_remaining.to_json(),
                 scaling_groups=per_sgroup,
             )
+
+    async def recalculate_usage(
+        self, action: RecalculateUsageAction
+    ) -> RecalculateUsageActionResult:
+        await self._agent_registry.recalc_resource_usage()
+        return RecalculateUsageActionResult()

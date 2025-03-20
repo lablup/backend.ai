@@ -43,6 +43,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.services.resource.actions.check_presets import CheckResourcePresetsAction
 from ai.backend.manager.services.resource.actions.list_presets import ListResourcePresetsAction
+from ai.backend.manager.services.resource.actions.recalculate_usage import RecalculateUsageAction
 
 from ..models import (
     LIVE_STATUS,
