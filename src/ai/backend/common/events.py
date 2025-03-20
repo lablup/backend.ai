@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+from dataclasses import dataclass
 import enum
 import hashlib
 import logging
@@ -39,6 +40,7 @@ from redis.asyncio import ConnectionPool
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from .message_queue.base import AbstractMessageQueue, MQMessage, AbstractMQMessagePayload
 
 from . import msgpack, redis_helper
 from .types import (
@@ -1137,6 +1139,28 @@ class NopEventObserver:
         pass
 
 
+@dataclass
+class EventMessage(AbstractMQMessagePayload):
+    name: str
+    source: AgentId
+    event_serialized: tuple[bytes, ...]
+
+    def serialize(self) -> bytes:
+        return {
+            b"name": self.name.encode(),
+            b"source": self.source.encode(),
+            b"args": msgpack.packb(self.event_serialized),
+        }
+
+    @classmethod
+    def deserialize(cls, data: bytes) -> Self:
+        payload = msgpack.unpackb(data)
+        return cls(
+            name=payload[b"name"].decode,
+            source=payload[b"source"].decode(),
+            event_serialized=msgpack.unpackb(data[b"args"]),
+        )
+
 class EventDispatcher(aobject):
     """
     We have two types of event handlers: consumer and subscriber.
@@ -1155,6 +1179,7 @@ class EventDispatcher(aobject):
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     redis_client: RedisConnectionInfo
+    _message_queue: AbstractMessageQueue
     consumer_loop_task: asyncio.Task
     subscriber_loop_task: asyncio.Task
     consumer_taskgroup: PersistentTaskGroup
@@ -1167,6 +1192,7 @@ class EventDispatcher(aobject):
     def __init__(
         self,
         redis_config: RedisConfig,
+        message_queue: AbstractMessageQueue,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -1184,6 +1210,7 @@ class EventDispatcher(aobject):
         self.redis_client = redis_helper.get_redis_object(
             _redis_config, name="event_dispatcher.stream", db=db
         )
+        self._message_queue = message_queue
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -1218,6 +1245,7 @@ class EventDispatcher(aobject):
                 self.subscriber_loop_task.cancel()
                 cancelled_tasks.append(self.subscriber_loop_task)
             await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+            await self._message_queue.close()
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
         finally:
@@ -1359,100 +1387,72 @@ class EventDispatcher(aobject):
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        async with aclosing(
-            redis_helper.read_stream_by_group(
-                self.redis_client,
-                self._stream_key,
-                self._consumer_group,
-                self._consumer_name,
-            )
-        ) as agen:
-            async for msg_id, msg_data in agen:
-                if self._closed:
-                    return
-                if msg_data is None:
-                    continue
-                event_type = "unknown"
-                start = time.perf_counter()
-                try:
-                    decoded = msg_data[b"name"].decode()
-                    if decoded and isinstance(decoded, str):
-                        event_type = decoded
-                    await self.dispatch_consumers(
-                        decoded,
-                        msg_data[b"source"].decode(),
-                        msgpack.unpackb(msg_data[b"args"]),
-                    )
-                    self._metric_observer.observe_event_success(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                    )
-                except Exception as e:
-                    self._metric_observer.observe_event_failure(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                        exception=e,
-                    )
-                    log.exception("EventDispatcher.consume(): unexpected-error")
-                except BaseException as e:
-                    self._metric_observer.observe_event_failure(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                        exception=e,
-                    )
-                    raise
+        msg: MQMessage
+        async for msg in self._message_queue.consume_queue():
+            if self._closed:
+                return
+            start = time.perf_counter()
+            event = EventMessage.deserialize(msg.payload)
+            try:
+                await self.dispatch_consumers(event.name, event.source, event.event_serialized)
+                self._metric_observer.observe_event_success(
+                    event_type=event.name,
+                    duration=time.perf_counter() - start,
+                )
+            except Exception as e:
+                self._metric_observer.observe_event_failure(
+                    event_type=event.name,
+                    duration=time.perf_counter() - start,
+                    exception=e,
+                )
+                log.exception("EventDispatcher.consume(): unexpected-error")
+            except BaseException as e:
+                self._metric_observer.observe_event_failure(
+                    event_type=event.name,
+                    duration=time.perf_counter() - start,
+                    exception=e,
+                )
+                raise
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        async with aclosing(
-            redis_helper.read_stream(
-                self.redis_client,
-                self._stream_key,
-            )
-        ) as agen:
-            async for msg_id, msg_data in agen:
-                if self._closed:
-                    return
-                if msg_data is None:
-                    continue
-                event_type = "unknown"
-                start = time.perf_counter()
-                try:
-                    decoded = msg_data[b"name"].decode()
-                    if decoded and isinstance(decoded, str):
-                        event_type = decoded
-                    await self.dispatch_subscribers(
-                        decoded,
-                        msg_data[b"source"].decode(),
-                        msgpack.unpackb(msg_data[b"args"]),
-                    )
-                    self._metric_observer.observe_event_success(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                    )
-                except Exception as e:
-                    self._metric_observer.observe_event_failure(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                        exception=e,
-                    )
-                    log.exception("EventDispatcher.subscribe(): unexpected-error")
-                except BaseException as e:
-                    self._metric_observer.observe_event_failure(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                        exception=e,
-                    )
-                    raise
+        msg: MQMessage
+        async for msg in self._message_queue.subscribe_queue():
+            if self._closed:
+                return
+            start = time.perf_counter()
+            event = EventMessage.deserialize(msg.payload)
+            try:
+                await self.dispatch_subscribers(event.name, event.source, event.event_serialized)
+                self._metric_observer.observe_event_success(
+                    event_type=event.name,
+                    duration=time.perf_counter() - start,
+                )
+            except Exception as e:
+                self._metric_observer.observe_event_failure(
+                    event_type=event.name,
+                    duration=time.perf_counter() - start,
+                    exception=e,
+                )
+                log.exception("EventDispatcher.subscribe(): unexpected-error")
+            except BaseException as e:
+                self._metric_observer.observe_event_failure(
+                    event_type=event.name,
+                    duration=time.perf_counter() - start,
+                    exception=e,
+                )
+                raise
 
 
 class EventProducer(aobject):
     redis_client: RedisConnectionInfo
+    _msg_queue: AbstractMessageQueue
     _log_events: bool
 
     def __init__(
         self,
         redis_config: RedisConfig,
+        msg_queue: AbstractMessageQueue,
         db: int = 0,
         *,
         service_name: str | None = None,
@@ -1468,6 +1468,7 @@ class EventProducer(aobject):
             name="event_producer.stream",
             db=db,
         )
+        self._msg_queue = msg_queue
         self._log_events = log_events
         self._stream_key = stream_key
 
@@ -1475,7 +1476,10 @@ class EventProducer(aobject):
         pass
 
     async def close(self) -> None:
+        if self._closed:
+            return
         self._closed = True
+        await self._msg_queue.close()
         await self.redis_client.close()
 
     async def produce_event(
@@ -1486,16 +1490,10 @@ class EventProducer(aobject):
     ) -> None:
         if self._closed:
             return
-        raw_event = {
-            b"name": event.name.encode(),
-            b"source": source.encode(),
-            b"args": msgpack.packb(event.serialize()),
-        }
-        await redis_helper.execute(
-            self.redis_client,
-            lambda r: r.xadd(self._stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
-        )
-
+        if self._log_events:
+            log.debug("PRODUCE_EVENT(ev:{}, ag:{})", event.name, source)
+        msg = EventMessage(event_serialized=event.serialize(), name=event.name, source=source)
+        await self._msg_queue.send(self._stream_key, msg)
 
 def _generate_consumer_id(node_id: str | None = None) -> str:
     h = hashlib.sha1()
