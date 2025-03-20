@@ -88,8 +88,11 @@ def scan_proc_stats() -> dict[int, dict]:
     for p in Path("/proc").iterdir():
         if p.name.isdigit():
             pid = int(p.name)
-            stat = parse_proc_stat(pid)
-            pid_set[pid] = stat
+            try:
+                stat = parse_proc_stat(pid)
+                pid_set[pid] = stat
+            except IOError:
+                pass
     return pid_set
 
 
