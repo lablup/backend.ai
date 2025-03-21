@@ -1,8 +1,9 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.base import ImageAction
@@ -25,31 +26,16 @@ class ForgetImageByIdAction(ImageAction):
 
 @dataclass
 class ForgetImageByIdActionResult(BaseActionResult):
-    # TODO: 여기서 ImageRow 타입을 그대로 써도 되는지?
     image_row: ImageRow
 
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.image_row.id)
 
-    @override
-    def status(self) -> str:
-        return "success"
 
-    @override
-    def description(self) -> str:
-        return "The image has been forgotten."
-
-    # TODO: eq 직접 정의보다 나은 방법?
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, ForgetImageByIdActionResult):
-            return False
-        return self.image_row.id == other.image_row.id
-
-
-class ForgetImageActionByIdGenericForbiddenError(Exception):
+class ForgetImageActionByIdGenericForbiddenError(BaseActionException):
     pass
 
 
-class ForgetImageActionByIdObjectNotFoundError(Exception):
+class ForgetImageActionByIdObjectNotFoundError(BaseActionException):
     pass

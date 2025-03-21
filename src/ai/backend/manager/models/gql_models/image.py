@@ -733,9 +733,7 @@ class ForgetImageById(graphene.Mutation):
             )
         )
 
-        return ForgetImageById(
-            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
-        )
+        return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row))
 
 
 class ForgetImage(graphene.Mutation):
@@ -776,9 +774,7 @@ class ForgetImage(graphene.Mutation):
             )
         )
 
-        return ForgetImage(
-            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
-        )
+        return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row))
 
 
 class PurgeImageById(graphene.Mutation):
@@ -813,9 +809,7 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
-        return PurgeImageById(
-            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
-        )
+        return PurgeImageById(ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -853,7 +847,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         )
 
         return UntagImageFromRegistry(
-            ok=True, msg=result.description(), image=ImageNode.from_row(ctx, result.image_row)
+            ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row)
         )
 
 
@@ -931,8 +925,7 @@ class RescanImages(graphene.Mutation):
                 )
             )
 
-            # TODO: 각 타입에 구현할거라면 to_dispatch_result 메서드를 구현하는게 낫지 않은지?
-            return DispatchResult.from_image_rescan_action_result(action_result)
+            return DispatchResult.success(action_result)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
@@ -968,7 +961,7 @@ class AliasImage(graphene.Mutation):
             )
         )
 
-        return AliasImage(ok=True, msg=result.description())
+        return AliasImage(ok=True, msg="")
 
 
 class DealiasImage(graphene.Mutation):
@@ -989,13 +982,13 @@ class DealiasImage(graphene.Mutation):
         log.info("dealias image {0} by API request", alias)
         ctx: GraphQueryContext = info.context
 
-        result = await ctx.processors.image.dealias_image.wait_for_complete(
+        await ctx.processors.image.dealias_image.wait_for_complete(
             DealiasImageAction(
                 alias=alias,
             )
         )
 
-        return DealiasImage(ok=True, msg=result.description())
+        return DealiasImage(ok=True, msg="")
 
 
 class ClearImages(graphene.Mutation):
@@ -1015,13 +1008,13 @@ class ClearImages(graphene.Mutation):
     ) -> ClearImages:
         ctx: GraphQueryContext = info.context
         log.info("clear images from registry {0} by API request", registry)
-        result = await ctx.processors.image.clear_images.wait_for_complete(
+        await ctx.processors.image.clear_images.wait_for_complete(
             ClearImagesAction(
                 registry=registry,
             )
         )
 
-        return ClearImages(ok=True, msg=result.description())
+        return ClearImages(ok=True, msg="")
 
 
 class ModifyImageInput(graphene.InputObjectType):
@@ -1061,7 +1054,7 @@ class ModifyImage(graphene.Mutation):
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
         log.info("modify image {0} by API request", target)
-        result = await ctx.processors.image.modify_image.wait_for_complete(
+        await ctx.processors.image.modify_image.wait_for_complete(
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
@@ -1069,7 +1062,7 @@ class ModifyImage(graphene.Mutation):
             )
         )
 
-        return ModifyImage(ok=True, msg=result.description())
+        return ModifyImage(ok=True, msg="")
 
 
 @dataclass
@@ -1123,8 +1116,7 @@ class PurgeImages(graphene.Mutation):
                 )
             )
 
-            # TODO: 각 타입에 구현할거라면 to_dispatch_result 메서드를 구현하는게 낫지 않은지?
-            return DispatchResult.from_purge_images_action_result(action_result)
+            return DispatchResult.success(action_result)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return PurgeImages(ok=True, msg="", task_id=task_id)

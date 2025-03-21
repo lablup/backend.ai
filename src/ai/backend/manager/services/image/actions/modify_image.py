@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.services.image.base import ImageAction
 
@@ -59,24 +60,11 @@ class ModifyImageActionResult(BaseActionResult):
     def entity_id(self) -> Optional[str]:
         return str(self.image_row.id)
 
-    @override
-    def status(self) -> str:
-        return "success"
 
-    @override
-    def description(self) -> str:
-        return "The image has been modified."
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, ModifyImageActionResult):
-            return False
-        return self.image_row.id == other.image_row.id
-
-
-class ModifyImageActionUnknownImageReferenceError(Exception):
+class ModifyImageActionUnknownImageReferenceError(BaseActionException):
     pass
 
 
 # TODO: Remove this.
-class ModifyImageActionValueError(Exception):
+class ModifyImageActionValueError(BaseActionException):
     pass
