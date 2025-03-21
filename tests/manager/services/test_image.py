@@ -70,7 +70,7 @@ def processors(extra_fixtures, database_fixture, database_engine):
                 reference=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
             ),
-            ForgetImageActionResult(image_row=IMAGE_ROW_FIXTURE),
+            ForgetImageActionResult(image=IMAGE_ROW_FIXTURE),
         ),
         TestScenario.failure(
             "When the user is not SUPERADMIN, and the user is not the image's owner, raise Generic Forbidden Error",
@@ -141,7 +141,7 @@ async def test_forget_image(
                 client_role=UserRole.SUPERADMIN,
                 image_id=IMAGE_ROW_FIXTURE.id,
             ),
-            ForgetImageByIdActionResult(image_row=IMAGE_ROW_FIXTURE),
+            ForgetImageByIdActionResult(image=IMAGE_ROW_FIXTURE),
         ),
         TestScenario.failure(
             "When the user is not SUPERADMIN, and the user is not the image's owner, raise Generic Forbidden Error",

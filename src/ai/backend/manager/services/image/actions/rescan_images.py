@@ -24,6 +24,7 @@ class RescanImagesAction(ImageAction):
 # TODO: BatchAction으로 업데이트, entity_ids는 image row ids로.
 @dataclass
 class RescanImagesActionResult(BaseActionResult):
+    # TODO: DispatchResult 제거하고 list[ImageRow]는 별도의 dataclass로 변경
     result: DispatchResult[list[ImageRow]]
 
     @override
