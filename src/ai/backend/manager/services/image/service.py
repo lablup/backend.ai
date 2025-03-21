@@ -137,7 +137,7 @@ class ImageService:
                     image_row.aliases.append(image_alias)
         except ValueError:
             raise AliasImageActionValueError
-        return AliasImageActionResult(image_alias=image_alias)
+        return AliasImageActionResult(image_id=image_alias.image_id, image_alias=image_alias)
 
     async def dealias_image(self, action: DealiasImageAction) -> DealiasImageActionResult:
         try:
@@ -150,7 +150,9 @@ class ImageService:
                 await session.delete(existing_alias)
         except ValueError:
             raise DealiasImageActionValueError()
-        return DealiasImageActionResult(image_alias=existing_alias)
+        return DealiasImageActionResult(
+            image_id=existing_alias.image_id, image_alias=existing_alias
+        )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
         try:

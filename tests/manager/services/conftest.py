@@ -41,7 +41,3 @@ class TestScenario(Generic[TInput, TResult]):
         else:
             result = await fn(self.input)
             assert result == self.expected
-
-    async def test_bgtask(self, fn: Callable[[TInput], Awaitable[TResult]]) -> None:
-        # TODO: Write this for testing background tasks (fire and forget tasks)
-        pass
