@@ -16,8 +16,8 @@ class ForgetImageAction(ImageAction):
     architecture: str
 
     @override
-    def entity_id(self) -> str:
-        return f"{self.reference} ({self.architecture})"
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):
@@ -31,14 +31,14 @@ class ForgetImageActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image_row.id)
 
     @override
     def status(self) -> str:
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return "The image has been forgotten."
 
     # TODO: eq 직접 정의보다 나은 방법?

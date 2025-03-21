@@ -50,6 +50,9 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
+from ai.backend.manager.services.image.actions.purge_images import PurgeImagesActionResult
+from ai.backend.manager.services.image.actions.rescan_images import RescanImagesActionResult
+
 from .defs import RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
@@ -1590,6 +1593,24 @@ class DispatchResult(Generic[ResultType]):
             return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
         else:
             return "errors: " + "\n".join(self.errors)
+
+    @classmethod
+    def from_image_rescan_action_result(
+        cls, action_result: RescanImagesActionResult
+    ) -> DispatchResult:
+        return action_result.result
+
+    @classmethod
+    def from_purge_images_action_result(
+        cls, action_result: PurgeImagesActionResult
+    ) -> DispatchResult:
+        return DispatchResult(
+            result=PurgeImagesResult(
+                results=PurgeImageResponses(action_result.results),
+                reserved_bytes=action_result.reserved_bytes,
+            ),
+            errors=action_result.errors,
+        )
 
 
 class PurgeImageResult(TypedDict):

@@ -15,9 +15,8 @@ class UntagImageFromRegistryAction(ImageAction):
     image_id: uuid.UUID
 
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return f"{self.image_id}"
+    def entity_id(self) -> Optional[str]:
+        return str(self.image_id)
 
     @override
     def operation_type(self):
@@ -30,14 +29,14 @@ class UntagImageFromRegistryActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image_row.id)
 
     @override
     def status(self) -> str:
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return "The image has been untagged from registry"
 
     def __eq__(self, other: Any) -> bool:

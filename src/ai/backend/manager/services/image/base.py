@@ -10,19 +10,9 @@ class ImageAction(BaseAction):
     def entity_type(self):
         return "image"
 
-    @override
-    def request_id(self):
-        # TODO: request_id는 어떻게 생성?
-        return "..."
-
 
 @dataclass
 class ImageBatchAction(BaseBatchAction):
     @override
     def entity_type(self):
         return "image"
-
-    @override
-    def request_id(self):
-        # TODO: request_id는 어떻게 생성?
-        return "..."

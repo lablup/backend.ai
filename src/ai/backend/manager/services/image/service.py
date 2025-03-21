@@ -213,8 +213,8 @@ class ImageService:
                     image_row = await ImageRow.resolve(
                         db_sess,
                         [
-                            ImageIdentifier(action.image_canonical, action.architecture),
-                            ImageAlias(action.image_canonical),
+                            ImageIdentifier(action.target, action.architecture),
+                            ImageAlias(action.target),
                         ],
                     )
                 except UnknownImageReference:
