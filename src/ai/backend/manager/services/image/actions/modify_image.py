@@ -3,22 +3,9 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.base import KVPairInput, ResourceLimitInput
 from ai.backend.manager.services.image.base import ImageAction
-
-
-# TODO: 타입 위치 옮길 것.
-@dataclass
-class ResourceLimitInput:
-    key: Optional[str] = None
-    min: Optional[str] = None
-    max: Optional[str] = None
-
-
-@dataclass
-class KVPairInput:
-    key: str
-    value: str
+from ai.backend.manager.services.image.types import ImageData
 
 
 @dataclass
@@ -54,11 +41,11 @@ class ModifyImageAction(ImageAction):
 
 @dataclass
 class ModifyImageActionResult(BaseActionResult):
-    image_row: ImageRow
+    image: ImageData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.image_row.id)
+        return str(self.image.id)
 
 
 class ModifyImageActionUnknownImageReferenceError(BaseActionException):

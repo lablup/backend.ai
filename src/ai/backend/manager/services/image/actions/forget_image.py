@@ -4,9 +4,9 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
-from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.base import ImageAction
+from ai.backend.manager.services.image.types import ImageData
 
 
 @dataclass
@@ -27,11 +27,11 @@ class ForgetImageAction(ImageAction):
 
 @dataclass
 class ForgetImageActionResult(BaseActionResult):
-    image_row: ImageRow
+    image: ImageData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.image_row.id)
+        return str(self.image.id)
 
 
 class ForgetImageActionGenericForbiddenError(BaseActionException):
