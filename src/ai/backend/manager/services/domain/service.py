@@ -20,7 +20,6 @@ from ai.backend.manager.models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
 )
-from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -63,11 +62,9 @@ class MutationResult:
 
 class DomainService:
     _db: ExtendedAsyncSAEngine
-    _registry: AgentRegistry
 
-    def __init__(self, db: ExtendedAsyncSAEngine, registry: AgentRegistry) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._registry = registry
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
         data = action.get_insert_data()
@@ -387,6 +384,6 @@ class DomainService:
             return MutationResult(success=False, message=str(orig_exc), data=None)
         except (asyncio.CancelledError, asyncio.TimeoutError):
             raise
-        except Exception as e:
+        except Exception:
             log.exception("db_mutation_wrapper(): other error")
-            return MutationResult(success=False, message=f"unexpected error: {e}", data=None)
+            raise
