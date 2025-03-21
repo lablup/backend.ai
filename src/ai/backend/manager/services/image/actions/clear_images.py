@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.services.image.base import ImageAction
 
 
@@ -25,21 +26,7 @@ class ClearImagesActionResult(BaseActionResult):
     def entity_id(self) -> Optional[str]:
         return None
 
-    @override
-    def status(self) -> str:
-        return "success"
-
-    @override
-    def description(self) -> str:
-        return "The registry's images have been cleared."
-
-    # TODO: 여기선 뭘로 비교해야 하지??
-    # def __eq__(self, other: Any) -> bool:
-    #     if not isinstance(other, ClearImagesActionResult):
-    #         return False
-    # return self.image_alias.alias == other.image_alias.alias
-
 
 # TODO: Remove this.
-class ClearImagesActionValueError(Exception):
+class ClearImagesActionValueError(BaseActionException):
     pass
