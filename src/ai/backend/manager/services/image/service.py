@@ -108,7 +108,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise ForgetImageActionGenericForbiddenError()
             await image_row.mark_as_deleted(session)
-        return ForgetImageActionResult(image_row=image_row)
+        return ForgetImageActionResult(image=image_row)
 
     async def forget_image_by_id(
         self, action: ForgetImageByIdAction
@@ -121,7 +121,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise ForgetImageActionByIdGenericForbiddenError()
             await image_row.mark_as_deleted(session)
-            return ForgetImageByIdActionResult(image_row=image_row)
+            return ForgetImageByIdActionResult(image=image_row)
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         try:
@@ -224,7 +224,7 @@ class ImageService:
         except ValueError:
             raise ModifyImageActionValueError
 
-        return ModifyImageActionResult(image_row=image_row)
+        return ModifyImageActionResult(image=image_row)
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         raise NotImplementedError
@@ -241,7 +241,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise PurgeImageActionByIdGenericForbiddenError()
             await db_session.delete(image_row)
-            return PurgeImageByIdActionResult(image_row=image_row)
+            return PurgeImageByIdActionResult(image=image_row)
 
     async def untag_image_from_registry(
         self, action: UntagImageFromRegistryAction
@@ -265,7 +265,7 @@ class ImageService:
 
         scanner = HarborRegistry_v2(self._db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
-        return UntagImageFromRegistryActionResult(image_row=image_row)
+        return UntagImageFromRegistryActionResult(image=image_row)
 
     async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
         errors = []
@@ -294,7 +294,7 @@ class ImageService:
                 errors.append(error_msg)
 
         return PurgeImagesActionResult(
-            reserved_bytes=reserved_bytes, results=responses, errors=errors
+            results=responses, errors=errors, reserved_bytes=reserved_bytes
         )
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
