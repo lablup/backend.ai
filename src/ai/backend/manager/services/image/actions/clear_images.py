@@ -5,14 +5,14 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.image.base import ImageAction
 
 
+# TODO: Batch로 변경?
 @dataclass
 class ClearImagesAction(ImageAction):
     registry: str
 
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return f"{self.registry}"
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):
@@ -30,7 +30,7 @@ class ClearImagesActionResult(BaseActionResult):
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return "The registry's images have been cleared."
 
     # TODO: 여기선 뭘로 비교해야 하지??

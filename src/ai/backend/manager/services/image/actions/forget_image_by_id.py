@@ -15,7 +15,7 @@ class ForgetImageByIdAction(ImageAction):
     image_id: uuid.UUID
 
     @override
-    def entity_id(self) -> str:
+    def entity_id(self) -> Optional[str]:
         return str(self.image_id)
 
     @override
@@ -30,14 +30,14 @@ class ForgetImageByIdActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image_row.id)
 
     @override
     def status(self) -> str:
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return "The image has been forgotten."
 
     # TODO: eq 직접 정의보다 나은 방법?

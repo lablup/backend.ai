@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
-from ai.backend.common.types import DispatchResult
+from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.image.base import ImageAction
 
@@ -25,8 +24,8 @@ class PurgeImagesAction(ImageAction):
     images: list[ImageRefInputType]
 
     @override
-    def entity_id(self) -> str:
-        return f"{self.agent_id}, {self.images}"
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self) -> str:
@@ -52,14 +51,14 @@ class PurgeImagesActionResult(BaseActionResult):
         # TODO: PurgeImagesResult의 description을 얻어올 방법?
         return ""
 
-    @override
-    def to_bgtask_result(self) -> DispatchResult:
-        from ai.backend.manager.models.gql_models.image import PurgeImagesResult
+    # @override
+    # def to_bgtask_result(self) -> DispatchResult:
+    #     from ai.backend.manager.models.gql_models.image import PurgeImagesResult
 
-        return DispatchResult(
-            result=PurgeImagesResult(
-                results=PurgeImageResponses(self.results),
-                reserved_bytes=self.reserved_bytes,
-            ),
-            errors=self.errors,
-        )
+    # return DispatchResult(
+    #     result=PurgeImagesResult(
+    #         results=PurgeImageResponses(self.results),
+    #         reserved_bytes=self.reserved_bytes,
+    #     ),
+    #     errors=self.errors,
+    # )

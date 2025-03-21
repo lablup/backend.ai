@@ -38,15 +38,13 @@ class ModifyImageInput:
 
 @dataclass
 class ModifyImageAction(ImageAction):
-    # TODO: 아래 필드는 image_alias도 될 수 있어야 함. -> target으로 이름 변경?
-    image_canonical: str
+    target: str
     architecture: str
     props: ModifyImageInput
 
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return f"{self.image_canonical}/{self.architecture}"
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):
@@ -59,14 +57,14 @@ class ModifyImageActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image_row.id)
 
     @override
     def status(self) -> str:
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return "The image has been modified."
 
     def __eq__(self, other: Any) -> bool:
