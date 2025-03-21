@@ -50,7 +50,7 @@ class ModifyImageAction(ImageAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.image_row.id)
+        return str(self.image.id)
 
     @override
     def operation_type(self):
