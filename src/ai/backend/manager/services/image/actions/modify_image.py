@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
