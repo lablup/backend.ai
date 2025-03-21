@@ -19,25 +19,6 @@ class CreateDomainAction(DomainAction):
     allowed_docker_registries: Optional[list[str]] = field(default_factory=list)
     integration_id: Optional[str] = None
 
-    def __init__(
-        self,
-        name: str,
-        description: Optional[str],
-        is_active: Optional[bool],
-        total_resource_slots: Optional[ResourceSlot],
-        allowed_vfolder_hosts: Optional[dict[str, str]],
-        allowed_docker_registries: Optional[list[str]],
-        integration_id: Optional[str],
-    ) -> None:
-        super().__init__()
-        self.name = name
-        self.description = description
-        self.is_active = is_active
-        self.total_resource_slots = total_resource_slots
-        self.allowed_vfolder_hosts = allowed_vfolder_hosts
-        self.allowed_docker_registries = allowed_docker_registries
-        self.integration_id = integration_id
-
     @override
     def entity_id(self):
         return self.name
