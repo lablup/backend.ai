@@ -11,9 +11,8 @@ class DealiasImageAction(ImageAction):
     alias: str
 
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return f"{self.alias}"
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):
@@ -26,14 +25,14 @@ class DealiasImageActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image_alias.id)
 
     @override
     def status(self) -> str:
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return "The image has been dealiased."
 
     def __eq__(self, other: Any) -> bool:

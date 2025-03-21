@@ -920,15 +920,18 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        # TODO: 이렇게 고쳐도 될지?
-        task_id = await ctx.processors.image.rescan_images.fire_and_forget(
-            ctx.background_task_manager,
-            RescanImagesAction(
-                registry=registry,
-                project=project,
-            ),
-        )
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            action_result = await ctx.processors.image.rescan_images.wait_for_complete(
+                RescanImagesAction(
+                    registry=registry,
+                    project=project,
+                )
+            )
 
+            # TODO: 각 타입에 구현할거라면 to_dispatch_result 메서드를 구현하는게 낫지 않은지?
+            return DispatchResult.from_image_rescan_action_result(action_result)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
@@ -1057,7 +1060,7 @@ class ModifyImage(graphene.Mutation):
         log.info("modify image {0} by API request", target)
         result = await ctx.processors.image.modify_image.wait_for_complete(
             ModifyImageAction(
-                image_canonical=target,
+                target=target,
                 architecture=architecture,
                 props=props,
             )
