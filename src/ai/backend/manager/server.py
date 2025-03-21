@@ -74,6 +74,9 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.processors import Processors
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -425,6 +428,27 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
         yield
+
+
+@actxmgr
+async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    # image_service = ImageService(
+    #     db=root_ctx.db,
+    #     agent_registry=root_ctx.registry,
+    # )
+
+    # root_ctx.processors = Processors(
+    #     image_service=image_service,
+    # )
+
+    domain_service = DomainService(root_ctx.db)
+    domain_processor = DomainProcessors(domain_service)
+
+    root_ctx.processors = Processors(
+        domain=domain_processor,
+    )
+
+    yield
 
 
 @actxmgr
@@ -908,6 +932,7 @@ def build_root_app(
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
+            processors_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
             hanging_session_scanner_ctx,

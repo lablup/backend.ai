@@ -345,10 +345,9 @@ class CreateDomain(graphene.Mutation):
     ) -> CreateDomain:
         ctx: GraphQueryContext = info.context
 
-        action: CreateDomainAction = props.to_action(domain_name=name)
-
+        action: CreateDomainAction = props.to_action(name)
         res: CreateDomainActionResult = await ctx.processors.domain.create_domain.wait_for_complete(
-            action=action
+            action
         )
 
         return cls(ok=res.ok, msg=res.description, domain=Domain.from_row(ctx, res.domain_row))
@@ -375,10 +374,9 @@ class ModifyDomain(graphene.Mutation):
     ) -> ModifyDomain:
         ctx: GraphQueryContext = info.context
 
-        action: ModifyDomainAction = props.to_action(domain_name=name)
-
+        action: ModifyDomainAction = props.to_action(name)
         res: ModifyDomainActionResult = await ctx.processors.domain.modify_domain.wait_for_complete(
-            action=action
+            action
         )
 
         return cls(ok=res.ok, msg=res.description, domain=Domain.from_row(ctx, res.domain_row))
@@ -401,8 +399,9 @@ class DeleteDomain(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
         ctx: GraphQueryContext = info.context
 
+        action = DeleteDomainAction(name)
         res: DeleteDomainActionResult = await ctx.processors.domain.delete_domain.wait_for_complete(
-            action=DeleteDomainAction(name=name)
+            action
         )
 
         return cls(ok=res.ok, msg=res.description)
@@ -428,8 +427,9 @@ class PurgeDomain(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
         ctx: GraphQueryContext = info.context
 
+        action = PurgeDomainAction(name)
         res: PurgeDomainActionResult = await ctx.processors.domain.purge_domain.wait_for_complete(
-            action=PurgeDomainAction(name=name)
+            action
         )
 
         return cls(ok=res.ok, msg=res.description)

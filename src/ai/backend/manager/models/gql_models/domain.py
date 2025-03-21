@@ -353,7 +353,7 @@ class CreateDomainNode(graphene.Mutation):
 
         res: CreateDomainNodeActionResult = (
             await graph_ctx.processors.domain.create_domain_node.wait_for_complete(
-                input.to_action(user_info=user_info)
+                input.to_action(user_info)
             )
         )
 

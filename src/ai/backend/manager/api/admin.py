@@ -16,7 +16,6 @@ from graphql.execution import ExecutionResult  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.processors import Processors
 
 from ..models.base import DataLoaderManager
 from ..models.gql import (
@@ -93,7 +92,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         registry=root_ctx.registry,
         idle_checker_host=root_ctx.idle_checker_host,
         metric_observer=root_ctx.metrics.gql,
-        processors=Processors(),  # TODO: Fill in the processors
+        processors=root_ctx.processors,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],
