@@ -15,7 +15,7 @@ class PurgeImageByIdAction(ImageAction):
     image_id: uuid.UUID
 
     @override
-    def entity_id(self) -> str:
+    def entity_id(self) -> Optional[str]:
         return str(self.image_id)
 
     @override
@@ -29,14 +29,14 @@ class PurgeImageByIdActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image_row.id)
 
     @override
     def status(self) -> str:
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return "The image has been purged."
 
     def __eq__(self, other: Any) -> bool:
