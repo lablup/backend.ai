@@ -258,7 +258,9 @@ async def test_forget_image_by_id(
             DealiasImageAction(
                 alias=IMAGE_ALIAS_ROW_FIXTURE.alias,
             ),
-            DealiasImageActionResult(image_alias=IMAGE_ALIAS_ROW_FIXTURE),
+            DealiasImageActionResult(
+                image_id=IMAGE_ALIAS_ROW_FIXTURE.image_id, image_alias=IMAGE_ALIAS_ROW_FIXTURE
+            ),
         ),
     ],
 )
