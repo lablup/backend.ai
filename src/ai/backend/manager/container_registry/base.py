@@ -36,9 +36,10 @@ from ai.backend.common.exception import (
     ProjectMismatchWithCanonical,
 )
 from ai.backend.common.json import read_json
-from ai.backend.common.types import DispatchResult, SlotName, SSLContextType
+from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..exceptions import ScanImageError, ScanTagError
@@ -113,7 +114,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter | None = None,
-    ) -> DispatchResult[list[ImageRow]]:
+    ) -> RescanImagesResult:
         log.info("rescan_single_registry()")
         errors: list[str] = []
 
@@ -142,12 +143,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         errors.append(f"Failed to scan image! Detail: {str(e)}")
 
             scanned_images = await self.commit_rescan_result()
-            return DispatchResult(result=scanned_images, errors=errors)
+            return RescanImagesResult(images=scanned_images, errors=errors)
         finally:
             all_updates.reset(all_updates_token)
 
-    async def commit_rescan_result(self) -> list[ImageRow]:
-        scanned_images: list[ImageRow] = []
+    async def commit_rescan_result(self) -> list[ImageData]:
+        scanned_images: list[ImageData] = []
         _all_updates = all_updates.get()
         if not _all_updates:
             log.info("No images found in registry {0}", self.registry_url)
@@ -171,7 +172,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.labels = update["labels"]
                         image_row.resources = update["resources"]
                         image_row.is_local = is_local
-                        scanned_images.append(image_row)
+                        scanned_images.append(ImageData.from_image_row(image_row))
 
                         if image_row.status == ImageStatus.DELETED:
                             image_row.status = ImageStatus.ALIVE
@@ -216,7 +217,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         status=ImageStatus.ALIVE,
                     )
                     session.add(image_row)
-                    scanned_images.append(image_row)
+                    scanned_images.append(ImageData.from_image_row(image_row))
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
@@ -226,7 +227,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 await session.flush()
         return scanned_images
 
-    async def scan_single_ref(self, image: str) -> DispatchResult[list[ImageRow]]:
+    async def scan_single_ref(self, image: str) -> RescanImagesResult:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
@@ -247,7 +248,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 rqst_args["headers"].update(**self.base_hdrs)
                 await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
             scanned_images = await self.commit_rescan_result()
-            return DispatchResult(result=scanned_images)
+            return RescanImagesResult(images=scanned_images)
         finally:
             concurrency_sema.reset(sema_token)
             all_updates.reset(all_updates_token)
