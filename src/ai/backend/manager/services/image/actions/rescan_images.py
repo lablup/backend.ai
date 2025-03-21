@@ -21,12 +21,24 @@ class RescanImagesAction(ImageAction):
         return "rescan_images"
 
 
+@dataclass
+class Image:
+    alias: str
+    architecture: str
+    digest: str
+    created_at: str
+    updated_at: str
+    size: int
+    status: str
+    tags: list[str]
+
 # TODO: BatchAction으로 업데이트, entity_ids는 image row ids로.
 @dataclass
 class RescanImagesActionResult(BaseActionResult):
     # TODO: DispatchResult를 직접 반환하지 않도록 업데이트 해야하지 않을까?
     # DispatchResult가 bgtask와만 사용될 수 있는 맥락이라면 이 타입을 여기서 쓰면 안 됨.
-    result: DispatchResult[list[ImageRow]]
+
+    image: Image
 
     @override
     def entity_id(self) -> Optional[str]:

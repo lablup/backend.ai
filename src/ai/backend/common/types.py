@@ -50,6 +50,7 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
+from ai.backend.manager.models.gql_models.image import PurgeImagesResult
 from ai.backend.manager.services.image.actions.purge_images import PurgeImagesActionResult
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesActionResult
 
@@ -1587,6 +1588,29 @@ class AutoScalingMetricComparator(CIUpperStrEnum):
 ResultType = TypeVar("ResultType")
 
 
+class PurgeImageBgResult:
+    @classmethod
+    def from_action_result(cls, result: PurgeImageResult) -> Self:
+        return cls(
+            result=result,
+            errors=result.errors,
+        )
+    
+
+@dataclass
+class PurgeImageBgTaskResult:
+    image: Image
+
+    @classmethod
+    def from_action_result(
+        cls, action_result: RescanImagesActionResult
+    ) -> DispatchResult:
+        return cls(
+            image=action_result.image,
+        )
+
+
+
 @dataclass
 class DispatchResult(Generic[ResultType]):
     result: Optional[ResultType] = None
@@ -1597,7 +1621,11 @@ class DispatchResult(Generic[ResultType]):
 
     def has_error(self) -> bool:
         return not self.is_success()
-
+    
+    @classmethod
+    def success(cls, result: ResultType) -> DispatchResult[ResultType]:
+        return cls(result=result)
+    
     def message(self) -> str:
         if self.is_success():
             return str(self.result)
@@ -1605,12 +1633,6 @@ class DispatchResult(Generic[ResultType]):
             return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
         else:
             return "errors: " + "\n".join(self.errors)
-
-    @classmethod
-    def from_image_rescan_action_result(
-        cls, action_result: RescanImagesActionResult
-    ) -> DispatchResult:
-        return action_result.result
 
     @classmethod
     def from_purge_images_action_result(

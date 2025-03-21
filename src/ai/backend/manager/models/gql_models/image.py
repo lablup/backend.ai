@@ -32,6 +32,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     DispatchResult,
     ImageAlias,
+    PurgeImageBgTaskResult,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -931,8 +932,9 @@ class RescanImages(graphene.Mutation):
                 )
             )
 
+            res = PurgeImageBgTaskResult.from_action_result(action_result=action_result)
             # TODO: 각 타입에 구현할거라면 to_dispatch_result 메서드를 구현하는게 낫지 않은지?
-            return DispatchResult.from_image_rescan_action_result(action_result)
+            return DispatchResult.success(res)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
@@ -1083,6 +1085,14 @@ class PurgeImagesResult:
             for r in self.results.responses
         )
         return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
+
+    def from_action_result(
+        action_result: PurgeImageResponses,
+    ) -> PurgeImagesResult:
+        return PurgeImagesResult(
+            results=action_result,
+            reserved_bytes=action_result.reserved_bytes,
+        )
 
 
 class PurgeImages(graphene.Mutation):
