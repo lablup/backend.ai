@@ -100,6 +100,9 @@ local_config_iv = (
                             t.Key("service-addr"): tx.HostPortPair(
                                 allow_blank_host=True,
                             ),
+                            t.Key("internal-addr", default=("127.0.0.1", 6023)): tx.HostPortPair(
+                                allow_blank_host=True,
+                            ),
                             t.Key("ssl-enabled"): t.ToBool,
                             t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
                             t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
