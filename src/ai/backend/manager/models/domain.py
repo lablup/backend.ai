@@ -308,12 +308,16 @@ class ModifyDomainInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False)
 
     def to_action(self, domain_name: str) -> ModifyDomainAction:
+        if self.total_resource_slots is not None:
+            total_resource_slots = ResourceSlot.from_user_input(self.total_resource_slots, None)
+        else:
+            total_resource_slots = None
         return ModifyDomainAction(
             name=domain_name,
             new_name=self.name,
             description=self.description,
             is_active=self.is_active,
-            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None),
+            total_resource_slots=total_resource_slots,
             allowed_vfolder_hosts=self.allowed_vfolder_hosts,
             allowed_docker_registries=self.allowed_docker_registries,
             integration_id=self.integration_id,
@@ -347,7 +351,7 @@ class CreateDomain(graphene.Mutation):
             action=action
         )
 
-        return cls(ok=res.ok, msg=res.description(), domain=Domain.from_row(ctx, res.domain_row))
+        return cls(ok=res.ok, msg=res.description, domain=Domain.from_row(ctx, res.domain_row))
 
 
 class ModifyDomain(graphene.Mutation):
@@ -377,7 +381,7 @@ class ModifyDomain(graphene.Mutation):
             action=action
         )
 
-        return cls(ok=res.ok, msg=res.description(), domain=Domain.from_row(ctx, res.domain_row))
+        return cls(ok=res.ok, msg=res.description, domain=Domain.from_row(ctx, res.domain_row))
 
 
 class DeleteDomain(graphene.Mutation):
@@ -401,7 +405,7 @@ class DeleteDomain(graphene.Mutation):
             action=DeleteDomainAction(name=name)
         )
 
-        return cls(ok=res.ok, msg=res.description())
+        return cls(ok=res.ok, msg=res.description)
 
 
 class PurgeDomain(graphene.Mutation):
@@ -428,7 +432,7 @@ class PurgeDomain(graphene.Mutation):
             action=PurgeDomainAction(name=name)
         )
 
-        return cls(ok=res.ok, msg=res.description())
+        return cls(ok=res.ok, msg=res.description)
 
     @classmethod
     async def delete_kernels(

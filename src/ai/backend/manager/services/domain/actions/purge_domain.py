@@ -7,43 +7,26 @@ from ai.backend.manager.services.domain.base import DomainAction
 
 @dataclass
 class PurgeDomainAction(DomainAction):
-    _name: str
+    name: str
 
-    def __init__(self, name: str) -> None:
-        self._name = name
-
+    @override
     def entity_id(self):
         return self._name
 
+    @override
     def operation_type(self):
         return "purge"
-
-    @property
-    def name(self):
-        return self._name
 
 
 @dataclass
 class PurgeDomainActionResult(BaseActionResult):
-    _status: str
-    _description: str
-
-    def __init__(self, status: str, description: str) -> None:
-        self._status = status
-        self._description = description
+    status: str
+    description: str
 
     @override
     def entity_id(self):
         return ""
 
-    @override
-    def status(self):
-        return self._status
-
-    @override
-    def description(self):
-        return self._description
-
     @property
     def ok(self):
-        return self._status == "success"
+        return self.status == "success"

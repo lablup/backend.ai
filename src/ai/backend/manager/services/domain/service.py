@@ -9,7 +9,6 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.rbac import SystemScope
@@ -71,7 +70,7 @@ class DomainService:
                 "name": "model-store",
                 "description": "Model Store",
                 "is_active": True,
-                "domain_name": action.domain_name,
+                "domain_name": action.name,
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
                 "integration_id": None,
@@ -90,7 +89,7 @@ class DomainService:
                     return MutationResult(success=True, message="domain creation succeed", data=row)
                 else:
                     return MutationResult(
-                        success=False, message=f"no matching {action.domain_name}", data=None
+                        success=False, message=f"no matching {action.name}", data=None
                     )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
@@ -108,9 +107,7 @@ class DomainService:
         if action.is_active is not None:
             data["is_active"] = action.is_active
         if action.total_resource_slots is not None:
-            data["total_resource_slots"] = ResourceSlot.from_user_input(
-                action.total_resource_slots, None
-            )
+            data["total_resource_slots"] = action.total_resource_slots
         if action.allowed_vfolder_hosts is not None:
             data["allowed_vfolder_hosts"] = action.allowed_vfolder_hosts
         if action.allowed_docker_registries is not None:
@@ -266,7 +263,7 @@ class DomainService:
     async def modify_domain_node(
         self, action: ModifyDomainNodeAction
     ) -> ModifyDomainNodeActionResult:
-        domain_name = action.domain_name
+        domain_name = action.name
 
         if hasattr(action, "sgroups_to_add") and action.sgroups_to_add is not None:
             sgroups_to_add = set(action.sgroups_to_add)

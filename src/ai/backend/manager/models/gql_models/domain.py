@@ -38,6 +38,7 @@ from ..gql_relay import (
     Connection,
     ConnectionResolverResult,
     GlobalIDField,
+    ResolvedGlobalID,
 )
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
@@ -310,14 +311,14 @@ class CreateDomainNodeInput(graphene.InputObjectType):
         return CreateDomainNodeAction(
             name=self.name,
             description=self.description,
+            scaling_groups=self.scaling_groups,
+            user_info=user_info,
             is_active=self.is_active,
             total_resource_slots=self.total_resource_slots,
             allowed_vfolder_hosts=self.allowed_vfolder_hosts,
             allowed_docker_registries=self.allowed_docker_registries,
             integration_id=self.integration_id,
             dotfiles=self.dotfiles,
-            scaling_groups=self.scaling_groups,
-            user_info=user_info,
         )
 
 
@@ -375,9 +376,9 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
     sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
     client_mutation_id = graphene.String(required=False)
 
-    def to_action(self, user_info: UserInfo) -> ModifyDomainNodeAction:
+    def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
         return ModifyDomainNodeAction(
-            id=self.id,
+            name=name,
             description=self.description,
             is_active=self.is_active,
             total_resource_slots=self.total_resource_slots,
@@ -412,6 +413,7 @@ class ModifyDomainNode(graphene.Mutation):
         info: graphene.ResolveInfo,
         input: ModifyDomainNodeInput,
     ) -> ModifyDomainNode:
+        _, domain_name = cast(ResolvedGlobalID, input["id"])
         graph_ctx: GraphQueryContext = info.context
         user_info: UserInfo = UserInfo(
             id=graph_ctx.user["uuid"],
@@ -420,7 +422,7 @@ class ModifyDomainNode(graphene.Mutation):
         )
         res: ModifyDomainNodeActionResult = (
             await graph_ctx.processors.domain.modify_domain_node.wait_for_complete(
-                input.to_action(user_info=user_info)
+                input.to_action(name=domain_name, user_info=user_info)
             )
         )
 

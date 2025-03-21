@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, override
 
 from ai.backend.common.types import ResourceSlot
@@ -9,13 +9,15 @@ from ai.backend.manager.services.domain.base import DomainAction
 
 @dataclass
 class CreateDomainAction(DomainAction):
-    _name: str
-    _description: Optional[str]
-    _is_active: Optional[bool]
-    _total_resource_slots: Optional[ResourceSlot]
-    _allowed_vfolder_hosts: Optional[dict[str, str]]
-    _allowed_docker_registries: Optional[list[str]]
-    _integration_id: Optional[str]
+    name: str
+    description: Optional[str] = ""
+    is_active: Optional[bool] = True
+    total_resource_slots: Optional[ResourceSlot] = field(
+        default_factory=lambda: ResourceSlot.from_user_input({}, None)
+    )
+    allowed_vfolder_hosts: Optional[dict[str, str]] = field(default_factory=dict)
+    allowed_docker_registries: Optional[list[str]] = field(default_factory=list)
+    integration_id: Optional[str] = None
 
     def __init__(
         self,
@@ -28,66 +30,49 @@ class CreateDomainAction(DomainAction):
         integration_id: Optional[str],
     ) -> None:
         super().__init__()
-        self._name = name
-        self._description = description
-        self._is_active = is_active
-        self._total_resource_slots = total_resource_slots
-        self._allowed_vfolder_hosts = allowed_vfolder_hosts
-        self._allowed_docker_registries = allowed_docker_registries
-        self._integration_id = integration_id
+        self.name = name
+        self.description = description
+        self.is_active = is_active
+        self.total_resource_slots = total_resource_slots
+        self.allowed_vfolder_hosts = allowed_vfolder_hosts
+        self.allowed_docker_registries = allowed_docker_registries
+        self.integration_id = integration_id
 
     @override
     def entity_id(self):
-        return self._name
+        return self.name
 
     @override
     def operation_type(self):
         return "create"
 
-    @override
     def get_insert_data(self):
         return {
-            "name": self._name,
-            "description": self._description,
-            "is_active": self._is_active,
-            "total_resource_slots": self._total_resource_slots,
-            "allowed_vfolder_hosts": self._allowed_vfolder_hosts,
-            "allowed_docker_registries": self._allowed_docker_registries,
-            "integration_id": self._integration_id,
+            "name": self.name,
+            "description": self.description,
+            "is_active": self.is_active,
+            "total_resource_slots": self.total_resource_slots,
+            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
+            "allowed_docker_registries": self.allowed_docker_registries,
+            "integration_id": self.integration_id,
         }
-
-    @property
-    def domain_name(self):
-        return self._name
 
 
 @dataclass
 class CreateDomainActionResult(BaseActionResult):
-    _domain_row: Optional[DomainRow]
-    _status: str
-    _description: Optional[str]
+    domain_row: Optional[DomainRow]
+    status: str
+    description: Optional[str]
 
     def __init__(self, domain_row: Optional[DomainRow], status: str, description: Optional[str]):
-        self._domain_row = domain_row
-        self._status = status
-        self._description = description
+        self.domain_row = domain_row
+        self.status = status
+        self.description = description
 
     @override
     def entity_id(self):
-        return self._domain_row.name
-
-    @override
-    def status(self):
-        return self._status
-
-    @override
-    def description(self):
-        return self._description
-
-    @property
-    def domain_row(self):
-        return self._domain_row
+        return self.domain_row.name
 
     @property
     def ok(self):
-        return self._status == "success"
+        return self.status == "success"
