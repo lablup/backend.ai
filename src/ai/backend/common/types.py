@@ -50,6 +50,9 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
+from ai.backend.manager.services.image.actions.purge_images import PurgeImagesActionResult
+from ai.backend.manager.services.image.actions.rescan_images import RescanImagesActionResult
+
 from .defs import RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser

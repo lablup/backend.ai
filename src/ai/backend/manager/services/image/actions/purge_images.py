@@ -39,14 +39,14 @@ class PurgeImagesActionResult(BaseActionResult):
     def description(self) -> str:
         return ""
 
-    @override
-    def to_bgtask_result(self) -> DispatchResult:
-        from ai.backend.manager.models.gql_models.image import PurgeImagesResult
+    # @override
+    # def to_bgtask_result(self) -> DispatchResult:
+    #     from ai.backend.manager.models.gql_models.image import PurgeImagesResult
 
-        return DispatchResult(
-            result=PurgeImagesResult(
-                results=PurgeImageResponses(self.results),
-                reserved_bytes=self.reserved_bytes,
-            ),
-            errors=self.errors,
-        )
+    # return DispatchResult(
+    #     result=PurgeImagesResult(
+    #         results=PurgeImageResponses(self.results),
+    #         reserved_bytes=self.reserved_bytes,
+    #     ),
+    #     errors=self.errors,
+    # )
