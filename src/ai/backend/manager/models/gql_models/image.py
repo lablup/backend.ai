@@ -52,7 +52,7 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetI
 from ai.backend.manager.services.image.actions.modify_image import ModifyImageAction
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
-    ImageRefInputType,
+    ImageRefData,
     PurgeImagesAction,
 )
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
@@ -733,7 +733,9 @@ class ForgetImageById(graphene.Mutation):
             )
         )
 
-        return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row))
+        return ForgetImageById(
+            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
+        )
 
 
 class ForgetImage(graphene.Mutation):
@@ -774,7 +776,9 @@ class ForgetImage(graphene.Mutation):
             )
         )
 
-        return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row))
+        return ForgetImage(
+            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
+        )
 
 
 class PurgeImageById(graphene.Mutation):
@@ -809,7 +813,9 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
-        return PurgeImageById(ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row))
+        return PurgeImageById(
+            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
+        )
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -847,7 +853,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         )
 
         return UntagImageFromRegistry(
-            ok=True, msg="", image=ImageNode.from_row(ctx, result.image_row)
+            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
         )
 
 
@@ -953,7 +959,7 @@ class AliasImage(graphene.Mutation):
         log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
 
-        result = await ctx.processors.image.alias_image.wait_for_complete(
+        await ctx.processors.image.alias_image.wait_for_complete(
             AliasImageAction(
                 image_canonical=target,
                 architecture=architecture,
@@ -1106,7 +1112,7 @@ class PurgeImages(graphene.Mutation):
                 PurgeImagesAction(
                     agent_id=agent_id,
                     images=[
-                        ImageRefInputType(
+                        ImageRefData(
                             name=image.name,
                             architecture=image.architecture,
                             registry=image.registry,

@@ -393,6 +393,7 @@ class ImageRow(Base):
         accelerators=None,
         labels=None,
         resources=None,
+        created_at=None,
         status=ImageStatus.ALIVE,
     ) -> None:
         self.name = name
@@ -410,6 +411,7 @@ class ImageRow(Base):
         self.labels = labels
         self.resources = resources
         self.status = status
+        self.created_at = created_at
 
     @property
     def trimmed_digest(self) -> str:
