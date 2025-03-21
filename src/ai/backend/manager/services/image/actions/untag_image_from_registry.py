@@ -4,9 +4,9 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
+from ai.backend.manager.data.image.image_data import ImageData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.base import ImageAction
-from ai.backend.manager.services.image.types import ImageData
 
 
 @dataclass
