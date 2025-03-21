@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Self, override
+from typing import Any, Mapping, Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
@@ -10,7 +10,7 @@ from ai.backend.manager.services.resource.base import ResourceAction
 @dataclass
 class CheckResourcePresetsAction(ResourceAction):
     access_key: str
-    resource_policy: str
+    resource_policy: Mapping[str, Any]
     domain_name: str
     user_id: uuid.UUID
     group: str
@@ -51,6 +51,6 @@ class CheckResourcePresetsActionResult(BaseActionResult):
         return ""
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, Self):
+        if not isinstance(other, type(self)):
             return False
         return True

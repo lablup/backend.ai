@@ -17,23 +17,27 @@ from typing import (
     Tuple,
 )
 
-import aiohttp
 import aiohttp_cors
 import trafaret as t
 import yarl
 from aiohttp import web
-from async_timeout import timeout as _timeout
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.services.resource.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.resource.actions.check_presets import CheckResourcePresetsAction
+from ai.backend.manager.services.resource.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.resource.actions.list_presets import ListResourcePresetsAction
 from ai.backend.manager.services.resource.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.resource.actions.usage_per_month import UsagePerMonthAction
 from ai.backend.manager.services.resource.actions.usage_per_period import UsagePerPeriodAction
 from ai.backend.manager.services.resource.actions.user_month_stats import UserMonthStatsAction
+from ai.backend.manager.services.resource.actions.watcher_agent_restart import (
+    WatcherAgentRestartAction,
+)
+from ai.backend.manager.services.resource.actions.watcher_agent_start import WatcherAgentStartAction
+from ai.backend.manager.services.resource.actions.watcher_agent_stop import WatcherAgentStopAction
 
 from .auth import auth_required, superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -367,6 +371,8 @@ async def admin_month_stats(request: web.Request) -> web.Response:
     return web.json_response(stats, status=HTTPStatus.OK)
 
 
+# TODO: get_watcher_info는 서비스쪽 메서드랑 겹침.
+# vfolder 쪽에서 쓰고 있어서 냅둠.
 async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     """
     Get watcher information.

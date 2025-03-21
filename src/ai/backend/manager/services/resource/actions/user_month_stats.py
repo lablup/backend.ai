@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional, Self, override
+from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.resource.base import ResourceAction
@@ -36,6 +36,6 @@ class UserMonthStatsActionResult(BaseActionResult):
         return ""
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, Self):
+        if not isinstance(other, type(self)):
             return False
         return True

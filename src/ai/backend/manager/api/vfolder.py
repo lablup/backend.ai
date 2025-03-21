@@ -52,6 +52,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
@@ -136,7 +137,6 @@ from .exceptions import (
     VFolderOperationFailed,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
-from .resource import get_watcher_info
 from .utils import (
     BaseResponseModel,
     check_api_params,

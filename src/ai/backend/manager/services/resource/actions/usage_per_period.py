@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Any, Optional, Self, override
+from typing import Any, Optional, override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.resource.base import ResourceAction
@@ -7,9 +8,9 @@ from ai.backend.manager.services.resource.base import ResourceAction
 
 @dataclass
 class UsagePerPeriodAction(ResourceAction):
-    project_id: Optional[str] = None
     start_date: str
     end_date: str
+    project_id: Optional[UUID] = None
 
     @override
     def entity_id(self) -> str:
@@ -39,6 +40,6 @@ class UsagePerPeriodActionResult(BaseActionResult):
         return ""
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, Self):
+        if not isinstance(other, type(self)):
             return False
         return True

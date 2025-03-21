@@ -1,5 +1,4 @@
 import uuid
-from abc import ABC
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
@@ -7,18 +6,12 @@ from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.types import DispatchResult
 
 from .action import (
-    BaseAction,
     BaseActionResultMeta,
     ProcessResult,
     TAction,
     TActionResult,
 )
 from .monitors.monitor import ActionMonitor
-
-
-class ActionValidator(ABC):
-    async def validate(self, action: BaseAction) -> None:
-        pass
 
 
 class ActionProcessor(Generic[TAction, TActionResult]):
