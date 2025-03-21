@@ -1,8 +1,9 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.base import ImageAction
@@ -31,23 +32,10 @@ class PurgeImageByIdActionResult(BaseActionResult):
     def entity_id(self) -> Optional[str]:
         return str(self.image_row.id)
 
-    @override
-    def status(self) -> str:
-        return "success"
 
-    @override
-    def description(self) -> str:
-        return "The image has been purged."
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, PurgeImageByIdActionResult):
-            return False
-        return self.image_row.id == other.image_row.id
-
-
-class PurgeImageActionByIdGenericForbiddenError(Exception):
+class PurgeImageActionByIdGenericForbiddenError(BaseActionException):
     pass
 
 
-class PurgeImageActionByIdObjectNotFoundError(Exception):
+class PurgeImageActionByIdObjectNotFoundError(BaseActionException):
     pass
