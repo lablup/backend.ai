@@ -32,7 +32,6 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
-    DispatchResult,
     ImageAlias,
     ImageConfig,
     ImageRegistry,
@@ -69,6 +68,7 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
+    from ai.backend.manager.data.image.types import RescanImagesResult
 
     from ..config import SharedConfig
 
@@ -169,10 +169,12 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> DispatchResult[list[ImageRow]]:
+) -> RescanImagesResult:
     """
     Performs an image rescan for all images in the registries.
     """
+    from ai.backend.manager.data.image.types import RescanImagesResult
+
     images, errors = [], []
 
     for registry_key, registry_row in registries.items():
@@ -184,12 +186,12 @@ async def scan_registries(
 
         try:
             scan_result = await scanner.rescan_single_registry(reporter)
-            images.extend(scan_result.result or [])
+            images.extend(scan_result.images or [])
             errors.extend(scan_result.errors or [])
         except Exception as e:
             errors.append(str(e))
 
-    return DispatchResult(result=images, errors=errors)
+    return RescanImagesResult(images=images, errors=errors)
 
 
 async def scan_single_image(
@@ -197,7 +199,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> DispatchResult[list[ImageRow]]:
+) -> RescanImagesResult:
     """
     Performs a scan for a single image.
     """
@@ -252,7 +254,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> DispatchResult[list[ImageRow]]:
+) -> RescanImagesResult:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
@@ -393,6 +395,7 @@ class ImageRow(Base):
         accelerators=None,
         labels=None,
         resources=None,
+        created_at=None,
         status=ImageStatus.ALIVE,
     ) -> None:
         self.name = name
@@ -410,6 +413,7 @@ class ImageRow(Base):
         self.labels = labels
         self.resources = resources
         self.status = status
+        self.created_at = created_at
 
     @property
     def trimmed_digest(self) -> str:
@@ -738,7 +742,7 @@ class ImageRow(Base):
 
         self.resources = resources
 
-    def is_customized_by(self, user_id: str) -> bool:
+    def is_customized_by(self, user_id: UUID) -> bool:
         return (self.labels or {}).get("ai.backend.customized-image.owner") == f"user:{user_id}"
 
 
