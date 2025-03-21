@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, Mapping, Optional, TypeVar
 
-from ai.backend.common.types import DispatchResult
-
 
 @dataclass
 class BaseAction(ABC):
@@ -52,14 +50,7 @@ class BaseActionResult(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def description(self) -> Optional[str]:
-        raise NotImplementedError
-
-    def to_bgtask_result(self) -> DispatchResult:
-        """
-        Implement this method to convert the Result to DispatchResult.
-        You should implment this method for running the action as bgtask.
-        """
+    def description(self) -> str:
         raise NotImplementedError
 
 
@@ -89,14 +80,7 @@ class BaseBatchActionResult(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def description(self) -> Optional[str]:
-        raise NotImplementedError
-
-    def to_bgtask_result(self) -> DispatchResult:
-        """
-        Implement this method to convert the Result to DispatchResult.
-        You should implment this method for running the action as bgtask.
-        """
+    def description(self) -> str:
         raise NotImplementedError
 
 
