@@ -25,4 +25,7 @@ class GroupProcessors:
     purge_group: ActionProcessor[PurgeGroupAction, PurgeGroupActionResult]
 
     def __init__(self, group_service: GroupService) -> None:
-        pass
+        self.create_group = ActionProcessor(group_service.create_group)
+        self.modify_group = ActionProcessor(group_service.modify_group)
+        self.delete_group = ActionProcessor(group_service.delete_group)
+        self.purge_group = ActionProcessor(group_service.purge_group)

@@ -78,6 +78,9 @@ from .user import ModifyUserInput, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.services.groups.actions.create_group import CreateGroupAction
+    from ai.backend.manager.services.groups.actions.modify_group import ModifyGroupAction
+
     from .gql import GraphQueryContext
     from .rbac import ContainerRegistryScope
     from .scaling_group import ScalingGroup
@@ -569,6 +572,19 @@ class GroupInput(graphene.InputObjectType):
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
+    def to_action(self, name: str) -> CreateGroupAction:
+        return CreateGroupAction(
+            name=name,
+            type=ProjectType[self.type],
+            description=self.description,
+            is_active=self.is_active,
+            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None),
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
+            integration_id=self.integration_id,
+            resource_policy=self.resource_policy,
+            container_registry=self.container_registry,
+        )
+
 
 class ModifyGroupInput(graphene.InputObjectType):
     name = graphene.String(required=False)
@@ -584,6 +600,22 @@ class ModifyGroupInput(graphene.InputObjectType):
     container_registry = graphene.JSONString(
         required=False, default_value={}, description="Added in 24.03.0"
     )
+
+    def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
+        return ModifyGroupAction(
+            group_id=group_id,
+            name=self.name,
+            description=self.description,
+            is_active=self.is_active,
+            domain_name=self.domain_name,
+            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None),
+            user_update_mode=self.user_update_mode,
+            user_uuids=self.user_uuids,
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
+            integration_id=self.integration_id,
+            resource_policy=self.resource_policy,
+            container_registry=self.container_registry,
+        )
 
 
 class CreateGroup(graphene.Mutation):

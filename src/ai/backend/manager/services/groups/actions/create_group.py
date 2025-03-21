@@ -1,17 +1,21 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.services.groups.base import GroupAction
 
 
 @dataclass
 class CreateGroupAction(GroupAction):
-    domain_name: str
-    type: Optional[str] = "GENERAL"
+    name: str
+    type: Optional[ProjectType] = ProjectType.GENERAL
     description: Optional[str] = ""
     is_active: Optional[bool] = True
-    total_resource_slots: Optional[dict[str, str]] = field(default_factory=dict)
+    total_resource_slots: Optional[ResourceSlot] = field(
+        default_factory=lambda: ResourceSlot({}, None)
+    )
     allowed_vfolder_hosts: Optional[dict[str, str]] = field(default_factory=dict)
     integration_id: Optional[str] = ""
     resource_policy: Optional[str] = "default"
@@ -24,6 +28,19 @@ class CreateGroupAction(GroupAction):
     @override
     def operation_type(self) -> str:
         return "create"
+
+    def get_insertion_data(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "type": self.type,
+            "description": self.description,
+            "is_active": self.is_active,
+            "total_resource_slots": self.total_resource_slots,
+            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
+            "integration_id": self.integration_id,
+            "resource_policy": self.resource_policy,
+            "container_registry": self.container_registry,
+        }
 
 
 @dataclass

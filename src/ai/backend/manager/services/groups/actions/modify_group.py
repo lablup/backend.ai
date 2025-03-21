@@ -1,30 +1,26 @@
+import uuid
 from dataclasses import dataclass
 from typing import Any, Optional, override
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.groups.base import GroupAction
 
 
 @dataclass
 class ModifyGroupAction(GroupAction):
-    username: Optional[str]
-    password: Optional[str]
-    need_password_change: Optional[bool]
-    full_name: Optional[str]
+    group_id: uuid.UUID
+    name: Optional[str]
     description: Optional[str]
     is_active: Optional[bool]
-    status: Optional[str]
     domain_name: Optional[str]
-    role: Optional[str]
-    group_ids: Optional[list[str]]
-    allowed_client_ip: Optional[list[str]]
+    total_resource_slots: Optional[ResourceSlot]
+    user_update_mode: Optional[str]
+    user_uuids: Optional[list[str]]
+    allowed_vfolder_hosts: Optional[dict[str, str]]
+    integration_id: Optional[str]
     resource_policy: Optional[str]
-    main_access_key: Optional[str]
-    container_uid: Optional[int]
-    container_main_gid: Optional[int]
-    container_gids: Optional[list[int]]
-    totp_activated: Optional[bool] = False
-    sudo_session_enabled: Optional[bool] = False
+    container_registry: Optional[dict[str, str]]
 
     @override
     def entity_id(self) -> Optional[str]:
