@@ -12,9 +12,8 @@ class UsagePerMonthAction(ResourceAction):
     group_ids: Optional[list[UUID]] = None
 
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return ""
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):

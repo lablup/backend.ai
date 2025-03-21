@@ -8,9 +8,8 @@ from ai.backend.manager.services.resource.base import ResourceAction
 @dataclass
 class AdminMonthStatsAction(ResourceAction):
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return ""
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):

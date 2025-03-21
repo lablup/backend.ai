@@ -8,9 +8,8 @@ from ai.backend.manager.services.resource.base import ResourceAction
 @dataclass
 class RecalculateUsageAction(ResourceAction):
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return ""
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):
@@ -35,5 +34,3 @@ class RecalculateUsageActionResult(BaseActionResult):
         if not isinstance(other, type(self)):
             return False
         return True
-        # # TODO: 여기선 id로 비교못할 듯.
-        # return self.image_alias.alias == other.image_alias.alias

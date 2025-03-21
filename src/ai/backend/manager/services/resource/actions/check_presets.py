@@ -17,9 +17,8 @@ class CheckResourcePresetsAction(ResourceAction):
     scaling_group: Optional[str] = None
 
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return ""
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):

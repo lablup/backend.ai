@@ -1,9 +1,7 @@
-import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
-from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.types import DispatchResult
+from ai.backend.common import asyncio
 
 from .action import (
     BaseActionResultMeta,
@@ -17,12 +15,6 @@ from .monitors.monitor import ActionMonitor
 class ActionProcessor(Generic[TAction, TActionResult]):
     _monitors: list[ActionMonitor]
     _func: Callable[[TAction], Awaitable[TActionResult]]
-
-    # TODO: Implement this.
-    # _validators: list[ActionValidator]
-
-    # TODO: Implement this.
-    # rollback: Callable[[TAction], None]
 
     def __init__(
         self,
@@ -65,12 +57,5 @@ class ActionProcessor(Generic[TAction, TActionResult]):
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         return await self._run(action)
 
-    # TODO: background_task_manager를 ActionProcessor 생성자에서 받아오는 게 나은지?
-    async def fire_and_forget(
-        self, background_task_manager: BackgroundTaskManager, action: TAction
-    ) -> uuid.UUID:
-        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
-            result = await self.wait_for_complete(action)
-            return result.to_bgtask_result()
-
-        return await background_task_manager.start(_bg_task)
+    async def fire_and_forget(self, action: TAction) -> None:
+        asyncio.create_task(self.wait_for_complete(action))

@@ -10,11 +10,6 @@ class ResourceAction(BaseAction):
     def entity_type(self):
         return "resource"
 
-    @override
-    def request_id(self):
-        # TODO: request_id는 어떻게 생성?
-        return "..."
-
 
 @dataclass
 class ResourceBatchAction(BaseBatchAction):
