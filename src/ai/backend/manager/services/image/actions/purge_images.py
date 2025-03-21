@@ -4,24 +4,13 @@ from typing import Optional, override
 from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.image.base import ImageAction
-
-
-# TODO: 타입 위치 이동
-@dataclass
-class ImageRefInputType:
-    """
-    DTO for ImageRefType.
-    """
-
-    name: str
-    registry: str
-    architecture: str
+from ai.backend.manager.services.image.types import ImageRefData
 
 
 @dataclass
 class PurgeImagesAction(ImageAction):
     agent_id: str
-    images: list[ImageRefInputType]
+    images: list[ImageRefData]
 
     @override
     def entity_id(self) -> Optional[str]:
