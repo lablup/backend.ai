@@ -25,10 +25,12 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
+    DispatchResult,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -921,15 +923,18 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        # TODO: 이렇게 고쳐도 될지?
-        task_id = await ctx.processors.image.rescan_images.fire_and_forget(
-            ctx.background_task_manager,
-            RescanImagesAction(
-                registry=registry,
-                project=project,
-            ),
-        )
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            action_result = await ctx.processors.image.rescan_images.wait_for_complete(
+                RescanImagesAction(
+                    registry=registry,
+                    project=project,
+                )
+            )
 
+            # TODO: 각 타입에 구현할거라면 to_dispatch_result 메서드를 구현하는게 낫지 않은지?
+            return DispatchResult.from_image_rescan_action_result(action_result)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
@@ -1058,7 +1063,7 @@ class ModifyImage(graphene.Mutation):
         log.info("modify image {0} by API request", target)
         result = await ctx.processors.image.modify_image.wait_for_complete(
             ModifyImageAction(
-                image_canonical=target,
+                target=target,
                 architecture=architecture,
                 props=props,
             )
@@ -1103,17 +1108,23 @@ class PurgeImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        task_id = await ctx.processors.image.purge_images.fire_and_forget(
-            ctx.background_task_manager,
-            PurgeImagesAction(
-                agent_id=agent_id,
-                images=[
-                    ImageRefInputType(
-                        name=image.name, architecture=image.architecture, registry=image.registry
-                    )
-                    for image in images
-                ],
-            ),
-        )
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            action_result = await ctx.processors.image.purge_images.wait_for_complete(
+                PurgeImagesAction(
+                    agent_id=agent_id,
+                    images=[
+                        ImageRefInputType(
+                            name=image.name,
+                            architecture=image.architecture,
+                            registry=image.registry,
+                        )
+                        for image in images
+                    ],
+                )
+            )
 
-        return RescanImages(task_id=task_id)
+            # TODO: 각 타입에 구현할거라면 to_dispatch_result 메서드를 구현하는게 낫지 않은지?
+            return DispatchResult.from_purge_images_action_result(action_result)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
+        return PurgeImages(ok=True, msg="", task_id=task_id)

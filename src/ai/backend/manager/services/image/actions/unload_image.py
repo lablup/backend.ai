@@ -11,9 +11,8 @@ class UnloadImageAction(ImageAction):
     agents: list[str]
 
     @override
-    def entity_id(self) -> str:
-        # TODO: ?
-        return f"{self.references} on {self.agents}"
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self):
@@ -31,5 +30,5 @@ class UnloadImageActionResult(BaseActionResult):
         return "success"
 
     @override
-    def description(self) -> Optional[str]:
+    def description(self) -> str:
         return ""

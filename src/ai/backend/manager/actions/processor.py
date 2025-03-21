@@ -1,24 +1,14 @@
-import uuid
-from abc import ABC
+import asyncio
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
-from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.types import DispatchResult
-
 from .action import (
-    BaseAction,
     BaseActionResultMeta,
     ProcessResult,
     TAction,
     TActionResult,
 )
 from .monitors.monitor import ActionMonitor
-
-
-class ActionValidator(ABC):
-    async def validate(self, action: BaseAction) -> None:
-        pass
 
 
 class ActionProcessor(Generic[TAction, TActionResult]):
@@ -66,12 +56,5 @@ class ActionProcessor(Generic[TAction, TActionResult]):
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         return await self._run(action)
 
-    # TODO: background_task_manager를 ActionProcessor 생성자에서 받아오는 게 나은지?
-    async def fire_and_forget(
-        self, background_task_manager: BackgroundTaskManager, action: TAction
-    ) -> uuid.UUID:
-        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
-            result = await self.wait_for_complete(action)
-            return result.to_bgtask_result()
-
-        return await background_task_manager.start(_bg_task)
+    async def fire_and_forget(self, action: TAction) -> None:
+        asyncio.create_task(self.wait_for_complete(action))
