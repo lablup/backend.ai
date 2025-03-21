@@ -104,6 +104,7 @@ class GroupService:
                 #       (to apply since 21.09)
                 gid = action.group_id
                 if action.user_update_mode == "add":
+                    assert action.user_uuids is not None
                     values = [{"user_id": uuid, "group_id": gid} for uuid in action.user_uuids]
                     await conn.execute(
                         sa.insert(association_groups_users).values(values),
@@ -121,14 +122,14 @@ class GroupService:
                     )
                     if result.rowcount > 0:
                         row = result.fist()
-                        return MutationResult(ok=True, msg="success", group=row)
-                    return MutationResult(ok=False, msg=f"no such group {gid}", group=None)
+                        return MutationResult(success=True, message="success", data=row)
+                    return MutationResult(success=False, message=f"no such group {gid}", data=None)
                 else:  # updated association_groups_users table
-                    return MutationResult(ok=True, msg="success", group=None)
+                    return MutationResult(success=True, message="success", data=None)
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return ModifyGroupActionResult(data=res.group)
+        return ModifyGroupActionResult(data=res.data)
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
         update_query = (
@@ -221,7 +222,7 @@ class GroupService:
         return False
 
     async def group_has_active_kernels(self, db_conn: SAConnection, group_id: uuid.UUID) -> bool:
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+        from ai.backend.manager.models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 
         query = (
             sa.select([sa.func.count()])
@@ -234,7 +235,7 @@ class GroupService:
         active_kernel_count = await db_conn.scalar(query)
         return True if active_kernel_count > 0 else False
 
-    async def delete_vfolders(self, group_id: uuid.UUID) -> None:
+    async def delete_vfolders(self, group_id: uuid.UUID) -> int:
         from ai.backend.manager.models import (
             VFolderDeletionInfo,
             VFolderRow,
