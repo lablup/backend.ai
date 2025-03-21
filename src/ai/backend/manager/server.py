@@ -74,6 +74,8 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.resource.service import ResourceService
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -429,15 +431,16 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # image_service = ImageService(
-    #     db=root_ctx.db,
-    #     agent_registry=root_ctx.registry,
-    # )
+    resource_service = ResourceService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+        redis_stat=root_ctx.redis_stat,
+        shared_config=root_ctx.shared_config,
+    )
 
-    # root_ctx.processors = Processors(
-    #     image_service=image_service,
-    # )
-
+    root_ctx.processors = Processors(
+        resource_service=resource_service,
+    )
     yield
 
 

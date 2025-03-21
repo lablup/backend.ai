@@ -1,6 +1,7 @@
-import asyncio
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
+
+from ai.backend.common import asyncio
 
 from .action import (
     BaseActionResultMeta,
@@ -26,24 +27,32 @@ class ActionProcessor(Generic[TAction, TActionResult]):
     async def _run(self, action: TAction) -> ProcessResult[TActionResult]:
         started_at = datetime.now()
         status: str
+        exc: Optional[Exception] = None
         try:
             result = await self._func(action)
             status = "success"
             description = "Success"
         except Exception as e:
+            exc = e
+            result = None
             status = "error"
             description = str(e)
-        finally:
-            end_at = datetime.now()
-            duration = (end_at - started_at).total_seconds()
-            meta = BaseActionResultMeta(
-                status=status,
-                description=description,
-                started_at=started_at,
-                end_at=end_at,
-                duration=duration,
-            )
+
+        end_at = datetime.now()
+        duration = (end_at - started_at).total_seconds()
+        meta = BaseActionResultMeta(
+            status=status,
+            description=description,
+            started_at=started_at,
+            end_at=end_at,
+            duration=duration,
+        )
+
+        if result:
             return ProcessResult(meta, result)
+        else:
+            assert exc is not None
+            raise exc
 
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         for monitor in self._monitors:
