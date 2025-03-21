@@ -29,6 +29,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.models.agent import AgentStatus, agents
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import (
@@ -57,6 +58,10 @@ from ai.backend.manager.services.resource.actions.admin_month_stats import (
 from ai.backend.manager.services.resource.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
+)
+from ai.backend.manager.services.resource.actions.get_container_registries import (
+    GetContainerRegistriesAction,
+    GetContainerRegistriesActionResult,
 )
 from ai.backend.manager.services.resource.actions.get_watcher_status import (
     GetWatcherStatusAction,
@@ -775,3 +780,16 @@ class ResourceService:
                 headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
                 async with sess.post(watcher_url, headers=headers) as resp:
                     return WatcherAgentStopActionResult(resp)
+
+    async def get_container_registries(
+        self, action: GetContainerRegistriesAction
+    ) -> GetContainerRegistriesActionResult:
+        async with self._db.begin_session() as session:
+            _registries = await ContainerRegistryRow.get_known_container_registries(session)
+
+        known_registries = {}
+        for project, registries in _registries.items():
+            for registry_name, url in registries.items():
+                if project not in known_registries:
+                    known_registries[f"{project}/{registry_name}"] = url.human_repr()
+        return known_registries

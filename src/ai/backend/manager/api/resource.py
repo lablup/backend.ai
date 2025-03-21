@@ -24,9 +24,11 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.services.resource.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.resource.actions.check_presets import CheckResourcePresetsAction
+from ai.backend.manager.services.resource.actions.get_container_registries import (
+    GetContainerRegistriesAction,
+)
 from ai.backend.manager.services.resource.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.resource.actions.list_presets import ListResourcePresetsAction
 from ai.backend.manager.services.resource.actions.recalculate_usage import RecalculateUsageAction
@@ -498,14 +500,10 @@ async def get_container_registries(request: web.Request) -> web.Response:
     Returns the list of all registered container registries.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin_session() as session:
-        _registries = await ContainerRegistryRow.get_known_container_registries(session)
 
-    known_registries = {}
-    for project, registries in _registries.items():
-        for registry_name, url in registries.items():
-            if project not in known_registries:
-                known_registries[f"{project}/{registry_name}"] = url.human_repr()
+    result = await root_ctx.processors.resource.get_container_registries.wait_for_complete(
+        GetContainerRegistriesAction()
+    )
 
     return web.json_response(known_registries, status=HTTPStatus.OK)
 

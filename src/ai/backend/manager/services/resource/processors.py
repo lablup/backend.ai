@@ -7,6 +7,10 @@ from ai.backend.manager.services.resource.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
 )
+from ai.backend.manager.services.resource.actions.get_container_registries import (
+    GetContainerRegistriesAction,
+    GetContainerRegistriesActionResult,
+)
 from ai.backend.manager.services.resource.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
@@ -60,6 +64,9 @@ class ResourceProcessors:
         WatcherAgentRestartAction, WatcherAgentRestartActionResult
     ]
     watcher_agent_stop: ActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
+    get_container_registries: ActionProcessor[
+        GetContainerRegistriesAction, GetContainerRegistriesActionResult
+    ]
 
     def __init__(self, service: ResourceService) -> None:
         self.list_presets = ActionProcessor(service.list_presets)
@@ -73,3 +80,4 @@ class ResourceProcessors:
         self.watcher_agent_start = ActionProcessor(service.watcher_agent_start)
         self.watcher_agent_restart = ActionProcessor(service.watcher_agent_restart)
         self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop)
+        self.get_container_registries = ActionProcessor(service.get_container_registries)
