@@ -38,7 +38,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.image.types import RescanImagesResult
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
@@ -68,6 +67,7 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
+    from ai.backend.manager.data.image.types import RescanImagesResult
 
     from ..config import SharedConfig
 
@@ -172,6 +172,8 @@ async def scan_registries(
     """
     Performs an image rescan for all images in the registries.
     """
+    from ai.backend.manager.data.image.types import RescanImagesResult
+
     images, errors = [], []
 
     for registry_key, registry_row in registries.items():
