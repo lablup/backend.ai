@@ -80,6 +80,7 @@ from .utils import ExtendedAsyncSAEngine, execute_with_retry
 if TYPE_CHECKING:
     from ai.backend.manager.services.groups.actions.create_group import CreateGroupAction
     from ai.backend.manager.services.groups.actions.modify_group import ModifyGroupAction
+    from ai.backend.manager.services.groups.types import GroupData
 
     from .gql import GraphQueryContext
     from .rbac import ContainerRegistryScope
@@ -427,6 +428,26 @@ class Group(graphene.ObjectType):
             container_registry=row["container_registry"],
         )
 
+    @classmethod
+    def from_dto(cls, dto: GroupData) -> Self:
+        return cls(
+            id=dto.id,
+            name=dto.name,
+            description=dto.description,
+            is_active=dto.is_active,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            domain_name=dto.domain_name,
+            total_resource_slots=dto.total_resource_slots.to_json()
+            if dto.total_resource_slots
+            else {},
+            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
+            integration_id=dto.integration_id,
+            resource_policy=dto.resource_policy,
+            type=dto.type.name,
+            container_registry=dto.container_registry,
+        )
+
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
@@ -608,8 +629,10 @@ class ModifyGroupInput(graphene.InputObjectType):
             description=self.description,
             is_active=self.is_active,
             domain_name=self.domain_name,
-            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None),
-            user_update_mode=self.user_update_mode,
+            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None)
+            if self.total_resource_slots is not None
+            else None,
+            user_update_mode=None if self.user_update_mode is Undefined else self.user_update_mode,
             user_uuids=self.user_uuids,
             allowed_vfolder_hosts=self.allowed_vfolder_hosts,
             integration_id=self.integration_id,

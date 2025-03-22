@@ -1,25 +1,24 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.group import ProjectType
-from ai.backend.manager.services.groups.base import GroupAction
+from ai.backend.manager.services.groups.actions.base import GroupAction
+from ai.backend.manager.services.groups.types import GroupData
 
 
 @dataclass
 class CreateGroupAction(GroupAction):
     name: str
-    type: Optional[ProjectType] = ProjectType.GENERAL
-    description: Optional[str] = ""
-    is_active: Optional[bool] = True
-    total_resource_slots: Optional[ResourceSlot] = field(
-        default_factory=lambda: ResourceSlot({}, None)
-    )
-    allowed_vfolder_hosts: Optional[dict[str, str]] = field(default_factory=dict)
-    integration_id: Optional[str] = ""
-    resource_policy: Optional[str] = "default"
-    container_registry: Optional[dict[str, str]] = field(default_factory=dict)
+    type: Optional[ProjectType]
+    description: Optional[str]
+    is_active: Optional[bool]
+    total_resource_slots: Optional[ResourceSlot]
+    allowed_vfolder_hosts: Optional[dict[str, str]]
+    integration_id: Optional[str]
+    resource_policy: Optional[str]
+    container_registry: Optional[dict[str, str]]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -45,8 +44,8 @@ class CreateGroupAction(GroupAction):
 
 @dataclass
 class CreateGroupActionResult(BaseActionResult):
-    data: Optional[Any]
+    data: Optional[GroupData]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return self.data.name if self.data is not None else None

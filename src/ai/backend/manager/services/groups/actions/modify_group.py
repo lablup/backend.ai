@@ -1,10 +1,11 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.groups.base import GroupAction
+from ai.backend.manager.services.groups.actions.base import GroupAction
+from ai.backend.manager.services.groups.types import GroupData
 
 
 @dataclass
@@ -33,8 +34,8 @@ class ModifyGroupAction(GroupAction):
 
 @dataclass
 class ModifyGroupActionResult(BaseActionResult):
-    data: Optional[Any]
+    data: Optional[GroupData]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.id) if self.data is not None else None

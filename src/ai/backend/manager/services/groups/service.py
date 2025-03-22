@@ -29,6 +29,7 @@ from ai.backend.manager.services.groups.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
+from ai.backend.manager.services.groups.types import GroupData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -68,7 +69,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return CreateGroupActionResult(data=res.data)
+        return CreateGroupActionResult(data=GroupData.from_table_var(res.data))
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
         data: dict[str, Any] = {}
@@ -129,7 +130,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return ModifyGroupActionResult(data=res.data)
+        return ModifyGroupActionResult(data=GroupData.from_table_var(res.data))
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
         update_query = (
@@ -152,7 +153,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return DeleteGroupActionResult(data=res.data)
+        return DeleteGroupActionResult(data=GroupData.from_table_var(res.data))
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
         gid = action.group_id
@@ -188,7 +189,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return PurgeGroupActionResult(data=res.data)
+        return PurgeGroupActionResult(data=GroupData.from_table_var(res.data))
 
     async def group_vfolder_mounted_to_active_kernels(
         self, db_conn: SAConnection, group_id: uuid.UUID
