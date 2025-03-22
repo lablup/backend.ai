@@ -18,41 +18,9 @@ class BaseAction(ABC):
         raise NotImplementedError
 
 
-class BaseBatchAction(ABC):
-    @abstractmethod
-    def entity_ids(self) -> list[str]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def entity_type(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_type(self) -> str:
-        raise NotImplementedError
-
-
 class BaseActionResult(ABC):
     @abstractmethod
     def entity_id(self) -> Optional[str]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def status(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def description(self) -> Optional[str]:
-        raise NotImplementedError
-
-
-class BaseBatchActionResult(ABC):
-    @abstractmethod
-    def entity_ids(self) -> list[str]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def statuses(self) -> dict[str, str]:
         raise NotImplementedError
 
 
