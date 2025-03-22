@@ -65,6 +65,7 @@ if TYPE_CHECKING:
         PurgeDomainAction,
         PurgeDomainActionResult,
     )
+    from ai.backend.manager.services.domain.types import DomainData
 
     from .gql import GraphQueryContext
 
@@ -238,6 +239,22 @@ class Domain(graphene.ObjectType):
         )
 
     @classmethod
+    def from_dto(cls, dto: DomainData) -> Domain:
+        return cls(
+            name=dto.name,
+            description=dto.description,
+            is_active=dto.is_active,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            total_resource_slots=dto.total_resource_slots.to_json()
+            if dto.total_resource_slots
+            else {},
+            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
+            allowed_docker_registries=dto.allowed_docker_registries,
+            integration_id=dto.integration_id,
+        )
+
+    @classmethod
     async def load_all(
         cls,
         ctx: GraphQueryContext,
@@ -350,7 +367,13 @@ class CreateDomain(graphene.Mutation):
             action
         )
 
-        return cls(ok=res.ok, msg=res.description, domain=Domain.from_row(ctx, res.domain_row))
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return cls(
+            ok=res.ok,
+            msg=res.description,
+            domain=Domain.from_dto(domain_data) if domain_data else None,
+        )
 
 
 class ModifyDomain(graphene.Mutation):
@@ -379,7 +402,13 @@ class ModifyDomain(graphene.Mutation):
             action
         )
 
-        return cls(ok=res.ok, msg=res.description, domain=Domain.from_row(ctx, res.domain_row))
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return cls(
+            ok=res.ok,
+            msg=res.description,
+            domain=Domain.from_dto(domain_data) if domain_data else None,
+        )
 
 
 class DeleteDomain(graphene.Mutation):

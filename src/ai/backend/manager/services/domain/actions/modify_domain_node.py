@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.services.domain.base import DomainAction, UserInfo
+from ai.backend.manager.services.domain.actions.base import DomainAction
+from ai.backend.manager.services.domain.types import DomainData, UserInfo
 
 
 @dataclass
@@ -59,7 +59,7 @@ class ModifyDomainNodeAction(DomainAction):
 
 @dataclass
 class ModifyDomainNodeActionResult(BaseActionResult):
-    domain_row: DomainRow
+    domain_data: Optional[DomainData]
     status: str
     description: Optional[str]
 

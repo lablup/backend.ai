@@ -44,7 +44,7 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
-from ai.backend.manager.services.domain.base import UserInfo
+from ai.backend.manager.services.domain.types import DomainData, UserInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -102,7 +102,7 @@ class DomainService:
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
         return CreateDomainActionResult(
-            domain_row=res.data, status=res.status, description=res.message
+            domain_data=DomainData.from_row(res.data), status=res.status, description=res.message
         )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
@@ -139,7 +139,7 @@ class DomainService:
         res = await self._db_mutation_wrapper(_do_mutate)
 
         return ModifyDomainActionResult(
-            domain_row=res.data, status=res.status, description=res.message
+            domain_data=DomainData.from_row(res.data), status=res.status, description=res.message
         )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
@@ -257,14 +257,18 @@ class DomainService:
 
         async with self._db.connect() as db_conn:
             try:
-                domain_row = await execute_with_txn_retry(_insert, self._db.begin_session, db_conn)
+                domain_row: DomainRow = await execute_with_txn_retry(
+                    _insert, self._db.begin_session, db_conn
+                )
             except sa.exc.IntegrityError as e:
                 raise ValueError(
                     f"Cannot create the domain with given arguments. (arg:{action}, e:{str(e)})"
                 )
 
         return CreateDomainNodeActionResult(
-            domain_row=domain_row, status="success", description=f"domain {action.name} created"
+            domain_data=DomainData.from_row(domain_row),
+            status="success",
+            description=f"domain {action.name} created",
         )
 
     async def modify_domain_node(
@@ -346,7 +350,9 @@ class DomainService:
             raise ValueError(f"Domain not found (id:{domain_name})")
 
         return ModifyDomainNodeActionResult(
-            domain_row=domain_row, status="success", description=f"domain {domain_name} modified"
+            domain_data=DomainData.from_row(domain_row),
+            status="success",
+            description=f"domain {domain_name} modified",
         )
 
     async def _ensure_sgroup_permission(

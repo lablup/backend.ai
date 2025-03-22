@@ -24,7 +24,7 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeAction,
     ModifyDomainNodeActionResult,
 )
-from ai.backend.manager.services.domain.base import UserInfo
+from ai.backend.manager.services.domain.types import DomainData, UserInfo
 
 from ..base import (
     FilterExprArg,
@@ -153,6 +153,22 @@ class DomainNode(graphene.ObjectType):
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
+        )
+
+    @classmethod
+    def from_dto(cls, dto: DomainData) -> Self:
+        return cls(
+            id=dto.name,
+            name=dto.name,
+            description=dto.description,
+            is_active=dto.is_active,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            total_resource_slots=dto.total_resource_slots,
+            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
+            allowed_docker_registries=dto.allowed_docker_registries,
+            dotfiles=dto.dotfiles,
+            integration_id=dto.integration_id,
         )
 
     async def resolve_scaling_groups(
@@ -357,7 +373,11 @@ class CreateDomainNode(graphene.Mutation):
             )
         )
 
-        return CreateDomainNode(True, "", DomainNode.from_orm_model(graph_ctx, res.domain_row))
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return CreateDomainNode(
+            ok=True, msg="", item=DomainNode.from_dto(domain_data) if domain_data else None
+        )
 
 
 class ModifyDomainNodeInput(graphene.InputObjectType):
@@ -426,7 +446,9 @@ class ModifyDomainNode(graphene.Mutation):
             )
         )
 
+        domain_data: Optional[DomainData] = res.domain_data
+
         return ModifyDomainNode(
-            DomainNode.from_orm_model(graph_ctx, res.domain_row),
-            input.get("client_mutation_id"),
+            item=DomainNode.from_dto(domain_data) if domain_data else None,
+            client_mutation_id=input.get("client_mutation_id"),
         )

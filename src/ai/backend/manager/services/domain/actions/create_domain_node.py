@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.services.domain.base import DomainAction, UserInfo
+from ai.backend.manager.services.domain.actions.base import DomainAction
+from ai.backend.manager.services.domain.types import DomainData, UserInfo
 
 
 @dataclass
@@ -30,14 +30,9 @@ class CreateDomainNodeAction(DomainAction):
 
 @dataclass
 class CreateDomainNodeActionResult(BaseActionResult):
-    domain_row: DomainRow
+    domain_data: Optional[DomainData]
     status: str
     description: Optional[str]
-
-    def __init__(self, domain_row: DomainRow, status: str, description: Optional[str]):
-        self.domain_row = domain_row
-        self.status = status
-        self.description = description
 
     @override
     def entity_id(self):

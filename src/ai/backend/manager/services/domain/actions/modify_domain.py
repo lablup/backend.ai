@@ -3,8 +3,8 @@ from typing import Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.services.domain.base import DomainAction
+from ai.backend.manager.services.domain.actions.base import DomainAction
+from ai.backend.manager.services.domain.types import DomainData
 
 
 @dataclass
@@ -29,13 +29,13 @@ class ModifyDomainAction(DomainAction):
 
 @dataclass
 class ModifyDomainActionResult(BaseActionResult):
-    domain_row: Optional[DomainRow]
+    domain_data: Optional[DomainData]
     status: str
     description: Optional[str]
 
     @override
     def entity_id(self) -> str:
-        return self.domain_row.name if self.domain_row is not None else ""
+        return self.domain_data.name if self.domain_data is not None else ""
 
     @property
     def ok(self) -> bool:
