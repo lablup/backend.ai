@@ -74,6 +74,13 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.metric.container_metric import (
+    MetricService as ContainerMetricService,
+)
+from ai.backend.manager.services.metric.types import (
+    ServiceInitParameter as MetricServiceInitParameter,
+)
+from ai.backend.manager.services.processors import Processors
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -438,6 +445,13 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     #     image_service=image_service,
     # )
 
+    metric_config = root_ctx.shared_config.data["metric"]
+    container_metric_service = ContainerMetricService(
+        MetricServiceInitParameter(metric_config["address"])
+    )
+    root_ctx.processors = Processors(
+        container_metric_service=container_metric_service,
+    )
     yield
 
 

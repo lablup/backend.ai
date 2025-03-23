@@ -388,6 +388,12 @@ _config_defaults: Mapping[str, Any] = {
             "threshold": {},
         },
     },
+    "metric": {
+        "address": {
+            "host": "127.0.0.1",
+            "port": 9090,
+        }
+    },
 }
 
 
@@ -476,6 +482,11 @@ shared_config_iv = t.Dict({
             ): session_hang_tolerance_iv,
         },
     ).allow_extra("*"),
+    t.Key("metric", default=_config_defaults["metric"]): t.Dict({
+        tx.AliasedKey(
+            ["address", "addr"], default=_config_defaults["metric"]["address"]
+        ): tx.HostPortPair,
+    }).allow_extra("*"),
 }).allow_extra("*")
 
 _volume_defaults: dict[str, Any] = {

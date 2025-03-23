@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
@@ -15,6 +15,8 @@ from graphql.type import GraphQLField
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.metric.types import MetricQueryParameter
+from ai.backend.manager.services.processors import Processors
 
 from .gql_models.container_registry import (
     ContainerRegistryConnection,
@@ -128,6 +130,7 @@ from .gql_models.image import (
     UnloadImage,
     UntagImageFromRegistry,
 )
+from .gql_models.metric.user import UserMetricNode
 from .gql_models.session import (
     CheckAndTransitStatus,
     ComputeSessionConnection,
@@ -260,6 +263,7 @@ class GraphQueryContext:
     registry: AgentRegistry
     idle_checker_host: IdleCheckerHost
     metric_observer: GraphQLMetricObserver
+    processors: Processors
 
 
 class Mutations(graphene.ObjectType):
@@ -1051,6 +1055,17 @@ class Queries(graphene.ObjectType):
         EndpointAutoScalingRuleConnection,
         endpoint=graphene.String(required=True),
         description="Added in 25.1.0.",
+    )
+
+    user_metric_node = graphene.Field(
+        UserMetricNode,
+        description="Added in 25.5.0.",
+        id=graphene.String(required=True),
+        metric_name=graphene.String(required=True),
+        value_type=graphene.String(required=True),
+        start=graphene.String(required=True),
+        end=graphene.String(required=True),
+        step=graphene.String(required=True),
     )
 
     @staticmethod
@@ -2871,6 +2886,34 @@ class Queries(graphene.ObjectType):
             first=first,
             before=before,
             last=last,
+        )
+
+    @staticmethod
+    async def resolve_user_metric_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+        *,
+        metric_name: str,
+        value_type: str,
+        start: str,
+        end: str,
+        step: str,
+    ) -> UserMetricNode:
+        _, raw_user_id = AsyncNode.resolve_global_id(info, id)
+        str_user_id = raw_user_id or id
+        try:
+            user_id = uuid.UUID(str_user_id)
+        except ValueError:
+            raise ObjectNotFound(object_name="User")
+
+        graph_ctx = cast(GraphQueryContext, info.context)
+        user = graph_ctx.user
+        if user["role"] not in (UserRole.SUPERADMIN, UserRole.MONITOR):
+            if user["uuid"] != user_id:
+                raise RuntimeError("Permission denied.")
+        return await UserMetricNode.get_node(
+            info, user_id, MetricQueryParameter(metric_name, value_type, start, end, step)
         )
 
 
