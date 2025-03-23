@@ -1,6 +1,10 @@
 from typing import Optional, Self
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
+
+from ai.backend.common.metrics.types import UNDEFINED
+
+from .types import FlattenedDeviceMetric, FlattenedKernelMetric
 
 
 class RPCMetricObserver:
@@ -45,3 +49,65 @@ class RPCMetricObserver:
         self._rpc_requests.labels(method=method).inc()
         self._rpc_failure_requests.labels(method=method, exception=exception_name).inc()
         self._rpc_request_duration.labels(method=method).observe(duration)
+
+
+class UtilizationMetricObserver:
+    _instance: Optional[Self] = None
+
+    _container_metric: Gauge
+    _device_metric: Gauge
+
+    def __init__(self) -> None:
+        self._container_metric = Gauge(
+            name="backendai_container_utilization",
+            documentation="Container utilization metrics",
+            labelnames=[
+                "container_metric_name",
+                "agent_id",
+                "kernel_id",
+                "session_id",
+                "owner_user_id",
+                "owner_project_id",
+                "value_type",
+            ],
+        )
+        self._device_metric = Gauge(
+            name="backendai_device_utilization",
+            documentation="Device utilization metrics",
+            labelnames=["device_metric_name", "agent_id", "device_id", "value_type"],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_container_metric(
+        self,
+        *,
+        metric: FlattenedKernelMetric,
+    ) -> None:
+        for metric_value_type, value in metric.value_pairs:
+            self._container_metric.labels(
+                container_metric_name=metric.key,
+                agent_id=metric.agent_id,
+                kernel_id=metric.kernel_id,
+                session_id=metric.session_id or UNDEFINED,
+                owner_user_id=metric.owner_user_id or UNDEFINED,
+                owner_project_id=metric.owner_project_id or UNDEFINED,
+                value_type=metric_value_type,
+            ).set(float(value))
+
+    def observe_device_metric(
+        self,
+        *,
+        metric: FlattenedDeviceMetric,
+    ) -> None:
+        for metric_value_type, value in metric.value_pairs:
+            self._device_metric.labels(
+                device_metric_name=metric.key,
+                agent_id=metric.agent_id,
+                device_id=metric.device_id,
+                value_type=metric_value_type,
+            ).set(float(value))

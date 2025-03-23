@@ -391,7 +391,12 @@ class User(BaseFunction):
 
     @api_function
     @classmethod
-    async def purge(cls, email: str, purge_shared_vfolders=False):
+    async def purge(
+        cls,
+        email: str,
+        purge_shared_vfolders: bool = False,
+        delegate_endpoint_ownership: bool = False,
+    ):
         """
         Deletes an existing user.
 
@@ -410,6 +415,7 @@ class User(BaseFunction):
             "email": email,
             "input": {
                 "purge_shared_vfolders": purge_shared_vfolders,
+                "delegate_endpoint_ownership": delegate_endpoint_ownership,
             },
         }
         data = await api_session.get().Admin._query(query, variables)

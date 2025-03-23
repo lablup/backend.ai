@@ -696,6 +696,10 @@ class KernelRow(Base):
         if status_data is not None:
             self.status_data = status_data
 
+    def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
+        self.user_uuid = user_uuid
+        self.access_key = access_key
+
     @classmethod
     async def set_kernel_status(
         cls,
@@ -941,7 +945,7 @@ class ComputeContainer(graphene.ObjectType):
             "session_id": row.session_id,
             # image
             "image": row.image,
-            "image_object": ImageNode.from_row(row.image_row),
+            "image_object": ImageNode.from_row(ctx, row.image_row),
             "architecture": row.architecture,
             "registry": row.registry,
             # status

@@ -43,11 +43,13 @@ from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
+from aiotools import TaskGroup
 from async_timeout import timeout
 
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -87,7 +89,15 @@ from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
 from ..server import get_extra_volumes
-from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
+from ..types import (
+    AgentEventData,
+    Container,
+    ContainerStatus,
+    KernelOwnershipData,
+    LifecycleEvent,
+    MountInfo,
+    Port,
+)
 from ..utils import (
     closing_async,
     container_pid_to_host_pid,
@@ -198,9 +208,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         event_producer: EventProducer,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
@@ -216,9 +224,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         gwbridge_subnet: Optional[str] = None,
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             event_producer,
             kernel_image,
             kernel_config,
@@ -227,6 +233,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             computers,
             restarting=restarting,
         )
+        kernel_id = ownership_data.kernel_id
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
 
@@ -841,9 +848,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
 
         kernel_obj = DockerKernel(
-            self.kernel_id,
-            self.session_id,
-            self.agent_id,
+            self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
@@ -987,6 +992,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Labels": {
                 "ai.backend.kernel-id": str(self.kernel_id),
                 "ai.backend.session-id": str(self.session_id),
+                "ai.backend.owner-user-id": self.ownership_data.owner_user_id_to_str,
+                "ai.backend.owner-project-id": self.ownership_data.owner_project_id_to_str,
                 "ai.backend.owner": str(self.agent_id),
                 "ai.backend.internal.block-service-ports": (
                     "1" if self.internal_data.get("block_service_ports", False) else "0"
@@ -1685,6 +1692,26 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
+    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResponse:
+        try:
+            await docker.images.delete(image)
+            return PurgeImageResponse.success(image=image)
+        except Exception as e:
+            log.error(f'Failed to purge image "{image}": {e}')
+            return PurgeImageResponse.failure(image=image, error=str(e))
+
+    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
+        async with closing_async(Docker()) as docker:
+            async with TaskGroup() as tg:
+                tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
+
+        results = []
+        for task in tasks:
+            deleted_info = task.result()
+            results.append(deleted_info)
+
+        return PurgeImageResponses(responses=results)
+
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
@@ -1709,8 +1736,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def init_kernel_context(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
@@ -1719,9 +1745,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     ) -> DockerKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return DockerKernelCreationContext(
-            kernel_id,
-            session_id,
-            self.id,
+            ownership_data,
             self.event_producer,
             kernel_image,
             kernel_config,

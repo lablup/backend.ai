@@ -428,6 +428,20 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    # image_service = ImageService(
+    #     db=root_ctx.db,
+    #     agent_registry=root_ctx.registry,
+    # )
+
+    # root_ctx.processors = Processors(
+    #     image_service=image_service,
+    # )
+
+    yield
+
+
+@actxmgr
 async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.distributed_lock_factory = init_lock_factory(root_ctx)
     yield
@@ -855,7 +869,7 @@ def build_root_app(
             sample_rate=local_config["pyroscope"]["sample-rate"],
         )
     )
-    root_ctx = RootContext(metrics=CommonMetricRegistry())
+    root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
     app = web.Application(
         middlewares=[
             exception_middleware,
@@ -908,6 +922,7 @@ def build_root_app(
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
+            processors_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
             hanging_session_scanner_ctx,
@@ -942,9 +957,6 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
-    cors.add(
-        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(root_ctx.metrics))
-    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
@@ -956,6 +968,13 @@ def build_root_app(
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     assert isinstance(vendor_path, Path)
     app.router.add_static("/static/vendor", path=vendor_path, name="static")
+    return app
+
+
+def build_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
 
@@ -982,6 +1001,7 @@ async def server_main(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
@@ -1021,8 +1041,11 @@ async def server_main(
                 )
 
             runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+            internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
             await runner.setup()
+            await internal_runner.setup()
             service_addr = cast(HostPortPair, root_ctx.local_config["manager"]["service-addr"])
+            internal_addr = cast(HostPortPair, root_ctx.local_config["manager"]["internal-addr"])
             site = web.TCPSite(
                 runner,
                 str(service_addr.host),
@@ -1031,7 +1054,15 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=ssl_ctx,
             )
+            internal_site = web.TCPSite(
+                internal_runner,
+                str(internal_addr.host),
+                internal_addr.port,
+                backlog=1024,
+                reuse_port=True,
+            )
             await site.start()
+            await internal_site.start()
             public_metrics_port = cast(
                 Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
             )

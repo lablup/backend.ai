@@ -21,6 +21,7 @@ from typing import (
     Sequence,
     TypeAlias,
     cast,
+    overload,
     override,
 )
 
@@ -341,11 +342,13 @@ DEAD_VFOLDER_STATUSES = (
 class VFolderDeletionInfo(NamedTuple):
     vfolder_id: VFolderID
     host: str
+    unmanaged_path: Optional[str]
 
 
 class VFolderCloneInfo(NamedTuple):
     source_vfolder_id: VFolderID
     source_host: str
+    unmanaged_path: Optional[str]
     domain_name: str
 
     # Target Vfolder infos
@@ -538,6 +541,10 @@ class VFolderRow(Base):
     @property
     def vfid(self) -> VFolderID:
         return VFolderID(self.quota_scope_id, self.id)
+
+
+def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
+    return (unmanaged_path is not None) and unmanaged_path != ""
 
 
 def verify_vfolder_name(folder: str) -> bool:
@@ -838,6 +845,29 @@ async def get_allowed_vfolder_hosts_by_user(
     return allowed_hosts
 
 
+@overload
+def check_overlapping_mounts(mounts: Iterable[str]) -> None:
+    pass
+
+
+@overload
+def check_overlapping_mounts(mounts: Iterable[PurePosixPath]) -> None:
+    pass
+
+
+def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) -> None:
+    for p1 in mounts:
+        for p2 in mounts:
+            _p1 = PurePosixPath(p1)
+            _p2 = PurePosixPath(p2)
+            if _p1 == _p2:
+                continue
+            if _p1.is_relative_to(_p2):
+                raise InvalidAPIParameters(
+                    f"VFolder path '{_p1}' overlaps with '{_p2}'",
+                )
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -852,39 +882,31 @@ async def prepare_vfolder_mounts(
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
+    # TODO: Refactor the whole function:
+    # - Replace 'requested_mount_references', 'requested_mount_reference_map' and 'requested_mount_reference_options' with one mapping parameter.
+    # - DO NOT validate value of subdirectories here.
     requested_mounts: list[str] = [
         name for name in requested_mount_references if isinstance(name, str)
     ]
-    requested_mount_map: dict[str, str] = {
+    requested_mount_name_map: dict[str, str] = {
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
     }
-    requested_mount_options: dict[str, dict[str, Any]] = {
+    requested_mount_map: dict[uuid.UUID, str] = {
+        vfolder_uuid: path
+        for vfolder_uuid, path in requested_mount_reference_map.items()
+        if isinstance(vfolder_uuid, uuid.UUID)
+    }
+    requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
         name: options
         for name, options in requested_mount_reference_options.items()
         if isinstance(name, str)
     }
 
-    vfolder_ids_to_resolve = [
-        vfid for vfid in requested_mount_references if isinstance(vfid, uuid.UUID)
-    ]
-    query = (
-        sa.select([vfolders.c.id, vfolders.c.name])
-        .select_from(vfolders)
-        .where(vfolders.c.id.in_(vfolder_ids_to_resolve))
-    )
-    result = await conn.execute(query)
-
-    for vfid, name in result.fetchall():
-        requested_mounts.append(name)
-        if path := requested_mount_reference_map.get(vfid):
-            requested_mount_map[name] = path
-        if options := requested_mount_reference_options.get(vfid):
-            requested_mount_options[name] = options
-
-    requested_vfolder_names: dict[str, str] = {}
-    requested_vfolder_subpaths: dict[str, str] = {}
-    requested_vfolder_dstpaths: dict[str, str] = {}
+    requested_vfolder_names: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_subpaths: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_dstpaths: dict[str | uuid.UUID, str] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
+    _already_resolved: set[str] = set()
 
     # Split the vfolder name and subpaths
     for key in requested_mounts:
@@ -895,7 +917,11 @@ async def prepare_vfolder_mounts(
             )
         requested_vfolder_names[key] = name
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
-    for key, value in requested_mount_map.items():
+        _already_resolved.add(name)
+    for vfolder_uuid, value in requested_mount_map.items():
+        requested_vfolder_subpaths[vfolder_uuid] = "."
+        requested_vfolder_dstpaths[vfolder_uuid] = value
+    for key, value in requested_mount_name_map.items():
         requested_vfolder_dstpaths[key] = value
 
     # Check if there are overlapping mount sources
@@ -911,14 +937,17 @@ async def prepare_vfolder_mounts(
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
     # - the name starts with a dot (dot-prefixed vfolder) for automatic mounting.
-    extra_vf_conds = vfolders.c.name.startswith(".") & vfolders.c.status.not_in(
-        DEAD_VFOLDER_STATUSES
-    )
+    extra_vf_conds = vfolders.c.name.startswith(".")
     if requested_vfolder_names:
-        extra_vf_conds = extra_vf_conds | (
-            vfolders.c.name.in_(requested_vfolder_names.values())
-            & vfolders.c.status.not_in(DEAD_VFOLDER_STATUSES)
+        extra_vf_conds = sa.or_(
+            extra_vf_conds, vfolders.c.name.in_(requested_vfolder_names.values())
         )
+    if requested_mount_map:
+        extra_vf_conds = sa.or_(
+            extra_vf_conds,
+            VFolderRow.id.in_(requested_mount_map.keys()),
+        )
+    extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
     accessible_vfolders = await query_accessible_vfolders(
         conn,
         user_scope.user_uuid,
@@ -934,17 +963,35 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound("There is no accessible vfolders at all.")
         else:
             return []
-    accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
+
+    requested_names = set(requested_vfolder_names.values())
+    for row in accessible_vfolders:
+        vfid = row["id"]
+        name = row["name"]
+        if name in _already_resolved:
+            continue
+        if name not in requested_names:
+            requested_vfolder_names[vfid] = name
+        requested_mounts.append(name)
+        if path := requested_mount_reference_map.get(vfid):
+            requested_mount_name_map[name] = path
+        if options := requested_mount_reference_options.get(vfid):
+            requested_mount_options[name] = options
+            requested_mount_options[vfid] = options
+
+    # Check if there are overlapping mount sources
+    check_overlapping_mounts(requested_mounts)
 
     # add automount folder list into requested_vfolder_names
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
         if _vfolder["name"].startswith("."):
-            requested_vfolder_names.setdefault(_vfolder["name"], _vfolder["name"])
-            requested_vfolder_subpaths.setdefault(_vfolder["name"], ".")
+            requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
+            requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
     # for vfolder in accessible_vfolders:
-    for key, vfolder_name in requested_vfolder_names.items():
+    accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
+    for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         await ensure_host_permission_allowed(
@@ -957,6 +1004,24 @@ async def prepare_vfolder_mounts(
             group_id=user_scope.group_id,
             permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
+        if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
+            if kernel_path_raw is None:
+                kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
+            else:
+                kernel_path = PurePosixPath(kernel_path_raw)
+            matched_vfolder_mounts.append(
+                VFolderMount(
+                    name=vfolder["name"],
+                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath(unmanaged_path),
+                    kernel_path=kernel_path,
+                    mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
+                )
+            )
+            continue
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
             # if they do not belong to the execution kernel.
@@ -966,7 +1031,7 @@ async def prepare_vfolder_mounts(
                 await storage_manager.get_mount_path(
                     vfolder["host"],
                     VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    PurePosixPath(requested_vfolder_subpaths[key]),
+                    PurePosixPath(requested_vfolder_subpaths[requested_key]),
                 ),
             )
         except VFolderOperationFailed as e:
@@ -980,7 +1045,7 @@ async def prepare_vfolder_mounts(
                 "POST",
                 "folder/file/mkdir",
                 params={
-                    "volume": storage_manager.split_host(vfolder["host"])[1],
+                    "volume": storage_manager.get_proxy_and_volume(vfolder["host"])[1],
                     "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
                     "relpaths": [str(user_scope.user_uuid.hex)],
                     "exist_ok": True,
@@ -1001,14 +1066,16 @@ async def prepare_vfolder_mounts(
             )
         else:
             # Normal vfolders
-            kernel_path_raw = requested_vfolder_dstpaths.get(key)
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            match requested_perm := requested_mount_options.get(key, {}).get("permission"):
+            match requested_perm := requested_mount_options.get(requested_key, {}).get(
+                "permission"
+            ):
                 case MountPermission.READ_ONLY:
                     mount_perm = MountPermission.READ_ONLY
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
@@ -1024,8 +1091,8 @@ async def prepare_vfolder_mounts(
                 VFolderMount(
                     name=vfolder["name"],
                     vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
-                    host_path=mount_base_path / requested_vfolder_subpaths[key],
+                    vfsubpath=PurePosixPath(requested_vfolder_subpaths[requested_key]),
+                    host_path=mount_base_path / requested_vfolder_subpaths[requested_key],
                     kernel_path=kernel_path,
                     mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
@@ -1033,14 +1100,7 @@ async def prepare_vfolder_mounts(
             )
 
     # Check if there are overlapping mount targets
-    for vf1 in matched_vfolder_mounts:
-        for vf2 in matched_vfolder_mounts:
-            if vf1.name == vf2.name:
-                continue
-            if vf1.kernel_path.is_relative_to(vf2.kernel_path):
-                raise InvalidAPIParameters(
-                    f"VFolder mount path {vf1.kernel_path} overlaps with {vf2.kernel_path}",
-                )
+    check_overlapping_mounts([trgt.kernel_path for trgt in matched_vfolder_mounts])
 
     return matched_vfolder_mounts
 
@@ -1123,6 +1183,10 @@ async def ensure_host_permission_allowed(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> None:
+    from .storage import StorageSessionManager
+
+    if StorageSessionManager.is_noop_host(folder_host):
+        return
     allowed_hosts = await filter_host_allowed_permission(
         db_conn,
         allowed_vfolder_types=allowed_vfolder_types,
@@ -1177,8 +1241,10 @@ async def initiate_vfolder_clone(
 
     await execute_with_retry(_update_status)
 
-    target_proxy, target_volume = storage_manager.split_host(vfolder_info.target_host)
-    source_proxy, source_volume = storage_manager.split_host(vfolder_info.source_host)
+    target_proxy, target_volume = storage_manager.get_proxy_and_volume(vfolder_info.target_host)
+    source_proxy, source_volume = storage_manager.get_proxy_and_volume(
+        vfolder_info.source_host, is_unmanaged(vfolder_info.unmanaged_path)
+    )
 
     # Generate the ID of the destination vfolder.
     # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
@@ -1203,7 +1269,7 @@ async def initiate_vfolder_clone(
                     "ownership_type": VFolderOwnershipType("user"),
                     "user": vfolder_info.user_id,
                     "group": None,
-                    "unmanaged_path": "",
+                    "unmanaged_path": None,
                     "cloneable": vfolder_info.cloneable,
                     "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
                 }
@@ -1285,7 +1351,7 @@ async def initiate_vfolder_deletion(
 ) -> int:
     """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
-    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
+    vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
     vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return 0
@@ -1305,8 +1371,10 @@ async def initiate_vfolder_deletion(
     already_deleted: list[VFolderDeletionInfo] = []
 
     for vfolder_info in requested_vfolders:
-        folder_id, host_name = vfolder_info
-        proxy_name, volume_name = storage_manager.split_host(host_name)
+        folder_id, host_name, unmanaged_path = vfolder_info
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(
+            host_name, is_unmanaged(unmanaged_path)
+        )
         try:
             async with storage_manager.request(
                 proxy_name,
@@ -1322,7 +1390,7 @@ async def initiate_vfolder_deletion(
             if e.status == 410:
                 already_deleted.append(vfolder_info)
     if already_deleted:
-        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in already_deleted)
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
 
         await update_vfolder_status(
             db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
@@ -2035,7 +2103,9 @@ class QuotaScope(graphene.ObjectType):
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
         graph_ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
+            self.storage_host_name
+        )
         try:
             async with graph_ctx.storage_manager.request(
                 proxy_name,
@@ -2121,7 +2191,7 @@ class SetQuotaScope(graphene.Mutation):
                 )
             )
         max_vfolder_size = props.hard_limit_bytes
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
         request_body = {
             "volume": volume_name,
             "qsid": str(qsid),
@@ -2165,7 +2235,7 @@ class UnsetQuotaScope(graphene.Mutation):
     ) -> SetQuotaScope:
         qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
         request_body: dict[str, Any] = {
             "volume": volume_name,
             "qsid": str(qsid),
@@ -2362,6 +2432,15 @@ class VFolderPermissionContext(
                     if perm in _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP
                 }
 
+        match vfolder_row.permission:
+            case (
+                VFolderPermission.OWNER_PERM
+                | VFolderPermission.RW_DELETE
+                | VFolderPermission.READ_WRITE
+            ):
+                pass
+            case VFolderPermission.READ_ONLY:
+                permissions -= {VFolderRBACPermission.MOUNT_RW, VFolderRBACPermission.MOUNT_WD}
         return frozenset(permissions)
 
 

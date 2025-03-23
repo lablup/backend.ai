@@ -26,6 +26,7 @@ python_distribution(
     dependencies=[
         ":src",
         "src/ai/backend/common/auth:src",
+        "src/ai/backend/common/dto/agent:src",
         "src/ai/backend/common/dto/manager:src",
         "src/ai/backend/common/dto/storage:src",
         "src/ai/backend/common/metrics:src",

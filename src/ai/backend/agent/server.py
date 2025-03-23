@@ -52,10 +52,12 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.metrics.metric import RPCMetricObserver
+from ai.backend.agent.resources import scan_gpu_alloc_map
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import AbstractAgentResponse, PurgeImageResponses
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     ImagePullFailedEvent,
@@ -96,7 +98,7 @@ from .config import (
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, LifecycleEvent, VolumeInfo
+from .types import AgentBackend, KernelOwnershipData, LifecycleEvent, VolumeInfo
 from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
@@ -200,6 +202,45 @@ class RPCFunctionRegistry:
         return _inner
 
 
+class RPCFunctionRegistryV2:
+    functions: Set[str]
+    _metric_observer: RPCMetricObserver
+
+    def __init__(self) -> None:
+        self.functions = set()
+        self._metric_observer = RPCMetricObserver.instance()
+
+    def __call__(
+        self,
+        meth: Callable[..., Coroutine[None, None, AbstractAgentResponse]],
+    ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
+        @functools.wraps(meth)
+        @_collect_metrics(self._metric_observer)
+        async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
+            try:
+                if request.body is None:
+                    return await meth(self_)
+                else:
+                    res = await meth(
+                        self_,
+                        *request.body["args"],
+                        **request.body["kwargs"],
+                    )
+                    return res.as_dict()
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                raise
+            except ResourceError:
+                # This is an expected scenario.
+                raise
+            except Exception:
+                log.exception("unexpected error")
+                await self_.error_monitor.capture_exception()
+                raise
+
+        self.functions.add(meth.__name__)
+        return _inner
+
+
 def _collect_metrics(observer: RPCMetricObserver) -> Callable:
     def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
@@ -229,6 +270,8 @@ def _collect_metrics(observer: RPCMetricObserver) -> Callable:
 
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
+    rpc_function_v2: ClassVar[RPCFunctionRegistryV2] = RPCFunctionRegistryV2()
+
     rpc_auth_manager_public_key: Optional[PublicKey]
     rpc_auth_agent_public_key: Optional[PublicKey]
     rpc_auth_agent_secret_key: Optional[SecretKey]
@@ -321,6 +364,10 @@ class AgentRPCServer(aobject):
         )
         for func_name in self.rpc_function.functions:
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
+
+        for func_name in self.rpc_function_v2.functions:
+            self.rpc_server.handle_function(func_name, getattr(self, func_name))
+
         log.info("started handling RPC requests at {}", rpc_addr)
 
         debug_socket_path = (
@@ -558,6 +605,7 @@ class AgentRPCServer(aobject):
                 await self.agent.produce_event(
                     ImagePullStartedEvent(
                         image=str(img_ref),
+                        image_ref=img_ref,
                         agent_id=self.agent.id,
                         timestamp=datetime.now(timezone.utc).timestamp(),
                     )
@@ -576,6 +624,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             msg=f"timeout (s:{image_pull_timeout})",
                         )
@@ -585,6 +634,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             msg=repr(e),
                         )
@@ -594,6 +644,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             timestamp=datetime.now(timezone.utc).timestamp(),
                         )
@@ -603,6 +654,7 @@ class AgentRPCServer(aobject):
                 await self.agent.produce_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
+                        image_ref=img_ref,
                         agent_id=self.agent.id,
                         timestamp=datetime.now(timezone.utc).timestamp(),
                         msg="Image already exists",
@@ -639,8 +691,13 @@ class AgentRPCServer(aobject):
             kernel_config = cast(KernelCreationConfig, raw_config)
             coros.append(
                 self.agent.create_kernel(
-                    session_id,
-                    kernel_id,
+                    KernelOwnershipData(
+                        kernel_id,
+                        session_id,
+                        self.agent.id,
+                        raw_config.get("owner_user_id"),
+                        raw_config.get("owner_project_id"),
+                    ),
                     kernel_image_refs[kernel_id],
                     kernel_config,
                     cluster_info,
@@ -727,8 +784,11 @@ class AgentRPCServer(aobject):
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
-            SessionId(UUID(session_id)),
-            KernelId(UUID(kernel_id)),
+            KernelOwnershipData(
+                KernelId(UUID(kernel_id)),
+                SessionId(UUID(session_id)),
+                self.agent.id,
+            ),
             kernel_image,
             cast(KernelCreationConfig, updated_config),
         )
@@ -873,6 +933,12 @@ class AgentRPCServer(aobject):
             "canonical": image_ref.canonical,
         }
 
+    @rpc_function_v2
+    @collect_error
+    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
+        log.info("rpc::purge_images(images:{0})", images)
+        return await self.agent.purge_images(images)
+
     @rpc_function
     @collect_error
     async def get_local_config(self) -> Mapping[str, Any]:
@@ -964,6 +1030,14 @@ class AgentRPCServer(aobject):
     async def release_port(self, port_no: int):
         log.debug("rpc::release_port(port_no:{})", port_no)
         self.agent.port_pool.add(port_no)
+
+    @rpc_function
+    @collect_error
+    async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:
+        log.debug("rpc::scan_gpu_alloc_map()")
+        scratch_root = self.agent.local_config["container"]["scratch-root"]
+        result = await scan_gpu_alloc_map(list(self.agent.kernel_registry.keys()), scratch_root)
+        return {k: str(v) for k, v in result.items()}
 
 
 @aiotools.server_context

@@ -982,6 +982,17 @@ class SessionRow(Base):
         if _status_info is not None:
             self.status_info = _status_info
 
+    def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
+        self.user_uuid = user_uuid
+        self.access_key = access_key
+        for kernel_row in cast(list[KernelRow], self.kernels):
+            kernel_row.delegate_ownership(user_uuid, access_key)
+
+    @staticmethod
+    async def delete_by_user_id(user_uuid: UUID, *, db_session: SASession) -> None:
+        await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == user_uuid))
+        await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
+
     @staticmethod
     async def set_session_status(
         db: ExtendedAsyncSAEngine,

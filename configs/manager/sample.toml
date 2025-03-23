@@ -73,6 +73,9 @@ group = "nobody"
 
 # Set the service hostname/port to accept API requests.
 service-addr = { host = "0.0.0.0", port = 8080 }
+
+# Set the internal hostname/port to accept internal API requests.
+internal-addr = { host = "0.0.0.0", port = 8082 }
 # env: BACKEND_SERVICE_IP, BACKEND_SERVICE_PORT
 
 # Set the SSL certificate chain and the private keys used for serving the API requests.

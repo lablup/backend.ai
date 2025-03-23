@@ -26,7 +26,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
 from .api.client import init_client_app
-from .api.manager import init_manager_app
+from .api.manager import init_internal_app, init_manager_app
 from .exception import InvalidVolumeError
 from .plugin import (
     BasePluginContext,
@@ -145,9 +145,7 @@ class RootContext:
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
     ) -> None:
         self.volumes = {
-            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(
-                self.etcd, self.event_dispatcher, self.event_producer
-            )
+            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
         }
         self.pid = pid
         self.pidx = pidx
@@ -175,6 +173,7 @@ class RootContext:
         # TODO: Setup the apps outside of the context.
         self.client_api_app = await init_client_app(self)
         self.manager_api_app = await init_manager_app(self)
+        self.internal_api_app = init_internal_app()
         self.backends = {
             **DEFAULT_BACKENDS,
         }

@@ -152,6 +152,7 @@ def create_mock_session(
     status_data: dict[str, Any] | None = None,
     kernel_opts: Sequence[KernelOpt] | None = None,
     priority: int = SESSION_PRIORITY_DEFAULT,
+    session_type: SessionTypes = SessionTypes.BATCH,
 ) -> SessionRow:
     """Create a simple single-kernel pending session."""
     if kernel_opts is None:
@@ -175,7 +176,7 @@ def create_mock_session(
         id=session_id,
         creation_id=secrets.token_hex(8),
         name=f"session-{secrets.token_hex(4)}",
-        session_type=SessionTypes.BATCH,
+        session_type=session_type,
         status=status,
         status_data=status_data,
         cluster_mode="single-node",

@@ -309,9 +309,6 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
     cors.add(app.router.add_route("GET", "/status", status))
-    cors.add(
-        app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
-    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
@@ -322,6 +319,13 @@ def build_root_app(
     return app
 
 
+def build_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
+    return app
+
+
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -329,6 +333,7 @@ async def server_main(
     _args: tuple[ServerConfig, str],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
@@ -356,7 +361,9 @@ async def server_main(
     # which freezes on_startup event.
     try:
         runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+        internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
         await runner.setup()
+        await internal_runner.setup()
         site = web.TCPSite(
             runner,
             str(root_ctx.local_config.wsproxy.bind_host),
@@ -364,7 +371,15 @@ async def server_main(
             backlog=1024,
             reuse_port=True,
         )
+        internal_site = web.TCPSite(
+            internal_runner,
+            str(root_ctx.local_config.wsproxy.bind_host),
+            root_ctx.local_config.wsproxy.internal_api_port,
+            backlog=1024,
+            reuse_port=True,
+        )
         await site.start()
+        await internal_site.start()
 
         if os.geteuid() == 0:
             uid = root_ctx.local_config.wsproxy.user

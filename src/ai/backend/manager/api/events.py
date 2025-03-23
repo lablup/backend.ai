@@ -13,7 +13,6 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Union,
 )
 
 import aiohttp_cors
@@ -30,6 +29,7 @@ from ai.backend.common.events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
+    BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
     EventDispatcher,
     KernelCancelledEvent,
@@ -69,7 +69,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 sentinel: Final = Sentinel.token
 
 SessionEventInfo = Tuple[str, dict, str, Optional[int]]
-BgtaskEvents = Union[BgtaskUpdatedEvent, BgtaskDoneEvent, BgtaskCancelledEvent, BgtaskFailedEvent]
+BgtaskEvents = (
+    BgtaskUpdatedEvent
+    | BgtaskDoneEvent
+    | BgtaskCancelledEvent
+    | BgtaskFailedEvent
+    | BgtaskPartialSuccessEvent
+)
 
 
 @server_status_required(READ_ALLOWED)
