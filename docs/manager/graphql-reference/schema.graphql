@@ -832,7 +832,7 @@ type UserNode implements Node {
   """
   container_gids: [Int]
 
-  """Added in 25.4.0."""
+  """Added in 25.5.0."""
   project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
