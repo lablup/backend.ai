@@ -37,6 +37,18 @@ class UserMetricNode(graphene.ObjectType):
     value_type = graphene.String()
     values = graphene.List(MetircResultValue)
 
+    max_value = graphene.String()
+    avg_value = graphene.String()
+
+    async def resolve_max_value(self, info: graphene.ResolveInfo) -> str:
+        return max(self.values, key=lambda x: Decimal(x.value)).value
+
+    async def resolve_avg_value(self, info: graphene.ResolveInfo) -> str:
+        if not self.values:
+            return "0"
+        avg_val = sum(Decimal(x.value) for x in self.values) / len(self.values)
+        return str(avg_val)
+
     @classmethod
     async def get_node(
         cls,
