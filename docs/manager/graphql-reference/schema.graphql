@@ -276,7 +276,26 @@ type Queries {
   endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
 
   """Added in 25.5.0."""
-  user_metric_node(id: String!, metric_name: String!, value_type: String!, start: String!, end: String!, step: String!): UserMetricNode
+  user_metric_node(
+    id: String!
+
+    """metric name of container utilization. For example, 'cpu_util', 'mem'."""
+    metric_name: String!
+
+    """One of 'current', 'capacity', 'pct'."""
+    value_type: String!
+
+    """rfc3339 or unix_timestamp."""
+    start: String!
+
+    """rfc3339 or unix_timestamp."""
+    end: String!
+
+    """
+    Query resolution step width in duration format or float number of seconds. For example, '1m', '1h', '1d', '1w'
+    """
+    step: String!
+  ): UserMetricNode
 }
 
 """
@@ -1898,9 +1917,15 @@ type UserMetricNode implements Node {
   id: ID!
   user_id: UUID
   container_metric_name: String
+
+  """One of 'current', 'capacity', 'pct'."""
   value_type: String
   values: [MetircResultValue]
+
+  """The maximum value of the metric in given time range. null if no data."""
   max_value: String
+
+  """The average value of the metric in given time range. null if no data."""
   avg_value: String
 }
 
