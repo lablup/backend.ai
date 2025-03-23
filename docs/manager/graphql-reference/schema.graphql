@@ -274,6 +274,9 @@ type Queries {
 
   """Added in 25.1.0."""
   endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
+
+  """Added in 25.5.0."""
+  user_metric_node(id: String!, metric_name: String!, value_type: String!, start: String!, end: String!, step: String!): UserMetricNode
 }
 
 """
@@ -1887,6 +1890,22 @@ type EndpointAutoScalingRuleEdge {
 
   """A cursor for use in pagination"""
   cursor: String!
+}
+
+"""Added in 25.5.0."""
+type UserMetricNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  user_id: UUID
+  container_metric_name: String
+  value_type: String
+  values: [MetircResultValue]
+}
+
+"""Added in 25.5.0. A pair of timestamp and value."""
+type MetircResultValue {
+  timestamp: Float
+  value: String
 }
 
 """All available GraphQL mutations."""
