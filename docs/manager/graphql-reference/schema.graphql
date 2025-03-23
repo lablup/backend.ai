@@ -1900,6 +1900,8 @@ type UserMetricNode implements Node {
   container_metric_name: String
   value_type: String
   values: [MetircResultValue]
+  max_value: String
+  avg_value: String
 }
 
 """Added in 25.5.0. A pair of timestamp and value."""
