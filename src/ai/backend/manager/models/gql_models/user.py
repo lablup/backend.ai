@@ -69,7 +69,7 @@ class UserNode(graphene.ObjectType):
 
     project_nodes = PaginatedConnectionField(
         "ai.backend.manager.models.gql_models.group.GroupConnection",
-        description="Added in 25.4.0.",
+        description="Added in 25.5.0.",
     )
 
     @classmethod
