@@ -4,6 +4,7 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
+    Optional,
     Self,
 )
 from uuid import UUID
@@ -37,15 +38,21 @@ class UserMetricNode(graphene.ObjectType):
     value_type = graphene.String(description="One of 'current', 'capacity', 'pct'.")
     values = graphene.List(MetircResultValue)
 
-    max_value = graphene.String()
-    avg_value = graphene.String()
+    max_value = graphene.String(
+        description="The maximum value of the metric in given time range. null if no data."
+    )
+    avg_value = graphene.String(
+        description="The average value of the metric in given time range. null if no data."
+    )
 
-    async def resolve_max_value(self, info: graphene.ResolveInfo) -> str:
+    async def resolve_max_value(self, info: graphene.ResolveInfo) -> Optional[str]:
+        if not self.values:
+            return None
         return max(self.values, key=lambda x: Decimal(x.value)).value
 
-    async def resolve_avg_value(self, info: graphene.ResolveInfo) -> str:
+    async def resolve_avg_value(self, info: graphene.ResolveInfo) -> Optional[str]:
         if not self.values:
-            return "0"
+            return None
         avg_val = sum(Decimal(x.value) for x in self.values) / len(self.values)
         return str(avg_val)
 
