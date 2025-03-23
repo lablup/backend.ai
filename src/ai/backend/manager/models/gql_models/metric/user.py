@@ -34,7 +34,7 @@ class UserMetricNode(graphene.ObjectType):
 
     user_id = graphene.UUID()
     container_metric_name = graphene.String()
-    value_type = graphene.String()
+    value_type = graphene.String(description="One of 'current', 'capacity', 'pct'.")
     values = graphene.List(MetircResultValue)
 
     max_value = graphene.String()

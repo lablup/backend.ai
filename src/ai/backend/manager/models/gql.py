@@ -1061,11 +1061,22 @@ class Queries(graphene.ObjectType):
         UserMetricNode,
         description="Added in 25.5.0.",
         id=graphene.String(required=True),
-        metric_name=graphene.String(required=True),
-        value_type=graphene.String(required=True),
-        start=graphene.String(required=True),
-        end=graphene.String(required=True),
-        step=graphene.String(required=True),
+        metric_name=graphene.String(
+            required=True,
+            description="metric name of container utilization. For example, 'cpu_util', 'mem'.",
+        ),
+        value_type=graphene.String(
+            required=True, description="One of 'current', 'capacity', 'pct'."
+        ),
+        start=graphene.String(required=True, description="rfc3339 or unix_timestamp."),
+        end=graphene.String(required=True, description="rfc3339 or unix_timestamp."),
+        step=graphene.String(
+            required=True,
+            description=(
+                "Query resolution step width in duration format or float number of seconds. "
+                "For example, '1m', '1h', '1d', '1w'"
+            ),
+        ),
     )
 
     @staticmethod
