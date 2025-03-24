@@ -7,17 +7,21 @@ from uuid import UUID
 
 import attrs
 import msgpack
+import sqlalchemy as sa
 from dateutil.tz.tz import tzfile
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common import redis_helper
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import nmget
 
 from .group import GroupRow
-from .kernel import KernelRow, KernelStatus
+from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
 from .session import SessionRow
+from .user import UserRow
+from .utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     "ResourceGroupUnit",
@@ -25,6 +29,7 @@ __all__: Sequence[str] = (
     "BaseResourceUsageGroup",
     "parse_resource_usage",
     "parse_resource_usage_groups",
+    "fetch_resource_usage",
 )
 
 
@@ -580,3 +585,65 @@ KERNEL_RESOURCE_SELECT_COLS = (
     KernelRow.image,
     KernelRow.cluster_mode,
 )
+
+
+def _parse_query(
+    kernel_cond: Optional[sa.sql.BinaryExpression] = None,
+    session_cond: Optional[sa.sql.BinaryExpression] = None,
+    project_cond: Optional[sa.sql.BinaryExpression] = None,
+) -> sa.sql.Select:
+    session_load = joinedload(KernelRow.session)
+    if session_cond is not None:
+        session_load = joinedload(KernelRow.session.and_(session_cond))
+
+    project_load = joinedload(SessionRow.group)
+    if project_cond is not None:
+        project_load = joinedload(SessionRow.group.and_(project_cond))
+    query = sa.select(KernelRow).options(
+        load_only(*KERNEL_RESOURCE_SELECT_COLS),
+        session_load.options(
+            load_only(*SESSION_RESOURCE_SELECT_COLS),
+            joinedload(SessionRow.user).options(
+                load_only(UserRow.email, UserRow.username, UserRow.full_name)
+            ),
+            project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
+        ),
+    )
+    if kernel_cond is not None:
+        query = query.where(kernel_cond)
+    return query
+
+
+async def fetch_resource_usage(
+    db_engine: ExtendedAsyncSAEngine,
+    start_date: datetime,
+    end_date: datetime,
+    session_ids: Optional[Sequence[UUID]] = None,
+    project_ids: Optional[Sequence[UUID]] = None,
+) -> list[KernelRow]:
+    project_cond = None
+    if project_ids:
+        project_cond = GroupRow.id.in_(project_ids)
+    session_cond = None
+    if session_ids:
+        session_cond = SessionRow.id.in_(session_ids)
+    query = _parse_query(
+        kernel_cond=(
+            # Filter sessions which existence period overlaps with requested period
+            (
+                (KernelRow.terminated_at >= start_date)
+                & (KernelRow.created_at < end_date)
+                & (KernelRow.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+            )
+            |
+            # Or, filter running sessions which created before requested end_date
+            ((KernelRow.created_at < end_date) & (KernelRow.status.in_(LIVE_STATUS)))
+        ),
+        session_cond=session_cond,
+        project_cond=project_cond,
+    )
+    async with db_engine.begin_readonly_session() as db_sess:
+        result = await db_sess.execute(query)
+        kernels = result.scalars().all()
+
+    return kernels

@@ -13,15 +13,6 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.resource_preset.actions.create_preset import (
-    CreateResourcePresetAction,
-)
-from ai.backend.manager.services.resource_preset.actions.delete_preset import (
-    DeleteResourcePresetAction,
-)
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-)
 
 from .base import (
     Base,
@@ -324,6 +315,10 @@ class CreateResourcePreset(graphene.Mutation):
         name: str,
         props: CreateResourcePresetInput,
     ) -> CreateResourcePreset:
+        from ai.backend.manager.services.resource_preset.actions.create_preset import (
+            CreateResourcePresetAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
 
         result = await graph_ctx.processors.resource_preset.create_preset.wait_for_complete(
@@ -359,6 +354,10 @@ class ModifyResourcePreset(graphene.Mutation):
         name: Optional[str],
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
+        from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+            ModifyResourcePresetAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.resource_preset.modify_preset.wait_for_complete(
@@ -392,6 +391,10 @@ class DeleteResourcePreset(graphene.Mutation):
         id: Optional[UUID],
         name: Optional[str],
     ) -> DeleteResourcePreset:
+        from ai.backend.manager.services.resource_preset.actions.delete_preset import (
+            DeleteResourcePresetAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.resource_preset.delete_preset.wait_for_complete(

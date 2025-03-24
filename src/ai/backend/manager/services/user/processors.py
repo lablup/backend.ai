@@ -1,9 +1,9 @@
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.services.resource.actions.admin_month_stats import (
+from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
 )
-from ai.backend.manager.services.resource.actions.user_month_stats import (
+from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
