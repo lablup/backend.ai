@@ -23,15 +23,15 @@ class ServiceInitParameter:
 
 @dataclass
 class ContainerMetricResponseInfo:
-    agent_id: str
-    container_metric_name: str
-    instance: str
-    job: str
-    kernel_id: str
-    owner_project_id: str
-    owner_user_id: str
-    session_id: str
     value_type: str
+    container_metric_name: Optional[str]
+    agent_id: Optional[str]
+    instance: Optional[str]
+    job: Optional[str]
+    kernel_id: Optional[str]
+    owner_project_id: Optional[str]
+    owner_user_id: Optional[str]
+    session_id: Optional[str]
 
 
 @dataclass

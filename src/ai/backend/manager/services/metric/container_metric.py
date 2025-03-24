@@ -1,4 +1,5 @@
 from typing import (
+    Optional,
     TypedDict,
     cast,
 )
@@ -27,29 +28,29 @@ class _LabelValueResponse(TypedDict):
 
 
 class MetricResponseInfo(TypedDict):
-    __name__: str  # "backendai_container_utilization"
-    agent_id: str
-    container_metric_name: str
-    instance: str
-    job: str
-    kernel_id: str
-    owner_project_id: str
-    owner_user_id: str
-    session_id: str
     value_type: str
+    __name__: Optional[str]  # "backendai_container_utilization"
+    agent_id: Optional[str]
+    container_metric_name: Optional[str]
+    instance: Optional[str]
+    job: Optional[str]
+    kernel_id: Optional[str]
+    owner_project_id: Optional[str]
+    owner_user_id: Optional[str]
+    session_id: Optional[str]
 
 
 def to_response_info(val: MetricResponseInfo) -> ContainerMetricResponseInfo:
     return ContainerMetricResponseInfo(
-        agent_id=val["agent_id"],
-        container_metric_name=val["container_metric_name"],
-        instance=val["instance"],
-        job=val["job"],
-        kernel_id=val["kernel_id"],
-        owner_project_id=val["owner_project_id"],
-        owner_user_id=val["owner_user_id"],
-        session_id=val["session_id"],
         value_type=val["value_type"],
+        agent_id=val.get("agent_id"),
+        container_metric_name=val.get("container_metric_name"),
+        instance=val.get("instance"),
+        job=val.get("job"),
+        kernel_id=val.get("kernel_id"),
+        owner_project_id=val.get("owner_project_id"),
+        owner_user_id=val.get("owner_user_id"),
+        session_id=val.get("session_id"),
     )
 
 
@@ -87,20 +88,27 @@ class MetricService:
         label_values: list[str] = [
             f'container_metric_name="{metric_name}"',
         ]
+        sum_by_values = ["value_type"]
         if label.value_type is not None:
             label_values.append(f'value_type="{label.value_type}"')
         if label.agent_id is not None:
             label_values.append(f'agent_id="{label.agent_id}"')
+            sum_by_values.append("agent_id")
         if label.kernel_id is not None:
             label_values.append(f'kernel_id="{label.kernel_id}"')
+            sum_by_values.append("kernel_id")
         if label.session_id is not None:
             label_values.append(f'session_id="{label.session_id}"')
+            sum_by_values.append("session_id")
         if label.user_id is not None:
             label_values.append(f'owner_user_id="{label.user_id}"')
+            sum_by_values.append("owner_user_id")
         if label.project_id is not None:
             label_values.append(f'owner_project_id="{label.project_id}"')
+            sum_by_values.append("owner_project_id")
         labels = ",".join(label_values)
-        return f"backendai_container_utilization{{{labels}}}"
+        sum_by = ",".join(sum_by_values)
+        return f"sum by ({sum_by}) (backendai_container_utilization{{{labels}}})"
 
     async def query_metric(
         self,
