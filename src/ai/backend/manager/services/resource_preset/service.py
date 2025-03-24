@@ -1,19 +1,22 @@
 import logging
 from decimal import Decimal
-from typing import cast
+from typing import Any, Optional, cast
 
 import sqlalchemy as sa
 import trafaret as t
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
+    BinarySize,
     DefaultForUnspecified,
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.models.agent import AgentStatus, agents
+from ai.backend.manager.models.base import set_if_set
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import (
@@ -23,11 +26,15 @@ from ai.backend.manager.models.kernel import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
+)
+from ai.backend.manager.services.resource_preset.actions.create_preset import (
+    CreateResourcePresetAction,
+    CreateResourcePresetActionResult,
 )
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
@@ -51,6 +58,40 @@ class ResourcePresetService:
         self._db = db
         self._agent_registry = agent_registry
         self._shared_config = shared_config
+
+    async def create_preset(
+        self, action: CreateResourcePresetAction
+    ) -> CreateResourcePresetActionResult:
+        name = action.name
+        props = action.props
+
+        data: dict[str, Any] = {
+            "name": name,
+            "resource_slots": ResourceSlot.from_user_input(props.resource_slots, None),
+        }
+        set_if_set(
+            props, data, "shared_memory", clean_func=lambda v: BinarySize.from_str(v) if v else None
+        )
+        set_if_set(props, data, "scaling_group_name")
+        scaling_group_name = cast(Optional[str], data.get("scaling_group_name"))
+
+        async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
+            return await ResourcePresetRow.create(
+                name,
+                cast(ResourceSlot, data["resource_slots"]),
+                scaling_group_name,
+                cast(Optional[int], data.get("shared_memory")),
+                db_session=db_session,
+            )
+
+        async with self._db.connect() as db_conn:
+            preset_row = await execute_with_txn_retry(_create, self._db.begin_session, db_conn)
+        if preset_row is None:
+            raise ValueError(
+                f"Duplicate resource preset name (name:{name}, scaling_group:{scaling_group_name})"
+            )
+
+        return CreateResourcePresetActionResult(resource_preset=preset_row)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
         # TODO: Remove this?

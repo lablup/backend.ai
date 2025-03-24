@@ -13,6 +13,9 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.services.resource_preset.actions.create_preset import (
+    CreateResourcePresetAction,
+)
 
 from .base import (
     Base,
@@ -21,7 +24,6 @@ from .base import (
     ResourceSlotColumn,
     batch_result,
     batch_result_in_scalar_stream,
-    cast,
     set_if_set,
 )
 from .minilang.ordering import ColumnMapType, QueryOrderParser
@@ -319,32 +321,13 @@ class CreateResourcePreset(graphene.Mutation):
         props: CreateResourcePresetInput,
     ) -> CreateResourcePreset:
         graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {
-            "name": name,
-            "resource_slots": ResourceSlot.from_user_input(props.resource_slots, None),
-        }
-        set_if_set(
-            props, data, "shared_memory", clean_func=lambda v: BinarySize.from_str(v) if v else None
+        ctx: GraphQueryContext = info.context
+
+        result = await ctx.processors.resource_preset.create_preset.wait_for_complete(
+            CreateResourcePresetAction(name=name, props=props)
         )
-        set_if_set(props, data, "scaling_group_name")
-        scaling_group_name = cast(Optional[str], data.get("scaling_group_name"))
 
-        async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
-            return await ResourcePresetRow.create(
-                name,
-                cast(ResourceSlot, data["resource_slots"]),
-                scaling_group_name,
-                cast(Optional[int], data.get("shared_memory")),
-                db_session=db_session,
-            )
-
-        async with graph_ctx.db.connect() as db_conn:
-            preset_row = await execute_with_txn_retry(_create, graph_ctx.db.begin_session, db_conn)
-        if preset_row is None:
-            raise ValueError(
-                f"Duplicate resource preset name (name:{name}, scaling_group:{scaling_group_name})"
-            )
-        return cls(True, "success", ResourcePreset.from_row(graph_ctx, preset_row))
+        return cls(True, "success", ResourcePreset.from_row(graph_ctx, result.resource_preset))
 
 
 class ModifyResourcePreset(graphene.Mutation):
