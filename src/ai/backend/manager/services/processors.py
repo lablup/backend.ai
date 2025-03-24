@@ -19,6 +19,7 @@ class Processors:
     user: UserProcessors
     image: ImageProcessors
     container_registry: ContainerRegistryProcessors
+    keypair_resource_policy_service: KeypairResourcePolicyProcessors
 
     vfolder: VFolderBaseProcessors
     vfolder_invitation: VFolderInviteProcessors

@@ -10,9 +10,15 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import relationship, selectinload
 
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import DefaultForUnspecified
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.utils import execute_with_retry
+from ai.backend.manager.services.keypair_resource_policies.actions.create_keypair_resource_policy import (
+    CreateKeyPairResourcePolicyAction,
+)
+from ai.backend.manager.services.keypair_resource_policies.actions.modify_keypair_resource_policy import (
+    ModifyKeyPairResourcePolicyAction,
+)
 
 from .base import (
     Base,
@@ -24,7 +30,6 @@ from .base import (
     mapper_registry,
     set_if_set,
     simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 from .keypair import keypairs
 from .user import UserRole
@@ -381,12 +386,13 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
             "max_pending_session_resource_slots",
             clean_func=lambda v: ResourceSlot.from_user_input(v, None) if v is not None else None,
         )
-        insert_query = sa.insert(keypair_resource_policies).values(data)
-        return await simple_db_mutate_returning_item(
-            cls,
-            info.context,
-            insert_query,
-            item_cls=KeyPairResourcePolicy,
+
+        return CreateKeyPairResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=KeyPairResourcePolicy.from_row(
+                graph_ctx, result.keypair_resource_policy
+            ),
         )
 
 
@@ -408,38 +414,18 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyKeyPairResourcePolicyInput,
     ) -> ModifyKeyPairResourcePolicy:
-        data: Dict[str, Any] = {}
-        set_if_set(
-            props,
-            data,
-            "default_for_unspecified",
-            clean_func=lambda v: DefaultForUnspecified[v],
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.keypair_resource_policy_service.modify_keypair_resource_policy.wait_for_complete(
+            ModifyKeyPairResourcePolicyAction(name, props)
         )
-        set_if_set(
-            props,
-            data,
-            "total_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+
+        return ModifyKeyPairResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=KeyPairResourcePolicy.from_row(
+                graph_ctx, result.keypair_resource_policy
+            ),
         )
-        set_if_set(props, data, "max_session_lifetime")
-        set_if_set(props, data, "max_concurrent_sessions")
-        set_if_set(props, data, "max_concurrent_sftp_sessions")
-        set_if_set(props, data, "max_containers_per_session")
-        set_if_set(props, data, "idle_timeout")
-        set_if_set(props, data, "allowed_vfolder_hosts")
-        set_if_set(props, data, "max_pending_session_count")
-        set_if_set(
-            props,
-            data,
-            "max_pending_session_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
-        )
-        update_query = (
-            sa.update(keypair_resource_policies)
-            .values(data)
-            .where(keypair_resource_policies.c.name == name)
-        )
-        return await simple_db_mutate(cls, info.context, update_query)
 
 
 class DeleteKeyPairResourcePolicy(graphene.Mutation):

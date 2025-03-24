@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import sqlalchemy as sa
 
@@ -13,6 +14,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.keypair_resource_policies.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
     CreateKeyPairResourcePolicyActionResult,
+)
+from ai.backend.manager.services.keypair_resource_policies.actions.modify_keypair_resource_policy import (
+    ModifyKeyPairResourcePolicyAction,
+    ModifyKeyPairResourcePolicyActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -61,3 +66,46 @@ class KeypairResourcePolicyService:
             inserted_row: KeyPairResourcePolicyRow = result.fetchone()
 
         return CreateKeyPairResourcePolicyActionResult(keypair_resource_policy=inserted_row)
+
+    async def modify_keypair_resource_policy(
+        self, action: ModifyKeyPairResourcePolicyAction
+    ) -> ModifyKeyPairResourcePolicyActionResult:
+        data: dict[str, Any] = {}
+        name = action.name
+        props = action.props
+
+        set_if_set(
+            props,
+            data,
+            "default_for_unspecified",
+            clean_func=lambda v: DefaultForUnspecified[v],
+        )
+        set_if_set(
+            props,
+            data,
+            "total_resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        set_if_set(props, data, "max_session_lifetime")
+        set_if_set(props, data, "max_concurrent_sessions")
+        set_if_set(props, data, "max_concurrent_sftp_sessions")
+        set_if_set(props, data, "max_containers_per_session")
+        set_if_set(props, data, "idle_timeout")
+        set_if_set(props, data, "allowed_vfolder_hosts")
+        set_if_set(props, data, "max_pending_session_count")
+        set_if_set(
+            props,
+            data,
+            "max_pending_session_resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        async with self._db.begin_session() as db_sess:
+            update_query = (
+                sa.update(keypair_resource_policies)
+                .values(data)
+                .where(keypair_resource_policies.c.name == name)
+                .returning(*keypair_resource_policies.c)
+            )
+            result = await db_sess.execute(update_query)
+            updated_row: KeyPairResourcePolicyRow = result.fetchone()
+        return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=updated_row)
