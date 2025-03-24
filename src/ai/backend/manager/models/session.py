@@ -1493,7 +1493,7 @@ class SessionLifecycleManager:
                 continue
 
         async with self.db.begin_readonly_session() as db_session:
-            session_query = sa.select(SessionRow.id).where(
+            session_query = sa.select(SessionRow).where(
                 SessionRow.status.in_(SessionStatus.kernel_awaiting_statuses())
             )
             session_rows = await db_session.scalars(session_query)
