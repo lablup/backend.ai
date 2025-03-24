@@ -33,17 +33,17 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import Watcher
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
-from ai.backend.manager.services.resource.actions.admin_month_stats import AdminMonthStatsAction
-from ai.backend.manager.services.resource.actions.recalculate_usage import RecalculateUsageAction
-from ai.backend.manager.services.resource.actions.usage_per_month import UsagePerMonthAction
-from ai.backend.manager.services.resource.actions.usage_per_period import UsagePerPeriodAction
-from ai.backend.manager.services.resource.actions.user_month_stats import UserMonthStatsAction
+from ai.backend.manager.services.group.actions.recalculate_usage import RecalculateUsageAction
+from ai.backend.manager.services.group.actions.usage_per_month import UsagePerMonthAction
+from ai.backend.manager.services.group.actions.usage_per_period import UsagePerPeriodAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
+from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
+from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 
 from .auth import auth_required, superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -339,7 +339,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     """
     root_ctx: RootContext = request.app["_root.context"]
 
-    result = await root_ctx.processors.resource.usage_per_period.wait_for_complete(
+    result = await root_ctx.processors.group.usage_per_period.wait_for_complete(
         UsagePerPeriodAction(
             project_id=params["project_id"],
             start_date=params["start_date"],
