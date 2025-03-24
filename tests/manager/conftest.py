@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import hashlib
 import hmac
 import json
@@ -476,8 +477,18 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
     extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
     extra_fixture_file_path = Path(extra_fixture_file.name)
 
+    def fixture_json_encoder(obj: Any):
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return str(obj)
+        if isinstance(obj, enum.Enum):
+            return obj.value
+
+        raise TypeError(f'Fixture type "{type(obj)}" not serializable')
+
     with open(extra_fixture_file_path, "w") as f:
-        json.dump(extra_fixtures, f)
+        json.dump(extra_fixtures, f, default=fixture_json_encoder)
 
     fixture_paths = [
         build_root / "fixtures" / "manager" / "example-users.json",

@@ -23,8 +23,7 @@ class RescanImagesAction(ImageAction):
 # TODO: BatchAction으로 업데이트, entity_ids는 image row ids로.
 @dataclass
 class RescanImagesActionResult(BaseActionResult):
-    # TODO: result란 이름 사용 지양
-    result: RescanImagesResult
+    rescan_result: RescanImagesResult
 
     @override
     def entity_id(self) -> Optional[str]:
