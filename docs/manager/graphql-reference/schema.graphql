@@ -276,26 +276,7 @@ type Queries {
   endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
 
   """Added in 25.5.0."""
-  user_metric_node(
-    id: String!
-
-    """metric name of container utilization. For example, 'cpu_util', 'mem'."""
-    metric_name: String!
-
-    """One of 'current', 'capacity', 'pct'."""
-    value_type: String!
-
-    """rfc3339 or unix_timestamp."""
-    start: String!
-
-    """rfc3339 or unix_timestamp."""
-    end: String!
-
-    """
-    Query resolution step width in duration format or float number of seconds. For example, '1m', '1h', '1d', '1w'
-    """
-    step: String!
-  ): UserMetricNode
+  user_utilization_metric(user_id: UUID!, input: UserUtilizationMetricQueryInput!): UserUtilizationMetric
 }
 
 """
@@ -1912,11 +1893,14 @@ type EndpointAutoScalingRuleEdge {
 }
 
 """Added in 25.5.0."""
-type UserMetricNode implements Node {
-  """The ID of the object"""
-  id: ID!
+type UserUtilizationMetric {
   user_id: UUID
-  container_metric_name: String
+  metrics: [ContainerUtilizationMetric]
+}
+
+"""Added in 25.5.0."""
+type ContainerUtilizationMetric {
+  metric_name: String
 
   """One of 'current', 'capacity', 'pct'."""
   value_type: String
@@ -1933,6 +1917,26 @@ type UserMetricNode implements Node {
 type MetircResultValue {
   timestamp: Float
   value: String
+}
+
+"""Added in 25.5.0."""
+input UserUtilizationMetricQueryInput {
+  """One of 'current', 'capacity', 'pct'. Default value is 'null'."""
+  value_type: String = null
+
+  """metric name of container utilization. For example, 'cpu_util', 'mem'."""
+  metric_name: String!
+
+  """rfc3339 or unix_timestamp."""
+  start: String!
+
+  """rfc3339 or unix_timestamp."""
+  end: String!
+
+  """
+  Query resolution step width in duration format or float number of seconds. For example, '1m', '1h', '1d', '1w'
+  """
+  step: String!
 }
 
 """All available GraphQL mutations."""
