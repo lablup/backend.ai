@@ -1851,6 +1851,10 @@ class AgentRegistry:
                             },
                             "network_id": str(scheduled_session.id),
                             "session_type": scheduled_session.session_type.value,
+                            "kernel_id": str(binding.kernel.id),
+                            "session_id": str(scheduled_session.id),
+                            "owner_user_id": str(scheduled_session.user_uuid),
+                            "owner_project_id": None,  # TODO: Implement project-owned sessions
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
                             "cluster_mode": binding.kernel.cluster_mode,

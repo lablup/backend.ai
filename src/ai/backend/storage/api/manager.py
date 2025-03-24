@@ -42,7 +42,11 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.metrics.http import build_api_metric_middleware
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.logging import BraceStyleAdapter
 
@@ -103,13 +107,6 @@ async def check_status(request: web.Request) -> web.Response:
                 "storage-proxy": __version__,
             },
         )
-
-
-@skip_token_auth
-async def prometheus_metrics_handler(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["ctx"]
-    metrics = root_ctx.metric_registry.to_prometheus()
-    return web.Response(text=metrics, content_type="text/plain")
 
 
 @ctxmgr
@@ -1214,7 +1211,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app["app_ctx"] = app_ctx
     app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
-    app.router.add_route("GET", "/metrics", prometheus_metrics_handler)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
@@ -1248,6 +1244,13 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
     evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
+    return app
+
+
+def init_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
 

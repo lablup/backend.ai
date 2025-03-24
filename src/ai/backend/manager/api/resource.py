@@ -103,7 +103,7 @@ async def list_presets(request: web.Request) -> web.Response:
             row = cast(ResourcePresetRow, row)
             preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
             resp["presets"].append({
-                "id": row.id,
+                "id": str(row.id),
                 "name": row.name,
                 "shared_memory": str(row.shared_memory) if row.shared_memory else None,
                 "resource_slots": preset_slots.to_json(),
