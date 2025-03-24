@@ -25,6 +25,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
+from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
 )
@@ -33,7 +34,6 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import Watcher
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
-from ai.backend.manager.services.group.actions.recalculate_usage import RecalculateUsageAction
 from ai.backend.manager.services.group.actions.usage_per_month import UsagePerMonthAction
 from ai.backend.manager.services.group.actions.usage_per_period import UsagePerPeriodAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
