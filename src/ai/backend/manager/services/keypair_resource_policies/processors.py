@@ -3,6 +3,10 @@ from ai.backend.manager.services.keypair_resource_policies.actions.create_keypai
     CreateKeyPairResourcePolicyAction,
     CreateKeyPairResourcePolicyActionResult,
 )
+from ai.backend.manager.services.keypair_resource_policies.actions.delete_keypair_resource_policy import (
+    DeleteKeyPairResourcePolicyAction,
+    DeleteKeyPairResourcePolicyActionResult,
+)
 from ai.backend.manager.services.keypair_resource_policies.actions.modify_keypair_resource_policy import (
     ModifyKeyPairResourcePolicyAction,
     ModifyKeyPairResourcePolicyActionResult,
@@ -19,6 +23,9 @@ class KeypairResourcePolicyProcessors:
     modify_keypair_resource_policy: ActionProcessor[
         ModifyKeyPairResourcePolicyAction, ModifyKeyPairResourcePolicyActionResult
     ]
+    delete_keypair_resource_policy: ActionProcessor[
+        DeleteKeyPairResourcePolicyAction, DeleteKeyPairResourcePolicyActionResult
+    ]
 
     def __init__(self, service: KeypairResourcePolicyService) -> None:
         self.create_keypair_resource_policy = ActionProcessor(
@@ -26,4 +33,7 @@ class KeypairResourcePolicyProcessors:
         )
         self.modify_keypair_resource_policy = ActionProcessor(
             service.modify_keypair_resource_policy
+        )
+        self.delete_keypair_resource_policy = ActionProcessor(
+            service.delete_keypair_resource_policy
         )

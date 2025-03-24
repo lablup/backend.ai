@@ -15,6 +15,10 @@ from ai.backend.manager.services.keypair_resource_policies.actions.create_keypai
     CreateKeyPairResourcePolicyAction,
     CreateKeyPairResourcePolicyActionResult,
 )
+from ai.backend.manager.services.keypair_resource_policies.actions.delete_keypair_resource_policy import (
+    DeleteKeyPairResourcePolicyAction,
+    DeleteKeyPairResourcePolicyActionResult,
+)
 from ai.backend.manager.services.keypair_resource_policies.actions.modify_keypair_resource_policy import (
     ModifyKeyPairResourcePolicyAction,
     ModifyKeyPairResourcePolicyActionResult,
@@ -109,3 +113,17 @@ class KeypairResourcePolicyService:
             result = await db_sess.execute(update_query)
             updated_row: KeyPairResourcePolicyRow = result.fetchone()
         return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=updated_row)
+
+    async def delete_keypair_resource_policy(
+        self, action: DeleteKeyPairResourcePolicyAction
+    ) -> DeleteKeyPairResourcePolicyActionResult:
+        name = action.name
+        async with self._db.begin_session() as db_sess:
+            delete_query = (
+                sa.delete(keypair_resource_policies)
+                .where(keypair_resource_policies.c.name == name)
+                .returning(*keypair_resource_policies.c)
+            )
+            result = await db_sess.execute(delete_query)
+            deleted_row = result.fetchone()
+        return DeleteKeyPairResourcePolicyActionResult(keypair_resource_policy=deleted_row)

@@ -16,6 +16,9 @@ from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.services.keypair_resource_policies.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
+from ai.backend.manager.services.keypair_resource_policies.actions.delete_keypair_resource_policy import (
+    DeleteKeyPairResourcePolicyAction,
+)
 from ai.backend.manager.services.keypair_resource_policies.actions.modify_keypair_resource_policy import (
     ModifyKeyPairResourcePolicyAction,
 )
@@ -444,10 +447,17 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteKeyPairResourcePolicy:
-        delete_query = sa.delete(keypair_resource_policies).where(
-            keypair_resource_policies.c.name == name
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.keypair_resource_policy_service.delete_keypair_resource_policy.wait_for_complete(
+            DeleteKeyPairResourcePolicyAction(name)
         )
-        return await simple_db_mutate(cls, info.context, delete_query)
+        return DeleteKeyPairResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=KeyPairResourcePolicy.from_row(
+                graph_ctx, result.keypair_resource_policy
+            ),
+        )
 
 
 class UserResourcePolicy(graphene.ObjectType):
