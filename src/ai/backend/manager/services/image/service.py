@@ -11,6 +11,7 @@ from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.models.base import set_if_set
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
@@ -108,7 +109,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise ForgetImageActionGenericForbiddenError()
             await image_row.mark_as_deleted(session)
-        return ForgetImageActionResult(image=image_row)
+        return ForgetImageActionResult(image=ImageData.from_image_row(image_row))
 
     async def forget_image_by_id(
         self, action: ForgetImageByIdAction
@@ -121,7 +122,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise ForgetImageActionByIdGenericForbiddenError()
             await image_row.mark_as_deleted(session)
-            return ForgetImageByIdActionResult(image=image_row)
+        return ForgetImageByIdActionResult(image=ImageData.from_image_row(image_row))
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         try:
@@ -137,7 +138,10 @@ class ImageService:
                     image_row.aliases.append(image_alias)
         except ValueError:
             raise AliasImageActionValueError
-        return AliasImageActionResult(image_id=image_alias.image_id, image_alias=image_alias)
+        return AliasImageActionResult(
+            image_id=image_alias.image_id,
+            image_alias=ImageAliasData.from_image_alias_row(image_alias),
+        )
 
     async def dealias_image(self, action: DealiasImageAction) -> DealiasImageActionResult:
         try:
@@ -151,7 +155,8 @@ class ImageService:
         except ValueError:
             raise DealiasImageActionValueError()
         return DealiasImageActionResult(
-            image_id=existing_alias.image_id, image_alias=existing_alias
+            image_id=existing_alias.image_id,
+            image_alias=ImageAliasData.from_image_alias_row(existing_alias),
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
@@ -226,7 +231,7 @@ class ImageService:
         except ValueError:
             raise ModifyImageActionValueError
 
-        return ModifyImageActionResult(image=image_row)
+        return ModifyImageActionResult(image=ImageData.from_image_row(image_row))
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         raise NotImplementedError
@@ -243,7 +248,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise PurgeImageActionByIdGenericForbiddenError()
             await db_session.delete(image_row)
-            return PurgeImageByIdActionResult(image=image_row)
+            return PurgeImageByIdActionResult(image=ImageData.from_image_row(image_row))
 
     async def untag_image_from_registry(
         self, action: UntagImageFromRegistryAction
@@ -267,7 +272,7 @@ class ImageService:
 
         scanner = HarborRegistry_v2(self._db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
-        return UntagImageFromRegistryActionResult(image=image_row)
+        return UntagImageFromRegistryActionResult(image=ImageData.from_image_row(image_row))
 
     async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
         errors = []
@@ -301,4 +306,4 @@ class ImageService:
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
         result = await rescan_images(self._db, action.registry, action.project)
-        return RescanImagesActionResult(result=result)
+        return RescanImagesActionResult(rescan_result=result)
