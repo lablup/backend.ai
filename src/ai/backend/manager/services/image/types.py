@@ -4,7 +4,7 @@ from typing import Optional
 
 @dataclass
 class ResourceLimitInput:
-    key: Optional[str] = None
+    key: str
     min: Optional[str] = None
     max: Optional[str] = None
 
