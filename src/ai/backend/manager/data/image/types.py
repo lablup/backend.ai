@@ -57,3 +57,10 @@ class RescanImagesResult:
 class ImageAliasData:
     id: uuid.UUID
     alias: str
+
+    @classmethod
+    def from_image_alias_row(cls, row: ImageAliasRow) -> Self:
+        return cls(id=row.id, alias=row.alias)
+
+    def to_image_alias_row(self, image_id: uuid.UUID) -> ImageAliasRow:
+        return ImageAliasRow(id=self.id, alias=self.alias, image_id=image_id)
