@@ -37,6 +37,10 @@ from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
     CreateResourcePresetActionResult,
 )
+from ai.backend.manager.services.resource_preset.actions.delete_preset import (
+    DeleteResourcePresetAction,
+    DeleteResourcePresetActionResult,
+)
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
@@ -149,6 +153,30 @@ class ResourcePresetService:
                 raise ValueError("Duplicate resource preset record")
 
         return ModifyResourcePresetActionResult(resource_preset=preset_row)
+
+    async def delete_preset(
+        self, action: DeleteResourcePresetAction
+    ) -> DeleteResourcePresetActionResult:
+        name = action.name
+        id = action.id
+
+        preset_id = id
+        if preset_id is None and name is None:
+            raise ValueError("One of (`id` or `name`) parameter should be not null")
+
+        async def _delete(db_session: AsyncSession) -> None:
+            if preset_id is not None:
+                query_option = filter_by_id(preset_id)
+            else:
+                if name is None:
+                    raise ValueError("One of (`id` or `name`) parameter should be not null")
+                query_option = filter_by_name(name)
+            return await ResourcePresetRow.delete(query_option, db_session=db_session)
+
+        async with self._db.connect() as db_conn:
+            await execute_with_txn_retry(_delete, self._db.begin_session, db_conn)
+
+        return DeleteResourcePresetActionResult()
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
         # TODO: Remove this?

@@ -16,6 +16,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
+from ai.backend.manager.services.resource_preset.actions.delete_preset import (
+    DeleteResourcePresetAction,
+)
 from ai.backend.manager.services.resource_preset.actions.modify_preset import (
     ModifyResourcePresetAction,
 )
@@ -31,7 +34,6 @@ from .base import (
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import UserRole
-from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -392,19 +394,8 @@ class DeleteResourcePreset(graphene.Mutation):
     ) -> DeleteResourcePreset:
         graph_ctx: GraphQueryContext = info.context
 
-        preset_id = id
-        if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
+        await graph_ctx.processors.resource_preset.delete_preset.wait_for_complete(
+            DeleteResourcePresetAction(id=id, name=name)
+        )
 
-        async def _delete(db_session: AsyncSession) -> None:
-            if preset_id is not None:
-                query_option = filter_by_id(preset_id)
-            else:
-                if name is None:
-                    raise ValueError("One of (`id` or `name`) parameter should be not null")
-                query_option = filter_by_name(name)
-            return await ResourcePresetRow.delete(query_option, db_session=db_session)
-
-        async with graph_ctx.db.connect() as db_conn:
-            await execute_with_txn_retry(_delete, graph_ctx.db.begin_session, db_conn)
         return cls(True, "success")
