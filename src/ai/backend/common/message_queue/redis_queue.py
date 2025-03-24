@@ -1,15 +1,14 @@
 import asyncio
+import logging
 from contextlib import aclosing
 from dataclasses import dataclass
-import logging
 from typing import AsyncGenerator, Self
 
 from ai.backend.common import redis_helper
+from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from .base import AbstractMessageQueue, MQMessage, AbstractMQMessagePayload
-from ai.backend.common.types import RedisConnectionInfo
-
+from .base import AbstractMessageQueue, AbstractMQMessagePayload, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -30,10 +29,12 @@ class RedisQueue(AbstractMessageQueue):
     _closed: bool
     _options: RedisMQOptions
     _autoclaim_start_id: str
+
     # loop tasks for consuming messages
     _auto_claim_loop_task: asyncio.Task
     _read_messages_task: asyncio.Task
     _read_broadcast_messages_task: asyncio.Task
+
     def __init__(self, conn: RedisConnectionInfo, opts: RedisMQOptions) -> None:
         self._consume_queue = asyncio.Queue()
         self._subscribe_queue = asyncio.Queue()
@@ -49,7 +50,7 @@ class RedisQueue(AbstractMessageQueue):
     async def create(cls, conn: RedisConnectionInfo, opts: RedisMQOptions) -> Self:
         self = cls(conn, opts)
         return self
-    
+
     async def send(self, key: str, msg: AbstractMQMessagePayload) -> None:
         if self._closed:
             raise RuntimeError("Redis Queue is already closed")
@@ -58,26 +59,32 @@ class RedisQueue(AbstractMessageQueue):
             self._conn,
             lambda r: r.xadd(key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
         )
-    
+
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:
-        while not self._closed:
-            try:
-                yield await self._consume_queue.get()
-            except asyncio.CancelledError:
-                break
-    
+        async def _generator() -> AsyncGenerator[MQMessage, None]:
+            while not self._closed:
+                try:
+                    yield await self._consume_queue.get()
+                except asyncio.CancelledError:
+                    break
+
+        return _generator()
+
     async def subscribe_queue(self) -> AsyncGenerator[MQMessage, None]:
-        while not self._closed:
-            try:
-                yield await self._subscribe_queue.get()
-            except asyncio.CancelledError:
-                break
-    
+        async def _generator() -> AsyncGenerator[MQMessage, None]:
+            while not self._closed:
+                try:
+                    yield await self._subscribe_queue.get()
+                except asyncio.CancelledError:
+                    break
+
+        return _generator()
+
     async def _put_consume_queue(self, msg_id: str, msg_data: dict[bytes, bytes]) -> None:
         payload = AbstractMQMessagePayload.deserialize(msg_data)
         msg = MQMessage(msg_id, payload)
         await self._consume_queue.put(msg)
-    
+
     async def _put_subscribe_queue(self, msg_id: str, msg_data: dict[bytes, bytes]) -> None:
         payload = AbstractMQMessagePayload.deserialize(msg_data)
         msg = MQMessage(msg_id, payload)
@@ -118,7 +125,7 @@ class RedisQueue(AbstractMessageQueue):
             )
             for _, events in reply:
                 for msg_id, msg_data in events:
-                    if msg_data == None:
+                    if msg_data is None:
                         continue
                     await self._put_consume_queue(msg_id, msg_data)
 
@@ -126,23 +133,25 @@ class RedisQueue(AbstractMessageQueue):
         while not self._closed:
             async with aclosing(
                 redis_helper.read_stream(
-                    self.redis_client,
-                    self._stream_key,
+                    self._conn,
+                    self._options.stream_key,
                 )
             ) as agen:
                 async for msg_id, msg_data in agen:
-                    if msg_data == None:
+                    if msg_data is None:
                         continue
-                    await self._put_subscribe_queue(msg_id, msg_data)
+                    await self._put_subscribe_queue(msg_id.decode("utf-8"), msg_data)
 
-    async def done(self, key: str, msg_id: str) -> None:
+    async def done(self, msg: MQMessage) -> None:
+        key = self._options.stream_key
+        msg_id = msg.msg_id
         if self._closed:
             raise RuntimeError("Queue is closed")
         await redis_helper.execute(
             self._conn,
-            lambda r: r.xack(key, self.group_name, msg_id),
+            lambda r: r.xack(key, self._options.group_name, msg_id),
         )
-    
+
     async def close(self) -> None:
         if self._closed:
             return
@@ -151,4 +160,3 @@ class RedisQueue(AbstractMessageQueue):
         self._auto_claim_loop_task.cancel()
         self._read_messages_task.cancel()
         self._read_broadcast_messages_task.cancel()
-        
