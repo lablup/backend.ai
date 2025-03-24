@@ -399,6 +399,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
         return ModifyDomainNodeAction(
             name=name,
+            user_info=user_info,
             description=self.description,
             is_active=self.is_active,
             total_resource_slots=self.total_resource_slots,
@@ -409,7 +410,6 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
             sgroups_to_add=self.sgroups_to_add,
             sgroups_to_remove=self.sgroups_to_remove,
             client_mutation_id=self.client_mutation_id,
-            user_info=user_info,
         )
 
 

@@ -10,13 +10,13 @@ from ai.backend.manager.services.domain.types import DomainData
 @dataclass
 class ModifyDomainAction(DomainAction):
     name: str
-    new_name: Optional[str]
-    description: Optional[str]
-    is_active: Optional[bool]
-    total_resource_slots: Optional[ResourceSlot]
-    allowed_vfolder_hosts: Optional[dict[str, str]]
-    allowed_docker_registries: Optional[list[str]]
-    integration_id: Optional[str]
+    new_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    total_resource_slots: Optional[ResourceSlot] = None
+    allowed_vfolder_hosts: Optional[dict[str, str]] = None
+    allowed_docker_registries: Optional[list[str]] = None
+    integration_id: Optional[str] = None
 
     @override
     def entity_id(self) -> str:
@@ -40,3 +40,6 @@ class ModifyDomainActionResult(BaseActionResult):
     @property
     def ok(self) -> bool:
         return self.status == "success"
+
+    def __eq__(self, other):
+        return self.domain_data == other.domain_data

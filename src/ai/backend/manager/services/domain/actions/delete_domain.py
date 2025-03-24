@@ -23,10 +23,6 @@ class DeleteDomainActionResult(BaseActionResult):
     status: str
     description: str
 
-    def __init__(self, status: str, description: str) -> None:
-        self.status = status
-        self.description = description
-
     @override
     def entity_id(self) -> str:
         return ""

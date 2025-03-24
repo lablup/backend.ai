@@ -1,7 +1,9 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
 from typing import Optional, Self
+
+from sqlalchemy.engine.result import Row
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.domain import DomainRow
@@ -29,7 +31,7 @@ class DomainData:
     integration_id: Optional[str]
 
     @classmethod
-    def from_row(cls, row: Optional[DomainRow]) -> Optional[Self]:
+    def from_row(cls, row: Optional[DomainRow | Row]) -> Optional[Self]:
         if row is None:
             return None
         return cls(
@@ -44,3 +46,13 @@ class DomainData:
             dotfiles=row.dotfiles,
             integration_id=row.integration_id,
         )
+
+    def __eq__(self, other):
+        if not isinstance(other, DomainData):
+            return False
+
+        for field in fields(self):
+            if field.name not in ("created_at", "modified_at"):
+                if getattr(self, field.name) != getattr(other, field.name):
+                    return False
+        return True

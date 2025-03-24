@@ -102,7 +102,9 @@ class DomainService:
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
         return CreateDomainActionResult(
-            domain_data=DomainData.from_row(res.data), status=res.status, description=res.message
+            domain_data=DomainData.from_row(res.data),
+            status=res.status,
+            description=res.message,
         )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
@@ -130,7 +132,9 @@ class DomainService:
                 result = await conn.execute(query)
                 row = result.first()
                 if result.rowcount > 0:
-                    return MutationResult(success=True, message="domain creation succeed", data=row)
+                    return MutationResult(
+                        success=True, message="domain modification succeed", data=row
+                    )
                 else:
                     return MutationResult(
                         success=False, message=f"no matching {action.name}", data=None
@@ -139,7 +143,9 @@ class DomainService:
         res = await self._db_mutation_wrapper(_do_mutate)
 
         return ModifyDomainActionResult(
-            domain_data=DomainData.from_row(res.data), status=res.status, description=res.message
+            domain_data=DomainData.from_row(res.data),
+            status=res.status,
+            description=res.message,
         )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
@@ -194,7 +200,7 @@ class DomainService:
                 else:
                     return MutationResult(
                         success=False,
-                        message=f"no matching {DomainRow.__name__.lower()}",
+                        message=f"no matching {name} domain to purge",
                         data=None,
                     )
 
@@ -236,13 +242,14 @@ class DomainService:
         else:
             scaling_groups = None
 
-        async def _insert(db_session: AsyncSession) -> DomainRow:
+        async def _insert(db_session: AsyncSession):
             if scaling_groups is not None:
                 await self._ensure_sgroup_permission(
                     action.user_info, scaling_groups, db_session=db_session
                 )
+            data = action.get_insertion_data()
             _insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(**action).returning(DomainRow)
+                sa.insert(DomainRow).values(data).returning(DomainRow)
             )
             domain_row = await db_session.scalar(_insert_and_returning)
             if scaling_groups is not None:
@@ -329,15 +336,18 @@ class DomainService:
                         & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
                     ),
                 )
+            update_data = action.get_update_values_as_dict()
             _update_stmt = (
                 sa.update(DomainRow)
                 .where(DomainRow.name == domain_name)
-                .values(action)
+                .values(update_data)
                 .returning(DomainRow)
             )
-            _stmt = sa.select(DomainRow).from_statement(_update_stmt)
+            await db_session.execute(_update_stmt)
 
-            return await db_session.scalar(_stmt)
+            return await db_session.scalar(
+                sa.select(DomainRow).where(DomainRow.name == domain_name)
+            )
 
         async with self._db.connect() as db_conn:
             try:

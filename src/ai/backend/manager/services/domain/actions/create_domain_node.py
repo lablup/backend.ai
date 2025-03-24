@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
@@ -26,6 +26,18 @@ class CreateDomainNodeAction(DomainAction):
     @override
     def operation_type(self):
         return "create"
+
+    def get_insertion_data(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "is_active": self.is_active,
+            "total_resource_slots": self.total_resource_slots,
+            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
+            "allowed_docker_registries": self.allowed_docker_registries,
+            "integration_id": self.integration_id,
+            "dotfiles": self.dotfiles,
+        }
 
 
 @dataclass

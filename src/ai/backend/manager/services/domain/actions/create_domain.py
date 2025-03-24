@@ -52,3 +52,6 @@ class CreateDomainActionResult(BaseActionResult):
     @property
     def ok(self):
         return self.status == "success"
+
+    def __eq__(self, other):
+        return self.domain_data == other.domain_data
