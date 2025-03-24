@@ -5,6 +5,7 @@ aiohttp~=3.10.8
 aiohttp_cors~=0.7
 aiohttp_jinja2~=1.6
 aiohttp_sse>=2.2
+aiokafka>=0.10.1
 aiodns>=3.2
 aiomonitor~=0.7.0
 aioresponses>=0.7.3
