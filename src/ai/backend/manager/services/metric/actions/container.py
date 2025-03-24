@@ -24,7 +24,6 @@ class ContainerMetricLabelValuesActionResult(MetricActionResult):
 @dataclass
 class ContainerMetricAction(MetricAction):
     metric_name: str
-    value_type: str
     labels: ContainerMetricOptionalLabel
 
     start: str

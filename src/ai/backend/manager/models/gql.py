@@ -130,7 +130,7 @@ from .gql_models.image import (
     UnloadImage,
     UntagImageFromRegistry,
 )
-from .gql_models.metric.user import UserMetricNode
+from .gql_models.metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
 from .gql_models.session import (
     CheckAndTransitStatus,
     ComputeSessionConnection,
@@ -1057,26 +1057,11 @@ class Queries(graphene.ObjectType):
         description="Added in 25.1.0.",
     )
 
-    user_metric_node = graphene.Field(
-        UserMetricNode,
+    user_utilization_metric = graphene.Field(
+        UserUtilizationMetric,
         description="Added in 25.5.0.",
-        id=graphene.String(required=True),
-        metric_name=graphene.String(
-            required=True,
-            description="metric name of container utilization. For example, 'cpu_util', 'mem'.",
-        ),
-        value_type=graphene.String(
-            required=True, description="One of 'current', 'capacity', 'pct'."
-        ),
-        start=graphene.String(required=True, description="rfc3339 or unix_timestamp."),
-        end=graphene.String(required=True, description="rfc3339 or unix_timestamp."),
-        step=graphene.String(
-            required=True,
-            description=(
-                "Query resolution step width in duration format or float number of seconds. "
-                "For example, '1m', '1h', '1d', '1w'"
-            ),
-        ),
+        user_id=graphene.UUID(required=True),
+        input=UserUtilizationMetricQueryInput(required=True),
     )
 
     @staticmethod
@@ -2900,31 +2885,24 @@ class Queries(graphene.ObjectType):
         )
 
     @staticmethod
-    async def resolve_user_metric_node(
+    async def resolve_user_utilization_metric(
         root: Any,
         info: graphene.ResolveInfo,
-        id: str,
+        user_id: uuid.UUID,
         *,
-        metric_name: str,
-        value_type: str,
-        start: str,
-        end: str,
-        step: str,
-    ) -> UserMetricNode:
-        _, raw_user_id = AsyncNode.resolve_global_id(info, id)
-        str_user_id = raw_user_id or id
-        try:
-            user_id = uuid.UUID(str_user_id)
-        except ValueError:
-            raise ObjectNotFound(object_name="User")
-
+        input: UserUtilizationMetricQueryInput,
+    ) -> UserUtilizationMetric:
         graph_ctx = cast(GraphQueryContext, info.context)
         user = graph_ctx.user
         if user["role"] not in (UserRole.SUPERADMIN, UserRole.MONITOR):
             if user["uuid"] != user_id:
                 raise RuntimeError("Permission denied.")
-        return await UserMetricNode.get_node(
-            info, user_id, MetricQueryParameter(metric_name, value_type, start, end, step)
+        return await UserUtilizationMetric.get_object(
+            info,
+            user_id,
+            MetricQueryParameter(
+                input.metric_name, input.value_type, input.start, input.end, input.step
+            ),
         )
 
 

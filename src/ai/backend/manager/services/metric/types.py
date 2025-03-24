@@ -10,7 +10,7 @@ from ai.backend.common.types import HostPortPair
 @dataclass
 class MetricQueryParameter:
     metric_name: str
-    value_type: str
+    value_type: Optional[str]
     start: str
     end: str
     step: str
@@ -42,6 +42,8 @@ class MetricResultValue:
 
 @dataclass
 class ContainerMetricOptionalLabel:
+    value_type: Optional[str] = None
+
     agent_id: Optional[str] = None
     kernel_id: Optional[UUID] = None
     session_id: Optional[UUID] = None

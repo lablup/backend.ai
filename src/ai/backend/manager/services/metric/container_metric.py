@@ -82,13 +82,13 @@ class MetricService:
     def _get_query_string(
         self,
         metric_name: str,
-        value_type: str,
         label: ContainerMetricOptionalLabel,
     ) -> str:
         label_values: list[str] = [
             f'container_metric_name="{metric_name}"',
-            f'value_type="{value_type}"',
         ]
+        if label.value_type is not None:
+            label_values.append(f'value_type="{label.value_type}"')
         if label.agent_id is not None:
             label_values.append(f'agent_id="{label.agent_id}"')
         if label.kernel_id is not None:
@@ -107,7 +107,7 @@ class MetricService:
         action: ContainerMetricAction,
     ) -> ContainerMetricActionResult:
         endpoint = self._metric_query_endpoint / "query_range"
-        query = self._get_query_string(action.metric_name, action.value_type, action.labels)
+        query = self._get_query_string(action.metric_name, action.labels)
         form_data = aiohttp.FormData({
             "query": query,
             "start": action.start,

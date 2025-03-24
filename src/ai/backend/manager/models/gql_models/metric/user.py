@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
-    Optional,
     Self,
 )
 from uuid import UUID
@@ -19,45 +16,44 @@ from ai.backend.manager.services.metric.types import (
     MetricQueryParameter,
 )
 
-from ...gql_relay import (
-    AsyncNode,
-)
-from .base import MetircResultValue
+from .base import ContainerUtilizationMetric, MetircResultValue
 
 if TYPE_CHECKING:
     from ...gql import GraphQueryContext
 
 
-class UserMetricNode(graphene.ObjectType):
+class UserUtilizationMetricQueryInput(graphene.InputObjectType):
     class Meta:
-        interfaces = (AsyncNode,)
+        description = "Added in 25.5.0."
+
+    value_type = graphene.String(
+        default_value=None,
+        description="One of 'current', 'capacity', 'pct'. Default value is 'null'.",
+    )
+    metric_name = graphene.String(
+        required=True,
+        description="metric name of container utilization. For example, 'cpu_util', 'mem'.",
+    )
+    start = graphene.String(required=True, description="rfc3339 or unix_timestamp.")
+    end = graphene.String(required=True, description="rfc3339 or unix_timestamp.")
+    step = graphene.String(
+        required=True,
+        description=(
+            "Query resolution step width in duration format or float number of seconds. "
+            "For example, '1m', '1h', '1d', '1w'"
+        ),
+    )
+
+
+class UserUtilizationMetric(graphene.ObjectType):
+    class Meta:
         description = "Added in 25.5.0."
 
     user_id = graphene.UUID()
-    container_metric_name = graphene.String()
-    value_type = graphene.String(description="One of 'current', 'capacity', 'pct'.")
-    values = graphene.List(MetircResultValue)
-
-    max_value = graphene.String(
-        description="The maximum value of the metric in given time range. null if no data."
-    )
-    avg_value = graphene.String(
-        description="The average value of the metric in given time range. null if no data."
-    )
-
-    async def resolve_max_value(self, info: graphene.ResolveInfo) -> Optional[str]:
-        if not self.values:
-            return None
-        return max(self.values, key=lambda x: Decimal(x.value)).value
-
-    async def resolve_avg_value(self, info: graphene.ResolveInfo) -> Optional[str]:
-        if not self.values:
-            return None
-        avg_val = sum(Decimal(x.value) for x in self.values) / len(self.values)
-        return str(avg_val)
+    metrics = graphene.List(ContainerUtilizationMetric)
 
     @classmethod
-    async def get_node(
+    async def get_object(
         cls,
         info: graphene.ResolveInfo,
         user_id: UUID,
@@ -67,27 +63,29 @@ class UserMetricNode(graphene.ObjectType):
         action_result = await graph_ctx.processors.container_metric.query_metric.wait_for_complete(
             ContainerMetricAction(
                 metric_name=param.metric_name,
-                value_type=param.value_type,
-                labels=ContainerMetricOptionalLabel(user_id=user_id),
+                labels=ContainerMetricOptionalLabel(user_id=user_id, value_type=param.value_type),
                 start=param.start,
                 end=param.end,
                 step=param.step,
             )
         )
-        final_result: defaultdict[float, Decimal] = defaultdict(Decimal)  # dict[timestamp, value]
+        metrics = []
         for result in action_result.result:
-            for value in result.values:
-                final_result[value.timestamp] += Decimal(value.value)
+            metrics.append(
+                ContainerUtilizationMetric(
+                    container_metric_name=result.metric.container_metric_name,
+                    value_type=result.metric.value_type,
+                    values=[
+                        MetircResultValue(
+                            timestamp=value.timestamp,
+                            value=value.value,
+                        )
+                        for value in result.values
+                    ],
+                )
+            )
 
         return cls(
             user_id=user_id,
-            container_metric_name=param.metric_name,
-            value_type=param.value_type,
-            values=[
-                MetircResultValue(
-                    timestamp=timestamp,
-                    value=str(value),
-                )
-                for timestamp, value in final_result.items()
-            ],
+            metrics=metrics,
         )
