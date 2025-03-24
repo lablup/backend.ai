@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Self
+from typing import TYPE_CHECKING, Any, Callable, Optional, Self
 from uuid import UUID
 
 import graphene
@@ -11,10 +11,13 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
+)
+from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+    ModifyResourcePresetAction,
 )
 
 from .base import (
@@ -24,7 +27,6 @@ from .base import (
     ResourceSlotColumn,
     batch_result,
     batch_result_in_scalar_stream,
-    set_if_set,
 )
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser
@@ -321,9 +323,8 @@ class CreateResourcePreset(graphene.Mutation):
         props: CreateResourcePresetInput,
     ) -> CreateResourcePreset:
         graph_ctx: GraphQueryContext = info.context
-        ctx: GraphQueryContext = info.context
 
-        result = await ctx.processors.resource_preset.create_preset.wait_for_complete(
+        result = await graph_ctx.processors.resource_preset.create_preset.wait_for_complete(
             CreateResourcePresetAction(name=name, props=props)
         )
 
@@ -358,40 +359,10 @@ class ModifyResourcePreset(graphene.Mutation):
     ) -> ModifyResourcePreset:
         graph_ctx: GraphQueryContext = info.context
 
-        data: Dict[str, Any] = {}
-        preset_id = id
-        if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
-
-        set_if_set(
-            props,
-            data,
-            "name",
+        await graph_ctx.processors.resource_preset.modify_preset.wait_for_complete(
+            ModifyResourcePresetAction(id=id, name=name, props=props)
         )
-        set_if_set(
-            props,
-            data,
-            "resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
-        )
-        set_if_set(
-            props, data, "shared_memory", clean_func=lambda v: BinarySize.from_str(v) if v else None
-        )
-        set_if_set(props, data, "scaling_group_name")
 
-        async def _update(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
-            if preset_id is not None:
-                query_option = filter_by_id(preset_id)
-            else:
-                if name is None:
-                    raise ValueError("One of (`id` or `name`) parameter should be not null")
-                query_option = filter_by_name(name)
-            return await ResourcePresetRow.update(query_option, data, db_session=db_session)
-
-        async with graph_ctx.db.connect() as db_conn:
-            preset_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
-            if preset_row is None:
-                raise ValueError("Duplicate resource preset record")
         return cls(True, "success")
 
 

@@ -1,9 +1,10 @@
 import logging
 from decimal import Decimal
-from typing import Any, Optional, cast
+from typing import Any, Callable, Optional, cast
 
 import sqlalchemy as sa
 import trafaret as t
+from graphene import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -23,7 +24,7 @@ from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset import QueryStatement, ResourcePresetRow
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
@@ -40,8 +41,20 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
+from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+    ModifyResourcePresetAction,
+    ModifyResourcePresetActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def filter_by_name(name: str) -> Callable[[QueryStatement], QueryStatement]:
+    return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
+
+
+def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
+    return lambda query_stmt: query_stmt.where(ResourcePresetRow.id == id)
 
 
 class ResourcePresetService:
@@ -92,6 +105,50 @@ class ResourcePresetService:
             )
 
         return CreateResourcePresetActionResult(resource_preset=preset_row)
+
+    async def modify_preset(
+        self, action: ModifyResourcePresetAction
+    ) -> ModifyResourcePresetActionResult:
+        name = action.name
+        id = action.id
+        props = action.props
+
+        data: dict[str, Any] = {}
+        preset_id = id
+        if preset_id is None and name is None:
+            raise ValueError("One of (`id` or `name`) parameter should be not null")
+
+        set_if_set(
+            props,
+            data,
+            "name",
+        )
+        set_if_set(
+            props,
+            data,
+            "resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        set_if_set(
+            props, data, "shared_memory", clean_func=lambda v: BinarySize.from_str(v) if v else None
+        )
+        set_if_set(props, data, "scaling_group_name")
+
+        async def _update(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
+            if preset_id is not None:
+                query_option = filter_by_id(preset_id)
+            else:
+                if name is None:
+                    raise ValueError("One of (`id` or `name`) parameter should be not null")
+                query_option = filter_by_name(name)
+            return await ResourcePresetRow.update(query_option, data, db_session=db_session)
+
+        async with self._db.connect() as db_conn:
+            preset_row = await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
+            if preset_row is None:
+                raise ValueError("Duplicate resource preset record")
+
+        return ModifyResourcePresetActionResult(resource_preset=preset_row)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
         # TODO: Remove this?
