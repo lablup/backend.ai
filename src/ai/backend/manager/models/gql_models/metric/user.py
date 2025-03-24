@@ -73,7 +73,7 @@ class UserUtilizationMetric(graphene.ObjectType):
         for result in action_result.result:
             metrics.append(
                 ContainerUtilizationMetric(
-                    container_metric_name=result.metric.container_metric_name,
+                    metric_name=result.metric.container_metric_name,
                     value_type=result.metric.value_type,
                     values=[
                         MetircResultValue(
