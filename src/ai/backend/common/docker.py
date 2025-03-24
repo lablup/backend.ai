@@ -111,7 +111,7 @@ class KernelFeatures(StringSetFlag):
 
     OPERATION = "operation"
     # Images with the `private` feature are not shown on a image list of the session launcher.
-    # TODO: Replace `private` feature with RBAC API
+    # TODO: Replace `private` feature with new Access control API
     PRIVATE = "private"
 
 
