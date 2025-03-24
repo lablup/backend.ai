@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from dateutil.relativedelta import relativedelta
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common import redis_helper
 from ai.backend.common.exception import InvalidAPIParameters
@@ -18,25 +19,24 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config import SharedConfig
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.kernel import (
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
 from ai.backend.manager.models.resource_usage import (
+    KERNEL_RESOURCE_SELECT_COLS,
+    PROJECT_RESOURCE_SELECT_COLS,
+    SESSION_RESOURCE_SELECT_COLS,
     ProjectResourceUsage,
-    fetch_resource_usage,
     parse_resource_usage_groups,
     parse_total_resource_group,
 )
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.services.group.actions.recalculate_usage import (
-    RecalculateUsageAction,
-    RecalculateUsageActionResult,
-)
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
@@ -49,21 +49,80 @@ from ai.backend.manager.services.group.actions.usage_per_period import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _parse_query(
+    kernel_cond: Optional[sa.sql.BinaryExpression] = None,
+    session_cond: Optional[sa.sql.BinaryExpression] = None,
+    project_cond: Optional[sa.sql.BinaryExpression] = None,
+) -> sa.sql.Select:
+    session_load = joinedload(KernelRow.session)
+    if session_cond is not None:
+        session_load = joinedload(KernelRow.session.and_(session_cond))
+
+    project_load = joinedload(SessionRow.group)
+    if project_cond is not None:
+        project_load = joinedload(SessionRow.group.and_(project_cond))
+    query = sa.select(KernelRow).options(
+        load_only(*KERNEL_RESOURCE_SELECT_COLS),
+        session_load.options(
+            load_only(*SESSION_RESOURCE_SELECT_COLS),
+            joinedload(SessionRow.user).options(
+                load_only(UserRow.email, UserRow.username, UserRow.full_name)
+            ),
+            project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
+        ),
+    )
+    if kernel_cond is not None:
+        query = query.where(kernel_cond)
+    return query
+
+
+async def fetch_resource_usage(
+    db_engine: ExtendedAsyncSAEngine,
+    start_date: datetime,
+    end_date: datetime,
+    session_ids: Optional[Sequence[UUID]] = None,
+    project_ids: Optional[Sequence[UUID]] = None,
+) -> list[KernelRow]:
+    project_cond = None
+    if project_ids:
+        project_cond = GroupRow.id.in_(project_ids)
+    session_cond = None
+    if session_ids:
+        session_cond = SessionRow.id.in_(session_ids)
+    query = _parse_query(
+        kernel_cond=(
+            # Filter sessions which existence period overlaps with requested period
+            (
+                (KernelRow.terminated_at >= start_date)
+                & (KernelRow.created_at < end_date)
+                & (KernelRow.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+            )
+            |
+            # Or, filter running sessions which created before requested end_date
+            ((KernelRow.created_at < end_date) & (KernelRow.status.in_(LIVE_STATUS)))
+        ),
+        session_cond=session_cond,
+        project_cond=project_cond,
+    )
+    async with db_engine.begin_readonly_session() as db_sess:
+        result = await db_sess.execute(query)
+        kernels = result.scalars().all()
+
+    return kernels
+
+
 class GroupService:
     _db: ExtendedAsyncSAEngine
     _shared_config: SharedConfig
-    _agent_registry: AgentRegistry
     _redis_stat: RedisConnectionInfo
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        agent_registry: AgentRegistry,
         redis_stat: RedisConnectionInfo,
         shared_config: SharedConfig,
     ) -> None:
         self._db = db
-        self._agent_registry = agent_registry
         self._redis_stat = redis_stat
         self._shared_config = shared_config
 
@@ -265,13 +324,6 @@ class GroupService:
                 objs_per_group[group_id]["g_gpu_allocated"] += c_info["gpu_allocated"]
                 objs_per_group[group_id]["c_infos"].append(c_info)
         return list(objs_per_group.values())
-
-    # 이건 아무리 봐도 keypair 별 인 듯...?
-    async def recalculate_usage(
-        self, action: RecalculateUsageAction
-    ) -> RecalculateUsageActionResult:
-        await self._agent_registry.recalc_resource_usage()
-        return RecalculateUsageActionResult()
 
     # group (or group 전체)
     async def usage_per_month(self, action: UsagePerMonthAction) -> UsagePerMonthActionResult:
