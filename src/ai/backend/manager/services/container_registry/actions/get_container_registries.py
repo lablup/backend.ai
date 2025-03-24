@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.resource.base import ResourceAction
+from ai.backend.manager.services.container_registry.base import ContainerRegistryAction
 
 
 @dataclass
-class GetContainerRegistriesAction(ResourceAction):
+class GetContainerRegistriesAction(ContainerRegistryAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -24,16 +24,3 @@ class GetContainerRegistriesActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return None
-
-    @override
-    def status(self) -> str:
-        return "success"
-
-    @override
-    def description(self) -> Optional[str]:
-        return ""
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return True

@@ -4,11 +4,11 @@ from typing import Any, Mapping, Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.resource.base import ResourceAction
+from ai.backend.manager.services.resource_preset.base import ResourcePresetAction
 
 
 @dataclass
-class CheckResourcePresetsAction(ResourceAction):
+class CheckResourcePresetsAction(ResourcePresetAction):
     access_key: str
     resource_policy: Mapping[str, Any]
     domain_name: str
@@ -37,19 +37,7 @@ class CheckResourcePresetsActionResult(BaseActionResult):
     scaling_group_remaining: Mapping[str, str]
     scaling_groups: dict[str | Any, dict[str, ResourceSlot]]
 
+    # TODO: Batching 으로 바꾼 뒤 preset row ids 반환해야함.
     @override
     def entity_id(self) -> Optional[str]:
         return None
-
-    @override
-    def status(self) -> str:
-        return "success"
-
-    @override
-    def description(self) -> Optional[str]:
-        return ""
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return True

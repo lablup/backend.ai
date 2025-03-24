@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.resource.base import ResourceAction
+from ai.backend.manager.services.resource_preset.base import ResourcePresetAction
 
 
 @dataclass
-class ListResourcePresetsAction(ResourceAction):
+class ListResourcePresetsAction(ResourcePresetAction):
     access_key: str
     scaling_group: Optional[str] = None
 
@@ -26,17 +26,5 @@ class ListResourcePresetsResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
+        # TODO: Batching 으로 바꾼 뒤 preset row ids 반환해야함.
         return None
-
-    @override
-    def status(self) -> str:
-        return "success"
-
-    @override
-    def description(self) -> Optional[str]:
-        return "Resource presets listed successfully."
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return True

@@ -1,7 +1,6 @@
+import asyncio
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
-
-from ai.backend.common import asyncio
 
 from .action import (
     BaseActionResultMeta,

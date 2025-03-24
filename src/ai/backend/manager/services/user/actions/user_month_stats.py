@@ -2,16 +2,16 @@ from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.resource.base import ResourceAction
+from ai.backend.manager.services.user.base import UserAction
 
 
 @dataclass
-class UserMonthStatsAction(ResourceAction):
+class UserMonthStatsAction(UserAction):
     user_id: str
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return self.user_id
 
     @override
     def operation_type(self):
@@ -25,16 +25,3 @@ class UserMonthStatsActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return None
-
-    @override
-    def status(self) -> str:
-        return "success"
-
-    @override
-    def description(self) -> Optional[str]:
-        return ""
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return True

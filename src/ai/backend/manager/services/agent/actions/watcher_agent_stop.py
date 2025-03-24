@@ -3,16 +3,16 @@ from typing import Any, Optional, override
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.resource.base import ResourceAction
+from ai.backend.manager.services.agent.base import AgentAction
 
 
 @dataclass
-class WatcherAgentStopAction(ResourceAction):
+class WatcherAgentStopAction(AgentAction):
     agent_id: AgentId
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.agent_id)
 
     @override
     def operation_type(self):
@@ -27,16 +27,3 @@ class WatcherAgentStopActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return None
-
-    @override
-    def status(self) -> str:
-        return "success"
-
-    @override
-    def description(self) -> Optional[str]:
-        return ""
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return True

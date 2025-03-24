@@ -3,11 +3,12 @@ from typing import Any, Optional, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.resource.base import ResourceAction
+from ai.backend.manager.services.group.base import GroupAction
 
 
+# TODO: Batch action 변경
 @dataclass
-class UsagePerMonthAction(ResourceAction):
+class UsagePerMonthAction(GroupAction):
     month: str
     group_ids: Optional[list[UUID]] = None
 
@@ -28,16 +29,3 @@ class UsagePerMonthActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return None
-
-    @override
-    def status(self) -> str:
-        return "success"
-
-    @override
-    def description(self) -> Optional[str]:
-        return ""
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return True
