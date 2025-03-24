@@ -65,6 +65,7 @@ from ai.backend.common.events import (
     DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoTerminateSessionEvent,
+    DoUpdateSessionStatusEvent,
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
@@ -3318,6 +3319,7 @@ class AgentRegistry:
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
         if session_ids:
             await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+            await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def mark_image_pull_finished(
         self,
@@ -3356,6 +3358,7 @@ class AgentRegistry:
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
         if session_ids:
             await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+            await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def handle_image_pull_failed(
         self,
@@ -3394,6 +3397,7 @@ class AgentRegistry:
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
         if session_ids:
             await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+            await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def mark_kernel_creating(
         self,
@@ -3412,6 +3416,7 @@ class AgentRegistry:
 
         await execute_with_txn_retry(_set_status, self.db.begin_session, db_conn)
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
+        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def mark_kernel_pulling(
         self,
@@ -3434,6 +3439,7 @@ class AgentRegistry:
         transited = await execute_with_txn_retry(_transit_status, self.db.begin_session, db_conn)
         if transited:
             await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
+            await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def mark_kernel_running(
         self,
@@ -3472,6 +3478,7 @@ class AgentRegistry:
         if transited:
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
             await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
+            await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def mark_kernel_terminated(
         self,
@@ -3542,6 +3549,7 @@ class AgentRegistry:
 
         await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
+        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def _get_user_email(
         self,
