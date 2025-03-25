@@ -27,7 +27,9 @@ class GroupData:
     container_registry: dict[str, str]
 
     @classmethod
-    def from_row(cls, row: GroupRow) -> Self:
+    def from_row(cls, row: Optional[GroupRow]) -> Optional[Self]:
+        if row is None:
+            return None
         return cls(
             id=row.id,
             name=row.name,
@@ -46,7 +48,9 @@ class GroupData:
         )
 
     @classmethod
-    def from_table_var(cls, table_var: Table) -> Self:
+    def from_table_var(cls, table_var: Optional[Table]) -> Optional[Self]:
+        if table_var is None:
+            return None
         return cls(
             id=table_var.c.id,
             name=table_var.c.name,

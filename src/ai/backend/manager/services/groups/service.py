@@ -50,7 +50,7 @@ class GroupService:
         self._storage_manager = storage_manager
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        data: dict[str, Any] = action.get_insertion_data()
+        data = action.get_insertion_data()
         base_query = sa.insert(groups).values(data)
 
         async def _do_mutate() -> MutationResult:
@@ -69,7 +69,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return CreateGroupActionResult(data=GroupData.from_table_var(res.data))
+        return CreateGroupActionResult(data=GroupData.from_row(res.data))
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
         data: dict[str, Any] = {}
@@ -130,7 +130,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return ModifyGroupActionResult(data=GroupData.from_table_var(res.data))
+        return ModifyGroupActionResult(data=GroupData.from_row(res.data))
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
         update_query = (
@@ -153,7 +153,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return DeleteGroupActionResult(data=GroupData.from_table_var(res.data))
+        return DeleteGroupActionResult(data=GroupData.from_row(res.data))
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
         gid = action.group_id
@@ -189,7 +189,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return PurgeGroupActionResult(data=GroupData.from_table_var(res.data))
+        return PurgeGroupActionResult(data=GroupData.from_row(res.data))
 
     async def group_vfolder_mounted_to_active_kernels(
         self, db_conn: SAConnection, group_id: uuid.UUID
