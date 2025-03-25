@@ -5,6 +5,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.models.base import Unset
+from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.services.image.base import ImageAction
 from ai.backend.manager.services.image.types import KVPairInput, ResourceLimitInput
 
@@ -18,7 +19,7 @@ class ModifyImageInputData:
     architecture: Optional[str] = None
     is_local: Optional[bool] = None
     size_bytes: Optional[int] = None
-    type: Optional[str] = None
+    type: Optional[ImageType] = None
     digest: Optional[str] = None
     labels: Optional[list[KVPairInput]] = None
     supported_accelerators: Optional[list[str]] | Unset = None

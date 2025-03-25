@@ -1,9 +1,14 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Optional, Self
 
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
+
+
+@dataclass
+class ImageLabels:
+    label_data: dict[str, str]
 
 
 @dataclass
@@ -22,8 +27,7 @@ class ImageData:
     is_local: bool
     type: ImageType
     accelerators: Optional[str]
-    # TODO: 타입 정의 필요
-    labels: dict[str, Any]
+    labels: ImageLabels
     # TODO: 타입 정의 필요
     resources: dict[str, dict[str, Optional[str]]]
     status: ImageStatus
@@ -45,7 +49,7 @@ class ImageData:
             is_local=row.is_local,
             type=row.type,
             accelerators=row.accelerators,
-            labels=row.labels,
+            labels=ImageLabels(label_data=row.labels),
             resources=row.resources,
             status=row.status,
         )
@@ -65,7 +69,7 @@ class ImageData:
             is_local=self.is_local,
             type=self.type,
             accelerators=self.accelerators,
-            labels=self.labels,
+            labels=self.labels.label_data,
             resources=self.resources,
             status=self.status,
         )
