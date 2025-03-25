@@ -1723,6 +1723,10 @@ class DecimalType(TypeDecorator, Decimal):
 
 
 class Unset:
+    """
+    TODO: Write comment
+    """
+
     def __repr__(self):
         return "UNSET"
 
@@ -1734,7 +1738,9 @@ T = TypeVar("T")
 
 
 def graphene_input_to_dataclass(cls: Type[T], data: MutableMapping[str, Any]) -> T:
-    """ """
+    """
+    TODO: Write comment
+    """
     if not is_dataclass(cls):
         raise ValueError(f"{cls} is not a dataclass type.")
 

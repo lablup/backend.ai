@@ -12,6 +12,11 @@ class ImageLabels:
 
 
 @dataclass
+class ImageResources:
+    resources_data: dict[str, dict[str, Optional[str]]]
+
+
+@dataclass
 class ImageData:
     id: uuid.UUID
     name: str
@@ -28,8 +33,7 @@ class ImageData:
     type: ImageType
     accelerators: Optional[str]
     labels: ImageLabels
-    # TODO: 타입 정의 필요
-    resources: dict[str, dict[str, Optional[str]]]
+    resources: ImageResources
     status: ImageStatus
 
     @classmethod
@@ -50,7 +54,7 @@ class ImageData:
             type=row.type,
             accelerators=row.accelerators,
             labels=ImageLabels(label_data=row.labels),
-            resources=row.resources,
+            resources=ImageResources(resources_data=row.resources),
             status=row.status,
         )
 
@@ -70,7 +74,7 @@ class ImageData:
             type=self.type,
             accelerators=self.accelerators,
             labels=self.labels.label_data,
-            resources=self.resources,
+            resources=self.resources.resources_data,
             status=self.status,
         )
 
