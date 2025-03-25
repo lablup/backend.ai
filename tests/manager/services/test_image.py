@@ -6,7 +6,12 @@ import pytest
 from dateutil.parser import isoparse
 
 from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageLabels
+from ai.backend.manager.data.image.types import (
+    ImageAliasData,
+    ImageData,
+    ImageLabels,
+    ImageResources,
+)
 from ai.backend.manager.models.base import UNSET
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
@@ -70,7 +75,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
     is_local=False,
     type=ImageType.COMPUTE,
     labels={},
-    resources={"cpu": {"min": "500m", "max": None}},
+    resources={},
     status=ImageStatus.ALIVE,
 )
 IMAGE_ROW_FIXTURE.id = uuid.uuid4()
@@ -91,6 +96,7 @@ IMAGE_FIXTURE_DICT = dataclasses.asdict(
 # TODO: labels에 그냥 dict를 쓰는 게 어떨지? 안 그럼 dataclasses.asdict에서 labels가 중첩되서 들어가기 때문에 커스텀 as_dict를 만들든,
 # 이런 식으로 필드 오버라이드 해야함.
 IMAGE_FIXTURE_DICT["labels"] = {}
+IMAGE_FIXTURE_DICT["resources"] = {}
 
 IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
 IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
@@ -147,7 +153,6 @@ def processors(extra_fixtures, database_fixture, database_engine):
             ]
         }
     ],
-    ids=[""],
 )
 async def test_forget_image(
     processors: ImageProcessors,
@@ -200,7 +205,6 @@ async def test_forget_image(
             ]
         }
     ],
-    ids=[""],
 )
 async def test_forget_image_by_id(
     processors: ImageProcessors,
@@ -251,7 +255,6 @@ async def test_forget_image_by_id(
             ]
         }
     ],
-    ids=[""],
 )
 async def test_purge_image_by_id(
     processors: ImageProcessors,
@@ -285,7 +288,6 @@ async def test_purge_image_by_id(
             "images": [IMAGE_FIXTURE_DICT],
         }
     ],
-    ids=[""],
 )
 async def test_alias_image(
     processors: ImageProcessors,
@@ -321,7 +323,6 @@ async def test_alias_image(
             ],
         }
     ],
-    ids=[""],
 )
 async def test_dealias_image(
     processors: ImageProcessors,
@@ -371,6 +372,7 @@ async def test_dealias_image(
                     ],
                     resource_limits=[
                         ResourceLimitInput(key="cpu", min="3", max="5"),
+                        ResourceLimitInput(key="mem", min="256m", max=None),
                     ],
                     digest="sha256:1234567890abcdef",
                 ),
@@ -384,7 +386,12 @@ async def test_dealias_image(
                     is_local=True,
                     size_bytes=123,
                     labels=ImageLabels(label_data={"key1": "value1", "key2": "value2"}),
-                    resources={"cpu": {"min": "3", "max": "5"}},
+                    resources=ImageResources(
+                        resources_data={
+                            "cpu": {"min": "3", "max": "5"},
+                            "mem": {"min": "256m"},
+                        }
+                    ),
                     config_digest="sha256:1234567890abcdef",
                 )
             ),
@@ -436,7 +443,6 @@ async def test_dealias_image(
             ],
         }
     ],
-    ids=[""],
 )
 async def test_modify_image(
     processors: ImageProcessors,
@@ -467,7 +473,6 @@ async def test_modify_image(
             ],
         }
     ],
-    ids=[""],
 )
 async def test_clear_images(
     processors: ImageProcessors,
