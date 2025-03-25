@@ -19,6 +19,7 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionId, SessionResult
