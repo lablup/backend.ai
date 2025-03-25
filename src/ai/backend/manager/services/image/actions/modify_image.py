@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.utils import Unset
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.data.image.types import ImageData
@@ -9,7 +10,7 @@ from ai.backend.manager.services.image.types import KVPairInput, ResourceLimitIn
 
 
 @dataclass
-class ModifyImageInput:
+class ModifyImageInputData:
     name: Optional[str] = None
     registry: Optional[str] = None
     image: Optional[str] = None
@@ -19,16 +20,16 @@ class ModifyImageInput:
     size_bytes: Optional[int] = None
     type: Optional[str] = None
     digest: Optional[str] = None
-    labels: list[KVPairInput] = field(default_factory=list)
-    supported_accelerators: list[str] = field(default_factory=list)
-    resource_limits: list[ResourceLimitInput] = field(default_factory=list)
+    labels: Optional[list[KVPairInput]] = None
+    supported_accelerators: Optional[list[str]] | Unset = None
+    resource_limits: Optional[list[ResourceLimitInput]] = None
 
 
 @dataclass
 class ModifyImageAction(ImageAction):
     target: str
     architecture: str
-    props: ModifyImageInput
+    props: ModifyImageInputData
 
     @override
     def entity_id(self) -> Optional[str]:
