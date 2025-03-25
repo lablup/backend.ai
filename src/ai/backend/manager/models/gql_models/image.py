@@ -1033,7 +1033,6 @@ class ModifyImageInput(graphene.InputObjectType):
     is_local = graphene.Boolean(required=False)
     size_bytes = graphene.Int(required=False)
     type = graphene.String(required=False)
-
     digest = graphene.String(required=False)
     labels = graphene.List(lambda: KVPairInput, required=False)
     supported_accelerators = graphene.List(graphene.String, required=False)
