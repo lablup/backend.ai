@@ -16,6 +16,10 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
 )
+from ai.backend.manager.services.image.actions.dealias_image import (
+    DealiasImageAction,
+    DealiasImageActionResult,
+)
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
     ForgetImageActionGenericForbiddenError,
@@ -59,11 +63,14 @@ IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
 )
 
 IMAGE_FIXTURE_DATA = ImageData.from_image_row(IMAGE_ROW_FIXTURE)
+IMAGE_ALIAS_DATA = ImageAliasData.from_image_alias_row(IMAGE_ALIAS_ROW_FIXTURE)
 
 
 IMAGE_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(IMAGE_FIXTURE_DATA, type=ImageType.COMPUTE._name_)  # type: ignore
 )
+IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
+IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
 
 
 @pytest.fixture
@@ -188,14 +195,11 @@ async def test_forget_image_by_id(
             AliasImageAction(
                 image_canonical=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
-                alias="new-alias",
+                alias="python",
             ),
             AliasImageActionResult(
                 image_id=IMAGE_ROW_FIXTURE.id,
-                image_alias=ImageAliasData(
-                    id=uuid.uuid4(),
-                    alias="new-alias",
-                ),
+                image_alias=IMAGE_ALIAS_DATA,
             ),
         ),
     ],
@@ -216,59 +220,40 @@ async def test_alias_image(
     await test_scenario.test(processors.alias_image.wait_for_complete)
 
 
-# @pytest.mark.asyncio
-# @pytest.mark.parametrize(
-#     "test_scenario",
-#     [
-#         TestScenario.success(
-#             "Success Case",
-#             DealiasImageAction(
-#                 alias=IMAGE_ALIAS_ROW_FIXTURE.alias,
-#             ),
-#             DealiasImageActionResult(
-#                 image_id=IMAGE_ALIAS_ROW_FIXTURE.image_id, image_alias=IMAGE_ALIAS_ROW_FIXTURE
-#             ),
-#         ),
-#     ],
-# )
-# @pytest.mark.parametrize(
-#     "extra_fixtures",
-#     [
-#         {
-#             "images": [
-#                 {
-#                     "id": str(IMAGE_ROW_FIXTURE.id),
-#                     "name": IMAGE_ROW_FIXTURE.name,
-#                     "image": IMAGE_ROW_FIXTURE.image,
-#                     "project": IMAGE_ROW_FIXTURE.project,
-#                     "registry": IMAGE_ROW_FIXTURE.registry,
-#                     "registry_id": IMAGE_ROW_FIXTURE.registry_id,
-#                     "architecture": IMAGE_ROW_FIXTURE.architecture,
-#                     "config_digest": IMAGE_ROW_FIXTURE.config_digest,
-#                     "size_bytes": IMAGE_ROW_FIXTURE.size_bytes,
-#                     "is_local": IMAGE_ROW_FIXTURE.is_local,
-#                     "type": IMAGE_ROW_FIXTURE.type._name_,
-#                     "labels": IMAGE_ROW_FIXTURE.labels,
-#                     "resources": IMAGE_ROW_FIXTURE.resources,
-#                     "status": IMAGE_ROW_FIXTURE.status.value,
-#                 }
-#             ],
-#             "image_aliases": [
-#                 {
-#                     "id": str(IMAGE_ALIAS_ROW_FIXTURE.id),
-#                     "alias": IMAGE_ALIAS_ROW_FIXTURE.alias,
-#                     "image": str(IMAGE_ROW_FIXTURE.id),
-#                 }
-#             ],
-#         }
-#     ],
-#     ids=[""],
-# )
-# async def test_dealias_image(
-#     processors: ImageProcessors,
-#     test_scenario: TestScenario[DealiasImageAction, DealiasImageActionResult],
-# ):
-#     await test_scenario.test(processors.dealias_image.wait_for_complete)
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "test_scenario",
+    [
+        TestScenario.success(
+            "Success Case",
+            DealiasImageAction(
+                alias=IMAGE_ALIAS_ROW_FIXTURE.alias,
+            ),
+            DealiasImageActionResult(
+                image_id=IMAGE_ALIAS_ROW_FIXTURE.image_id, image_alias=IMAGE_ALIAS_DATA
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    [
+        {
+            "images": [
+                IMAGE_FIXTURE_DICT,
+            ],
+            "image_aliases": [
+                IMAGE_ALIAS_DICT,
+            ],
+        }
+    ],
+    ids=[""],
+)
+async def test_dealias_image(
+    processors: ImageProcessors,
+    test_scenario: TestScenario[DealiasImageAction, DealiasImageActionResult],
+):
+    await test_scenario.test(processors.dealias_image.wait_for_complete)
 
 
 # # TODO: 일단 ClearImages에서 뭔가를 리턴해야...?
