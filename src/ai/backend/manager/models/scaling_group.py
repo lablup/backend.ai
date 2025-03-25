@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Dict,
     Optional,
     Self,
@@ -63,6 +64,7 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ScalingGroupPermission
 from .user import UserRole
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -288,6 +290,26 @@ class ScalingGroupRow(Base):
         primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
     )
 
+    @classmethod
+    async def list_by_condition(
+        cls,
+        conditions: Iterable[QueryCondition],
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> list[Self]:
+        stmt = sa.select(ScalingGroupRow)
+        for cond in conditions:
+            stmt = cond(stmt)
+        async with db.begin_readonly_session() as db_session:
+            return await db_session.scalars(stmt)
+
+
+type QueryCondition = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
+
+
+def and_names(names: Iterable[str]) -> Callable[..., sa.sql.Select]:
+    return lambda query_stmt: query_stmt.where(ScalingGroupRow.name.in_(names))
+
 
 # For compatibility
 scaling_groups = ScalingGroupRow.__table__
@@ -429,6 +451,10 @@ class ScalingGroup(graphene.ObjectType):
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
+    accelerator_quantum_size = graphene.Field(
+        graphene.Float,
+        description="Added in 25.5.0.",
+    )
 
     # Dynamic fields.
     agent_count_by_status = graphene.Field(
@@ -458,9 +484,15 @@ class ScalingGroup(graphene.ObjectType):
         ),
     )
 
+    def __init__(self, is_masked: bool = False, *args, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._is_masked = is_masked
+
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
-    ) -> int:
+    ) -> Optional[int]:
+        if self._is_masked:
+            return None
         from .gql_models.agent import Agent
 
         return await Agent.load_count(
@@ -471,7 +503,9 @@ class ScalingGroup(graphene.ObjectType):
 
     async def resolve_agent_total_resource_slots_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
-    ) -> Mapping[str, Any]:
+    ) -> Optional[Mapping[str, Any]]:
+        if self._is_masked:
+            return None
         from .agent import AgentRow, AgentStatus
 
         graph_ctx = info.context
@@ -526,6 +560,11 @@ class ScalingGroup(graphene.ObjectType):
             occupied_slots += kernel.occupied_slots
         return occupied_slots.to_json()
 
+    async def resolve_accelerator_quantum_size(self, info: graphene.ResolveInfo) -> Optional[float]:
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.etcd.get("config/plugins/accelerator/cuda/quantum_size")
+        return float(result) if result is not None else None
+
     @classmethod
     def from_row(
         cls,
@@ -547,6 +586,36 @@ class ScalingGroup(graphene.ObjectType):
             scheduler=row["scheduler"],
             scheduler_opts=row["scheduler_opts"].to_json(),
             use_host_network=row["use_host_network"],
+        )
+
+    @classmethod
+    def from_orm_row(
+        cls,
+        row: ScalingGroupRow,
+    ) -> ScalingGroup:
+        return cls(
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            is_public=row.is_public,
+            created_at=row.created_at,
+            wsproxy_addr=row.wsproxy_addr,
+            wsproxy_api_token=row.wsproxy_api_token,
+            driver=row.driver,
+            driver_opts=row.driver_opts,
+            scheduler=row.scheduler,
+            scheduler_opts=row.scheduler_opts.to_json(),
+            use_host_network=row.use_host_network,
+        )
+
+    @property
+    def masked(self) -> Self:
+        return self.__class__(
+            is_masked=True,
+            name=self.name,
+            is_active=self.is_active,
+            own_session_occupied_resource_slots=self.own_session_occupied_resource_slots,
+            accelerator_quantum_size=self.accelerator_quantum_size,
         )
 
     @classmethod
