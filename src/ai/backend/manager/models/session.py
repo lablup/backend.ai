@@ -38,6 +38,7 @@ from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectin
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
     DoStartSessionEvent,
+    DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
     SessionStartedEvent,
@@ -168,6 +169,15 @@ class SessionStatus(enum.StrEnum):
     TERMINATED = "TERMINATED"
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
+
+    @classmethod
+    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
+        return {
+            cls.PREPARING,
+            cls.PULLING,
+            cls.CREATING,
+            cls.TERMINATING,
+        }
 
 
 FOLLOWING_SESSION_STATUSES = (
@@ -1452,8 +1462,9 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
+        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
-    async def get_status_updatable_sessions(self) -> list[SessionId]:
+    async def get_status_updatable_sessions(self) -> set[SessionId]:
         pop_all_session_id_script = textwrap.dedent("""
         local key = KEYS[1]
         local count = redis.call('SCARD', key)
@@ -1473,7 +1484,7 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
-            return []
+            raw_result = []
         raw_result = cast(list[bytes], raw_result)
         result: list[SessionId] = []
         for raw_session_id in raw_result:
@@ -1482,7 +1493,14 @@ class SessionLifecycleManager:
             except (ValueError, SyntaxError):
                 log.warning(f"Cannot parse session id, skip. (id:{raw_session_id})")
                 continue
-        return result
+
+        async with self.db.begin_readonly_session() as db_session:
+            session_query = sa.select(SessionRow).where(
+                SessionRow.status.in_(SessionStatus.kernel_awaiting_statuses())
+            )
+            session_rows = await db_session.scalars(session_query)
+            session_ids = [row.id for row in session_rows]
+        return {*result, *session_ids}
 
     async def deregister_status_updatable_session(
         self,
