@@ -38,6 +38,7 @@ from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectin
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
     DoStartSessionEvent,
+    DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
     SessionStartedEvent,
@@ -1461,6 +1462,7 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
+        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
         pop_all_session_id_script = textwrap.dedent("""
