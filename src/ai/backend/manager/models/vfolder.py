@@ -986,8 +986,8 @@ async def prepare_vfolder_mounts(
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
         if _vfolder["name"].startswith("."):
-            requested_vfolder_names.setdefault(_vfolder["name"], _vfolder["name"])
-            requested_vfolder_subpaths.setdefault(_vfolder["name"], ".")
+            requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
+            requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
     # for vfolder in accessible_vfolders:
     accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
