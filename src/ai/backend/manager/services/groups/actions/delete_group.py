@@ -23,6 +23,7 @@ class DeleteGroupAction(GroupAction):
 @dataclass
 class DeleteGroupActionResult(BaseActionResult):
     data: Optional[GroupData]
+    success: bool
 
     @override
     def entity_id(self) -> Optional[str]:

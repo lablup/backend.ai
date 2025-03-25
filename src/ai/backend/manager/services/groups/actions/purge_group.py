@@ -22,7 +22,8 @@ class PurgeGroupAction(GroupAction):
 
 @dataclass
 class PurgeGroupActionResult(BaseActionResult):
-    data: Optional[GroupData] = None
+    data: Optional[GroupData]
+    success: bool
 
     @override
     def entity_id(self) -> Optional[str]:

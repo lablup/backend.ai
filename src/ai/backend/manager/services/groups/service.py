@@ -69,7 +69,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return CreateGroupActionResult(data=GroupData.from_row(res.data))
+        return CreateGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
         data: dict[str, Any] = {}
@@ -97,7 +97,7 @@ class GroupService:
         if not action.user_uuids:
             action.user_update_mode = None
         if not data and action.user_update_mode is None:
-            return ModifyGroupActionResult(data=None)
+            return ModifyGroupActionResult(data=None, success=False)
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
@@ -130,7 +130,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return ModifyGroupActionResult(data=GroupData.from_row(res.data))
+        return ModifyGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
         update_query = (
@@ -153,7 +153,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return DeleteGroupActionResult(data=GroupData.from_row(res.data))
+        return DeleteGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
         gid = action.group_id
@@ -189,7 +189,7 @@ class GroupService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return PurgeGroupActionResult(data=GroupData.from_row(res.data))
+        return PurgeGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
     async def group_vfolder_mounted_to_active_kernels(
         self, db_conn: SAConnection, group_id: uuid.UUID
