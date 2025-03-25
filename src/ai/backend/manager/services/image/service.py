@@ -1,18 +1,16 @@
 import logging
-from typing import Any, MutableMapping
 
 import sqlalchemy as sa
-from graphql import Undefined
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
+from ai.backend.common.utils import apply_dataclass_field
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
-from ai.backend.manager.models.base import set_if_set
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
@@ -173,43 +171,36 @@ class ImageService:
         return ClearImagesActionResult()
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
-        data: MutableMapping[str, Any] = {}
+        data: dict = {}
         props = action.props
 
-        set_if_set(props, data, "name")
-        set_if_set(props, data, "registry")
-        set_if_set(props, data, "image")
-        set_if_set(props, data, "tag")
-        set_if_set(props, data, "architecture")
-        set_if_set(props, data, "is_local")
-        set_if_set(props, data, "size_bytes")
-        set_if_set(props, data, "type")
-        set_if_set(props, data, "digest", target_key="config_digest")
-        set_if_set(
+        apply_dataclass_field(props, data, "name")
+        apply_dataclass_field(props, data, "registry")
+        apply_dataclass_field(props, data, "image")
+        apply_dataclass_field(props, data, "tag")
+        apply_dataclass_field(props, data, "architecture")
+        apply_dataclass_field(props, data, "is_local")
+        apply_dataclass_field(props, data, "size_bytes")
+        apply_dataclass_field(props, data, "type")
+        apply_dataclass_field(props, data, "digest", target_key="config_digest")
+        apply_dataclass_field(
             props,
             data,
             "supported_accelerators",
             clean_func=lambda v: ",".join(v),
             target_key="accelerators",
         )
-        set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
+        apply_dataclass_field(
+            props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v}
+        )
 
-        # TODO: graphql Undefined를 여기서 쓰면 안 될 듯.
-        if props.resource_limits is not Undefined:
+        if props.resource_limits is not None:
             resources_data = {}
             for limit_option in props.resource_limits:
                 limit_data = {}
-                if (
-                    limit_option.min is not None
-                    and limit_option.min is not Undefined
-                    and len(limit_option.min) > 0
-                ):
+                if limit_option.min is not None and len(limit_option.min) > 0:
                     limit_data["min"] = limit_option.min
-                if (
-                    limit_option.max is not None
-                    and limit_option.max is not Undefined
-                    and len(limit_option.max) > 0
-                ):
+                if limit_option.max is not None and len(limit_option.max) > 0:
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
             data["resources"] = resources_data
