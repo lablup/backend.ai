@@ -34,6 +34,7 @@ from ai.backend.common.types import (
     DispatchResult,
     ImageAlias,
 )
+from ai.backend.common.utils import graphene_input_to_dataclass
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
@@ -50,7 +51,10 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
-from ai.backend.manager.services.image.actions.modify_image import ModifyImageAction
+from ai.backend.manager.services.image.actions.modify_image import (
+    ModifyImageAction,
+    ModifyImageInputData,
+)
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
@@ -1061,7 +1065,7 @@ class ModifyImage(graphene.Mutation):
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                props=props,
+                props=graphene_input_to_dataclass(ModifyImageInputData, props),
             )
         )
 
