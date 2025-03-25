@@ -32,6 +32,11 @@ class ImageLabels:
 
 
 @dataclass
+class ImageResources:
+    resources_data: dict[str, dict[str, Optional[str]]]
+
+
+@dataclass
 class ImageData:
     id: uuid.UUID
     name: str
