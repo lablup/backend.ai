@@ -32,7 +32,6 @@ from ai.backend.common.types import (
     DispatchResult,
     ImageAlias,
 )
-from ai.backend.common.utils import graphene_input_to_dataclass
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -83,6 +82,7 @@ from ..base import (
     OrderExprArg,
     batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
+    graphene_input_to_dataclass,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
 from ..image import (

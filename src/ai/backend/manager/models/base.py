@@ -14,6 +14,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from dataclasses import fields, is_dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -26,6 +27,7 @@ from typing import (
     Optional,
     Protocol,
     Self,
+    Type,
     TypeVar,
     cast,
     overload,
@@ -1731,3 +1733,54 @@ class DecimalType(TypeDecorator, Decimal):
     @property
     def python_type(self) -> type[Decimal]:
         return Decimal
+
+
+class Unset:
+    def __repr__(self):
+        return "UNSET"
+
+
+UNSET = Unset()
+
+
+T = TypeVar("T")
+
+
+def graphene_input_to_dataclass(cls: Type[T], data: MutableMapping[str, Any]) -> T:
+    """ """
+    if not is_dataclass(cls):
+        raise ValueError(f"{cls} is not a dataclass type.")
+
+    result: dict[str, Any] = {}
+    for field in fields(cls):
+        value = data.get(field.name, Undefined)
+        if value is Undefined:
+            result[field.name] = None
+        elif value is None:
+            result[field.name] = UNSET
+        else:
+            result[field.name] = value
+
+    return cast(T, cls(**result))
+
+
+def apply_dataclass_field(
+    src: Any,
+    target: dict[str, Any],
+    name: str,
+    *,
+    clean_func: Optional[Callable[[Any], Any]] = None,
+    target_key: Optional[str] = None,
+) -> None:
+    if not (is_dataclass(src) and not isinstance(src, type)):
+        raise TypeError("src must be a dataclass instance.")
+
+    # "name" should exist in the "src"
+    v = getattr(src, name)
+
+    if v is None:
+        pass
+    elif v is UNSET:
+        target[target_key or name] = None
+    else:
+        target[target_key or name] = clean_func(v) if callable(clean_func) else v
