@@ -6,7 +6,7 @@ import pytest
 from dateutil.parser import isoparse
 
 from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageLabels
 from ai.backend.manager.models.base import UNSET
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
@@ -39,6 +39,7 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import (
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
+    ModifyImageActionValueError,
     ModifyImageInputData,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import (
@@ -87,6 +88,10 @@ IMAGE_ALIAS_DATA = ImageAliasData.from_image_alias_row(IMAGE_ALIAS_ROW_FIXTURE)
 IMAGE_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(IMAGE_FIXTURE_DATA, type=ImageType.COMPUTE._name_)  # type: ignore
 )
+# TODO: labels에 그냥 dict를 쓰는 게 어떨지? 안 그럼 dataclasses.asdict에서 labels가 중첩되서 들어가기 때문에 커스텀 as_dict를 만들든,
+# 이런 식으로 필드 오버라이드 해야함.
+IMAGE_FIXTURE_DICT["labels"] = {}
+
 IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
 IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
 
@@ -355,6 +360,7 @@ async def test_dealias_image(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
                 props=ModifyImageInputData(
+                    type=ImageType.SERVICE,
                     registry="cr.backend.ai2",
                     supported_accelerators=["cuda", "rocm"],
                     is_local=True,
@@ -366,19 +372,33 @@ async def test_dealias_image(
                     resource_limits=[
                         ResourceLimitInput(key="cpu", min="3", max="5"),
                     ],
+                    digest="sha256:1234567890abcdef",
                 ),
             ),
             ModifyImageActionResult(
                 image=replace(
                     IMAGE_FIXTURE_DATA,
+                    type=ImageType.SERVICE,
                     registry="cr.backend.ai2",
                     accelerators="cuda,rocm",
                     is_local=True,
                     size_bytes=123,
-                    labels={"key1": "value1", "key2": "value2"},
+                    labels=ImageLabels(label_data={"key1": "value1", "key2": "value2"}),
                     resources={"cpu": {"min": "3", "max": "5"}},
+                    config_digest="sha256:1234567890abcdef",
                 )
             ),
+        ),
+        TestScenario.success(
+            "Update one column by image alias",
+            ModifyImageAction(
+                target=IMAGE_ALIAS_ROW_FIXTURE.alias,
+                architecture=IMAGE_ROW_FIXTURE.architecture,
+                props=ModifyImageInputData(
+                    registry="cr.backend.ai2",
+                ),
+            ),
+            ModifyImageActionResult(image=replace(IMAGE_FIXTURE_DATA, registry="cr.backend.ai2")),
         ),
         TestScenario.failure(
             "Image not found",
@@ -391,6 +411,17 @@ async def test_dealias_image(
             ),
             ImageNotFound,
         ),
+        TestScenario.failure(
+            "Value Error",
+            ModifyImageAction(
+                target=IMAGE_ROW_FIXTURE.name,
+                architecture=IMAGE_ROW_FIXTURE.architecture,
+                props=ModifyImageInputData(
+                    digest="a" * 73,  # config_digest column is sa.CHAR(length=72)
+                ),
+            ),
+            ModifyImageActionValueError,
+        ),
     ],
 )
 @pytest.mark.parametrize(
@@ -399,6 +430,9 @@ async def test_dealias_image(
         {
             "images": [
                 IMAGE_FIXTURE_DICT,
+            ],
+            "image_aliases": [
+                IMAGE_ALIAS_DICT,
             ],
         }
     ],
@@ -440,22 +474,3 @@ async def test_clear_images(
     test_scenario: TestScenario[ClearImagesAction, ClearImagesActionResult],
 ):
     await test_scenario.test(processors.clear_images.wait_for_complete)
-
-
-# # @pytest.mark.parametrize(
-# #     "test_scenario",
-# #     [
-# #         TestScenario.success("Success Case", PurgeImagesAction(), PurgeImagesActionResult()),
-# #         TestScenario.failure(
-# #             "When No Image exists, raise Image Not Found Error",
-# #             PurgeImagesAction(),
-# #             BackendError,
-# #         ),
-# #     ],
-# # )
-# # def test_purge_images(
-# #     test_scenario: TestScenario[PurgeImagesAction, PurgeImagesActionResult],
-# #     processors: ImageProcessors,
-# # ):
-# #     # test_scenario.test(processors.purge_images.fire_and_forget)
-# #     pass
