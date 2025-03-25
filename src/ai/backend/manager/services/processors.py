@@ -21,6 +21,7 @@ class Processors:
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     user_resource_policy: UserResourcePolicyProcessors
+    project_resource_policy: ProjectResourcePolicyProcessors
 
     vfolder: VFolderBaseProcessors
     vfolder_invitation: VFolderInviteProcessors
