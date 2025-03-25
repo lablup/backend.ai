@@ -134,6 +134,7 @@ from .gql_models.session import (
     ComputeSessionNode,
     ModifyComputeSession,
     SessionPermissionValueField,
+    TotalResourceSlot,
 )
 from .gql_models.user import UserConnection, UserNode
 from .gql_models.vfolder import (
@@ -217,7 +218,12 @@ from .scaling_group import (
     and_names,
     query_allowed_sgroups,
 )
-from .session import ComputeSession, ComputeSessionList
+from .session import (
+    ComputeSession,
+    ComputeSessionList,
+    SessionQueryConditions,
+    SessionStatus,
+)
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
     CreateUser,
@@ -962,6 +968,31 @@ class Queries(graphene.ObjectType):
         sess_id=graphene.String(required=True),
         domain_name=graphene.String(),
         access_key=graphene.String(),
+    )
+
+    total_resource_slot = graphene.Field(
+        TotalResourceSlot,
+        description="Added in 25.5.0.",
+        statuses=graphene.List(
+            graphene.String,
+            default_value=None,
+            description=(
+                "`statuses` argument is an array of session statuses. "
+                "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
+                f"The argument should be an array of the following valid status values: {[s.name for s in SessionStatus]}.\n"
+                f"Default value is null."
+            ),
+        ),
+        filter=graphene.String(
+            description=(
+                "`filter` argument is a string that is parsed into query conditions. "
+                "It works in the same way as the `filter` argument in the `compute_session` query schema, "
+                "meaning the values are parsed into an identical SQL query expression.\n"
+                "Default value is `null`."
+            ),
+        ),
+        domain_name=graphene.String(),
+        resource_group_name=graphene.String(),
     )
 
     vfolder_host_permissions = graphene.Field(
@@ -2561,6 +2592,32 @@ class Queries(graphene.ObjectType):
             return matches[0]
         else:
             raise TooManyKernelsFound
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_total_resource_slot(
+        root: Any,
+        info: graphene.ResolveInfo,
+        statuses: Optional[list[str]] = None,
+        filter: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        resource_group_name: Optional[str] = None,
+    ) -> TotalResourceSlot:
+        graph_ctx: GraphQueryContext = info.context
+
+        if statuses is not None:
+            status_list = [SessionStatus[s] for s in statuses]
+        else:
+            status_list = None
+        return await TotalResourceSlot.get_data(
+            graph_ctx,
+            SessionQueryConditions(
+                statuses=status_list,
+                domain_name=domain_name,
+                resource_group_name=resource_group_name,
+                raw_filter=filter,
+            ),
+        )
 
     @staticmethod
     async def resolve_vfolder_host_permissions(
