@@ -55,10 +55,6 @@ class MutationResult:
     message: str
     data: Optional[Any]
 
-    @property
-    def status(self) -> str:
-        return "success" if self.success else "failed"
-
 
 class DomainService:
     _db: ExtendedAsyncSAEngine
@@ -92,6 +88,7 @@ class DomainService:
                 result = await conn.execute(query)
                 row = result.first()
                 await _post_func(conn, result)
+                # TODO: Raise Error if rowcount is 0
                 if result.rowcount > 0:
                     return MutationResult(success=True, message="domain creation succeed", data=row)
                 else:
@@ -103,7 +100,7 @@ class DomainService:
 
         return CreateDomainActionResult(
             domain_data=DomainData.from_row(res.data),
-            status=res.status,
+            success=res.success,
             description=res.message,
         )
 
@@ -144,7 +141,7 @@ class DomainService:
 
         return ModifyDomainActionResult(
             domain_data=DomainData.from_row(res.data),
-            status=res.status,
+            success=res.success,
             description=res.message,
         )
 
@@ -156,6 +153,7 @@ class DomainService:
         async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
                 result = await conn.execute(base_query)
+                # TODO: Raise Error if rowcount is 0
                 if result.rowcount > 0:
                     return MutationResult(
                         success=True,
@@ -168,9 +166,8 @@ class DomainService:
                     )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
-        print(f"res: {res.success}, {res.message}")
 
-        return DeleteDomainActionResult(status=res.status, description=res.message)
+        return DeleteDomainActionResult(success=res.success, description=res.message)
 
     async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         from ai.backend.manager.models import groups, users
@@ -196,6 +193,7 @@ class DomainService:
                 await _pre_func(conn)
                 delete_query = sa.delete(domains).where(domains.c.name == name)
                 result = await conn.execute(delete_query)
+                # TODO: Raise Error if rowcount is 0
                 if result.rowcount > 0:
                     return MutationResult(
                         success=True, message=f"domain {name} purged successfully", data=None
@@ -209,7 +207,7 @@ class DomainService:
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
-        return PurgeDomainActionResult(status=res.status, description=res.message)
+        return PurgeDomainActionResult(success=res.success, description=res.message)
 
     async def _delete_kernels(self, conn: SAConnection, domain_name: str) -> int:
         from ai.backend.manager.models.kernel import kernels
@@ -277,7 +275,7 @@ class DomainService:
 
         return CreateDomainNodeActionResult(
             domain_data=DomainData.from_row(domain_row),
-            status="success",
+            success=True,
             description=f"domain {action.name} created",
         )
 
@@ -364,7 +362,7 @@ class DomainService:
 
         return ModifyDomainNodeActionResult(
             domain_data=DomainData.from_row(domain_row),
-            status="success",
+            success=True,
             description=f"domain {domain_name} modified",
         )
 

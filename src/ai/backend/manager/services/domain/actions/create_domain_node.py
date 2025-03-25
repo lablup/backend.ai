@@ -43,9 +43,9 @@ class CreateDomainNodeAction(DomainAction):
 @dataclass
 class CreateDomainNodeActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    status: str
-    description: Optional[str]
+    success: bool
+    description: str
 
     @override
-    def entity_id(self):
-        return self.domain_row.name
+    def entity_id(self) -> Optional[str]:
+        return self.domain_data.name if self.domain_data is not None else None

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
@@ -20,13 +20,9 @@ class DeleteDomainAction(DomainAction):
 
 @dataclass
 class DeleteDomainActionResult(BaseActionResult):
-    status: str
+    success: bool
     description: str
 
     @override
-    def entity_id(self) -> str:
-        return ""
-
-    @property
-    def ok(self) -> bool:
-        return self.status == "success"
+    def entity_id(self) -> Optional[str]:
+        return None

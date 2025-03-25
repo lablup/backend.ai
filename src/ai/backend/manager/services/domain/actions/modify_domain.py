@@ -30,16 +30,12 @@ class ModifyDomainAction(DomainAction):
 @dataclass
 class ModifyDomainActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    status: str
+    success: bool
     description: Optional[str]
 
     @override
-    def entity_id(self) -> str:
-        return self.domain_data.name if self.domain_data is not None else ""
-
-    @property
-    def ok(self) -> bool:
-        return self.status == "success"
+    def entity_id(self) -> Optional[str]:
+        return self.domain_data.name if self.domain_data is not None else None
 
     def __eq__(self, other):
         return self.domain_data == other.domain_data

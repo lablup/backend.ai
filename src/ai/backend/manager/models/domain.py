@@ -376,7 +376,7 @@ class CreateDomain(graphene.Mutation):
         domain_data: Optional[DomainData] = res.domain_data
 
         return cls(
-            ok=res.ok,
+            ok=res.success,
             msg=res.description,
             domain=Domain.from_dto(domain_data) if domain_data else None,
         )
@@ -411,7 +411,7 @@ class ModifyDomain(graphene.Mutation):
         domain_data: Optional[DomainData] = res.domain_data
 
         return cls(
-            ok=res.ok,
+            ok=res.success,
             msg=res.description,
             domain=Domain.from_dto(domain_data) if domain_data else None,
         )
@@ -439,7 +439,7 @@ class DeleteDomain(graphene.Mutation):
             action
         )
 
-        return cls(ok=res.ok, msg=res.description)
+        return cls(ok=res.success, msg=res.description)
 
 
 class PurgeDomain(graphene.Mutation):
@@ -467,7 +467,7 @@ class PurgeDomain(graphene.Mutation):
             action
         )
 
-        return cls(ok=res.ok, msg=res.description)
+        return cls(ok=res.success, msg=res.description)
 
     @classmethod
     async def delete_kernels(
