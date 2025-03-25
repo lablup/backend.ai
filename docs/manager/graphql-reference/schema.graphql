@@ -276,7 +276,10 @@ type Queries {
   endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
 
   """Added in 25.5.0."""
-  user_utilization_metric(user_id: UUID!, input: UserUtilizationMetricQueryInput!): UserUtilizationMetric
+  user_utilization_metric(user_id: UUID!, props: UserUtilizationMetricQueryInput!): UserUtilizationMetric
+
+  """Added in 25.5.0."""
+  container_utilization_metric_metadata: ContainerUtilizationMetricMetadata
 }
 
 """
@@ -1937,6 +1940,11 @@ input UserUtilizationMetricQueryInput {
   Query resolution step width in duration format or float number of seconds. For example, '1m', '1h', '1d', '1w'
   """
   step: String!
+}
+
+"""Added in 25.5.0."""
+type ContainerUtilizationMetricMetadata {
+  metric_names: [String]
 }
 
 """All available GraphQL mutations."""
