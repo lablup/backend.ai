@@ -1061,7 +1061,7 @@ class Queries(graphene.ObjectType):
         UserUtilizationMetric,
         description="Added in 25.5.0.",
         user_id=graphene.UUID(required=True),
-        input=UserUtilizationMetricQueryInput(required=True),
+        props=UserUtilizationMetricQueryInput(required=True),
     )
 
     @staticmethod
@@ -2890,7 +2890,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         user_id: uuid.UUID,
         *,
-        input: UserUtilizationMetricQueryInput,
+        props: UserUtilizationMetricQueryInput,
     ) -> UserUtilizationMetric:
         graph_ctx = cast(GraphQueryContext, info.context)
         user = graph_ctx.user
@@ -2901,7 +2901,7 @@ class Queries(graphene.ObjectType):
             info,
             user_id,
             MetricQueryParameter(
-                input.metric_name, input.value_type, input.start, input.end, input.step
+                props.metric_name, props.value_type, props.start, props.end, props.step
             ),
         )
 
