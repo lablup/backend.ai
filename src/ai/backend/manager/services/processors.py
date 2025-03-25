@@ -19,7 +19,8 @@ class Processors:
     user: UserProcessors
     image: ImageProcessors
     container_registry: ContainerRegistryProcessors
-    keypair_resource_policy_service: KeypairResourcePolicyProcessors
+    keypair_resource_policy: KeypairResourcePolicyProcessors
+    user_resource_policy: UserResourcePolicyProcessors
 
     vfolder: VFolderBaseProcessors
     vfolder_invitation: VFolderInviteProcessors

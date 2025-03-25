@@ -410,7 +410,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy_service.modify_keypair_resource_policy.wait_for_complete(
+        await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.wait_for_complete(
             ModifyKeyPairResourcePolicyAction(name, props)
         )
 
@@ -441,7 +441,7 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy_service.delete_keypair_resource_policy.wait_for_complete(
+        await graph_ctx.processors.keypair_resource_policy.delete_keypair_resource_policy.wait_for_complete(
             DeleteKeyPairResourcePolicyAction(name)
         )
         return DeleteKeyPairResourcePolicy(
@@ -589,27 +589,20 @@ class CreateUserResourcePolicy(graphene.Mutation):
         name: str,
         props: CreateUserResourcePolicyInput,
     ) -> CreateUserResourcePolicy:
+        from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
+            CreateUserResourcePolicyAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
+            CreateUserResourcePolicyAction(name, props)
+        )
 
-        async def _do_mutate() -> UserResourcePolicy:
-            async with graph_ctx.db.begin_session() as sess:
-                row = UserResourcePolicyRow(
-                    name,
-                    props.max_vfolder_count,
-                    props.max_quota_scope_size,
-                    props.max_session_count_per_model_session,
-                    props.max_customized_image_count,
-                )
-                sess.add(row)
-                await sess.flush()
-                query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-                return cls(
-                    True,
-                    "success",
-                    UserResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
-                )
-
-        return await execute_with_retry(_do_mutate)
+        return CreateUserResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+        )
 
 
 class ModifyUserResourcePolicy(graphene.Mutation):
@@ -630,15 +623,20 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_count")
-        set_if_set(props, data, "max_quota_scope_size")
-        set_if_set(props, data, "max_session_count_per_model_session")
-        set_if_set(props, data, "max_customized_image_count")
-        update_query = (
-            sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
+        from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+            ModifyUserResourcePolicyAction,
         )
-        return await simple_db_mutate(cls, info.context, update_query)
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
+            ModifyUserResourcePolicyAction(name, props)
+        )
+
+        return ModifyUserResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+        )
 
 
 class DeleteUserResourcePolicy(graphene.Mutation):
@@ -657,8 +655,20 @@ class DeleteUserResourcePolicy(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteUserResourcePolicy:
-        delete_query = sa.delete(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-        return await simple_db_mutate(cls, info.context, delete_query)
+        from ai.backend.manager.services.user_resource_policy.actions.delete_user_resource_policy import (
+            DeleteUserResourcePolicyAction,
+        )
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.user_resource_policy.delete_user_resource_policy.wait_for_complete(
+            DeleteUserResourcePolicyAction(name)
+        )
+
+        return DeleteUserResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+        )
 
 
 class ProjectResourcePolicy(graphene.ObjectType):
