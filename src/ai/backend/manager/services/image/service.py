@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import sqlalchemy as sa
 
@@ -171,7 +172,7 @@ class ImageService:
         return ClearImagesActionResult()
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
-        data: dict = {}
+        data: dict[str, Any] = {}
         props = action.props
 
         apply_dataclass_field(props, data, "name")
@@ -219,7 +220,7 @@ class ImageService:
                     raise ModifyImageActionUnknownImageReferenceError
                 for k, v in data.items():
                     setattr(image_row, k, v)
-        except ValueError:
+        except (ValueError, sa.exc.DBAPIError):
             raise ModifyImageActionValueError
 
         return ModifyImageActionResult(image=ImageData.from_image_row(image_row))
