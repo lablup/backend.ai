@@ -49,6 +49,7 @@ from ai.backend.manager.services.image.actions.purge_image_by_id import (
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
+from ai.backend.manager.services.image.types import KVPairInput, ResourceLimitInput
 
 from .conftest import TestScenario
 
@@ -358,6 +359,13 @@ async def test_dealias_image(
                     supported_accelerators=["cuda", "rocm"],
                     is_local=True,
                     size_bytes=123,
+                    labels=[
+                        KVPairInput(key="key1", value="value1"),
+                        KVPairInput(key="key2", value="value2"),
+                    ],
+                    resource_limits=[
+                        ResourceLimitInput(key="cpu", min="3", max="5"),
+                    ],
                 ),
             ),
             ModifyImageActionResult(
@@ -367,8 +375,21 @@ async def test_dealias_image(
                     accelerators="cuda,rocm",
                     is_local=True,
                     size_bytes=123,
+                    labels={"key1": "value1", "key2": "value2"},
+                    resources={"cpu": {"min": "3", "max": "5"}},
                 )
             ),
+        ),
+        TestScenario.failure(
+            "Image not found",
+            ModifyImageAction(
+                target="wrong-image",
+                architecture=IMAGE_ROW_FIXTURE.architecture,
+                props=ModifyImageInputData(
+                    registry="cr.backend.ai2",
+                ),
+            ),
+            ImageNotFound,
         ),
     ],
 )
