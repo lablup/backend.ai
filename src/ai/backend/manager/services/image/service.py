@@ -6,11 +6,11 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
-from ai.backend.common.utils import apply_dataclass_field
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
+from ai.backend.manager.models.base import apply_dataclass_field
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
