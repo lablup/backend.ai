@@ -77,6 +77,7 @@ from ai.backend.manager.models.base import (
     populate_fixture,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.image import ImageAliasRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -537,6 +538,7 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ImageAliasRow.__table__.delete()))
                 await conn.execute((ImageRow.__table__.delete()))
                 await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
