@@ -149,7 +149,9 @@ class DomainService:
         )
 
     async def delete_domain(self, action: DeleteDomainAction) -> DeleteDomainActionResult:
-        base_query = sa.update(domains).values(is_active=False).where(domains.c.name == action.name)
+        base_query = (
+            sa.update(domains).values({"is_active": False}).where(domains.c.name == action.name)
+        )
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
@@ -166,6 +168,7 @@ class DomainService:
                     )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
+        print(f"res: {res.success}, {res.message}")
 
         return DeleteDomainActionResult(status=res.status, description=res.message)
 
