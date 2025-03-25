@@ -16,6 +16,30 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.5.0rc1 (2025-03-25)
+
+### Features
+* Add `AuditLog` table. ([#3712](https://github.com/lablup/backend.ai/issues/3712))
+* Improve performance of vfolder `list_host()` API handler through task parallel execution. ([#3935](https://github.com/lablup/backend.ai/issues/3935))
+* Add accelerator quantum size field to GQL scaling group ([#3940](https://github.com/lablup/backend.ai/issues/3940))
+* Add container labels to simplify metric queries ([#3980](https://github.com/lablup/backend.ai/issues/3980))
+* Separate internal api port ([#3989](https://github.com/lablup/backend.ai/issues/3989))
+* Make action processor work with async functions ([#3999](https://github.com/lablup/backend.ai/issues/3999))
+* Enhance session status transition management ([#4029](https://github.com/lablup/backend.ai/issues/4029))
+
+### Fixes
+* Properly handle zero-value unknown resource limits when creating session. ([#3925](https://github.com/lablup/backend.ai/issues/3925))
+* Fix `PurgeImageById` mutation not working when `image_aliass` are present. ([#3972](https://github.com/lablup/backend.ai/issues/3972))
+* Fix wrong error message logging when `model_path` does not exist. ([#3990](https://github.com/lablup/backend.ai/issues/3990))
+* Allow superadmins to query all GQL agent nodes ([#3996](https://github.com/lablup/backend.ai/issues/3996))
+* Fix wrong JSON serialization for response of list presets API handler ([#4006](https://github.com/lablup/backend.ai/issues/4006))
+* Fix a potential race condition error in the kernel runner's OOM logger ([#4008](https://github.com/lablup/backend.ai/issues/4008))
+* Fix initialization of Storage proxy event dispatcher ([#4010](https://github.com/lablup/backend.ai/issues/4010))
+* Update common structure. (Remove `request_id` from `BaseAction`, add `processors_ctx`). ([#4022](https://github.com/lablup/backend.ai/issues/4022))
+* Fix wrong parse of auto-mount vfolders inputs ([#4025](https://github.com/lablup/backend.ai/issues/4025))
+* Fix `modify_compute_session` GQL mutation error caused by missing kernel loading option. ([#4032](https://github.com/lablup/backend.ai/issues/4032))
+
+
 ## 25.4.0 (2025-03-12)
 
 ### Features
