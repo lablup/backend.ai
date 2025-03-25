@@ -5,9 +5,7 @@ from .base import MetricAction, MetricActionResult
 
 
 @dataclass
-class ContainerMetricLabelValuesAction(MetricAction):
-    label: str
-
+class ContainerMetricMetadataAction(MetricAction):
     def entity_type(self) -> str:
         return "metric"
 
@@ -16,9 +14,8 @@ class ContainerMetricLabelValuesAction(MetricAction):
 
 
 @dataclass
-class ContainerMetricLabelValuesActionResult(MetricActionResult):
-    status: str
-    data: list[str]
+class ContainerMetricMetadataActionResult(MetricActionResult):
+    metric_names: list[str]
 
 
 @dataclass

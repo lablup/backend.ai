@@ -1,7 +1,14 @@
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Self
 
 import graphene
+
+from ai.backend.manager.services.metric.actions.container import (
+    ContainerMetricMetadataAction,
+)
+
+if TYPE_CHECKING:
+    from ...gql import GraphQueryContext
 
 
 class MetircResultValue(graphene.ObjectType):
@@ -10,6 +17,28 @@ class MetircResultValue(graphene.ObjectType):
 
     timestamp = graphene.Float()
     value = graphene.String()
+
+
+class ContainerUtilizationMetricMetadata(graphene.ObjectType):
+    class Meta:
+        description = "Added in 25.5.0."
+
+    metric_names = graphene.List(graphene.String)
+
+    @classmethod
+    async def get_object(
+        cls,
+        info: graphene.ResolveInfo,
+    ) -> Self:
+        graph_ctx: GraphQueryContext = info.context
+        action_result = (
+            await graph_ctx.processors.container_metric.query_metadata.wait_for_complete(
+                ContainerMetricMetadataAction()
+            )
+        )
+        return cls(
+            metric_names=action_result.metric_names,
+        )
 
 
 class ContainerUtilizationMetric(graphene.ObjectType):

@@ -130,6 +130,7 @@ from .gql_models.image import (
     UnloadImage,
     UntagImageFromRegistry,
 )
+from .gql_models.metric.base import ContainerUtilizationMetricMetadata
 from .gql_models.metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
 from .gql_models.session import (
     CheckAndTransitStatus,
@@ -1062,6 +1063,10 @@ class Queries(graphene.ObjectType):
         description="Added in 25.5.0.",
         user_id=graphene.UUID(required=True),
         props=UserUtilizationMetricQueryInput(required=True),
+    )
+    container_utilization_metric_metadata = graphene.Field(
+        ContainerUtilizationMetricMetadata,
+        description="Added in 25.5.0.",
     )
 
     @staticmethod
@@ -2904,6 +2909,13 @@ class Queries(graphene.ObjectType):
                 props.metric_name, props.value_type, props.start, props.end, props.step
             ),
         )
+
+    @staticmethod
+    async def resolve_container_utilization_metric_metadata(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> ContainerUtilizationMetricMetadata:
+        return await ContainerUtilizationMetricMetadata.get_object(info)
 
 
 class GQLMutationPrivilegeCheckMiddleware:

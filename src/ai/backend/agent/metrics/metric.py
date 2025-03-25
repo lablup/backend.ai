@@ -2,7 +2,11 @@ from typing import Optional, Self
 
 from prometheus_client import Counter, Gauge, Histogram
 
-from ai.backend.common.metrics.types import UNDEFINED
+from ai.backend.common.metrics.types import (
+    CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
+    DEVICE_UTILIZATION_METRIC_LABEL_NAME,
+    UNDEFINED,
+)
 
 from .types import FlattenedDeviceMetric, FlattenedKernelMetric
 
@@ -62,7 +66,7 @@ class UtilizationMetricObserver:
             name="backendai_container_utilization",
             documentation="Container utilization metrics",
             labelnames=[
-                "container_metric_name",
+                CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
                 "agent_id",
                 "kernel_id",
                 "session_id",
@@ -74,7 +78,12 @@ class UtilizationMetricObserver:
         self._device_metric = Gauge(
             name="backendai_device_utilization",
             documentation="Device utilization metrics",
-            labelnames=["device_metric_name", "agent_id", "device_id", "value_type"],
+            labelnames=[
+                DEVICE_UTILIZATION_METRIC_LABEL_NAME,
+                "agent_id",
+                "device_id",
+                "value_type",
+            ],
         )
 
     @classmethod

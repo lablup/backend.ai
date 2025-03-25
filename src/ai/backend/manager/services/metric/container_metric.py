@@ -1,17 +1,18 @@
 from typing import (
     Optional,
     TypedDict,
-    cast,
 )
 
 import aiohttp
 import yarl
 
+from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
+
 from .actions.container import (
     ContainerMetricAction,
     ContainerMetricActionResult,
-    ContainerMetricLabelValuesAction,
-    ContainerMetricLabelValuesActionResult,
+    ContainerMetricMetadataAction,
+    ContainerMetricMetadataActionResult,
 )
 from .types import (
     ContainerMetricOptionalLabel,
@@ -22,7 +23,7 @@ from .types import (
 )
 
 
-class _LabelValueResponse(TypedDict):
+class LabelValueResponse(TypedDict):
     status: str
     data: list[str]
 
@@ -68,17 +69,20 @@ class MetricService:
     def __init__(self, param: ServiceInitParameter) -> None:
         self._metric_query_endpoint = yarl.URL(f"http://{param.metric_query_addr}/api/v1")
 
-    async def query_label_values(
-        self,
-        action: ContainerMetricLabelValuesAction,
-    ) -> ContainerMetricLabelValuesActionResult:
-        endpoint = self._metric_query_endpoint / "label" / action.label / "values"
+    async def _query_label_values(self, label_name: str) -> LabelValueResponse:
+        endpoint = self._metric_query_endpoint / "label" / label_name / "values"
         form_data = aiohttp.FormData({"match[]": "backendai_container_utilization"})
         async with aiohttp.ClientSession() as session:
             async with session.get(endpoint, data=form_data) as response:
                 response.raise_for_status()
-                result = cast(_LabelValueResponse, await response.json())
-        return ContainerMetricLabelValuesActionResult(result["status"], result["data"])
+                return await response.json()
+
+    async def query_metadata(
+        self,
+        action: ContainerMetricMetadataAction,
+    ) -> ContainerMetricMetadataActionResult:
+        result = await self._query_label_values(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
+        return ContainerMetricMetadataActionResult(result["data"])
 
     def _get_query_string(
         self,
