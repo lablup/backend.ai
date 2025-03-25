@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Sequence
+from typing import TYPE_CHECKING, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -12,7 +12,6 @@ from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common.types import DefaultForUnspecified
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.utils import execute_with_retry
 
 from .base import (
     Base,
@@ -22,8 +21,6 @@ from .base import (
     VFolderHostPermissionColumn,
     batch_result,
     mapper_registry,
-    set_if_set,
-    simple_db_mutate,
 )
 from .keypair import keypairs
 from .user import UserRole
@@ -807,28 +804,22 @@ class CreateProjectResourcePolicy(graphene.Mutation):
         name: str,
         props: CreateProjectResourcePolicyInput,
     ) -> CreateProjectResourcePolicy:
+        from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
+            CreateProjectResourcePolicyAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
+            CreateProjectResourcePolicyAction(name, props)
+        )
 
-        async def _do_mutate() -> ProjectResourcePolicy:
-            async with graph_ctx.db.begin_session() as sess:
-                row = ProjectResourcePolicyRow(
-                    name,
-                    props.max_vfolder_count,
-                    props.max_quota_scope_size,
-                    props.max_network_count,
-                )
-                sess.add(row)
-                await sess.flush()
-                query = sa.select(ProjectResourcePolicyRow).where(
-                    ProjectResourcePolicyRow.name == name
-                )
-                return cls(
-                    True,
-                    "success",
-                    ProjectResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
-                )
-
-        return await execute_with_retry(_do_mutate)
+        return CreateProjectResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=ProjectResourcePolicy.from_row(
+                graph_ctx, result.project_resource_policy
+            ),
+        )
 
 
 class ModifyProjectResourcePolicy(graphene.Mutation):
@@ -849,16 +840,22 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_count")
-        set_if_set(props, data, "max_quota_scope_size")
-        set_if_set(props, data, "max_network_count")
-        update_query = (
-            sa.update(ProjectResourcePolicyRow)
-            .values(data)
-            .where(ProjectResourcePolicyRow.name == name)
+        from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
+            ModifyProjectResourcePolicyAction,
         )
-        return await simple_db_mutate(cls, info.context, update_query)
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
+            ModifyProjectResourcePolicyAction(name, props)
+        )
+
+        return ModifyProjectResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=ProjectResourcePolicy.from_row(
+                graph_ctx, result.project_resource_policy
+            ),
+        )
 
 
 class DeleteProjectResourcePolicy(graphene.Mutation):
@@ -877,7 +874,19 @@ class DeleteProjectResourcePolicy(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteProjectResourcePolicy:
-        delete_query = sa.delete(ProjectResourcePolicyRow).where(
-            ProjectResourcePolicyRow.name == name
+        from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
+            DeleteProjectResourcePolicyAction,
         )
-        return await simple_db_mutate(cls, info.context, delete_query)
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.wait_for_complete(
+            DeleteProjectResourcePolicyAction(name)
+        )
+
+        return DeleteProjectResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=ProjectResourcePolicy.from_row(
+                graph_ctx, result.project_resource_policy
+            ),
+        )
