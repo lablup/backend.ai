@@ -700,6 +700,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
             )
             _stmt = (
                 sa.select(SessionRow)
+                .options(selectinload(SessionRow.kernels))
                 .from_statement(_update_stmt)
                 .execution_options(populate_existing=True)
             )
