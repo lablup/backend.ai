@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 import asyncio
-from dataclasses import dataclass
 import enum
 import hashlib
 import logging
@@ -12,7 +11,7 @@ import time
 import uuid
 from abc import abstractmethod
 from collections import defaultdict
-from contextlib import aclosing
+from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
@@ -40,9 +39,9 @@ from redis.asyncio import ConnectionPool
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.logging import BraceStyleAdapter, LogLevel
-from .message_queue.base import AbstractMessageQueue, MQMessage, AbstractMQMessagePayload
 
 from . import msgpack, redis_helper
+from .message_queue.base import AbstractMessageQueue, AbstractMQMessagePayload, MQMessage
 from .types import (
     AgentId,
     KernelId,
@@ -1145,7 +1144,7 @@ class EventMessage(AbstractMQMessagePayload):
     source: AgentId
     event_serialized: tuple[bytes, ...]
 
-    def serialize(self) -> bytes:
+    def serialize(self) -> dict[bytes, bytes]:
         return {
             b"name": self.name.encode(),
             b"source": self.source.encode(),
@@ -1153,13 +1152,12 @@ class EventMessage(AbstractMQMessagePayload):
         }
 
     @classmethod
-    def deserialize(cls, data: bytes) -> Self:
-        payload = msgpack.unpackb(data)
-        return cls(
-            name=payload[b"name"].decode,
-            source=payload[b"source"].decode(),
-            event_serialized=msgpack.unpackb(data[b"args"]),
-        )
+    def deserialize(cls, raw_event: dict[bytes, bytes]) -> Self:
+        name = raw_event[b"name"].decode("utf-8")
+        source = raw_event[b"source"].decode("utf-8")
+        event_serialized = tuple(msgpack.unpackb(raw_event[b"args"]))
+        return cls(name=name, source=AgentId(source), event_serialized=event_serialized)
+
 
 class EventDispatcher(aobject):
     """
@@ -1387,12 +1385,11 @@ class EventDispatcher(aobject):
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        msg: MQMessage
-        async for msg in self._message_queue.consume_queue():
+        async for msg in await self._message_queue.consume_queue():
             if self._closed:
                 return
             start = time.perf_counter()
-            event = EventMessage.deserialize(msg.payload)
+            event = EventMessage.deserialize(msg.payload.serialize())
             try:
                 await self.dispatch_consumers(event.name, event.source, event.event_serialized)
                 self._metric_observer.observe_event_success(
@@ -1417,11 +1414,12 @@ class EventDispatcher(aobject):
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
         msg: MQMessage
-        async for msg in self._message_queue.subscribe_queue():
+        subscribe_queue = await self._message_queue.subscribe_queue()
+        async for msg in subscribe_queue:
             if self._closed:
                 return
             start = time.perf_counter()
-            event = EventMessage.deserialize(msg.payload)
+            event = EventMessage.deserialize(msg.payload.serialize())
             try:
                 await self.dispatch_subscribers(event.name, event.source, event.event_serialized)
                 self._metric_observer.observe_event_success(
@@ -1492,8 +1490,11 @@ class EventProducer(aobject):
             return
         if self._log_events:
             log.debug("PRODUCE_EVENT(ev:{}, ag:{})", event.name, source)
-        msg = EventMessage(event_serialized=event.serialize(), name=event.name, source=source)
+        msg = EventMessage(
+            event_serialized=event.serialize(), name=event.name, source=AgentId(source)
+        )
         await self._msg_queue.send(self._stream_key, msg)
+
 
 def _generate_consumer_id(node_id: str | None = None) -> str:
     h = hashlib.sha1()
