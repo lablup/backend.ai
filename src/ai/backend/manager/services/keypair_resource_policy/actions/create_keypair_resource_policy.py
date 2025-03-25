@@ -3,7 +3,7 @@ from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.services.keypair_resource_policies.base import KeypairResourcePolicyAction
+from ai.backend.manager.services.keypair_resource_policy.base import KeypairResourcePolicyAction
 
 
 @dataclass
