@@ -242,7 +242,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
         self.kernel_features = frozenset(
-            self.image_labels.get(LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE.value).split()
+            self.image_labels.get(LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE).split()
         )
         self.ownership_data = ownership_data
         self.session_id = ownership_data.session_id

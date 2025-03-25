@@ -1294,13 +1294,17 @@ async def convert_session_to_image(
                 kern_features: list[str]
                 if existing_row:
                     kern_features = existing_row.labels.get(
-                        LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE.value
+                        LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE
                     ).split()
                     customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID.value]
                     log.debug("reusing existing customized image ID {}", customized_image_id)
                 else:
-                    kern_features = [DEFAULT_KERNEL_FEATURE.value]
+                    kern_features = [DEFAULT_KERNEL_FEATURE]
                     customized_image_id = str(uuid.uuid4())
+                # Remove PRIVATE label for customized images
+                kern_features = [
+                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
+                ]
 
             new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
             new_image_ref = ImageRef.from_image_str(
@@ -1315,9 +1319,7 @@ async def convert_session_to_image(
                 LabelName.CUSTOMIZED_OWNER.value: f"{params.image_visibility.value}:{image_owner_id}",
                 LabelName.CUSTOMIZED_NAME.value: params.image_name,
                 LabelName.CUSTOMIZED_ID.value: customized_image_id,
-                LabelName.FEATURES.value: " ".join([
-                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
-                ]),
+                LabelName.FEATURES.value: " ".join(kern_features),
             }
             match params.image_visibility:
                 case CustomizedImageVisibilityScope.USER:

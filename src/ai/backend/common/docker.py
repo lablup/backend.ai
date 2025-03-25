@@ -115,7 +115,7 @@ class KernelFeatures(StringSetFlag):
     PRIVATE = "private"
 
 
-DEFAULT_KERNEL_FEATURE: Final[KernelFeatures] = KernelFeatures.UID_MATCH
+DEFAULT_KERNEL_FEATURE: Final[Literal["uid-match"]] = KernelFeatures.UID_MATCH.value
 
 common_image_label_schema = t.Dict({
     # Required labels
