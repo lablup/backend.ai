@@ -27,7 +27,6 @@ from typing import (
     Optional,
     Protocol,
     Self,
-    Type,
     TypeVar,
     cast,
     overload,
@@ -1737,24 +1736,65 @@ UNSET = Unset()
 T = TypeVar("T")
 
 
-def graphene_input_to_dataclass(cls: Type[T], data: MutableMapping[str, Any]) -> T:
-    """
-    TODO: Write comment
-    """
-    if not is_dataclass(cls):
-        raise ValueError(f"{cls} is not a dataclass type.")
+def graphene_input_to_dataclass(value: Any) -> Any:
+    if value is Undefined:
+        return None
+    elif value is None:
+        return UNSET
 
-    result: dict[str, Any] = {}
-    for field in fields(cls):
-        value = data.get(field.name, Undefined)
-        if value is Undefined:
-            result[field.name] = None
-        elif value is None:
-            result[field.name] = UNSET
-        else:
-            result[field.name] = value
+    if is_dataclass(value):
+        if isinstance(value, type):
+            raise ValueError("Dataclass type was passed, not instance.")
 
-    return cast(T, cls(**result))
+        cls_type = type(value)
+        updated_fields = {}
+        for f in fields(value):
+            field_val = getattr(value, f.name)
+            updated_fields[f.name] = graphene_input_to_dataclass(field_val)
+        return cls_type(**updated_fields)
+
+    if isinstance(value, list):
+        return [graphene_input_to_dataclass(v) for v in value]
+
+    if isinstance(value, dict):
+        return {k: graphene_input_to_dataclass(v) for k, v in value.items()}
+
+    return value
+
+
+def _apply_dataclass_field(
+    value: Any,
+) -> Any:
+    if value is None:
+        return None
+
+    if value is UNSET:
+        return UNSET
+
+    if is_dataclass(value):
+        if isinstance(value, type):
+            raise ValueError("Dataclass type was passed, not instance.")
+
+        cls_type = type(value)
+
+        new_fields = {}
+        for f in fields(value):
+            original_v = getattr(value, f.name)
+            new_fields[f.name] = _apply_dataclass_field(original_v)
+
+        new_instance = cls_type(**new_fields)
+        return new_instance
+
+    if isinstance(value, list):
+        converted_list = [_apply_dataclass_field(v) for v in value]
+        converted_list = [v for v in converted_list if v is not None]
+        return converted_list
+
+    if isinstance(value, dict):
+        converted_dict = {k: _apply_dataclass_field(v) for k, v in value.items()}
+        return converted_dict
+
+    return value
 
 
 def apply_dataclass_field(
@@ -1776,4 +1816,12 @@ def apply_dataclass_field(
     elif v is UNSET:
         target[target_key or name] = None
     else:
-        target[target_key or name] = clean_func(v) if callable(clean_func) else v
+        serialized = _apply_dataclass_field(v)
+        if serialized is None:
+            pass
+        elif serialized is UNSET:
+            target[target_key or name] = None
+        else:
+            target[target_key or name] = (
+                clean_func(serialized) if callable(clean_func) else serialized
+            )
