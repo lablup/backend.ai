@@ -819,9 +819,7 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
-        return PurgeImageById(
-            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
-        )
+        return PurgeImageById(image=ImageNode.from_row(ctx, result.image.to_image_row()))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -1168,4 +1166,4 @@ class PurgeImages(graphene.Mutation):
             return DispatchResult.success(action_result)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
-        return PurgeImages(ok=True, msg="", task_id=task_id)
+        return PurgeImages(task_id=task_id)
