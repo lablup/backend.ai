@@ -11,27 +11,25 @@ from ai.backend.manager.types import NoUnsetStatus, TriStatus
 
 @dataclass
 class ModifyImageInputData:
-    name: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus("name", None))
-    registry: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus("registry", None))
-    image: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus("image", None))
-    tag: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus("tag", None))
+    name: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus.none("name"))
+    registry: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus.none("registry"))
+    image: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus.none("image"))
+    tag: NoUnsetStatus[str] = field(default_factory=lambda: NoUnsetStatus.none("tag"))
     architecture: NoUnsetStatus[str] = field(
-        default_factory=lambda: NoUnsetStatus("architecture", None)
+        default_factory=lambda: NoUnsetStatus.none("architecture")
     )
-    is_local: NoUnsetStatus[bool] = field(default_factory=lambda: NoUnsetStatus("is_local", None))
-    size_bytes: NoUnsetStatus[int] = field(
-        default_factory=lambda: NoUnsetStatus("size_bytes", None)
-    )
-    type: NoUnsetStatus[ImageType] = field(default_factory=lambda: NoUnsetStatus("type", None))
+    is_local: NoUnsetStatus[bool] = field(default_factory=lambda: NoUnsetStatus.none("is_local"))
+    size_bytes: NoUnsetStatus[int] = field(default_factory=lambda: NoUnsetStatus.none("size_bytes"))
+    type: NoUnsetStatus[ImageType] = field(default_factory=lambda: NoUnsetStatus.none("type"))
     config_digest: NoUnsetStatus[str] = field(
-        default_factory=lambda: NoUnsetStatus("config_digest", None)
+        default_factory=lambda: NoUnsetStatus.none("config_digest")
     )
     labels: NoUnsetStatus[dict[str, Any]] = field(
-        default_factory=lambda: NoUnsetStatus("labels", None)
+        default_factory=lambda: NoUnsetStatus.none("labels")
     )
     accelerators: TriStatus[str] = field(default_factory=lambda: TriStatus.nop("accelerators"))
     resources: NoUnsetStatus[dict[str, Any]] = field(
-        default_factory=lambda: NoUnsetStatus("resources", None)
+        default_factory=lambda: NoUnsetStatus.none("resources")
     )
 
     def set_attr(self, image_row: ImageRow):
