@@ -1377,7 +1377,7 @@ class EtcdRedisConfig:
     def __contains__(self, key: str) -> bool:
         return hasattr(self._base_config, key)
 
-    def get_override_config(self, role: RedisRole) -> Any:
+    def get_override_config(self, role: RedisRole) -> RedisConfig:
         if self._override_configs and (role in self._override_configs):
             return self._override_configs[role]
         return self._base_config

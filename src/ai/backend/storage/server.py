@@ -18,18 +18,21 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.common import redis_helper
 from ai.backend.common.config import (
     ConfigurationError,
     override_key,
     redis_config_iv,
 )
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import safe_print_redis_config
+from ai.backend.common.types import EtcdRedisConfig, safe_print_redis_config
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -123,16 +126,36 @@ async def server_main(
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
-
-        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-        if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
-            event_dispatcher_cls = ExperimentalEventDispatcher
-        else:
-            event_dispatcher_cls = EventDispatcher
-
-        event_producer = await EventProducer.new(
-            redis_config,
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(redis_config)
+        stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+        stream_redis = redis_helper.get_redis_object(
+            stream_redis_config,
+            name="event_producer.stream",
             db=REDIS_STREAM_DB,
+        )
+        node_id = local_config["storage-proxy"]["node-id"]
+        redis_mq = RedisQueue(
+            stream_redis,
+            RedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+            ),
+        )
+        dispatcher_queue: AbstractMessageQueue = redis_mq
+        if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
+            dispatcher_queue = HiRedisQueue(
+                stream_redis_config,
+                HiRedisMQArgs(
+                    stream_key="events",
+                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                    node_id=node_id,
+                    db=REDIS_STREAM_DB,
+                ),
+            )
+
+        event_producer = EventProducer(
+            redis_mq,
             log_events=local_config["debug"]["log-events"],
         )
         log.info(
@@ -140,12 +163,9 @@ async def server_main(
             pidx,
             safe_print_redis_config(redis_config),
         )
-        event_dispatcher = await event_dispatcher_cls.new(
-            redis_config,
-            db=REDIS_STREAM_DB,
+        event_dispatcher = EventDispatcher(
+            dispatcher_queue,
             log_events=local_config["debug"]["log-events"],
-            node_id=local_config["storage-proxy"]["node-id"],
-            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             event_observer=metric_registry.event,
         )
         log.info(

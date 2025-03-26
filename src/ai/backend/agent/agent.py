@@ -96,9 +96,11 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
+from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -683,31 +685,41 @@ class AbstractAgent(
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
 
-        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
-            event_dispatcher_cls = ExperimentalEventDispatcher
-        else:
-            event_dispatcher_cls = EventDispatcher
-
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
 
-        # stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
-        # stream_redis = redis_helper.get_redis_object(
-        #     stream_redis_config,
-        #     name="event_producer.stream",
-        #     db=REDIS_STREAM_DB,
-        # )
-        self.event_producer = await EventProducer.new(
-            etcd_redis_config.get_override_config(RedisRole.STREAM),
+        stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+        stream_redis = redis_helper.get_redis_object(
+            stream_redis_config,
+            name="event_producer.stream",
             db=REDIS_STREAM_DB,
+        )
+        node_id = self.local_config["agent"]["id"]
+        redis_mq = RedisQueue(
+            stream_redis,
+            RedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+            ),
+        )
+        dispatcher_queue: AbstractMessageQueue = redis_mq
+        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
+            dispatcher_queue = HiRedisQueue(
+                stream_redis_config,
+                HiRedisMQArgs(
+                    stream_key="events",
+                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                    node_id=node_id,
+                    db=REDIS_STREAM_DB,
+                ),
+            )
+        self.event_producer = EventProducer(
+            redis_mq,
             log_events=self.local_config["debug"]["log-events"],
         )
-        self.event_dispatcher = await event_dispatcher_cls.new(
-            etcd_redis_config.get_override_config(RedisRole.STREAM),
-            db=REDIS_STREAM_DB,
+        self.event_dispatcher = EventDispatcher(
+            dispatcher_queue,
             log_events=self.local_config["debug"]["log-events"],
-            node_id=self.local_config["agent"]["id"],
-            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
@@ -722,6 +734,7 @@ class AbstractAgent(
         )
 
         self.background_task_manager = BackgroundTaskManager(
+            stream_redis,
             self.event_producer,
             bgtask_observer=self._metric_registry.bgtask,
         )

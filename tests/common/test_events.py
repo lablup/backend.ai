@@ -1,4 +1,5 @@
 import asyncio
+import random
 from types import TracebackType
 from typing import Type
 
@@ -7,6 +8,7 @@ import attrs
 import pytest
 
 from ai.backend.common import config, redis_helper
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import (
     AbstractEvent,
     CoalescingOptions,
@@ -14,7 +16,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AgentId, RedisConfig
 
 
@@ -36,20 +38,30 @@ EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
-async def test_dispatch(
-    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher], redis_container
-) -> None:
+async def test_dispatch(redis_container) -> None:
     app = object()
 
     redis_config = RedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
-    dispatcher = await dispatcher_cls.new(
+    stream_redis = redis_helper.get_redis_object(
         redis_config,
-        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
     )
-    producer = await EventProducer.new(redis_config)
+    node_id = f"test-{random.randint(0, 1000)}"
+    redis_mq = RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
+    dispatcher = EventDispatcher(
+        redis_mq,
+    )
+    producer = EventProducer(redis_mq)
 
     records = set()
 
@@ -79,16 +91,13 @@ async def test_dispatch(
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(stream_redis, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
-async def test_error_on_dispatch(
-    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher], redis_container
-) -> None:
+async def test_error_on_dispatch(redis_container) -> None:
     app = object()
     exception_log: list[str] = []
 
@@ -102,13 +111,27 @@ async def test_error_on_dispatch(
     redis_config = RedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
-    dispatcher = await dispatcher_cls.new(
+    stream_redis = redis_helper.get_redis_object(
         redis_config,
-        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
+    node_id = f"test-{random.randint(0, 1000)}"
+    redis_mq = RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
+
+    dispatcher = EventDispatcher(
+        redis_mq,
         consumer_exception_handler=handle_exception,
         subscriber_exception_handler=handle_exception,
     )
-    producer = await EventProducer.new(redis_config)
+    producer = EventProducer(redis_mq)
 
     async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
@@ -132,7 +155,7 @@ async def test_error_on_dispatch(
     assert "ZeroDivisionError" in exception_log
     assert "OverflowError" in exception_log
 
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(stream_redis, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 

@@ -3,10 +3,8 @@ from __future__ import annotations
 import abc
 import asyncio
 import enum
-import hashlib
 import logging
 import secrets
-import socket
 import time
 import uuid
 from abc import abstractmethod
@@ -31,7 +29,6 @@ from typing import (
 
 import attrs
 from aiomonitor.task import preserve_termination_log
-from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
@@ -49,7 +46,6 @@ from .types import (
     SessionId,
     VFolderID,
     VolumeMountableNodeType,
-    aobject,
 )
 
 __all__ = (
@@ -1142,7 +1138,7 @@ class NopEventObserver:
         pass
 
 
-class EventDispatcher(aobject):
+class EventDispatcher:
     """
     We have two types of event handlers: consumer and subscriber.
 
@@ -1174,8 +1170,6 @@ class EventDispatcher(aobject):
         message_queue: AbstractMessageQueue,
         log_events: bool = False,
         *,
-        consumer_group: str,
-        node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
         event_observer: EventObserver = NopEventObserver(),
@@ -1185,8 +1179,6 @@ class EventDispatcher(aobject):
         self._consumers = defaultdict(set)
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
-        self._consumer_group = consumer_group
-        self._consumer_name = _generate_consumer_id(node_id)
         self._metric_observer = event_observer
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
@@ -1196,8 +1188,6 @@ class EventDispatcher(aobject):
             name="subscriber_taskgroup",
             exception_handler=subscriber_exception_handler,
         )
-
-    async def __ainit__(self) -> None:
         self._consumer_loop_task = asyncio.create_task(self._consume_loop())
         self._subscriber_loop_task = asyncio.create_task(self._subscribe_loop())
 
@@ -1353,8 +1343,7 @@ class EventDispatcher(aobject):
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        queue = await self._msg_queue.consume_queue()
-        async for msg in queue:
+        async for msg in self._msg_queue.consume_queue():  # noqa
             if self._closed:
                 return
             event_type = "unknown"
@@ -1389,8 +1378,7 @@ class EventDispatcher(aobject):
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        queue = await self._msg_queue.subscribe_queue()
-        async for msg in queue:
+        async for msg in self._msg_queue.subscribe_queue():  # noqa
             if self._closed:
                 return
             event_type = "unknown"
@@ -1424,26 +1412,20 @@ class EventDispatcher(aobject):
                 raise
 
 
-class EventProducer(aobject):
+class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
     _log_events: bool
-    _stream_key: str
 
     def __init__(
         self,
         msg_queue: AbstractMessageQueue,
         *,
-        stream_key: str = "events",
         log_events: bool = False,
     ) -> None:
         self._closed = False
         self._msg_queue = msg_queue
         self._log_events = log_events
-        self._stream_key = stream_key
-
-    async def __ainit__(self) -> None:
-        pass
 
     async def close(self) -> None:
         self._closed = True
@@ -1462,15 +1444,4 @@ class EventProducer(aobject):
             b"source": source.encode(),
             b"args": msgpack.packb(event.serialize()),
         }
-        await self._msg_queue.send(self._stream_key, raw_event)
-
-
-def _generate_consumer_id(node_id: str | None = None) -> str:
-    h = hashlib.sha1()
-    h.update(str(node_id or socket.getfqdn()).encode("utf8"))
-    hostname_hash = h.hexdigest()
-    h = hashlib.sha1()
-    h.update(__file__.encode("utf8"))
-    installation_path_hash = h.hexdigest()
-    pidx = process_index.get(0)
-    return f"{hostname_hash}:{installation_path_hash}:{pidx}"
+        await self._msg_queue.send(raw_event)
