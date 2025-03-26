@@ -164,6 +164,7 @@ class VASTAPIClient:
         storage_base_dir: str,
         ssl: ssl.SSLContext | bool = False,
         force_login: bool = True,
+        use_auth_token: bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
@@ -175,6 +176,7 @@ class VASTAPIClient:
         self._auth_token = None
         self.ssl_context = ssl
         self.force_login = force_login
+        self.use_auth_token = use_auth_token
 
     @property
     def _req_header(self) -> Mapping[str, str]:
@@ -186,6 +188,9 @@ class VASTAPIClient:
 
     async def _validate_token(self) -> None:
         if self.force_login:
+            return await self._login()
+
+        if not self.use_auth_token:
             return await self._login()
 
         current_dt = datetime.now(timezone.utc)
@@ -251,7 +256,8 @@ class VASTAPIClient:
                 ssl=self.ssl_context,
             )
             data = await response.json()
-        self._parse_token(data)
+        if self.use_auth_token:
+            self._parse_token(data)
 
     async def _build_request(
         self,
