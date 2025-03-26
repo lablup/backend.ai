@@ -63,15 +63,24 @@ class SessionSweeper(AbstractSweeper):
                 result = await conn.execute(query)
                 sessions = result.fetchall()
 
-            results_and_exceptions = await asyncio.gather(
-                *[
-                    asyncio.create_task(
-                        self._registry.destroy_session(
-                            session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
-                        ),
+            async def _destroy_session(session: SessionRow) -> None:
+                try:
+                    await self._registry.destroy_session(
+                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
                     )
-                    for session in sessions
-                ],
+                    log.info(
+                        "sweep(session) - succeeded to terminate {} session ({}).",
+                        status,
+                        session.id,
+                    )
+                except Exception as e:
+                    log.warning(
+                        "sweep(session) - failed to terminate {} session ({}).", status, session.id
+                    )
+                    raise e
+
+            results_and_exceptions = await asyncio.gather(
+                *[asyncio.create_task(_destroy_session(session)) for session in sessions],
                 return_exceptions=True,
             )
             results = [
