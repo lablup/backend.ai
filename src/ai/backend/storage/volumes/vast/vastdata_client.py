@@ -2,11 +2,22 @@ from __future__ import annotations
 
 import logging
 import ssl
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, NewType, Optional, TypedDict
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Concatenate,
+    NewType,
+    Optional,
+    ParamSpec,
+    TypedDict,
+    TypeVar,
+)
 
 import aiohttp
 import jwt
@@ -115,6 +126,23 @@ class Cache:
     cluster_info: VASTClusterInfo | None
 
 
+T_Return = TypeVar("T_Return")
+P = ParamSpec("P")
+
+
+def auth_handler(
+    func: Callable[Concatenate[VASTAPIClient, P], Awaitable[T_Return]],
+) -> Callable[..., Awaitable[T_Return]]:
+    async def wrapped(self: VASTAPIClient, *args: P.args, **kwargs: P.kwargs) -> T_Return:
+        try:
+            return await func(self, *args, **kwargs)
+        except (VASTUnauthorizedError, VASTUnknownError):
+            await self._login()
+            return await func(self, *args, **kwargs)
+
+    return wrapped
+
+
 class VASTAPIClient:
     api_endpoint: URL
     api_version: APIVersion
@@ -136,6 +164,7 @@ class VASTAPIClient:
         storage_base_dir: str,
         ssl: ssl.SSLContext | bool = False,
         force_login: bool = True,
+        use_auth_token: bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
@@ -147,10 +176,12 @@ class VASTAPIClient:
         self._auth_token = None
         self.ssl_context = ssl
         self.force_login = force_login
+        self.use_auth_token = use_auth_token
 
     @property
     def _req_header(self) -> Mapping[str, str]:
-        assert self._auth_token is not None
+        if self._auth_token is None:
+            raise VASTUnauthorizedError("Cannot build request header without auth token.")
         return {
             "Authorization": f"Bearer {self._auth_token['access_token']}",
             "Content-Type": "application/json",
@@ -158,7 +189,12 @@ class VASTAPIClient:
 
     async def _validate_token(self) -> None:
         if self.force_login:
-            return await self._login()
+            await self._login()
+            return
+
+        if not self.use_auth_token:
+            await self._login()
+            return
 
         current_dt = datetime.now(timezone.utc)
 
@@ -173,7 +209,8 @@ class VASTAPIClient:
             return datetime.fromtimestamp(decoded["exp"])
 
         if self._auth_token is None:
-            return await self._login()
+            await self._login()
+            return
         elif get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has not expired yet
             # Auth requests using the access token
@@ -182,7 +219,8 @@ class VASTAPIClient:
             # The access token has expired but the refresh token has not expired
             # Refresh tokens
             return await self._refresh()
-        return await self._login()
+        await self._login()
+        return
 
     def _parse_token(self, data: Mapping[str, Any]) -> None:
         try:
@@ -207,7 +245,7 @@ class VASTAPIClient:
         data = await response.json()
         self._parse_token(data)
 
-    async def _login(self) -> None:
+    async def _login(self) -> Mapping[str, Any]:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -224,6 +262,7 @@ class VASTAPIClient:
             )
             data = await response.json()
         self._parse_token(data)
+        return data
 
     async def _build_request(
         self,
@@ -276,6 +315,7 @@ class VASTAPIClient:
                 ssl=self.ssl_context,
             )
 
+    @auth_handler
     async def list_quotas(self, qname: Optional[str] = None) -> list[VASTQuota]:
         if qname is not None:
             params = {"name": qname}
@@ -293,6 +333,7 @@ class VASTAPIClient:
             data: list[Mapping[str, Any]] = await response.json()
         return [VASTQuota.from_json(info) for info in data]
 
+    @auth_handler
     async def get_quota(self, vast_quota_id: VASTQuotaID) -> VASTQuota | None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
@@ -310,6 +351,7 @@ class VASTAPIClient:
 
         return VASTQuota.from_json(data)
 
+    @auth_handler
     async def set_quota(
         self,
         path: Path,
@@ -361,6 +403,7 @@ class VASTAPIClient:
                     )
         return VASTQuota.from_json(data)
 
+    @auth_handler
     async def modify_quota(
         self,
         vast_quota_id: VASTQuotaID,
@@ -406,6 +449,7 @@ class VASTAPIClient:
                     )
         return VASTQuota.from_json(data)
 
+    @auth_handler
     async def remove_quota(self, vast_quota_id: VASTQuotaID) -> None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
@@ -418,6 +462,7 @@ class VASTAPIClient:
             if response.status == 404:
                 raise VASTNotFoundError
 
+    @auth_handler
     async def get_cluster_info(self, cluster_id: int) -> VASTClusterInfo | None:
         if (_cached := self.cache.cluster_info) is not None:
             return _cached
@@ -438,6 +483,7 @@ class VASTAPIClient:
                         f"Unkwon error from vast API. status code: {response.status}"
                     )
 
+    @auth_handler
     async def get_capacity_info(self) -> CapacityUsage:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,

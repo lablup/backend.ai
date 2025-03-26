@@ -222,6 +222,7 @@ class VASTVolume(BaseVolume):
             api_version=self.config["vast_api_version"],
             ssl=ssl_verify,
             force_login=self.config["vast_force_login"],
+            use_auth_token=self.config["vast_use_auth_token"],
         )
 
     async def shutdown(self) -> None:
