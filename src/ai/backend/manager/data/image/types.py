@@ -64,6 +64,11 @@ class RescanImagesResult:
 
 
 @dataclass
+class PurgeImageResponseData:
+    image_canonical: str
+
+
+@dataclass
 class ImageAliasData:
     id: uuid.UUID
     alias: str
