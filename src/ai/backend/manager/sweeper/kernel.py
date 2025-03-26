@@ -14,11 +14,9 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
 from ..models import DEAD_KERNEL_STATUSES, DEAD_SESSION_STATUSES, KernelRow, SessionRow
-from .base import AbstractSweeper
+from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-DEFAULT_KERNEL_SWEEP_INTERVAL_SEC = 60.0
 
 
 class KernelSweeper(AbstractSweeper):
@@ -49,7 +47,7 @@ class KernelSweeper(AbstractSweeper):
         for kernel in kernels:
             kernels_per_session[kernel.session_id].append(kernel)
 
-        await asyncio.gather(
+        results_and_exceptions = await asyncio.gather(
             *[
                 asyncio.create_task(
                     self._registry.destroy_session_lowlevel(
@@ -69,8 +67,22 @@ class KernelSweeper(AbstractSweeper):
                 )
                 for session_id, session_kernels in kernels_per_session.items()
             ],
-            return_exceptions=False,
+            return_exceptions=True,
         )
+        results = [
+            result_or_exception
+            for result_or_exception in results_and_exceptions
+            if not isinstance(result_or_exception, (BaseException, Exception))
+        ]
+
+        if kernels:
+            log.info(
+                "sweep(kernel) - {} kernel(s) found, {} kernel(s) sweeped.",
+                len(kernels),
+                len(results),
+            )
+        else:
+            log.debug("sweep(kernel) - No kernels found.")
 
 
 @actxmgr
@@ -78,7 +90,7 @@ async def kernel_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async def _sweep(interval: float) -> None:
         await KernelSweeper(db=root_ctx.db, registry=root_ctx.registry).sweep()
 
-    task = aiotools.create_timer(_sweep, interval=DEFAULT_KERNEL_SWEEP_INTERVAL_SEC)
+    task = aiotools.create_timer(_sweep, interval=DEFAULT_SWEEP_INTERVAL_SEC)
 
     yield
 

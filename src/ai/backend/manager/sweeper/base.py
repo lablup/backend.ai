@@ -1,9 +1,9 @@
 import abc
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from ..models.utils import ExtendedAsyncSAEngine
-    from ..registry import AgentRegistry
+from ..models.utils import ExtendedAsyncSAEngine
+from ..registry import AgentRegistry
+
+DEFAULT_SWEEP_INTERVAL_SEC = 60.0
 
 
 class AbstractSweeper(abc.ABC):
