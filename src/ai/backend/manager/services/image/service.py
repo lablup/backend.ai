@@ -3,13 +3,12 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData
+from ai.backend.manager.data.image.types import ImageAliasData, ImageData, PurgeImageResponseData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
@@ -230,7 +229,7 @@ class ImageService:
         image_canonicals = [image.name for image in action.images]
         arch_per_images = {image.name: image.architecture for image in action.images}
         reserved_bytes: int = 0
-        responses: list[PurgeImageResponse] = []
+        purged_images: list[PurgeImageResponseData] = []
 
         results = await self._agent_registry.purge_images(
             AgentId(action.agent_id), image_canonicals
@@ -245,14 +244,14 @@ class ImageService:
                 async with self._db.begin_session() as session:
                     image_row = await ImageRow.resolve(session, [image_identifier])
                     reserved_bytes += int(image_row.size_bytes)
-                    responses.append(result)
+                    purged_images.append(PurgeImageResponseData(image_canonical=image_canonical))
             else:
                 error_msg = f"Failed to purge images {image_canonical} from agent {action.agent_id}: {result.error}"
                 log.error(error_msg)
                 errors.append(error_msg)
 
         return PurgeImagesActionResult(
-            results=responses, errors=errors, reserved_bytes=reserved_bytes
+            purged_images=purged_images, errors=errors, reserved_bytes=reserved_bytes
         )
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
