@@ -54,8 +54,8 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetI
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageInputData,
-    NoUnsetStatus,
-    TriStatus,
+    OptionalState,
+    TriState,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
@@ -1056,22 +1056,22 @@ class ModifyImageInput(graphene.InputObjectType):
             return value if value is not Undefined else None
 
         return ModifyImageInputData(
-            name=NoUnsetStatus("name", value_or_none(self.name)),
-            registry=NoUnsetStatus("registry", value_or_none(self.registry)),
-            image=NoUnsetStatus("image", value_or_none(self.image)),
-            tag=NoUnsetStatus("tag", value_or_none(self.tag)),
-            architecture=NoUnsetStatus("architecture", value_or_none(self.architecture)),
-            is_local=NoUnsetStatus("is_local", value_or_none(self.is_local)),
-            size_bytes=NoUnsetStatus("size_bytes", value_or_none(self.size_bytes)),
-            type=NoUnsetStatus("type", value_or_none(self.type)),
-            config_digest=NoUnsetStatus("config_digest", value_or_none(self.digest)),
-            labels=NoUnsetStatus("labels", self.labels),
-            accelerators=TriStatus(
+            name=OptionalState("name", value_or_none(self.name)),
+            registry=OptionalState("registry", value_or_none(self.registry)),
+            image=OptionalState("image", value_or_none(self.image)),
+            tag=OptionalState("tag", value_or_none(self.tag)),
+            architecture=OptionalState("architecture", value_or_none(self.architecture)),
+            is_local=OptionalState("is_local", value_or_none(self.is_local)),
+            size_bytes=OptionalState("size_bytes", value_or_none(self.size_bytes)),
+            type=OptionalState("type", value_or_none(self.type)),
+            config_digest=OptionalState("config_digest", value_or_none(self.digest)),
+            labels=OptionalState("labels", self.labels),
+            accelerators=TriState(
                 "accelerators",
                 unset=self.supported_accelerators is None,
                 value=",".join(self.supported_accelerators),
             ),
-            resources=NoUnsetStatus(
+            resources=OptionalState(
                 "resources",
                 value_or_none(resources_data),
             ),
