@@ -340,7 +340,7 @@ async def test_dealias_image(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
                 props=ModifyImageInputData(
-                    registry=NoUnsetStatus("registry", "cr.backend.ai2"),
+                    registry=NoUnsetStatus.set("registry", "cr.backend.ai2"),
                 ),
             ),
             ModifyImageActionResult(image=replace(IMAGE_FIXTURE_DATA, registry="cr.backend.ai2")),
@@ -362,16 +362,16 @@ async def test_dealias_image(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
                 props=ModifyImageInputData(
-                    type=NoUnsetStatus("type", ImageType.SERVICE),
-                    registry=NoUnsetStatus("registry", "cr.backend.ai2"),
+                    type=NoUnsetStatus.set("type", ImageType.SERVICE),
+                    registry=NoUnsetStatus.set("registry", "cr.backend.ai2"),
                     accelerators=TriStatus.set("accelerators", value="cuda,rocm"),
-                    is_local=NoUnsetStatus("is_local", True),
-                    size_bytes=NoUnsetStatus("size_bytes", 123),
-                    labels=NoUnsetStatus("labels", {"key1": "value1", "key2": "value2"}),
-                    resources=NoUnsetStatus(
+                    is_local=NoUnsetStatus.set("is_local", True),
+                    size_bytes=NoUnsetStatus.set("size_bytes", 123),
+                    labels=NoUnsetStatus.set("labels", {"key1": "value1", "key2": "value2"}),
+                    resources=NoUnsetStatus.set(
                         "resources", {"cpu": {"min": "3", "max": "5"}, "mem": {"min": "256m"}}
                     ),
-                    config_digest=NoUnsetStatus("config_digest", "sha256:1234567890abcdef"),
+                    config_digest=NoUnsetStatus.set("config_digest", "sha256:1234567890abcdef"),
                 ),
             ),
             ModifyImageActionResult(
@@ -399,7 +399,7 @@ async def test_dealias_image(
                 target=IMAGE_ALIAS_ROW_FIXTURE.alias,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
                 props=ModifyImageInputData(
-                    registry=NoUnsetStatus("registry", "cr.backend.ai2"),
+                    registry=NoUnsetStatus.set("registry", "cr.backend.ai2"),
                 ),
             ),
             ModifyImageActionResult(image=replace(IMAGE_FIXTURE_DATA, registry="cr.backend.ai2")),
@@ -410,7 +410,7 @@ async def test_dealias_image(
                 target="wrong-image",
                 architecture=IMAGE_ROW_FIXTURE.architecture,
                 props=ModifyImageInputData(
-                    registry=NoUnsetStatus("registry", "cr.backend.ai2"),
+                    registry=NoUnsetStatus.set("registry", "cr.backend.ai2"),
                 ),
             ),
             ImageNotFound,
@@ -421,7 +421,7 @@ async def test_dealias_image(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
                 props=ModifyImageInputData(
-                    config_digest=NoUnsetStatus(
+                    config_digest=NoUnsetStatus.set(
                         "config_digest", "a" * 73
                     ),  # config_digest column is sa.CHAR(length=72)
                 ),
