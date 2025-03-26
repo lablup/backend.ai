@@ -6,6 +6,7 @@ from ai.backend.manager.data.image.types import RescanImagesResult
 from ai.backend.manager.services.image.base import ImageAction
 
 
+# TODO: Change this to Batch Action
 @dataclass
 class RescanImagesAction(ImageAction):
     registry: Optional[str] = None
@@ -20,7 +21,6 @@ class RescanImagesAction(ImageAction):
         return "rescan_images"
 
 
-# TODO: BatchAction으로 업데이트, entity_ids는 image row ids로.
 @dataclass
 class RescanImagesActionResult(BaseActionResult):
     rescan_result: RescanImagesResult
