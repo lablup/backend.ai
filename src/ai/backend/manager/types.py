@@ -61,7 +61,7 @@ class MountOptionModel(BaseModel):
 TVal = TypeVar("TVal")
 
 
-class TriStatus(Generic[TVal]):
+class TriState(Generic[TVal]):
     _attr_name: str
     _unset: bool
     _value: Optional[TVal]
@@ -72,15 +72,15 @@ class TriStatus(Generic[TVal]):
         self._value = value
 
     @classmethod
-    def set(cls, attr_name: str, value: TVal) -> TriStatus[TVal]:
+    def set(cls, attr_name: str, value: TVal) -> TriState[TVal]:
         return cls(attr_name, False, value)
 
     @classmethod
-    def unset(cls, attr_name: str) -> TriStatus[TVal]:
+    def unset(cls, attr_name: str) -> TriState[TVal]:
         return cls(attr_name, True, None)
 
     @classmethod
-    def nop(cls, attr_name: str) -> TriStatus[TVal]:
+    def nop(cls, attr_name: str) -> TriState[TVal]:
         return cls(attr_name, False, None)
 
     def set_attr(self, row: Any):
@@ -95,14 +95,14 @@ class TriStatus(Generic[TVal]):
                 pass
 
 
-class NoUnsetStatus(TriStatus[TVal]):
+class OptionalState(TriState[TVal]):
     def __init__(self, attr_name: str, value: Optional[TVal]):
         super().__init__(attr_name, False, value)
 
     @classmethod
-    def set(cls, attr_name: str, value: TVal) -> NoUnsetStatus[TVal]:
+    def set(cls, attr_name: str, value: TVal) -> OptionalState[TVal]:
         return cls(attr_name, value)
 
     @classmethod
-    def none(cls, attr_name: str) -> NoUnsetStatus[TVal]:
+    def none(cls, attr_name: str) -> OptionalState[TVal]:
         return cls(attr_name, None)
