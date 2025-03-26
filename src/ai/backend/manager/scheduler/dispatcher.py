@@ -1697,7 +1697,7 @@ class SchedulerDispatcher(aobject):
             )
         for endpoint in endpoints:
             active_routings = [
-                r for r in endpoint.routings if r.status in RouteStatus.active_route_statuses
+                r for r in endpoint.routings if r.status in RouteStatus.active_route_statuses()
             ]
             replicas = endpoint.replicas
             if (
