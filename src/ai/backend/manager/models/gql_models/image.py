@@ -59,6 +59,8 @@ from ai.backend.manager.services.image.actions.rescan_images import RescanImages
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
+from ai.backend.manager.services.image.types import KVPairInput as KVPairInputData
+from ai.backend.manager.services.image.types import ResourceLimitInput as ResourceLimitInputData
 
 from ...api.exceptions import ImageNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -1060,11 +1062,36 @@ class ModifyImage(graphene.Mutation):
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
         log.info("modify image {0} by API request", target)
+
+        _props = ModifyImageInputData(
+            name=props.name,
+            registry=props.registry,
+            image=props.image,
+            tag=props.tag,
+            architecture=props.architecture,
+            is_local=props.is_local,
+            size_bytes=props.size_bytes,
+            type=props.type,
+            digest=props.digest,
+            labels=[KVPairInputData(key=k.key, value=k.value) for k in props.labels],
+            resource_limits=[
+                ResourceLimitInputData(key=r.key, min=r.min, max=r.max)
+                for r in props.resource_limits
+            ],
+            supported_accelerators=props,
+        )
+
+        # 1. Action엔 dict가 아니라 dataclass를 넘겨야 함.
+        # 2. 따라서 일단 props를 dataclass로 변환하는데, 이 때 Undefined 등 graphql 타입이 들어가면 안 되니까
+        #    필드 내부를 재귀적으로 돌면서 Undefined롤 제거해야 함.
+        #    Undefined, None의 의미 처리를 별도로 해야 하기 때문에 Unset이란 별도의 타입 정의가 필요.
+        # 3. 이렇게 생성된 action에 넘겨진 dataclass를 SQL 실행을 위해 다시 순회하면서 dict로 변환해야 함.
+        # 4. Unset 처리를 위해 dataclass를 순회하며 dict로 변환하는 재귀 함수가 별도로 필요.
         await ctx.processors.image.modify_image.wait_for_complete(
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                props=graphene_input_to_dataclass(ModifyImageInputData, props),
+                props=graphene_input_to_dataclass(_props),
             )
         )
 
