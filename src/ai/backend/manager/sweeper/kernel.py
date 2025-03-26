@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
@@ -19,6 +20,8 @@ from ..models import DEAD_KERNEL_STATUSES, DEAD_SESSION_STATUSES, KernelRow, Ses
 from .base import AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+DEFAULT_KERNEL_SWEEP_INTERVAL_SEC = 60.0
 
 
 class KernelSweeper(AbstractSweeper):
@@ -62,12 +65,12 @@ class KernelSweeper(AbstractSweeper):
                                 "agent_addr": kernel.agent_addr,
                                 "container_id": kernel.container_id,
                             }
-                            for kernel in kernels_
+                            for kernel in session_kernels
                         ],
                         reason=KernelLifecycleEventReason.HANG_TIMEOUT,
                     )
                 )
-                for session_id, kernels_ in kernels_per_session.items()
+                for session_id, session_kernels in kernels_per_session.items()
             ],
             return_exceptions=False,
         )
@@ -78,13 +81,12 @@ async def stale_kernel_collection_ctx(root_ctx: RootContext) -> AsyncIterator[No
     session_hang_tolerance = session_hang_tolerance_iv.check(
         await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
-    default_interval_sec = 60.0
-    interval_sec = float("inf")
+    interval_sec = math.inf
     threshold: TimeDelta
     for threshold in session_hang_tolerance["threshold"].values():
         interval_sec = min(interval_sec, threshold.seconds)
-    if interval_sec == float("inf"):
-        interval_sec = default_interval_sec
+    if interval_sec == math.inf:
+        interval_sec = DEFAULT_KERNEL_SWEEP_INTERVAL_SEC
     task = aiotools.create_timer(
         KernelSweeper(db=root_ctx.db, registry=root_ctx.registry).sweep,
         interval=interval_sec,
