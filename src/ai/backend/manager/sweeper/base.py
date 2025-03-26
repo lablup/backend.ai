@@ -1,7 +1,9 @@
 import abc
+from typing import TYPE_CHECKING
 
-from ..models.utils import ExtendedAsyncSAEngine
-from ..registry import AgentRegistry
+if TYPE_CHECKING:
+    from ..models.utils import ExtendedAsyncSAEngine
+    from ..registry import AgentRegistry
 
 
 class AbstractSweeper(abc.ABC):
@@ -13,5 +15,5 @@ class AbstractSweeper(abc.ABC):
         self._registry = registry
 
     @abc.abstractmethod
-    async def sweep(self, *args) -> None:
+    async def sweep(self) -> None:
         raise NotImplementedError

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import math
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
@@ -11,11 +10,9 @@ import sqlalchemy as sa
 from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common.events import KernelLifecycleEventReason
-from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
-from ..config import session_hang_tolerance_iv
 from ..models import DEAD_KERNEL_STATUSES, DEAD_SESSION_STATUSES, KernelRow, SessionRow
 from .base import AbstractSweeper
 
@@ -26,7 +23,7 @@ DEFAULT_KERNEL_SWEEP_INTERVAL_SEC = 60.0
 
 class KernelSweeper(AbstractSweeper):
     @override
-    async def sweep(self, *args) -> None:
+    async def sweep(self) -> None:
         query = (
             sa.select(KernelRow)
             .join(SessionRow, KernelRow.session_id == SessionRow.id)
@@ -77,20 +74,11 @@ class KernelSweeper(AbstractSweeper):
 
 
 @actxmgr
-async def stale_kernel_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    session_hang_tolerance = session_hang_tolerance_iv.check(
-        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
-    )
-    interval_sec = math.inf
-    threshold: TimeDelta
-    for threshold in session_hang_tolerance["threshold"].values():
-        interval_sec = min(interval_sec, threshold.seconds)
-    if interval_sec == math.inf:
-        interval_sec = DEFAULT_KERNEL_SWEEP_INTERVAL_SEC
-    task = aiotools.create_timer(
-        KernelSweeper(db=root_ctx.db, registry=root_ctx.registry).sweep,
-        interval=interval_sec,
-    )
+async def kernel_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    async def _sweep(interval: float) -> None:
+        await KernelSweeper(db=root_ctx.db, registry=root_ctx.registry).sweep()
+
+    task = aiotools.create_timer(_sweep, interval=DEFAULT_KERNEL_SWEEP_INTERVAL_SEC)
 
     yield
 

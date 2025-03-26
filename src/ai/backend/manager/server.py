@@ -95,8 +95,8 @@ from .api.types import (
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
-from .sweeper.kernel import stale_kernel_collection_ctx
-from .sweeper.session import stale_session_collection_ctx
+from .sweeper.kernel import kernel_sweeper_ctx
+from .sweeper.session import session_sweeper_ctx
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset([
@@ -816,8 +816,8 @@ def build_root_app(
             processors_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            stale_session_collection_ctx,
-            stale_kernel_collection_ctx,
+            session_sweeper_ctx,
+            kernel_sweeper_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:

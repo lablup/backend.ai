@@ -2,12 +2,11 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
-from datetime import datetime, timedelta
-from typing import AsyncIterator, override
+from datetime import datetime
+from typing import TYPE_CHECKING, AsyncIterator, override
 
 import aiotools
 import sqlalchemy as sa
-from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
 from sqlalchemy.orm import load_only, noload
 
@@ -19,11 +18,15 @@ from ..api.context import RootContext
 from ..config import session_hang_tolerance_iv
 from ..models import SessionRow
 from ..models.session import SessionStatus
-from ..models.utils import ExtendedAsyncSAEngine
-from ..registry import AgentRegistry
 from .base import AbstractSweeper
 
+if TYPE_CHECKING:
+    from ..models.utils import ExtendedAsyncSAEngine
+    from ..registry import AgentRegistry
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+DEFAULT_SESSION_SWEEP_INTERVAL_SEC = 60.0
 
 
 class SessionSweeper(AbstractSweeper):
@@ -43,7 +46,7 @@ class SessionSweeper(AbstractSweeper):
         self._threshold = threshold
 
     @override
-    async def sweep(self, *args) -> None:
+    async def sweep(self) -> None:
         now = datetime.now(tz=tzutc())
         query = (
             sa.select(SessionRow)
@@ -72,19 +75,8 @@ class SessionSweeper(AbstractSweeper):
         )
 
 
-def _get_interval(
-    threshold: TimeDelta,
-    *,
-    max_interval: float = timedelta(hours=1).total_seconds(),
-    heuristic_interval_weight: float = 0.4,  # NOTE: to repeat more than twice within the same time window.
-) -> float:
-    if isinstance(threshold, relativedelta):  # months, years
-        return max_interval
-    return min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
-
-
 @actxmgr
-async def stale_session_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def session_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     session_hang_tolerance = session_hang_tolerance_iv.check(
         await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
@@ -97,15 +89,12 @@ async def stale_session_collection_ctx(root_ctx: RootContext) -> AsyncIterator[N
             log.warning(f"Invalid session status for hang-threshold: '{raw_status}'")
             continue
 
-        interval = _get_interval(threshold)
-        tasks.append(
-            aiotools.create_timer(
-                SessionSweeper(
-                    root_ctx.db, root_ctx.registry, status=status, threshold=threshold
-                ).sweep,
-                interval,
-            ),
-        )
+        async def _sweep(interval: float) -> None:
+            await SessionSweeper(
+                root_ctx.db, root_ctx.registry, status=status, threshold=threshold
+            ).sweep()
+
+        tasks.append(aiotools.create_timer(_sweep, interval=DEFAULT_SESSION_SWEEP_INTERVAL_SEC))
 
     yield
 
