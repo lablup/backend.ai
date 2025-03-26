@@ -38,6 +38,7 @@ from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from . import msgpack, redis_helper
@@ -1162,6 +1163,7 @@ class EventDispatcher(aobject):
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     redis_client: RedisConnectionInfo
+    _msg_queue: AbstractMessageQueue
     consumer_loop_task: asyncio.Task
     subscriber_loop_task: asyncio.Task
     consumer_taskgroup: PersistentTaskGroup
@@ -1174,6 +1176,7 @@ class EventDispatcher(aobject):
     def __init__(
         self,
         redis_config: RedisConfig,
+        message_queue: AbstractMessageQueue,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -1195,6 +1198,7 @@ class EventDispatcher(aobject):
         self._closed = False
         self.consumers = defaultdict(set)
         self.subscribers = defaultdict(set)
+        self._msg_queue = message_queue
         self._stream_key = stream_key
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
