@@ -12,6 +12,7 @@ from ai.backend.common.types import HardwareMetadata, QuotaScopeID
 
 from ...exception import NotEmptyError
 from ...types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
+from ...watcher import WatcherClient
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..vfs import BaseQuotaModel, BaseVolume
 from .config import config_iv
@@ -141,6 +142,7 @@ class DellEMCOneFSVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
+        watcher: Optional[WatcherClient] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         super().__init__(
@@ -150,6 +152,7 @@ class DellEMCOneFSVolume(BaseVolume):
             options=options,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
+            watcher=watcher,
         )
         self.config = cast(Mapping[str, Any], config_iv.check(self.config))
         self.endpoint = self.config["dell_endpoint"]
