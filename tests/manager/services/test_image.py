@@ -351,7 +351,7 @@ async def test_dealias_image(
                 target=IMAGE_ROW_FIXTURE.name,
                 architecture=IMAGE_ROW_FIXTURE.architecture,
                 props=ModifyImageInputData(
-                    accelerators=TriStatus("accelerators", unset=True, value=None)
+                    accelerators=TriStatus.unset("accelerators"),
                 ),
             ),
             ModifyImageActionResult(image=replace(IMAGE_FIXTURE_DATA, accelerators=None)),
@@ -364,7 +364,7 @@ async def test_dealias_image(
                 props=ModifyImageInputData(
                     type=NoUnsetStatus("type", ImageType.SERVICE),
                     registry=NoUnsetStatus("registry", "cr.backend.ai2"),
-                    accelerators=TriStatus("accelerators", unset=False, value="cuda,rocm"),
+                    accelerators=TriStatus.set("accelerators", value="cuda,rocm"),
                     is_local=NoUnsetStatus("is_local", True),
                     size_bytes=NoUnsetStatus("size_bytes", 123),
                     labels=NoUnsetStatus("labels", {"key1": "value1", "key2": "value2"}),

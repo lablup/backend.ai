@@ -71,6 +71,18 @@ class TriStatus(Generic[TVal]):
         self._unset = unset
         self._value = value
 
+    @classmethod
+    def set(cls, attr_name: str, value: TVal) -> TriStatus[TVal]:
+        return cls(attr_name, False, value)
+
+    @classmethod
+    def unset(cls, attr_name: str) -> TriStatus[TVal]:
+        return cls(attr_name, True, None)
+
+    @classmethod
+    def nop(cls, attr_name: str) -> TriStatus[TVal]:
+        return cls(attr_name, False, None)
+
     def set_attr(self, row: Any):
         if self._unset:
             # TODO: Is this necessary?
