@@ -209,11 +209,11 @@ class EventDispatcher(_EventDispatcher):
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
         self._metric_observer = event_observer
-        self.consumer_taskgroup = PersistentTaskGroup(
+        self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
         )
-        self.subscriber_taskgroup = PersistentTaskGroup(
+        self._subscriber_taskgroup = PersistentTaskGroup(
             name="subscriber_taskgroup",
             exception_handler=subscriber_exception_handler,
         )

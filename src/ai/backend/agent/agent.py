@@ -691,6 +691,12 @@ class AbstractAgent(
 
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
 
+        # stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+        # stream_redis = redis_helper.get_redis_object(
+        #     stream_redis_config,
+        #     name="event_producer.stream",
+        #     db=REDIS_STREAM_DB,
+        # )
         self.event_producer = await EventProducer.new(
             etcd_redis_config.get_override_config(RedisRole.STREAM),
             db=REDIS_STREAM_DB,

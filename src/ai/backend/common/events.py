@@ -40,14 +40,12 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from . import msgpack, redis_helper
+from . import msgpack
 from .types import (
     AgentId,
     KernelId,
     ModelServiceStatus,
     QuotaScopeID,
-    RedisConfig,
-    RedisConnectionInfo,
     SessionId,
     VFolderID,
     VolumeMountableNodeType,
@@ -1159,70 +1157,62 @@ class EventDispatcher(aobject):
     Subscriber example: enqueuing events to the queues for event streaming API handlers
     """
 
-    consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
-    subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
+    _consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
+    _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
-    consumer_loop_task: asyncio.Task
-    subscriber_loop_task: asyncio.Task
-    consumer_taskgroup: PersistentTaskGroup
-    subscriber_taskgroup: PersistentTaskGroup
+
+    _consumer_loop_task: asyncio.Task
+    _subscriber_loop_task: asyncio.Task
+    _consumer_taskgroup: PersistentTaskGroup
+    _subscriber_taskgroup: PersistentTaskGroup
 
     _log_events: bool
-    _consumer_name: str
     _metric_observer: EventObserver
 
     def __init__(
         self,
-        redis_config: RedisConfig,
         message_queue: AbstractMessageQueue,
-        db: int = 0,
         log_events: bool = False,
         *,
         consumer_group: str,
-        service_name: str | None = None,
-        stream_key: str = "events",
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
         event_observer: EventObserver = NopEventObserver(),
     ) -> None:
-        _redis_config = redis_config.copy()
-        if service_name:
-            _redis_config["service_name"] = service_name
         self._log_events = log_events
         self._closed = False
-        self.consumers = defaultdict(set)
-        self.subscribers = defaultdict(set)
+        self._consumers = defaultdict(set)
+        self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
-        self._stream_key = stream_key
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
         self._metric_observer = event_observer
-        self.consumer_taskgroup = PersistentTaskGroup(
+        self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
         )
-        self.subscriber_taskgroup = PersistentTaskGroup(
+        self._subscriber_taskgroup = PersistentTaskGroup(
             name="subscriber_taskgroup",
             exception_handler=subscriber_exception_handler,
         )
 
     async def __ainit__(self) -> None:
-        self.consumer_loop_task = asyncio.create_task(self._consume_loop())
-        self.subscriber_loop_task = asyncio.create_task(self._subscribe_loop())
+        self._consumer_loop_task = asyncio.create_task(self._consume_loop())
+        self._subscriber_loop_task = asyncio.create_task(self._subscribe_loop())
 
     async def close(self) -> None:
         self._closed = True
         try:
             cancelled_tasks = []
-            await self.consumer_taskgroup.shutdown()
-            await self.subscriber_taskgroup.shutdown()
-            if not self.consumer_loop_task.done():
-                self.consumer_loop_task.cancel()
-                cancelled_tasks.append(self.consumer_loop_task)
-            if not self.subscriber_loop_task.done():
-                self.subscriber_loop_task.cancel()
-                cancelled_tasks.append(self.subscriber_loop_task)
+            await self._consumer_taskgroup.shutdown()
+            await self._subscriber_taskgroup.shutdown()
+            if not self._consumer_loop_task.done():
+                self._consumer_loop_task.cancel()
+                cancelled_tasks.append(self._consumer_loop_task)
+            if not self._subscriber_loop_task.done():
+                self._subscriber_loop_task.cancel()
+                cancelled_tasks.append(self._subscriber_loop_task)
             await asyncio.gather(*cancelled_tasks, return_exceptions=True)
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
@@ -1257,14 +1247,14 @@ class EventDispatcher(aobject):
             CoalescingState(),
             args_matcher,
         )
-        self.consumers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
+        self._consumers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
     def unconsume(
         self,
         handler: EventHandler[TContext, TEvent],
     ) -> None:
-        self.consumers[handler.event_cls.name].discard(
+        self._consumers[handler.event_cls.name].discard(
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
@@ -1299,7 +1289,7 @@ class EventDispatcher(aobject):
             args_matcher,
         )
         override_event_name = override_event_name or event_cls.name
-        self.subscribers[override_event_name].add(cast(EventHandler[Any, AbstractEvent], handler))
+        self._subscribers[override_event_name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
     def unsubscribe(
@@ -1309,7 +1299,7 @@ class EventDispatcher(aobject):
         override_event_name: Optional[str] = None,
     ) -> None:
         override_event_name = override_event_name or handler.event_cls.name
-        self.subscribers[override_event_name].discard(
+        self._subscribers[override_event_name].discard(
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
@@ -1341,8 +1331,8 @@ class EventDispatcher(aobject):
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
-        for consumer in self.consumers[event_name].copy():
-            self.consumer_taskgroup.create_task(
+        for consumer in self._consumers[event_name].copy():
+            self._consumer_taskgroup.create_task(
                 self.handle("CONSUMER", consumer, source, args),
             )
             await asyncio.sleep(0)
@@ -1355,8 +1345,8 @@ class EventDispatcher(aobject):
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
-        for subscriber in self.subscribers[event_name].copy():
-            self.subscriber_taskgroup.create_task(
+        for subscriber in self._subscribers[event_name].copy():
+            self._subscriber_taskgroup.create_task(
                 self.handle("SUBSCRIBER", subscriber, source, args),
             )
             await asyncio.sleep(0)
@@ -1435,29 +1425,19 @@ class EventDispatcher(aobject):
 
 
 class EventProducer(aobject):
-    redis_client: RedisConnectionInfo
+    _closed: bool
     _msg_queue: AbstractMessageQueue
     _log_events: bool
+    _stream_key: str
 
     def __init__(
         self,
-        redis_config: RedisConfig,
         msg_queue: AbstractMessageQueue,
-        db: int = 0,
         *,
-        service_name: str | None = None,
         stream_key: str = "events",
         log_events: bool = False,
     ) -> None:
-        _redis_config = redis_config.copy()
-        if service_name:
-            _redis_config["service_name"] = service_name
         self._closed = False
-        self.redis_client = redis_helper.get_redis_object(
-            _redis_config,
-            name="event_producer.stream",
-            db=db,
-        )
         self._msg_queue = msg_queue
         self._log_events = log_events
         self._stream_key = stream_key
@@ -1467,7 +1447,6 @@ class EventProducer(aobject):
 
     async def close(self) -> None:
         self._closed = True
-        await self.redis_client.close()
         await self._msg_queue.close()
 
     async def produce_event(

@@ -43,7 +43,7 @@ from .events import (
     EventDispatcher,
     EventProducer,
 )
-from .types import AgentId, DispatchResult, Sentinel
+from .types import AgentId, DispatchResult, RedisConnectionInfo, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -62,20 +62,24 @@ MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
 
 class ProgressReporter:
-    event_producer: Final[EventProducer]
-    task_id: Final[uuid.UUID]
     total_progress: Union[int, float]
     current_progress: Union[int, float]
 
+    _event_producer: Final[EventProducer]
+    _redis_client: RedisConnectionInfo
+    _task_id: Final[uuid.UUID]
+
     def __init__(
         self,
+        redis_client: RedisConnectionInfo,
         event_dispatcher: EventProducer,
         task_id: uuid.UUID,
         current_progress: int = 0,
         total_progress: int = 0,
     ) -> None:
-        self.event_producer = event_dispatcher
-        self.task_id = task_id
+        self._redis_client = redis_client
+        self._event_producer = event_dispatcher
+        self._task_id = task_id
         self.current_progress = current_progress
         self.total_progress = total_progress
 
@@ -88,11 +92,10 @@ class ProgressReporter:
         # keep the state as local variables because they might be changed
         # due to interleaving at await statements below.
         current, total = self.current_progress, self.total_progress
-        redis_producer = self.event_producer.redis_client
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
-            tracker_key = f"bgtask.{self.task_id}"
+            tracker_key = f"bgtask.{self._task_id}"
             await pipe.hset(
                 tracker_key,
                 mapping={
@@ -105,10 +108,10 @@ class ProgressReporter:
             await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis_helper.execute(redis_producer, _pipe_builder)
-        await self.event_producer.produce_event(
+        await redis_helper.execute(self._redis_client, _pipe_builder)
+        await self._event_producer.produce_event(
             BgtaskUpdatedEvent(
-                self.task_id,
+                self._task_id,
                 message=message,
                 current_progress=current,
                 total_progress=total,
@@ -135,23 +138,25 @@ class NopBackgroundTaskObserver:
 
 
 class BackgroundTaskManager:
-    event_producer: EventProducer
-    ongoing_tasks: weakref.WeakSet[asyncio.Task]
-    task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
-    dict_lock: asyncio.Lock
-
+    _dict_lock: asyncio.Lock
+    _redis_client: RedisConnectionInfo
+    _event_producer: EventProducer
     _metric_observer: BackgroundTaskObserver
+    _ongoing_tasks: weakref.WeakSet[asyncio.Task]
+    _task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
 
     def __init__(
         self,
+        redis_client: RedisConnectionInfo,
         event_producer: EventProducer,
         *,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
     ) -> None:
-        self.event_producer = event_producer
-        self.ongoing_tasks = weakref.WeakSet()
-        self.task_update_queues = defaultdict(set)
-        self.dict_lock = asyncio.Lock()
+        self._redis_client = redis_client
+        self._event_producer = event_producer
+        self._ongoing_tasks = weakref.WeakSet()
+        self._task_update_queues = defaultdict(set)
+        self._dict_lock = asyncio.Lock()
         self._metric_observer = bgtask_observer
 
     def register_event_handlers(self, event_dispatcher: EventDispatcher) -> None:
@@ -180,7 +185,7 @@ class BackgroundTaskManager:
         if task_id is None:
             raise ValueError(f"Task ID is not set in the {event.name} event!")
 
-        for q in self.task_update_queues[task_id]:
+        for q in self._task_update_queues[task_id]:
             q.put_nowait(event)
 
     async def _send_event(
@@ -224,9 +229,8 @@ class BackgroundTaskManager:
         (e.g. progress information of task when callee is trying to poll information of already completed one)
         """
         tracker_key = f"bgtask.{task_id}"
-        redis_producer = self.event_producer.redis_client
         task_info = await redis_helper.execute(
-            redis_producer,
+            self._redis_client,
             lambda r: r.hgetall(tracker_key),
             encoding="utf-8",
         )
@@ -249,8 +253,8 @@ class BackgroundTaskManager:
 
         # It is an ongoing task.
         my_queue: asyncio.Queue[BgtaskEvents | Sentinel] = asyncio.Queue()
-        async with self.dict_lock:
-            self.task_update_queues[task_id].add(my_queue)
+        async with self._dict_lock:
+            self._task_update_queues[task_id].add(my_queue)
         try:
             while True:
                 event = await my_queue.get()
@@ -263,10 +267,10 @@ class BackgroundTaskManager:
                 finally:
                     my_queue.task_done()
         finally:
-            self.task_update_queues[task_id].remove(my_queue)
-            async with self.dict_lock:
-                if len(self.task_update_queues[task_id]) == 0:
-                    del self.task_update_queues[task_id]
+            self._task_update_queues[task_id].remove(my_queue)
+            async with self._dict_lock:
+                if len(self._task_update_queues[task_id]) == 0:
+                    del self._task_update_queues[task_id]
 
     async def start(
         self,
@@ -277,13 +281,13 @@ class BackgroundTaskManager:
         task_id = uuid.uuid4()
         await self._update_bgtask_status(task_id=task_id, status="bgtask_started", msg="")
         task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
-        self.ongoing_tasks.add(task)
+        self._ongoing_tasks.add(task)
         return task_id
 
     async def shutdown(self) -> None:
         join_tasks = []
         log.info("Cancelling remaining background tasks...")
-        for task in self.ongoing_tasks.copy():
+        for task in self._ongoing_tasks.copy():
             if task.done():
                 continue
             try:
@@ -291,7 +295,7 @@ class BackgroundTaskManager:
                 await task
             except asyncio.CancelledError:
                 pass
-        for qset in self.task_update_queues.values():
+        for qset in self._task_update_queues.values():
             for tq in qset:
                 tq.put_nowait(sentinel)
                 join_tasks.append(tq.join())
@@ -303,7 +307,6 @@ class BackgroundTaskManager:
         status: TaskStatus,
         msg: str = "",
     ) -> None:
-        redis_producer = self.event_producer.redis_client
         tracker_key = f"bgtask.{task_id}"
 
         async def _pipe_builder(r: Redis) -> Pipeline:
@@ -329,7 +332,7 @@ class BackgroundTaskManager:
             pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis_helper.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(self._redis_client, _pipe_builder)
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult | str | None
@@ -352,7 +355,7 @@ class BackgroundTaskManager:
         task_id: uuid.UUID,
         **kwargs,
     ) -> AbstractBgtaskDoneEventType:
-        reporter = ProgressReporter(self.event_producer, task_id)
+        reporter = ProgressReporter(self._redis_client, self._event_producer, task_id)
         bgtask_result = await func(reporter, **kwargs)
         return self._convert_bgtask_to_event(task_id, bgtask_result)
 
@@ -400,7 +403,7 @@ class BackgroundTaskManager:
         **kwargs,
     ) -> None:
         bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
-        await self.event_producer.produce_event(bgtask_result_event)
+        await self._event_producer.produce_event(bgtask_result_event)
         log.info(
             "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
         )
