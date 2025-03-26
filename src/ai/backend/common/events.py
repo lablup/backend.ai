@@ -1161,7 +1161,6 @@ class EventDispatcher(aobject):
 
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
-    redis_client: RedisConnectionInfo
     _msg_queue: AbstractMessageQueue
     consumer_loop_task: asyncio.Task
     subscriber_loop_task: asyncio.Task
@@ -1190,9 +1189,6 @@ class EventDispatcher(aobject):
         _redis_config = redis_config.copy()
         if service_name:
             _redis_config["service_name"] = service_name
-        self.redis_client = redis_helper.get_redis_object(
-            _redis_config, name="event_dispatcher.stream", db=db
-        )
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -1230,8 +1226,6 @@ class EventDispatcher(aobject):
             await asyncio.gather(*cancelled_tasks, return_exceptions=True)
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
-        finally:
-            await self.redis_client.close()
 
     def consume(
         self,
