@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 import sqlalchemy as sa
 
@@ -11,7 +10,6 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
-from ai.backend.manager.models.base import apply_dataclass_field
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
@@ -172,39 +170,7 @@ class ImageService:
         return ClearImagesActionResult()
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
-        data: dict[str, Any] = {}
         props = action.props
-
-        apply_dataclass_field(props, data, "name")
-        apply_dataclass_field(props, data, "registry")
-        apply_dataclass_field(props, data, "image")
-        apply_dataclass_field(props, data, "tag")
-        apply_dataclass_field(props, data, "architecture")
-        apply_dataclass_field(props, data, "is_local")
-        apply_dataclass_field(props, data, "size_bytes")
-        apply_dataclass_field(props, data, "type")
-        apply_dataclass_field(props, data, "digest", target_key="config_digest")
-        apply_dataclass_field(
-            props,
-            data,
-            "supported_accelerators",
-            clean_func=lambda v: ",".join(v),
-            target_key="accelerators",
-        )
-        apply_dataclass_field(
-            props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v}
-        )
-
-        if props.resource_limits is not None:
-            resources_data = {}
-            for limit_option in props.resource_limits:
-                limit_data = {}
-                if limit_option.min is not None and len(limit_option.min) > 0:
-                    limit_data["min"] = limit_option.min
-                if limit_option.max is not None and len(limit_option.max) > 0:
-                    limit_data["max"] = limit_option.max
-                resources_data[limit_option.key] = limit_data
-            data["resources"] = resources_data
 
         try:
             async with self._db.begin_session() as db_sess:
@@ -218,8 +184,7 @@ class ImageService:
                     )
                 except UnknownImageReference:
                     raise ModifyImageActionUnknownImageReferenceError
-                for k, v in data.items():
-                    setattr(image_row, k, v)
+                props.set_attr(image_row)
         except (ValueError, sa.exc.DBAPIError):
             raise ModifyImageActionValueError
 

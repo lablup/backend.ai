@@ -20,6 +20,7 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
@@ -53,14 +54,14 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetI
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageInputData,
+    NoUnsetStatus,
+    TriStatus,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
-from ai.backend.manager.services.image.types import KVPairInput as KVPairInputData
-from ai.backend.manager.services.image.types import ResourceLimitInput as ResourceLimitInputData
 
 from ...api.exceptions import ImageNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -69,7 +70,6 @@ from ..base import (
     OrderExprArg,
     batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
-    graphene_input_to_dataclass,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
 from ..image import (
@@ -1040,6 +1040,43 @@ class ModifyImageInput(graphene.InputObjectType):
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
+    def to_dataclass(self) -> ModifyImageInputData:
+        resources_data = None
+        if self.resource_limits is not Undefined:
+            resources_data = {}
+            for limit_option in self.resource_limits:
+                limit_data = {}
+                if limit_option.min is not Undefined and len(limit_option.min) > 0:
+                    limit_data["min"] = limit_option.min
+                if limit_option.max is not Undefined and len(limit_option.max) > 0:
+                    limit_data["max"] = limit_option.max
+                resources_data[limit_option.key] = limit_data
+
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        return ModifyImageInputData(
+            name=NoUnsetStatus("name", value_or_none(self.name)),
+            registry=NoUnsetStatus("registry", value_or_none(self.registry)),
+            image=NoUnsetStatus("image", value_or_none(self.image)),
+            tag=NoUnsetStatus("tag", value_or_none(self.tag)),
+            architecture=NoUnsetStatus("architecture", value_or_none(self.architecture)),
+            is_local=NoUnsetStatus("is_local", value_or_none(self.is_local)),
+            size_bytes=NoUnsetStatus("size_bytes", value_or_none(self.size_bytes)),
+            type=NoUnsetStatus("type", value_or_none(self.type)),
+            config_digest=NoUnsetStatus("config_digest", value_or_none(self.digest)),
+            labels=NoUnsetStatus("labels", self.labels),
+            accelerators=TriStatus(
+                "accelerators",
+                self.supported_accelerators is None,
+                ",".join(self.supported_accelerators),
+            ),
+            resources=NoUnsetStatus(
+                "resources",
+                value_or_none(resources_data),
+            ),
+        )
+
 
 class ModifyImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -1063,35 +1100,11 @@ class ModifyImage(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         log.info("modify image {0} by API request", target)
 
-        _props = ModifyImageInputData(
-            name=props.name,
-            registry=props.registry,
-            image=props.image,
-            tag=props.tag,
-            architecture=props.architecture,
-            is_local=props.is_local,
-            size_bytes=props.size_bytes,
-            type=props.type,
-            digest=props.digest,
-            labels=[KVPairInputData(key=k.key, value=k.value) for k in props.labels],
-            resource_limits=[
-                ResourceLimitInputData(key=r.key, min=r.min, max=r.max)
-                for r in props.resource_limits
-            ],
-            supported_accelerators=props,
-        )
-
-        # 1. Action엔 dict가 아니라 dataclass를 넘겨야 함.
-        # 2. 따라서 일단 props를 dataclass로 변환하는데, 이 때 Undefined 등 graphql 타입이 들어가면 안 되니까
-        #    필드 내부를 재귀적으로 돌면서 Undefined롤 제거해야 함.
-        #    Undefined, None의 의미 처리를 별도로 해야 하기 때문에 Unset이란 별도의 타입 정의가 필요.
-        # 3. 이렇게 생성된 action에 넘겨진 dataclass를 SQL 실행을 위해 다시 순회하면서 dict로 변환해야 함.
-        # 4. Unset 처리를 위해 dataclass를 순회하며 dict로 변환하는 재귀 함수가 별도로 필요.
         await ctx.processors.image.modify_image.wait_for_complete(
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                props=graphene_input_to_dataclass(_props),
+                props=props.to_dataclass(),
             )
         )
 
