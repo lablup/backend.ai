@@ -180,7 +180,8 @@ class VASTAPIClient:
 
     @property
     def _req_header(self) -> Mapping[str, str]:
-        assert self._auth_token is not None
+        if self._auth_token is None:
+            raise VASTUnauthorizedError("Cannot build request header without auth token.")
         return {
             "Authorization": f"Bearer {self._auth_token['access_token']}",
             "Content-Type": "application/json",
@@ -188,10 +189,12 @@ class VASTAPIClient:
 
     async def _validate_token(self) -> None:
         if self.force_login:
-            return await self._login()
+            await self._login()
+            return
 
         if not self.use_auth_token:
-            return await self._login()
+            await self._login()
+            return
 
         current_dt = datetime.now(timezone.utc)
 
@@ -206,7 +209,8 @@ class VASTAPIClient:
             return datetime.fromtimestamp(decoded["exp"])
 
         if self._auth_token is None:
-            return await self._login()
+            await self._login()
+            return
         elif get_exp_dt(self._auth_token["access_token"]) > current_dt + TOKEN_EXPIRATION_BUFFER:
             # The access token has not expired yet
             # Auth requests using the access token
@@ -215,7 +219,8 @@ class VASTAPIClient:
             # The access token has expired but the refresh token has not expired
             # Refresh tokens
             return await self._refresh()
-        return await self._login()
+        await self._login()
+        return
 
     def _parse_token(self, data: Mapping[str, Any]) -> None:
         try:
@@ -240,7 +245,7 @@ class VASTAPIClient:
         data = await response.json()
         self._parse_token(data)
 
-    async def _login(self) -> None:
+    async def _login(self) -> Mapping[str, Any]:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -256,8 +261,8 @@ class VASTAPIClient:
                 ssl=self.ssl_context,
             )
             data = await response.json()
-        if self.use_auth_token:
-            self._parse_token(data)
+        self._parse_token(data)
+        return data
 
     async def _build_request(
         self,
