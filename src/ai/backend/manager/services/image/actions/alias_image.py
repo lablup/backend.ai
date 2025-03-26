@@ -46,3 +46,11 @@ class AliasImageActionNoSuchAliasError(BaseActionException):
 # TODO: Is this required?
 class AliasImageActionValueError(BaseActionException):
     pass
+
+
+class AliasImageActionDBError(BaseActionException):
+    """
+    This can occur when an image alias with the same value already exists.
+    """
+
+    pass

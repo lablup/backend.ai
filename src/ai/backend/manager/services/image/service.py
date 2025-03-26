@@ -22,6 +22,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
+    AliasImageActionDBError,
     AliasImageActionResult,
     AliasImageActionValueError,
 )
@@ -57,6 +58,7 @@ from ai.backend.manager.services.image.actions.preload_image import (
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import (
     PurgeImageActionByIdGenericForbiddenError,
+    PurgeImageActionByIdObjectDBError,
     PurgeImageActionByIdObjectNotFoundError,
     PurgeImageByIdAction,
     PurgeImageByIdActionResult,
@@ -132,6 +134,8 @@ class ImageService:
                     image_row.aliases.append(image_alias)
         except ValueError:
             raise AliasImageActionValueError
+        except sa.exc.DBAPIError as e:
+            raise AliasImageActionDBError(e)
         return AliasImageActionResult(
             image_id=image_alias.image_id,
             image_alias=ImageAliasData.from_image_alias_row(image_alias),
@@ -197,7 +201,10 @@ class ImageService:
             if action.client_role != UserRole.SUPERADMIN:
                 if not image_row.is_customized_by(action.user_id):
                     raise PurgeImageActionByIdGenericForbiddenError()
-            await db_session.delete(image_row)
+            try:
+                await db_session.delete(image_row)
+            except sa.exc.DBAPIError as e:
+                raise PurgeImageActionByIdObjectDBError(e)
             return PurgeImageByIdActionResult(image=ImageData.from_image_row(image_row))
 
     async def untag_image_from_registry(

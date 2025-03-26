@@ -816,9 +816,7 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
-        return PurgeImageById(
-            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
-        )
+        return PurgeImageById(image=ImageNode.from_row(ctx, result.image.to_image_row()))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
