@@ -1,6 +1,5 @@
 import functools
 import logging
-from typing import Any
 
 import sqlalchemy as sa
 

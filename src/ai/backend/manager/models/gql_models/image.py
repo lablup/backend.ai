@@ -82,7 +82,6 @@ from ..base import (
     OrderExprArg,
     batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
-    graphene_input_to_dataclass,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
 from ..image import (
