@@ -95,7 +95,8 @@ from .api.types import (
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
-from .sweeper import stale_kernel_collection_ctx, stale_session_collection_ctx
+from .sweeper.kernel import stale_kernel_collection_ctx
+from .sweeper.session import stale_session_collection_ctx
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset([
