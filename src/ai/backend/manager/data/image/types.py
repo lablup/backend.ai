@@ -27,12 +27,12 @@ class ImageResourcesData:
 
 
 @dataclass
-class ImageLabels:
+class ImageLabelsData:
     label_data: dict[str, str]
 
 
 @dataclass
-class ImageResources:
+class ImageResourcesData:
     resources_data: dict[str, dict[str, Optional[str]]]
 
 
@@ -72,10 +72,3 @@ class PurgeImageResponseData:
 class ImageAliasData:
     id: uuid.UUID
     alias: str
-
-    @classmethod
-    def from_image_alias_row(cls, row: ImageAliasRow) -> Self:
-        return cls(id=row.id, alias=row.alias)
-
-    def to_image_alias_row(self, image_id: uuid.UUID) -> ImageAliasRow:
-        return ImageAliasRow(id=self.id, alias=self.alias, image_id=image_id)
