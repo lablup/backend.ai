@@ -111,6 +111,12 @@ class VASTQuota:
     used_capacity: int
     percent_capacity: int
 
+    def __init__(self, **kwargs):
+        names = set([f.name for f in fields(self)])
+        for k, v in kwargs.items():
+            if k in names:
+                setattr(self, k, v)
+
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VASTQuota:
         return VASTQuota(**obj)
