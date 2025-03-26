@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.image.types import PurgeImageResponseData
 from ai.backend.manager.services.image.base import ImageAction
 from ai.backend.manager.services.image.types import ImageRefData
 
@@ -24,7 +24,7 @@ class PurgeImagesAction(ImageAction):
 @dataclass
 class PurgeImagesActionResult(BaseActionResult):
     reserved_bytes: int
-    results: list[PurgeImageResponse]  # TODO: Don't use DTO here
+    purged_images: list[PurgeImageResponseData]
     errors: list[str]
 
     @override
