@@ -146,7 +146,7 @@ async def server_main(
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
-            event_observer=metric_registry,
+            event_observer=metric_registry.event,
         )
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
@@ -206,10 +206,13 @@ async def server_main(
                 )
             client_api_runner = web.AppRunner(ctx.client_api_app)
             manager_api_runner = web.AppRunner(ctx.manager_api_app)
+            internal_api_runner = web.AppRunner(ctx.internal_api_app)
             await client_api_runner.setup()
             await manager_api_runner.setup()
+            await internal_api_runner.setup()
             client_service_addr = local_config["api"]["client"]["service-addr"]
             manager_service_addr = local_config["api"]["manager"]["service-addr"]
+            internal_addr = local_config["api"]["manager"]["internal-addr"]
             client_api_site = web.TCPSite(
                 client_api_runner,
                 str(client_service_addr.host),
@@ -226,8 +229,16 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=manager_ssl_ctx,
             )
+            internal_api_site = web.TCPSite(
+                internal_api_runner,
+                str(internal_addr.host),
+                internal_addr.port,
+                backlog=1024,
+                reuse_port=True,
+            )
             await client_api_site.start()
             await manager_api_site.start()
+            await internal_api_site.start()
             if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]

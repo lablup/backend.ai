@@ -22,13 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import AccessKey, ClusterMode, SessionId, SessionResult
+from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionId, SessionResult
 from ai.backend.manager.api.exceptions import SessionNotFound
 from ai.backend.manager.idle import ReportInfo
 
 from ..base import (
     BigInt,
     FilterExprArg,
+    Item,
     OrderExprArg,
     PaginatedConnectionField,
     batch_multiresult_in_session,
@@ -43,7 +44,7 @@ from ..gql_relay import (
     ResolvedGlobalID,
 )
 from ..kernel import KernelRow
-from ..minilang import ArrayFieldItem, JSONFieldItem
+from ..minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from ..rbac import ScopeType
@@ -52,13 +53,24 @@ from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import (
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
+    QueryCondition,
+    QueryOption,
+    RelatedFields,
+    SessionQueryConditions,
     SessionRow,
     SessionStatus,
     SessionTypes,
+    and_domain_name,
+    and_raw_filter,
+    and_resource_group_name,
+    and_status,
     get_permission_ctx,
+    join_related_field,
+    load_related_field,
 )
-from ..user import UserRole
+from ..user import UserRole, UserRow
 from ..utils import execute_with_txn_retry
+from .group import GroupRow
 from .kernel import KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
@@ -77,10 +89,15 @@ _queryfilter_fieldspec: FieldSpecType = {
     "type": ("session_type", enum_field_getter(SessionTypes)),
     "name": ("name", None),
     "priority": ("priority", None),
+    "images": (ArrayFieldItem("images"), None),
+    "image": (ArrayFieldItem("images"), None),
     "agent_ids": (ArrayFieldItem("agent_ids"), None),
     "domain_name": ("domain_name", None),
-    "project_id": ("project_id", None),
+    "project_id": ("group_id", None),
     "user_id": ("user_uuid", None),
+    "full_name": (ORMFieldItem(UserRow.full_name), None),
+    "group_name": (ORMFieldItem(GroupRow.name), None),
+    "user_email": (ORMFieldItem(UserRow.email), None),
     "access_key": ("access_key", None),
     "scaling_group": ("scaling_group_name", None),
     "cluster_mode": ("cluster_mode", lambda s: ClusterMode[s]),
@@ -103,10 +120,11 @@ _queryorder_colmap: ColumnMapType = {
     "type": ("session_type", None),
     "name": ("name", None),
     "priority": ("priority", None),
+    "images": ("images", None),
     "image": ("images", None),
     "agent_ids": ("agent_ids", None),
     "domain_name": ("domain_name", None),
-    "project_id": ("project_id", None),
+    "project_id": ("group_id", None),
     "user_id": ("user_uuid", None),
     "access_key": ("access_key", None),
     "scaling_group": ("scaling_group_name", None),
@@ -226,6 +244,25 @@ class ComputeSessionNode(graphene.ObjectType):
         "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
         description="Added in 24.09.0.",
     )
+
+    @classmethod
+    def _add_basic_options_to_query(
+        cls, stmt: sa.sql.Select, is_count: bool = False
+    ) -> sa.sql.Select:
+        options = [
+            join_related_field(RelatedFields.USER),
+            join_related_field(RelatedFields.PROJECT),
+        ]
+        if not is_count:
+            options = [
+                *options,
+                load_related_field(RelatedFields.KERNEL),
+                load_related_field(RelatedFields.USER, already_joined=True),
+                load_related_field(RelatedFields.PROJECT, already_joined=True),
+            ]
+        for option in options:
+            stmt = option(stmt)
+        return stmt
 
     @classmethod
     def from_row(
@@ -454,11 +491,8 @@ class ComputeSessionNode(graphene.ObjectType):
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = (
-                sa.select(SessionRow)
-                .where(cond & (SessionRow.id == uuid.UUID(session_id)))
-                .options(selectinload(SessionRow.kernels))
-            )
+            query = sa.select(SessionRow).where(cond & (SessionRow.id == uuid.UUID(session_id)))
+            query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
         result = cls.from_row(
@@ -521,8 +555,8 @@ class ComputeSessionNode(graphene.ObjectType):
             cond = permission_ctx.query_condition
             if cond is None:
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-            query = query.where(cond).options(selectinload(SessionRow.kernels))
-            cnt_query = cnt_query.where(cond)
+            query = cls._add_basic_options_to_query(query.where(cond))
+            cnt_query = cls._add_basic_options_to_query(cnt_query.where(cond), is_count=True)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
@@ -541,6 +575,52 @@ class ComputeSessionConnection(Connection):
     class Meta:
         node = ComputeSessionNode
         description = "Added in 24.09.0."
+
+
+class TotalResourceSlot(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+        description = "Added in 25.5.0."
+
+    occupied_slots = graphene.JSONString()
+    requested_slots = graphene.JSONString()
+
+    @classmethod
+    async def get_data(
+        cls,
+        ctx: GraphQueryContext,
+        conditions: SessionQueryConditions,
+    ) -> Self:
+        query_conditions: list[QueryCondition] = []
+        if conditions.raw_filter is not None:
+            query_conditions.append(and_raw_filter(_queryfilter_fieldspec, conditions.raw_filter))
+        if conditions.statuses is not None:
+            query_conditions.append(and_status(conditions.statuses))
+        if conditions.domain_name is not None:
+            query_conditions.append(and_domain_name(conditions.domain_name))
+        if conditions.resource_group_name is not None:
+            query_conditions.append(and_resource_group_name(conditions.resource_group_name))
+
+        query_options: list[QueryOption] = [
+            load_related_field(RelatedFields.KERNEL),
+            join_related_field(RelatedFields.USER),
+            join_related_field(RelatedFields.PROJECT),
+        ]
+
+        session_rows = await SessionRow.list_session_by_condition(
+            query_conditions, query_options, db=ctx.db
+        )
+        occupied_slots = ResourceSlot()
+        requested_slots = ResourceSlot()
+        for row in session_rows:
+            occupied_slots += row.occupying_slots
+            requested_slots += row.requested_slots
+        occupied, requested = occupied_slots.to_json(), requested_slots.to_json()
+
+        return TotalResourceSlot(
+            occupied_slots=occupied,
+            requested_slots=requested,
+        )
 
 
 def _validate_priority_input(priority: int) -> None:
@@ -621,6 +701,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
             )
             _stmt = (
                 sa.select(SessionRow)
+                .options(selectinload(SessionRow.kernels))
                 .from_statement(_update_stmt)
                 .execution_options(populate_existing=True)
             )
