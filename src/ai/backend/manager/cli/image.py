@@ -15,6 +15,7 @@ from .image_impl import dealias as dealias_impl
 from .image_impl import forget_image as forget_image_impl
 from .image_impl import inspect_image as inspect_image_impl
 from .image_impl import list_images as list_images_impl
+from .image_impl import purge_image as purge_image_impl
 from .image_impl import rescan_images as rescan_images_impl
 from .image_impl import set_image_resource_limit as set_image_resource_limit_impl
 from .image_impl import validate_image_alias as validate_image_alias_impl
@@ -51,8 +52,17 @@ def inspect(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.argument("architecture")
 @click.pass_obj
 def forget(cli_ctx, canonical_or_alias, architecture) -> None:
-    """Forget (delete) a specific image."""
+    """Forget (soft-delete) a specific image."""
     asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
+
+
+@cli.command()
+@click.argument("canonical_or_alias")
+@click.argument("architecture")
+@click.pass_obj
+def purge(cli_ctx, canonical_or_alias, architecture) -> None:
+    """Purge (hard-delete) a specific image."""
+    asyncio.run(purge_image_impl(cli_ctx, canonical_or_alias, architecture))
 
 
 @cli.command()
@@ -82,14 +92,19 @@ def set_resource_limit(
 
 @cli.command()
 @click.argument("registry_or_image", required=False, default="")
+@click.option(
+    "-p", "--project", default=None, help="The name of the project to which the images belong."
+)
 @click.pass_obj
-def rescan(cli_ctx, registry_or_image: str) -> None:
+def rescan(cli_ctx, registry_or_image: str, project: Optional[str] = None) -> None:
     """
-    Update the kernel image metadata from all configured docker registries.
+    Update the kernel image metadata from the configured registries.
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
+
+    To rescan only the images belonging to a specific project, use the --project option.
     """
-    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image))
+    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image, project))
 
 
 @cli.command()

@@ -18,6 +18,7 @@ pool-pre-ping = false
 [manager]
 num-proc = 4
 service-addr = { host = "0.0.0.0", port = 8081 }
+internal-addr = { host = "0.0.0.0", port = 8092 }
 #user = "nobody"
 #group = "nobody"
 ssl-enabled = false
@@ -37,6 +38,12 @@ agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 [docker-registry]
 ssl-verify = false
+
+[pyroscope]
+enabled = true
+app-name = "backendai-half-manager"
+server-addr = "http://localhost:4040"
+sample-rate = 100
 
 
 [logging]

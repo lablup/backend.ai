@@ -16,7 +16,6 @@ from typing import (
     Any,
     FrozenSet,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -34,11 +33,11 @@ from kubernetes_asyncio import config as kube_config
 
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
-    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -52,7 +51,6 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
-    SessionId,
     SlotName,
     VFolderMount,
     current_resource_slots,
@@ -63,7 +61,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel, KernelFeatures
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, MountInfo, Port
+from ..types import Container, ContainerStatus, KernelOwnershipData, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,
@@ -101,9 +99,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         event_producer: EventProducer,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
@@ -116,9 +112,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         restarting: bool = False,
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             event_producer,
             kernel_image,
             kernel_config,
@@ -127,6 +121,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             computers,
             restarting=restarting,
         )
+        kernel_id = ownership_data.kernel_id
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         rel_scratch_dir = Path(str(kernel_id))  # need relative path for nfs mount
 
@@ -182,7 +177,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             current_resource_slots.set(known_slot_types)
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
-                container_id="",
                 allocations={},
                 slots={**slots},  # copy
                 mounts=[],
@@ -413,7 +407,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
@@ -521,11 +515,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             },
         }
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> KubernetesKernel:
         loop = current_loop()
         if self.restarting:
@@ -645,9 +640,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         # TODO: Mark shmem feature as unsupported when advertising agent
 
         kernel_obj = KubernetesKernel(
-            self.kernel_id,
-            self.session_id,
-            self.agent_id,
+            self.ownership_data,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -664,6 +658,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         image_labels = self.kernel_config["image"]["labels"]
         service_ports = kernel_obj.service_ports
@@ -886,7 +881,7 @@ class KubernetesAgent(
                 new_pv.label("backend.ai/backend-ai-scratch-volume", "hostPath")
             else:
                 raise NotImplementedError(
-                    f'Scratch type {self.local_config["container"]["scratch-type"]} is not'
+                    f"Scratch type {self.local_config['container']['scratch-type']} is not"
                     " supported",
                 )
 
@@ -1023,6 +1018,13 @@ class KubernetesAgent(
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
+    async def purge_images(
+        self,
+        images: list[str],
+    ) -> PurgeImageResponses:
+        # TODO: Add support for appropriate image purging mechanism on K8s
+        return PurgeImageResponses([])
+
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
@@ -1032,8 +1034,7 @@ class KubernetesAgent(
 
     async def init_kernel_context(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
@@ -1042,9 +1043,7 @@ class KubernetesAgent(
     ) -> KubernetesKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return KubernetesKernelCreationContext(
-            kernel_id,
-            session_id,
-            self.id,
+            ownership_data,
             self.event_producer,
             kernel_image,
             kernel_config,

@@ -42,6 +42,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 # Translations
 *.mo
@@ -78,7 +79,7 @@ venv/
 ENV/
 
 # IDE/vim
-.idea
+.idea/
 .swp
 .swo
 .*.swp
@@ -90,6 +91,9 @@ ENV/
 /.exrc
 .ripgreprc
 .neoconf.json
+.zed/
+/.ropeproject
+pyrightconfig.json
 
 # Pants
 /.pants.d/
@@ -100,23 +104,27 @@ ENV/
 /tools/pants-src
 
 # Local configurations
-/account-manager.toml
-/manager.toml
-/agent.toml
-/storage-proxy.toml
-/webserver.conf
-/cuda-mock.toml
-/mock-accelerator.toml
+/account-manager*.toml
+/manager*.toml
+/agent*.toml
+/storage-proxy*.toml
+/webserver*.conf
+/cuda-mock*.toml
+/mock-accelerator*.toml
 /.pants.env
 /.pants.bootstrap
 /.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
+/alembic-accountmgr.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
-/agent.dummy.toml
+/*dummy*.toml
 /wsproxy.toml
+/grafana-dashboards
+/grafana-provisioning
+/prometheus.yaml
 
 # Local temp and installer-generated directories
 /.tmp/

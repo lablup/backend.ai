@@ -26,7 +26,10 @@ from ai.backend.common.config import (
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.types import safe_print_redis_config
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -89,6 +92,14 @@ async def server_main(
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            application_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
     m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
     m.console_locals["local_config"] = local_config
     aiomon_started = False
@@ -97,14 +108,18 @@ async def server_main(
         aiomon_started = True
     except Exception as e:
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
-
+    metric_registry = CommonMetricRegistry()
     try:
         etcd = load_shared_config(local_config)
         try:
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
-            log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
+            log.info(
+                "PID: {0} - configured redis_config: {1}",
+                pidx,
+                safe_print_redis_config(redis_config),
+            )
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
@@ -120,15 +135,24 @@ async def server_main(
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
-        log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
+        log.info(
+            "PID: {0} - Event producer created. (redis_config: {1})",
+            pidx,
+            safe_print_redis_config(redis_config),
+        )
         event_dispatcher = await event_dispatcher_cls.new(
             redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            event_observer=metric_registry.event,
         )
-        log.info("PID: {0} - Event dispatcher created. (redis_config: {1})", pidx, redis_config)
+        log.info(
+            "PID: {0} - Event dispatcher created. (redis_config: {1})",
+            pidx,
+            safe_print_redis_config(redis_config),
+        )
         if local_config["storage-proxy"]["use-watcher"]:
             if not _is_root():
                 raise ValueError(
@@ -156,6 +180,7 @@ async def server_main(
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
             watcher=watcher_client,
+            metric_registry=metric_registry,
         )
         async with ctx:
             m.console_locals["ctx"] = ctx
@@ -181,10 +206,13 @@ async def server_main(
                 )
             client_api_runner = web.AppRunner(ctx.client_api_app)
             manager_api_runner = web.AppRunner(ctx.manager_api_app)
+            internal_api_runner = web.AppRunner(ctx.internal_api_app)
             await client_api_runner.setup()
             await manager_api_runner.setup()
+            await internal_api_runner.setup()
             client_service_addr = local_config["api"]["client"]["service-addr"]
             manager_service_addr = local_config["api"]["manager"]["service-addr"]
+            internal_addr = local_config["api"]["manager"]["internal-addr"]
             client_api_site = web.TCPSite(
                 client_api_runner,
                 str(client_service_addr.host),
@@ -201,8 +229,16 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=manager_ssl_ctx,
             )
+            internal_api_site = web.TCPSite(
+                internal_api_runner,
+                str(internal_addr.host),
+                internal_addr.port,
+                backlog=1024,
+                reuse_port=True,
+            )
             await client_api_site.start()
             await manager_api_site.start()
+            await internal_api_site.start()
             if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]

@@ -15,9 +15,9 @@ from typing import (
 
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.events import EventProducer
 from ai.backend.common.types import (
-    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -28,8 +28,10 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
+    MountPermission,
     MountTypes,
     ResourceSlot,
+    Sentinel,
     ServicePort,
     SessionId,
     SlotName,
@@ -40,7 +42,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, MountInfo
+from ..types import Container, ContainerStatus, KernelOwnershipData, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
 from .resources import load_resources, scan_available_resources
@@ -51,9 +53,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         event_producer: EventProducer,
         kenrel_image: ImageRef,
         kernel_config: KernelCreationConfig,
@@ -65,9 +65,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             event_producer,
             kenrel_image,
             kernel_config,
@@ -98,7 +96,6 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         current_resource_slots.set(known_slot_types)
         slots = slots.normalize_slots(ignore_unknown=True)
         resource_spec = KernelResourceSpec(
-            container_id="",
             allocations={},
             slots={**slots},  # copy
             mounts=[],
@@ -156,23 +153,23 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         type: MountTypes,
         src: str | Path,
         target: str | Path,
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
         return DummyKernel(
-            self.kernel_id,
-            self.session_id,
-            self.agent_id,
+            self.ownership_data,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -189,6 +186,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         cmdargs: list[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
@@ -290,9 +288,23 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         delay = self.dummy_agent_cfg["delay"]["push-image"]
         await asyncio.sleep(delay)
+
+    async def purge_images(
+        self,
+        images: list[str],
+    ) -> PurgeImageResponses:
+        delay = self.dummy_agent_cfg["delay"]["purge-images"]
+        await asyncio.sleep(delay)
+        return PurgeImageResponses([])
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -305,8 +317,7 @@ class DummyAgent(
 
     async def init_kernel_context(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
@@ -315,9 +326,7 @@ class DummyAgent(
     ) -> DummyKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return DummyKernelCreationContext(
-            kernel_id,
-            session_id,
-            self.id,
+            ownership_data,
             self.event_producer,
             kernel_image,
             kernel_config,

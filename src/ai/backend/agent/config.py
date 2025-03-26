@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import trafaret as t
 
@@ -22,11 +23,22 @@ default_sync_container_lifecycles_config = {
     "interval": 10.0,
 }
 
+_default_pyroscope_config: dict[str, Any] = {
+    "enabled": False,
+    "app-name": None,
+    "server-addr": None,
+    "sample-rate": None,
+}
+
 agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
             tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
+            t.Key("service-addr", default=("0.0.0.0", 6003)): tx.HostPortPair,
+            t.Key("ssl-enabled", default=False): t.Bool,
+            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+            t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
             t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
             t.Key("rpc-auth-manager-public-key", default=None): t.Null | tx.Path(type="file"),
             t.Key("rpc-auth-agent-keypair", default=None): t.Null | tx.Path(type="file"),
@@ -52,14 +64,16 @@ agent_local_config_iv = (
             ),
             t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
             t.Key("skip-manager-detection", default=False): t.ToBool,
-            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=48200): t.ToInt[
+            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=38200): t.ToInt[
                 1:65535
             ],
-            t.Key("aiomonitor-webui-port", default=49200): t.ToInt[1:65535],
+            t.Key("aiomonitor-webui-port", default=39200): t.ToInt[1:65535],
             t.Key("metadata-server-bind-host", default="0.0.0.0"): t.String,
             t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
             t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
             t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("allow-network-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("block-network-plugins", default=None): t.Null | tx.ToSet,
             t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
                 type="dir", auto_create=True
             ),
@@ -95,6 +109,14 @@ agent_local_config_iv = (
             t.Key("scratch-nfs-address", default=None): t.Null | t.String,
             t.Key("scratch-nfs-options", default=None): t.Null | t.String,
             t.Key("alternative-bridge", default=None): t.Null | t.String,
+        }).allow_extra("*"),
+        t.Key("pyroscope", default=_default_pyroscope_config): t.Dict({
+            t.Key("enabled", default=_default_pyroscope_config["enabled"]): t.ToBool,
+            t.Key("app-name", default=_default_pyroscope_config["app-name"]): t.Null | t.String,
+            t.Key("server-addr", default=_default_pyroscope_config["server-addr"]): t.Null
+            | t.String,
+            t.Key("sample-rate", default=_default_pyroscope_config["sample-rate"]): t.Null
+            | t.ToInt[1:],
         }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("resource"): t.Dict({
@@ -148,10 +170,18 @@ default_container_logs_config = {
 }
 
 DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
+DEFAULT_PUSH_TIMEOUT = None  # Infinite
+DEFAULT_KERNEL_INIT_POLLING_ATTEMPT = 10
+DEFAULT_KERNEL_INIT_POLLING_TIMEOUT = 60.0  # 60 seconds
+DEFAULT_KERNEL_INIT_TIMEOUT = 60.0  # 60 seconds
 
-default_api_config = {
-    "pull-timeout": DEFAULT_PULL_TIMEOUT,
+default_api_config = {"pull-timeout": DEFAULT_PULL_TIMEOUT, "push-timeout": DEFAULT_PUSH_TIMEOUT}
+default_kernel_lifecycles = {
+    "init-polling-attempt": DEFAULT_KERNEL_INIT_POLLING_ATTEMPT,
+    "init-polling-timeout-sec": DEFAULT_KERNEL_INIT_POLLING_TIMEOUT,
+    "init-timeout-sec": DEFAULT_KERNEL_INIT_TIMEOUT,
 }
+
 
 agent_etcd_config_iv = t.Dict({
     t.Key("container-logs", default=default_container_logs_config): t.Dict({
@@ -161,7 +191,25 @@ agent_etcd_config_iv = t.Dict({
     t.Key("api", default=default_api_config): t.Dict({
         t.Key("pull-timeout", default=default_api_config["pull-timeout"]): tx.ToNone
         | t.ToFloat[0:],  # Set the image pull timeout in seconds
+        t.Key("push-timeout", default=default_api_config["push-timeout"]): tx.ToNone
+        | t.ToFloat[
+            0:
+        ],  # Set the image push timeout in seconds. 'None' indicates an infinite timeout.
     }).allow_extra("*"),
+    t.Key("kernel-lifecycles", default=default_kernel_lifecycles): t.Dict({
+        t.Key(
+            "init-polling-attempt",
+            default=default_kernel_lifecycles["init-polling-attempt"],
+        ): t.ToInt,
+        t.Key(
+            "init-polling-timeout-sec",
+            default=default_kernel_lifecycles["init-polling-timeout-sec"],
+        ): t.ToFloat,
+        t.Key(
+            "init-timeout-sec",
+            default=default_kernel_lifecycles["init-timeout-sec"],
+        ): t.ToFloat,
+    }),
 }).allow_extra("*")
 
 container_etcd_config_iv = t.Dict({

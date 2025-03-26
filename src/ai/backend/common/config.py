@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
 
+import humps
 import tomli
 import trafaret as t
 from pydantic import (
@@ -80,6 +81,22 @@ redis_config_iv = t.Dict({
         "redis_helper_config",
         default=redis_helper_default_config,
     ): redis_helper_config_iv,
+    t.Key("override_configs", default=None): t.Null
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("addr", default=redis_default_config["addr"]): t.Null | tx.HostPortPair,
+            t.Key(  # if present, addr is ignored and service_name becomes mandatory.
+                "sentinel", default=redis_default_config["sentinel"]
+            ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
+            t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
+            t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+            t.Key(
+                "redis_helper_config",
+                default=redis_helper_default_config,
+            ): redis_helper_config_iv,
+        }).allow_extra("*"),
+    ),
 }).allow_extra("*")
 
 vfolder_config_iv = t.Dict({
@@ -113,13 +130,15 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command"): t.List(t.String),
+                t.Key("start_command"): t.String | t.List(t.String),
+                t.Key("shell", default="/bin/bash"): t.String,  # used if start_command is a string
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
                 | t.Dict({
+                    t.Key("interval", default=10): t.Null | t.ToFloat[0:],
                     t.Key("path"): t.String,
                     t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                    t.Key("max_wait_time", default=5): t.Null | t.ToFloat[0:],
+                    t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
                 }),
             }),
@@ -254,3 +273,13 @@ def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], v
         table = table[k]
     if table.get(key_path[-1]) is None:
         table[key_path[-1]] = value
+
+
+def config_key_to_snake_case(o: Any) -> Any:
+    match o:
+        case dict():
+            return {humps.dekebabize(k): config_key_to_snake_case(v) for k, v in o.items()}
+        case list() | tuple() | set():
+            return [config_key_to_snake_case(i) for i in o]
+        case _:
+            return o

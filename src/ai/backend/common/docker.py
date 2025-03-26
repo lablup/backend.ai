@@ -11,11 +11,14 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
+    TYPE_CHECKING,
     Final,
     Iterable,
+    Literal,
     Mapping,
     NamedTuple,
     Optional,
+    Self,
 )
 
 import aiohttp
@@ -30,6 +33,9 @@ from .arch import arch_name_aliases
 from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
 from .service_ports import parse_service_ports
 from .utils import is_ip_address_format, join_non_empty
+
+if TYPE_CHECKING:
+    from .types import ImageConfig
 
 __all__ = (
     "arch_name_aliases",
@@ -150,9 +156,9 @@ def parse_docker_host_url(
 
 # We may cache the connector type but not connector instances!
 @functools.lru_cache()
-def _search_docker_socket_files_impl() -> (
-    tuple[Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]]
-):
+def _search_docker_socket_files_impl() -> tuple[
+    Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
     match sys.platform:
         case "linux" | "darwin":
@@ -323,6 +329,12 @@ class PlatformTagSet(Mapping):
                 value = ""
             self._data[key] = value
 
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return f"PlatformTagSet({str(self._data)})"
+
     def has(self, key: str, version: Optional[str] = None):
         if version is None:
             return key in self._data
@@ -373,29 +385,41 @@ class ImageRef:
     """
 
     name: str
-    project: str
+    project: str | None
     tag: str
     registry: str
     architecture: str
     is_local: bool
 
     @classmethod
+    def from_image_config(cls, config: ImageConfig) -> Self:
+        return cls.from_image_str(
+            config["canonical"],
+            config["project"],
+            config["registry"]["name"],
+            is_local=config["is_local"],
+            architecture=config["architecture"],
+        )
+
+    @classmethod
     def from_image_str(
         cls,
         image_str: str,
-        project: str,
+        project: str | None,
         registry: str,
         *,
         architecture: str = "x86_64",
         is_local: bool = False,
-    ) -> ImageRef:
+    ) -> Self:
         """
         Parse the image reference string and return an ImageRef object from the string.
         """
 
         parsed = cls.parse_image_str(image_str, registry)
 
-        if parsed.project_and_image_name == project:
+        if not project:
+            image_name = parsed.project_and_image_name
+        elif parsed.project_and_image_name == project:
             image_name = ""
         else:
             if not parsed.project_and_image_name.startswith(f"{project}/"):
@@ -435,7 +459,9 @@ class ImageRef:
         return image_str, tag
 
     @classmethod
-    def parse_image_str(cls, image_str: str, registry: str | None = None) -> ParsedImageStr:
+    def parse_image_str(
+        cls, image_str: str, registry: str | Literal["*"] | None = None
+    ) -> ParsedImageStr:
         """
         Parses a string representing an image.
 
@@ -456,7 +482,7 @@ class ImageRef:
         if "://" in image_str or image_str.startswith("//"):
             raise InvalidImageName(image_str)
 
-        def divide_parts(image_str: str, registry: str | None) -> tuple[str, str]:
+        def divide_parts(image_str: str, registry: str | Literal["*"] | None) -> tuple[str, str]:
             if "/" not in image_str:
                 return (default_registry, image_str)
 
@@ -544,7 +570,7 @@ class ImageRef:
         for name in possible_names:
             ret[name] = self
         for name, ptags in itertools.product(possible_names, itertools.product(*possible_ptags)):
-            ret[f"{name}:{"-".join(t for t in ptags if t)}"] = self
+            ret[f"{name}:{'-'.join(t for t in ptags if t)}"] = self
         return ret
 
     @staticmethod
@@ -565,8 +591,8 @@ class ImageRef:
 
     @property
     def canonical(self) -> str:
-        # e.g., cr.backend.ai/stable/python:3.9-ubuntu
         join = functools.partial(join_non_empty, sep="/")
+        # e.g., cr.backend.ai/stable/python:3.9-ubuntu
         return f"{join(self.registry, self.project, self.name)}:{self.tag}"
 
     @property

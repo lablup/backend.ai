@@ -13,7 +13,6 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Callable,
-    Dict,
     FrozenSet,
     List,
     Mapping,
@@ -34,6 +33,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.types import (
     PID,
+    AgentId,
     ContainerId,
     DeviceId,
     KernelId,
@@ -43,10 +43,19 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .metrics.metric import UtilizationMetricObserver
+from .metrics.types import (
+    CAPACITY_METRIC_KEY,
+    CURRENT_METRIC_KEY,
+    PCT_METRIC_KEY,
+    FlattenedDeviceMetric,
+    FlattenedKernelMetric,
+)
 from .utils import remove_exponent
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
+    from .kernel import AbstractKernel
 
 __all__ = (
     "StatContext",
@@ -253,7 +262,7 @@ class MovingStatistics:
 
 @attrs.define(auto_attribs=True, slots=True)
 class Metric:
-    key: str
+    key: str  # MetricKey
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
@@ -305,6 +314,7 @@ class StatContext:
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
     kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
+    _utilization_metric_observer: UtilizationMetricObserver
 
     def __init__(
         self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
@@ -320,6 +330,7 @@ class StatContext:
 
         self._lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
+        self._utilization_metric_observer = UtilizationMetricObserver.instance()
 
     def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
         """
@@ -388,16 +399,37 @@ class StatContext:
                             )
                         else:
                             self.device_metrics[metric_key][dev_id].update(measure)
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        device_metrics: dict[MetricKey, dict[DeviceId, MetricValue]] = {}
+        flattened_metrics: list[FlattenedDeviceMetric] = []
+        for metric_key, per_device in self.device_metrics.items():
+            if metric_key not in device_metrics:
+                device_metrics[metric_key] = {}
+            for device_id, obj in per_device.items():
+                metric_value = obj.to_serializable_dict()
+                device_metrics[metric_key][device_id] = metric_value
+                value_pairs = [
+                    (CURRENT_METRIC_KEY, metric_value["current"]),
+                    (PCT_METRIC_KEY, metric_value["pct"]),
+                ]
+                if (capacity := metric_value["capacity"]) is not None:
+                    value_pairs.append((CAPACITY_METRIC_KEY, capacity))
+                flattened_metrics.append(
+                    FlattenedDeviceMetric(
+                        agent_id,
+                        device_id,
+                        metric_key,
+                        value_pairs,
+                    )
+                )
+
+        for metric in flattened_metrics:
+            self._utilization_metric_observer.observe_device_metric(metric=metric)
 
         # push to the Redis server
         redis_agent_updates = {
             "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
-            "devices": {
-                metric_key: {
-                    str(dev_id): obj.to_serializable_dict() for dev_id, obj in per_device.items()
-                }
-                for metric_key, per_device in self.device_metrics.items()
-            },
+            "devices": device_metrics,
         }
         if self.agent.local_config["debug"]["log-stats"]:
             log.debug(
@@ -425,7 +457,8 @@ class StatContext:
         Intended to be used by the agent and triggered by container cgroup synchronization processes.
         """
         async with self._lock:
-            kernel_id_map: Dict[ContainerId, KernelId] = {}
+            kernel_id_map: dict[ContainerId, KernelId] = {}
+            kernel_obj_map: dict[KernelId, AbstractKernel] = {}
             for kid, info in self.agent.kernel_registry.items():
                 try:
                     cid = info["container_id"]
@@ -433,6 +466,7 @@ class StatContext:
                     log.warning("collect_container_stat(): no container for kernel {}", kid)
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
+                    kernel_obj_map[kid] = info
             unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
             for unused_kernel_id in unused_kernel_ids:
                 log.debug("removing kernel_metric for {}", unused_kernel_id)
@@ -484,17 +518,54 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
+        kernel_updates: list[FlattenedKernelMetric] = []
+        kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        for kernel_id in updated_kernel_ids:
+            kernel_obj = kernel_obj_map.get(kernel_id)
+            if kernel_obj is not None:
+                ownership_data = kernel_obj.ownership_data
+                session_id = ownership_data.session_id
+                owner_user_id = ownership_data.owner_user_id
+                owner_project_id = ownership_data.owner_project_id
+            else:
+                session_id = None
+                owner_user_id = None
+                owner_project_id = None
+            metrics = self.kernel_metrics[kernel_id]
+            serializable_metrics: dict[MetricKey, MetricValue] = {}
+            for key, obj in metrics.items():
+                metric_value = obj.to_serializable_dict()
+                serializable_metrics[key] = metric_value
+                value_pairs = [
+                    (CURRENT_METRIC_KEY, metric_value["current"]),
+                    (PCT_METRIC_KEY, metric_value["pct"]),
+                ]
+                if (capacity := metric_value["capacity"]) is not None:
+                    value_pairs.append((CAPACITY_METRIC_KEY, capacity))
+                kernel_updates.append(
+                    FlattenedKernelMetric(
+                        agent_id,
+                        kernel_id,
+                        session_id,
+                        owner_user_id,
+                        owner_project_id,
+                        key,
+                        value_pairs,
+                    )
+                )
+            if self.agent.local_config["debug"]["log-stats"]:
+                log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
+
+            kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
+
+        for metric in kernel_updates:
+            self._utilization_metric_observer.observe_container_metric(metric=metric)
+
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
-            for kernel_id in updated_kernel_ids:
-                metrics = self.kernel_metrics[kernel_id]
-                serializable_metrics = {
-                    str(key): obj.to_serializable_dict() for key, obj in metrics.items()
-                }
-                if self.agent.local_config["debug"]["log-stats"]:
-                    log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
-                serialized_metrics = msgpack.packb(serializable_metrics)
-                pipe.set(str(kernel_id), serialized_metrics)
+            for kernel_id, update in kernel_serialized_updates:
+                pipe.set(str(kernel_id), update)
             return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)

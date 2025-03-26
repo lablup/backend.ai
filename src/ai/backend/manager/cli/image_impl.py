@@ -16,7 +16,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow, ImageStatus
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
@@ -33,6 +33,7 @@ async def list_images(cli_ctx, short, installed_only):
     ):
         displayed_items = []
         try:
+            # Idea: Add `--include-deleted` option to include deleted images?
             items = await ImageRow.list(session)
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
@@ -81,8 +82,8 @@ async def list_images(cli_ctx, short, installed_only):
                         pprint(item)
             if short:
                 print(tabulate(displayed_items, tablefmt="plain"))
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def inspect_image(cli_ctx, canonical_or_alias, architecture):
@@ -101,8 +102,8 @@ async def inspect_image(cli_ctx, canonical_or_alias, architecture):
             pprint(await image_row.inspect())
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def forget_image(cli_ctx, canonical_or_alias, architecture):
@@ -118,11 +119,32 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
                     ImageAlias(canonical_or_alias),
                 ],
             )
+            await image_row.mark_as_deleted(session)
+        except UnknownImageReference:
+            log.exception("Image not found.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
+
+
+async def purge_image(cli_ctx, canonical_or_alias, architecture):
+    async with (
+        connect_database(cli_ctx.local_config) as db,
+        db.begin_session() as session,
+    ):
+        try:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
+                ],
+                filter_by_statuses=None,
+            )
             await session.delete(image_row)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def set_image_resource_limit(
@@ -147,20 +169,22 @@ async def set_image_resource_limit(
             await image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
-async def rescan_images(cli_ctx: CLIContext, registry_or_image: str) -> None:
+async def rescan_images(
+    cli_ctx: CLIContext, registry_or_image: str, project: Optional[str] = None
+) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
     async with (
         connect_database(cli_ctx.local_config) as db,
     ):
         try:
-            await rescan_images_func(db, registry_or_image)
-        except Exception:
-            log.exception("An error occurred.")
+            await rescan_images_func(db, registry_or_image, project)
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def alias(cli_ctx, alias, target, architecture):
@@ -178,8 +202,8 @@ async def alias(cli_ctx, alias, target, architecture):
             await ImageAliasRow.create(session, alias, image_row)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def dealias(cli_ctx, alias):
@@ -206,13 +230,22 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
             for key, value in validate_image_labels(image_row.labels).items():
                 print(f"{key:<40}: ", end="")
                 if isinstance(value, list):
-                    value = f'[{", ".join(value)}]'
+                    value = f"[{', '.join(value)}]"
                 print(value)
 
         except UnknownImageReference:
             log.error(f"No images were found with alias: {alias}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
+
+
+def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
+    if architecture is not None:
+        return architecture
+    if current:
+        return CURRENT_ARCH
+
+    raise ValueError("Unreachable code!")
 
 
 async def validate_image_canonical(
@@ -224,36 +257,37 @@ async def validate_image_canonical(
     ):
         try:
             if current or architecture is not None:
-                if current:
-                    architecture = architecture or CURRENT_ARCH
-                image_row = await session.scalar(
-                    sa.select(ImageRow).where(
-                        (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
-                    )
+                resolved_arch = _resolve_architecture(current, architecture)
+                image_row = await ImageRow.resolve(
+                    session, [ImageIdentifier(canonical, resolved_arch)]
                 )
-                if image_row is None:
-                    raise UnknownImageReference(f"{canonical}/{architecture}")
+
+                print(f"{'architecture':<40}: {resolved_arch}")
                 for key, value in validate_image_labels(image_row.labels).items():
                     print(f"{key:<40}: ", end="")
                     if isinstance(value, list):
-                        value = f'{", ".join(value)}'
+                        value = f"{', '.join(value)}"
                     print(value)
             else:
-                rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
+                rows = await session.scalars(
+                    sa.select(ImageRow).where(
+                        sa.and_(ImageRow.name == canonical, ImageRow.status == ImageStatus.ALIVE)
+                    )
+                )
                 image_rows = rows.fetchall()
                 if not image_rows:
                     raise UnknownImageReference(f"{canonical}")
                 for i, image_row in enumerate(image_rows):
                     if i > 0:
                         print("-" * 50)
-                    print(f"{"architecture":<40}: {image_row.architecture}")
+                    print(f"{'architecture':<40}: {image_row.architecture}")
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: ", end="")
                         if isinstance(value, list):
-                            value = f'{", ".join(value)}'
+                            value = f"{', '.join(value)}"
                         print(value)
 
         except UnknownImageReference as e:
             log.error(f"{e}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")

@@ -1,10 +1,11 @@
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterator, override
 
 import aiohttp
 import boto3
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import (
     BaseContainerRegistry,
@@ -14,10 +15,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class AWSElasticContainerRegistry(BaseContainerRegistry):
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
+        if not self.registry_info.project:
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
+
         access_key, secret_access_key, region, type_ = (
             self.registry_info.extra.get("access_key"),
             self.registry_info.extra.get("secret_access_key"),
@@ -43,10 +48,12 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
                 for repo in response["repositories"]:
                     match type_:
                         case "ecr":
-                            yield repo["repositoryName"]
+                            if repo["repositoryName"].startswith(self.registry_info.project):
+                                yield repo["repositoryName"]
                         case "ecr-public":
                             registry_alias = (repo["repositoryUri"].split("/"))[1]
-                            yield f"{registry_alias}/{repo["repositoryName"]}"
+                            if self.registry_info.project == registry_alias:
+                                yield f"{registry_alias}/{repo['repositoryName']}"
                         case _:
                             raise ValueError(f"Unknown registry type: {type_}")
 

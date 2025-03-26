@@ -3,7 +3,7 @@ import logging
 import time
 from collections import defaultdict
 from collections.abc import AsyncIterable
-from typing import Any
+from typing import Any, Protocol
 
 import hiredis
 from aiomonitor.task import preserve_termination_log
@@ -16,7 +16,7 @@ from . import msgpack
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
 from .redis_client import RedisClient, RedisConnection
-from .types import AgentId, EtcdRedisConfig
+from .types import AgentId, RedisConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -157,15 +157,34 @@ async def read_stream_by_group(
             raise
 
 
+class EventObserver(Protocol):
+    def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: BaseException
+    ) -> None: ...
+
+
+class NopEventObserver:
+    def observe_event_success(self, *, event_type: str, duration: float) -> None:
+        pass
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: BaseException
+    ) -> None:
+        pass
+
+
 class EventDispatcher(_EventDispatcher):
-    redis_config: EtcdRedisConfig
+    redis_config: RedisConfig
     db: int
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
+    _metric_observer: EventObserver
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -175,6 +194,7 @@ class EventDispatcher(_EventDispatcher):
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
+        event_observer: EventObserver = NopEventObserver(),
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
@@ -188,6 +208,7 @@ class EventDispatcher(_EventDispatcher):
         self._stream_key = stream_key
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
+        self._metric_observer = event_observer
         self.consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -211,7 +232,7 @@ class EventDispatcher(_EventDispatcher):
         now = time.perf_counter()
         if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
             log.warning(
-                "Retrying due to interruption of Redis connection " "({}, retrying-for: {:.3f}s)",
+                "Retrying due to interruption of Redis connection ({}, retrying-for: {:.3f}s)",
                 repr(e),
                 now - first_trial,
             )

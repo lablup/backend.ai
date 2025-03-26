@@ -12,7 +12,8 @@ future UX improvements.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Mapping, Optional, Union, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from aiohttp import web
 
@@ -20,6 +21,9 @@ from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.plugin.hook import HookResult
 
 from ..exceptions import AgentError
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.vfolder import VFolderRow
 
 
 class BackendError(web.HTTPError):
@@ -194,6 +198,16 @@ class GraphQLError(BackendError, web.HTTPBadRequest):
     error_title = "GraphQL-generated error."
 
 
+class ContainerRegistryWebhookAuthorizationFailed(BackendError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/webhook/auth-failed"
+    error_title = "Container Registry Webhook authorization failed."
+
+
+class HarborWebhookContainerRegistryRowNotFound(InternalServerError):
+    error_type = "https://api.backend.ai/probs/webhook/harbor/container-registry-not-found"
+    error_title = "Container registry row not found."
+
+
 class InstanceNotFound(ObjectNotFound):
     object_name = "agent instance"
 
@@ -242,12 +256,23 @@ class EndpointTokenNotFound(ObjectNotFound):
     object_name = "endpoint_token"
 
 
+class ContainerRegistryNotFound(ObjectNotFound):
+    object_name = "container_registry"
+
+
+class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
+    object_name = "association of container_registry and group"
+
+
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
 
     def __init__(
-        self, extra_msg: Optional[str] = None, extra_data: Optional[Dict[str, Any]] = None, **kwargs
+        self,
+        extra_msg: Optional[str] = None,
+        extra_data: Optional[dict[str, Any]] = None,
+        **kwargs,
     ):
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
             serializable_matches = [
@@ -288,7 +313,21 @@ class VFolderCreationFailed(BackendError, web.HTTPBadRequest):
 
 class TooManyVFoldersFound(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-vfolders"
-    error_title = "There are two or more matching vfolders."
+    error_title = "Multiple vfolders found for the operation for a single vfolder."
+
+    def __init__(self, matched_rows: Sequence[VFolderRow]) -> None:
+        serialized_matches = [
+            {
+                "id": row["id"],
+                "host": row["host"],
+                "user": row["user_email"],
+                "user_id": row["user"],
+                "group": row["group_name"],
+                "group_id": row["group"],
+            }
+            for row in matched_rows
+        ]
+        super().__init__(extra_data={"matches": serialized_matches})
 
 
 class VFolderNotFound(ObjectNotFound):

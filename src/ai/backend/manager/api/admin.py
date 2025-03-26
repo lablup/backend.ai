@@ -19,6 +19,8 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..models.base import DataLoaderManager
 from ..models.gql import (
+    GQLExceptionMiddleware,
+    GQLMetricMiddleware,
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
     Mutations,
@@ -81,12 +83,15 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         redis_stat=root_ctx.redis_stat,
         redis_image=root_ctx.redis_image,
         redis_live=root_ctx.redis_live,
+        network_plugin_ctx=root_ctx.network_plugin_ctx,
         manager_status=manager_status,
         known_slot_types=known_slot_types,
         background_task_manager=root_ctx.background_task_manager,
+        services_ctx=root_ctx.services_ctx,
         storage_manager=root_ctx.storage_manager,
         registry=root_ctx.registry,
         idle_checker_host=root_ctx.idle_checker_host,
+        metric_observer=root_ctx.metrics.gql,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],
@@ -96,6 +101,8 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         context_value=gql_ctx,
         middleware=[
             GQLLoggingMiddleware(),
+            GQLExceptionMiddleware(),
+            GQLMetricMiddleware(),
             GQLMutationUnfrozenRequiredMiddleware(),
             GQLMutationPrivilegeCheckMiddleware(),
         ],

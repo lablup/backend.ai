@@ -24,6 +24,12 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -233,11 +239,21 @@ def build_root_app(
     cleanup_contexts: Sequence[CleanupContext] | None = None,
     subapp_pkgs: Sequence[str] = [],
 ) -> web.Application:
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config.pyroscope.enabled,
+            application_name=local_config.pyroscope.app_name,
+            server_address=local_config.pyroscope.server_addr,
+            sample_rate=local_config.pyroscope.sample_rate,
+        )
+    )
+    metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[
             request_context_aware_middleware,
             exception_middleware,
             api_middleware,
+            build_api_metric_middleware(metric_registry.api),
         ]
     )
     root_ctx = RootContext()
@@ -303,6 +319,13 @@ def build_root_app(
     return app
 
 
+def build_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
+    return app
+
+
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -310,6 +333,7 @@ async def server_main(
     _args: tuple[ServerConfig, str],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
@@ -337,7 +361,9 @@ async def server_main(
     # which freezes on_startup event.
     try:
         runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+        internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
         await runner.setup()
+        await internal_runner.setup()
         site = web.TCPSite(
             runner,
             str(root_ctx.local_config.wsproxy.bind_host),
@@ -345,7 +371,15 @@ async def server_main(
             backlog=1024,
             reuse_port=True,
         )
+        internal_site = web.TCPSite(
+            internal_runner,
+            str(root_ctx.local_config.wsproxy.bind_host),
+            root_ctx.local_config.wsproxy.internal_api_port,
+            backlog=1024,
+            reuse_port=True,
+        )
         await site.start()
+        await internal_site.start()
 
         if os.geteuid() == 0:
             uid = root_ctx.local_config.wsproxy.user
@@ -372,7 +406,7 @@ async def server_main(
             m.close()
 
 
-@actxmgr
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,

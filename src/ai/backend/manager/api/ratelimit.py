@@ -10,8 +10,8 @@ from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_RLIM_DB
-from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
 from .context import RootContext
@@ -93,8 +93,13 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
     app_ctx.redis_rlim = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
+        etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),
+        name="ratelimit",
+        db=REDIS_RATE_LIMIT_DB,
     )
     app_ctx.redis_rlim_script = await redis_helper.execute(
         app_ctx.redis_rlim, lambda r: r.script_load(_rlim_script)

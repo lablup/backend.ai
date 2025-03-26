@@ -1,7 +1,7 @@
 import logging
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -17,8 +17,8 @@ from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
 
 if TYPE_CHECKING:
-    # from .gql import GraphQueryContext
     from .endpoint import EndpointRow
+    from .gql import GraphQueryContext
 
 
 __all__ = ("RoutingRow", "Routing", "RoutingList", "RouteStatus")
@@ -198,6 +198,9 @@ class RoutingRow(Base):
         self.status = status
         self.traffic_ratio = traffic_ratio
 
+    def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
+        self.session_owner = user_uuid
+
 
 class Routing(graphene.ObjectType):
     class Meta:
@@ -212,6 +215,10 @@ class Routing(graphene.ObjectType):
     error = InferenceSessionError()
     error_data = graphene.JSONString()
 
+    live_stat = graphene.JSONString(description="Added in 24.12.0.")
+
+    _endpoint_row: "EndpointRow"
+
     @classmethod
     async def from_row(
         cls,
@@ -219,7 +226,7 @@ class Routing(graphene.ObjectType):
         row: RoutingRow,
         endpoint: Optional["EndpointRow"] = None,
     ) -> "Routing":
-        return cls(
+        ret = cls(
             routing_id=row.id,
             endpoint=(endpoint or row.endpoint_row).url,
             session=row.session,
@@ -228,6 +235,8 @@ class Routing(graphene.ObjectType):
             created_at=row.created_at,
             error_data=row.error_data,
         )
+        ret._endpoint_row = endpoint or row.endpoint_row
+        return ret
 
     @classmethod
     async def load_count(
@@ -348,6 +357,11 @@ class Routing(graphene.ObjectType):
                 for e in self.error_data["errors"]
             ],
         )
+
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+        graph_ctx: "GraphQueryContext" = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "EndpointStatistics.by_replica")
+        return await loader.load((self._endpoint_row.id, self.routing_id))
 
 
 class RoutingList(graphene.ObjectType):

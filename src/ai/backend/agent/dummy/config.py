@@ -7,7 +7,7 @@ from ai.backend.common import validators as tx
 DEFAULT_CONFIG_PATH = Path.cwd() / "agent.dummy.toml"
 
 RandomRange = t.Tuple(t.ToFloat, t.ToFloat)
-core_idx = {0, 1, 2, 3, 4}
+num_core = 4
 
 
 dummy_local_config = t.Dict({
@@ -15,12 +15,14 @@ dummy_local_config = t.Dict({
         t.Key("delay"): t.Dict({
             t.Key("scan-image", default=0.1): tx.Delay,
             t.Key("pull-image", default=1.0): tx.Delay,
+            t.Key("push-image", default=1.0): tx.Delay,
+            t.Key("purge-images", default=1.0): tx.Delay,
             t.Key("destroy-kernel", default=1.0): tx.Delay,
             t.Key("clean-kernel", default=1.0): tx.Delay,
             t.Key("create-network", default=1.0): tx.Delay,
             t.Key("destroy-network", default=1.0): tx.Delay,
             t.Key("destroy-network", default=1.0): tx.Delay,
-        }),
+        }).allow_extra("*"),
         t.Key("image"): t.Dict({
             t.Key("already-have", default=None): t.Null | t.List(t.String),
             t.Key("need-to-pull", default=None): t.Null | t.List(t.String),
@@ -28,13 +30,13 @@ dummy_local_config = t.Dict({
         }),
         t.Key("resource"): t.Dict({
             t.Key("cpu"): t.Dict({
-                t.Key("core-indexes", default=core_idx): tx.ToSet,
+                t.Key("num-core", default=num_core): t.ToInt,
             }),
             t.Key("memory"): t.Dict({
                 t.Key("size", default=34359738368): t.Int,
             }),
         }),
-    }),
+    }).allow_extra("*"),
     t.Key("kernel-creation-ctx"): t.Dict({
         t.Key("delay"): t.Dict({
             t.Key("prepare-scratch", default=1.0): tx.Delay,
@@ -62,4 +64,4 @@ dummy_local_config = t.Dict({
             t.Key("list-files", default=0.1): tx.Delay,
         }),
     }),
-})
+}).allow_extra("*")

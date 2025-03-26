@@ -28,7 +28,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.session import SESSION_PRIORITY_DEFUALT, SessionRow, SessionStatus
+from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT, SessionRow, SessionStatus
 
 ARCH_FOR_TEST: Final = "x86_64"
 
@@ -151,7 +151,8 @@ def create_mock_session(
     status: SessionStatus = SessionStatus.PENDING,
     status_data: dict[str, Any] | None = None,
     kernel_opts: Sequence[KernelOpt] | None = None,
-    priority: int = SESSION_PRIORITY_DEFUALT,
+    priority: int = SESSION_PRIORITY_DEFAULT,
+    session_type: SessionTypes = SessionTypes.BATCH,
 ) -> SessionRow:
     """Create a simple single-kernel pending session."""
     if kernel_opts is None:
@@ -175,7 +176,7 @@ def create_mock_session(
         id=session_id,
         creation_id=secrets.token_hex(8),
         name=f"session-{secrets.token_hex(4)}",
-        session_type=SessionTypes.BATCH,
+        session_type=session_type,
         status=status,
         status_data=status_data,
         cluster_mode="single-node",

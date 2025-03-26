@@ -10,7 +10,6 @@ import enum
 import functools
 import json
 import logging
-import re
 import secrets
 import uuid
 from datetime import datetime, timedelta
@@ -25,6 +24,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Set,
     Tuple,
     Union,
@@ -50,9 +50,8 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier, rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -104,10 +103,11 @@ from ..models import (
 )
 from ..models.session import (
     PRIVATE_SESSION_TYPES,
-    SESSION_PRIORITY_DEFUALT,
+    SESSION_PRIORITY_DEFAULT,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
 )
+from ..models.vfolder import is_unmanaged
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -260,11 +260,51 @@ creation_config_v5_template = t.Dict({
         UndefChecker | t.Null | t.Mapping(t.String, t.Any)
     ),
 })
+creation_config_v6 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["mount_options", "mountOptions"], default=None): t.Null
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("type", default=MountTypes.BIND): tx.Enum(MountTypes),
+            tx.AliasedKey(["permission", "perm"], default=None): t.Null | tx.Enum(MountPermission),
+        }).ignore_extra("*"),
+    ),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
+    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
+    | t.List(t.Int[1024:65535]),
+    tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
+})
+creation_config_v6_template = t.Dict({
+    t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.String)
+    ),
+    t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+        UndefChecker | t.Null | t.String
+    ),
+    t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+    ),
+    tx.AliasedKey(["attach_network", "attachNetwork"], default=undefined): (
+        UndefChecker | t.Null | tx.UUID
+    ),
+})
 
 
 overwritten_param_check = t.Dict({
     t.Key("template_id"): tx.UUID,
-    t.Key("session_name"): t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+    t.Key("session_name"): tx.SessionName,
     t.Key("image", default=None): t.Null | t.String,
     tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
     t.Key("group", default=None): t.Null | t.String,
@@ -281,6 +321,7 @@ overwritten_param_check = t.Dict({
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
     tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(ClusterMode),
     tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+    tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
 }).allow_extra("*")
 
 
@@ -390,13 +431,14 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             dependencies=params["dependencies"],
             startup_command=params["startup_command"],
             starts_at_timestamp=params["starts_at"],
+            batch_timeout=params["batch_timeout"],
             tag=params["tag"],
             callback_url=params["callback_url"],
             sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
@@ -412,8 +454,8 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     t.Dict({
         tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
         tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
-        >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
-        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+        >> "session_name": UndefChecker | tx.SessionName,
+        t.Key("priority", default=SESSION_PRIORITY_DEFAULT): t.ToInt(
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
@@ -438,6 +480,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
         t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
         tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
         t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
         t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
         | t.Null
@@ -465,7 +508,9 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     api_version = request["api_version"]
     try:
-        if 6 <= api_version[0]:
+        if 8 <= api_version[0]:
+            params["config"] = creation_config_v6_template.check(params["config"])
+        elif 6 <= api_version[0]:
             params["config"] = creation_config_v5_template.check(params["config"])
         elif 5 <= api_version[0]:
             params["config"] = creation_config_v4_template.check(params["config"])
@@ -573,7 +618,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         cmd_builder = "git clone "
         if credential := git.get("credential"):
             proto, url = git["repository"].split("://")
-            cmd_builder += f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
+            cmd_builder += f"{proto}://{credential['username']}:{credential['password']}@{url}"
         else:
             cmd_builder += git["repository"]
         if branch := git.get("branch"):
@@ -597,10 +642,9 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 @auth_required
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
-            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
-        ),
-        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"])
+        >> "session_name": tx.SessionName,
+        t.Key("priority", default=SESSION_PRIORITY_DEFAULT): t.ToInt(
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"]): t.String,
@@ -620,6 +664,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
         t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.ToInt[0:],
         tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
         t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
         t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
         tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
@@ -634,10 +679,12 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 async def create_from_params(request: web.Request, params: dict[str, Any]) -> web.Response:
     if params["session_name"] in ["from-template"]:
         raise InvalidAPIParameters(
-            f'Requested session ID {params["session_name"]} is reserved word'
+            f"Requested session ID {params['session_name']} is reserved word"
         )
     api_version = request["api_version"]
-    if 6 <= api_version[0]:
+    if 8 <= api_version[0]:
+        creation_config = creation_config_v6.check(params["config"])
+    elif 6 <= api_version[0]:
         creation_config = creation_config_v5.check(params["config"])
     elif 5 <= api_version[0]:
         creation_config = creation_config_v4.check(params["config"])
@@ -650,30 +697,32 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     else:
         raise InvalidAPIParameters("API version not supported")
     params["config"] = creation_config
-    if params["config"]["agent_list"] is not None and request["user"]["role"] != (
-        UserRole.SUPERADMIN
-    ):
-        raise InsufficientPrivilege(
-            "You are not allowed to manually assign agents for your session."
-        )
-    if request["user"]["role"] == (UserRole.SUPERADMIN):
-        if not params["config"]["agent_list"]:
-            pass
+
+    root_ctx: RootContext = request.app["_root.context"]
+
+    agent_list = cast(Optional[list[str]], params["config"]["agent_list"])
+    if agent_list is not None:
+        if (
+            request["user"]["role"] != UserRole.SUPERADMIN
+            and root_ctx.local_config["manager"]["hide-agents"]
+        ):
+            raise InsufficientPrivilege(
+                "You are not allowed to manually assign agents for your session."
+            )
+        agent_count = len(agent_list)
+        if params["cluster_mode"] == "multi-node":
+            if agent_count != params["cluster_size"]:
+                raise InvalidAPIParameters(
+                    "For multi-node cluster sessions, the number of manually assigned"
+                    " agents must be same to the cluster size. Note that you may specify"
+                    " duplicate agents in the list.",
+                )
         else:
-            agent_count = len(params["config"]["agent_list"])
-            if params["cluster_mode"] == "multi-node":
-                if agent_count != params["cluster_size"]:
-                    raise InvalidAPIParameters(
-                        "For multi-node cluster sessions, the number of manually assigned"
-                        " agents must be same to the cluster size. Note that you may specify"
-                        " duplicate agents in the list.",
-                    )
-            else:
-                if agent_count != 1:
-                    raise InvalidAPIParameters(
-                        "For non-cluster sessions and single-node cluster sessions, "
-                        "you may specify only one manually assigned agent.",
-                    )
+            if agent_count != 1:
+                raise InvalidAPIParameters(
+                    "For non-cluster sessions and single-node cluster sessions, "
+                    "you may specify only one manually assigned agent.",
+                )
     return await _create(request, params)
 
 
@@ -681,9 +730,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
 @auth_required
 @check_api_params(
     t.Dict({
-        t.Key("clientSessionToken") >> "session_name": t.Regexp(
-            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
-        ),
+        t.Key("clientSessionToken") >> "session_name": tx.SessionName,
         tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
         tx.AliasedKey(["type", "sessionType"], default="interactive") >> "sess_type": tx.Enum(
             SessionTypes
@@ -758,7 +805,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         log.exception("GET_OR_CREATE: exception")
         raise
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except Exception:
         await root_ctx.error_monitor.capture_exception()
         log.exception("GET_OR_CREATE: unexpected error!")
@@ -845,7 +892,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
                     hport_idx = sport["container_ports"].index(params["port"])
                 except ValueError:
                     raise InvalidAPIParameters(
-                        f"Service {service} does not open the port number {params["port"]}."
+                        f"Service {service} does not open the port number {params['port']}."
                     )
                 host_port = sport["host_ports"][hport_idx]
             else:
@@ -1030,8 +1077,9 @@ async def check_and_transit_status(
                 log.warning(
                     f"You are not allowed to transit others's sessions status, skip (s:{sid})"
                 )
+
+    now = datetime.now(tzutc())
     if accessible_session_ids:
-        now = datetime.now(tzutc())
         session_rows = await root_ctx.registry.session_lifecycle_mgr.transit_session_status(
             accessible_session_ids, now
         )
@@ -1114,6 +1162,8 @@ class ConvertSessionToImageResponseModel(BaseResponseModel):
 async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
 ) -> ConvertSessionToImageResponseModel:
+    from ..models.container_registry import ContainerRegistryRow
+
     root_ctx: RootContext = request.app["_root.context"]
     background_task_manager = root_ctx.background_task_manager
 
@@ -1154,8 +1204,8 @@ async def convert_session_to_image(
         query = (
             sa.select(ContainerRegistryRow)
             .where(
-                ContainerRegistryRow.registry_name == registry_hostname
-                and ContainerRegistryRow.project == registry_project
+                (ContainerRegistryRow.registry_name == registry_hostname)
+                & (ContainerRegistryRow.project == registry_project)
             )
             .options(
                 load_only(
@@ -1191,7 +1241,14 @@ async def convert_session_to_image(
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
+            if base_image_ref.name == "":
+                new_name = base_image_ref.project
+            else:
+                new_name = base_image_ref.name
+
+            new_canonical = (
+                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            )
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
@@ -1204,6 +1261,7 @@ async def convert_session_to_image(
                             == f"{params.image_visibility.value}:{image_owner_id}"
                         )
                     )
+                    .where(ImageRow.status == ImageStatus.ALIVE)
                 )
                 existing_image_count = await sess.scalar(query)
 
@@ -1221,14 +1279,13 @@ async def convert_session_to_image(
 
                 # check if image with same name exists and reuse ID it if is
                 query = sa.select(ImageRow).where(
-                    ImageRow.name.like(f"{new_canonical}%")
-                    & (
+                    sa.and_(
+                        ImageRow.name.like(f"{new_canonical}%"),
                         ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{params.image_visibility.value}:{image_owner_id}"
-                    )
-                    & (
+                        == f"{params.image_visibility.value}:{image_owner_id}",
                         ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                        == params.image_name
+                        == params.image_name,
+                        ImageRow.status == ImageStatus.ALIVE,
                     )
                 )
                 existing_row = await sess.scalar(query)
@@ -1240,11 +1297,11 @@ async def convert_session_to_image(
                 else:
                     customized_image_id = str(uuid.uuid4())
 
-            new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
+            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
             new_image_ref = ImageRef.from_image_str(
                 new_canonical,
-                base_image_ref.project,
-                base_image_ref.registry,
+                None,
+                registry_hostname,
                 architecture=base_image_ref.architecture,
                 is_local=base_image_ref.is_local,
             )
@@ -1307,6 +1364,8 @@ async def convert_session_to_image(
             await rescan_images(
                 root_ctx.db,
                 new_image_ref.canonical,
+                registry_project,
+                reporter=reporter,
             )
             await reporter.update(increment=1, message="Completed")
         except BackendError:
@@ -1389,9 +1448,8 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
 @auth_required
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
-            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
-        ),
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"])
+        >> "session_name": tx.SessionName,
     }),
 )
 async def rename_session(request: web.Request, params: Any) -> web.Response:
@@ -1412,7 +1470,6 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
             session_name,
             owner_access_key,
             allow_stale=True,
-            for_update=True,
             kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
         )
         if compute_session.status != SessionStatus.RUNNING:
@@ -2311,7 +2368,9 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             )
         log_vfolder = matched_vfolders[0]
 
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(log_vfolder["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
+    )
     response = web.StreamResponse(status=200)
     response.headers[hdrs.CONTENT_TYPE] = "text/plain"
     prepared = False

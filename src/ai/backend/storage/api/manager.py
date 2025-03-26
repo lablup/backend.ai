@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import weakref
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -19,30 +20,39 @@ from typing import (
     Callable,
     Iterator,
     NotRequired,
+    Optional,
     TypedDict,
     cast,
 )
 
 import attr
+import attrs
 import jwt
 import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.events import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
+    VFolderDeletionFailureEvent,
+    VFolderDeletionSuccessEvent,
     VolumeMountableNodeType,
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import ExecutionError
-from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
+    ExecutionError,
     ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
@@ -53,10 +63,12 @@ from ..exception import (
 )
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
+from ..watcher import ChownTask, MountTask, UmountTask
+from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
-    from ..abc import AbstractVolume
-    from ..context import RootContext
+    from ..context import RootContext, ServiceContext
+    from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -328,6 +340,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
+        mode: Optional[int]
         options: dict[str, Any] | None  # deprecated
 
     async with cast(
@@ -338,6 +351,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
+                    # TODO: Change `mode` parameter to not-nullable
+                    t.Key("mode", default=DEFAULT_VFOLDER_PERMISSION_MODE): t.Null | t.Int,
                     t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
             ),
@@ -346,9 +361,12 @@ async def create_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_vfolder", params)
         assert params["vfid"].quota_scope_id is not None
         ctx: RootContext = request.app["ctx"]
+        perm_mode = cast(
+            int, params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
+        )
         async with ctx.get_volume(params["volume"]) as volume:
             try:
-                await volume.create_vfolder(params["vfid"])
+                await volume.create_vfolder(params["vfid"], mode=perm_mode)
             except QuotaScopeNotFoundError:
                 assert params["vfid"].quota_scope_id
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
@@ -361,7 +379,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                     params["vfid"].quota_scope_id, options=options
                 )
                 try:
-                    await volume.create_vfolder(params["vfid"])
+                    await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
                     raise ExternalError("Failed to create vfolder due to quota scope not found.")
             return web.Response(status=204)
@@ -386,10 +404,57 @@ async def delete_vfolder(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            with handle_fs_errors(volume, params["vfid"]):
-                await volume.delete_vfolder(params["vfid"])
-            return web.Response(status=204)
+        app_ctx: PrivateContext = request.app["app_ctx"]
+        vfid: VFolderID = params["vfid"]
+
+        async def _delete_vfolder(
+            task_map: weakref.WeakValueDictionary[VFolderID, asyncio.Task],
+        ) -> None:
+            current_task = asyncio.current_task()
+            assert current_task is not None
+            task_map[vfid] = current_task
+
+            try:
+                async with ctx.get_volume(params["volume"]) as volume:
+                    await volume.delete_vfolder(vfid)
+            except OSError as e:
+                msg = str(e) if e.strerror is None else e.strerror
+                msg = f"{msg} (errno:{e.errno})"
+                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
+                await ctx.event_producer.produce_event(
+                    VFolderDeletionFailureEvent(
+                        vfid,
+                        msg,
+                    )
+                )
+            except Exception as e:
+                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
+                await ctx.event_producer.produce_event(
+                    VFolderDeletionFailureEvent(
+                        vfid,
+                        str(e),
+                    )
+                )
+            except asyncio.CancelledError:
+                log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
+            else:
+                log.info(f"VFolder deletion task successed. (vfid:{vfid})")
+                await ctx.event_producer.produce_event(VFolderDeletionSuccessEvent(vfid))
+
+        try:
+            async with ctx.get_volume(params["volume"]) as volume:
+                await volume.get_vfolder_mount(vfid, ".")
+        except VFolderNotFoundError:
+            ongoing_task = app_ctx.deletion_tasks.get(vfid)
+            if ongoing_task is not None:
+                ongoing_task.cancel()
+            return web.Response(status=410)
+        else:
+            ongoing_task = app_ctx.deletion_tasks.get(vfid)
+            if ongoing_task is None or ongoing_task.done():
+                asyncio.create_task(_delete_vfolder(app_ctx.deletion_tasks))
+
+    return web.Response(status=202)
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
@@ -899,7 +964,8 @@ async def rename_file(request: web.Request) -> web.Response:
                     t.Key("vfid"): tx.VFolderID(),
                     t.Key("relpath"): tx.PurePath(relative_only=True),
                     t.Key("new_name"): t.String(),
-                    t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
+                    # ignored since 22.03
+                    t.Key("is_dir", default=False): t.ToBool,
                 },
             ),
         ),
@@ -1076,13 +1142,74 @@ async def delete_files(request: web.Request) -> web.Response:
         )
 
 
+@attrs.define(slots=True)
+class PrivateContext:
+    deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
+
+
+async def _shutdown(app: web.Application) -> None:
+    app_ctx: PrivateContext = app["app_ctx"]
+    for task in app_ctx.deletion_tasks.values():
+        task.cancel()
+        await asyncio.sleep(0)
+        if not task.done():
+            await task
+
+
+def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
+    app = web.Application()
+    handler = VFolderHandler(service_ctx.volume_service)
+    app.router.add_route("GET", "/volumes", handler.get_volumes)
+    app.router.add_route("GET", "/volumes/{volume_id}", handler.get_volume)
+    app.router.add_route(
+        "GET", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.get_quota_scope
+    )
+    app.router.add_route(
+        "POST", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.create_quota_scope
+    )
+    app.router.add_route(
+        "PUT", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.update_quota_scope
+    )
+    app.router.add_route(
+        "DELETE",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}",
+        handler.delete_quota_scope,
+    )
+    app.router.add_route(
+        "POST",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.create_vfolder,
+    )
+    app.router.add_route(
+        "GET",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.get_vfolder_info,
+    )
+    app.router.add_route(
+        "PUT",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}/clone",
+        handler.clone_vfolder,
+    )
+    app.router.add_route(
+        "DELETE",
+        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.delete_vfolder,
+    )
+
+    return app
+
+
 async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
             token_auth_middleware,
+            build_api_metric_middleware(ctx.metric_registry.api),
         ],
     )
     app["ctx"] = ctx
+    app_ctx = PrivateContext(deletion_tasks=weakref.WeakValueDictionary())
+    app["app_ctx"] = app_ctx
+    app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
@@ -1112,10 +1239,18 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
+    app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
     # passive events
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
     evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
+    return app
+
+
+def init_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
 

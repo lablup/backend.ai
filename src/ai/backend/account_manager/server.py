@@ -31,6 +31,12 @@ from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
@@ -185,10 +191,12 @@ def build_root_app(
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
+    metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[
-            exception_middleware,
             api_middleware,
+            exception_middleware,
+            build_api_metric_middleware(metric_registry.api),
         ]
     )
 
@@ -257,7 +265,13 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    return app
 
+
+def build_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
 
@@ -268,10 +282,19 @@ async def server_main(
     _args: list[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
     local_cfg = cast(ServerConfig, root_ctx.local_config)
     am_cfg = cast(AccountManagerConfig, local_cfg.account_manager)
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_cfg.pyroscope.enabled,
+            application_name=local_cfg.pyroscope.app_name,
+            server_address=local_cfg.pyroscope.server_addr,
+            sample_rate=local_cfg.pyroscope.sample_rate,
+        )
+    )
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
@@ -299,9 +322,9 @@ async def server_main(
     try:
         ssl_ctx = None
         if am_cfg.ssl_enabled:
-            assert (
-                am_cfg.ssl_cert is not None
-            ), "Should set `account_manager.ssl-cert` in config file."
+            assert am_cfg.ssl_cert is not None, (
+                "Should set `account_manager.ssl-cert` in config file."
+            )
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
                 str(am_cfg.ssl_cert),
@@ -309,7 +332,9 @@ async def server_main(
             )
 
         runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+        internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
         await runner.setup()
+        await internal_runner.setup()
         service_addr = am_cfg.service_addr
         site = web.TCPSite(
             runner,
@@ -319,7 +344,15 @@ async def server_main(
             reuse_port=True,
             ssl_context=ssl_ctx,
         )
+        internal_site = web.TCPSite(
+            internal_runner,
+            str(am_cfg.internal_addr.host),
+            am_cfg.internal_addr.port,
+            backlog=1024,
+            reuse_port=True,
+        )
         await site.start()
+        await internal_site.start()
 
         if os.geteuid() == 0:
             uid = am_cfg.user
@@ -342,7 +375,7 @@ async def server_main(
             m.close()
 
 
-@actxmgr
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,

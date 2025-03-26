@@ -87,8 +87,8 @@ metadata-server-bind-host = "0.0.0.0"
 metadata-server-port = 40128
 
 # The port number for aiomonitor.
-# aiomonitor-termui-port = 48200
-# aiomonitor-webui-port = 49200
+# aiomonitor-termui-port = 38200
+# aiomonitor-webui-port = 39200
 
 # Explicitly set allowed(or blocked) compute plugins to avoid conflicts of mock &
 # open-source CUDA plugins in the mono-repo source installation.
@@ -214,6 +214,13 @@ target-service = "backendai-agent.service"
 
 # If "reload" is supported, set true.
 soft-reset-available = false
+
+
+[pyroscope]
+enabled = true
+app-name = "backendai-half-agent"
+server-addr = "http://localhost:4040"
+sample-rate = 100
 
 
 [logging]
@@ -372,7 +379,3 @@ backup-count = 10
 
 # Set the maximum size of coredumps from containers.
 size-limit = "64M"
-
-
-[license]
-addr = { host = "127.0.0.1", port = 6099 }
