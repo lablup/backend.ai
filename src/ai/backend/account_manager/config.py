@@ -298,7 +298,7 @@ class AccountManagerConfig(BaseSchema):
         HostPortPair,
         Field(
             description="Address of account-manager internal service for internal infra communication.",
-            examples=[HostPortPair(host="127.0.0.1", port=8098)],
+            examples=[HostPortPair(host="127.0.0.1", port=18098)],
         ),
     ]
     ipc_base_path: Annotated[

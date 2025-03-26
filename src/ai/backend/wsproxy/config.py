@@ -391,7 +391,7 @@ class WSProxyConfig(BaseSchema):
         int, Field(default=5050, description="Port number to bind for API server")
     ]
     internal_api_port: Annotated[
-        int, Field(default=5051, description="Port number to bind for internal API server")
+        int, Field(default=15050, description="Port number to bind for internal API server")
     ]
     advertised_api_port: Annotated[
         int | None,
