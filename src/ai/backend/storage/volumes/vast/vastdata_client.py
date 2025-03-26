@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import ssl
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
@@ -83,6 +83,12 @@ class VASTClusterInfo:
     wr_latency: int = -1
     max_file_size: int = -1
     max_performance: Performance = field(default_factory=default_perf)
+
+    def __init__(self, **kwargs):
+        names = set([f.name for f in fields(self)])
+        for k, v in kwargs.items():
+            if k in names:
+                setattr(self, k, v)
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VASTClusterInfo:
