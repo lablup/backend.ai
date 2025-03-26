@@ -29,13 +29,11 @@ from ai.backend.manager.services.image.actions.alias_image import (
 from ai.backend.manager.services.image.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
-    ClearImagesActionValueError,
 )
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
     DealiasImageActionNoSuchAliasError,
     DealiasImageActionResult,
-    DealiasImageActionValueError,
 )
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
@@ -141,32 +139,28 @@ class ImageService:
         )
 
     async def dealias_image(self, action: DealiasImageAction) -> DealiasImageActionResult:
-        try:
-            async with self._db.begin_session() as session:
-                existing_alias = await session.scalar(
-                    sa.select(ImageAliasRow).where(ImageAliasRow.alias == action.alias),
-                )
-                if existing_alias is None:
-                    raise DealiasImageActionNoSuchAliasError()
-                await session.delete(existing_alias)
-        except ValueError:
-            raise DealiasImageActionValueError()
+        async with self._db.begin_session() as session:
+            existing_alias = await session.scalar(
+                sa.select(ImageAliasRow).where(ImageAliasRow.alias == action.alias),
+            )
+            if existing_alias is None:
+                raise DealiasImageActionNoSuchAliasError()
+            await session.delete(existing_alias)
+
         return DealiasImageActionResult(
             image_id=existing_alias.image_id,
             image_alias=ImageAliasData.from_image_alias_row(existing_alias),
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
-        try:
-            async with self._db.begin_session() as session:
-                await session.execute(
-                    sa.update(ImageRow)
-                    .where(ImageRow.registry == action.registry)
-                    .where(ImageRow.status != ImageStatus.DELETED)
-                    .values(status=ImageStatus.DELETED)
-                )
-        except ValueError:
-            raise ClearImagesActionValueError()
+        async with self._db.begin_session() as session:
+            await session.execute(
+                sa.update(ImageRow)
+                .where(ImageRow.registry == action.registry)
+                .where(ImageRow.status != ImageStatus.DELETED)
+                .values(status=ImageStatus.DELETED)
+            )
+
         return ClearImagesActionResult()
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
