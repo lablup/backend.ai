@@ -396,8 +396,7 @@ session_hang_tolerance_iv = t.Dict(
         t.Key(
             "threshold", default=_config_defaults["session"]["hang-tolerance"]["threshold"]
         ): t.Dict({
-            t.Key(status, optional=True): tx.TimeDuration()
-            for status in SessionStatus
+            t.Key(status, optional=True): tx.TimeDuration() for status in SessionStatus
         }).allow_extra("*"),
     },
 )

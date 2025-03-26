@@ -74,8 +74,11 @@ class SessionSweeper(AbstractSweeper):
                         session.id,
                     )
                 except Exception as e:
-                    log.warning(
-                        "sweep(session) - failed to terminate {} session ({}).", status, session.id
+                    log.error(
+                        "sweep(session) - failed to terminate {} session ({}).",
+                        status,
+                        session.id,
+                        exc_info=e,
                     )
                     raise e
 
