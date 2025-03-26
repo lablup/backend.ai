@@ -103,7 +103,7 @@ class GroupService:
                         sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
                     )
                     if result.rowcount > 0:
-                        row = result.fist()
+                        row = result.first()
                         return MutationResult(success=True, message="success", data=row)
                     return MutationResult(success=False, message=f"no such group {gid}", data=None)
                 else:  # updated association_groups_users table
