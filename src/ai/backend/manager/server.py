@@ -86,6 +86,8 @@ from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
+from ai.backend.manager.services.groups.processors import GroupProcessors
+from ai.backend.manager.services.groups.service import GroupService
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -469,6 +471,13 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         user=user_processor,
         image=image_processor,
         container_registry=container_registry_processor,
+    )
+
+    group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
+    group_processor = GroupProcessors(group_service)
+
+    root_ctx.processors = Processors(
+        group_processor=group_processor,
     )
 
     yield

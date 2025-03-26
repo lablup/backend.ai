@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import enum
 import logging
 import uuid
@@ -10,7 +9,7 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
+    Callable,
     Iterable,
     Optional,
     Self,
@@ -36,7 +35,7 @@ from sqlalchemy.orm import load_only, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import ResourceSlot, VFolderID
+from ai.backend.common.types import ResourceSlot, Sentinel, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
@@ -57,9 +56,6 @@ from .base import (
     batch_result,
     mapper_registry,
     privileged_mutation,
-    set_if_set,
-    simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 from .rbac import (
     AbstractPermissionContext,
@@ -74,12 +70,26 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
-from .user import ModifyUserInput, UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry
+from .user import UserRole
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.groups.actions.create_group import CreateGroupAction
-    from ai.backend.manager.services.groups.actions.modify_group import ModifyGroupAction
+    from ai.backend.manager.services.groups.actions.create_group import (
+        CreateGroupAction,
+        CreateGroupActionResult,
+    )
+    from ai.backend.manager.services.groups.actions.delete_group import (
+        DeleteGroupAction,
+        DeleteGroupActionResult,
+    )
+    from ai.backend.manager.services.groups.actions.modify_group import (
+        ModifyGroupAction,
+        ModifyGroupActionResult,
+    )
+    from ai.backend.manager.services.groups.actions.purge_group import (
+        PurgeGroupAction,
+        PurgeGroupActionResult,
+    )
     from ai.backend.manager.services.groups.types import GroupData
 
     from .gql import GraphQueryContext
@@ -429,7 +439,9 @@ class Group(graphene.ObjectType):
         )
 
     @classmethod
-    def from_dto(cls, dto: GroupData) -> Self:
+    def from_dto(cls, dto: Optional[GroupData]) -> Optional[Self]:
+        if dto is None:
+            return None
         return cls(
             id=dto.id,
             name=dto.name,
@@ -622,22 +634,31 @@ class ModifyGroupInput(graphene.InputObjectType):
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
+    def _convert_field(
+        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+    ) -> Any | Sentinel:
+        if field_value is Undefined:
+            return Sentinel.TOKEN
+        if converter is not None:
+            return converter(field_value)
+        return field_value
+
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
         return ModifyGroupAction(
             group_id=group_id,
-            name=self.name,
-            description=self.description,
-            is_active=self.is_active,
-            domain_name=self.domain_name,
-            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None)
-            if self.total_resource_slots is not None
-            else None,
-            user_update_mode=None if self.user_update_mode is Undefined else self.user_update_mode,
-            user_uuids=self.user_uuids,
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            integration_id=self.integration_id,
-            resource_policy=self.resource_policy,
-            container_registry=self.container_registry,
+            name=self._convert_field(self.name),
+            description=self._convert_field(self.description),
+            is_active=self._convert_field(self.is_active),
+            domain_name=self._convert_field(self.domain_name),
+            total_resource_slots=self._convert_field(
+                self.total_resource_slots, lambda x: ResourceSlot.from_user_input(x, None)
+            ),
+            user_update_mode=self._convert_field(self.user_update_mode),
+            user_uuids=self._convert_field(self.user_uuids),
+            allowed_vfolder_hosts=self._convert_field(self.allowed_vfolder_hosts),
+            integration_id=self._convert_field(self.integration_id),
+            resource_policy=self._convert_field(self.resource_policy),
+            container_registry=self._convert_field(self.container_registry),
         )
 
 
@@ -665,26 +686,17 @@ class CreateGroup(graphene.Mutation):
         props: GroupInput,
     ) -> CreateGroup:
         graph_ctx: GraphQueryContext = info.context
-        data = {
-            "name": name,
-            "type": ProjectType[props.type],
-            "description": props.description,
-            "is_active": props.is_active,
-            "domain_name": props.domain_name,
-            "integration_id": props.integration_id,
-            "resource_policy": props.resource_policy,
-            "container_registry": props.container_registry,
-        }
-        # set_if_set() applies to optional without defaults
-        set_if_set(
-            props,
-            data,
-            "total_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+
+        action = props.to_action(name)
+        res: CreateGroupActionResult = (
+            await graph_ctx.processors.group.create_group.wait_for_complete(action)
         )
-        set_if_set(props, data, "allowed_vfolder_hosts")
-        insert_query = sa.insert(groups).values(data)
-        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)
+
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+            group=Group.from_dto(res.data) if res.success else None,
+        )
 
 
 class ModifyGroup(graphene.Mutation):
@@ -708,67 +720,20 @@ class ModifyGroup(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         gid: uuid.UUID,
-        props: ModifyUserInput,
+        props: ModifyGroupInput,
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "name")
-        set_if_set(props, data, "description")
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "domain_name")
-        set_if_set(
-            props,
-            data,
-            "total_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+
+        action = props.to_action(gid)
+        res: ModifyGroupActionResult = (
+            await graph_ctx.processors.group.modify_group.wait_for_complete(action)
         )
-        set_if_set(props, data, "allowed_vfolder_hosts")
-        set_if_set(props, data, "integration_id")
-        set_if_set(props, data, "resource_policy")
-        set_if_set(props, data, "container_registry")
 
-        if props.user_update_mode not in (None, Undefined, "add", "remove"):
-            raise ValueError("invalid user_update_mode")
-        if not props.user_uuids:
-            props.user_update_mode = None
-        if not data and props.user_update_mode is None:
-            return cls(ok=False, msg="nothing to update", group=None)
-
-        async def _do_mutate() -> ModifyGroup:
-            async with graph_ctx.db.begin() as conn:
-                # TODO: refactor user addition/removal in groups as separate mutations
-                #       (to apply since 21.09)
-                if props.user_update_mode == "add":
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in props.user_uuids]
-                    await conn.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
-                elif props.user_update_mode == "remove":
-                    await conn.execute(
-                        sa.delete(association_groups_users).where(
-                            (association_groups_users.c.user_id.in_(props.user_uuids))
-                            & (association_groups_users.c.group_id == gid),
-                        ),
-                    )
-                if data:
-                    result = await conn.execute(
-                        sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
-                    )
-                    if result.rowcount > 0:
-                        o = Group.from_row(graph_ctx, result.first())
-                        return cls(ok=True, msg="success", group=o)
-                    return cls(ok=False, msg="no such group", group=None)
-                else:  # updated association_groups_users table
-                    return cls(ok=True, msg="success", group=None)
-
-        try:
-            return await execute_with_retry(_do_mutate)
-        except sa.exc.IntegrityError as e:
-            return cls(ok=False, msg=f"integrity error: {e}", group=None)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            raise
-        except Exception as e:
-            return cls(ok=False, msg=f"unexpected error: {e}", group=None)
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+            group=Group.from_dto(res.data) if res.success else None,
+        )
 
 
 class DeleteGroup(graphene.Mutation):
@@ -791,15 +756,11 @@ class DeleteGroup(graphene.Mutation):
     )
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
-        update_query = (
-            sa.update(groups)
-            .values(
-                is_active=False,
-                integration_id=None,
-            )
-            .where(groups.c.id == gid)
+        res: DeleteGroupActionResult = await ctx.processors.group.delete_group.wait_for_complete(
+            DeleteGroupAction(gid)
         )
-        return await simple_db_mutate(cls, ctx, update_query)
+
+        return cls(ok=res.success, msg="success" if res.success else "failed")
 
 
 class PurgeGroup(graphene.Mutation):
@@ -827,23 +788,14 @@ class PurgeGroup(graphene.Mutation):
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _pre_func(conn: SAConnection) -> None:
-            if await cls.group_vfolder_mounted_to_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Some of virtual folders that belong to this group "
-                    "are currently mounted to active sessions. "
-                    "Terminate them first to proceed removal.",
-                )
-            if await cls.group_has_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Group has some active session. Terminate them first to proceed removal.",
-                )
-            await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
-            await cls.delete_kernels(conn, gid)
-            await cls.delete_sessions(conn, gid)
+        res: PurgeGroupActionResult = (
+            await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
+        )
 
-        delete_query = sa.delete(groups).where(groups.c.id == gid)
-        return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+        )
 
     @classmethod
     async def delete_vfolders(
