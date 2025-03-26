@@ -29,9 +29,7 @@ class ModifyImageInputData:
     labels: NoUnsetStatus[dict[str, Any]] = field(
         default_factory=lambda: NoUnsetStatus("labels", None)
     )
-    accelerators: TriStatus[str] = field(
-        default_factory=lambda: TriStatus("accelerators", False, None)
-    )
+    accelerators: TriStatus[str] = field(default_factory=lambda: TriStatus.nop("accelerators"))
     resources: NoUnsetStatus[dict[str, Any]] = field(
         default_factory=lambda: NoUnsetStatus("resources", None)
     )
@@ -79,6 +77,5 @@ class ModifyImageActionUnknownImageReferenceError(BaseActionException):
     pass
 
 
-# TODO: Remove this.
 class ModifyImageActionValueError(BaseActionException):
     pass

@@ -1068,8 +1068,8 @@ class ModifyImageInput(graphene.InputObjectType):
             labels=NoUnsetStatus("labels", self.labels),
             accelerators=TriStatus(
                 "accelerators",
-                self.supported_accelerators is None,
-                ",".join(self.supported_accelerators),
+                unset=self.supported_accelerators is None,
+                value=",".join(self.supported_accelerators),
             ),
             resources=NoUnsetStatus(
                 "resources",
