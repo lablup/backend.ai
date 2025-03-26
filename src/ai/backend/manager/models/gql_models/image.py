@@ -740,7 +740,7 @@ class ForgetImageById(graphene.Mutation):
         )
 
         return ForgetImageById(
-            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
+            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
         )
 
 
@@ -783,7 +783,7 @@ class ForgetImage(graphene.Mutation):
         )
 
         return ForgetImage(
-            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
+            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
         )
 
 
@@ -819,7 +819,7 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
-        return PurgeImageById(image=ImageNode.from_row(ctx, result.image.to_image_row()))
+        return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -857,7 +857,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         )
 
         return UntagImageFromRegistry(
-            ok=True, msg="", image=ImageNode.from_row(ctx, result.image.to_image_row())
+            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
         )
 
 

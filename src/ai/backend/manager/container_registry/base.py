@@ -172,7 +172,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.labels = update["labels"]
                         image_row.resources = update["resources"]
                         image_row.is_local = is_local
-                        scanned_images.append(ImageData.from_image_row(image_row))
+                        scanned_images.append(image_row.to_dataclass())
 
                         if image_row.status == ImageStatus.DELETED:
                             image_row.status = ImageStatus.ALIVE
@@ -217,7 +217,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         status=ImageStatus.ALIVE,
                     )
                     session.add(image_row)
-                    scanned_images.append(ImageData.from_image_row(image_row))
+                    scanned_images.append(image_row.to_dataclass())
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
