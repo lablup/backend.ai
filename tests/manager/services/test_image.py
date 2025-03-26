@@ -7,10 +7,8 @@ from dateutil.parser import isoparse
 
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.data.image.types import (
-    ImageAliasData,
-    ImageData,
-    ImageLabels,
-    ImageResources,
+    ImageLabelsData,
+    ImageResourcesData,
 )
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
@@ -85,8 +83,8 @@ IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
     image_id=IMAGE_ROW_FIXTURE.id,
 )
 
-IMAGE_FIXTURE_DATA = ImageData.from_image_row(IMAGE_ROW_FIXTURE)
-IMAGE_ALIAS_DATA = ImageAliasData.from_image_alias_row(IMAGE_ALIAS_ROW_FIXTURE)
+IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()
+IMAGE_ALIAS_DATA = IMAGE_ALIAS_ROW_FIXTURE.to_dataclass()
 
 
 IMAGE_FIXTURE_DICT = dataclasses.asdict(
@@ -382,8 +380,8 @@ async def test_dealias_image(
                     accelerators="cuda,rocm",
                     is_local=True,
                     size_bytes=123,
-                    labels=ImageLabels(label_data={"key1": "value1", "key2": "value2"}),
-                    resources=ImageResources(
+                    labels=ImageLabelsData(label_data={"key1": "value1", "key2": "value2"}),
+                    resources=ImageResourcesData(
                         resources_data={
                             "cpu": {"min": "3", "max": "5"},
                             "mem": {"min": "256m"},
