@@ -98,3 +98,11 @@ class TriStatus(Generic[TVal]):
 class NoUnsetStatus(TriStatus[TVal]):
     def __init__(self, attr_name: str, value: Optional[TVal]):
         super().__init__(attr_name, False, value)
+
+    @classmethod
+    def set(cls, attr_name: str, value: TVal) -> NoUnsetStatus[TVal]:
+        return cls(attr_name, value)
+
+    @classmethod
+    def none(cls, attr_name: str) -> NoUnsetStatus[TVal]:
+        return cls(attr_name, None)
