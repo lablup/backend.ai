@@ -265,7 +265,7 @@ manager_local_config_iv = (
             t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
             t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
             t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
-            t.Key("internal-addr", default=("0.0.0.0", 8081)): tx.HostPortPair,
+            t.Key("internal-addr", default=("0.0.0.0", 18080)): tx.HostPortPair,
             t.Key(
                 "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
             ): tx.Path(type="file"),
