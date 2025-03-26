@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
+    Any,
+    Callable,
     List,
     Optional,
     Self,
@@ -19,6 +21,7 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -26,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import ResourceSlot, Sentinel, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import RESERVED_DOTFILES
@@ -330,20 +333,27 @@ class ModifyDomainInput(graphene.InputObjectType):
     allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
     integration_id = graphene.String(required=False)
 
+    def _convert_field(
+        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+    ) -> Any | Sentinel:
+        if field_value is Undefined:
+            return Sentinel.TOKEN
+        if converter is not None:
+            return converter(field_value)
+        return field_value
+
     def to_action(self, domain_name: str) -> ModifyDomainAction:
-        if self.total_resource_slots is not None:
-            total_resource_slots = ResourceSlot.from_user_input(self.total_resource_slots, None)
-        else:
-            total_resource_slots = None
         return ModifyDomainAction(
-            name=domain_name,
-            new_name=self.name,
-            description=self.description,
-            is_active=self.is_active,
-            total_resource_slots=total_resource_slots,
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            allowed_docker_registries=self.allowed_docker_registries,
-            integration_id=self.integration_id,
+            domain_name=domain_name,
+            name=self._convert_field(self.name),
+            description=self._convert_field(self.description),
+            is_active=self._convert_field(self.is_active),
+            total_resource_slots=self._convert_field(
+                self.total_resource_slots, lambda x: ResourceSlot.from_user_input(x, None)
+            ),
+            allowed_vfolder_hosts=self._convert_field(self.allowed_vfolder_hosts),
+            allowed_docker_registries=self._convert_field(self.allowed_docker_registries),
+            integration_id=self._convert_field(self.integration_id),
         )
 
 

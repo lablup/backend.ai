@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Optional,
     Self,
     cast,
@@ -16,6 +17,7 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
     CreateDomainNodeActionResult,
@@ -396,20 +398,31 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
     sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
     client_mutation_id = graphene.String(required=False)
 
+    def _convert_field(
+        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+    ) -> Any | Sentinel:
+        if field_value is graphql.Undefined:
+            return Sentinel.TOKEN
+        if converter is not None:
+            return converter(field_value)
+        return field_value
+
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
         return ModifyDomainNodeAction(
             name=name,
             user_info=user_info,
-            description=self.description,
-            is_active=self.is_active,
-            total_resource_slots=self.total_resource_slots,
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            allowed_docker_registries=self.allowed_docker_registries,
-            integration_id=self.integration_id,
-            dotfiles=self.dotfiles,
-            sgroups_to_add=self.sgroups_to_add,
-            sgroups_to_remove=self.sgroups_to_remove,
-            client_mutation_id=self.client_mutation_id,
+            description=self._convert_field(self.description),
+            is_active=self._convert_field(self.is_active),
+            total_resource_slots=self._convert_field(
+                self.total_resource_slots, lambda x: ResourceSlot.from_user_input(x, None)
+            ),
+            allowed_vfolder_hosts=self._convert_field(self.allowed_vfolder_hosts),
+            allowed_docker_registries=self._convert_field(self.allowed_docker_registries),
+            integration_id=self._convert_field(self.integration_id),
+            dotfiles=self._convert_field(self.dotfiles),
+            sgroups_to_add=self._convert_field(self.sgroups_to_add),
+            sgroups_to_remove=self._convert_field(self.sgroups_to_remove),
+            client_mutation_id=self._convert_field(self.client_mutation_id),
         )
 
 

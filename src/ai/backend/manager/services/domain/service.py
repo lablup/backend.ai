@@ -105,23 +105,8 @@ class DomainService:
         )
 
     async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
-        data: dict[str, Any] = {}
-        if action.new_name is not None:
-            data["name"] = action.new_name
-        if action.description is not None:
-            data["description"] = action.description
-        if action.is_active is not None:
-            data["is_active"] = action.is_active
-        if action.total_resource_slots is not None:
-            data["total_resource_slots"] = action.total_resource_slots
-        if action.allowed_vfolder_hosts is not None:
-            data["allowed_vfolder_hosts"] = action.allowed_vfolder_hosts
-        if action.allowed_docker_registries is not None:
-            data["allowed_docker_registries"] = action.allowed_docker_registries
-        if action.integration_id is not None:
-            data["integration_id"] = action.integration_id
-
-        base_query = sa.update(domains).values(data).where(domains.c.name == action.name)
+        data = action.get_modified_fields()
+        base_query = sa.update(domains).values(data).where(domains.c.name == action.domain_name)
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
@@ -284,18 +269,13 @@ class DomainService:
     ) -> ModifyDomainNodeActionResult:
         domain_name = action.name
 
-        if hasattr(action, "sgroups_to_add") and action.sgroups_to_add is not None:
-            sgroups_to_add = set(action.sgroups_to_add)
-        else:
-            sgroups_to_add = None
+        sgroups_to_add_set = action.get_sgroups_to_add_as_set()
+        sgroups_to_remove_set = action.get_sgroups_to_remove_as_set()
 
-        if hasattr(action, "sgroups_to_remove") and action.sgroups_to_remove is not None:
-            sgroups_to_remove = set(action.sgroups_to_remove)
-        else:
-            sgroups_to_remove = None
-
-        if sgroups_to_add is not None and sgroups_to_remove is not None:
-            if union := sgroups_to_add & sgroups_to_remove:
+        if action.has_sgroups_to_add and action.has_sgroups_to_remove:
+            sgroups_to_add_set = cast(set[str], sgroups_to_add_set)
+            sgroups_to_remove_set = cast(set[str], sgroups_to_remove_set)
+            if union := sgroups_to_add_set & sgroups_to_remove_set:
                 raise ValueError(
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
                     f"(sg:{union})."
@@ -316,28 +296,34 @@ class DomainService:
             if not domain_models:
                 raise ValueError(f"Not allowed to update domain (id:{domain_name})")
 
-            if sgroups_to_add is not None:
+            # Redefine the variables to avoid type checker error
+            sgroups_to_add_set = action.get_sgroups_to_add_as_set()
+            sgroups_to_remove_set = action.get_sgroups_to_remove_as_set()
+
+            if action.has_sgroups_to_add:
+                sgroups_to_add_set = cast(set[str], sgroups_to_add_set)
                 await self._ensure_sgroup_permission(
-                    action.user_info, sgroups_to_add, db_session=db_session
+                    action.user_info, sgroups_to_add_set, db_session=db_session
                 )
                 await db_session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
                         {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
+                        for sgroup_name in sgroups_to_add_set
                     ],
                 )
-            if sgroups_to_remove is not None:
+            if action.has_sgroups_to_remove:
+                sgroups_to_remove_set = cast(set[str], sgroups_to_remove_set)
                 await self._ensure_sgroup_permission(
-                    action.user_info, sgroups_to_remove, db_session=db_session
+                    action.user_info, sgroups_to_remove_set, db_session=db_session
                 )
                 await db_session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
                         (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
+                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove_set))
                     ),
                 )
-            update_data = action.get_update_values_as_dict()
+            update_data = action.get_modified_fields()
             _update_stmt = (
                 sa.update(DomainRow)
                 .where(DomainRow.name == domain_name)
