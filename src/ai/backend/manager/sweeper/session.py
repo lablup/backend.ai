@@ -8,7 +8,7 @@ from typing import AsyncIterator, Mapping, override
 import aiotools
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common.events import KernelLifecycleEventReason
@@ -42,51 +42,53 @@ class SessionSweeper(AbstractSweeper):
     @override
     async def sweep(self) -> None:
         now = datetime.now(tz=tzutc())
-        conditions = [
-            and_(
-                SessionRow.status == status,
-                SessionRow.get_status_elapsed_time(status, now) > threshold,
-            )
-            for status, threshold in self._status_threshold_map.items()
-        ]
-        query = (
-            sa.select(SessionRow)
-            .where(or_(*conditions))
-            .options(
-                noload("*"),
-                load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
-            )
-        )
 
-        async with self._db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            sessions = result.fetchall()
-
-        results_and_exceptions = await asyncio.gather(
-            *[
-                asyncio.create_task(
-                    self._registry.destroy_session(
-                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
-                    ),
+        for status, threshold in self._status_threshold_map.items():
+            query = (
+                sa.select(SessionRow)
+                # .where(or_(*conditions))
+                .where(
+                    and_(
+                        SessionRow.status == status,
+                        SessionRow.get_status_elapsed_time(status, now) > threshold,
+                    )
                 )
-                for session in sessions
-            ],
-            return_exceptions=True,
-        )
-        results = [
-            result_or_exception
-            for result_or_exception in results_and_exceptions
-            if not isinstance(result_or_exception, (BaseException, Exception))
-        ]
-
-        if sessions:
-            log.info(
-                "sweep(session) - {} session(s) found, {} session(s) sweeped.",
-                len(sessions),
-                len(results),
+                .options(
+                    noload("*"),
+                    load_only(SessionRow.id, SessionRow.name, SessionRow.access_key),
+                )
             )
-        else:
-            log.debug("sweep(session) - No sessions found.")
+
+            async with self._db.begin_readonly() as conn:
+                result = await conn.execute(query)
+                sessions = result.fetchall()
+
+            results_and_exceptions = await asyncio.gather(
+                *[
+                    asyncio.create_task(
+                        self._registry.destroy_session(
+                            session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
+                        ),
+                    )
+                    for session in sessions
+                ],
+                return_exceptions=True,
+            )
+            results = [
+                result_or_exception
+                for result_or_exception in results_and_exceptions
+                if not isinstance(result_or_exception, (BaseException, Exception))
+            ]
+
+            if sessions:
+                log.info(
+                    "sweep(session) - {} {} session(s) found, {} session(s) sweeped.",
+                    len(sessions),
+                    status,
+                    len(results),
+                )
+            else:
+                log.debug("sweep(session) - No {} sessions found.", status)
 
 
 @actxmgr

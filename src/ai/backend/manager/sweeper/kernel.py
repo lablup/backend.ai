@@ -77,12 +77,12 @@ class KernelSweeper(AbstractSweeper):
 
         if kernels:
             log.info(
-                "sweep(kernel) - {} kernel(s) found, {} kernel(s) sweeped.",
+                "sweep(kernel) - {} orphan kernel(s) found, {} kernel(s) sweeped.",
                 len(kernels),
                 len(results),
             )
         else:
-            log.debug("sweep(kernel) - No kernels found.")
+            log.debug("sweep(kernel) - No orphan kernels found.")
 
 
 @actxmgr
