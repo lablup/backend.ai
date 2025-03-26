@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, Optional, cast
 import aiotools
 import sqlalchemy as sa
 
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import Sentinel, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import VFolderOperationFailed
 from ai.backend.manager.models.group import association_groups_users, groups
@@ -72,27 +72,8 @@ class GroupService:
         return CreateGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        data: dict[str, Any] = {}
-        if action.name is not None:
-            data["name"] = action.name
-        if action.description is not None:
-            data["description"] = action.description
-        if action.is_active is not None:
-            data["is_active"] = action.is_active
-        if action.domain_name is not None:
-            data["domain_name"] = action.domain_name
-        if action.total_resource_slots is not None:
-            data["total_resource_slots"] = action.total_resource_slots
-        if action.allowed_vfolder_hosts is not None:
-            data["allowed_vfolder_hosts"] = action.allowed_vfolder_hosts
-        if action.integration_id is not None:
-            data["integration_id"] = action.integration_id
-        if action.resource_policy is not None:
-            data["resource_policy"] = action.resource_policy
-        if action.container_registry is not None:
-            data["container_registry"] = action.container_registry
-
-        if action.user_update_mode not in (None, "add", "remove"):
+        data = action.get_modified_fields()
+        if action.user_update_mode not in (None, "add", "remove", Sentinel.TOKEN):
             raise ValueError("invalid user_update_mode")
         if not action.user_uuids:
             action.user_update_mode = None
@@ -104,16 +85,16 @@ class GroupService:
                 # TODO: refactor user addition/removal in groups as separate mutations
                 #       (to apply since 21.09)
                 gid = action.group_id
+                user_uuids = cast(list[str], action.user_uuids)
                 if action.user_update_mode == "add":
-                    assert action.user_uuids is not None
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in action.user_uuids]
+                    values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]
                     await conn.execute(
                         sa.insert(association_groups_users).values(values),
                     )
                 elif action.user_update_mode == "remove":
                     await conn.execute(
                         sa.delete(association_groups_users).where(
-                            (association_groups_users.c.user_id.in_(action.user_uuids))
+                            (association_groups_users.c.user_id.in_(user_uuids))
                             & (association_groups_users.c.group_id == gid),
                         ),
                     )
