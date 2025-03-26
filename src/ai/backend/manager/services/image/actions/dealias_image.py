@@ -39,8 +39,3 @@ class DealiasImageActionResult(BaseActionResult):
 
 class DealiasImageActionNoSuchAliasError(BaseActionException):
     pass
-
-
-# TODO: Remove this.
-class DealiasImageActionValueError(BaseActionException):
-    pass
