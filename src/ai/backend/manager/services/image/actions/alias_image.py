@@ -43,6 +43,6 @@ class AliasImageActionNoSuchAliasError(BaseActionException):
     pass
 
 
-# TODO: Remove this.
+# TODO: Is this required?
 class AliasImageActionValueError(BaseActionException):
     pass
