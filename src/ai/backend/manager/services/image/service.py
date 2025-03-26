@@ -8,7 +8,7 @@ from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData, PurgeImageResponseData
+from ai.backend.manager.data.image.types import PurgeImageResponseData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
@@ -105,7 +105,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise ForgetImageActionGenericForbiddenError()
             await image_row.mark_as_deleted(session)
-        return ForgetImageActionResult(image=ImageData.from_image_row(image_row))
+        return ForgetImageActionResult(image=image_row.to_dataclass())
 
     async def forget_image_by_id(
         self, action: ForgetImageByIdAction
@@ -118,7 +118,7 @@ class ImageService:
                 if not image_row.is_customized_by(action.user_id):
                     raise ForgetImageActionByIdGenericForbiddenError()
             await image_row.mark_as_deleted(session)
-        return ForgetImageByIdActionResult(image=ImageData.from_image_row(image_row))
+        return ForgetImageByIdActionResult(image=image_row.to_dataclass())
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         try:
@@ -138,7 +138,7 @@ class ImageService:
             raise AliasImageActionDBError(e)
         return AliasImageActionResult(
             image_id=image_alias.image_id,
-            image_alias=ImageAliasData.from_image_alias_row(image_alias),
+            image_alias=image_alias.to_dataclass(),
         )
 
     async def dealias_image(self, action: DealiasImageAction) -> DealiasImageActionResult:
@@ -152,7 +152,7 @@ class ImageService:
 
         return DealiasImageActionResult(
             image_id=existing_alias.image_id,
-            image_alias=ImageAliasData.from_image_alias_row(existing_alias),
+            image_alias=existing_alias.to_dataclass(),
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
@@ -185,7 +185,7 @@ class ImageService:
         except (ValueError, sa.exc.DBAPIError):
             raise ModifyImageActionValueError
 
-        return ModifyImageActionResult(image=ImageData.from_image_row(image_row))
+        return ModifyImageActionResult(image=image_row.to_dataclass())
 
     async def preload_image(self, action: PreloadImageAction) -> PreloadImageActionResult:
         raise NotImplementedError
@@ -205,7 +205,7 @@ class ImageService:
                 await db_session.delete(image_row)
             except sa.exc.DBAPIError as e:
                 raise PurgeImageActionByIdObjectDBError(e)
-            return PurgeImageByIdActionResult(image=ImageData.from_image_row(image_row))
+            return PurgeImageByIdActionResult(image=image_row.to_dataclass())
 
     async def untag_image_from_registry(
         self, action: UntagImageFromRegistryAction
@@ -229,7 +229,7 @@ class ImageService:
 
         scanner = HarborRegistry_v2(self._db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
-        return UntagImageFromRegistryActionResult(image=ImageData.from_image_row(image_row))
+        return UntagImageFromRegistryActionResult(image=image_row.to_dataclass())
 
     async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
         errors = []
