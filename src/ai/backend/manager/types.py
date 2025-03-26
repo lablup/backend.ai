@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Annotated, Protocol
+from typing import TYPE_CHECKING, Annotated, Any, Generic, Optional, Protocol, TypeVar
 
 import attr
 from pydantic import AliasChoices, BaseModel, Field
@@ -56,3 +56,33 @@ class MountOptionModel(BaseModel):
         MountPermission | None,
         Field(validation_alias=AliasChoices("permission", "perm"), default=None),
     ]
+
+
+TVal = TypeVar("TVal")
+
+
+class TriStatus(Generic[TVal]):
+    _attr_name: str
+    _unset: bool
+    _value: Optional[TVal]
+
+    def __init__(self, attr_name: str, unset: bool, value: Optional[TVal]):
+        self._attr_name = attr_name
+        self._unset = unset
+        self._value = value
+
+    def set_attr(self, row: Any):
+        if self._unset:
+            # TODO: Is this necessary?
+            assert self._value is None
+            setattr(row, self._attr_name, None)
+        else:
+            if self._value is not None:
+                setattr(row, self._attr_name, self._value)
+            else:
+                pass
+
+
+class NoUnsetStatus(TriStatus[TVal]):
+    def __init__(self, attr_name: str, value: Optional[TVal]):
+        super().__init__(attr_name, False, value)
