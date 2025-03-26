@@ -19,18 +19,26 @@ from ..api.context import RootContext
 from ..config import session_hang_tolerance_iv
 from ..models import SessionRow
 from ..models.session import SessionStatus
+from ..models.utils import ExtendedAsyncSAEngine
+from ..registry import AgentRegistry
 from .base import AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SessionSweeper(AbstractSweeper):
-    _root_ctx: RootContext
     _status: SessionStatus
     _threshold: TimeDelta
 
-    def __init__(self, root_ctx: RootContext, status: SessionStatus, threshold: TimeDelta) -> None:
-        self._root_ctx = root_ctx
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        *,
+        status: SessionStatus,
+        threshold: TimeDelta,
+    ) -> None:
+        super().__init__(db, registry)
         self._status = status
         self._threshold = threshold
 
@@ -47,14 +55,14 @@ class SessionSweeper(AbstractSweeper):
             )
         )
 
-        async with self._root_ctx.db.begin_readonly() as conn:
+        async with self._db.begin_readonly() as conn:
             result = await conn.execute(query)
             sessions = result.fetchall()
 
         await asyncio.gather(
             *[
                 asyncio.create_task(
-                    self._root_ctx.registry.destroy_session(
+                    self._registry.destroy_session(
                         session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
                     ),
                 )
@@ -92,7 +100,9 @@ async def stale_session_collection_ctx(root_ctx: RootContext) -> AsyncIterator[N
         interval = _get_interval(threshold)
         tasks.append(
             aiotools.create_timer(
-                SessionSweeper(root_ctx, status, threshold).sweep,
+                SessionSweeper(
+                    root_ctx.db, root_ctx.registry, status=status, threshold=threshold
+                ).sweep,
                 interval,
             ),
         )

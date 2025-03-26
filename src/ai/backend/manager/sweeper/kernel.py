@@ -22,11 +22,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KernelSweeper(AbstractSweeper):
-    _root_ctx: RootContext
-
-    def __init__(self, root_ctx: RootContext) -> None:
-        self._root_ctx = root_ctx
-
     @override
     async def sweep(self, *args) -> None:
         query = (
@@ -46,7 +41,7 @@ class KernelSweeper(AbstractSweeper):
             )
         )
 
-        async with self._root_ctx.db.begin_readonly() as conn:
+        async with self._db.begin_readonly() as conn:
             result = await conn.execute(query)
             kernels = result.fetchall()
 
@@ -57,7 +52,7 @@ class KernelSweeper(AbstractSweeper):
         await asyncio.gather(
             *[
                 asyncio.create_task(
-                    self._root_ctx.registry.destroy_session_lowlevel(
+                    self._registry.destroy_session_lowlevel(
                         session_id,
                         [
                             {
@@ -91,7 +86,7 @@ async def stale_kernel_collection_ctx(root_ctx: RootContext) -> AsyncIterator[No
     if interval_sec == float("inf"):
         interval_sec = default_interval_sec
     task = aiotools.create_timer(
-        KernelSweeper(root_ctx).sweep,
+        KernelSweeper(db=root_ctx.db, registry=root_ctx.registry).sweep,
         interval=interval_sec,
     )
 
