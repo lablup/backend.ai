@@ -39,3 +39,11 @@ class PurgeImageActionByIdGenericForbiddenError(BaseActionException):
 
 class PurgeImageActionByIdObjectNotFoundError(BaseActionException):
     pass
+
+
+class PurgeImageActionByIdObjectDBError(BaseActionException):
+    """
+    This can occur when the alias of the image you are trying to delete already exists.
+    """
+
+    pass
