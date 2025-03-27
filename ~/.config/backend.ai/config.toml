@@ -1,0 +1,6 @@
+[api]
+endpoint = "https://your-backend-ai-server/api"
+domain = "default"
+[api]
+endpoint = "https://your-backend-ai-server/api"
+domain = "default"
