@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot
@@ -11,14 +11,17 @@ from ai.backend.manager.services.groups.types import GroupData
 @dataclass
 class CreateGroupAction(GroupAction):
     name: str
-    type: Optional[ProjectType]
-    description: Optional[str]
-    is_active: Optional[bool]
-    total_resource_slots: Optional[ResourceSlot]
-    allowed_vfolder_hosts: Optional[dict[str, str]]
-    integration_id: Optional[str]
-    resource_policy: Optional[str]
-    container_registry: Optional[dict[str, str]]
+    domain_name: str
+    type: Optional[ProjectType] = ProjectType.GENERAL
+    description: Optional[str] = ""
+    is_active: Optional[bool] = True
+    total_resource_slots: Optional[ResourceSlot] = field(
+        default_factory=lambda: ResourceSlot.from_user_input({}, None)
+    )
+    allowed_vfolder_hosts: Optional[dict[str, str]] = field(default_factory=dict)
+    integration_id: Optional[str] = ""
+    resource_policy: Optional[str] = "default"
+    container_registry: Optional[dict[str, str]] = field(default_factory=dict)
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -31,6 +34,7 @@ class CreateGroupAction(GroupAction):
     def get_insertion_data(self) -> dict[str, Any]:
         return {
             "name": self.name,
+            "domain_name": self.domain_name,
             "type": self.type,
             "description": self.description,
             "is_active": self.is_active,

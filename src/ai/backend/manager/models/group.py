@@ -611,6 +611,7 @@ class GroupInput(graphene.InputObjectType):
             type=ProjectType[self.type],
             description=self.description,
             is_active=self.is_active,
+            domain_name=self.domain_name,
             total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None),
             allowed_vfolder_hosts=self.allowed_vfolder_hosts,
             integration_id=self.integration_id,

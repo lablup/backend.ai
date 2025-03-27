@@ -11,17 +11,17 @@ from ai.backend.manager.services.groups.types import GroupData
 @dataclass
 class ModifyGroupAction(GroupAction):
     group_id: uuid.UUID
-    name: Optional[str] | Sentinel
-    description: Optional[str] | Sentinel
-    is_active: Optional[bool] | Sentinel
-    domain_name: Optional[str] | Sentinel
-    total_resource_slots: Optional[ResourceSlot] | Sentinel
-    user_update_mode: Optional[str] | Sentinel
-    user_uuids: Optional[list[str]] | Sentinel
-    allowed_vfolder_hosts: Optional[dict[str, str]] | Sentinel
-    integration_id: Optional[str] | Sentinel
-    resource_policy: Optional[str] | Sentinel
-    container_registry: Optional[dict[str, str]] | Sentinel
+    name: Optional[str] | Sentinel = Sentinel.TOKEN
+    description: Optional[str] | Sentinel = Sentinel.TOKEN
+    is_active: Optional[bool] | Sentinel = Sentinel.TOKEN
+    domain_name: Optional[str] | Sentinel = Sentinel.TOKEN
+    total_resource_slots: Optional[ResourceSlot] | Sentinel = Sentinel.TOKEN
+    user_update_mode: Optional[str] | Sentinel = Sentinel.TOKEN
+    user_uuids: Optional[list[str]] | Sentinel = Sentinel.TOKEN
+    allowed_vfolder_hosts: Optional[dict[str, str]] | Sentinel = Sentinel.TOKEN
+    integration_id: Optional[str] | Sentinel = Sentinel.TOKEN
+    resource_policy: Optional[str] | Sentinel = Sentinel.TOKEN
+    container_registry: Optional[dict[str, str]] | Sentinel = Sentinel.TOKEN
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -140,19 +140,19 @@ class GroupService:
         gid = action.group_id
 
         async def _pre_func(conn: SAConnection) -> None:
-            if await self.group_vfolder_mounted_to_active_kernels(conn, gid):
+            if await self._group_vfolder_mounted_to_active_kernels(conn, gid):
                 raise RuntimeError(
                     "Some of virtual folders that belong to this group "
                     "are currently mounted to active sessions. "
                     "Terminate them first to proceed removal.",
                 )
-            if await self.group_has_active_kernels(conn, gid):
+            if await self._group_has_active_kernels(conn, gid):
                 raise RuntimeError(
                     "Group has some active session. Terminate them first to proceed removal.",
                 )
-            await self.delete_vfolders(gid)
-            await self.delete_kernels(conn, gid)
-            await self.delete_sessions(conn, gid)
+            await self._delete_vfolders(gid)
+            await self._delete_kernels(conn, gid)
+            await self._delete_sessions(conn, gid)
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin() as conn:
@@ -172,7 +172,7 @@ class GroupService:
 
         return PurgeGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
-    async def group_vfolder_mounted_to_active_kernels(
+    async def _group_vfolder_mounted_to_active_kernels(
         self, db_conn: SAConnection, group_id: uuid.UUID
     ) -> bool:
         from ai.backend.manager.models import (
@@ -203,7 +203,7 @@ class GroupService:
                     pass
         return False
 
-    async def group_has_active_kernels(self, db_conn: SAConnection, group_id: uuid.UUID) -> bool:
+    async def _group_has_active_kernels(self, db_conn: SAConnection, group_id: uuid.UUID) -> bool:
         from ai.backend.manager.models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 
         query = (
@@ -217,7 +217,7 @@ class GroupService:
         active_kernel_count = await db_conn.scalar(query)
         return True if active_kernel_count > 0 else False
 
-    async def delete_vfolders(self, group_id: uuid.UUID) -> int:
+    async def _delete_vfolders(self, group_id: uuid.UUID) -> int:
         from ai.backend.manager.models import (
             VFolderDeletionInfo,
             VFolderRow,
@@ -257,7 +257,7 @@ class GroupService:
             log.info("deleted {0} group's virtual folders ({1})", deleted_count, group_id)
         return deleted_count
 
-    async def delete_kernels(self, db_conn: SAConnection, group_id: uuid.UUID) -> None:
+    async def _delete_kernels(self, db_conn: SAConnection, group_id: uuid.UUID) -> None:
         from ai.backend.manager.models import kernels
 
         query = sa.delete(kernels).where(kernels.c.group_id == group_id)
@@ -266,7 +266,7 @@ class GroupService:
             log.info("deleted {0} group's kernels ({1})", result.rowcount, group_id)
         return result.rowcount
 
-    async def delete_sessions(self, db_conn: SAConnection, group_id: uuid.UUID) -> None:
+    async def _delete_sessions(self, db_conn: SAConnection, group_id: uuid.UUID) -> None:
         from ai.backend.manager.models.session import SessionRow
 
         stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
