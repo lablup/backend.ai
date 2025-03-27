@@ -95,7 +95,7 @@ class KernelSweeper(AbstractSweeper):
 
 
 @actxmgr
-async def kernel_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def stale_kernel_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async def _sweep(interval: float) -> None:
         await KernelSweeper(root_ctx.db, root_ctx.registry, root_ctx.metrics.sweeper).sweep()
 

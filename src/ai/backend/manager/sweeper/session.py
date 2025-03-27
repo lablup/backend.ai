@@ -107,7 +107,7 @@ class SessionSweeper(AbstractSweeper):
 
 
 @actxmgr
-async def session_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def stale_session_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     session_hang_tolerance = session_hang_tolerance_iv.check(
         await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
