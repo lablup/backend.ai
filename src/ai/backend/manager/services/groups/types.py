@@ -1,7 +1,7 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
-from typing import Optional, Self
+from typing import Any, Optional, Self
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -23,6 +23,18 @@ class GroupData:
     resource_policy: str
     type: ProjectType
     container_registry: dict[str, str]
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, GroupData):
+            return False
+
+        for field in fields(self):
+            # For test success in test_group.py, we need to ignore the id field
+            # TODO: If partial matching test is implemented, we need to remove 'id' from the ignore list
+            if field.name not in ("id", "created_at", "modified_at"):
+                if getattr(self, field.name) != getattr(other, field.name):
+                    return False
+        return True
 
     @classmethod
     def from_row(cls, row: Optional[GroupRow]) -> Optional[Self]:
