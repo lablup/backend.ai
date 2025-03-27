@@ -1,5 +1,4 @@
 import asyncio
-import enum
 import hashlib
 import hmac
 import json
@@ -77,7 +76,6 @@ from ai.backend.manager.models.base import (
     populate_fixture,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageAliasRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -478,18 +476,8 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
     extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
     extra_fixture_file_path = Path(extra_fixture_file.name)
 
-    def fixture_json_encoder(obj: Any):
-        if isinstance(obj, uuid.UUID):
-            return str(obj)
-        if isinstance(obj, datetime):
-            return str(obj)
-        if isinstance(obj, enum.Enum):
-            return obj.value
-
-        raise TypeError(f'Fixture type "{type(obj)}" not serializable')
-
     with open(extra_fixture_file_path, "w") as f:
-        json.dump(extra_fixtures, f, default=fixture_json_encoder)
+        json.dump(extra_fixtures, f)
 
     fixture_paths = [
         build_root / "fixtures" / "manager" / "example-users.json",
@@ -538,7 +526,6 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
-                await conn.execute((ImageAliasRow.__table__.delete()))
                 await conn.execute((ImageRow.__table__.delete()))
                 await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
