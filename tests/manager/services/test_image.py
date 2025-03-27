@@ -367,7 +367,12 @@ async def test_dealias_image(
                     size_bytes=OptionalState.set("size_bytes", 123),
                     labels=OptionalState.set("labels", {"key1": "value1", "key2": "value2"}),
                     resources=OptionalState.set(
-                        "resources", {"cpu": {"min": "3", "max": "5"}, "mem": {"min": "256m"}}
+                        "resources",
+                        {
+                            "cpu": {"min": "3", "max": "5"},
+                            "mem": {"min": "256m"},
+                            "cuda.device": {"max": None, "min": "1"},
+                        },
                     ),
                     config_digest=OptionalState.set("config_digest", "sha256:1234567890abcdef"),
                 ),
@@ -385,6 +390,7 @@ async def test_dealias_image(
                         resources_data={
                             "cpu": {"min": "3", "max": "5"},
                             "mem": {"min": "256m"},
+                            "cuda.device": {"max": None, "min": "1"},
                         }
                     ),
                     config_digest="sha256:1234567890abcdef",
