@@ -1069,7 +1069,7 @@ class ModifyImageInput(graphene.InputObjectType):
             size_bytes=OptionalState("size_bytes", value_or_none(self.size_bytes)),
             type=OptionalState("type", value_or_none(self.type)),
             config_digest=OptionalState("config_digest", value_or_none(self.digest)),
-            labels=OptionalState("labels", self.labels),
+            labels=OptionalState("labels", {label.key: label.value for label in self.labels}),
             accelerators=TriState(
                 "accelerators",
                 unset=self.supported_accelerators is None,
