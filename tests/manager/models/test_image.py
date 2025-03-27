@@ -24,18 +24,14 @@ from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.server import (
-    agent_registry_ctx,
     background_task_ctx,
     database_ctx,
     event_dispatcher_ctx,
     hook_plugin_ctx,
     monitoring_ctx,
-    network_plugin_ctx,
-    processors_ctx,
     redis_ctx,
     services_ctx,
     shared_config_ctx,
-    storage_manager_ctx,
 )
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
@@ -48,7 +44,6 @@ def client() -> Client:
 def get_graphquery_context(
     background_task_manager,
     services_ctx,
-    processor_ctx,
     database_engine: ExtendedAsyncSAEngine,
 ) -> GraphQueryContext:
     return GraphQueryContext(
@@ -71,7 +66,6 @@ def get_graphquery_context(
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
         services_ctx=services_ctx,  # type: ignore
-        processors=processor_ctx,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
     )
@@ -190,10 +184,6 @@ async def test_image_rescan_on_docker_registry(
             redis_ctx,
             event_dispatcher_ctx,
             services_ctx,
-            network_plugin_ctx,
-            storage_manager_ctx,
-            agent_registry_ctx,
-            processors_ctx,
             background_task_ctx,
         ],
         [".events", ".auth"],
@@ -291,10 +281,7 @@ async def test_image_rescan_on_docker_registry(
         setup_dockerhub_mocking(mocked)
 
         context = get_graphquery_context(
-            root_ctx.background_task_manager,
-            root_ctx.services_ctx,
-            root_ctx.processors,
-            root_ctx.db,
+            root_ctx.background_task_manager, root_ctx.services_ctx, root_ctx.db
         )
         image_rescan_query = """
             mutation ($registry: String, $project: String) {
