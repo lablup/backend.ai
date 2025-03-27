@@ -1050,6 +1050,12 @@ class ModifyImageInput(graphene.InputObjectType):
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
 
+        accelerators = (
+            ",".join(self.supported_accelerators)
+            if self.supported_accelerators is not Undefined
+            else None
+        )
+
         def value_or_none(value):
             return value if value is not Undefined else None
 
@@ -1067,7 +1073,7 @@ class ModifyImageInput(graphene.InputObjectType):
             accelerators=TriState(
                 "accelerators",
                 unset=self.supported_accelerators is None,
-                value=",".join(self.supported_accelerators),
+                value=accelerators,
             ),
             resources=OptionalState(
                 "resources",
