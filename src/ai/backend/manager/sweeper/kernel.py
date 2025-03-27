@@ -3,13 +3,14 @@ import logging
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import suppress
-from typing import AsyncIterator, override
+from typing import AsyncIterator, Iterable, override
 
 import aiotools
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
@@ -47,24 +48,32 @@ class KernelSweeper(AbstractSweeper):
         for kernel in kernels:
             kernels_per_session[kernel.session_id].append(kernel)
 
+        async def _destroy_kernels(session_id: SessionId, kernels: Iterable[KernelRow]) -> None:
+            try:
+                await self._registry.destroy_session_lowlevel(
+                    session_id,
+                    [
+                        {
+                            "id": kernel.id,
+                            "session_id": kernel.session_id,
+                            "agent": kernel.agent,
+                            "agent_addr": kernel.agent_addr,
+                            "container_id": kernel.container_id,
+                        }
+                        for kernel in kernels
+                    ],
+                    reason=KernelLifecycleEventReason.HANG_TIMEOUT,
+                )
+            except Exception as e:
+                self._sweeper_metric.observe_kernel_sweep(success=False)
+                log.error("sweep(kernel) - failed to terminate kernels (s:{}).", session_id)
+                raise e
+            self._sweeper_metric.observe_kernel_sweep(success=True)
+            log.info("sweep(kernel) - succeeded to terminate kernels (s:{}).", session_id)
+
         results_and_exceptions = await asyncio.gather(
             *[
-                asyncio.create_task(
-                    self._registry.destroy_session_lowlevel(
-                        session_id,
-                        [
-                            {
-                                "id": kernel.id,
-                                "session_id": kernel.session_id,
-                                "agent": kernel.agent,
-                                "agent_addr": kernel.agent_addr,
-                                "container_id": kernel.container_id,
-                            }
-                            for kernel in session_kernels
-                        ],
-                        reason=KernelLifecycleEventReason.HANG_TIMEOUT,
-                    )
-                )
+                asyncio.create_task(_destroy_kernels(session_id, session_kernels))
                 for session_id, session_kernels in kernels_per_session.items()
             ],
             return_exceptions=True,
@@ -88,7 +97,7 @@ class KernelSweeper(AbstractSweeper):
 @actxmgr
 async def kernel_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async def _sweep(interval: float) -> None:
-        await KernelSweeper(db=root_ctx.db, registry=root_ctx.registry).sweep()
+        await KernelSweeper(root_ctx.db, root_ctx.registry, root_ctx.metrics.sweeper).sweep()
 
     task = aiotools.create_timer(_sweep, interval=DEFAULT_SWEEP_INTERVAL_SEC)
 

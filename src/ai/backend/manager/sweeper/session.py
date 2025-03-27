@@ -12,6 +12,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.metrics.metric import SweeperMetricObserver
 from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
 
@@ -33,10 +34,11 @@ class SessionSweeper(AbstractSweeper):
         self,
         db: ExtendedAsyncSAEngine,
         registry: AgentRegistry,
+        sweeper_metric: SweeperMetricObserver,
         *,
         status_threshold_map: Mapping[SessionStatus, TimeDelta],
     ) -> None:
-        super().__init__(db, registry)
+        super().__init__(db, registry, sweeper_metric)
         self._status_threshold_map = status_threshold_map
 
     @override
@@ -46,7 +48,6 @@ class SessionSweeper(AbstractSweeper):
         for status, threshold in self._status_threshold_map.items():
             query = (
                 sa.select(SessionRow)
-                # .where(or_(*conditions))
                 .where(
                     and_(
                         SessionRow.status == status,
@@ -68,19 +69,21 @@ class SessionSweeper(AbstractSweeper):
                     await self._registry.destroy_session(
                         session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
                     )
-                    log.info(
-                        "sweep(session) - succeeded to terminate {} session ({}).",
-                        status,
-                        session.id,
-                    )
                 except Exception as e:
+                    self._sweeper_metric.observe_session_sweep(status=status, success=False)
                     log.error(
-                        "sweep(session) - failed to terminate {} session ({}).",
+                        "sweep(session) - failed to terminate {} session (s:{}).",
                         status,
                         session.id,
                         exc_info=e,
                     )
                     raise e
+                self._sweeper_metric.observe_session_sweep(status=status, success=True)
+                log.info(
+                    "sweep(session) - succeeded to terminate {} session (s:{}).",
+                    status,
+                    session.id,
+                )
 
             results_and_exceptions = await asyncio.gather(
                 *[asyncio.create_task(_destroy_session(session)) for session in sessions],
@@ -113,6 +116,7 @@ async def session_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await SessionSweeper(
             root_ctx.db,
             root_ctx.registry,
+            root_ctx.metrics.sweeper,
             status_threshold_map=session_hang_tolerance["threshold"],
         ).sweep()
 
