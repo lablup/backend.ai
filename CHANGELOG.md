@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.5.1 (2025-03-27)
+
+### Fixes
+* Fix exceeding amount of sessions removed when scaling down model service ([#4037](https://github.com/lablup/backend.ai/issues/4037))
+* Add missing migration revision history file ([#4039](https://github.com/lablup/backend.ai/issues/4039))
+* Missing `watcher` arg in storage volume init methods ([#4041](https://github.com/lablup/backend.ai/issues/4041))
+* Do not check storage host permission in VFolder RBAC function ([#4045](https://github.com/lablup/backend.ai/issues/4045))
+
+
 ## 25.5.0 (2025-03-25)
 
 ### Features
