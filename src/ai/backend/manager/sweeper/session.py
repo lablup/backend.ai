@@ -111,13 +111,19 @@ async def stale_session_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None
     session_hang_tolerance = session_hang_tolerance_iv.check(
         await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
+    status_threshold_map: dict[SessionStatus, TimeDelta] = {}
+    for status, threshold in session_hang_tolerance["threshold"].items():
+        try:
+            status_threshold_map[SessionStatus(status)] = threshold
+        except ValueError:
+            log.warning("sweep(session) - Skipping invalid session status '{}'.", status)
 
     async def _sweep(interval: float) -> None:
         await SessionSweeper(
             root_ctx.db,
             root_ctx.registry,
             root_ctx.metrics.sweeper,
-            status_threshold_map=session_hang_tolerance["threshold"],
+            status_threshold_map=status_threshold_map,
         ).sweep()
 
     task = aiotools.create_timer(_sweep, interval=DEFAULT_SWEEP_INTERVAL_SEC)
