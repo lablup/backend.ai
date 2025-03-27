@@ -52,8 +52,6 @@
     "srcCollapsed": "/manifest/backend.ai-brand-simple-white.svg",
     "srcDark": "/manifest/backend.ai-webui-black.svg",
     "srcCollapsedDark": "/manifest/backend.ai-brand-simple-black.svg",
-    "logoTitle": "WebUI",
-    "logoTitleCollapsed": "WebUI",
     "alt": "Backend.AI Logo",
     "href": "/start",
     "sizeCollapsed": {
