@@ -74,6 +74,9 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.groups.processors import GroupProcessors
+from ai.backend.manager.services.groups.service import GroupService
+from ai.backend.manager.services.processors import Processors
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -438,6 +441,13 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # root_ctx.processors = Processors(
     #     image_service=image_service,
     # )
+
+    group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
+    group_processor = GroupProcessors(group_service)
+
+    root_ctx.processors = Processors(
+        group_processor=group_processor,
+    )
 
     yield
 
