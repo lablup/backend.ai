@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import MutableMapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
@@ -26,17 +26,15 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResponses
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
-    AgentId,
     DispatchResult,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -45,26 +43,45 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
+from ai.backend.manager.services.image.actions.clear_images import ClearImagesAction
+from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
+from ai.backend.manager.services.image.actions.forget_image import (
+    ForgetImageAction,
+)
+from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.modify_image import (
+    ModifyImageAction,
+    ModifyImageInputData,
+    OptionalState,
+    TriState,
+)
+from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import (
+    ImageRefData,
+    PurgeImagesAction,
+)
+from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
+from ai.backend.manager.services.image.actions.untag_image_from_registry import (
+    UntagImageFromRegistryAction,
+)
 
-from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
+from ...api.exceptions import ImageNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
     OrderExprArg,
     batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
-    set_if_set,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
 from ..image import (
-    ImageAliasRow,
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
     ImageStatus,
     ImageType,
     get_permission_ctx,
-    rescan_images,
 )
 from ..rbac import ScopeType
 from ..user import UserRole
@@ -79,8 +96,6 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import ProgressReporter
-
     from ..gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -715,17 +730,18 @@ class ForgetImageById(graphene.Mutation):
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
 
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ObjectNotFound("image")
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    return ForgetImageById(ok=False, msg="Forbidden")
-            await image_row.mark_as_deleted(session)
-            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
+        result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
+            ForgetImageByIdAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                image_id=image_uuid,
+            )
+        )
+
+        return ForgetImageById(
+            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
+        )
 
 
 class ForgetImage(graphene.Mutation):
@@ -756,21 +772,19 @@ class ForgetImage(graphene.Mutation):
     ) -> ForgetImage:
         log.info("forget image {0} by API request", reference)
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
 
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageIdentifier(reference, architecture),
-                    ImageAlias(reference),
-                ],
+        result = await ctx.processors.image.forget_image.wait_for_complete(
+            ForgetImageAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                reference=reference,
+                architecture=architecture,
             )
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    return ForgetImage(ok=False, msg="Forbidden")
-            await image_row.mark_as_deleted(session)
-            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
+        )
+
+        return ForgetImage(
+            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
+        )
 
 
 class PurgeImageById(graphene.Mutation):
@@ -797,20 +811,15 @@ class PurgeImageById(graphene.Mutation):
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
+        result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
+            PurgeImageByIdAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                image_id=image_uuid,
+            )
+        )
 
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ObjectNotFound("image")
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    raise GenericForbidden("Image is not owned by your account.")
-            for alias in image_row.aliases:
-                await session.delete(alias)
-
-            await session.delete(image_row)
-            return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
+        return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -835,35 +844,21 @@ class UntagImageFromRegistry(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> UntagImageFromRegistry:
-        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-
-        async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ImageNotFound
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
-
-            query = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == image_row.image_ref.registry
+        result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+            UntagImageFromRegistryAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                image_id=image_uuid,
             )
+        )
 
-            registry_info = (await session.execute(query)).scalar()
-
-            if registry_info.type != ContainerRegistryType.HARBOR2:
-                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
-
-        scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
-        await scanner.untag(image_row.image_ref)
-
-        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
+        return UntagImageFromRegistry(
+            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
+        )
 
 
 class PreloadImage(graphene.Mutation):
@@ -932,10 +927,17 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
-            return await rescan_images(ctx.db, registry, project, reporter=reporter)
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            action_result = await ctx.processors.image.rescan_images.wait_for_complete(
+                RescanImagesAction(
+                    registry=registry,
+                    project=project,
+                )
+            )
 
-        task_id = await ctx.background_task_manager.start(_rescan_task)
+            return DispatchResult.success(action_result)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
@@ -960,18 +962,15 @@ class AliasImage(graphene.Mutation):
     ) -> AliasImage:
         log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                try:
-                    image_row = await ImageRow.resolve(
-                        session, [ImageIdentifier(target, architecture)]
-                    )
-                except UnknownImageReference:
-                    raise ImageNotFound
-                else:
-                    image_row.aliases.append(ImageAliasRow(alias=alias, image_id=image_row.id))
-        except ValueError as e:
-            return AliasImage(ok=False, msg=str(e))
+
+        await ctx.processors.image.alias_image.wait_for_complete(
+            AliasImageAction(
+                image_canonical=target,
+                architecture=architecture,
+                alias=alias,
+            )
+        )
+
         return AliasImage(ok=True, msg="")
 
 
@@ -992,16 +991,13 @@ class DealiasImage(graphene.Mutation):
     ) -> DealiasImage:
         log.info("dealias image {0} by API request", alias)
         ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                existing_alias = await session.scalar(
-                    sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
-                )
-                if existing_alias is None:
-                    raise DealiasImage(ok=False, msg=str("No such alias"))
-                await session.delete(existing_alias)
-        except ValueError as e:
-            return DealiasImage(ok=False, msg=str(e))
+
+        await ctx.processors.image.dealias_image.wait_for_complete(
+            DealiasImageAction(
+                alias=alias,
+            )
+        )
+
         return DealiasImage(ok=True, msg="")
 
 
@@ -1021,16 +1017,13 @@ class ClearImages(graphene.Mutation):
         registry: str,
     ) -> ClearImages:
         ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                await session.execute(
-                    sa.update(ImageRow)
-                    .where(ImageRow.registry == registry)
-                    .where(ImageRow.status != ImageStatus.DELETED)
-                    .values(status=ImageStatus.DELETED)
-                )
-        except ValueError as e:
-            return ClearImages(ok=False, msg=str(e))
+        log.info("clear images from registry {0} by API request", registry)
+        await ctx.processors.image.clear_images.wait_for_complete(
+            ClearImagesAction(
+                registry=registry,
+            )
+        )
+
         return ClearImages(ok=True, msg="")
 
 
@@ -1043,11 +1036,53 @@ class ModifyImageInput(graphene.InputObjectType):
     is_local = graphene.Boolean(required=False)
     size_bytes = graphene.Int(required=False)
     type = graphene.String(required=False)
-
     digest = graphene.String(required=False)
     labels = graphene.List(lambda: KVPairInput, required=False)
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
+
+    def to_dataclass(self) -> ModifyImageInputData:
+        resources_data = None
+        if self.resource_limits is not Undefined:
+            resources_data = {}
+            for limit_option in self.resource_limits:
+                limit_data = {}
+                if limit_option.min is not Undefined and len(limit_option.min) > 0:
+                    limit_data["min"] = limit_option.min
+                if limit_option.max is not Undefined and len(limit_option.max) > 0:
+                    limit_data["max"] = limit_option.max
+                resources_data[limit_option.key] = limit_data
+
+        accelerators = (
+            ",".join(self.supported_accelerators)
+            if self.supported_accelerators is not Undefined
+            else None
+        )
+
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        return ModifyImageInputData(
+            name=OptionalState("name", value_or_none(self.name)),
+            registry=OptionalState("registry", value_or_none(self.registry)),
+            image=OptionalState("image", value_or_none(self.image)),
+            tag=OptionalState("tag", value_or_none(self.tag)),
+            architecture=OptionalState("architecture", value_or_none(self.architecture)),
+            is_local=OptionalState("is_local", value_or_none(self.is_local)),
+            size_bytes=OptionalState("size_bytes", value_or_none(self.size_bytes)),
+            type=OptionalState("type", value_or_none(self.type)),
+            config_digest=OptionalState("config_digest", value_or_none(self.digest)),
+            labels=OptionalState("labels", {label.key: label.value for label in self.labels}),
+            accelerators=TriState(
+                "accelerators",
+                unset=self.supported_accelerators is None,
+                value=accelerators,
+            ),
+            resources=OptionalState(
+                "resources",
+                value_or_none(resources_data),
+            ),
+        )
 
 
 class ModifyImage(graphene.Mutation):
@@ -1070,52 +1105,16 @@ class ModifyImage(graphene.Mutation):
         props: ModifyImageInput,
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
-        data: MutableMapping[str, Any] = {}
-        set_if_set(props, data, "name")
-        set_if_set(props, data, "registry")
-        set_if_set(props, data, "image")
-        set_if_set(props, data, "tag")
-        set_if_set(props, data, "architecture")
-        set_if_set(props, data, "is_local")
-        set_if_set(props, data, "size_bytes")
-        set_if_set(props, data, "type")
-        set_if_set(props, data, "digest", target_key="config_digest")
-        set_if_set(
-            props,
-            data,
-            "supported_accelerators",
-            clean_func=lambda v: ",".join(v),
-            target_key="accelerators",
+        log.info("modify image {0} by API request", target)
+
+        await ctx.processors.image.modify_image.wait_for_complete(
+            ModifyImageAction(
+                target=target,
+                architecture=architecture,
+                props=props.to_dataclass(),
+            )
         )
-        set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
 
-        if props.resource_limits is not Undefined:
-            resources_data = {}
-            for limit_option in props.resource_limits:
-                limit_data = {}
-                if limit_option.min is not Undefined and len(limit_option.min) > 0:
-                    limit_data["min"] = limit_option.min
-                if limit_option.max is not Undefined and len(limit_option.max) > 0:
-                    limit_data["max"] = limit_option.max
-                resources_data[limit_option.key] = limit_data
-            data["resources"] = resources_data
-
-        try:
-            async with ctx.db.begin_session() as session:
-                try:
-                    image_row = await ImageRow.resolve(
-                        session,
-                        [
-                            ImageIdentifier(target, architecture),
-                            ImageAlias(target),
-                        ],
-                    )
-                except UnknownImageReference:
-                    return ModifyImage(ok=False, msg="Image not found")
-                for k, v in data.items():
-                    setattr(image_row, k, v)
-        except ValueError as e:
-            return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
 
 
@@ -1155,35 +1154,22 @@ class PurgeImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _purge_images_task(
-            reporter: ProgressReporter,
-        ) -> DispatchResult[PurgeImagesResult]:
-            errors = []
-            task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
-            arch_per_images = {image.name: image.architecture for image in images}
-
-            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
-
-            for result in results.responses:
-                image_canonical = result.image
-                arch = arch_per_images[result.image]
-
-                if not result.error:
-                    image_identifier = ImageIdentifier(image_canonical, arch)
-                    async with ctx.db.begin_session() as session:
-                        image_row = await ImageRow.resolve(session, [image_identifier])
-                        task_result.reserved_bytes += image_row.size_bytes
-                        task_result.results.responses.append(result)
-
-                else:
-                    error_msg = f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
-                    log.error(error_msg)
-                    errors.append(error_msg)
-
-            return DispatchResult(
-                result=task_result,
-                errors=errors,
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            action_result = await ctx.processors.image.purge_images.wait_for_complete(
+                PurgeImagesAction(
+                    agent_id=agent_id,
+                    images=[
+                        ImageRefData(
+                            name=image.name,
+                            architecture=image.architecture,
+                            registry=image.registry,
+                        )
+                        for image in images
+                    ],
+                )
             )
 
-        task_id = await ctx.background_task_manager.start(_purge_images_task)
-        return RescanImages(task_id=task_id)
+            return DispatchResult.success(action_result)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
+        return PurgeImages(task_id=task_id)

@@ -14,6 +14,7 @@ from typing import (
     List,
     NamedTuple,
     Optional,
+    Self,
     Tuple,
     TypeAlias,
     cast,
@@ -32,7 +33,6 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
-    DispatchResult,
     ImageAlias,
     ImageConfig,
     ImageRegistry,
@@ -69,6 +69,11 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
+    from ai.backend.manager.data.image.types import (
+        ImageAliasData,
+        ImageData,
+        RescanImagesResult,
+    )
 
     from ..config import SharedConfig
 
@@ -169,10 +174,12 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> DispatchResult[list[ImageRow]]:
+) -> RescanImagesResult:
     """
     Performs an image rescan for all images in the registries.
     """
+    from ai.backend.manager.data.image.types import RescanImagesResult
+
     images, errors = [], []
 
     for registry_key, registry_row in registries.items():
@@ -184,12 +191,12 @@ async def scan_registries(
 
         try:
             scan_result = await scanner.rescan_single_registry(reporter)
-            images.extend(scan_result.result or [])
+            images.extend(scan_result.images or [])
             errors.extend(scan_result.errors or [])
         except Exception as e:
             errors.append(str(e))
 
-    return DispatchResult(result=images, errors=errors)
+    return RescanImagesResult(images=images, errors=errors)
 
 
 async def scan_single_image(
@@ -197,7 +204,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> DispatchResult[list[ImageRow]]:
+) -> RescanImagesResult:
     """
     Performs a scan for a single image.
     """
@@ -252,7 +259,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> DispatchResult[list[ImageRow]]:
+) -> RescanImagesResult:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
@@ -393,6 +400,7 @@ class ImageRow(Base):
         accelerators=None,
         labels=None,
         resources=None,
+        created_at=None,
         status=ImageStatus.ALIVE,
     ) -> None:
         self.name = name
@@ -410,6 +418,7 @@ class ImageRow(Base):
         self.labels = labels
         self.resources = resources
         self.status = status
+        self.created_at = created_at
 
     @property
     def trimmed_digest(self) -> str:
@@ -439,7 +448,7 @@ class ImageRow(Base):
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
+    ) -> Self:
         query = (
             sa.select(ImageRow)
             .select_from(ImageRow)
@@ -466,7 +475,7 @@ class ImageRow(Base):
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
+    ) -> Self:
         query = sa.select(ImageRow).where(
             (ImageRow.name == identifier.canonical)
             & (ImageRow.architecture == identifier.architecture)
@@ -497,7 +506,7 @@ class ImageRow(Base):
         load_aliases: bool = False,
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
+    ) -> Self:
         """
         Loads a image row that corresponds to the given ImageRef object.
 
@@ -526,6 +535,27 @@ class ImageRow(Base):
         raise UnknownImageReference(ref)
 
     @classmethod
+    def from_dataclass(cls, image_data: ImageData) -> Self:
+        return cls(
+            name=image_data.name,
+            project=image_data.project,
+            image=image_data.image,
+            created_at=image_data.created_at,
+            tag=image_data.tag,
+            registry=image_data.registry,
+            registry_id=image_data.registry_id,
+            architecture=image_data.architecture,
+            config_digest=image_data.config_digest,
+            size_bytes=image_data.size_bytes,
+            is_local=image_data.is_local,
+            type=image_data.type,
+            accelerators=image_data.accelerators,
+            labels=image_data.labels.label_data,
+            resources=image_data.resources.resources_data,
+            status=image_data.status,
+        )
+
+    @classmethod
     async def resolve(
         cls,
         session: AsyncSession,
@@ -535,7 +565,7 @@ class ImageRow(Base):
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> ImageRow:
+    ) -> Self:
         """
         Resolves a matching row in the image table from image references and/or aliases.
         If candidate element is `ImageRef`, this method will try to resolve image with matching
@@ -601,7 +631,7 @@ class ImageRow(Base):
         image_id: UUID,
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_aliases: bool = False,
-    ) -> ImageRow | None:
+    ) -> Optional[Self]:
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -617,7 +647,7 @@ class ImageRow(Base):
         session: AsyncSession,
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_aliases: bool = False,
-    ) -> List[ImageRow]:
+    ) -> list[Self]:
         query = sa.select(ImageRow)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -738,8 +768,35 @@ class ImageRow(Base):
 
         self.resources = resources
 
-    def is_customized_by(self, user_id: str) -> bool:
+    def is_customized_by(self, user_id: UUID) -> bool:
         return (self.labels or {}).get("ai.backend.customized-image.owner") == f"user:{user_id}"
+
+    def to_dataclass(self) -> ImageData:
+        from ai.backend.manager.data.image.types import (
+            ImageData,
+            ImageLabelsData,
+            ImageResourcesData,
+        )
+
+        return ImageData(
+            id=self.id,
+            name=self.name,
+            project=self.project,
+            image=self.image,
+            created_at=self.created_at,
+            tag=self.tag,
+            registry=self.registry,
+            registry_id=self.registry_id,
+            architecture=self.architecture,
+            config_digest=self.config_digest,
+            size_bytes=self.size_bytes,
+            is_local=self.is_local,
+            type=self.type,
+            accelerators=self.accelerators,
+            labels=ImageLabelsData(label_data=self.labels),
+            resources=ImageResourcesData(resources_data=self.resources),
+            status=self.status,
+        )
 
 
 async def bulk_get_image_configs(
@@ -802,7 +859,7 @@ class ImageAliasRow(Base):
         session: AsyncSession,
         alias: str,
         target: ImageRow,
-    ) -> ImageAliasRow:
+    ) -> Self:
         existing_alias: Optional[ImageRow] = await session.scalar(
             sa.select(ImageAliasRow)
             .where(ImageAliasRow.alias == alias)
@@ -818,6 +875,17 @@ class ImageAliasRow(Base):
         )
         session.add_all([new_alias])
         return new_alias
+
+    @classmethod
+    def from_dataclass(cls, alias_data: ImageAliasData, image_id: uuid.UUID) -> Self:
+        return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
+
+    def to_dataclass(self) -> ImageAliasData:
+        from ai.backend.manager.data.image.types import (
+            ImageAliasData,
+        )
+
+        return ImageAliasData(id=self.id, alias=self.alias)
 
 
 ImageRow.aliases = relationship("ImageAliasRow", back_populates="image")

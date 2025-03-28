@@ -1,0 +1,32 @@
+from dataclasses import dataclass
+from typing import Optional, override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.image.types import PurgeImageResponseData
+from ai.backend.manager.services.image.base import ImageAction
+from ai.backend.manager.services.image.types import ImageRefData
+
+
+@dataclass
+class PurgeImagesAction(ImageAction):
+    agent_id: str
+    images: list[ImageRefData]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def operation_type(self) -> str:
+        return "purge_images"
+
+
+@dataclass
+class PurgeImagesActionResult(BaseActionResult):
+    reserved_bytes: int
+    purged_images: list[PurgeImageResponseData]
+    errors: list[str]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
