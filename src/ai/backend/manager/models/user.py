@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Self, Sequence, cast
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Self, Sequence, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -12,13 +12,11 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
-from sqlalchemy.sql.expression import bindparam
+from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
@@ -36,9 +34,7 @@ from .base import (
     batch_multiresult,
     batch_result,
     mapper_registry,
-    set_if_set,
     simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -48,6 +44,10 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.users.actions.create_user import (
         CreateUserAction,
         CreateUserActionResult,
+    )
+    from ai.backend.manager.services.users.actions.modify_user import (
+        ModifyUserAction,
+        ModifyUserActionResult,
     )
     from ai.backend.manager.services.users.type import UserData
 
@@ -734,6 +734,41 @@ class ModifyUserInput(graphene.InputObjectType):
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
+    def to_action(self, email) -> ModifyUserAction:
+        fields = {}
+
+        for field in [
+            "username",
+            "password",
+            "need_password_change",
+            "full_name",
+            "description",
+            "is_active",
+            "status",
+            "domain_name",
+            "role",
+            "group_ids",
+            "allowed_client_ip",
+            "totp_activated",
+            "resource_policy",
+            "sudo_session_enabled",
+            "main_access_key",
+            "container_uid",
+            "container_main_gid",
+            "container_gids",
+        ]:
+            if hasattr(self, field):
+                value = getattr(self, field)
+                if field == "status":
+                    value = UserStatus(value)
+                elif field == "role":
+                    value = UserRole(value)
+                fields[field] = value
+            else:
+                fields[field] = Sentinel.TOKEN
+
+        return ModifyUserAction(email=email, **fields)
+
 
 class PurgeUserInput(graphene.InputObjectType):
     purge_shared_vfolders = graphene.Boolean(required=False, default=False)
@@ -799,190 +834,17 @@ class ModifyUser(graphene.Mutation):
         email: str,
         props: ModifyUserInput,
     ) -> ModifyUser:
-        from .keypair import KeyPairRow
-
         graph_ctx: GraphQueryContext = info.context
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "username")
-        set_if_set(props, data, "password")
-        set_if_set(props, data, "need_password_change")
-        set_if_set(props, data, "full_name")
-        set_if_set(props, data, "description")
-        set_if_set(props, data, "status", clean_func=UserStatus)
-        set_if_set(props, data, "domain_name")
-        set_if_set(props, data, "role", clean_func=UserRole)
-        set_if_set(props, data, "allowed_client_ip")
-        set_if_set(props, data, "totp_activated")
-        set_if_set(props, data, "resource_policy")
-        set_if_set(props, data, "sudo_session_enabled")
-        set_if_set(props, data, "main_access_key")
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "container_uid")
-        set_if_set(props, data, "container_main_gid")
-        set_if_set(props, data, "container_gids")
-        if data.get("password") is None:
-            data.pop("password", None)
-        if not data and not props.group_ids:
-            return cls(ok=False, msg="nothing to update", user=None)
-        if data.get("status") is None and data.get("is_active") is not None:
-            data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
 
-        if data.get("password") is not None:
-            data["password_changed_at"] = sa.func.now()
-
-        main_access_key: str | None = data.get("main_access_key")
-        user_update_data: Dict[str, Any] = {}
-        prev_domain_name: str
-        prev_role: UserRole
-
-        async def _pre_func(conn: SAConnection) -> None:
-            nonlocal user_update_data, prev_domain_name, prev_role, main_access_key
-            result = await conn.execute(
-                sa.select([users.c.domain_name, users.c.role, users.c.status])
-                .select_from(users)
-                .where(users.c.email == email),
-            )
-            row = result.first()
-            prev_domain_name = row.domain_name
-            prev_role = row.role
-            user_update_data = data.copy()
-            if "status" in data and row.status != data["status"]:
-                user_update_data["status_info"] = (
-                    "admin-requested"  # user mutation is only for admin
-                )
-            if main_access_key is not None:
-                db_session = SASession(conn)
-                keypair_query = (
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == main_access_key)
-                    .options(
-                        noload("*"),
-                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
-                    )
-                )
-                keypair_row: KeyPairRow | None = (await db_session.scalars(keypair_query)).first()
-                if keypair_row is None:
-                    raise RuntimeError("Cannot set non-existing access key as the main access key.")
-                if keypair_row.user_row.email != email:
-                    raise RuntimeError(
-                        "Cannot set another user's access key as the main access key."
-                    )
-                await conn.execute(
-                    sa.update(users)
-                    .where(users.c.email == email)
-                    .values(main_access_key=main_access_key)
-                )
-
-        update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()
-            sa.update(users).values(user_update_data).where(users.c.email == email)
+        action: ModifyUserAction = props.to_action(email)
+        res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
+            action
         )
 
-        async def _post_func(conn: SAConnection, result: Result) -> Row:
-            nonlocal prev_domain_name, prev_role
-            updated_user = result.first()
-            if "role" in data and data["role"] != prev_role:
-                from ai.backend.manager.models import keypairs
-
-                result = await conn.execute(
-                    sa.select([
-                        keypairs.c.user,
-                        keypairs.c.is_active,
-                        keypairs.c.is_admin,
-                        keypairs.c.access_key,
-                    ])
-                    .select_from(keypairs)
-                    .where(keypairs.c.user == updated_user.uuid)
-                    .order_by(sa.desc(keypairs.c.is_admin))
-                    .order_by(sa.desc(keypairs.c.is_active)),
-                )
-                if data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]:
-                    # User's becomes admin. Set the keypair as active admin.
-                    # TODO: Should we update the role of all users related to keypair?
-                    kp = result.first()
-                    kp_data = dict()
-                    if not kp.is_admin:
-                        kp_data["is_admin"] = True
-                    if not kp.is_active:
-                        kp_data["is_active"] = True
-                    if kp_data:
-                        await conn.execute(
-                            sa.update(keypairs)
-                            .values(kp_data)
-                            .where(keypairs.c.user == updated_user.uuid),
-                        )
-                else:
-                    # User becomes non-admin. Make the keypair non-admin as well.
-                    # If there are multiple admin keypairs, inactivate them.
-                    # TODO: Should elaborate keypair inactivation policy.
-                    rows = result.fetchall()
-                    kp_updates = []
-                    for idx, row in enumerate(rows):
-                        kp_data = {
-                            "b_access_key": row.access_key,
-                            "is_admin": row.is_admin,
-                            "is_active": row.is_active,
-                        }
-                        if idx == 0:
-                            kp_data["is_admin"] = False
-                            kp_updates.append(kp_data)
-                            continue
-                        if row.is_admin and row.is_active:
-                            kp_data["is_active"] = False
-                            kp_updates.append(kp_data)
-                    if kp_updates:
-                        await conn.execute(
-                            sa.update(keypairs)
-                            .values({
-                                "is_admin": bindparam("is_admin"),
-                                "is_active": bindparam("is_active"),
-                            })
-                            .where(keypairs.c.access_key == bindparam("b_access_key")),
-                            kp_updates,
-                        )
-
-            # If domain is changed and no group is associated, clear previous domain's group.
-            if prev_domain_name != updated_user.domain_name and not props.group_ids:
-                from .group import association_groups_users, groups
-
-                await conn.execute(
-                    sa.delete(association_groups_users).where(
-                        association_groups_users.c.user_id == updated_user.uuid
-                    ),
-                )
-
-            # Update user's group if group_ids parameter is provided.
-            if props.group_ids and updated_user is not None:
-                from .group import association_groups_users, groups  # noqa
-
-                # Clear previous groups associated with the user.
-                await conn.execute(
-                    sa.delete(association_groups_users).where(
-                        association_groups_users.c.user_id == updated_user.uuid
-                    ),
-                )
-                # Add user to new groups.
-                result = await conn.execute(
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == updated_user.domain_name)
-                    .where(groups.c.id.in_(props.group_ids)),
-                )
-                grps = result.fetchall()
-                if grps:
-                    values = [{"user_id": updated_user.uuid, "group_id": grp.id} for grp in grps]
-                    await conn.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
-
-            return updated_user
-
-        return await simple_db_mutate_returning_item(
-            cls,
-            graph_ctx,
-            update_query,
-            item_cls=User,
-            pre_func=_pre_func,
-            post_func=_post_func,
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+            user=User.from_dto(res.data) if res.data else None,
         )
 
 

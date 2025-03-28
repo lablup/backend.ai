@@ -5,14 +5,22 @@ from typing import Any, Awaitable, Callable, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Result, Row
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import joinedload, load_only, noload
+from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.models.user import UserRole, UserStatus, users
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
 from ai.backend.manager.services.users.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
+)
+from ai.backend.manager.services.users.actions.modify_user import (
+    ModifyUserAction,
+    ModifyUserActionResult,
 )
 from ai.backend.manager.services.users.type import UserData
 
@@ -125,6 +133,182 @@ class UserService:
                 data=None,
                 success=False,
             )
+
+    async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
+        data = action.get_modified_data()
+        email = action.email
+
+        if not data and action.group_ids is None:
+            return ModifyUserActionResult(
+                success=False,
+                message="No data to update",
+            )
+
+        main_access_key: str | None = data.get("main_access_key")
+        user_update_data: dict[str, Any] = {}
+        prev_domain_name: str
+        prev_role: UserRole
+
+        async def _pre_func(conn: SAConnection) -> None:
+            nonlocal user_update_data, prev_domain_name, prev_role, main_access_key
+            result = await conn.execute(
+                sa.select([users.c.domain_name, users.c.role, users.c.status])
+                .select_from(users)
+                .where(users.c.email == email),
+            )
+            row = result.first()
+            prev_domain_name = row.domain_name
+            prev_role = row.role
+            user_update_data = data.copy()
+            if "status" in data and row.status != data["status"]:
+                user_update_data["status_info"] = (
+                    "admin-requested"  # user mutation is only for admin
+                )
+            if main_access_key is not None:
+                db_session = SASession(conn)
+                keypair_query = (
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == main_access_key)
+                    .options(
+                        noload("*"),
+                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
+                    )
+                )
+                keypair_row: KeyPairRow | None = (await db_session.scalars(keypair_query)).first()
+                if keypair_row is None:
+                    raise RuntimeError("Cannot set non-existing access key as the main access key.")
+                if keypair_row.user_row.email != email:
+                    raise RuntimeError(
+                        "Cannot set another user's access key as the main access key."
+                    )
+                await conn.execute(
+                    sa.update(users)
+                    .where(users.c.email == email)
+                    .values(main_access_key=main_access_key)
+                )
+
+        update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()
+            sa.update(users).values(user_update_data).where(users.c.email == email)
+        )
+
+        async def _post_func(conn: SAConnection, result: Result) -> Row:
+            nonlocal prev_domain_name, prev_role
+            updated_user = result.first()
+            if "role" in data and data["role"] != prev_role:
+                from ai.backend.manager.models import keypairs
+
+                result = await conn.execute(
+                    sa.select([
+                        keypairs.c.user,
+                        keypairs.c.is_active,
+                        keypairs.c.is_admin,
+                        keypairs.c.access_key,
+                    ])
+                    .select_from(keypairs)
+                    .where(keypairs.c.user == updated_user.uuid)
+                    .order_by(sa.desc(keypairs.c.is_admin))
+                    .order_by(sa.desc(keypairs.c.is_active)),
+                )
+                if data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]:
+                    # User's becomes admin. Set the keypair as active admin.
+                    # TODO: Should we update the role of all users related to keypair?
+                    kp = result.first()
+                    kp_data = dict()
+                    if not kp.is_admin:
+                        kp_data["is_admin"] = True
+                    if not kp.is_active:
+                        kp_data["is_active"] = True
+                    if kp_data:
+                        await conn.execute(
+                            sa.update(keypairs)
+                            .values(kp_data)
+                            .where(keypairs.c.user == updated_user.uuid),
+                        )
+                else:
+                    # User becomes non-admin. Make the keypair non-admin as well.
+                    # If there are multiple admin keypairs, inactivate them.
+                    # TODO: Should elaborate keypair inactivation policy.
+                    rows = result.fetchall()
+                    kp_updates = []
+                    for idx, row in enumerate(rows):
+                        kp_data = {
+                            "b_access_key": row.access_key,
+                            "is_admin": row.is_admin,
+                            "is_active": row.is_active,
+                        }
+                        if idx == 0:
+                            kp_data["is_admin"] = False
+                            kp_updates.append(kp_data)
+                            continue
+                        if row.is_admin and row.is_active:
+                            kp_data["is_active"] = False
+                            kp_updates.append(kp_data)
+                    if kp_updates:
+                        await conn.execute(
+                            sa.update(keypairs)
+                            .values({
+                                "is_admin": bindparam("is_admin"),
+                                "is_active": bindparam("is_active"),
+                            })
+                            .where(keypairs.c.access_key == bindparam("b_access_key")),
+                            kp_updates,
+                        )
+
+            # If domain is changed and no group is associated, clear previous domain's group.
+            if prev_domain_name != updated_user.domain_name and not action.group_ids:
+                from ai.backend.manager.models import association_groups_users, groups
+
+                await conn.execute(
+                    sa.delete(association_groups_users).where(
+                        association_groups_users.c.user_id == updated_user.uuid
+                    ),
+                )
+
+            # Update user's group if group_ids parameter is provided.
+            if action.group_ids and updated_user is not None:
+                from ai.backend.manager.models import association_groups_users, groups  # noqa
+
+                # Clear previous groups associated with the user.
+                await conn.execute(
+                    sa.delete(association_groups_users).where(
+                        association_groups_users.c.user_id == updated_user.uuid
+                    ),
+                )
+                # Add user to new groups.
+                result = await conn.execute(
+                    sa.select([groups.c.id])
+                    .select_from(groups)
+                    .where(groups.c.domain_name == updated_user.domain_name)
+                    .where(groups.c.id.in_(action.group_ids)),
+                )
+                grps = result.fetchall()
+                if grps:
+                    values = [{"user_id": updated_user.uuid, "group_id": grp.id} for grp in grps]
+                    await conn.execute(
+                        sa.insert(association_groups_users).values(values),
+                    )
+
+            return updated_user
+
+        async def _do_mutate() -> MutationResult:
+            async with self._db.begin() as conn:
+                await _pre_func(conn)
+                query = update_query().returning(update_query().table)
+                result = await conn.execute(query)
+                updated_user = await _post_func(conn, result)
+
+            return MutationResult(
+                success=True,
+                message="User modified successfully",
+                data=updated_user,
+            )
+
+        result: MutationResult = await self._db_mutation_wrapper(_do_mutate)
+
+        return ModifyUserActionResult(
+            success=result.success,
+            data=UserData.from_row(result.data),
+        )
 
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[MutationResult]]
