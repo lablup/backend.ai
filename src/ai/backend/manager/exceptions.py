@@ -151,3 +151,11 @@ class ContainerRegistryProjectEmpty(RuntimeError):
         super().__init__(
             f"{type} container registry requires project value, but {project} is provided"
         )
+
+
+class ScanImageError(RuntimeError):
+    pass
+
+
+class ScanTagError(RuntimeError):
+    pass
