@@ -72,7 +72,7 @@ class UserService:
         user_data = action.get_insertion_data()
         user_insert_query = sa.insert(users).values(user_data)
 
-        async def _post_func(conn: SAConnection, result: Result) -> Row:
+        async def _post_func(conn: SAConnection, result: Result) -> Optional[Row]:
             from ai.backend.manager.models.group import (
                 ProjectType,
                 association_groups_users,
@@ -80,7 +80,7 @@ class UserService:
             )
 
             if result.rowcount == 0:
-                return
+                return None
             created_user = result.first()
 
             # Create a default keypair for the user.
