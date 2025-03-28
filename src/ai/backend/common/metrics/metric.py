@@ -267,6 +267,37 @@ class SystemMetricObserver:
         self._memory_used_vms.set(proc.memory_info().vms)
 
 
+class SweeperMetricObserver:
+    _instance: Optional[Self] = None
+
+    _session_sweep_count: Counter
+    _kernel_sweep_count: Counter
+
+    def __init__(self) -> None:
+        self._session_sweep_count = Counter(
+            name="backendai_sweep_session_count",
+            documentation="Total number of session sweeps",
+            labelnames=["status", "success"],
+        )
+        self._kernel_sweep_count = Counter(
+            name="backendai_sweep_kernel_count",
+            documentation="Total number of kernel sweeps",
+            labelnames=["success"],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_session_sweep(self, *, status: str, success: bool) -> None:
+        self._session_sweep_count.labels(status=status, success=success).inc()
+
+    def observe_kernel_sweep(self, *, success: bool) -> None:
+        self._kernel_sweep_count.labels(success=success).inc()
+
+
 class CommonMetricRegistry:
     _instance: Optional[Self] = None
 
@@ -275,6 +306,7 @@ class CommonMetricRegistry:
     event: EventMetricObserver
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
+    sweeper: SweeperMetricObserver
 
     def __init__(self) -> None:
         self.api = APIMetricObserver.instance()
@@ -282,6 +314,7 @@ class CommonMetricRegistry:
         self.event = EventMetricObserver.instance()
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()
+        self.sweeper = SweeperMetricObserver.instance()
 
     @classmethod
     def instance(cls):

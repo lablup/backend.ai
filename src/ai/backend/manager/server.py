@@ -49,7 +49,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_LOCK,
     RedisRole,
 )
-from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
@@ -95,7 +95,8 @@ from .api.types import (
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
-from .models import SessionRow
+from .sweeper.kernel import stale_kernel_sweeper_ctx
+from .sweeper.session import stale_session_sweeper_ctx
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset([
@@ -614,116 +615,6 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from contextlib import suppress
-    from datetime import timedelta
-    from typing import TYPE_CHECKING
-
-    import sqlalchemy as sa
-    from dateutil.relativedelta import relativedelta
-    from dateutil.tz import tzutc
-    from sqlalchemy.orm import load_only, noload
-
-    from .config import session_hang_tolerance_iv
-    from .models.session import SessionStatus
-
-    if TYPE_CHECKING:
-        from .models.utils import ExtendedAsyncSAEngine
-
-    async def _fetch_hanging_sessions(
-        db: ExtendedAsyncSAEngine,
-        status: SessionStatus,
-        threshold: relativedelta | timedelta,
-    ) -> tuple[SessionRow, ...]:
-        query = (
-            sa.select(SessionRow)
-            .where(SessionRow.status == status)
-            .where(
-                (
-                    datetime.now(tz=tzutc())
-                    - SessionRow.status_history[status.name].astext.cast(
-                        sa.types.DateTime(timezone=True)
-                    )
-                )
-                > threshold
-            )
-            .options(
-                noload("*"),
-                load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
-            )
-        )
-        async with db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            return result.fetchall()
-
-    async def _force_terminate_hanging_sessions(
-        status: SessionStatus,
-        threshold: relativedelta | timedelta,
-        interval: float,
-    ) -> None:
-        try:
-            sessions = await _fetch_hanging_sessions(root_ctx.db, status, threshold)
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            log.error("fetching hanging sessions error: {}", repr(e), exc_info=e)
-            return
-
-        log.debug(f"{len(sessions)} {status.name} sessions found.")
-
-        results_and_exceptions = await asyncio.gather(
-            *[
-                asyncio.create_task(
-                    root_ctx.registry.destroy_session(
-                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
-                    ),
-                )
-                for session in sessions
-            ],
-            return_exceptions=True,
-        )
-        for result_or_exception in results_and_exceptions:
-            if isinstance(result_or_exception, (BaseException, Exception)):
-                log.error(
-                    "hanging session force-termination error: {}",
-                    repr(result_or_exception),
-                    exc_info=result_or_exception,
-                )
-
-    session_hang_tolerance = session_hang_tolerance_iv.check(
-        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
-    )
-
-    session_force_termination_tasks = []
-    heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
-    max_interval = timedelta(hours=1).total_seconds()
-    threshold: relativedelta | timedelta
-    for status, threshold in session_hang_tolerance["threshold"].items():
-        try:
-            session_status = SessionStatus[status]
-        except KeyError:
-            continue
-        if isinstance(threshold, relativedelta):  # years, months
-            interval = max_interval
-        else:  # timedelta
-            interval = min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
-        session_force_termination_tasks.append(
-            aiotools.create_timer(
-                functools.partial(_force_terminate_hanging_sessions, session_status, threshold),
-                interval,
-            )
-        )
-
-    yield
-
-    for task in session_force_termination_tasks:
-        if not task.done():
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-
-
-@actxmgr
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     db = root_ctx.db
 
@@ -925,7 +816,8 @@ def build_root_app(
             processors_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            hanging_session_scanner_ctx,
+            stale_session_sweeper_ctx,
+            stale_kernel_sweeper_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
