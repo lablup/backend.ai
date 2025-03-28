@@ -369,7 +369,7 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
             "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
             "max_session_lifetime": props.max_session_lifetime,
             "max_concurrent_sessions": props.max_concurrent_sessions,
-            "max_concurrent_sftp_sessions": props.max_concurrent_sessions,
+            "max_concurrent_sftp_sessions": props.max_concurrent_sftp_sessions,
             "max_containers_per_session": props.max_containers_per_session,
             "idle_timeout": props.idle_timeout,
             "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
