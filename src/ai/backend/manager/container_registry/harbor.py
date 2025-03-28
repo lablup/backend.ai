@@ -379,18 +379,18 @@ class HarborRegistry_v2(BaseContainerRegistry):
             digests.append((reference["child_digest"], reference["platform"]["architecture"]))
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(digests)
-        async with aiotools.TaskGroup() as tg:
-            for digest, architecture in digests:
-                tg.create_task(
-                    self._harbor_scan_tag_per_arch(
-                        sess,
-                        rqst_args,
-                        image,
-                        digest=digest,
-                        tag=tag,
-                        architecture=architecture,
-                    )
+
+        for digest, architecture in digests:
+            tg.create_task(
+                self._harbor_scan_tag_per_arch(
+                    sess,
+                    rqst_args,
+                    image,
+                    digest=digest,
+                    tag=tag,
+                    architecture=architecture,
                 )
+            )
 
     @override
     async def _process_oci_manifest(
@@ -485,18 +485,18 @@ class HarborRegistry_v2(BaseContainerRegistry):
             digests.append((reference["child_digest"], reference["platform"]["architecture"]))
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(digests)
-        async with aiotools.TaskGroup() as tg:
-            for digest, architecture in digests:
-                tg.create_task(
-                    self._harbor_scan_tag_per_arch(
-                        sess,
-                        rqst_args,
-                        image,
-                        digest=digest,
-                        tag=tag,
-                        architecture=architecture,
-                    )
+
+        for digest, architecture in digests:
+            tg.create_task(
+                self._harbor_scan_tag_per_arch(
+                    sess,
+                    rqst_args,
+                    image,
+                    digest=digest,
+                    tag=tag,
+                    architecture=architecture,
                 )
+            )
 
     @override
     async def _process_docker_v2_image(
@@ -515,15 +515,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
         })
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
-        async with aiotools.TaskGroup() as tg:
-            tg.create_task(
-                self._harbor_scan_tag_single_arch(
-                    sess,
-                    rqst_args,
-                    image,
-                    tag=tag,
-                )
+        tg.create_task(
+            self._harbor_scan_tag_single_arch(
+                sess,
+                rqst_args,
+                image,
+                tag=tag,
             )
+        )
 
     async def _harbor_scan_tag_per_arch(
         self,
