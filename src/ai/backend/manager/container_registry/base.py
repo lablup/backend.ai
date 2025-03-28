@@ -135,10 +135,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     task = asyncio.create_task(self._scan_image(client_session, image))
                     tasks.append(task)
 
-                for res in await asyncio.gather(*tasks, return_exceptions=True):
-                    if isinstance(res, Exception):
-                        error_msg = f"Failed to scan image! Detail: {str(res)}"
-                        errors.append(error_msg)
+                for fut in asyncio.as_completed(tasks):
+                    try:
+                        await fut
+                    except Exception as e:
+                        errors.append(f"Failed to scan image! Detail: {str(e)}")
 
             scanned_images = await self.commit_rescan_result()
             return DispatchResult(result=scanned_images, errors=errors)
