@@ -130,16 +130,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             async with self.prepare_client_session() as (url, client_session):
                 self.registry_url = url
 
-                async def scan_image_wrapper(sess: aiohttp.ClientSession, image: str) -> None:
-                    try:
-                        await self._scan_image(sess, image)
-                    except Exception as e:
-                        error_msg = f"Failed to scan image! (image: {image}). Detail: {str(e)}"
-                        errors.append(error_msg)
+                tasks = []
+                async for image in self.fetch_repositories(client_session):
+                    task = asyncio.create_task(self._scan_image(client_session, image))
+                    tasks.append(task)
 
-                async with aiotools.TaskGroup() as tg:
-                    async for image in self.fetch_repositories(client_session):
-                        tg.create_task(scan_image_wrapper(client_session, image))
+                for res in await asyncio.gather(*tasks, return_exceptions=True):
+                    if isinstance(res, Exception):
+                        error_msg = f"Failed to scan image! Detail: {str(res)}"
+                        errors.append(error_msg)
 
             scanned_images = await self.commit_rescan_result()
             return DispatchResult(result=scanned_images, errors=errors)
