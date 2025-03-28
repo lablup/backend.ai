@@ -69,7 +69,7 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
                 print_error(e)
                 sys.exit(ExitCode.FAILURE)
             if not result["ok"]:
-                print_fail(f"Failed to begin registry scanning: {result['msg']}")
+                print_fail(f"Failed to scan registries: {result['msg']}")
                 sys.exit(ExitCode.FAILURE)
             print_done("Started updating the image metadata from the configured registries.")
             bgtask_id = result["task_id"]

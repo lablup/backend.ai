@@ -128,14 +128,16 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, client_session):
                 self.registry_url = url
-                async with aiotools.TaskGroup() as tg:
-                    try:
+
+                try:
+                    async with aiotools.TaskGroup() as tg:
                         async for image in self.fetch_repositories(client_session):
                             tg.create_task(self._scan_image(client_session, image))
-                    except Exception as e:
-                        error_msg = f"Failed to fetch repositories! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
-                        log.error(error_msg)
-                        errors.append(error_msg)
+
+                except Exception as e:
+                    error_msg = f"Failed to scan registry! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
+                    log.error(error_msg)
+                    errors.append(error_msg)
 
             scanned_images = await self.commit_rescan_result()
             return DispatchResult(result=scanned_images, errors=errors)
