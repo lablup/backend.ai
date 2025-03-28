@@ -11,7 +11,6 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
@@ -23,11 +22,10 @@ from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import RedisConnectionInfo, Sentinel, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import VFolderOperationFailed
-from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from .base import (
     Base,
     EnumValueType,
@@ -47,6 +45,12 @@ from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_g
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.services.users.actions.create_user import (
+        CreateUserAction,
+        CreateUserActionResult,
+    )
+    from ai.backend.manager.services.users.type import UserData
+
     from .gql import GraphQueryContext
     from .keypair import KeyPairRow
     from .storage import StorageSessionManager
@@ -318,6 +322,34 @@ class User(graphene.ObjectType):
         manager = ctx.dataloader_manager
         loader = manager.get_loader(ctx, "UserGroup.by_user_id")
         return await loader.load(self.id)
+
+    @classmethod
+    def from_dto(cls, dto: UserData) -> Self:
+        return cls(
+            id=dto.id,
+            uuid=dto.uuid,  # legacy
+            username=dto.username,
+            email=dto.email,
+            need_password_change=dto.need_password_change,
+            full_name=dto.full_name,
+            description=dto.description,
+            is_active=dto.is_active,
+            status=dto.status,
+            status_info=dto.status_info,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            domain_name=dto.domain_name,
+            role=dto.role,
+            resource_policy=dto.resource_policy,
+            allowed_client_ip=dto.allowed_client_ip,
+            totp_activated=dto.totp_activated,
+            totp_activated_at=dto.totp_activated_at,
+            sudo_session_enabled=dto.sudo_session_enabled,
+            main_access_key=dto.main_access_key,
+            container_uid=dto.container_uid,
+            container_main_gid=dto.container_main_gid,
+            container_gids=dto.container_gids,
+        )
 
     @classmethod
     def from_row(
@@ -627,6 +659,50 @@ class UserInput(graphene.InputObjectType):
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
+    def to_action(self, email: str) -> CreateUserAction:
+        action = CreateUserAction(
+            username=self.username,
+            password=self.password,
+            email=email,
+            need_password_change=self.need_password_change,
+            domain_name=self.domain_name,
+        )
+
+        if hasattr(self, "full_name"):
+            action.full_name = self.full_name
+        if hasattr(self, "description"):
+            action.description = self.description
+        if hasattr(self, "is_active"):
+            action.is_active = self.is_active
+        if hasattr(self, "status"):
+            action.status = UserStatus(self.status)
+        if hasattr(self, "role"):
+            action.role = UserRole(self.role)
+        if hasattr(self, "group_ids"):
+            action.group_ids = self.group_ids
+        if hasattr(self, "group_ids"):
+            action.group_ids = self.group_ids
+        if hasattr(self, "allowed_client_ip"):
+            action.allowed_client_ip = self.allowed_client_ip
+        if hasattr(self, "totp_activated"):
+            action.totp_activated = self.totp_activated
+        if hasattr(self, "resource_policy"):
+            action.resource_policy = self.resource_policy
+        if hasattr(self, "sudo_session_enabled"):
+            action.sudo_session_enabled = self.sudo_session_enabled
+
+        action.container_uid = (
+            self.container_uid if hasattr(self, "container_uid") else Sentinel.TOKEN
+        )
+        action.container_main_gid = (
+            self.container_main_gid if hasattr(self, "container_main_gid") else Sentinel.TOKEN
+        )
+        action.container_gids = (
+            self.container_gids if hasattr(self, "container_gids") else Sentinel.TOKEN
+        )
+
+        return action
+
 
 class ModifyUserInput(graphene.InputObjectType):
     username = graphene.String(required=False)
@@ -691,103 +767,16 @@ class CreateUser(graphene.Mutation):
         props: UserInput,
     ) -> CreateUser:
         graph_ctx: GraphQueryContext = info.context
-        username = props.username if props.username else email
-        if props.status is None and props.is_active is not None:
-            _status = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
-        else:
-            _status = UserStatus(props.status)
-        group_ids = [] if props.group_ids is Undefined else props.group_ids
+        action: CreateUserAction = props.to_action(email)
 
-        user_data = {
-            "username": username,
-            "email": email,
-            "password": props.password,
-            "need_password_change": props.need_password_change,
-            "full_name": props.full_name,
-            "description": props.description,
-            "status": _status,
-            "status_info": "admin-requested",  # user mutation is only for admin
-            "domain_name": props.domain_name,
-            "role": UserRole(props.role),
-            "allowed_client_ip": props.allowed_client_ip,
-            "totp_activated": props.totp_activated,
-            "resource_policy": props.resource_policy,
-            "sudo_session_enabled": props.sudo_session_enabled,
-        }
-        set_if_set(props, user_data, "container_uid")
-        set_if_set(props, user_data, "container_main_gid")
-        set_if_set(props, user_data, "container_gids")
-        user_insert_query = sa.insert(users).values(user_data)
+        res: CreateUserActionResult = await graph_ctx.processors.user.create_user.wait_for_complete(
+            action
+        )
 
-        async def _post_func(conn: SAConnection, result: Result) -> Row:
-            from .group import ProjectType, association_groups_users, groups
-
-            if result.rowcount == 0:
-                return
-            created_user = result.first()
-
-            # Create a default keypair for the user.
-            from .keypair import CreateKeyPair, keypairs
-
-            kp_data = CreateKeyPair.prepare_new_keypair(
-                email,
-                {
-                    "is_active": _status == UserStatus.ACTIVE,
-                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                    "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                    "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
-                },
-            )
-            kp_insert_query = sa.insert(keypairs).values(
-                **kp_data,
-                user=created_user.uuid,
-            )
-            await conn.execute(kp_insert_query)
-
-            # Update user main_keypair
-            main_ak = kp_data["access_key"]
-            update_query = (
-                sa.update(users)
-                .where(users.c.uuid == created_user.uuid)
-                .values(main_access_key=main_ak)
-            )
-            await conn.execute(update_query)
-
-            model_store_query = sa.select([groups.c.id]).where(
-                groups.c.type == ProjectType.MODEL_STORE
-            )
-            model_store_project = cast(
-                dict[str, Any] | None, (await conn.execute(model_store_query)).first()
-            )
-            if model_store_project is not None:
-                gids_to_join = [*group_ids, model_store_project["id"]]
-            else:
-                gids_to_join = group_ids
-
-            # Add user to groups if group_ids parameter is provided.
-            if gids_to_join:
-                query = (
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == props.domain_name)
-                    .where(groups.c.id.in_(gids_to_join))
-                )
-                grps = (await conn.execute(query)).all()
-                if grps:
-                    group_data = [
-                        {"user_id": created_user.uuid, "group_id": grp.id} for grp in grps
-                    ]
-                    group_insert_query = sa.insert(association_groups_users).values(group_data)
-                    await conn.execute(group_insert_query)
-
-            return created_user
-
-        return await simple_db_mutate_returning_item(
-            cls,
-            graph_ctx,
-            user_insert_query,
-            item_cls=User,
-            post_func=_post_func,
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+            user=User.from_dto(res.data) if res.data else None,
         )
 
 
