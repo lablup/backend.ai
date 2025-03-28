@@ -51,8 +51,6 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             process_result = ProcessResult(meta=meta, result=result)
             for monitor in reversed(self._monitors):
                 await monitor.done(action, process_result)
-        if result is None:
-            raise RuntimeError("not set result")
         return result
 
     async def wait_for_complete(self, action: TAction) -> TActionResult:
