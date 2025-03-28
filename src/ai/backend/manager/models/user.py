@@ -34,7 +34,6 @@ from .base import (
     batch_multiresult,
     batch_result,
     mapper_registry,
-    simple_db_mutate,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -44,6 +43,10 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.users.actions.create_user import (
         CreateUserAction,
         CreateUserActionResult,
+    )
+    from ai.backend.manager.services.users.actions.delete_user import (
+        DeleteUserAction,
+        DeleteUserActionResult,
     )
     from ai.backend.manager.services.users.actions.modify_user import (
         ModifyUserAction,
@@ -872,20 +875,15 @@ class DeleteUser(graphene.Mutation):
     ) -> DeleteUser:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _pre_func(conn: SAConnection) -> None:
-            # Make all user keypairs inactive.
-            from ai.backend.manager.models import keypairs
-
-            await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user_id == email),
-            )
-
-        update_query = (
-            sa.update(users)
-            .values(status=UserStatus.DELETED, status_info="admin-requested")
-            .where(users.c.email == email)
+        action = DeleteUserAction(email)
+        res: DeleteUserActionResult = await graph_ctx.processors.user.delete_user.wait_for_complete(
+            action
         )
-        return await simple_db_mutate(cls, graph_ctx, update_query, pre_func=_pre_func)
+
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+        )
 
 
 class PurgeUser(graphene.Mutation):

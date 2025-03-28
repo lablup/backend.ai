@@ -18,6 +18,10 @@ from ai.backend.manager.services.users.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
+from ai.backend.manager.services.users.actions.delete_user import (
+    DeleteUserAction,
+    DeleteUserActionResult,
+)
 from ai.backend.manager.services.users.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
@@ -308,6 +312,39 @@ class UserService:
         return ModifyUserActionResult(
             success=result.success,
             data=UserData.from_row(result.data),
+        )
+
+    async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
+        async def _pre_func(conn: SAConnection) -> None:
+            # Make all user keypairs inactive.
+            from ai.backend.manager.models import keypairs
+
+            await conn.execute(
+                sa.update(keypairs)
+                .values(is_active=False)
+                .where(keypairs.c.user_id == action.email),
+            )
+
+        update_query = (
+            sa.update(users)
+            .values(status=UserStatus.DELETED, status_info="admin-requested")
+            .where(users.c.email == action.email)
+        )
+
+        async def _do_mutate() -> MutationResult:
+            async with self._db.begin() as conn:
+                await _pre_func(conn)
+                await conn.execute(update_query)
+
+            return MutationResult(
+                success=True,
+                message="User deleted successfully",
+                data=None,
+            )
+
+        result: MutationResult = await self._db_mutation_wrapper(_do_mutate)
+        return DeleteUserActionResult(
+            success=result.success,
         )
 
     async def _db_mutation_wrapper(
