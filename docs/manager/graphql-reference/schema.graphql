@@ -2000,6 +2000,9 @@ type Mutations {
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
 
+  """Added in 25.5.0"""
+  clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload
+
   """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
 
@@ -2567,6 +2570,17 @@ input ResourceLimitInput {
   key: String
   min: String
   max: String
+}
+
+"""Added in 25.5.0."""
+type ClearImageCustomResourceLimitPayload {
+  image_node: ImageNode
+}
+
+"""Added in 25.5.0."""
+input ClearImageCustomResourceLimitKey {
+  image_canonical: String!
+  architecture: String!
 }
 
 """Added in 24.03.0."""
