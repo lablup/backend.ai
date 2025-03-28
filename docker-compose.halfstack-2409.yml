@@ -101,6 +101,8 @@ services:
       - "host.docker.internal:host-gateway"
     command:
       - '--config.file=/etc/prometheus/prometheus.yaml'
+    ports:
+      - "9090:9090"
 
 networks:
   half:
