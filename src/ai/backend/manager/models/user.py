@@ -52,7 +52,10 @@ if TYPE_CHECKING:
         ModifyUserAction,
         ModifyUserActionResult,
     )
-    from ai.backend.manager.services.users.type import UserData
+    from ai.backend.manager.services.users.actions.purge_user import (
+        PurgeUserAction,
+    )
+    from ai.backend.manager.services.users.type import UserData, UserInfoContext
 
     from .gql import GraphQueryContext
     from .keypair import KeyPairRow
@@ -783,6 +786,18 @@ class PurgeUserInput(graphene.InputObjectType):
             "Indicates whether the user's existing endpoints are delegated to the requester."
         ),
     )
+
+    def to_action(self, email: str, user_info_ctx: UserInfoContext) -> PurgeUserAction:
+        return PurgeUserAction(
+            user_info_ctx=user_info_ctx,
+            email=email,
+            purge_shared_vfolders=self.purge_shared_vfolders
+            if hasattr(self, "purge_shared_vfolders")
+            else False,
+            delegate_endpoint_ownership=self.delegate_endpoint_ownership
+            if hasattr(self, "delegate_endpoint_ownership")
+            else False,
+        )
 
 
 class CreateUser(graphene.Mutation):

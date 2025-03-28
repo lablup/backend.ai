@@ -441,7 +441,11 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     #     image_service=image_service,
     # )
 
-    user_service = UserService(root_ctx.db)
+    user_service = UserService(
+        db=root_ctx.db,
+        storage_manager=root_ctx.storage_manager,
+        redis_stat=root_ctx.redis_stat,
+    )
     user_processor = UserProcessors(user_service)
 
     root_ctx.processors = Processors(

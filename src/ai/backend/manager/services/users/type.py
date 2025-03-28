@@ -5,6 +5,15 @@ from typing import Optional, Self
 
 from sqlalchemy.engine import Row
 
+from ai.backend.common.types import AccessKey
+
+
+@dataclass
+class UserInfoContext:
+    uuid: uuid.UUID
+    email: str
+    main_access_key: AccessKey
+
 
 @dataclass
 class UserData:
