@@ -1061,7 +1061,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 "(This may be due to server shutdown.)",
                             )
                         elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            issues = data.get("issues")
+                            issues = data.get("errors")
                             if issues:
                                 for issue in issues:
                                     print_fail(f"Issue reported: {issue}")

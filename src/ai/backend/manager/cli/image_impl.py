@@ -182,9 +182,11 @@ async def rescan_images(
         connect_database(cli_ctx.local_config) as db,
     ):
         try:
-            await rescan_images_func(db, registry_or_image, project)
+            result = await rescan_images_func(db, registry_or_image, project)
+            for error in result.errors:
+                log.error(f"Failed to scan registries: {error}")
         except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            log.exception(f"Unknown error occurred. Error: {e}")
 
 
 async def alias(cli_ctx, alias, target, architecture):

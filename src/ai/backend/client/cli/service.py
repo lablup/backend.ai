@@ -565,7 +565,7 @@ def try_start(
                             )
                         # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
                         elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            issues = data.get("issues")
+                            issues = data.get("errors")
                             if issues:
                                 for issue in issues:
                                     print_fail(f"Issue reported: {issue}")
