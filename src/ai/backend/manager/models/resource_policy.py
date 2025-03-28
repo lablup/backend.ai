@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Sequence
+from typing import TYPE_CHECKING, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -10,9 +10,8 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import relationship, selectinload
 
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import DefaultForUnspecified
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.utils import execute_with_retry
 
 from .base import (
     Base,
@@ -22,9 +21,6 @@ from .base import (
     VFolderHostPermissionColumn,
     batch_result,
     mapper_registry,
-    set_if_set,
-    simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 from .keypair import keypairs
 from .user import UserRole
@@ -363,30 +359,18 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
         name: str,
         props: CreateKeyPairResourcePolicyInput,
     ) -> CreateKeyPairResourcePolicy:
-        data = {
-            "name": name,
-            "default_for_unspecified": DefaultForUnspecified[props.default_for_unspecified],
-            "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
-            "max_session_lifetime": props.max_session_lifetime,
-            "max_concurrent_sessions": props.max_concurrent_sessions,
-            "max_concurrent_sftp_sessions": props.max_concurrent_sessions,
-            "max_containers_per_session": props.max_containers_per_session,
-            "idle_timeout": props.idle_timeout,
-            "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
-        }
-        set_if_set(props, data, "max_pending_session_count")
-        set_if_set(
-            props,
-            data,
-            "max_pending_session_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None) if v is not None else None,
+        from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
+            CreateKeyPairResourcePolicyAction,
         )
-        insert_query = sa.insert(keypair_resource_policies).values(data)
-        return await simple_db_mutate_returning_item(
-            cls,
-            info.context,
-            insert_query,
-            item_cls=KeyPairResourcePolicy,
+
+        graph_ctx: GraphQueryContext = info.context
+        await graph_ctx.processors.keypair_resource_policy.create_keypair_resource_policy.wait_for_complete(
+            CreateKeyPairResourcePolicyAction(name, props)
+        )
+
+        return CreateKeyPairResourcePolicy(
+            ok=True,
+            msg="",
         )
 
 
@@ -408,38 +392,19 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyKeyPairResourcePolicyInput,
     ) -> ModifyKeyPairResourcePolicy:
-        data: Dict[str, Any] = {}
-        set_if_set(
-            props,
-            data,
-            "default_for_unspecified",
-            clean_func=lambda v: DefaultForUnspecified[v],
+        from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
+            ModifyKeyPairResourcePolicyAction,
         )
-        set_if_set(
-            props,
-            data,
-            "total_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+
+        graph_ctx: GraphQueryContext = info.context
+        await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.wait_for_complete(
+            ModifyKeyPairResourcePolicyAction(name, props)
         )
-        set_if_set(props, data, "max_session_lifetime")
-        set_if_set(props, data, "max_concurrent_sessions")
-        set_if_set(props, data, "max_concurrent_sftp_sessions")
-        set_if_set(props, data, "max_containers_per_session")
-        set_if_set(props, data, "idle_timeout")
-        set_if_set(props, data, "allowed_vfolder_hosts")
-        set_if_set(props, data, "max_pending_session_count")
-        set_if_set(
-            props,
-            data,
-            "max_pending_session_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+
+        return ModifyKeyPairResourcePolicy(
+            ok=True,
+            msg="",
         )
-        update_query = (
-            sa.update(keypair_resource_policies)
-            .values(data)
-            .where(keypair_resource_policies.c.name == name)
-        )
-        return await simple_db_mutate(cls, info.context, update_query)
 
 
 class DeleteKeyPairResourcePolicy(graphene.Mutation):
@@ -458,10 +423,18 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteKeyPairResourcePolicy:
-        delete_query = sa.delete(keypair_resource_policies).where(
-            keypair_resource_policies.c.name == name
+        from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import (
+            DeleteKeyPairResourcePolicyAction,
         )
-        return await simple_db_mutate(cls, info.context, delete_query)
+
+        graph_ctx: GraphQueryContext = info.context
+        await graph_ctx.processors.keypair_resource_policy.delete_keypair_resource_policy.wait_for_complete(
+            DeleteKeyPairResourcePolicyAction(name)
+        )
+        return DeleteKeyPairResourcePolicy(
+            ok=True,
+            msg="",
+        )
 
 
 class UserResourcePolicy(graphene.ObjectType):
@@ -603,27 +576,20 @@ class CreateUserResourcePolicy(graphene.Mutation):
         name: str,
         props: CreateUserResourcePolicyInput,
     ) -> CreateUserResourcePolicy:
+        from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
+            CreateUserResourcePolicyAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
+            CreateUserResourcePolicyAction(name, props)
+        )
 
-        async def _do_mutate() -> UserResourcePolicy:
-            async with graph_ctx.db.begin_session() as sess:
-                row = UserResourcePolicyRow(
-                    name,
-                    props.max_vfolder_count,
-                    props.max_quota_scope_size,
-                    props.max_session_count_per_model_session,
-                    props.max_customized_image_count,
-                )
-                sess.add(row)
-                await sess.flush()
-                query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-                return cls(
-                    True,
-                    "success",
-                    UserResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
-                )
-
-        return await execute_with_retry(_do_mutate)
+        return CreateUserResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+        )
 
 
 class ModifyUserResourcePolicy(graphene.Mutation):
@@ -644,15 +610,20 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_count")
-        set_if_set(props, data, "max_quota_scope_size")
-        set_if_set(props, data, "max_session_count_per_model_session")
-        set_if_set(props, data, "max_customized_image_count")
-        update_query = (
-            sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
+        from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+            ModifyUserResourcePolicyAction,
         )
-        return await simple_db_mutate(cls, info.context, update_query)
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
+            ModifyUserResourcePolicyAction(name, props)
+        )
+
+        return ModifyUserResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+        )
 
 
 class DeleteUserResourcePolicy(graphene.Mutation):
@@ -671,8 +642,20 @@ class DeleteUserResourcePolicy(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteUserResourcePolicy:
-        delete_query = sa.delete(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-        return await simple_db_mutate(cls, info.context, delete_query)
+        from ai.backend.manager.services.user_resource_policy.actions.delete_user_resource_policy import (
+            DeleteUserResourcePolicyAction,
+        )
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.user_resource_policy.delete_user_resource_policy.wait_for_complete(
+            DeleteUserResourcePolicyAction(name)
+        )
+
+        return DeleteUserResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+        )
 
 
 class ProjectResourcePolicy(graphene.ObjectType):
@@ -811,28 +794,22 @@ class CreateProjectResourcePolicy(graphene.Mutation):
         name: str,
         props: CreateProjectResourcePolicyInput,
     ) -> CreateProjectResourcePolicy:
+        from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
+            CreateProjectResourcePolicyAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
+            CreateProjectResourcePolicyAction(name, props)
+        )
 
-        async def _do_mutate() -> ProjectResourcePolicy:
-            async with graph_ctx.db.begin_session() as sess:
-                row = ProjectResourcePolicyRow(
-                    name,
-                    props.max_vfolder_count,
-                    props.max_quota_scope_size,
-                    props.max_network_count,
-                )
-                sess.add(row)
-                await sess.flush()
-                query = sa.select(ProjectResourcePolicyRow).where(
-                    ProjectResourcePolicyRow.name == name
-                )
-                return cls(
-                    True,
-                    "success",
-                    ProjectResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
-                )
-
-        return await execute_with_retry(_do_mutate)
+        return CreateProjectResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=ProjectResourcePolicy.from_row(
+                graph_ctx, result.project_resource_policy
+            ),
+        )
 
 
 class ModifyProjectResourcePolicy(graphene.Mutation):
@@ -853,16 +830,22 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_count")
-        set_if_set(props, data, "max_quota_scope_size")
-        set_if_set(props, data, "max_network_count")
-        update_query = (
-            sa.update(ProjectResourcePolicyRow)
-            .values(data)
-            .where(ProjectResourcePolicyRow.name == name)
+        from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
+            ModifyProjectResourcePolicyAction,
         )
-        return await simple_db_mutate(cls, info.context, update_query)
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
+            ModifyProjectResourcePolicyAction(name, props)
+        )
+
+        return ModifyProjectResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=ProjectResourcePolicy.from_row(
+                graph_ctx, result.project_resource_policy
+            ),
+        )
 
 
 class DeleteProjectResourcePolicy(graphene.Mutation):
@@ -881,7 +864,19 @@ class DeleteProjectResourcePolicy(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteProjectResourcePolicy:
-        delete_query = sa.delete(ProjectResourcePolicyRow).where(
-            ProjectResourcePolicyRow.name == name
+        from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
+            DeleteProjectResourcePolicyAction,
         )
-        return await simple_db_mutate(cls, info.context, delete_query)
+
+        graph_ctx: GraphQueryContext = info.context
+        result = await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.wait_for_complete(
+            DeleteProjectResourcePolicyAction(name)
+        )
+
+        return DeleteProjectResourcePolicy(
+            ok=True,
+            msg="",
+            resource_policy=ProjectResourcePolicy.from_row(
+                graph_ctx, result.project_resource_policy
+            ),
+        )

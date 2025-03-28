@@ -74,6 +74,17 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.keypair_resource_policy.service import (
+    KeypairResourcePolicyService,
+)
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
+from ai.backend.manager.services.resource_preset.service import ResourcePresetService
+from ai.backend.manager.services.user.service import UserService
+from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -430,15 +441,55 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # image_service = ImageService(
-    #     db=root_ctx.db,
-    #     agent_registry=root_ctx.registry,
-    # )
+    agent_service = AgentService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+        shared_config=root_ctx.shared_config,
+    )
 
-    # root_ctx.processors = Processors(
-    #     image_service=image_service,
-    # )
+    resource_preset_service = ResourcePresetService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+        shared_config=root_ctx.shared_config,
+    )
 
+    container_registry_service = ContainerRegistryService(
+        db=root_ctx.db,
+    )
+
+    user_service = UserService(
+        db=root_ctx.db,
+        redis_stat=root_ctx.redis_stat,
+    )
+
+    group_service = GroupService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        redis_stat=root_ctx.redis_stat,
+    )
+
+    keypair_resource_policy_service = KeypairResourcePolicyService(
+        db=root_ctx.db,
+    )
+
+    user_resource_policy_service = UserResourcePolicyService(
+        db=root_ctx.db,
+    )
+
+    project_resource_policy_service = ProjectResourcePolicyService(
+        db=root_ctx.db,
+    )
+
+    root_ctx.processors = Processors(
+        agent_service=agent_service,
+        resource_preset_service=resource_preset_service,
+        container_registry_service=container_registry_service,
+        user_service=user_service,
+        group_service=group_service,
+        keypair_resource_policy_service=keypair_resource_policy_service,
+        user_resource_policy_service=user_resource_policy_service,
+        project_resource_policy_service=project_resource_policy_service,
+    )
     yield
 
 
