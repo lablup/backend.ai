@@ -505,7 +505,7 @@ class TimeZone(t.Trafaret):
         return tz
 
 
-TimeDelta = Union[datetime.timedelta, relativedelta]
+TimeDelta = datetime.timedelta | relativedelta
 
 
 class TimeDuration(t.Trafaret):
