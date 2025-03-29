@@ -56,6 +56,7 @@ from ai.backend.manager.services.session.actions.complete import CompleteAction
 from ai.backend.manager.services.session.actions.convert_session_to_image import (
     ConvertSessionToImageAction,
 )
+from ai.backend.manager.services.session.actions.create_cluster import CreateClusterAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -120,7 +121,6 @@ from .exceptions import (
     InvalidAPIParameters,
     ObjectNotFound,
     ServiceUnavailable,
-    SessionAlreadyExists,
     SessionNotFound,
     StorageProxyError,
     TaskTemplateNotFound,
@@ -763,52 +763,26 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         params["session_name"],
     )
 
-    async with root_ctx.db.begin_readonly() as conn:
-        query = (
-            sa.select([session_templates.c.template])
-            .select_from(session_templates)
-            .where(
-                (session_templates.c.id == params["template_id"]) & session_templates.c.is_active,
-            )
-        )
-        template = await conn.scalar(query)
-        log.debug("task template: {}", template)
-        if not template:
-            raise TaskTemplateNotFound
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
-        sudo_session_enabled = request["user"]["sudo_session_enabled"]
-
-    try:
-        resp = await root_ctx.registry.create_cluster(
-            template,
-            params["session_name"],
-            UserScope(
-                domain_name=domain_name,
-                group_id=group_id,
-                user_uuid=request["user"]["uuid"],
-                user_role=request["user"]["role"],
-            ),
-            owner_access_key,
-            resource_policy,
-            params["scaling_group"],
-            params["sess_type"],
-            params["tag"],
+    result = await root_ctx.processors.session.create_cluster.wait_for_complete(
+        CreateClusterAction(
+            session_name=params["session_name"],
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            domain_name=domain_name,
+            group_name=params["group"],
+            requester_access_key=requester_access_key,
+            owner_access_key=owner_access_key,
+            scaling_group_name=params["scaling_group"],
+            tag=params["tag"],
+            session_type=params["sess_type"],
             enqueue_only=params["enqueue_only"],
+            template_id=params["template_id"],
+            sudo_session_enabled=request["user"]["sudo_session_enabled"],
             max_wait_seconds=params["max_wait_seconds"],
-            sudo_session_enabled=sudo_session_enabled,
         )
-        return web.json_response(resp, status=HTTPStatus.CREATED)
-    except TooManySessionsMatched:
-        raise SessionAlreadyExists
-    except BackendError:
-        log.exception("GET_OR_CREATE: exception")
-        raise
-    except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
-    except Exception:
-        await root_ctx.error_monitor.capture_exception()
-        log.exception("GET_OR_CREATE: unexpected error!")
-        raise InternalServerError
+    )
+
+    return web.json_response(result.result, status=HTTPStatus.CREATED)
 
 
 @server_status_required(READ_ALLOWED)

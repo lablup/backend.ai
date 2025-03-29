@@ -23,13 +23,20 @@ from ai.backend.common.events import (
     BgtaskFailedEvent,
     EventProducer,
 )
-from ai.backend.common.exception import BackendError, InvalidAPIParameters
-from ai.backend.common.plugin.monitor import GAUGE, StatsPluginContext
+from ai.backend.common.exception import BackendError, InvalidAPIParameters, UnknownImageReference
+from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import ImageRegistry, RedisConnectionInfo
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import QuotaExceeded
+from ai.backend.manager.api.exceptions import (
+    InternalServerError,
+    QuotaExceeded,
+    SessionAlreadyExists,
+    TaskTemplateNotFound,
+    TooManySessionsMatched,
+    UnknownImageReferenceError,
+)
 from ai.backend.manager.api.session import CustomizedImageVisibilityScope
-from ai.backend.manager.api.utils import catch_unexpected
+from ai.backend.manager.api.utils import catch_unexpected, undefined
 from ai.backend.manager.config import LocalConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -38,6 +45,7 @@ from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStat
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.session.actions.commit_session import (
@@ -52,6 +60,12 @@ from ai.backend.manager.services.session.actions.convert_session_to_image import
     ConvertSessionToImageAction,
     ConvertSessionToImageActionResult,
 )
+from ai.backend.manager.services.session.actions.create_cluster import (
+    CreateClusterAction,
+    CreateClusterActionResult,
+)
+from ai.backend.manager.types import UserScope
+from ai.backend.manager.utils import query_userinfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -152,6 +166,7 @@ class SessionService:
     _app_ctx: PrivateContext
     _event_producer: EventProducer
     _background_task_manager: BackgroundTaskManager
+    _error_monitor: ErrorPluginContext
 
     def __init__(
         self,
@@ -162,6 +177,7 @@ class SessionService:
         stats_monitor: StatsPluginContext,
         event_producer: EventProducer,
         background_task_manager: BackgroundTaskManager,
+        error_monitor: ErrorPluginContext,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -170,6 +186,7 @@ class SessionService:
         self._stats_monitor = stats_monitor
         self._event_producer = event_producer
         self._background_task_manager = background_task_manager
+        self._error_monitor = error_monitor
         self.init_app_ctx()
 
     def init_app_ctx(self) -> None:
@@ -460,3 +477,83 @@ class SessionService:
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
         return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
+
+    async def create_cluster(self, action: CreateClusterAction) -> CreateClusterActionResult:
+        template_id = action.template_id
+        user_id = action.user_id
+        user_role = action.user_role
+        sudo_session_enabled = action.sudo_session_enabled
+        keypair_resource_policy = action.keypair_resource_policy
+        requester_access_key = action.requester_access_key
+        owner_access_key = action.owner_access_key
+        domain_name = action.domain_name
+        group_name = action.group_name
+        scaling_group_name = action.scaling_group_name
+        session_name = action.session_name
+        session_type = action.session_type
+        enqueue_only = action.enqueue_only
+        max_wait_seconds = action.max_wait_seconds
+        tag = action.tag
+
+        async with self._db.begin_readonly() as conn:
+            query = (
+                sa.select([session_templates.c.template])
+                .select_from(session_templates)
+                .where(
+                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                )
+            )
+            template = await conn.scalar(query)
+            log.debug("task template: {}", template)
+            if not template:
+                raise TaskTemplateNotFound
+
+            try:
+                _owner_uuid, group_id, resource_policy = await query_userinfo(
+                    conn,
+                    user_id,
+                    requester_access_key,
+                    user_role,
+                    domain_name,
+                    keypair_resource_policy,
+                    domain_name,
+                    group_name,
+                    query_on_behalf_of=(
+                        None if owner_access_key is undefined else owner_access_key
+                    ),
+                )
+
+            except ValueError as e:
+                raise InvalidAPIParameters(str(e))
+
+        try:
+            resp = await self._agent_registry.create_cluster(
+                template,
+                session_name,
+                UserScope(
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_id,
+                    user_role=user_role,
+                ),
+                owner_access_key,
+                resource_policy,
+                scaling_group_name,
+                session_type,
+                tag,
+                enqueue_only=enqueue_only,
+                max_wait_seconds=max_wait_seconds,
+                sudo_session_enabled=sudo_session_enabled,
+            )
+            return CreateClusterActionResult(result=resp, session_id=resp["kernelId"])
+        except TooManySessionsMatched:
+            raise SessionAlreadyExists
+        except BackendError:
+            log.exception("GET_OR_CREATE: exception")
+            raise
+        except UnknownImageReference:
+            raise UnknownImageReferenceError("Unknown image reference!")
+        except Exception:
+            await self._error_monitor.capture_exception()
+            log.exception("GET_OR_CREATE: unexpected error!")
+            raise InternalServerError
