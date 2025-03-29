@@ -1,13 +1,16 @@
 import asyncio
+import base64
+import dataclasses
 import functools
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Mapping, cast
+from typing import Any, Dict, Mapping, MutableMapping, cast
 
 import aiotools
 import attrs
 import sqlalchemy as sa
+import trafaret as t
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.orm import load_only, selectinload
@@ -24,8 +27,9 @@ from ai.backend.common.events import (
     EventProducer,
 )
 from ai.backend.common.exception import BackendError, InvalidAPIParameters, UnknownImageReference
+from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPluginContext
-from ai.backend.common.types import ImageAlias, ImageRegistry, RedisConnectionInfo
+from ai.backend.common.types import ImageAlias, ImageRegistry, RedisConnectionInfo, SessionTypes
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
     InternalServerError,
@@ -35,12 +39,16 @@ from ai.backend.manager.api.exceptions import (
     TooManySessionsMatched,
     UnknownImageReferenceError,
 )
-from ai.backend.manager.api.session import CustomizedImageVisibilityScope
+from ai.backend.manager.api.session import (
+    CustomizedImageVisibilityScope,
+    drop,
+    overwritten_param_check,
+)
 from ai.backend.manager.api.utils import catch_unexpected, undefined
 from ai.backend.manager.config import LocalConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.keypair import keypairs
@@ -67,6 +75,10 @@ from ai.backend.manager.services.session.actions.create_cluster import (
 from ai.backend.manager.services.session.actions.create_from_params import (
     CreateFromParamsAction,
     CreateFromParamsActionResult,
+)
+from ai.backend.manager.services.session.actions.create_from_template import (
+    CreateFromTemplateAction,
+    CreateFromTemplateActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -570,27 +582,28 @@ class SessionService:
         sudo_session_enabled = action.sudo_session_enabled
         keypair_resource_policy = action.keypair_resource_policy
         requester_access_key = action.requester_access_key
-        owner_access_key = action.owner_access_key
-        domain_name = action.domain_name
-        group_name = action.group_name
-        config = action.config
-        cluster_size = action.cluster_size
-        cluster_mode = action.cluster_mode
-        session_name = action.session_name
-        session_type = action.session_type
-        enqueue_only = action.enqueue_only
-        max_wait_seconds = action.max_wait_seconds
-        tag = action.tag
-        image = action.image
-        architecture = action.architecture
-        priority = action.priority
-        bootstrap_script = action.bootstrap_script
-        dependencies = action.dependencies
-        startup_command = action.startup_command
-        starts_at = action.starts_at
-        batch_timeout = action.batch_timeout
-        callback_url = action.callback_url
-        reuse_if_exists = action.reuse_if_exists
+
+        owner_access_key = action.params.owner_access_key
+        domain_name = action.params.domain_name
+        group_name = action.params.group_name
+        config = action.params.config
+        cluster_size = action.params.cluster_size
+        cluster_mode = action.params.cluster_mode
+        session_name = action.params.session_name
+        session_type = action.params.session_type
+        enqueue_only = action.params.enqueue_only
+        max_wait_seconds = action.params.max_wait_seconds
+        tag = action.params.tag
+        image = action.params.image
+        architecture = action.params.architecture
+        priority = action.params.priority
+        bootstrap_script = action.params.bootstrap_script
+        dependencies = action.params.dependencies
+        startup_command = action.params.startup_command
+        starts_at = action.params.starts_at
+        batch_timeout = action.params.batch_timeout
+        callback_url = action.params.callback_url
+        reuse_if_exists = action.params.reuse_if_exists
 
         async with self._db.begin_readonly() as conn:
             owner_uuid, group_id, resource_policy = await query_userinfo(
@@ -647,6 +660,224 @@ class SessionService:
                 sudo_session_enabled=sudo_session_enabled,
             )
             return CreateFromParamsActionResult(session_id=resp["sessionId"], result=resp)
+        except UnknownImageReference:
+            raise UnknownImageReferenceError(f"Unknown image reference: {image}")
+        except BackendError:
+            log.exception("GET_OR_CREATE: exception")
+            raise
+        except Exception:
+            await self._error_monitor.capture_exception(context={"user": owner_uuid})
+            log.exception("GET_OR_CREATE: unexpected error!")
+            raise InternalServerError
+
+    async def create_from_template(
+        self, action: CreateFromTemplateAction
+    ) -> CreateFromTemplateActionResult:
+        template_id = action.params.template_id
+        domain_name = action.params.domain_name
+        user_id = action.user_id
+        user_role = action.user_role
+        sudo_session_enabled = action.sudo_session_enabled
+        keypair_resource_policy = action.keypair_resource_policy
+        requester_access_key = action.requester_access_key
+
+        owner_access_key = action.params.owner_access_key
+        config = action.params.config
+        cluster_size = action.params.cluster_size
+        cluster_mode = action.params.cluster_mode
+        session_name = action.params.session_name
+        session_type = action.params.session_type
+        enqueue_only = action.params.enqueue_only
+        max_wait_seconds = action.params.max_wait_seconds
+        tag = action.params.tag
+        image = action.params.image
+        architecture = action.params.architecture
+        priority = action.params.priority
+        bootstrap_script = action.params.bootstrap_script
+        dependencies = action.params.dependencies
+        startup_command = action.params.startup_command
+        starts_at = action.params.starts_at
+        batch_timeout = action.params.batch_timeout
+        callback_url = action.params.callback_url
+        reuse_if_exists = action.params.reuse_if_exists
+
+        async with self._db.begin_readonly() as conn:
+            query = (
+                sa.select([session_templates])
+                .select_from(session_templates)
+                .where(
+                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                )
+            )
+            result = await conn.execute(query)
+            template_info = result.fetchone()
+            template = template_info["template"]
+            if not template:
+                raise TaskTemplateNotFound
+
+            group_name = None
+            if template_info["domain_name"] and template_info["group_id"]:
+                query = (
+                    sa.select([groups.c.name])
+                    .select_from(groups)
+                    .where(
+                        (groups.c.domain_name == template_info["domain_name"])
+                        & (groups.c.id == template_info["group_id"]),
+                    )
+                )
+                group_name = await conn.scalar(query)
+
+        if isinstance(template, str):
+            template = load_json(template)
+
+        log.debug("Template: {0}", template)
+
+        param_from_template = {
+            "image": template["spec"]["kernel"]["image"],
+            "architecture": template["spec"]["kernel"]["architecture"],
+        }
+
+        if "domain_name" in template_info:
+            param_from_template["domain"] = template_info["domain_name"]
+        if group_name:
+            param_from_template["group"] = group_name
+        if template["spec"]["session_type"] == "interactive":
+            param_from_template["session_type"] = SessionTypes.INTERACTIVE
+        elif template["spec"]["session_type"] == "batch":
+            param_from_template["session_type"] = SessionTypes.BATCH
+        elif template["spec"]["session_type"] == "inference":
+            param_from_template["session_type"] = SessionTypes.INFERENCE
+
+        if tag := template["metadata"].get("tag"):
+            param_from_template["tag"] = tag
+        if runtime_opt := template["spec"]["kernel"]["run"]:
+            if bootstrap := runtime_opt["bootstrap"]:
+                param_from_template["bootstrap_script"] = bootstrap
+            if startup := runtime_opt["startup_command"]:
+                param_from_template["startup_command"] = startup
+
+        config_from_template: MutableMapping[Any, Any] = {}
+        if scaling_group := template["spec"].get("scaling_group"):
+            config_from_template["scaling_group"] = scaling_group
+        if mounts := template["spec"].get("mounts"):
+            config_from_template["mounts"] = list(mounts.keys())
+            config_from_template["mount_map"] = {
+                key: value for (key, value) in mounts.items() if len(value) > 0
+            }
+        if environ := template["spec"]["kernel"].get("environ"):
+            config_from_template["environ"] = environ
+        if resources := template["spec"].get("resources"):
+            config_from_template["resources"] = resources
+        if "agent_list" in template["spec"]:
+            config_from_template["agent_list"] = template["spec"]["agent_list"]
+
+        override_config = drop(dict(action.params.config), undefined)
+        override_params = drop(dataclasses.asdict(action.params), undefined)
+
+        log.debug("Default config: {0}", config_from_template)
+        log.debug("Default params: {0}", param_from_template)
+
+        log.debug("Override config: {0}", override_config)
+        log.debug("Override params: {0}", override_params)
+
+        if override_config:
+            config_from_template.update(override_config)
+        if override_params:
+            param_from_template.update(override_params)
+
+        try:
+            params = overwritten_param_check.check(param_from_template)
+        except RuntimeError as e1:
+            log.exception(e1)
+        except t.DataError as e2:
+            log.debug("Error: {0}", str(e2))
+            raise InvalidAPIParameters("Error while validating template")
+        params["config"] = config_from_template
+
+        log.debug("Updated param: {0}", params)
+
+        if git := template["spec"]["kernel"]["git"]:
+            if _dest := git.get("dest_dir"):
+                target = _dest
+            else:
+                target = git["repository"].split("/")[-1]
+
+            cmd_builder = "git clone "
+            if credential := git.get("credential"):
+                proto, url = git["repository"].split("://")
+                cmd_builder += f"{proto}://{credential['username']}:{credential['password']}@{url}"
+            else:
+                cmd_builder += git["repository"]
+            if branch := git.get("branch"):
+                cmd_builder += f" -b {branch}"
+            cmd_builder += f" {target}\n"
+
+            if commit := git.get("commit"):
+                cmd_builder = "CWD=$(pwd)\n" + cmd_builder
+                cmd_builder += f"cd {target}\n"
+                cmd_builder += f"git checkout {commit}\n"
+                cmd_builder += "cd $CWD\n"
+
+            bootstrap = base64.b64decode(params.get("bootstrap_script") or b"").decode()
+            bootstrap += "\n"
+            bootstrap += cmd_builder
+            params["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
+
+        async with self._db.begin_readonly() as conn:
+            owner_uuid, group_id, resource_policy = await query_userinfo(
+                conn,
+                user_id,
+                requester_access_key,
+                user_role,
+                domain_name,
+                keypair_resource_policy,
+                domain_name,
+                action.params.group_name,
+                query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+            )
+
+        try:
+            async with self._db.begin_session() as session:
+                image_row = await ImageRow.resolve(
+                    session,
+                    [
+                        ImageIdentifier(
+                            image,
+                            architecture,
+                        ),
+                        ImageAlias(image),
+                    ],
+                )
+
+            resp = await self._agent_registry.create_session(
+                session_name,
+                image_row.image_ref,
+                UserScope(
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_id,
+                    user_role=user_role,
+                ),
+                owner_access_key,
+                resource_policy,
+                session_type,
+                config,
+                cluster_mode,
+                cluster_size,
+                reuse=reuse_if_exists,
+                priority=priority,
+                enqueue_only=enqueue_only,
+                max_wait_seconds=max_wait_seconds,
+                bootstrap_script=bootstrap_script,
+                dependencies=dependencies,
+                startup_command=startup_command,
+                starts_at_timestamp=starts_at,
+                batch_timeout=batch_timeout,
+                tag=tag,
+                callback_url=callback_url,
+                sudo_session_enabled=sudo_session_enabled,
+            )
+            return CreateFromTemplateActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
         except BackendError:
