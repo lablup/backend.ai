@@ -25,7 +25,7 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import BackendError, InvalidAPIParameters, UnknownImageReference
 from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPluginContext
-from ai.backend.common.types import ImageRegistry, RedisConnectionInfo
+from ai.backend.common.types import ImageAlias, ImageRegistry, RedisConnectionInfo
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
     InternalServerError,
@@ -63,6 +63,10 @@ from ai.backend.manager.services.session.actions.convert_session_to_image import
 from ai.backend.manager.services.session.actions.create_cluster import (
     CreateClusterAction,
     CreateClusterActionResult,
+)
+from ai.backend.manager.services.session.actions.create_from_params import (
+    CreateFromParamsAction,
+    CreateFromParamsActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -555,5 +559,100 @@ class SessionService:
             raise UnknownImageReferenceError("Unknown image reference!")
         except Exception:
             await self._error_monitor.capture_exception()
+            log.exception("GET_OR_CREATE: unexpected error!")
+            raise InternalServerError
+
+    async def create_from_params(
+        self, action: CreateFromParamsAction
+    ) -> CreateFromParamsActionResult:
+        user_id = action.user_id
+        user_role = action.user_role
+        sudo_session_enabled = action.sudo_session_enabled
+        keypair_resource_policy = action.keypair_resource_policy
+        requester_access_key = action.requester_access_key
+        owner_access_key = action.owner_access_key
+        domain_name = action.domain_name
+        group_name = action.group_name
+        config = action.config
+        cluster_size = action.cluster_size
+        cluster_mode = action.cluster_mode
+        session_name = action.session_name
+        session_type = action.session_type
+        enqueue_only = action.enqueue_only
+        max_wait_seconds = action.max_wait_seconds
+        tag = action.tag
+        image = action.image
+        architecture = action.architecture
+        priority = action.priority
+        bootstrap_script = action.bootstrap_script
+        dependencies = action.dependencies
+        startup_command = action.startup_command
+        starts_at = action.starts_at
+        batch_timeout = action.batch_timeout
+        callback_url = action.callback_url
+        reuse_if_exists = action.reuse_if_exists
+
+        async with self._db.begin_readonly() as conn:
+            owner_uuid, group_id, resource_policy = await query_userinfo(
+                conn,
+                user_id,
+                requester_access_key,
+                user_role,
+                domain_name,
+                keypair_resource_policy,
+                domain_name,
+                group_name,
+                query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+            )
+
+        try:
+            async with self._db.begin_session() as session:
+                image_row = await ImageRow.resolve(
+                    session,
+                    [
+                        ImageIdentifier(
+                            image,
+                            architecture,
+                        ),
+                        ImageAlias(image),
+                    ],
+                )
+
+            resp = await self._agent_registry.create_session(
+                session_name,
+                image_row.image_ref,
+                UserScope(
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_id,
+                    user_role=user_role,
+                ),
+                owner_access_key,
+                resource_policy,
+                session_type,
+                config,
+                cluster_mode,
+                cluster_size,
+                reuse=reuse_if_exists,
+                priority=priority,
+                enqueue_only=enqueue_only,
+                max_wait_seconds=max_wait_seconds,
+                bootstrap_script=bootstrap_script,
+                dependencies=dependencies,
+                startup_command=startup_command,
+                starts_at_timestamp=starts_at,
+                batch_timeout=batch_timeout,
+                tag=tag,
+                callback_url=callback_url,
+                sudo_session_enabled=sudo_session_enabled,
+            )
+            return CreateFromParamsActionResult(session_id=resp["sessionId"], result=resp)
+        except UnknownImageReference:
+            raise UnknownImageReferenceError(f"Unknown image reference: {image}")
+        except BackendError:
+            log.exception("GET_OR_CREATE: exception")
+            raise
+        except Exception:
+            await self._error_monitor.capture_exception(context={"user": owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
