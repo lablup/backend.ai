@@ -15,6 +15,10 @@ from ai.backend.manager.services.session.actions.create_cluster import (
     CreateClusterAction,
     CreateClusterActionResult,
 )
+from ai.backend.manager.services.session.actions.create_from_params import (
+    CreateFromParamsAction,
+    CreateFromParamsActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -25,9 +29,14 @@ class SessionProcessors:
         ConvertSessionToImageAction, ConvertSessionToImageActionResult
     ]
     create_cluster: ActionProcessor[CreateClusterAction, CreateClusterActionResult]
+    create_from_params: ActionProcessor[
+        CreateFromParamsAction,
+        CreateFromParamsActionResult,
+    ]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
         self.complete = ActionProcessor(service.complete)
         self.convert_session_to_image = ActionProcessor(service.convert_session_to_image)
         self.create_cluster = ActionProcessor(service.create_cluster)
+        self.create_from_params = ActionProcessor(service.create_from_params)
