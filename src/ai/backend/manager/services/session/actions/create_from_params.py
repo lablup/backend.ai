@@ -11,7 +11,7 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction
 
 
-# TODO: Refactor this type using pydantic and utilize as API model
+# TODO: Idea: Refactor this type using pydantic and utilize as API model
 @dataclass
 class CreateFromParamsActionParams:
     template_id: uuid.UUID

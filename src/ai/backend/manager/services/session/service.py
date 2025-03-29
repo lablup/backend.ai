@@ -5,7 +5,7 @@ import functools
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Mapping, MutableMapping, cast
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, cast
 
 import aiotools
 import attrs
@@ -32,9 +32,11 @@ from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPlu
 from ai.backend.common.types import ImageAlias, ImageRegistry, RedisConnectionInfo, SessionTypes
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
+    GenericForbidden,
     InternalServerError,
     QuotaExceeded,
     SessionAlreadyExists,
+    SessionNotFound,
     TaskTemplateNotFound,
     TooManySessionsMatched,
     UnknownImageReferenceError,
@@ -42,6 +44,7 @@ from ai.backend.manager.api.exceptions import (
 from ai.backend.manager.api.session import (
     CustomizedImageVisibilityScope,
     drop,
+    find_dependent_sessions,
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import catch_unexpected, undefined
@@ -79,6 +82,10 @@ from ai.backend.manager.services.session.actions.create_from_params import (
 from ai.backend.manager.services.session.actions.create_from_template import (
     CreateFromTemplateAction,
     CreateFromTemplateActionResult,
+)
+from ai.backend.manager.services.session.actions.destory_session import (
+    DestroySessionAction,
+    DestroySessionActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -887,3 +894,72 @@ class SessionService:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
+
+    async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
+        user_role = action.user_role
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        forced = action.forced
+        recursive = action.recursive
+
+        if recursive:
+            async with self._db.begin_readonly_session() as db_sess:
+                dependent_session_ids = await find_dependent_sessions(
+                    session_name,
+                    db_sess,
+                    owner_access_key,
+                    allow_stale=True,
+                )
+
+                target_session_references: list[str | uuid.UUID] = [
+                    *dependent_session_ids,
+                    session_name,
+                ]
+                sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
+                    *[
+                        SessionRow.get_session(
+                            db_sess,
+                            name_or_id,
+                            owner_access_key,
+                            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                        )
+                        for name_or_id in target_session_references
+                    ],
+                    return_exceptions=True,
+                )
+
+            last_stats = await asyncio.gather(
+                *[
+                    self._agent_registry.destroy_session(sess, forced=forced, user_role=user_role)
+                    for sess in sessions
+                    if isinstance(sess, SessionRow)
+                ],
+                return_exceptions=True,
+            )
+
+            # Consider not found sessions already terminated.
+            # Consider GenericForbidden error occurs with scheduled/preparing/terminating/error status session, and leave them not to be quitted.
+            last_stats = [
+                *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
+            ]
+
+            # TODO: 왜 아래랑 타입이 다른지 확인할 것.
+            return DestroySessionActionResult(result=last_stats, destroyed_sessions=sessions)
+        else:
+            async with self._db.begin_readonly_session() as db_sess:
+                session = await SessionRow.get_session(
+                    db_sess,
+                    session_name,
+                    owner_access_key,
+                    kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                )
+            last_stat = await self._agent_registry.destroy_session(
+                session,
+                forced=forced,
+                user_role=user_role,
+            )
+            resp = {
+                "stats": last_stat,
+            }
+
+            return DestroySessionActionResult(result=resp, destroyed_sessions=[session])

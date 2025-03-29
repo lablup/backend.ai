@@ -63,6 +63,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
     CreateFromTemplateAction,
     CreateFromTemplateActionParams,
 )
+from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -115,7 +116,6 @@ from .auth import auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
-    GenericForbidden,
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
@@ -1200,67 +1200,16 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
 
-    if params["recursive"]:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            dependent_session_ids = await find_dependent_sessions(
-                session_name,
-                db_sess,
-                owner_access_key,
-                allow_stale=True,
-            )
-
-            target_session_references: List[str | uuid.UUID] = [
-                *dependent_session_ids,
-                session_name,
-            ]
-            sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
-                *[
-                    SessionRow.get_session(
-                        db_sess,
-                        name_or_id,
-                        owner_access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                    )
-                    for name_or_id in target_session_references
-                ],
-                return_exceptions=True,
-            )
-
-        last_stats = await asyncio.gather(
-            *[
-                root_ctx.registry.destroy_session(
-                    sess, forced=params["forced"], user_role=user_role
-                )
-                for sess in sessions
-                if isinstance(sess, SessionRow)
-            ],
-            return_exceptions=True,
-        )
-
-        # Consider not found sessions already terminated.
-        # Consider GenericForbidden error occurs with scheduled/preparing/terminating/error status session, and leave them not to be quitted.
-        last_stats = [
-            *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
-        ]
-
-        return web.json_response(last_stats, status=HTTPStatus.OK)
-    else:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-            )
-        last_stat = await root_ctx.registry.destroy_session(
-            session,
-            forced=params["forced"],
+    result = await root_ctx.processors.session.destroy_session.wait_for_complete(
+        DestroySessionAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
             user_role=user_role,
+            forced=params["forced"],
+            recursive=params["recursive"],
         )
-        resp = {
-            "stats": last_stat,
-        }
-        return web.json_response(resp, status=HTTPStatus.OK)
+    )
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
