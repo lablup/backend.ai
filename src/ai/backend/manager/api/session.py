@@ -53,6 +53,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
 from ai.backend.manager.services.session.actions.commit_session import CommitSessionAction
+from ai.backend.manager.services.session.actions.complete import CompleteAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1866,43 +1867,30 @@ async def interrupt(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def complete(request: web.Request) -> web.Response:
-    resp = {
-        "result": {
-            "status": "finished",
-            "completions": [],
-        },
-    }
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
     try:
         params = await request.json(loads=json.loads)
-        log.info(
-            "COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
-        )
-    except json.decoder.JSONDecodeError:
-        raise InvalidAPIParameters
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
-    try:
         code = params.get("code", "")
         opts = params.get("options", None) or {}
-        await root_ctx.registry.increment_session_usage(session)
-        resp["result"] = cast(
-            Dict[str, Any],
-            await root_ctx.registry.get_completions(session, code, opts),
-        )
-    except AssertionError:
+    except json.decoder.JSONDecodeError:
         raise InvalidAPIParameters
-    except BackendError:
-        log.exception("COMPLETE: exception")
-        raise
-    return web.json_response(resp, status=200)
+
+    log.info("COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
+
+    action_result = await root_ctx.processors.session.complete.wait_for_complete(
+        CompleteAction(
+            session_name=session_name,
+            requester_access_key=requester_access_key,
+            owner_access_key=owner_access_key,
+            code=code,
+            options=opts,
+        )
+    )
+
+    return web.json_response(action_result.result, status=200)
 
 
 @server_status_required(READ_ALLOWED)
