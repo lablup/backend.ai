@@ -19,6 +19,10 @@ from ai.backend.manager.services.session.actions.create_from_params import (
     CreateFromParamsAction,
     CreateFromParamsActionResult,
 )
+from ai.backend.manager.services.session.actions.create_from_template import (
+    CreateFromTemplateAction,
+    CreateFromTemplateActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -33,6 +37,10 @@ class SessionProcessors:
         CreateFromParamsAction,
         CreateFromParamsActionResult,
     ]
+    create_from_template: ActionProcessor[
+        CreateFromTemplateAction,
+        CreateFromTemplateActionResult,
+    ]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -40,3 +48,4 @@ class SessionProcessors:
         self.convert_session_to_image = ActionProcessor(service.convert_session_to_image)
         self.create_cluster = ActionProcessor(service.create_cluster)
         self.create_from_params = ActionProcessor(service.create_from_params)
+        self.create_from_template = ActionProcessor(service.create_from_template)
