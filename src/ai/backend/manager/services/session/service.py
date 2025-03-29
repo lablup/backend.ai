@@ -2,7 +2,7 @@ import asyncio
 import functools
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Mapping
+from typing import Any, Dict, Mapping, cast
 
 import aiotools
 import attrs
@@ -13,7 +13,7 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import AgentTerminatedEvent, EventProducer
-from ai.backend.common.exception import BackendError
+from ai.backend.common.exception import BackendError, InvalidAPIParameters
 from ai.backend.common.plugin.monitor import GAUGE, StatsPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -28,6 +28,10 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
+)
+from ai.backend.manager.services.session.actions.complete import (
+    CompleteAction,
+    CompleteActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -199,4 +203,42 @@ class SessionService:
         return CommitSessionActionResult(
             session_row=session,
             commit_result=resp,
+        )
+
+    async def complete(self, action: CompleteAction) -> CompleteActionResult:
+        session_name = action.session_name
+        _requester_access_key, owner_access_key = (
+            action.requester_access_key,
+            action.owner_access_key,
+        )
+        code = action.code
+        options = action.options or {}
+
+        resp = {
+            "result": {
+                "status": "finished",
+                "completions": [],
+            },
+        }
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        try:
+            await self._agent_registry.increment_session_usage(session)
+            resp["result"] = cast(
+                Dict[str, Any],
+                await self._agent_registry.get_completions(session, code, opts=options),
+            )
+        except AssertionError:
+            raise InvalidAPIParameters
+        except BackendError:
+            log.exception("COMPLETE: exception")
+            raise
+        return CompleteActionResult(
+            session_row=session,
+            result=resp,
         )
