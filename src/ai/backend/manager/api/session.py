@@ -46,16 +46,16 @@ from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
-from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.json import load_json, read_json
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
+from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.services.session.actions.commit_session import CommitSessionAction
 from ai.backend.manager.services.session.actions.complete import CompleteAction
+from ai.backend.manager.services.session.actions.convert_session_to_image import (
+    ConvertSessionToImageAction,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -65,9 +65,6 @@ from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import (
     AgentTerminatedEvent,
-    BgtaskCancelledEvent,
-    BgtaskDoneEvent,
-    BgtaskFailedEvent,
 )
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.plugin.monitor import GAUGE
@@ -76,7 +73,6 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     ImageAlias,
-    ImageRegistry,
     KernelId,
     MountPermission,
     MountTypes,
@@ -123,7 +119,6 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
-    QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -1154,19 +1149,9 @@ class ConvertSessionToImageResponseModel(BaseResponseModel):
 async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
 ) -> ConvertSessionToImageResponseModel:
-    from ..models.container_registry import ContainerRegistryRow
-
     root_ctx: RootContext = request.app["_root.context"]
-    background_task_manager = root_ctx.background_task_manager
-
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
-
-    myself = asyncio.current_task()
-    assert myself is not None
-
-    if params.image_visibility != CustomizedImageVisibilityScope.USER:
-        raise InvalidAPIParameters(f"Unsupported visibility scope {params.image_visibility}")
 
     log.info(
         "CONVERT_SESSION_TO_IMAGE (ak:{}/{}, s:{})",
@@ -1174,198 +1159,21 @@ async def convert_session_to_image(
         owner_access_key,
         session_name,
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            eager_loading_op=[selectinload(SessionRow.group)],
+
+    result = await root_ctx.processors.session.convert_session_to_image.wait_for_complete(
+        ConvertSessionToImageAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+            image_name=params.image_name,
+            image_visibility=params.image_visibility,
+            image_owner_id=request["user"]["uuid"],
+            user_email=request["user"]["email"],
+            max_customized_image_count=request["user"]["resource_policy"][
+                "max_customized_image_count"
+            ],
         )
-
-    project: GroupRow = session.group
-    if not project.container_registry:
-        raise InvalidAPIParameters(
-            "Project not ready to convert session image (registry configuration not populated)"
-        )
-
-    registry_hostname = project.container_registry["registry"]
-    registry_project = project.container_registry["project"]
-
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        query = (
-            sa.select(ContainerRegistryRow)
-            .where(
-                (ContainerRegistryRow.registry_name == registry_hostname)
-                & (ContainerRegistryRow.project == registry_project)
-            )
-            .options(
-                load_only(
-                    ContainerRegistryRow.url,
-                    ContainerRegistryRow.username,
-                    ContainerRegistryRow.password,
-                    ContainerRegistryRow.project,
-                )
-            )
-        )
-
-        registry_conf = cast(ContainerRegistryRow | None, await db_session.scalar(query))
-
-        if not registry_conf:
-            raise InvalidAPIParameters(
-                f"Project {registry_project} not found in registry {registry_hostname}."
-            )
-
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        image_row = await ImageRow.resolve(
-            db_sess, [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)]
-        )
-
-    base_image_ref = image_row.image_ref
-    image_owner_id = request["user"]["uuid"]
-
-    async def _commit_and_upload(reporter: ProgressReporter) -> None:
-        reporter.total_progress = 3
-        await reporter.update(message="Commit started")
-        try:
-            # remove any existing customized related tag from base canonical
-            filtered_tag_set = [
-                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
-            ]
-
-            if base_image_ref.name == "":
-                new_name = base_image_ref.project
-            else:
-                new_name = base_image_ref.name
-
-            new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
-            )
-
-            async with root_ctx.db.begin_readonly_session() as sess:
-                # check if user has passed its limit of customized image count
-                query = (
-                    sa.select([sa.func.count()])
-                    .select_from(ImageRow)
-                    .where(
-                        (
-                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                            == f"{params.image_visibility.value}:{image_owner_id}"
-                        )
-                    )
-                    .where(ImageRow.status == ImageStatus.ALIVE)
-                )
-                existing_image_count = await sess.scalar(query)
-
-                customized_image_count_limit = request["user"]["resource_policy"][
-                    "max_customized_image_count"
-                ]
-                if customized_image_count_limit <= existing_image_count:
-                    raise QuotaExceeded(
-                        extra_msg="You have reached your customized image count quota",
-                        extra_data={
-                            "limit": customized_image_count_limit,
-                            "current": existing_image_count,
-                        },
-                    )
-
-                # check if image with same name exists and reuse ID it if is
-                query = sa.select(ImageRow).where(
-                    sa.and_(
-                        ImageRow.name.like(f"{new_canonical}%"),
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{params.image_visibility.value}:{image_owner_id}",
-                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                        == params.image_name,
-                        ImageRow.status == ImageStatus.ALIVE,
-                    )
-                )
-                existing_row = await sess.scalar(query)
-
-                customized_image_id: str
-                if existing_row:
-                    customized_image_id = existing_row.labels["ai.backend.customized-image.id"]
-                    log.debug("reusing existing customized image ID {}", customized_image_id)
-                else:
-                    customized_image_id = str(uuid.uuid4())
-
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-            new_image_ref = ImageRef.from_image_str(
-                new_canonical,
-                None,
-                registry_hostname,
-                architecture=base_image_ref.architecture,
-                is_local=base_image_ref.is_local,
-            )
-
-            image_labels = {
-                "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
-                "ai.backend.customized-image.name": params.image_name,
-                "ai.backend.customized-image.id": customized_image_id,
-            }
-            match params.image_visibility:
-                case CustomizedImageVisibilityScope.USER:
-                    image_labels["ai.backend.customized-image.user.email"] = request["user"][
-                        "email"
-                    ]
-
-            # commit image with new tag set
-            resp = await root_ctx.registry.commit_session(
-                session,
-                new_image_ref,
-                extra_labels=image_labels,
-            )
-            async for event, _ in background_task_manager.poll_bgtask_event(
-                uuid.UUID(resp["bgtask_id"])
-            ):
-                match event:
-                    case BgtaskDoneEvent():
-                        await reporter.update(increment=1, message="Committed image")
-                        break
-                    case BgtaskFailedEvent():
-                        raise BackendError(extra_msg=event.message)
-                    case BgtaskCancelledEvent():
-                        raise BackendError(extra_msg="Operation cancelled")
-
-            if not new_image_ref.is_local:
-                # push image to registry from local agent
-                image_registry = ImageRegistry(
-                    name=registry_hostname,
-                    url=str(registry_conf.url),
-                    username=registry_conf.username,
-                    password=registry_conf.password,
-                )
-                resp = await root_ctx.registry.push_image(
-                    session.main_kernel.agent,
-                    new_image_ref,
-                    image_registry,
-                )
-                async for event, _ in background_task_manager.poll_bgtask_event(
-                    uuid.UUID(resp["bgtask_id"])
-                ):
-                    match event:
-                        case BgtaskDoneEvent():
-                            break
-                        case BgtaskFailedEvent():
-                            raise BackendError(extra_msg=event.message)
-                        case BgtaskCancelledEvent():
-                            raise BackendError(extra_msg="Operation cancelled")
-
-            await reporter.update(increment=1, message="Pushed image to registry")
-            # rescan updated image only
-            await rescan_images(
-                root_ctx.db,
-                new_image_ref.canonical,
-                registry_project,
-                reporter=reporter,
-            )
-            await reporter.update(increment=1, message="Completed")
-        except BackendError:
-            log.exception("CONVERT_SESSION_TO_IMAGE: exception")
-            raise
-
-    task_id = await background_task_manager.start(_commit_and_upload)
-    return ConvertSessionToImageResponseModel(task_id=str(task_id))
+    )
+    return ConvertSessionToImageResponseModel(task_id=str(result.task_id))
 
 
 @catch_unexpected(log)

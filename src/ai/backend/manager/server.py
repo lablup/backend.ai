@@ -442,6 +442,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         local_config=root_ctx.local_config,
         stats_monitor=root_ctx.stats_monitor,
         event_producer=root_ctx.event_producer,
+        background_task_manager=root_ctx.background_task_manager,
     )
 
     root_ctx.processors = Processors(
