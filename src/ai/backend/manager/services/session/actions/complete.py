@@ -11,9 +11,7 @@ from ai.backend.manager.services.session.base import SessionAction
 @dataclass
 class CompleteAction(SessionAction):
     session_name: str
-    requester_access_key: AccessKey
     owner_access_key: AccessKey
-
     code: str
     # TODO: Add type
     options: Optional[Mapping[str, Any]] = None
