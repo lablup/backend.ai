@@ -11,40 +11,40 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction
 
 
+# TODO: Refactor this type using pydantic and utilize as API model
 @dataclass
-class CreateFromParamsAction(SessionAction):
+class CreateFromParamsActionParams:
+    template_id: uuid.UUID
     session_name: str
-    session_type: SessionTypes
-    priority: int
-
     image: str
     architecture: str
-
+    session_type: SessionTypes
     group_name: str
     domain_name: str
-
     cluster_size: int
     cluster_mode: ClusterMode
     config: dict[str, Any]
     tag: str
-
-    user_id: uuid.UUID
-    user_role: UserRole
-    sudo_session_enabled: bool
-
-    requester_access_key: AccessKey
+    priority: int
     owner_access_key: AccessKey
-
-    agent_list: Optional[list[str]] = None
     enqueue_only: bool = False
     max_wait_seconds: int = 0
     starts_at: Optional[str] = None
-    batch_timeout: Optional[timedelta] = None
     reuse_if_exists: bool = True
     startup_command: Optional[str] = None
+    batch_timeout: Optional[timedelta] = None
     bootstrap_script: Optional[str] = None
     dependencies: Optional[list[uuid.UUID]] = None
     callback_url: Optional[yarl.URL] = None
+
+
+@dataclass
+class CreateFromParamsAction(SessionAction):
+    params: CreateFromParamsActionParams
+    user_id: uuid.UUID
+    user_role: UserRole
+    sudo_session_enabled: bool
+    requester_access_key: AccessKey
     keypair_resource_policy: Optional[dict] = None
 
     @override
