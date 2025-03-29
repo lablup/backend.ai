@@ -173,10 +173,7 @@ class SessionService:
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
-        _requester_access_key, owner_access_key = (
-            action.requester_access_key,
-            action.owner_access_key,
-        )
+        owner_access_key = action.owner_access_key
         filename = action.filename
 
         myself = asyncio.current_task()
@@ -207,10 +204,7 @@ class SessionService:
 
     async def complete(self, action: CompleteAction) -> CompleteActionResult:
         session_name = action.session_name
-        _requester_access_key, owner_access_key = (
-            action.requester_access_key,
-            action.owner_access_key,
-        )
+        owner_access_key = action.owner_access_key
         code = action.code
         options = action.options or {}
 

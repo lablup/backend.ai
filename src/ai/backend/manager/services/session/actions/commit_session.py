@@ -10,7 +10,6 @@ from ai.backend.manager.services.session.base import SessionAction
 @dataclass
 class CommitSessionAction(SessionAction):
     session_name: str
-    requester_access_key: AccessKey
     owner_access_key: AccessKey
     filename: Optional[str] = None
 

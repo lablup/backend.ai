@@ -1117,7 +1117,6 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     action_result = await root_ctx.processors.session.commit_session.wait_for_complete(
         CommitSessionAction(
             session_name=session_name,
-            requester_access_key=requester_access_key,
             owner_access_key=owner_access_key,
             filename=filename,
         )
@@ -1883,7 +1882,6 @@ async def complete(request: web.Request) -> web.Response:
     action_result = await root_ctx.processors.session.complete.wait_for_complete(
         CompleteAction(
             session_name=session_name,
-            requester_access_key=requester_access_key,
             owner_access_key=owner_access_key,
             code=code,
             options=opts,
