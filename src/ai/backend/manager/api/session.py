@@ -5,7 +5,6 @@ REST-style session management APIs.
 from __future__ import annotations
 
 import asyncio
-import base64
 import enum
 import functools
 import json
@@ -45,13 +44,24 @@ from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
-from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
+from ai.backend.manager.services.session.actions.commit_session import CommitSessionAction
+from ai.backend.manager.services.session.actions.complete import CompleteAction
+from ai.backend.manager.services.session.actions.convert_session_to_image import (
+    ConvertSessionToImageAction,
+)
+from ai.backend.manager.services.session.actions.create_cluster import CreateClusterAction
+from ai.backend.manager.services.session.actions.create_from_params import (
+    CreateFromParamsAction,
+    CreateFromParamsActionParams,
+)
+from ai.backend.manager.services.session.actions.create_from_template import (
+    CreateFromTemplateAction,
+    CreateFromTemplateActionParams,
+)
+from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -61,18 +71,12 @@ from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import (
     AgentTerminatedEvent,
-    BgtaskCancelledEvent,
-    BgtaskDoneEvent,
-    BgtaskFailedEvent,
 )
-from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
-    ImageAlias,
-    ImageRegistry,
     KernelId,
     MountPermission,
     MountTypes,
@@ -87,18 +91,15 @@ from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
-    ImageRow,
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
     UserRole,
-    groups,
     kernels,
     keypairs,
     query_accessible_vfolders,
     scaling_groups,
-    session_templates,
     vfolders,
 )
 from ..models.session import (
@@ -108,25 +109,19 @@ from ..models.session import (
     SESSION_PRIORITY_MIN,
 )
 from ..models.vfolder import is_unmanaged
-from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
-    GenericForbidden,
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
-    QuotaExceeded,
     ServiceUnavailable,
-    SessionAlreadyExists,
     SessionNotFound,
     StorageProxyError,
-    TaskTemplateNotFound,
     TooManySessionsMatched,
-    UnknownImageReferenceError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .scaling_group import query_wsproxy_status
@@ -369,85 +364,6 @@ async def query_userinfo(
         raise InvalidAPIParameters(str(e))
 
 
-async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
-    if params["domain"] is None:
-        domain_name = request["user"]["domain_name"]
-    else:
-        domain_name = params["domain"]
-    scopes_param = {
-        "owner_access_key": (
-            None if params["owner_access_key"] is undefined else params["owner_access_key"]
-        ),
-    }
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-    log.info(
-        "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
-        requester_access_key,
-        owner_access_key if owner_access_key != requester_access_key else "*",
-        params["image"],
-        params["session_name"],
-    )
-
-    root_ctx: RootContext = request.app["_root.context"]
-
-    async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
-
-    sudo_session_enabled = request["user"]["sudo_session_enabled"]
-
-    try:
-        async with root_ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageIdentifier(
-                        params["image"],
-                        params["architecture"],
-                    ),
-                    ImageAlias(params["image"]),
-                ],
-            )
-
-        resp = await root_ctx.registry.create_session(
-            params["session_name"],
-            image_row.image_ref,
-            UserScope(
-                domain_name=domain_name,
-                group_id=group_id,
-                user_uuid=request["user"]["uuid"],
-                user_role=request["user"]["role"],
-            ),
-            owner_access_key,
-            resource_policy,
-            params["session_type"],
-            params["config"],
-            params["cluster_mode"],
-            params["cluster_size"],
-            reuse=params["reuse"],
-            priority=params["priority"],
-            enqueue_only=params["enqueue_only"],
-            max_wait_seconds=params["max_wait_seconds"],
-            bootstrap_script=params["bootstrap_script"],
-            dependencies=params["dependencies"],
-            startup_command=params["startup_command"],
-            starts_at_timestamp=params["starts_at"],
-            batch_timeout=params["batch_timeout"],
-            tag=params["tag"],
-            callback_url=params["callback_url"],
-            sudo_session_enabled=sudo_session_enabled,
-        )
-        return web.json_response(resp, status=201)
-    except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
-    except BackendError:
-        log.exception("GET_OR_CREATE: exception")
-        raise
-    except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": owner_uuid})
-        log.exception("GET_OR_CREATE: unexpected error!")
-        raise InternalServerError
-
-
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
@@ -519,123 +435,61 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     except t.DataError as e:
         log.debug("Validation error: {0}", e.as_dict())
         raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
-    async with root_ctx.db.begin_readonly() as conn:
-        query = (
-            sa.select([session_templates])
-            .select_from(session_templates)
-            .where(
-                (session_templates.c.id == params["template_id"]) & session_templates.c.is_active,
-            )
-        )
-        result = await conn.execute(query)
-        template_info = result.fetchone()
-        template = template_info["template"]
-        if not template:
-            raise TaskTemplateNotFound
-        group_name = None
-        if template_info["domain_name"] and template_info["group_id"]:
-            query = (
-                sa.select([groups.c.name])
-                .select_from(groups)
-                .where(
-                    (groups.c.domain_name == template_info["domain_name"])
-                    & (groups.c.id == template_info["group_id"]),
-                )
-            )
-            group_name = await conn.scalar(query)
 
-    if isinstance(template, str):
-        template = json.loads(template)
-    log.debug("Template: {0}", template)
-
-    param_from_template = {
-        "image": template["spec"]["kernel"]["image"],
-        "architecture": template["spec"]["kernel"]["architecture"],
+    scopes_param = {
+        "owner_access_key": (
+            None if params["owner_access_key"] is undefined else params["owner_access_key"]
+        ),
     }
-    if "domain_name" in template_info:
-        param_from_template["domain"] = template_info["domain_name"]
-    if group_name:
-        param_from_template["group"] = group_name
-    if template["spec"]["session_type"] == "interactive":
-        param_from_template["session_type"] = SessionTypes.INTERACTIVE
-    elif template["spec"]["session_type"] == "batch":
-        param_from_template["session_type"] = SessionTypes.BATCH
-    elif template["spec"]["session_type"] == "inference":
-        param_from_template["session_type"] = SessionTypes.INFERENCE
 
-    if tag := template["metadata"].get("tag"):
-        param_from_template["tag"] = tag
-    if runtime_opt := template["spec"]["kernel"]["run"]:
-        if bootstrap := runtime_opt["bootstrap"]:
-            param_from_template["bootstrap_script"] = bootstrap
-        if startup := runtime_opt["startup_command"]:
-            param_from_template["startup_command"] = startup
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
+    log.info(
+        "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
+        requester_access_key,
+        owner_access_key if owner_access_key != requester_access_key else "*",
+        params["image"],
+        params["session_name"],
+    )
 
-    config_from_template: MutableMapping[Any, Any] = {}
-    if scaling_group := template["spec"].get("scaling_group"):
-        config_from_template["scaling_group"] = scaling_group
-    if mounts := template["spec"].get("mounts"):
-        config_from_template["mounts"] = list(mounts.keys())
-        config_from_template["mount_map"] = {
-            key: value for (key, value) in mounts.items() if len(value) > 0
-        }
-    if environ := template["spec"]["kernel"].get("environ"):
-        config_from_template["environ"] = environ
-    if resources := template["spec"].get("resources"):
-        config_from_template["resources"] = resources
-    if "agent_list" in template["spec"]:
-        config_from_template["agent_list"] = template["spec"]["agent_list"]
+    if params["domain"] is None:
+        domain_name = request["user"]["domain_name"]
+    else:
+        domain_name = params["domain"]
 
-    override_config = drop(dict(params["config"]), undefined)
-    override_params = drop(dict(params), undefined)
+    result = await root_ctx.processors.session.create_from_template.wait_for_complete(
+        CreateFromTemplateAction(
+            params=CreateFromTemplateActionParams(
+                template_id=params["template_id"],
+                session_name=params["session_name"],
+                image=params["image"],
+                architecture=params["architecture"],
+                session_type=params["session_type"],
+                group_name=params["group"],
+                domain_name=domain_name,
+                cluster_size=params["cluster_size"],
+                cluster_mode=params["cluster_mode"],
+                config=params["config"],
+                tag=params["tag"],
+                enqueue_only=params["enqueue_only"],
+                max_wait_seconds=params["max_wait_seconds"],
+                reuse_if_exists=params["reuse"],
+                startup_command=params["startup_command"],
+                bootstrap_script=params["bootstrap_script"],
+                dependencies=params["dependencies"],
+                callback_url=params["callback_url"],
+                priority=params["priority"],
+                starts_at=params["starts_at"],
+                batch_timeout=params["batch_timeout"],
+                owner_access_key=owner_access_key,
+            ),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            requester_access_key=requester_access_key,
+            sudo_session_enabled=request["user"]["sudo_session_enabled"],
+        )
+    )
 
-    log.debug("Default config: {0}", config_from_template)
-    log.debug("Default params: {0}", param_from_template)
-
-    log.debug("Override config: {0}", override_config)
-    log.debug("Override params: {0}", override_params)
-    if override_config:
-        config_from_template.update(override_config)
-    if override_params:
-        param_from_template.update(override_params)
-    try:
-        params = overwritten_param_check.check(param_from_template)
-    except RuntimeError as e1:
-        log.exception(e1)
-    except t.DataError as e2:
-        log.debug("Error: {0}", str(e2))
-        raise InvalidAPIParameters("Error while validating template")
-    params["config"] = config_from_template
-
-    log.debug("Updated param: {0}", params)
-
-    if git := template["spec"]["kernel"]["git"]:
-        if _dest := git.get("dest_dir"):
-            target = _dest
-        else:
-            target = git["repository"].split("/")[-1]
-
-        cmd_builder = "git clone "
-        if credential := git.get("credential"):
-            proto, url = git["repository"].split("://")
-            cmd_builder += f"{proto}://{credential['username']}:{credential['password']}@{url}"
-        else:
-            cmd_builder += git["repository"]
-        if branch := git.get("branch"):
-            cmd_builder += f" -b {branch}"
-        cmd_builder += f" {target}\n"
-
-        if commit := git.get("commit"):
-            cmd_builder = "CWD=$(pwd)\n" + cmd_builder
-            cmd_builder += f"cd {target}\n"
-            cmd_builder += f"git checkout {commit}\n"
-            cmd_builder += "cd $CWD\n"
-
-        bootstrap = base64.b64decode(params.get("bootstrap_script") or b"").decode()
-        bootstrap += "\n"
-        bootstrap += cmd_builder
-        params["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
-    return await _create(request, params)
+    return web.json_response(result.result, status=201)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -723,7 +577,59 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
                     "For non-cluster sessions and single-node cluster sessions, "
                     "you may specify only one manually assigned agent.",
                 )
-    return await _create(request, params)
+
+    if params["domain"] is None:
+        domain_name = request["user"]["domain_name"]
+    else:
+        domain_name = params["domain"]
+    scopes_param = {
+        "owner_access_key": (
+            None if params["owner_access_key"] is undefined else params["owner_access_key"]
+        ),
+    }
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
+    log.info(
+        "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
+        requester_access_key,
+        owner_access_key if owner_access_key != requester_access_key else "*",
+        params["image"],
+        params["session_name"],
+    )
+
+    result = await root_ctx.processors.session.create_from_params.wait_for_complete(
+        CreateFromParamsAction(
+            params=CreateFromParamsActionParams(
+                template_id=params["template_id"],
+                session_name=params["session_name"],
+                image=params["image"],
+                architecture=params["architecture"],
+                session_type=params["session_type"],
+                group_name=params["group"],
+                domain_name=domain_name,
+                cluster_size=params["cluster_size"],
+                cluster_mode=params["cluster_mode"],
+                config=params["config"],
+                tag=params["tag"],
+                enqueue_only=params["enqueue_only"],
+                max_wait_seconds=params["max_wait_seconds"],
+                reuse_if_exists=params["reuse"],
+                startup_command=params["startup_command"],
+                bootstrap_script=params["bootstrap_script"],
+                dependencies=params["dependencies"],
+                callback_url=params["callback_url"],
+                priority=params["priority"],
+                starts_at=params["starts_at"],
+                batch_timeout=params["batch_timeout"],
+                owner_access_key=owner_access_key,
+            ),
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            requester_access_key=requester_access_key,
+            sudo_session_enabled=request["user"]["sudo_session_enabled"],
+        )
+    )
+
+    return web.json_response(result.result, status=201)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -764,52 +670,26 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         params["session_name"],
     )
 
-    async with root_ctx.db.begin_readonly() as conn:
-        query = (
-            sa.select([session_templates.c.template])
-            .select_from(session_templates)
-            .where(
-                (session_templates.c.id == params["template_id"]) & session_templates.c.is_active,
-            )
-        )
-        template = await conn.scalar(query)
-        log.debug("task template: {}", template)
-        if not template:
-            raise TaskTemplateNotFound
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
-        sudo_session_enabled = request["user"]["sudo_session_enabled"]
-
-    try:
-        resp = await root_ctx.registry.create_cluster(
-            template,
-            params["session_name"],
-            UserScope(
-                domain_name=domain_name,
-                group_id=group_id,
-                user_uuid=request["user"]["uuid"],
-                user_role=request["user"]["role"],
-            ),
-            owner_access_key,
-            resource_policy,
-            params["scaling_group"],
-            params["sess_type"],
-            params["tag"],
+    result = await root_ctx.processors.session.create_cluster.wait_for_complete(
+        CreateClusterAction(
+            session_name=params["session_name"],
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            domain_name=domain_name,
+            group_name=params["group"],
+            requester_access_key=requester_access_key,
+            owner_access_key=owner_access_key,
+            scaling_group_name=params["scaling_group"],
+            tag=params["tag"],
+            session_type=params["sess_type"],
             enqueue_only=params["enqueue_only"],
+            template_id=params["template_id"],
+            sudo_session_enabled=request["user"]["sudo_session_enabled"],
             max_wait_seconds=params["max_wait_seconds"],
-            sudo_session_enabled=sudo_session_enabled,
         )
-        return web.json_response(resp, status=201)
-    except TooManySessionsMatched:
-        raise SessionAlreadyExists
-    except BackendError:
-        log.exception("GET_OR_CREATE: exception")
-        raise
-    except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
-    except Exception:
-        await root_ctx.error_monitor.capture_exception()
-        log.exception("GET_OR_CREATE: unexpected error!")
-        raise InternalServerError
+    )
+
+    return web.json_response(result.result, status=201)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1105,34 +985,22 @@ async def check_and_transit_status(
 async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
-    app_ctx: PrivateContext = request.app["session.context"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     filename: str | None = params["filename"]
-
-    myself = asyncio.current_task()
-    assert myself is not None
 
     log.info(
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
 
-        resp: Mapping[str, Any] = await asyncio.shield(
-            app_ctx.rpc_ptask_group.create_task(
-                root_ctx.registry.commit_session_to_file(session, filename),
-            ),
+    action_result = await root_ctx.processors.session.commit_session.wait_for_complete(
+        CommitSessionAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+            filename=filename,
         )
-    except BackendError:
-        log.exception("COMMIT_SESSION: exception")
-        raise
-    return web.json_response(resp, status=201)
+    )
+
+    return web.json_response(action_result.commit_result, status=201)
 
 
 class CustomizedImageVisibilityScope(str, enum.Enum):
@@ -1162,19 +1030,9 @@ class ConvertSessionToImageResponseModel(BaseResponseModel):
 async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
 ) -> ConvertSessionToImageResponseModel:
-    from ..models.container_registry import ContainerRegistryRow
-
     root_ctx: RootContext = request.app["_root.context"]
-    background_task_manager = root_ctx.background_task_manager
-
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
-
-    myself = asyncio.current_task()
-    assert myself is not None
-
-    if params.image_visibility != CustomizedImageVisibilityScope.USER:
-        raise InvalidAPIParameters(f"Unsupported visibility scope {params.image_visibility}")
 
     log.info(
         "CONVERT_SESSION_TO_IMAGE (ak:{}/{}, s:{})",
@@ -1182,198 +1040,21 @@ async def convert_session_to_image(
         owner_access_key,
         session_name,
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            eager_loading_op=[selectinload(SessionRow.group)],
+
+    result = await root_ctx.processors.session.convert_session_to_image.wait_for_complete(
+        ConvertSessionToImageAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+            image_name=params.image_name,
+            image_visibility=params.image_visibility,
+            image_owner_id=request["user"]["uuid"],
+            user_email=request["user"]["email"],
+            max_customized_image_count=request["user"]["resource_policy"][
+                "max_customized_image_count"
+            ],
         )
-
-    project: GroupRow = session.group
-    if not project.container_registry:
-        raise InvalidAPIParameters(
-            "Project not ready to convert session image (registry configuration not populated)"
-        )
-
-    registry_hostname = project.container_registry["registry"]
-    registry_project = project.container_registry["project"]
-
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        query = (
-            sa.select(ContainerRegistryRow)
-            .where(
-                (ContainerRegistryRow.registry_name == registry_hostname)
-                & (ContainerRegistryRow.project == registry_project)
-            )
-            .options(
-                load_only(
-                    ContainerRegistryRow.url,
-                    ContainerRegistryRow.username,
-                    ContainerRegistryRow.password,
-                    ContainerRegistryRow.project,
-                )
-            )
-        )
-
-        registry_conf = cast(ContainerRegistryRow | None, await db_session.scalar(query))
-
-        if not registry_conf:
-            raise InvalidAPIParameters(
-                f"Project {registry_project} not found in registry {registry_hostname}."
-            )
-
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        image_row = await ImageRow.resolve(
-            db_sess, [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)]
-        )
-
-    base_image_ref = image_row.image_ref
-    image_owner_id = request["user"]["uuid"]
-
-    async def _commit_and_upload(reporter: ProgressReporter) -> None:
-        reporter.total_progress = 3
-        await reporter.update(message="Commit started")
-        try:
-            # remove any existing customized related tag from base canonical
-            filtered_tag_set = [
-                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
-            ]
-
-            if base_image_ref.name == "":
-                new_name = base_image_ref.project
-            else:
-                new_name = base_image_ref.name
-
-            new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
-            )
-
-            async with root_ctx.db.begin_readonly_session() as sess:
-                # check if user has passed its limit of customized image count
-                query = (
-                    sa.select([sa.func.count()])
-                    .select_from(ImageRow)
-                    .where(
-                        (
-                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                            == f"{params.image_visibility.value}:{image_owner_id}"
-                        )
-                    )
-                    .where(ImageRow.status == ImageStatus.ALIVE)
-                )
-                existing_image_count = await sess.scalar(query)
-
-                customized_image_count_limit = request["user"]["resource_policy"][
-                    "max_customized_image_count"
-                ]
-                if customized_image_count_limit <= existing_image_count:
-                    raise QuotaExceeded(
-                        extra_msg="You have reached your customized image count quota",
-                        extra_data={
-                            "limit": customized_image_count_limit,
-                            "current": existing_image_count,
-                        },
-                    )
-
-                # check if image with same name exists and reuse ID it if is
-                query = sa.select(ImageRow).where(
-                    sa.and_(
-                        ImageRow.name.like(f"{new_canonical}%"),
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{params.image_visibility.value}:{image_owner_id}",
-                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                        == params.image_name,
-                        ImageRow.status == ImageStatus.ALIVE,
-                    )
-                )
-                existing_row = await sess.scalar(query)
-
-                customized_image_id: str
-                if existing_row:
-                    customized_image_id = existing_row.labels["ai.backend.customized-image.id"]
-                    log.debug("reusing existing customized image ID {}", customized_image_id)
-                else:
-                    customized_image_id = str(uuid.uuid4())
-
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-            new_image_ref = ImageRef.from_image_str(
-                new_canonical,
-                None,
-                registry_hostname,
-                architecture=base_image_ref.architecture,
-                is_local=base_image_ref.is_local,
-            )
-
-            image_labels = {
-                "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
-                "ai.backend.customized-image.name": params.image_name,
-                "ai.backend.customized-image.id": customized_image_id,
-            }
-            match params.image_visibility:
-                case CustomizedImageVisibilityScope.USER:
-                    image_labels["ai.backend.customized-image.user.email"] = request["user"][
-                        "email"
-                    ]
-
-            # commit image with new tag set
-            resp = await root_ctx.registry.commit_session(
-                session,
-                new_image_ref,
-                extra_labels=image_labels,
-            )
-            async for event, _ in background_task_manager.poll_bgtask_event(
-                uuid.UUID(resp["bgtask_id"])
-            ):
-                match event:
-                    case BgtaskDoneEvent():
-                        await reporter.update(increment=1, message="Committed image")
-                        break
-                    case BgtaskFailedEvent():
-                        raise BackendError(extra_msg=event.message)
-                    case BgtaskCancelledEvent():
-                        raise BackendError(extra_msg="Operation cancelled")
-
-            if not new_image_ref.is_local:
-                # push image to registry from local agent
-                image_registry = ImageRegistry(
-                    name=registry_hostname,
-                    url=str(registry_conf.url),
-                    username=registry_conf.username,
-                    password=registry_conf.password,
-                )
-                resp = await root_ctx.registry.push_image(
-                    session.main_kernel.agent,
-                    new_image_ref,
-                    image_registry,
-                )
-                async for event, _ in background_task_manager.poll_bgtask_event(
-                    uuid.UUID(resp["bgtask_id"])
-                ):
-                    match event:
-                        case BgtaskDoneEvent():
-                            break
-                        case BgtaskFailedEvent():
-                            raise BackendError(extra_msg=event.message)
-                        case BgtaskCancelledEvent():
-                            raise BackendError(extra_msg="Operation cancelled")
-
-            await reporter.update(increment=1, message="Pushed image to registry")
-            # rescan updated image only
-            await rescan_images(
-                root_ctx.db,
-                new_image_ref.canonical,
-                registry_project,
-                reporter=reporter,
-            )
-            await reporter.update(increment=1, message="Completed")
-        except BackendError:
-            log.exception("CONVERT_SESSION_TO_IMAGE: exception")
-            raise
-
-    task_id = await background_task_manager.start(_commit_and_upload)
-    return ConvertSessionToImageResponseModel(task_id=str(task_id))
+    )
+    return ConvertSessionToImageResponseModel(task_id=str(result.task_id))
 
 
 @catch_unexpected(log)
@@ -1516,67 +1197,16 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
 
-    if params["recursive"]:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            dependent_session_ids = await find_dependent_sessions(
-                session_name,
-                db_sess,
-                owner_access_key,
-                allow_stale=True,
-            )
-
-            target_session_references: List[str | uuid.UUID] = [
-                *dependent_session_ids,
-                session_name,
-            ]
-            sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
-                *[
-                    SessionRow.get_session(
-                        db_sess,
-                        name_or_id,
-                        owner_access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                    )
-                    for name_or_id in target_session_references
-                ],
-                return_exceptions=True,
-            )
-
-        last_stats = await asyncio.gather(
-            *[
-                root_ctx.registry.destroy_session(
-                    sess, forced=params["forced"], user_role=user_role
-                )
-                for sess in sessions
-                if isinstance(sess, SessionRow)
-            ],
-            return_exceptions=True,
-        )
-
-        # Consider not found sessions already terminated.
-        # Consider GenericForbidden error occurs with scheduled/preparing/terminating/error status session, and leave them not to be quitted.
-        last_stats = [
-            *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
-        ]
-
-        return web.json_response(last_stats, status=200)
-    else:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-            )
-        last_stat = await root_ctx.registry.destroy_session(
-            session,
-            forced=params["forced"],
+    result = await root_ctx.processors.session.destroy_session.wait_for_complete(
+        DestroySessionAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
             user_role=user_role,
+            forced=params["forced"],
+            recursive=params["recursive"],
         )
-        resp = {
-            "stats": last_stat,
-        }
-        return web.json_response(resp, status=200)
+    )
+    return web.json_response(result.result, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1876,43 +1506,29 @@ async def interrupt(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def complete(request: web.Request) -> web.Response:
-    resp = {
-        "result": {
-            "status": "finished",
-            "completions": [],
-        },
-    }
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
     try:
         params = await request.json(loads=json.loads)
-        log.info(
-            "COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
-        )
-    except json.decoder.JSONDecodeError:
-        raise InvalidAPIParameters
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
-    try:
         code = params.get("code", "")
         opts = params.get("options", None) or {}
-        await root_ctx.registry.increment_session_usage(session)
-        resp["result"] = cast(
-            Dict[str, Any],
-            await root_ctx.registry.get_completions(session, code, opts),
-        )
-    except AssertionError:
+    except json.decoder.JSONDecodeError:
         raise InvalidAPIParameters
-    except BackendError:
-        log.exception("COMPLETE: exception")
-        raise
-    return web.json_response(resp, status=200)
+
+    log.info("COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
+
+    action_result = await root_ctx.processors.session.complete.wait_for_complete(
+        CompleteAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+            code=code,
+            options=opts,
+        )
+    )
+
+    return web.json_response(action_result.result, status=200)
 
 
 @server_status_required(READ_ALLOWED)
