@@ -1,14 +1,16 @@
 import logging
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 import aiohttp
 from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.wsproxy.defs import RootContext
-from ai.backend.wsproxy.types import Circuit
+
+from ...defs import RootContext
+from ...types import Circuit
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -28,3 +30,12 @@ class AbstractBackend(metaclass=ABCMeta):
     def __init__(self, root_context: RootContext, circuit: Circuit) -> None:
         self.root_context = root_context
         self.circuit = circuit
+
+
+TRoute = TypeVar("TRoute")
+
+
+class AbstractRouteSelector(metaclass=ABCMeta):
+    @abstractmethod
+    def select_route(self, routes: Sequence[TRoute]) -> TRoute:
+        raise NotImplementedError
