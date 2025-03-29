@@ -57,6 +57,7 @@ from ai.backend.manager.services.session.actions.convert_session_to_image import
     ConvertSessionToImageAction,
 )
 from ai.backend.manager.services.session.actions.create_cluster import CreateClusterAction
+from ai.backend.manager.services.session.actions.create_from_params import CreateFromParamsAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -722,7 +723,56 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
                     "For non-cluster sessions and single-node cluster sessions, "
                     "you may specify only one manually assigned agent.",
                 )
-    return await _create(request, params)
+
+    if params["domain"] is None:
+        domain_name = request["user"]["domain_name"]
+    else:
+        domain_name = params["domain"]
+    scopes_param = {
+        "owner_access_key": (
+            None if params["owner_access_key"] is undefined else params["owner_access_key"]
+        ),
+    }
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
+    log.info(
+        "CREATE_FROM_PARAMS (ak:{0}/{1}, img:{2}, s:{3})",
+        requester_access_key,
+        owner_access_key if owner_access_key != requester_access_key else "*",
+        params["image"],
+        params["session_name"],
+    )
+
+    result = await root_ctx.processors.session.create_from_params.wait_for_complete(
+        CreateFromParamsAction(
+            session_name=params["session_name"],
+            user_id=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            domain_name=domain_name,
+            group_name=params["group"],
+            requester_access_key=requester_access_key,
+            owner_access_key=owner_access_key,
+            tag=params["tag"],
+            cluster_size=params["cluster_size"],
+            cluster_mode=params["cluster_mode"],
+            config=params["config"],
+            image=params["image"],
+            architecture=params["architecture"],
+            reuse_if_exists=params["reuse"],
+            priority=params["priority"],
+            enqueue_only=params["enqueue_only"],
+            max_wait_seconds=params["max_wait_seconds"],
+            bootstrap_script=params["bootstrap_script"],
+            dependencies=params["dependencies"],
+            startup_command=params["startup_command"],
+            starts_at=params["starts_at"],
+            batch_timeout=params["batch_timeout"],
+            callback_url=params["callback_url"],
+            sudo_session_enabled=request["user"]["sudo_session_enabled"],
+            session_type=params["session_type"],
+        )
+    )
+
+    return web.json_response(result.result, status=201)
 
 
 @server_status_required(ALL_ALLOWED)
