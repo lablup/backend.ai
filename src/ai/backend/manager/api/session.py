@@ -54,6 +54,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.json import load_json, read_json
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
+from ai.backend.manager.services.session.actions.commit_session import CommitSessionAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1107,34 +1108,23 @@ async def check_and_transit_status(
 async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
-    app_ctx: PrivateContext = request.app["session.context"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     filename: str | None = params["filename"]
-
-    myself = asyncio.current_task()
-    assert myself is not None
 
     log.info(
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
 
-        resp: Mapping[str, Any] = await asyncio.shield(
-            app_ctx.rpc_ptask_group.create_task(
-                root_ctx.registry.commit_session_to_file(session, filename),
-            ),
+    action_result = await root_ctx.processors.session.commit_session.wait_for_complete(
+        CommitSessionAction(
+            session_name=session_name,
+            requester_access_key=requester_access_key,
+            owner_access_key=owner_access_key,
+            filename=filename,
         )
-    except BackendError:
-        log.exception("COMMIT_SESSION: exception")
-        raise
-    return web.json_response(resp, status=HTTPStatus.CREATED)
+    )
+
+    return web.json_response(action_result.commit_result, status=HTTPStatus.CREATED)
 
 
 class CustomizedImageVisibilityScope(str, enum.Enum):
