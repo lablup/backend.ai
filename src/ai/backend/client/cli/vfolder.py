@@ -857,12 +857,12 @@ def clone(name, target_name, target_host, usage_mode, permission):
                                 "(This may be due to server shutdown.)",
                             )
                         elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            issues = data.get("errors")
-                            if issues:
-                                for issue in issues:
-                                    print_fail(f"Issue reported: {issue}")
+                            errors = data.get("errors")
+                            if errors:
+                                for error in errors:
+                                    print_fail(f"Error reported: {error}")
                                 completion_msg_func = lambda: print_warn(
-                                    f"Task finished with {len(issues)} issues."
+                                    f"Task finished with {len(errors)} issues."
                                 )
             finally:
                 completion_msg_func()

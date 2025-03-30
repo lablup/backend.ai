@@ -98,12 +98,12 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
                             )
                         # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
                         elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            issues = data.get("errors")
-                            if issues:
-                                for issue in issues:
-                                    print_fail(f"Issue reported: {issue}")
+                            errors = data.get("errors")
+                            if errors:
+                                for error in errors:
+                                    print_fail(f"Error reported: {error}")
                                 completion_msg_func = lambda: print_warn(
-                                    f"Finished registry scanning with {len(issues)} issues."
+                                    f"Finished registry scanning with {len(errors)} issues."
                                 )
             finally:
                 completion_msg_func()
