@@ -33,7 +33,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..exceptions import ScanImageError, ScanTagError
-from ..models.image import ImageIdentifier, ImageRow, ImageStatus, ImageType
+from ..models.image import ImageIdentifier, ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -125,10 +125,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     try:
                         await fut
                     except Exception as e:
-                        errors.append(f"Failed to scan image! Detail: {str(e)}")
+                        log.error(f"Failed to scan image! Detail: {str(e)}")
 
-            scanned_images = await self.commit_rescan_result()
-            return DispatchResult(result=scanned_images, errors=errors)
+            await self.commit_rescan_result()
         finally:
             all_updates.reset(all_updates_token)
 
@@ -303,10 +302,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 )
                             case self.MEDIA_TYPE_OCI_INDEX:
                                 await self._process_oci_index(
-                                    tg, sess, rqst_args, image, tag, resp_json
-                                )
-                            case self.MEDIA_TYPE_OCI_MANIFEST:
-                                await self._process_oci_manifest(
                                     tg, sess, rqst_args, image, tag, resp_json
                                 )
                             case (

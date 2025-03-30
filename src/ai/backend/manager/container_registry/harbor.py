@@ -271,15 +271,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
                                             await self._process_oci_index(
                                                 tg, sess, rqst_args, image, tag, image_info
                                             )
-                                        case self.MEDIA_TYPE_OCI_MANIFEST:
-                                            await self._process_oci_manifest(
-                                                tg,
-                                                sess,
-                                                rqst_args,
-                                                image,
-                                                tag,
-                                                image_info,
-                                            )
                                         case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
                                             await self._process_docker_v2_multiplatform_image(
                                                 tg, sess, rqst_args, image, tag, image_info
