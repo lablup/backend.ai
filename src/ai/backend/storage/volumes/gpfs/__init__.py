@@ -9,6 +9,7 @@ from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...types import CapacityUsage, FSPerfMetric
+from ...watcher import WatcherClient
 from ..abc import (
     CAP_FAST_FS_SIZE,
     CAP_METRIC,
@@ -119,6 +120,7 @@ class GPFSVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
+        watcher: Optional[WatcherClient] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         super().__init__(
@@ -128,6 +130,7 @@ class GPFSVolume(BaseVolume):
             options=options,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
+            watcher=watcher,
         )
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
         self.api_client = GPFSAPIClient(
