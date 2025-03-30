@@ -32,6 +32,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
+from ..exceptions import ScanImageError, ScanTagError
 from ..models.image import ImageIdentifier, ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
@@ -114,9 +115,18 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, client_session):
                 self.registry_url = url
-                async with aiotools.TaskGroup() as tg:
-                    async for image in self.fetch_repositories(client_session):
-                        tg.create_task(self._scan_image(client_session, image))
+
+                tasks = []
+                async for image in self.fetch_repositories(client_session):
+                    task = asyncio.create_task(self._scan_image(client_session, image))
+                    tasks.append(task)
+
+                for fut in asyncio.as_completed(tasks):
+                    try:
+                        await fut
+                    except Exception as e:
+                        log.error(f"Failed to scan image! Detail: {str(e)}")
+
             await self.commit_rescan_result()
         finally:
             all_updates.reset(all_updates_token)
@@ -249,9 +259,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     )
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(tags)
-        async with aiotools.TaskGroup() as tg:
-            for tag in tags:
-                tg.create_task(self._scan_tag(sess, rqst_args, image, tag))
+
+        try:
+            async with aiotools.TaskGroup() as tg:
+                for tag in tags:
+                    tg.create_task(self._scan_tag(sess, rqst_args, image, tag))
+        except aiotools.TaskGroupError as e:
+            raise ScanImageError(
+                f"Image scan failed, Details: {cast(ExceptionGroup, e).exceptions}"
+            ) from e
 
     async def _scan_tag(
         self,
@@ -273,34 +289,39 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 resp.raise_for_status()
                 resp_json = json.loads(await resp.read())
 
-                async with aiotools.TaskGroup() as tg:
-                    match content_type:
-                        case self.MEDIA_TYPE_DOCKER_MANIFEST:
-                            await self._process_docker_v2_image(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
-                        case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
-                            await self._process_docker_v2_multiplatform_image(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
-                        case self.MEDIA_TYPE_OCI_INDEX:
-                            await self._process_oci_index(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
-                        case (
-                            self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS
-                            | self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON
-                        ):
-                            await self._process_docker_v1_image(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
+                try:
+                    async with aiotools.TaskGroup() as tg:
+                        match content_type:
+                            case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                                await self._process_docker_v2_image(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
+                            case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                                await self._process_docker_v2_multiplatform_image(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
+                            case self.MEDIA_TYPE_OCI_INDEX:
+                                await self._process_oci_index(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
+                            case (
+                                self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS
+                                | self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON
+                            ):
+                                await self._process_docker_v1_image(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
 
-                        case _:
-                            log.warn("Unknown content type: {}", content_type)
-                            raise RuntimeError(
-                                "The registry does not support the standard way of "
-                                "listing multiarch images."
-                            )
+                            case _:
+                                log.warning("Unknown content type: {}", content_type)
+                                raise RuntimeError(
+                                    "The registry does not support the standard way of "
+                                    "listing multiarch images."
+                                )
+                except aiotools.TaskGroupError as e:
+                    raise ScanTagError(
+                        f"Tag scan failed, Details: {cast(ExceptionGroup, e).exceptions}"
+                    ) from e
 
     async def _read_manifest_list(
         self,

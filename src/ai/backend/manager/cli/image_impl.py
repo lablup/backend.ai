@@ -159,8 +159,8 @@ async def rescan_images(cli_ctx: CLIContext, registry_or_image: str) -> None:
     ):
         try:
             await rescan_images_func(db, registry_or_image)
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def alias(cli_ctx, alias, target, architecture):
