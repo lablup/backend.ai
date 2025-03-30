@@ -228,7 +228,7 @@ async def execute(
                 else:
                     raise TypeError(
                         "The return value must be an awaitable"
-                        "or redis.asyncio.client.Pipeline object"
+                        " or redis.asyncio.client.Pipeline object"
                     )
                 if isinstance(result, Pipeline):
                     # This happens when func is an async function that returns a pipeline.
