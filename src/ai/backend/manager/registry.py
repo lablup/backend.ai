@@ -1151,6 +1151,8 @@ class AgentRegistry:
             session_data["network_id"] = str(network.id)
         elif use_host_network:
             session_data["network_type"] = NetworkType.HOST
+        else:
+            session_data["network_type"] = NetworkType.VOLATILE
 
         kernel_data = []
         session_images: list[str] = []
