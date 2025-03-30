@@ -100,7 +100,7 @@ local_config_iv = (
                             t.Key("service-addr"): tx.HostPortPair(
                                 allow_blank_host=True,
                             ),
-                            t.Key("internal-addr", default=("127.0.0.1", 6023)): tx.HostPortPair(
+                            t.Key("internal-addr", default=("127.0.0.1", 16023)): tx.HostPortPair(
                                 allow_blank_host=True,
                             ),
                             t.Key("ssl-enabled"): t.ToBool,

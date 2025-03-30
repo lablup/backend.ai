@@ -134,6 +134,7 @@ from .gql_models.session import (
     ComputeSessionNode,
     ModifyComputeSession,
     SessionPermissionValueField,
+    TotalResourceSlot,
 )
 from .gql_models.user import UserConnection, UserNode
 from .gql_models.vfolder import (
@@ -213,8 +214,16 @@ from .scaling_group import (
     DisassociateScalingGroupWithUserGroup,
     ModifyScalingGroup,
     ScalingGroup,
+    ScalingGroupRow,
+    and_names,
+    query_allowed_sgroups,
 )
-from .session import ComputeSession, ComputeSessionList
+from .session import (
+    ComputeSession,
+    ComputeSessionList,
+    SessionQueryConditions,
+    SessionStatus,
+)
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
     CreateUser,
@@ -748,6 +757,16 @@ class Queries(graphene.ObjectType):
         is_active=graphene.Boolean(),
     )
 
+    accessible_scaling_groups = graphene.List(
+        ScalingGroup,
+        description=(
+            "Added in 25.5.0. This query is available for all users. "
+            "It returns the resource groups(=scaling groups) that the user has access to. "
+            "Only name, is_active, own_session_occupied_resource_slots and accelerator_quantum_size fields are returned."
+        ),
+        project_id=graphene.UUID(required=True),
+    )
+
     # super-admin only
     scaling_groups_for_domain = graphene.List(
         ScalingGroup,
@@ -949,6 +968,31 @@ class Queries(graphene.ObjectType):
         sess_id=graphene.String(required=True),
         domain_name=graphene.String(),
         access_key=graphene.String(),
+    )
+
+    total_resource_slot = graphene.Field(
+        TotalResourceSlot,
+        description="Added in 25.5.0.",
+        statuses=graphene.List(
+            graphene.String,
+            default_value=None,
+            description=(
+                "`statuses` argument is an array of session statuses. "
+                "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
+                f"The argument should be an array of the following valid status values: {[s.name for s in SessionStatus]}.\n"
+                f"Default value is null."
+            ),
+        ),
+        filter=graphene.String(
+            description=(
+                "`filter` argument is a string that is parsed into query conditions. "
+                "It works in the same way as the `filter` argument in the `compute_session` query schema, "
+                "meaning the values are parsed into an identical SQL query expression.\n"
+                "Default value is `null`."
+            ),
+        ),
+        domain_name=graphene.String(),
+        resource_group_name=graphene.String(),
     )
 
     vfolder_host_permissions = graphene.Field(
@@ -2047,6 +2091,25 @@ class Queries(graphene.ObjectType):
         return await ScalingGroup.load_all(info.context, is_active=is_active)
 
     @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_accessible_scaling_groups(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        domain_name: Optional[str],
+        project_id: uuid.UUID,
+        group_id: uuid.UUID,  # Not used. `scoped_query()` injects this parameter.
+        access_key: AccessKey,
+    ) -> Sequence[ScalingGroup]:
+        ctx: GraphQueryContext = info.context
+        domain_name = domain_name or ctx.user["domain_name"]
+        async with ctx.db.begin() as db_conn:
+            sgroup_rows = await query_allowed_sgroups(db_conn, domain_name, project_id, access_key)
+        conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
+        sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
+        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
+
+    @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups_for_domain(
         root: Any,
@@ -2529,6 +2592,32 @@ class Queries(graphene.ObjectType):
             return matches[0]
         else:
             raise TooManyKernelsFound
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_total_resource_slot(
+        root: Any,
+        info: graphene.ResolveInfo,
+        statuses: Optional[list[str]] = None,
+        filter: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        resource_group_name: Optional[str] = None,
+    ) -> TotalResourceSlot:
+        graph_ctx: GraphQueryContext = info.context
+
+        if statuses is not None:
+            status_list = [SessionStatus[s] for s in statuses]
+        else:
+            status_list = None
+        return await TotalResourceSlot.get_data(
+            graph_ctx,
+            SessionQueryConditions(
+                statuses=status_list,
+                domain_name=domain_name,
+                resource_group_name=resource_group_name,
+                raw_filter=filter,
+            ),
+        )
 
     @staticmethod
     async def resolve_vfolder_host_permissions(

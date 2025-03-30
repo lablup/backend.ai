@@ -3,7 +3,6 @@ apiEndpoint = "[Default API Endpoint. If blank, user input field will be shown.]
 apiEndpointText = "[Placeholder text instead of API endpoint input field.]"
 defaultSessionEnvironment = "[Default session kernel. If blank, alphabetically first kernel will be default.]"
 defaultImportEnvironment = "[Default kernel to use import features. If blank, index.docker.io/lablup/python:3.8-ubuntu18.04 will be used.]"
-siteDescription = "[Site description placeholder. It will be at the bottom of 'Backend.AI' at the top left corner.]"
 connectionMode = "[Connection mode. Default is API. Currenly supports API and SESSION]"
 allowChangeSigninMode = false           # Allows user to change signin mode between `API` and `SESSION`
 signupSupport = false                   # Enable/disable signup feature support. Manager plugin is required.
@@ -30,11 +29,10 @@ isDirectorySizeVisible = true           # If false, directory size in folder exp
 maxCountForPreopenPorts = 10            # The maximum allowed number of preopen ports. If you set this option to 0, the feature of preopen ports is disabled.
 allowCustomResourceAllocation = true    # If true, display the custom allocation on the session launcher.
 eduAppNamePrefix = ""                   # The prefix of edu applauncher's app name. If the app name starts with this prefix, split it by '-' and use the tail as the name of image.
-enableModelStore = false                # Enable model store feature. (From Backend.AI 24.03)
-enableLLMPlayground = false             # Enable LLM Playground feature. (From Backend.AI 24.03)
 enableExtendLoginSession = false        # If true, enables login session extension UI. (From Backend.AI 24.09)
 enableImportFromHuggingFace = false     # Enable import from Hugging Face feature. (From Backend.AI 24.09)
 enableInteractiveLoginAccountSwitch = true  # If false, hide the "Sign in with a different account" button from the interactive login page.
+enableModelFolders = true               # Enable model folders feature. (From Backend.AI 23.03)
 
 [wsproxy]
 proxyURL = "[Proxy URL]"

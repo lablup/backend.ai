@@ -18,7 +18,7 @@ pool-pre-ping = false
 [account-manager]
 num-proc = 1
 service-addr = { host = "0.0.0.0", port = 8088 }
-internal-addr = { host = "0.0.0.0", port = 8087 }
+internal-addr = { host = "0.0.0.0", port = 18088 }
 #user = "nobody"
 #group = "nobody"
 ssl-enabled = false
