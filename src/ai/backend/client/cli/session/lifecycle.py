@@ -953,6 +953,14 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                                 "The operation has been cancelled in the middle. "
                                 "(This may be due to server shutdown.)",
                             )
+                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
+                            errors = data.get("errors")
+                            if errors:
+                                for error in errors:
+                                    print_fail(f"Error reported: {error}")
+                                completion_msg_func = lambda: print_warn(
+                                    f"Task finished with {len(errors)} issues."
+                                )
             finally:
                 completion_msg_func()
                 sys.exit()

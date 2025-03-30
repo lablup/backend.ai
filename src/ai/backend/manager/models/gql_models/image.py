@@ -663,8 +663,12 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.db, registry, reporter=reporter)
+        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
+            result = await rescan_images(ctx.db, registry, project, reporter=reporter)
+            for error in result.errors:
+                log.error(error)
+
+            return result
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)

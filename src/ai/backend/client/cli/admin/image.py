@@ -61,7 +61,7 @@ def rescan(registry: str) -> None:
                 print_error(e)
                 sys.exit(ExitCode.FAILURE)
             if not result["ok"]:
-                print_fail(f"Failed to begin registry scanning: {result['msg']}")
+                print_fail(f"Failed to scan registries: {result['msg']}")
                 sys.exit(ExitCode.FAILURE)
             print_done("Started updating the image metadata from the configured registries.")
             bgtask_id = result["task_id"]
@@ -88,6 +88,15 @@ def rescan(registry: str) -> None:
                             completion_msg_func = lambda: print_warn(
                                 "Registry scanning has been cancelled in the middle."
                             )
+                        # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
+                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
+                            errors = data.get("errors")
+                            if errors:
+                                for error in errors:
+                                    print_fail(f"Error reported: {error}")
+                                completion_msg_func = lambda: print_warn(
+                                    f"Finished registry scanning with {len(errors)} issues."
+                                )
             finally:
                 completion_msg_func()
 

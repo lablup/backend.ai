@@ -591,6 +591,13 @@ class BgtaskDoneEventArgs:
 
     @classmethod
     def deserialize(cls, value: tuple):
+        # TODO: Remove this after renaming BgtaskPartialSuccessEvent.
+        if len(value) == 3:
+            return BgtaskPartialSuccessEvent(
+                uuid.UUID(value[0]),
+                value[1],
+                value[2],
+            )
         return cls(
             uuid.UUID(value[0]),
             value[1],
