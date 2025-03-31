@@ -64,6 +64,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
     CreateFromTemplateActionParams,
 )
 from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
+from ai.backend.manager.services.session.actions.download_file import DownloadFileAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1809,27 +1810,15 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
         session_name,
         file,
     )
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-        await root_ctx.registry.increment_session_usage(session)
-        result = await root_ctx.registry.download_single(session, owner_access_key, file)
-    except asyncio.CancelledError:
-        raise
-    except BackendError:
-        log.exception("DOWNLOAD_SINGLE: exception")
-        raise
-    except (ValueError, FileNotFoundError):
-        raise InvalidAPIParameters("The file is not found.")
-    except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
-        log.exception("DOWNLOAD_SINGLE: unexpected error!")
-        raise InternalServerError
+
+    result = await root_ctx.processors.session.download_file.wait_for_complete(
+        DownloadFileAction(
+            user_id=request["user"]["uuid"],
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+            file=file,
+        )
+    )
     return web.Response(body=result, status=HTTPStatus.OK)
 
 

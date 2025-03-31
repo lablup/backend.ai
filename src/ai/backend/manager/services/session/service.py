@@ -87,6 +87,10 @@ from ai.backend.manager.services.session.actions.destory_session import (
     DestroySessionAction,
     DestroySessionActionResult,
 )
+from ai.backend.manager.services.session.actions.download_file import (
+    DownloadFileAction,
+    DownloadFileActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -963,3 +967,33 @@ class SessionService:
             }
 
             return DestroySessionActionResult(result=resp, destroyed_sessions=[session])
+
+    async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        user_id = action.user_id
+        file = action.file
+
+        try:
+            async with self._db.begin_readonly_session() as db_sess:
+                session = await SessionRow.get_session(
+                    db_sess,
+                    session_name,
+                    owner_access_key,
+                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                )
+            await self._agent_registry.increment_session_usage(session)
+            result = await self._agent_registry.download_single(session, owner_access_key, file)
+        except asyncio.CancelledError:
+            raise
+        except BackendError:
+            log.exception("DOWNLOAD_SINGLE: exception")
+            raise
+        except (ValueError, FileNotFoundError):
+            raise InvalidAPIParameters("The file is not found.")
+        except Exception:
+            await self._error_monitor.capture_exception(context={"user": user_id})
+            log.exception("DOWNLOAD_SINGLE: unexpected error!")
+            raise InternalServerError
+
+        return DownloadFileActionResult(result=result)
