@@ -39,6 +39,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import DispatchResult, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 
 from ..models.image import ImageIdentifier, ImageRow, ImageStatus, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
