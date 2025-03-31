@@ -115,15 +115,21 @@ class RedisQueue(AbstractMessageQueue):
         log.debug("Starting auto claim loop for stream %s", self._stream_key)
         while not self._closed:
             try:
-                claimed = await self._auto_claim(autoclaim_start_id, autoclaim_idle_timeout)
+                next_start_id, claimed = await self._auto_claim(
+                    autoclaim_start_id, autoclaim_idle_timeout
+                )
                 if not claimed:
                     await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
+                    continue
+                autoclaim_start_id = next_start_id
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
                 log.exception("Error while auto claiming messages: %s", e)
 
-    async def _auto_claim(self, autoclaim_start_id: str, autoclaim_idle_timeout: int) -> bool:
+    async def _auto_claim(
+        self, autoclaim_start_id: str, autoclaim_idle_timeout: int
+    ) -> tuple[str, bool]:
         reply = await redis_helper.execute(
             self._conn,
             lambda r: r.xautoclaim(
@@ -138,13 +144,13 @@ class RedisQueue(AbstractMessageQueue):
         )
         if reply[0] == b"0-0":
             log.debug("No messages to claim")
-            return False
+            return autoclaim_start_id, False
         autoclaim_start_id = reply[0]
         for msg_id, msg_data in reply[1]:
             msg = MQMessage(msg_id, msg_data)
             await self._consume_queue.put(msg)
 
-        return True
+        return autoclaim_start_id, True
 
     async def _read_messages_loop(self) -> None:
         log.debug("Reading messages from stream %s", self._stream_key)

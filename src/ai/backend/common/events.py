@@ -1349,11 +1349,11 @@ class EventDispatcher:
             event_type = "unknown"
             start = time.perf_counter()
             try:
-                decoded = msg.payload[b"name"].decode()
-                if decoded and isinstance(decoded, str):
-                    event_type = decoded
+                decoded_event_name = msg.payload[b"name"].decode()
+                if decoded_event_name and isinstance(decoded_event_name, str):
+                    event_type = decoded_event_name
                 await self.dispatch_consumers(
-                    decoded,
+                    decoded_event_name,
                     AgentId(msg.payload[b"source"].decode()),
                     msgpack.unpackb(msg.payload[b"args"]),
                 )
@@ -1385,15 +1385,14 @@ class EventDispatcher:
             event_type = "unknown"
             start = time.perf_counter()
             try:
-                decoded = msg.payload[b"name"].decode()
-                if decoded and isinstance(decoded, str):
-                    event_type = decoded
+                decoded_event_name = msg.payload[b"name"].decode()
+                if decoded_event_name and isinstance(decoded_event_name, str):
+                    event_type = decoded_event_name
                 await self.dispatch_subscribers(
-                    decoded,
+                    decoded_event_name,
                     AgentId(msg.payload[b"source"].decode()),
                     msgpack.unpackb(msg.payload[b"args"]),
                 )
-                await self._msg_queue.done(msg.msg_id)
                 self._metric_observer.observe_event_success(
                     event_type=event_type,
                     duration=time.perf_counter() - start,

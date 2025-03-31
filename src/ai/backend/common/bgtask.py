@@ -72,13 +72,13 @@ class ProgressReporter:
     def __init__(
         self,
         redis_client: RedisConnectionInfo,
-        event_dispatcher: EventProducer,
+        event_producer: EventProducer,
         task_id: uuid.UUID,
         current_progress: int = 0,
         total_progress: int = 0,
     ) -> None:
         self._redis_client = redis_client
-        self._event_producer = event_dispatcher
+        self._event_producer = event_producer
         self._task_id = task_id
         self.current_progress = current_progress
         self.total_progress = total_progress
