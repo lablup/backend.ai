@@ -27,6 +27,10 @@ from ai.backend.manager.services.session.actions.destory_session import (
     DestroySessionAction,
     DestroySessionActionResult,
 )
+from ai.backend.manager.services.session.actions.download_file import (
+    DownloadFileAction,
+    DownloadFileActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -46,6 +50,7 @@ class SessionProcessors:
         CreateFromTemplateActionResult,
     ]
     destroy_session: ActionProcessor[DestroySessionAction, DestroySessionActionResult]
+    download_file: ActionProcessor[DownloadFileAction, DownloadFileActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -55,3 +60,4 @@ class SessionProcessors:
         self.create_from_params = ActionProcessor(service.create_from_params)
         self.create_from_template = ActionProcessor(service.create_from_template)
         self.destroy_session = ActionProcessor(service.destroy_session)
+        self.download_file = ActionProcessor(service.download_file)
