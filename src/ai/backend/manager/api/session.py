@@ -9,7 +9,6 @@ import enum
 import functools
 import json
 import logging
-import secrets
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -65,6 +64,10 @@ from ai.backend.manager.services.session.actions.create_from_template import (
 from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
 from ai.backend.manager.services.session.actions.download_file import DownloadFileAction
 from ai.backend.manager.services.session.actions.download_files import DownloadFilesAction
+from ai.backend.manager.services.session.actions.execute_session import (
+    ExecuteSessionAction,
+    ExecuteSessionActionParams,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1386,7 +1389,6 @@ async def restart(request: web.Request, params: Any) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def execute(request: web.Request) -> web.Response:
-    resp = {}
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -1396,92 +1398,21 @@ async def execute(request: web.Request) -> web.Response:
     except json.decoder.JSONDecodeError:
         log.warning("EXECUTE: invalid/missing parameters")
         raise InvalidAPIParameters
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+
+    result = await root_ctx.processors.session.execute_session.wait_for_complete(
+        ExecuteSessionAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+            api_version=request["api_version"],
+            params=ExecuteSessionActionParams(
+                mode=params.get("mode", None),
+                run_id=params.get("run_id", None),
+                code=params.get("code", None),
+                options=params.get("options", None),
+            ),
         )
-    try:
-        await root_ctx.registry.increment_session_usage(session)
-        api_version = request["api_version"]
-        if api_version[0] == 1:
-            run_id = params.get("runId", secrets.token_hex(8))
-            mode = "query"
-            code = params.get("code", None)
-            opts = None
-        elif api_version[0] >= 2:
-            assert "runId" in params, "runId is missing!"
-            run_id = params["runId"]  # maybe None
-            assert params.get("mode"), "mode is missing or empty!"
-            mode = params["mode"]
-            assert mode in {
-                "query",
-                "batch",
-                "complete",
-                "continue",
-                "input",
-            }, "mode has an invalid value."
-            if mode in {"continue", "input"}:
-                assert run_id is not None, "continuation requires explicit run ID"
-            code = params.get("code", None)
-            opts = params.get("options", None)
-        else:
-            raise RuntimeError("should not reach here")
-        # handle cases when some params are deliberately set to None
-        if code is None:
-            code = ""  # noqa
-        if opts is None:
-            opts = {}  # noqa
-        if mode == "complete":
-            # For legacy
-            resp["result"] = await root_ctx.registry.get_completions(session, code, opts)
-        else:
-            raw_result = await root_ctx.registry.execute(
-                session,
-                api_version,
-                run_id,
-                mode,
-                code,
-                opts,
-                flush_timeout=2.0,
-            )
-            if raw_result is None:
-                # the kernel may have terminated from its side,
-                # or there was interruption of agents.
-                resp["result"] = {
-                    "status": "finished",
-                    "runId": run_id,
-                    "exitCode": 130,
-                    "options": {},
-                    "files": [],
-                    "console": [],
-                }
-                return web.json_response(resp, status=HTTPStatus.OK)
-            # Keep internal/public API compatilibty
-            result = {
-                "status": raw_result["status"],
-                "runId": raw_result["runId"],
-                "exitCode": raw_result.get("exitCode"),
-                "options": raw_result.get("options"),
-                "files": raw_result.get("files"),
-            }
-            if api_version[0] == 1:
-                result["stdout"] = raw_result.get("stdout")
-                result["stderr"] = raw_result.get("stderr")
-                result["media"] = raw_result.get("media")
-                result["html"] = raw_result.get("html")
-            else:
-                result["console"] = raw_result.get("console")
-            resp["result"] = result
-    except AssertionError as e:
-        log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
-        raise InvalidAPIParameters(extra_msg=e.args[0])
-    except BackendError:
-        log.exception("EXECUTE: exception")
-        raise
-    return web.json_response(resp, status=HTTPStatus.OK)
+    )
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
