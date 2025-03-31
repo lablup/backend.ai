@@ -1357,6 +1357,7 @@ class EventDispatcher:
                     AgentId(msg.payload[b"source"].decode()),
                     msgpack.unpackb(msg.payload[b"args"]),
                 )
+                await self._msg_queue.done(msg.msg_id)
                 self._metric_observer.observe_event_success(
                     event_type=event_type,
                     duration=time.perf_counter() - start,
@@ -1392,6 +1393,7 @@ class EventDispatcher:
                     AgentId(msg.payload[b"source"].decode()),
                     msgpack.unpackb(msg.payload[b"args"]),
                 )
+                await self._msg_queue.done(msg.msg_id)
                 self._metric_observer.observe_event_success(
                     event_type=event_type,
                     duration=time.perf_counter() - start,
