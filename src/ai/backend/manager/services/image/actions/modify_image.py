@@ -59,7 +59,7 @@ class ModifyImageAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "modify_image"
+        return "modify"
 
 
 @dataclass

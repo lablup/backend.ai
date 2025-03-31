@@ -20,7 +20,7 @@ class AliasImageAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "alias_image"
+        return "alias"
 
 
 @dataclass

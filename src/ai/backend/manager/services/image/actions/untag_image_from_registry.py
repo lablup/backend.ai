@@ -21,7 +21,7 @@ class UntagImageFromRegistryAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "untag_image_from_registry"
+        return "untag_from_registry"
 
 
 @dataclass
