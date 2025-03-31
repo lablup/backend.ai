@@ -1102,7 +1102,7 @@ class ModifyImage(graphene.Mutation):
                 if limit_option.max is not Undefined and len(limit_option.max) > 0:
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
-            data["resources"] = resources_data
+            data["_resources"] = resources_data
 
         try:
             async with ctx.db.begin_session() as session:
@@ -1121,6 +1121,53 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    image_canonical = graphene.String(required=True)
+    architecture = graphene.String(required=True)
+
+
+class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    image_node = graphene.Field(ImageNode)
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+
+class ClearImageCustomResourceLimit(graphene.Mutation):
+    """
+    Added in 25.6.0.
+    """
+
+    class Arguments:
+        key = ClearImageCustomResourceLimitKey(required=True)
+
+    Output = ClearImageCustomResourceLimitPayload
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        key: ClearImageCustomResourceLimitKey,
+    ) -> ClearImageCustomResourceLimitPayload:
+        log.info(
+            f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
+        )
+        ctx: GraphQueryContext = info.context
+        async with ctx.db.begin_session() as db_sess:
+            image_row = await ImageRow.resolve(
+                db_sess, [ImageIdentifier(key.image_canonical, key.architecture)]
+            )
+            image_row._resources = {}
+            await db_sess.flush()
+        return ClearImageCustomResourceLimitPayload(image_node=ImageNode.from_row(ctx, image_row))
 
 
 @dataclass
