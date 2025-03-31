@@ -1308,20 +1308,6 @@ class RedisConfig:
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
 
-    def __init__(
-        self,
-        addr: Optional[HostPortPair] = None,
-        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
-        service_name: Optional[str] = None,
-        password: Optional[str] = None,
-        redis_helper_config: Optional[RedisHelperConfig] = None,
-    ) -> None:
-        self.addr = addr
-        self.sentinel = sentinel
-        self.service_name = service_name
-        self.password = password
-        self.redis_helper_config = redis_helper_config
-
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
 
@@ -1334,7 +1320,7 @@ class RedisConfig:
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
 
-    def copy(self) -> "RedisConfig":
+    def copy(self) -> RedisConfig:
         return RedisConfig(
             addr=self.addr,
             sentinel=self.sentinel,

@@ -69,10 +69,7 @@ class RedisQueue(AbstractMessageQueue):
         If the queue is full, the oldest message will be removed.
         The new message will be added to the end of the queue.
         """
-        pipe = await self._conn.client.pipeline(transaction=True)
-        pipe.xadd(self._stream_key, payload)
-        pipe.xtrim(self._stream_key, maxlen=_DEFAULT_QUEUE_MAX_LEN)
-        await pipe.execute()
+        await self._conn.client.xadd(self._stream_key, payload, maxlen=_DEFAULT_QUEUE_MAX_LEN)
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
         """
@@ -125,7 +122,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.exception("Error while auto claiming messages: %s", e)
+                log.error(f"Error while auto claiming messages: {e}")
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int
@@ -160,7 +157,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.exception("Error while reading messages: %s", e)
+                log.error(f"Error while reading messages: {e}")
 
     async def _read_messages(self) -> None:
         reply = await redis_helper.execute(
@@ -173,6 +170,9 @@ class RedisQueue(AbstractMessageQueue):
                 block=1000,
             ),
         )
+        if not reply:
+            log.debug("No messages to read")
+            return
         for _, events in reply:
             for msg_id, msg_data in events:
                 if msg_data is None:
@@ -190,7 +190,7 @@ class RedisQueue(AbstractMessageQueue):
                 await self._failover_consumer(e)
                 last_msg_id = "$"
             except Exception as e:
-                log.exception("Error while reading broadcast messages: %s", e)
+                log.error(f"Error while reading broadcast messages: {e}")
 
     async def _read_broadcast_messages(self, last_msg_id: str) -> str:
         reply = await redis_helper.execute(
@@ -201,6 +201,9 @@ class RedisQueue(AbstractMessageQueue):
                 block=1000,
             ),
         )
+        if not reply:
+            log.debug("No broadcast messages to read")
+            return last_msg_id
         for _, events in reply:
             for msg_id, msg_data in events:
                 if msg_data is None:
@@ -227,7 +230,7 @@ class RedisQueue(AbstractMessageQueue):
                     f"Error while creating consumer group {self._group_name}: {internal_exception}",
                 )
         else:
-            log.exception(f"Error while reading messages: {e}")
+            log.error(f"Error while reading messages: {e}")
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:

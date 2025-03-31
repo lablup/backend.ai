@@ -2,14 +2,13 @@ import asyncio
 import hashlib
 import logging
 import socket
-import time
 from dataclasses import dataclass
-from typing import AsyncGenerator, AsyncIterable, Optional
+from typing import AsyncGenerator, Optional
 
 import hiredis
 from aiotools.server import process_index
 
-from ai.backend.common.redis_client import RedisClient, RedisConnection
+from ai.backend.common.redis_client import RedisConnection
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..types import RedisConfig
@@ -17,173 +16,10 @@ from .queue import AbstractMessageQueue, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_AUTOCLAIM_IDLE_TIMEOUT = 1_000
+_DEFAULT_AUTOCLAIM_IDLE_TIMEOUT = 300_000  # 5 minutes
 _DEFAULT_AUTOCLAIM_INTERVAL = 60_000
 _DEFAULT_AUTOCLAIM_COUNT = 64
-
-
-async def _read_stream(
-    client: RedisClient,
-    stream_key: str,
-    *,
-    block_timeout: int = 10_000,  # in msec
-) -> AsyncIterable[tuple[bytes, dict[bytes, bytes]]]:
-    """
-    A high-level wrapper for the XREAD command.
-    """
-    last_id = b"$"
-    while True:
-        try:
-            reply = await client.execute(
-                ["XREAD", "BLOCK", block_timeout, "STREAMS", stream_key, last_id],
-                command_timeout=(block_timeout + 5_000) / 1000,
-            )
-            if not reply:
-                continue
-            # Keep some latest messages so that other manager
-            # processes to have chances of fetching them.
-            await client.execute([
-                "XTRIM",
-                stream_key,
-                "MAXLEN",
-                "~",
-                128,
-            ])
-            for msg_id, msg_data_list in reply[stream_key.encode()]:
-                try:
-                    msg_data = {}
-                    for idx in range(0, len(msg_data_list), 2):
-                        msg_data[msg_data_list[idx]] = msg_data_list[idx + 1]
-                    yield msg_id, msg_data
-                finally:
-                    last_id = msg_id
-        except asyncio.CancelledError:
-            raise
-
-
-async def _autoclaim(
-    client: RedisClient,
-    stream_key: str,
-    group_name: str,
-    consumer_id: str,
-    *,
-    autoclaim_idle_timeout: int = 1_000,  # in msec
-) -> AsyncIterable[tuple[bytes, dict[bytes, bytes]]]:
-    """
-    A high-level wrapper for the XAUTOCLAIM command
-    combined with XGROUP_CREATE.
-    """
-    autoclaim_start_id = b"0-0"
-    while True:
-        try:
-            reply = await client.execute(
-                [
-                    "XAUTOCLAIM",
-                    stream_key,
-                    group_name,
-                    consumer_id,
-                    str(autoclaim_idle_timeout),
-                    autoclaim_start_id,
-                ],
-                command_timeout=(autoclaim_idle_timeout + 5_000) / 1000,
-            )
-            if not reply:
-                await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
-                continue
-            autoclaim_start_id = reply[0]
-            for data in reply[1]:
-                if data is None:
-                    continue
-                msg_id, msg_data_list = data
-                msg_data = {}
-                for idx in range(0, len(msg_data_list), 2):
-                    msg_data[msg_data_list[idx]] = msg_data_list[idx + 1]
-                yield msg_id, msg_data
-        except asyncio.CancelledError:
-            raise
-        except hiredis.HiredisError as e:
-            if e.args[0].startswith("NOGROUP "):
-                try:
-                    await client.execute([
-                        "XGROUP",
-                        "CREATE",
-                        stream_key,
-                        group_name,
-                        "$",
-                        "MKSTREAM",
-                    ])
-                except hiredis.HiredisError as e:
-                    if e.args[0].startswith("BUSYGROUP "):
-                        pass
-                    else:
-                        raise
-                continue
-            raise
-
-
-async def _read_stream_by_group(
-    client: RedisClient,
-    stream_key: str,
-    group_name: str,
-    consumer_id: str,
-    *,
-    block_timeout: int = 10_000,  # in msec
-) -> AsyncIterable[tuple[bytes, dict[bytes, bytes]]]:
-    """
-    A high-level wrapper for the XREADGROUP command
-    combined with XAUTOCLAIM and XGROUP_CREATE.
-    """
-    while True:
-        try:
-            messages = []
-            reply = await client.execute(
-                [
-                    "XREADGROUP",
-                    "GROUP",
-                    group_name,
-                    consumer_id,
-                    "BLOCK",
-                    block_timeout,
-                    "STREAMS",
-                    stream_key,
-                    ">",  # fetch messages not seen by other consumers
-                ],
-                command_timeout=(block_timeout + 5_000) / 1000,
-            )
-            if not reply:
-                continue
-            for msg_id, msg_data_list in reply[stream_key.encode()]:
-                msg_data = {}
-                for idx in range(0, len(msg_data_list), 2):
-                    msg_data[msg_data_list[idx]] = msg_data_list[idx + 1]
-
-                messages.append((msg_id, msg_data))
-            await client.execute([
-                "XACK",
-                stream_key,
-                group_name,
-                *(msg_id for msg_id, msg_data in reply[stream_key.encode()]),
-            ])
-            for msg_id, msg_data in messages:
-                yield msg_id, msg_data
-        except asyncio.CancelledError:
-            raise
-        except hiredis.HiredisError as e:
-            if not e.args[0].startswith("NOGROUP "):
-                raise
-            try:
-                await client.execute([
-                    "XGROUP",
-                    "CREATE",
-                    stream_key,
-                    group_name,
-                    "$",
-                    "MKSTREAM",
-                ])
-            except hiredis.HiredisError as e:
-                if not e.args[0].startswith("BUSYGROUP "):
-                    raise
-            continue
+_DEFAULT_QUEUE_MAX_LEN = 128
 
 
 @dataclass
@@ -195,7 +31,7 @@ class HiRedisMQArgs:
     db: int
     # Optional arguments
     autoclaim_idle_timeout: int = _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT
-    reconnect_poll_interval: float = 0.3
+    autoclaim_start_id: Optional[str] = None
 
 
 class HiRedisQueue(AbstractMessageQueue):
@@ -207,7 +43,6 @@ class HiRedisQueue(AbstractMessageQueue):
     _group_name: str
     _consumer_id: str
     _closed: bool
-    _reconnect_poll_interval: float
     # loop tasks for consuming messages
     _auto_claim_loop_task: asyncio.Task
     _read_messages_task: asyncio.Task
@@ -222,17 +57,42 @@ class HiRedisQueue(AbstractMessageQueue):
         self._group_name = args.group_name
         self._consumer_id = _generate_consumer_id(args.node_id)
         self._closed = False
-        self._reconnect_poll_interval = args.reconnect_poll_interval
+        start_id = args.autoclaim_start_id or "0-0"
         self._auto_claim_loop_task = asyncio.create_task(
-            self._auto_claim_loop(args.autoclaim_idle_timeout)
+            self._auto_claim_loop(start_id, args.autoclaim_idle_timeout)
         )
-        self._read_messages_task = asyncio.create_task(self._read_messages())
-        self._read_broadcast_messages_task = asyncio.create_task(self._read_broadcast_messages())
+        self._read_messages_task = asyncio.create_task(self._read_messages_loop())
+        self._read_broadcast_messages_task = asyncio.create_task(
+            self._read_broadcast_messages_loop()
+        )
 
     async def send(self, payload: dict[bytes, bytes]) -> None:
-        raise NotImplementedError("send() is not implemented for HiRedisQueue")
+        async with RedisConnection(self._conf, db=self._db) as client:
+            pieces = []
+            for k, v in payload.items():
+                pieces.append(k)
+                pieces.append(v)
+            await client.execute([
+                "XADD",
+                self._stream_key,
+                "MAXLEN",
+                _DEFAULT_QUEUE_MAX_LEN,
+                "*",
+                *pieces,
+            ])
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
+        """
+        Consume messages from the queue.
+        This method will block until a message is available.
+
+        This is a normal queue, so the message will be delivered to one consumer.
+        Messages are consumed only once by one consumer.
+
+        Consumer should call `done` method to acknowledge the message when it is processed.
+        If the consumer does not call `done`, the message will be re-delivered after the
+        `autoclaim_idle_timeout` period.
+        """
         while not self._closed:
             try:
                 yield await self._consume_queue.get()
@@ -263,169 +123,148 @@ class HiRedisQueue(AbstractMessageQueue):
         self._read_messages_task.cancel()
         self._read_broadcast_messages_task.cancel()
 
-    async def _auto_claim_loop(self, autoclaim_idle_timeout: int) -> None:
-        first_trial = time.perf_counter()
-        retry_log_count = 0
-        last_log_time = first_trial
-
+    async def _auto_claim_loop(self, autoclaim_start_id: str, autoclaim_idle_timeout: int) -> None:
+        log.debug("Starting auto claim loop for stream %s", self._stream_key)
         while not self._closed:
             try:
-                async with RedisConnection(self._conf, db=self._db) as client:
-                    async for msg_id, msg_data in _autoclaim(
-                        client,
-                        self._stream_key,
-                        self._group_name,
-                        self._consumer_id,
-                        autoclaim_idle_timeout=autoclaim_idle_timeout,
-                    ):
-                        if self._closed:
-                            return
-                        if msg_data is None:
-                            continue
-                        msg = MQMessage(msg_id, msg_data)
-                        await self._consume_queue.put(msg)
+                next_start_id, claimed = await self._auto_claim(
+                    autoclaim_start_id, autoclaim_idle_timeout
+                )
+                if not claimed:
+                    await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
+                    continue
+                autoclaim_start_id = next_start_id
             except hiredis.HiredisError as e:
-                if "READONLY" in e.args[0]:
-                    self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                    if self._reconnect_poll_interval:
-                        await asyncio.sleep(self._reconnect_poll_interval)
-                    continue
-                elif "NOREPLICAS" in e.args[0]:
-                    self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                    if self._reconnect_poll_interval:
-                        await asyncio.sleep(self._reconnect_poll_interval)
-                    continue
-                else:
-                    raise
-            except asyncio.TimeoutError as e:
-                self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                if self._reconnect_poll_interval:
-                    await asyncio.sleep(self._reconnect_poll_interval)
-                continue
-            except (ConnectionError, EOFError) as e:
-                self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                if self._reconnect_poll_interval:
-                    await asyncio.sleep(self._reconnect_poll_interval)
-                continue
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("EventDispatcher.autoclaim(): unexpected-error")
-                raise
+                await self._failover_consumer(e)
+            except Exception as e:
+                log.error(f"Error while auto claiming messages: {e}")
 
-    async def _read_messages(self) -> None:
-        first_trial = time.perf_counter()
-        retry_log_count = 0
-        last_log_time = first_trial
-
-        while not self._closed:
-            try:
-                async with RedisConnection(self._conf, db=self._db) as client:
-                    async for msg_id, msg_data in _read_stream_by_group(
-                        client,
-                        self._stream_key,
-                        self._group_name,
-                        self._consumer_id,
-                    ):
-                        if self._closed:
-                            return
-                        if msg_data is None:
-                            continue
-                        msg = MQMessage(msg_id, msg_data)
-                        await self._consume_queue.put(msg)
-            except hiredis.HiredisError as e:
-                if "READONLY" in e.args[0]:
-                    self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                    if self._reconnect_poll_interval:
-                        await asyncio.sleep(self._reconnect_poll_interval)
-                    continue
-                elif "NOREPLICAS" in e.args[0]:
-                    self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                    if self._reconnect_poll_interval:
-                        await asyncio.sleep(self._reconnect_poll_interval)
-                    continue
-                else:
-                    raise
-            except asyncio.TimeoutError as e:
-                self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                if self._reconnect_poll_interval:
-                    await asyncio.sleep(self._reconnect_poll_interval)
-                continue
-            except (ConnectionError, EOFError) as e:
-                self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                if self._reconnect_poll_interval:
-                    await asyncio.sleep(self._reconnect_poll_interval)
-                continue
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("EventDispatcher.consume(): unexpected-error")
-                raise
-
-    async def _read_broadcast_messages(self) -> None:
-        first_trial = time.perf_counter()
-        retry_log_count = 0
-        last_log_time = first_trial
-
-        while not self._closed:
-            try:
-                async with RedisConnection(self._conf, db=self._db) as client:
-                    async for msg_id, msg_data in _read_stream(
-                        client,
-                        self._stream_key,
-                    ):
-                        if self._closed:
-                            return
-                        if msg_data is None:
-                            continue
-                        msg = MQMessage(msg_id, msg_data)
-                        await self._subscribe_queue.put(msg)
-            except hiredis.HiredisError as e:
-                if "READONLY" in e.args[0]:
-                    self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                    if self._reconnect_poll_interval:
-                        await asyncio.sleep(self._reconnect_poll_interval)
-                    continue
-                elif "NOREPLICAS" in e.args[0]:
-                    self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                    if self._reconnect_poll_interval:
-                        await asyncio.sleep(self._reconnect_poll_interval)
-                    continue
-                else:
-                    raise
-            except asyncio.TimeoutError as e:
-                self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                if self._reconnect_poll_interval:
-                    await asyncio.sleep(self._reconnect_poll_interval)
-                continue
-            except (ConnectionError, EOFError) as e:
-                self._show_retry_warning(e, first_trial, retry_log_count, last_log_time)
-                if self._reconnect_poll_interval:
-                    await asyncio.sleep(self._reconnect_poll_interval)
-                continue
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("EventDispatcher.subscribe(): unexpected-error")
-                raise
-
-    def _show_retry_warning(
-        self,
-        e: Exception,
-        first_trial: float,
-        retry_log_count: int,
-        last_log_time: float,
-        warn_on_first_attempt: bool = True,
-    ) -> None:
-        now = time.perf_counter()
-        if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
-            log.warning(
-                "Retrying due to interruption of Redis connection ({}, retrying-for: {:.3f}s)",
-                repr(e),
-                now - first_trial,
+    async def _auto_claim(
+        self, autoclaim_start_id: str, autoclaim_idle_timeout: int
+    ) -> tuple[str, bool]:
+        async with RedisConnection(self._conf, db=self._db) as client:
+            reply = await client.execute(
+                [
+                    "XAUTOCLAIM",
+                    self._stream_key,
+                    self._group_name,
+                    self._consumer_id,
+                    str(autoclaim_idle_timeout),
+                    autoclaim_start_id,
+                    "COUNT",
+                    _DEFAULT_AUTOCLAIM_COUNT,
+                ],
+                command_timeout=(autoclaim_idle_timeout + 5_000) / 1000,
             )
-            retry_log_count += 1
-            last_log_time = now
+            if reply is None or reply[0] == b"0-0":
+                log.debug("No messages to claim")
+                return autoclaim_start_id, False
+            for stream_msg in reply.values():
+                for msg_id, messages in stream_msg:
+                    payload = {}
+                    for i in range(0, len(messages), 2):
+                        key = messages[i]
+                        value = messages[i + 1]
+                        payload[key] = value
+                    msg = MQMessage(msg_id, payload)
+                    await self._consume_queue.put(msg)
+        return autoclaim_start_id, True
+
+    async def _read_messages_loop(self) -> None:
+        log.debug("Reading messages from stream %s", self._stream_key)
+        while not self._closed:
+            try:
+                await self._read_messages()
+            except hiredis.HiredisError as e:
+                await self._failover_consumer(e)
+            except Exception as e:
+                log.error(f"Error while reading messages: {e}")
+
+    async def _read_messages(self):
+        log.debug(f"Reading messages from stream {self._stream_key}")
+        async with RedisConnection(self._conf, db=self._db) as client:
+            reply = await client.execute(
+                [
+                    "XREADGROUP",
+                    "GROUP",
+                    self._group_name,
+                    self._consumer_id,
+                    "COUNT",
+                    1,
+                    "BLOCK",
+                    1000,
+                    "STREAMS",
+                    self._stream_key,
+                    ">",  # fetch messages not seen by other consumers
+                ],
+                command_timeout=5,
+            )
+            if reply is None:
+                log.debug("No messages to read")
+                return
+            for stream_msg in reply.values():
+                for msg_id, messages in stream_msg:
+                    payload = {}
+                    for i in range(0, len(messages), 2):
+                        key = messages[i]
+                        value = messages[i + 1]
+                        payload[key] = value
+                    msg = MQMessage(msg_id, payload)
+                    await self._consume_queue.put(msg)
+
+    async def _read_broadcast_messages_loop(self) -> None:
+        log.debug("Reading broadcast messages from stream %s", self._stream_key)
+        last_msg_id = "$"
+        while not self._closed:
+            try:
+                last_msg_id = await self._read_broadcast_messages(last_msg_id)
+            except hiredis.HiredisError as e:
+                await self._failover_consumer(e)
+                last_msg_id = "$"
+            except Exception as e:
+                log.error(f"Error while reading broadcast messages: {e}")
+
+    async def _read_broadcast_messages(self, last_msg_id: str) -> str:
+        async with RedisConnection(self._conf, db=self._db) as client:
+            reply = await client.execute(
+                ["XREAD", "BLOCK", "1000", "STREAMS", self._stream_key, last_msg_id],
+                command_timeout=5,
+            )
+            if reply is None:
+                log.debug("No messages to read")
+                return last_msg_id
+            for stream_msg in reply.values():
+                for msg_id, messages in stream_msg:
+                    payload = {}
+                    for i in range(0, len(messages), 2):
+                        key = messages[i]
+                        value = messages[i + 1]
+                        payload[key] = value
+                    msg = MQMessage(msg_id, payload)
+                    await self._subscribe_queue.put(msg)
+                    last_msg_id = str(msg_id)
+        return last_msg_id
+
+    async def _failover_consumer(self, e: hiredis.HiredisError) -> None:
+        # If the group does not exist, create it
+        # and start the auto claim loop again
+        if not e.args[0].startswith("NOGROUP "):
+            log.error(f"Error while auto claiming messages: {e}")
+            return
+        try:
+            async with RedisConnection(self._conf, db=self._db) as client:
+                await client.execute([
+                    "XGROUP",
+                    "CREATE",
+                    self._stream_key,
+                    self._group_name,
+                    "$",
+                    "MKSTREAM",
+                ])
+        except hiredis.HiredisError as internal_e:
+            log.error(f"Error while creating group: {internal_e}")
+        except Exception as internal_e:
+            log.error(f"Error while creating group: {internal_e}")
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:
