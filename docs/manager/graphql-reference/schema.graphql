@@ -342,7 +342,7 @@ interface Node {
 A schema that contains metadata related to the AuditLogNode.
 It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
 
-Added in 25.5.0.
+Added in 25.6.0.
 """
 type AuditLogSchema {
   """
@@ -356,7 +356,7 @@ type AuditLogSchema {
   status_variants: [String]
 }
 
-"""Added in 25.5.0."""
+"""Added in 25.6.0."""
 type AuditLogConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -385,7 +385,7 @@ type PageInfo {
   endCursor: String
 }
 
-"""Added in 25.5.0. A Relay edge containing a `AuditLog` and its cursor."""
+"""Added in 25.6.0. A Relay edge containing a `AuditLog` and its cursor."""
 type AuditLogEdge {
   """The item at the end of the edge"""
   node: AuditLogNode
@@ -394,7 +394,7 @@ type AuditLogEdge {
   cursor: String!
 }
 
-"""Added in 25.5.0."""
+"""Added in 25.6.0."""
 type AuditLogNode implements Node {
   """The ID of the object"""
   id: ID!

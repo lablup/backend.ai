@@ -28,7 +28,7 @@ class AuditLogSchema(graphene.ObjectType):
     A schema that contains metadata related to the AuditLogNode.
     It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
 
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     entity_type_variants = graphene.List(
@@ -47,12 +47,12 @@ class AuditLogSchema(graphene.ObjectType):
 
 class AuditLogNode(graphene.ObjectType):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     class Meta:
         interfaces = (AsyncNode,)
-        description = "Added in 25.5.0."
+        description = "Added in 25.6.0."
 
     row_id = graphene.UUID(required=True, description="UUID of the audit log row")
     entity_type = graphene.String(required=True, description="Entity ID of the AuditLog")
@@ -151,8 +151,8 @@ class AuditLogNode(graphene.ObjectType):
 
 
 class AuditLogConnection(Connection):
-    """Added in 25.5.0."""
+    """Added in 25.6.0."""
 
     class Meta:
         node = AuditLogNode
-        description = "Added in 25.5.0."
+        description = "Added in 25.6.0."
