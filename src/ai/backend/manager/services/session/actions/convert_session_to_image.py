@@ -25,7 +25,7 @@ class ConvertSessionToImageAction(SessionAction):
 
     @override
     def operation_type(self):
-        return "convert_session_to_image"
+        return "convert_to_image"
 
 
 @dataclass
