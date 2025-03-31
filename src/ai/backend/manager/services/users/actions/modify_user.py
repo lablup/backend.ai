@@ -54,6 +54,10 @@ class ModifyUserAction(UserAction):
 
         return sanitized_data
 
+    @property
+    def has_group_ids(self) -> bool:
+        return (self.group_ids != Sentinel.TOKEN) and (self.group_ids is not None)
+
 
 @dataclass
 class ModifyUserActionResult(BaseActionResult):

@@ -42,7 +42,7 @@ class CreateUserAction(UserAction):
     def get_insertion_data(self) -> dict[str, Any]:
         username = self.username if self.username else self.email
         if self.status is None and self.is_active is not None:
-            _status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
+            self.status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
 
         user_data = {
             "username": username,
@@ -51,7 +51,7 @@ class CreateUserAction(UserAction):
             "need_password_change": self.need_password_change,
             "full_name": self.full_name,
             "description": self.description,
-            "status": _status,
+            "status": self.status,
             "status_info": "admin-requested",  # user mutation is only for admin
             "domain_name": self.domain_name,
             "role": self.role,

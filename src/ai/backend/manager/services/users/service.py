@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import RedisConnectionInfo, Sentinel, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import VFolderOperationFailed
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
@@ -151,22 +151,16 @@ class UserService:
                 )
 
         result: MutationResult = await self._db_mutation_wrapper(_do_mutate)
-        if result.success:
-            return CreateUserActionResult(
-                data=UserData.from_row(result.data),
-                success=True,
-            )
-        else:
-            return CreateUserActionResult(
-                data=None,
-                success=False,
-            )
+        return CreateUserActionResult(
+            data=UserData.from_row(result.data),
+            success=result.success,
+        )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
         data = action.get_modified_data()
         email = action.email
 
-        if not data and action.group_ids is None:
+        if not data and (action.group_ids != Sentinel.TOKEN and action.group_ids is None):
             return ModifyUserActionResult(
                 success=False,
                 message="No data to update",
@@ -283,7 +277,9 @@ class UserService:
                         )
 
             # If domain is changed and no group is associated, clear previous domain's group.
-            if prev_domain_name != updated_user.domain_name and not action.group_ids:
+            if prev_domain_name != updated_user.domain_name and (
+                action.group_ids == Sentinel.TOKEN or action.group_ids is None
+            ):
                 from ai.backend.manager.models import association_groups_users, groups
 
                 await conn.execute(
@@ -293,7 +289,7 @@ class UserService:
                 )
 
             # Update user's group if group_ids parameter is provided.
-            if action.group_ids and updated_user is not None:
+            if action.has_group_ids and updated_user is not None:
                 from ai.backend.manager.models import association_groups_users, groups  # noqa
 
                 # Clear previous groups associated with the user.

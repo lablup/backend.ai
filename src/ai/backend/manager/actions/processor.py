@@ -23,16 +23,21 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         self._func = func
         self._monitors = monitors or []
 
-    async def _run(self, action: TAction) -> ProcessResult[TActionResult]:
+    async def _run(self, action: TAction) -> TActionResult:
         started_at = datetime.now()
-        status: str
+        status: str = "unknown"
+        description: str = "unknown"
+        result: Optional[TActionResult] = None
+        for monitor in self._monitors:
+            await monitor.prepare(action)
         try:
             result = await self._func(action)
             status = "success"
             description = "Success"
-        except Exception as e:
+        except BaseException as e:
             status = "error"
             description = str(e)
+            raise
         finally:
             end_at = datetime.now()
             duration = (end_at - started_at).total_seconds()
@@ -43,15 +48,13 @@ class ActionProcessor(Generic[TAction, TActionResult]):
                 end_at=end_at,
                 duration=duration,
             )
-            return ProcessResult(meta, result)
+            process_result = ProcessResult(meta=meta, result=result)
+            for monitor in reversed(self._monitors):
+                await monitor.done(action, process_result)
+        return result
 
     async def wait_for_complete(self, action: TAction) -> TActionResult:
-        for monitor in self._monitors:
-            await monitor.prepare(action)
-        result = await self._run(action)
-        for monitor in reversed(self._monitors):
-            await monitor.done(action, result)
-        return result.result
+        return await self._run(action)
 
     async def fire_and_forget(self, action: TAction) -> None:
         asyncio.create_task(self.wait_for_complete(action))
