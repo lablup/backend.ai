@@ -37,7 +37,6 @@ import aiohttp
 import aiohttp_cors
 import aiotools
 import attrs
-import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
@@ -65,6 +64,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
 )
 from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
 from ai.backend.manager.services.session.actions.download_file import DownloadFileAction
+from ai.backend.manager.services.session.actions.download_files import DownloadFilesAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1751,41 +1751,15 @@ async def download_files(request: web.Request, params: Any) -> web.Response:
         session_name,
         files[0],
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+    result = await root_ctx.processors.session.download_files.wait_for_complete(
+        DownloadFilesAction(
+            user_id=request["user"]["uuid"],
+            owner_access_key=owner_access_key,
+            session_name=session_name,
+            files=files,
         )
-    try:
-        assert len(files) <= 5, "Too many files"
-        await root_ctx.registry.increment_session_usage(session)
-        # TODO: Read all download file contents. Need to fix by using chuncking, etc.
-        results = await asyncio.gather(
-            *map(
-                functools.partial(root_ctx.registry.download_file, session),
-                files,
-            ),
-        )
-        log.debug("file(s) inside container retrieved")
-    except asyncio.CancelledError:
-        raise
-    except BackendError:
-        log.exception("DOWNLOAD_FILE: exception")
-        raise
-    except (ValueError, FileNotFoundError):
-        raise InvalidAPIParameters("The file is not found.")
-    except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
-        log.exception("DOWNLOAD_FILE: unexpected error!")
-        raise InternalServerError
-
-    with aiohttp.MultipartWriter("mixed") as mpwriter:
-        headers = multidict.MultiDict({"Content-Encoding": "identity"})
-        for tarbytes in results:
-            mpwriter.append(tarbytes, headers)
-        return web.Response(body=mpwriter, status=HTTPStatus.OK)
+    )
+    return web.Response(body=result.result, status=HTTPStatus.OK)
 
 
 @auth_required
