@@ -4,6 +4,7 @@ import enum
 import functools
 import logging
 import uuid
+from collections import UserDict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -91,7 +92,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "rescan_images",
-    "ImageType",
     "ImageAliasRow",
     "ImageLoadFilter",
     "ImageRow",
@@ -303,6 +303,11 @@ async def rescan_images(
     log.debug("running a per-registry metadata scan")
     return await scan_registries(db, matching_registries, reporter=reporter)
     # TODO: delete images removed from registry?
+
+
+class Resources(UserDict[SlotName, dict[str, Decimal]]):
+    pass
+
 
 
 # Defined for avoiding circular import
@@ -666,7 +671,7 @@ class ImageRow(Base):
         return self.__str__()
 
     @property
-    def resources(self) -> dict[SlotName, dict[str, Decimal]]:
+    def resources(self) -> Resources:
         custom_resources = self._resources or {}
         label_resources = self.get_resources_from_labels()  # Set this as default
 
@@ -675,11 +680,11 @@ class ImageRow(Base):
             if label_key not in resources:
                 resources[label_key] = value
 
-        return ImageRow._resources.type._schema.check(resources)
+        return Resources(ImageRow._resources.type._schema.check(resources))
 
-    def get_resources_from_labels(self) -> dict[SlotName, dict[str, Decimal]]:
+    def get_resources_from_labels(self) -> Resources:
         if self.labels is None:
-            raise RuntimeError(f"Labels not loaded in the image {self}")
+            raise RuntimeError(f'Labels not loaded in the ImageRow "({self.image_ref.canonical})"')
 
         RESOURCE_LABEL_PREFIX = "ai.backend.resource.min."
 
@@ -692,7 +697,7 @@ class ImageRow(Base):
             res_key = k[len(RESOURCE_LABEL_PREFIX) :]
             resources[res_key] = {"min": v}
 
-        return ImageRow._resources.type._schema.check(resources)
+        return Resources(ImageRow._resources.type._schema.check(resources))
 
     async def get_slot_ranges(
         self,

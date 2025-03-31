@@ -339,7 +339,7 @@ class Mutations(graphene.ObjectType):
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
     clear_image_custom_resource_limit = ClearImageCustomResourceLimit.Field(
-        description="Added in 25.5.0"
+        description="Added in 25.6.0"
     )
     forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
     forget_image = ForgetImage.Field(
