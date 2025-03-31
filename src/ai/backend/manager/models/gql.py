@@ -455,11 +455,11 @@ class Queries(graphene.ObjectType):
     # super-admin only
     audit_log_schema = graphene.Field(
         AuditLogSchema,
-        description="Added in 25.5.0.",
+        description="Added in 25.6.0.",
     )
     audit_log_nodes = PaginatedConnectionField(
         AuditLogConnection,
-        description="Added in 25.5.0.",
+        description="Added in 25.6.0.",
         filter=graphene.String(
             description="Specifies the criteria used to narrow down the query results based on certain conditions."
         ),

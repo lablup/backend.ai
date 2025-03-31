@@ -10,10 +10,10 @@ type Queries {
     id: ID!
   ): Node
 
-  """Added in 25.5.0."""
+  """Added in 25.6.0."""
   audit_log_schema: AuditLogSchema
 
-  """Added in 25.5.0."""
+  """Added in 25.6.0."""
   audit_log_nodes(
     """
     Specifies the criteria used to narrow down the query results based on certain conditions.
