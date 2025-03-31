@@ -366,8 +366,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
-        rqst_args["headers"] = rqst_args.get("headers") or {}
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -401,9 +399,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
-        rqst_args["headers"] = rqst_args.get("headers") or {}
-
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
 
@@ -468,8 +463,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
-        rqst_args["headers"] = rqst_args.get("headers") or {}
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -503,8 +496,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
-        rqst_args["headers"] = rqst_args.get("headers") or {}
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
         tg.create_task(
@@ -519,7 +510,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_per_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: dict[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         *,
         digest: str,
@@ -576,7 +567,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_single_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: dict[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
     ) -> None:
