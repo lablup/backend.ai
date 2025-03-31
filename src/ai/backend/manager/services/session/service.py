@@ -102,6 +102,10 @@ from ai.backend.manager.services.session.actions.execute_session import (
     ExecuteSessionAction,
     ExecuteSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.get_abusing_report import (
+    GetAbusingReportAction,
+    GetAbusingReportActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1153,3 +1157,23 @@ class SessionService:
             raise
 
         return ExecuteSessionActionResult(result=resp)
+
+    async def get_abusing_report(
+        self, action: GetAbusingReportAction
+    ) -> GetAbusingReportActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        try:
+            async with self._db.begin_readonly_session() as db_sess:
+                session = await SessionRow.get_session(
+                    db_sess,
+                    session_name,
+                    owner_access_key,
+                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                )
+            kernel = session.main_kernel
+            report = await self._agent_registry.get_abusing_report(kernel.id)
+        except BackendError:
+            log.exception("GET_ABUSING_REPORT: exception")
+            raise
+        return GetAbusingReportActionResult(result=report, session_row=session)

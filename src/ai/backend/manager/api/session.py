@@ -68,6 +68,7 @@ from ai.backend.manager.services.session.actions.execute_session import (
     ExecuteSessionAction,
     ExecuteSessionActionParams,
 )
+from ai.backend.manager.services.session.actions.get_abusing_report import GetAbusingReportAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -887,20 +888,13 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
     log.info(
         "GET_ABUSING_REPORT (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-        kernel = session.main_kernel
-        report = await root_ctx.registry.get_abusing_report(kernel.id)
-    except BackendError:
-        log.exception("GET_ABUSING_REPORT: exception")
-        raise
-    return web.json_response(report or {}, status=HTTPStatus.OK)
+    result = await root_ctx.processors.session.get_abusing_report.wait_for_complete(
+        GetAbusingReportAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+        )
+    )
+    return web.json_response(result.result or {}, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
