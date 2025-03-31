@@ -18,7 +18,7 @@ class RescanImagesAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "rescan_images"
+        return "rescan_multi"
 
 
 @dataclass

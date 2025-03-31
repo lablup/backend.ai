@@ -16,7 +16,7 @@ class ClearImagesAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "clear_images"
+        return "clear_multi"
 
 
 @dataclass
