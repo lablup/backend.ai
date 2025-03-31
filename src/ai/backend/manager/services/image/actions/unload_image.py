@@ -16,7 +16,7 @@ class UnloadImageAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "unload_image"
+        return "unload"
 
 
 @dataclass

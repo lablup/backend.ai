@@ -18,7 +18,7 @@ class PurgeImagesAction(ImageAction):
 
     @override
     def operation_type(self) -> str:
-        return "purge_images"
+        return "purge_multi"
 
 
 @dataclass

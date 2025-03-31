@@ -18,7 +18,7 @@ class DealiasImageAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "dealias_image"
+        return "dealias"
 
 
 @dataclass

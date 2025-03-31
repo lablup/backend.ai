@@ -16,7 +16,7 @@ class PreloadImageAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "preload_image"
+        return "preload"
 
 
 @dataclass
