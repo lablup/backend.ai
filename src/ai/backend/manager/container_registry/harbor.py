@@ -368,7 +368,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> None:
         rqst_args = {**rqst_args}
         rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({"Accept": "application/vnd.oci.image.manifest.v1+json"})
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -404,7 +403,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> None:
         rqst_args = {**rqst_args}
         rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
 
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
@@ -472,9 +470,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> None:
         rqst_args = {**rqst_args}
         rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-        })
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -510,9 +505,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> None:
         rqst_args = {**rqst_args}
         rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-        })
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
         tg.create_task(
@@ -595,7 +587,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         """
         manifests = {}
         async with concurrency_sema.get():
-            rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
             # Harbor does not provide architecture information for a single-arch tag reference.
             # We heuristically detect the architecture using the tag name pattern.
             if tag.endswith("-arm64") or tag.endswith("-aarch64"):
