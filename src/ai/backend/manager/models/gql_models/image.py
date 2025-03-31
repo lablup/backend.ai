@@ -796,7 +796,7 @@ class ForgetImage(graphene.Mutation):
 
 class PurgeImageOptions(graphene.InputObjectType):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     remove_from_registry = graphene.Boolean(
@@ -818,7 +818,7 @@ class PurgeImageById(graphene.Mutation):
         options = PurgeImageOptions(
             required=False,
             default_value={"remove_from_registry": False},
-            description="Added in 25.5.0.",
+            description="Added in 25.6.0.",
         )
 
     image = graphene.Field(ImageNode)
@@ -862,7 +862,7 @@ class PurgeImageById(graphene.Mutation):
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Deprecated since 25.5.0. Use `purge_image_by_id`, and `remove_from_registry` option instead."""
+    """Deprecated since 25.6.0. Use `purge_image_by_id`, and `remove_from_registry` option instead."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
