@@ -1140,7 +1140,7 @@ class PurgeImagesResult:
 
 class PurgeImagesKey(graphene.InputObjectType):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     agent_id = graphene.String(required=True)
@@ -1149,21 +1149,21 @@ class PurgeImagesKey(graphene.InputObjectType):
 
 class PurgeImagesOptions(graphene.InputObjectType):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     force = graphene.Boolean(
         default_value=False,
-        description="Remove the images even if it is being used by stopped containers or has other tags, Added in 25.5.0.",
+        description="Remove the images even if it is being used by stopped containers or has other tags, Added in 25.6.0.",
     )
     noprune = graphene.Boolean(
-        default_value=False, description="Don't delete untagged parent images, Added in 25.5.0."
+        default_value=False, description="Don't delete untagged parent images, Added in 25.6.0."
     )
 
 
 class PurgeImagesPayload(graphene.ObjectType):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     task_id = graphene.String()

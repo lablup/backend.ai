@@ -2616,12 +2616,12 @@ type ClearImages {
   msg: String
 }
 
-"""Added in 25.5.0."""
+"""Added in 25.6.0."""
 type PurgeImagesPayload {
   task_id: String
 }
 
-"""Added in 25.5.0."""
+"""Added in 25.6.0."""
 input PurgeImagesKey {
   agent_id: String!
   images: [ImageRefType]!
@@ -2633,14 +2633,14 @@ input ImageRefType {
   architecture: String
 }
 
-"""Added in 25.5.0."""
+"""Added in 25.6.0."""
 input PurgeImagesOptions {
   """
-  Remove the images even if it is being used by stopped containers or has other tags, Added in 25.5.0.
+  Remove the images even if it is being used by stopped containers or has other tags, Added in 25.6.0.
   """
   force: Boolean = false
 
-  """Don't delete untagged parent images, Added in 25.5.0."""
+  """Don't delete untagged parent images, Added in 25.6.0."""
   noprune: Boolean = false
 }
 
