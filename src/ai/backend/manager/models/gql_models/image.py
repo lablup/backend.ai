@@ -1125,7 +1125,7 @@ class ModifyImage(graphene.Mutation):
 
 class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     image_canonical = graphene.String(required=True)
@@ -1134,7 +1134,7 @@ class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
 
 class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     image_node = graphene.Field(ImageNode)
@@ -1143,7 +1143,7 @@ class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
 
 class ClearImageCustomResourceLimit(graphene.Mutation):
     """
-    Added in 25.5.0.
+    Added in 25.6.0.
     """
 
     class Arguments:
