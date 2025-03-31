@@ -3,9 +3,10 @@ import base64
 import dataclasses
 import functools
 import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, cast
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, cast
 
 import aiohttp
 import aiotools
@@ -96,6 +97,10 @@ from ai.backend.manager.services.session.actions.download_file import (
 from ai.backend.manager.services.session.actions.download_files import (
     DownloadFilesAction,
     DownloadFilesActionResult,
+)
+from ai.backend.manager.services.session.actions.execute_session import (
+    ExecuteSessionAction,
+    ExecuteSessionActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -1048,3 +1053,103 @@ class SessionService:
             return DownloadFilesActionResult(
                 result=mpwriter,  # type: ignore
             )
+
+    async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+
+        resp = {}
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        try:
+            await self._agent_registry.increment_session_usage(session)
+            api_version = action.api_version
+
+            run_id: Optional[str]
+            mode: Optional[str]
+
+            if api_version[0] == 1:
+                run_id = action.params.run_id or secrets.token_hex(8)
+                mode = "query"
+                code = action.params.code
+                opts = None
+            elif api_version[0] >= 2:
+                run_id = action.params.run_id
+                mode = action.params.mode
+
+                if run_id is None or mode is None:
+                    # TODO: Create new exception
+                    raise RuntimeError("runId is missing!")
+
+                assert mode in {
+                    "query",
+                    "batch",
+                    "complete",
+                    "continue",
+                    "input",
+                }, "mode has an invalid value."
+                if mode in {"continue", "input"}:
+                    assert run_id is not None, "continuation requires explicit run ID"
+                code = action.params.code
+                opts = action.params.options
+            else:
+                raise RuntimeError("should not reach here")
+            # handle cases when some params are deliberately set to None
+            if code is None:
+                code = ""  # noqa
+            if opts is None:
+                opts = {}  # noqa
+            if mode == "complete":
+                # For legacy
+                resp["result"] = await self._agent_registry.get_completions(session, code, opts)
+            else:
+                raw_result = await self._agent_registry.execute(
+                    session,
+                    api_version,
+                    run_id,
+                    mode,
+                    code,
+                    opts,
+                    flush_timeout=2.0,
+                )
+                if raw_result is None:
+                    # the kernel may have terminated from its side,
+                    # or there was interruption of agents.
+                    resp["result"] = {
+                        "status": "finished",
+                        "runId": run_id,
+                        "exitCode": 130,
+                        "options": {},
+                        "files": [],
+                        "console": [],
+                    }
+                    return ExecuteSessionActionResult(result=resp)
+                # Keep internal/public API compatilibty
+                result = {
+                    "status": raw_result["status"],
+                    "runId": raw_result["runId"],
+                    "exitCode": raw_result.get("exitCode"),
+                    "options": raw_result.get("options"),
+                    "files": raw_result.get("files"),
+                }
+                if api_version[0] == 1:
+                    result["stdout"] = raw_result.get("stdout")
+                    result["stderr"] = raw_result.get("stderr")
+                    result["media"] = raw_result.get("media")
+                    result["html"] = raw_result.get("html")
+                else:
+                    result["console"] = raw_result.get("console")
+                resp["result"] = result
+        except AssertionError as e:
+            log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
+            raise InvalidAPIParameters(extra_msg=e.args[0])
+        except BackendError:
+            log.exception("EXECUTE: exception")
+            raise
+
+        return ExecuteSessionActionResult(result=resp)
