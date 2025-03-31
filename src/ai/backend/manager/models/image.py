@@ -309,7 +309,6 @@ class Resources(UserDict[SlotName, dict[str, Decimal]]):
     pass
 
 
-
 # Defined for avoiding circular import
 def _get_image_endpoint_join_condition():
     from ai.backend.manager.models.endpoint import EndpointRow

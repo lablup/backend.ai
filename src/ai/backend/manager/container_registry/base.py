@@ -40,6 +40,7 @@ from ai.backend.common.types import SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
+from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 
 from ..data.image.types import ImageStatus, ImageType
 from ..exceptions import ScanImageError, ScanTagError
