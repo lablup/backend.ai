@@ -1011,7 +1011,7 @@ class SessionService:
             log.exception("DOWNLOAD_SINGLE: unexpected error!")
             raise InternalServerError
 
-        return DownloadFileActionResult(result=result)
+        return DownloadFileActionResult(result=result, session_row=session)
 
     async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
         session_name = action.session_name
@@ -1055,6 +1055,7 @@ class SessionService:
                 mpwriter.append(tarbytes, headers)
 
             return DownloadFilesActionResult(
+                session_row=session,
                 result=mpwriter,  # type: ignore
             )
 

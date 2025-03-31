@@ -32,4 +32,4 @@ class CommitSessionActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.session_row.session_id)
+        return str(self.session_row.id)
