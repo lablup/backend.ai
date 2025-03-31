@@ -9,6 +9,37 @@ type Queries {
     """The ID of the object"""
     id: ID!
   ): Node
+
+  """Added in 25.6.0."""
+  audit_log_schema: AuditLogSchema
+
+  """Added in 25.6.0."""
+  audit_log_nodes(
+    """
+    Specifies the criteria used to narrow down the query results based on certain conditions.
+    """
+    filter: String
+
+    """Specifies the sorting order of the query result."""
+    order: String
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): AuditLogConnection
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
@@ -307,6 +338,108 @@ interface Node {
   id: ID!
 }
 
+"""
+A schema that contains metadata related to the AuditLogNode.
+It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
+
+Added in 25.6.0.
+"""
+type AuditLogSchema {
+  """
+  Possible values of "AuditLogNode.entity_type"
+  """
+  entity_type_variants: [String]
+
+  """
+  Possible values of "AuditLogNode.status"
+  """
+  status_variants: [String]
+}
+
+"""Added in 25.6.0."""
+type AuditLogConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AuditLogEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""Added in 25.6.0. A Relay edge containing a `AuditLog` and its cursor."""
+type AuditLogEdge {
+  """The item at the end of the edge"""
+  node: AuditLogNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.6.0."""
+type AuditLogNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """UUID of the audit log row"""
+  row_id: UUID!
+
+  """Entity ID of the AuditLog"""
+  entity_type: String!
+
+  """Entity type of the AuditLog"""
+  operation: String!
+
+  """Operation type of the AuditLog"""
+  entity_id: String!
+
+  """The time the AuditLog was reported"""
+  created_at: DateTime!
+
+  """RequestID of the AuditLog"""
+  request_id: UUID!
+
+  """Description of the AuditLog"""
+  description: String!
+
+  """Duration taken to perform the operation"""
+  duration: String!
+
+  """Status of the AuditLog"""
+  status: String!
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
+
 type Agent implements Item {
   id: ID
   status: String
@@ -346,13 +479,6 @@ type Agent implements Item {
 interface Item {
   id: ID
 }
-
-"""
-The `DateTime` scalar type represents a DateTime
-value as specified by
-[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
-"""
-scalar DateTime
 
 """
 Allows use of a JSON String for input / output from the GraphQL schema.
@@ -407,12 +533,6 @@ type ComputeContainer implements Item {
   last_stat: JSONString
   preopen_ports: [Int]
 }
-
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
 
 type ImageNode implements Node {
   """The ID of the object"""
@@ -537,23 +657,6 @@ type ScalinGroupConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """
