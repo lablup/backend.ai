@@ -720,7 +720,7 @@ class AbstractAgent(
         self.event_dispatcher = EventDispatcher(
             dispatcher_queue,
             log_events=self.local_config["debug"]["log-events"],
-            event_observer=self._metric_registry.event,  # type: ignore
+            event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
             etcd_redis_config.get_override_config(RedisRole.STREAM),

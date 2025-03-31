@@ -177,7 +177,11 @@ class EventMetricObserver:
         )
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self,
+        *,
+        event_type: str,
+        duration: float,
+        exception: BaseException,
     ) -> None:
         exception_name = exception.__class__.__name__
         self._event_failure_count.labels(event_type=event_type, exeception=exception_name).inc()

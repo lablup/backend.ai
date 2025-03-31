@@ -488,7 +488,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_dispatcher = EventDispatcher(
         dispatcher_queue,
         log_events=root_ctx.local_config["debug"]["log-events"],
-        event_observer=root_ctx.metrics.event,  # type: ignore
+        event_observer=root_ctx.metrics.event,
     )
     yield
     await root_ctx.event_producer.close()
