@@ -10,8 +10,8 @@ class DeleteDomainAction(DomainAction):
     name: str
 
     @override
-    def entity_id(self) -> str:
-        return self.name
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self) -> str:

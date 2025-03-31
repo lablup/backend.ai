@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Any, Optional, override
 
 from ai.backend.common.types import Sentinel
@@ -22,10 +22,10 @@ class ModifyDomainNodeAction(DomainAction):
     sgroups_to_remove: Optional[list[str]] | Sentinel = Sentinel.TOKEN
     client_mutation_id: Optional[str] | Sentinel = Sentinel.TOKEN
 
-    def entity_id(self):
-        return self._id
+    def entity_id(self) -> Optional[str]:
+        return None
 
-    def operation_type(self):
+    def operation_type(self) -> str:
         return "modify"
 
     def get_modified_fields(self) -> dict[str, Any]:
@@ -33,13 +33,17 @@ class ModifyDomainNodeAction(DomainAction):
             "name",
             "user_info",
             "sgroups_to_add",
-            "sgroups_to_removeclient_mutation_id",
+            "sgroups_to_remove",
+            "client_mutation_id",
         ]
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if v is not Sentinel.TOKEN and k not in exclude_fields
-        }
+        result = {}
+        for f in fields(self):
+            if f.name in exclude_fields:
+                continue
+            value = getattr(self, f.name)
+            if value is not Sentinel.TOKEN:
+                result[f.name] = value
+        return result
 
     def get_sgroups_to_add_as_set(self) -> Optional[set[str]] | Sentinel:
         if isinstance(self.sgroups_to_add, list):

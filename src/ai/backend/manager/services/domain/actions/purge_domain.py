@@ -10,11 +10,11 @@ class PurgeDomainAction(DomainAction):
     name: str
 
     @override
-    def entity_id(self):
-        return self._name
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
-    def operation_type(self):
+    def operation_type(self) -> str:
         return "purge"
 
 

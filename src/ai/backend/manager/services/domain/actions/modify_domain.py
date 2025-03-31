@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
 from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot, Sentinel
@@ -21,28 +21,30 @@ class ModifyDomainAction(DomainAction):
     integration_id: Optional[str] | Sentinel = Sentinel.TOKEN
 
     @override
-    def entity_id(self) -> str:
-        return self.domain_name
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
     def operation_type(self) -> str:
         return "modify"
 
     def get_modified_fields(self) -> dict[str, Any]:
-        return {
-            k: v for k, v in self.__dict__.items() if v is not Sentinel.TOKEN and k != "domain_name"
-        }
+        result = {}
+        for f in fields(self):
+            if f.name == "domain_name":
+                continue
+            value = getattr(self, f.name)
+            if value is not Sentinel.TOKEN:
+                result[f.name] = value
+        return result
 
 
 @dataclass
 class ModifyDomainActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    success: bool
-    description: Optional[str]
+    success: bool = field(compare=False)
+    description: Optional[str] = field(compare=False)
 
     @override
     def entity_id(self) -> Optional[str]:
         return self.domain_data.name if self.domain_data is not None else None
-
-    def __eq__(self, other):
-        return self.domain_data == other.domain_data

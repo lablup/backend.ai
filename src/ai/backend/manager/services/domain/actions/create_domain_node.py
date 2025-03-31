@@ -20,11 +20,11 @@ class CreateDomainNodeAction(DomainAction):
     dotfiles: Optional[bytes] = b"\x90"
 
     @override
-    def entity_id(self):
-        return self.name
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
-    def operation_type(self):
+    def operation_type(self) -> str:
         return "create"
 
     def get_insertion_data(self) -> dict[str, Any]:

@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Self
 
@@ -22,8 +22,8 @@ class DomainData:
     name: str
     description: Optional[str]
     is_active: bool
-    created_at: datetime
-    modified_at: datetime
+    created_at: datetime = field(compare=False)
+    modified_at: datetime = field(compare=False)
     total_resource_slots: ResourceSlot
     allowed_vfolder_hosts: VFolderHostPermissionMap
     allowed_docker_registries: list[str]
@@ -46,13 +46,3 @@ class DomainData:
             dotfiles=row.dotfiles,
             integration_id=row.integration_id,
         )
-
-    def __eq__(self, other):
-        if not isinstance(other, DomainData):
-            return False
-
-        for field in fields(self):
-            if field.name not in ("created_at", "modified_at"):
-                if getattr(self, field.name) != getattr(other, field.name):
-                    return False
-        return True

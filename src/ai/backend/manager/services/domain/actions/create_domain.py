@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
@@ -20,14 +20,14 @@ class CreateDomainAction(DomainAction):
     integration_id: Optional[str] = None
 
     @override
-    def entity_id(self):
-        return self.name
+    def entity_id(self) -> Optional[str]:
+        return None
 
     @override
-    def operation_type(self):
+    def operation_type(self) -> str:
         return "create"
 
-    def get_insert_data(self):
+    def get_insert_data(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -42,12 +42,9 @@ class CreateDomainAction(DomainAction):
 @dataclass
 class CreateDomainActionResult(BaseActionResult):
     domain_data: Optional[DomainData]
-    success: bool
-    description: Optional[str]
+    success: bool = field(compare=False)
+    description: Optional[str] = field(compare=False)
 
     @override
     def entity_id(self) -> Optional[str]:
         return self.domain_data.name if self.domain_data is not None else None
-
-    def __eq__(self, other):
-        return self.domain_data == other.domain_data
