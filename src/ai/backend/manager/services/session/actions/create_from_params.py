@@ -58,6 +58,7 @@ class CreateFromParamsAction(SessionAction):
 
 @dataclass
 class CreateFromParamsActionResult(BaseActionResult):
+    # TODO: Change this to SessionData
     session_id: uuid.UUID
 
     # TODO: Add proper type

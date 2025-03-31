@@ -37,6 +37,7 @@ class CreateClusterAction(SessionAction):
 
 @dataclass
 class CreateClusterActionResult(BaseActionResult):
+    # TODO: Change this to SessionData
     session_id: uuid.UUID
 
     # TODO: Add proper type
