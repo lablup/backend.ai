@@ -23,7 +23,7 @@ class DestroySessionAction(SessionAction):
 
     @override
     def operation_type(self):
-        return "destory_session"
+        return "destory"
 
 
 @dataclass

@@ -19,7 +19,7 @@ class CommitSessionAction(SessionAction):
 
     @override
     def operation_type(self):
-        return "commit_session"
+        return "commit"
 
 
 @dataclass
