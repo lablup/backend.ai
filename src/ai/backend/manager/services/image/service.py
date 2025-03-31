@@ -3,7 +3,6 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.dto.agent.response import PurgeImageResponse
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter

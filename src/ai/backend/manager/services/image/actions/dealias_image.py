@@ -14,7 +14,7 @@ class DealiasImageAction(ImageAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.image_alias.id)
+        return None
 
     @override
     def operation_type(self):
