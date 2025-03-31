@@ -7,8 +7,10 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, cast
 
+import aiohttp
 import aiotools
 import attrs
+import multidict
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.tz import tzutc
@@ -90,6 +92,10 @@ from ai.backend.manager.services.session.actions.destory_session import (
 from ai.backend.manager.services.session.actions.download_file import (
     DownloadFileAction,
     DownloadFileActionResult,
+)
+from ai.backend.manager.services.session.actions.download_files import (
+    DownloadFilesAction,
+    DownloadFilesActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -997,3 +1003,48 @@ class SessionService:
             raise InternalServerError
 
         return DownloadFileActionResult(result=result)
+
+    async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        user_id = action.user_id
+        files = action.files
+
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        try:
+            assert len(files) <= 5, "Too many files"
+            await self._agent_registry.increment_session_usage(session)
+            # TODO: Read all download file contents. Need to fix by using chuncking, etc.
+            results = await asyncio.gather(
+                *map(
+                    functools.partial(self._agent_registry.download_file, session),
+                    files,
+                ),
+            )
+            log.debug("file(s) inside container retrieved")
+        except asyncio.CancelledError:
+            raise
+        except BackendError:
+            log.exception("DOWNLOAD_FILE: exception")
+            raise
+        except (ValueError, FileNotFoundError):
+            raise InvalidAPIParameters("The file is not found.")
+        except Exception:
+            await self._error_monitor.capture_exception(context={"user": user_id})
+            log.exception("DOWNLOAD_FILE: unexpected error!")
+            raise InternalServerError
+
+        with aiohttp.MultipartWriter("mixed") as mpwriter:
+            headers = multidict.MultiDict({"Content-Encoding": "identity"})
+            for tarbytes in results:
+                mpwriter.append(tarbytes, headers)
+
+            return DownloadFilesActionResult(
+                result=mpwriter,  # type: ignore
+            )
