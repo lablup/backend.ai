@@ -21,7 +21,7 @@ class ForgetImageByIdAction(ImageAction):
 
     @override
     def operation_type(self):
-        return "forget_image_by_id"
+        return "forget_by_id"
 
 
 @dataclass
