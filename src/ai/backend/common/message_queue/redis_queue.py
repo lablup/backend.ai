@@ -118,21 +118,7 @@ class RedisQueue(AbstractMessageQueue):
                 await self._auto_claim(autoclaim_start_id, autoclaim_idle_timeout)
                 await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
             except redis.exceptions.ResponseError as e:
-                # If the group does not exist, create it
-                # and start the auto claim loop again
-                if "NOGROUP" in str(e):
-                    log.warning(
-                        "Consumer group %s does not exist, creating it",
-                        self._group_name,
-                    )
-                    await redis_helper.execute(
-                        self._conn,
-                        lambda r: r.xgroup_create(
-                            self._stream_key, self._group_name, mkstream=True
-                        ),
-                    )
-                else:
-                    log.exception("Error while auto claiming messages: %s", e)
+                await self._failover_consumer(e)
             except Exception as e:
                 log.exception("Error while auto claiming messages: %s", e)
 
@@ -162,21 +148,7 @@ class RedisQueue(AbstractMessageQueue):
             try:
                 await self._read_messages()
             except redis.exceptions.ResponseError as e:
-                # If the group does not exist, create it
-                # and start the read messages loop again
-                if "NOGROUP" in str(e):
-                    log.warning(
-                        "Consumer group %s does not exist, creating it",
-                        self._group_name,
-                    )
-                    await redis_helper.execute(
-                        self._conn,
-                        lambda r: r.xgroup_create(
-                            self._stream_key, self._group_name, mkstream=True
-                        ),
-                    )
-                else:
-                    log.exception("Error while reading messages: %s", e)
+                await self._failover_consumer(e)
             except Exception as e:
                 log.exception("Error while reading messages: %s", e)
 
@@ -205,21 +177,7 @@ class RedisQueue(AbstractMessageQueue):
             try:
                 last_msg_id = await self._read_broadcast_messages(last_msg_id)
             except redis.exceptions.ResponseError as e:
-                # If the group does not exist, create it
-                # and start the read messages loop again
-                if "NOGROUP" in str(e):
-                    log.warning(
-                        "Consumer group %s does not exist, creating it",
-                        self._group_name,
-                    )
-                    await redis_helper.execute(
-                        self._conn,
-                        lambda r: r.xgroup_create(
-                            self._stream_key, self._group_name, mkstream=True
-                        ),
-                    )
-                else:
-                    log.exception("Error while reading broadcast messages: %s", e)
+                await self._failover_consumer(e)
                 last_msg_id = "$"
             except Exception as e:
                 log.exception("Error while reading broadcast messages: %s", e)
@@ -241,6 +199,25 @@ class RedisQueue(AbstractMessageQueue):
                 await self._subscribe_queue.put(msg)
                 last_msg_id = msg_id
         return last_msg_id
+
+    async def _failover_consumer(self, e: redis.exceptions.ResponseError) -> None:
+        # If the group does not exist, create it
+        # and start the auto claim loop again
+        if "NOGROUP" in str(e):
+            log.warning(
+                f"Consumer group {self._group_name} does not exist, creating it",
+            )
+            try:
+                await redis_helper.execute(
+                    self._conn,
+                    lambda r: r.xgroup_create(self._stream_key, self._group_name, mkstream=True),
+                )
+            except Exception as e:
+                log.warning(
+                    f"Error while creating consumer group {self._group_name}: {e}",
+                )
+        else:
+            log.exception("Error while auto claiming messages: %s", e)
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:
