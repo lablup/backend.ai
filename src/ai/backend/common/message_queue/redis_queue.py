@@ -212,12 +212,12 @@ class RedisQueue(AbstractMessageQueue):
                     self._conn,
                     lambda r: r.xgroup_create(self._stream_key, self._group_name, mkstream=True),
                 )
-            except Exception as e:
+            except Exception as internal_exception:
                 log.warning(
-                    f"Error while creating consumer group {self._group_name}: {e}",
+                    f"Error while creating consumer group {self._group_name}: {internal_exception}",
                 )
         else:
-            log.exception("Error while auto claiming messages: %s", e)
+            log.exception(f"Error while reading messages: {e}")
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:

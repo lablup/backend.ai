@@ -128,8 +128,8 @@ async def test_error_on_dispatch(redis_container) -> None:
 
     dispatcher = EventDispatcher(
         redis_mq,
-        consumer_exception_handler=handle_exception,
-        subscriber_exception_handler=handle_exception,
+        consumer_exception_handler=handle_exception,  # type: ignore
+        subscriber_exception_handler=handle_exception,  # type: ignore
     )
     producer = EventProducer(redis_mq)
 

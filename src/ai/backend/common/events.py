@@ -1343,7 +1343,7 @@ class EventDispatcher:
 
     @preserve_termination_log
     async def _consume_loop(self) -> None:
-        async for msg in self._msg_queue.consume_queue():  # noqa
+        async for msg in self._msg_queue.consume_queue():  # type: ignore
             if self._closed:
                 return
             event_type = "unknown"
@@ -1378,7 +1378,7 @@ class EventDispatcher:
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        async for msg in self._msg_queue.subscribe_queue():  # noqa
+        async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:
                 return
             event_type = "unknown"

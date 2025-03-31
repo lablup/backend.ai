@@ -166,7 +166,7 @@ async def server_main(
         event_dispatcher = EventDispatcher(
             dispatcher_queue,
             log_events=local_config["debug"]["log-events"],
-            event_observer=metric_registry.event,
+            event_observer=metric_registry.event,  # type: ignore
         )
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
