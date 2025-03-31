@@ -15,7 +15,7 @@ class PurgeUserAction(UserAction):
     delegate_endpoint_ownership: bool | Sentinel = False
 
     def entity_id(self) -> Optional[str]:
-        return self.email
+        return None
 
     def operation_type(self) -> str:
         return "purge"

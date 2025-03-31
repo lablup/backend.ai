@@ -34,7 +34,7 @@ class CreateUserAction(UserAction):
             self.status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
 
     def entity_id(self) -> Optional[str]:
-        return self.username
+        return None
 
     def operation_type(self) -> str:
         return "create"
@@ -79,4 +79,4 @@ class CreateUserActionResult(BaseActionResult):
     success: bool
 
     def entity_id(self) -> Optional[str]:
-        return self.data.username if self.data else None
+        return str(self.data.id) if self.data else None

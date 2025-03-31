@@ -11,7 +11,7 @@ class DeleteUserAction(UserAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return self.email
+        return None
 
     @override
     def operation_type(self) -> str:

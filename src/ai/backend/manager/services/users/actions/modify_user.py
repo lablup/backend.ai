@@ -34,7 +34,7 @@ class ModifyUserAction(UserAction):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return self.username if self.username != Sentinel.TOKEN else None
+        return None
 
     @override
     def operation_type(self) -> str:
