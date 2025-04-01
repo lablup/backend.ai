@@ -18,7 +18,7 @@ class GetSessionInfoAction(SessionAction):
 
     @override
     def operation_type(self):
-        return "get_session_info"
+        return "get_info"
 
 
 @dataclass
