@@ -61,6 +61,7 @@ from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STA
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
+    PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
     SessionRow,
 )
@@ -122,6 +123,10 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
 from ai.backend.manager.services.session.actions.get_dependency_graph import (
     GetDependencyGraphAction,
     GetDependencyGraphActionResult,
+)
+from ai.backend.manager.services.session.actions.get_direct_access_info import (
+    GetDirectAccessInfoAction,
+    GetDirectAccessInfoActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -1272,3 +1277,35 @@ class SessionService:
                 await find_dependency_sessions(root_session_name, db_session, owner_access_key),
             )
         return GetDependencyGraphActionResult(result=dependency_graph)
+
+    async def get_direct_access_info(
+        self, action: GetDirectAccessInfoAction
+    ) -> GetDirectAccessInfoActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+
+        async with self._db.begin_session() as db_sess:
+            sess = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        resp = {}
+        sess_type = cast(SessionTypes, sess.session_type)
+        if sess_type in PRIVATE_SESSION_TYPES:
+            public_host = sess.main_kernel.agent_row.public_host
+            found_ports: dict[str, list[str]] = {}
+            for sport in sess.main_kernel.service_ports:
+                if sport["name"] == "sshd":
+                    found_ports["sshd"] = sport["host_ports"]
+                elif sport["name"] == "sftpd":
+                    found_ports["sftpd"] = sport["host_ports"]
+            resp = {
+                "kernel_role": sess_type.name,  # legacy
+                "session_type": sess_type.name,
+                "public_host": public_host,
+                "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
+            }
+
+        return GetDirectAccessInfoActionResult(result=resp, session_row=sess)

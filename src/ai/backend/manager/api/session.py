@@ -74,6 +74,9 @@ from ai.backend.manager.services.session.actions.get_container_logs import GetCo
 from ai.backend.manager.services.session.actions.get_dependency_graph import (
     GetDependencyGraphAction,
 )
+from ai.backend.manager.services.session.actions.get_direct_access_info import (
+    GetDirectAccessInfoAction,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -114,7 +117,6 @@ from ..models import (
     vfolders,
 )
 from ..models.session import (
-    PRIVATE_SESSION_TYPES,
     SESSION_PRIORITY_DEFAULT,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
@@ -1258,30 +1260,13 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     _, owner_access_key = await get_access_key_scopes(request)
 
-    async with root_ctx.db.begin_session() as db_sess:
-        sess = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+    result = await root_ctx.processors.session.get_direct_access_info.wait_for_complete(
+        GetDirectAccessInfoAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
         )
-    resp = {}
-    sess_type = cast(SessionTypes, sess.session_type)
-    if sess_type in PRIVATE_SESSION_TYPES:
-        public_host = sess.main_kernel.agent_row.public_host
-        found_ports: dict[str, list[str]] = {}
-        for sport in sess.main_kernel.service_ports:
-            if sport["name"] == "sshd":
-                found_ports["sshd"] = sport["host_ports"]
-            elif sport["name"] == "sftpd":
-                found_ports["sftpd"] = sport["host_ports"]
-        resp = {
-            "kernel_role": sess_type.name,  # legacy
-            "session_type": sess_type.name,
-            "public_host": public_host,
-            "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
-        }
-    return web.json_response(resp)
+    )
+    return web.json_response(result.result)
 
 
 @server_status_required(READ_ALLOWED)
