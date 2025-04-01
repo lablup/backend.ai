@@ -78,6 +78,7 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
 )
 from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
+from ai.backend.manager.services.session.actions.interrupt import InterruptAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1359,16 +1360,14 @@ async def interrupt(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("INTERRUPT(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
+
     try:
-        await root_ctx.registry.increment_session_usage(session)
-        await root_ctx.registry.interrupt_session(session)
+        await root_ctx.processors.session.interrupt.wait_for_complete(
+            InterruptAction(
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+            )
+        )
     except BackendError:
         log.exception("INTERRUPT: exception")
         raise

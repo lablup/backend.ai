@@ -67,6 +67,10 @@ from ai.backend.manager.services.session.actions.get_task_logs import (
     GetTaskLogsAction,
     GetTaskLogsActionResult,
 )
+from ai.backend.manager.services.session.actions.interrupt import (
+    InterruptAction,
+    InterruptActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -98,6 +102,7 @@ class SessionProcessors:
     ]
     get_session_info: ActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
     get_task_logs: ActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
+    interrupt: ActionProcessor[InterruptAction, InterruptActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -117,3 +122,4 @@ class SessionProcessors:
         self.get_direct_access_info = ActionProcessor(service.get_direct_access_info)
         self.get_session_info = ActionProcessor(service.get_session_info)
         self.get_task_logs = ActionProcessor(service.get_task_logs)
+        self.interrupt = ActionProcessor(service.interrupt)
