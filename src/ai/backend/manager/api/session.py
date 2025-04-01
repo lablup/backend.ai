@@ -82,6 +82,7 @@ from ai.backend.manager.services.session.actions.rename_session import RenameSes
 from ai.backend.manager.services.session.actions.restart_session import RestartSessionAction
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
+from ai.backend.manager.services.session.actions.sync_agent_registry import SyncAgentRegistryAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -815,7 +816,11 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
         "SYNC_AGENT_REGISTRY (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
     )
     try:
-        await root_ctx.registry.sync_agent_kernel_registry(agent_id)
+        await root_ctx.processors.session.sync_agent_registry.wait_for_complete(
+            SyncAgentRegistryAction(
+                agent_id=agent_id,
+            )
+        )
     except BackendError:
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise

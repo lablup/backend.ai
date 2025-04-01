@@ -1,0 +1,31 @@
+from dataclasses import dataclass
+from typing import Any, Optional, override
+
+from ai.backend.common.types import AgentId
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.services.session.base import SessionAction
+
+
+@dataclass
+class SyncAgentRegistryAction(SessionAction):
+    agent_id: AgentId
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def operation_type(self):
+        return "sync_agent_registry"
+
+
+@dataclass
+class SyncAgentRegistryActionResult(BaseActionResult):
+    # TODO: Add proper type
+    result: Any
+    # session_row: SessionRow
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        # return str(self.session_row.id)
+        return None
