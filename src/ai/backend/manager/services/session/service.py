@@ -180,6 +180,10 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
     StartServiceActionResult,
 )
+from ai.backend.manager.services.session.actions.sync_agent_registry import (
+    SyncAgentRegistryAction,
+    SyncAgentRegistryActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1729,3 +1733,10 @@ class SessionService:
                     token=token_json["token"],
                     wsproxy_addr=wsproxy_advertise_addr,
                 )
+
+    async def sync_agent_registry(
+        self, action: SyncAgentRegistryAction
+    ) -> SyncAgentRegistryActionResult:
+        agent_id = action.agent_id
+        await self._agent_registry.sync_agent_kernel_registry(agent_id)
+        return SyncAgentRegistryActionResult(result=None)

@@ -95,6 +95,10 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
     StartServiceActionResult,
 )
+from ai.backend.manager.services.session.actions.sync_agent_registry import (
+    SyncAgentRegistryAction,
+    SyncAgentRegistryActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -133,6 +137,7 @@ class SessionProcessors:
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
+    sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -159,3 +164,4 @@ class SessionProcessors:
         self.restart_session = ActionProcessor(service.restart_session)
         self.shutdown_service = ActionProcessor(service.shutdown_service)
         self.start_service = ActionProcessor(service.start_service)
+        self.sync_agent_registry = ActionProcessor(service.sync_agent_registry)
