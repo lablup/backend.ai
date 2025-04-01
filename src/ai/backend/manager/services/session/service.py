@@ -146,6 +146,10 @@ from ai.backend.manager.services.session.actions.get_task_logs import (
     GetTaskLogsAction,
     GetTaskLogsActionResult,
 )
+from ai.backend.manager.services.session.actions.interrupt import (
+    InterruptAction,
+    InterruptActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1448,3 +1452,19 @@ class SessionService:
         #     if prepared:
         #         await response.write_eof()
         return GetTaskLogsActionResult(result=response)
+
+    async def interrupt(self, action: InterruptAction) -> InterruptActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        await self._agent_registry.increment_session_usage(session)
+        await self._agent_registry.interrupt_session(session)
+
+        return InterruptActionResult(result=None, session_row=session)
