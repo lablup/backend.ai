@@ -58,7 +58,11 @@ from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.session import (
+    DEAD_SESSION_STATUSES,
+    KernelLoadingStrategy,
+    SessionRow,
+)
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -109,6 +113,10 @@ from ai.backend.manager.services.session.actions.get_abusing_report import (
 from ai.backend.manager.services.session.actions.get_commit_status import (
     GetCommitStatusAction,
     GetCommitStatusActionResult,
+)
+from ai.backend.manager.services.session.actions.get_container_logs import (
+    GetContainerLogsAction,
+    GetContainerLogsActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -1201,3 +1209,48 @@ class SessionService:
             raise
         resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
         return GetCommitStatusActionResult(result=resp, session_row=session)
+
+    async def get_container_logs(
+        self, action: GetContainerLogsAction
+    ) -> GetContainerLogsActionResult:
+        resp = {"result": {"logs": ""}}
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        kernel_id = action.kernel_id
+
+        async with self._db.begin_readonly_session() as db_sess:
+            compute_session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                allow_stale=True,
+                kernel_loading_strategy=(
+                    KernelLoadingStrategy.MAIN_KERNEL_ONLY
+                    if kernel_id is None
+                    else KernelLoadingStrategy.ALL_KERNELS
+                ),
+            )
+
+            if compute_session.status in DEAD_SESSION_STATUSES:
+                if kernel_id is None:
+                    # Get logs from the main kernel
+                    kernel_id = compute_session.main_kernel.id
+                    kernel_log = compute_session.main_kernel.container_log
+                else:
+                    # Get logs from the specific kernel
+                    kernel_row = compute_session.get_kernel_by_id(kernel_id)
+                    kernel_log = kernel_row.container_log
+                if kernel_log is not None:
+                    # Get logs from database record
+                    log.debug("returning log from database record")
+                    resp["result"]["logs"] = kernel_log.decode("utf-8")
+                    return GetContainerLogsActionResult(result=resp, session_row=compute_session)
+
+        registry = self._agent_registry
+        await registry.increment_session_usage(compute_session)
+        resp["result"]["logs"] = await registry.get_logs_from_agent(
+            session=compute_session, kernel_id=kernel_id
+        )
+        log.debug("returning log from agent")
+
+        return GetContainerLogsActionResult(result=resp, session_row=compute_session)

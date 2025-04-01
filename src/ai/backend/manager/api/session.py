@@ -70,6 +70,7 @@ from ai.backend.manager.services.session.actions.execute_session import (
 )
 from ai.backend.manager.services.session.actions.get_abusing_report import GetAbusingReportAction
 from ai.backend.manager.services.session.actions.get_commit_status import GetCommitStatusAction
+from ai.backend.manager.services.session.actions.get_container_logs import GetContainerLogsAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -98,7 +99,6 @@ from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    DEAD_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
@@ -1791,42 +1791,15 @@ async def get_container_logs(
         session_name,
         kernel_id,
     )
-    resp = {"result": {"logs": ""}}
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        compute_session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            allow_stale=True,
-            kernel_loading_strategy=(
-                KernelLoadingStrategy.MAIN_KERNEL_ONLY
-                if kernel_id is None
-                else KernelLoadingStrategy.ALL_KERNELS
-            ),
-        )
-
-        if compute_session.status in DEAD_SESSION_STATUSES:
-            if kernel_id is None:
-                # Get logs from the main kernel
-                kernel_id = compute_session.main_kernel.id
-                kernel_log = compute_session.main_kernel.container_log
-            else:
-                # Get logs from the specific kernel
-                kernel_row = compute_session.get_kernel_by_id(kernel_id)
-                kernel_log = kernel_row.container_log
-            if kernel_log is not None:
-                # Get logs from database record
-                log.debug("returning log from database record")
-                resp["result"]["logs"] = kernel_log.decode("utf-8")
-                return web.json_response(resp, status=HTTPStatus.OK)
 
     try:
-        registry = root_ctx.registry
-        await registry.increment_session_usage(compute_session)
-        resp["result"]["logs"] = await registry.get_logs_from_agent(
-            session=compute_session, kernel_id=kernel_id
+        result = await root_ctx.processors.session.get_container_logs.wait_for_complete(
+            GetContainerLogsAction(
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+                kernel_id=kernel_id,
+            )
         )
-        log.debug("returning log from agent")
     except BackendError:
         log.exception(
             "GET_CONTAINER_LOG(ak:{}/{}, kernel_id: {}, s:{}): unexpected error",
@@ -1836,7 +1809,7 @@ async def get_container_logs(
             session_name,
         )
         raise
-    return web.json_response(resp, status=HTTPStatus.OK)
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
