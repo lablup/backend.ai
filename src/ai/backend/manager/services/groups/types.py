@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Self
 
@@ -9,12 +9,13 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 
 @dataclass
 class GroupData:
-    id: uuid.UUID
+    # TODO: If partial matching test is implemented, we need to remove 'id' from the ignore list
+    id: uuid.UUID = field(compare=False)
     name: str
     description: Optional[str]
     is_active: bool
-    created_at: datetime
-    modified_at: datetime
+    created_at: datetime = field(compare=False)
+    modified_at: datetime = field(compare=False)
     integration_id: Optional[str]
     domain_name: str
     total_resource_slots: ResourceSlot
