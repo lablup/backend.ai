@@ -79,6 +79,10 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
 )
+from ai.backend.manager.services.session.actions.rename_session import (
+    RenameSessionAction,
+    RenameSessionActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -113,6 +117,7 @@ class SessionProcessors:
     interrupt: ActionProcessor[InterruptAction, InterruptActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
+    rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -135,3 +140,4 @@ class SessionProcessors:
         self.interrupt = ActionProcessor(service.interrupt)
         self.list_files = ActionProcessor(service.list_files)
         self.match_sessions = ActionProcessor(service.match_sessions)
+        self.rename_session = ActionProcessor(service.rename_session)

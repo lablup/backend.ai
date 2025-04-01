@@ -81,6 +81,7 @@ from ai.backend.manager.services.session.actions.get_session_info import GetSess
 from ai.backend.manager.services.session.actions.interrupt import InterruptAction
 from ai.backend.manager.services.session.actions.list_files import ListFilesAction
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
+from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -112,7 +113,6 @@ from ..models import (
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     UserRole,
     kernels,
     keypairs,
@@ -1149,20 +1149,14 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
         session_name,
         new_name,
     )
-    async with root_ctx.db.begin_session() as db_sess:
-        compute_session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            allow_stale=True,
-            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+
+    await root_ctx.processors.session.rename_session.wait_for_complete(
+        RenameSessionAction(
+            session_name=session_name,
+            new_name=new_name,
+            owner_access_key=owner_access_key,
         )
-        if compute_session.status != SessionStatus.RUNNING:
-            raise InvalidAPIParameters("Can't change name of not running session")
-        compute_session.name = new_name
-        for kernel in compute_session.kernels:
-            kernel.session_name = new_name
-        await db_sess.commit()
+    )
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 

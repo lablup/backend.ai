@@ -72,6 +72,7 @@ from ai.backend.manager.models.session import (
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
     SessionRow,
+    SessionStatus,
 )
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -157,6 +158,10 @@ from ai.backend.manager.services.session.actions.list_files import (
 from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.rename_session import (
+    RenameSessionAction,
+    RenameSessionActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -1530,3 +1535,25 @@ class SessionService:
                 for item in sessions
             )
         return MatchSessionsActionResult(result=matches)
+
+    async def rename_session(self, action: RenameSessionAction) -> RenameSessionActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        new_name = action.new_name
+
+        async with self._db.begin_session() as db_sess:
+            compute_session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                allow_stale=True,
+                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+            )
+            if compute_session.status != SessionStatus.RUNNING:
+                raise InvalidAPIParameters("Can't change name of not running session")
+            compute_session.name = new_name
+            for kernel in compute_session.kernels:
+                kernel.session_name = new_name
+            await db_sess.commit()
+
+        return RenameSessionActionResult(result=None, session_row=compute_session)
