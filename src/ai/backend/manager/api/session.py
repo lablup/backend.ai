@@ -77,6 +77,7 @@ from ai.backend.manager.services.session.actions.get_dependency_graph import (
 from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
 )
+from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1273,61 +1274,21 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
 @auth_required
 async def get_info(request: web.Request) -> web.Response:
     # NOTE: This API should be replaced with GraphQL version.
-    resp = {}
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("GET_INFO (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     try:
-        async with root_ctx.db.begin_session() as db_sess:
-            sess = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        result = await root_ctx.processors.session.get_session_info.wait_for_complete(
+            GetSessionInfoAction(
+                session_name=session_name,
+                owner_access_key=owner_access_key,
             )
-        await root_ctx.registry.increment_session_usage(sess)
-        resp["domainName"] = sess.domain_name
-        resp["groupId"] = str(sess.group_id)
-        resp["userId"] = str(sess.user_uuid)
-        resp["lang"] = sess.main_kernel.image  # legacy
-        resp["image"] = sess.main_kernel.image
-        resp["architecture"] = sess.main_kernel.architecture
-        resp["registry"] = sess.main_kernel.registry
-        resp["tag"] = sess.tag
-
-        # Resource occupation
-        resp["containerId"] = str(sess.main_kernel.container_id)
-        resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
-        resp["occupyingSlots"] = str(sess.occupying_slots)
-        resp["requestedSlots"] = str(sess.requested_slots)
-        resp["occupiedShares"] = str(
-            sess.main_kernel.occupied_shares
-        )  # legacy, only caculate main kernel's occupying resource
-        resp["environ"] = str(sess.environ)
-        resp["resourceOpts"] = str(sess.resource_opts)
-
-        # Lifecycle
-        resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
-        resp["statusInfo"] = str(sess.status_info)
-        resp["statusData"] = sess.status_data
-        age = datetime.now(tzutc()) - sess.created_at
-        resp["age"] = int(age.total_seconds() * 1000)  # age in milliseconds
-        resp["creationTime"] = str(sess.created_at)
-        resp["terminationTime"] = str(sess.terminated_at) if sess.terminated_at else None
-
-        resp["numQueriesExecuted"] = sess.num_queries
-        resp["lastStat"] = sess.last_stat
-        resp["idleChecks"] = await root_ctx.idle_checker_host.get_idle_check_report(sess.id)
-
-        # Resource limits collected from agent heartbeats were erased, as they were deprecated
-        # TODO: factor out policy/image info as a common repository
-
-        log.info("information retrieved: {0!r}", resp)
+        )
     except BackendError:
         log.exception("GET_INFO: exception")
         raise
-    return web.json_response(resp, status=HTTPStatus.OK)
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)

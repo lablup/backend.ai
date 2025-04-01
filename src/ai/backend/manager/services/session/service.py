@@ -54,6 +54,7 @@ from ai.backend.manager.api.session import (
 from ai.backend.manager.api.utils import catch_unexpected, undefined
 from ai.backend.manager.config import LocalConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
@@ -127,6 +128,10 @@ from ai.backend.manager.services.session.actions.get_dependency_graph import (
 from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
     GetDirectAccessInfoActionResult,
+)
+from ai.backend.manager.services.session.actions.get_session_info import (
+    GetSessionInfoAction,
+    GetSessionInfoActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -231,6 +236,7 @@ class SessionService:
     _event_producer: EventProducer
     _background_task_manager: BackgroundTaskManager
     _error_monitor: ErrorPluginContext
+    _idle_checker_host: IdleCheckerHost
 
     def __init__(
         self,
@@ -242,6 +248,7 @@ class SessionService:
         event_producer: EventProducer,
         background_task_manager: BackgroundTaskManager,
         error_monitor: ErrorPluginContext,
+        idle_checker_host: IdleCheckerHost,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -251,6 +258,7 @@ class SessionService:
         self._event_producer = event_producer
         self._background_task_manager = background_task_manager
         self._error_monitor = error_monitor
+        self._idle_checker_host = idle_checker_host
         self.init_app_ctx()
 
     def init_app_ctx(self) -> None:
@@ -1309,3 +1317,54 @@ class SessionService:
             }
 
         return GetDirectAccessInfoActionResult(result=resp, session_row=sess)
+
+    async def get_session_info(self, action: GetSessionInfoAction) -> GetSessionInfoActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+
+        resp = {}
+        async with self._db.begin_session() as db_sess:
+            sess = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        await self._agent_registry.increment_session_usage(sess)
+        resp["domainName"] = sess.domain_name
+        resp["groupId"] = str(sess.group_id)
+        resp["userId"] = str(sess.user_uuid)
+        resp["lang"] = sess.main_kernel.image  # legacy
+        resp["image"] = sess.main_kernel.image
+        resp["architecture"] = sess.main_kernel.architecture
+        resp["registry"] = sess.main_kernel.registry
+        resp["tag"] = sess.tag
+
+        # Resource occupation
+        resp["containerId"] = str(sess.main_kernel.container_id)
+        resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
+        resp["occupyingSlots"] = str(sess.occupying_slots)
+        resp["requestedSlots"] = str(sess.requested_slots)
+        resp["occupiedShares"] = str(
+            sess.main_kernel.occupied_shares
+        )  # legacy, only caculate main kernel's occupying resource
+        resp["environ"] = str(sess.environ)
+        resp["resourceOpts"] = str(sess.resource_opts)
+
+        # Lifecycle
+        resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
+        resp["statusInfo"] = str(sess.status_info)
+        resp["statusData"] = sess.status_data
+        age = datetime.now(tzutc()) - sess.created_at
+        resp["age"] = int(age.total_seconds() * 1000)  # age in milliseconds
+        resp["creationTime"] = str(sess.created_at)
+        resp["terminationTime"] = str(sess.terminated_at) if sess.terminated_at else None
+
+        resp["numQueriesExecuted"] = sess.num_queries
+        resp["lastStat"] = sess.last_stat
+        resp["idleChecks"] = await self._idle_checker_host.get_idle_check_report(sess.id)
+
+        # Resource limits collected from agent heartbeats were erased, as they were deprecated
+        # TODO: factor out policy/image info as a common repository
+
+        return GetSessionInfoActionResult(result=resp, session_row=sess)

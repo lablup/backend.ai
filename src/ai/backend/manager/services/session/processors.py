@@ -59,6 +59,10 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
     GetDirectAccessInfoActionResult,
 )
+from ai.backend.manager.services.session.actions.get_session_info import (
+    GetSessionInfoAction,
+    GetSessionInfoActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -88,6 +92,7 @@ class SessionProcessors:
     get_direct_access_info: ActionProcessor[
         GetDirectAccessInfoAction, GetDirectAccessInfoActionResult
     ]
+    get_session_info: ActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -105,3 +110,4 @@ class SessionProcessors:
         self.get_container_logs = ActionProcessor(service.get_container_logs)
         self.get_dependency_graph = ActionProcessor(service.get_dependency_graph)
         self.get_direct_access_info = ActionProcessor(service.get_direct_access_info)
+        self.get_session_info = ActionProcessor(service.get_session_info)
