@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections
 import json
 import logging
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -90,7 +91,7 @@ async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
     known_slots = await root_ctx.shared_config.get_resource_slots()
-    return web.json_response(known_slots, status=200)
+    return web.json_response(known_slots, status=HTTPStatus.OK)
 
 
 @check_api_params(
@@ -141,14 +142,14 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
             for k, v in accelerator_metadata.items()
             if k in {"cpu", "mem", *available_slot_keys}
         }
-    return web.json_response(accelerator_metadata, status=200)
+    return web.json_response(accelerator_metadata, status=HTTPStatus.OK)
 
 
 async def get_vfolder_types(request: web.Request) -> web.Response:
     log.info("ETCD.GET_VFOLDER_TYPES ()")
     root_ctx: RootContext = request.app["_root.context"]
     vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    return web.json_response(vfolder_types, status=200)
+    return web.json_response(vfolder_types, status=HTTPStatus.OK)
 
 
 @superadmin_required

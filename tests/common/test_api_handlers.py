@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import Optional, Self
 
 import pytest
@@ -25,7 +26,7 @@ class TestEmptyHandler:
     @api_handler
     async def handle_empty(self) -> APIResponse:
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestEmptyResponseModel(status="success", version="1.0.0"),
         )
 
@@ -39,7 +40,7 @@ async def test_empty_parameter_handler_in_class(aiohttp_client):
     client = await aiohttp_client(app)
     resp = await client.get("/system")
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["status"] == "success"
     assert data["version"] == "1.0.0"
@@ -72,7 +73,7 @@ class CombinedParamsHandler:
         parsed_search = search.parsed
 
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestCombinedResponseModel(
                 user_info={
                     "username": parsed_user.username,
@@ -103,7 +104,7 @@ async def test_combined_parameters_handler_in_class(aiohttp_client):
         "/users/search?keyword=python&category=programming&limit=20", json=test_user_data
     )
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
 
     assert data["user_info"]["username"] == "john_doe"
@@ -123,7 +124,7 @@ class TestMessageHandler:
     @api_handler
     async def handle_message(self) -> APIResponse:
         return APIResponse.build(
-            status_code=200, response_model=TestMessageResponse(message="test")
+            status_code=HTTPStatus.OK, response_model=TestMessageResponse(message="test")
         )
 
 
@@ -136,7 +137,7 @@ async def test_empty_parameter(aiohttp_client):
     client = await aiohttp_client(app)
     resp = await client.get("/test")
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["message"] == "test"
 
@@ -156,7 +157,7 @@ class TestPostUserHandler:
     async def handle_user(self, user: BodyParam[TestPostUserModel]) -> APIResponse:
         parsed_user = user.parsed
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestPostUserResponse(name=parsed_user.name, age=parsed_user.age),
         )
 
@@ -171,7 +172,7 @@ async def test_body_parameter(aiohttp_client):
     test_data = {"name": "John", "age": 30}
     resp = await client.post("/test", json=test_data)
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["name"] == "John"
     assert data["age"] == 30
@@ -192,7 +193,7 @@ class TestSearchQueryHandler:
     async def handle_search(self, query: QueryParam[TestSearchQueryModel]) -> APIResponse:
         parsed_query = query.parsed
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestSearchQueryResponse(
                 search=parsed_query.search, page=parsed_query.page
             ),
@@ -208,7 +209,7 @@ async def test_query_parameter(aiohttp_client):
     client = await aiohttp_client(app)
     resp = await client.get("/test?search=test&page=2")
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["search"] == "test"
     assert data["page"] == 2
@@ -227,7 +228,7 @@ class TestAuthHeaderHandler:
     async def handle_auth(self, headers: HeaderParam[TestAuthHeaderModel]) -> APIResponse:
         parsed_headers = headers.parsed
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestAuthHeaderResponse(authorization=parsed_headers.authorization),
         )
 
@@ -242,7 +243,7 @@ async def test_header_parameter(aiohttp_client):
     headers = {"Authorization": "Bearer token123"}
     resp = await client.get("/test", headers=headers)
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["authorization"] == "Bearer token123"
 
@@ -260,7 +261,8 @@ class TestUserPathHandler:
     async def handle_path(self, path: PathParam[TestUserPathModel]) -> APIResponse:
         parsed_path = path.parsed
         return APIResponse.build(
-            status_code=200, response_model=TestUserPathResponse(user_id=parsed_path.user_id)
+            status_code=HTTPStatus.OK,
+            response_model=TestUserPathResponse(user_id=parsed_path.user_id),
         )
 
 
@@ -273,7 +275,7 @@ async def test_path_parameter(aiohttp_client):
     client = await aiohttp_client(app)
     resp = await client.get("/test/123")
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["user_id"] == "123"
 
@@ -294,7 +296,8 @@ class TestAuthHandler:
     @api_handler
     async def handle_middleware_auth(self, auth: TestAuthInfo) -> APIResponse:
         return APIResponse.build(
-            status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
+            status_code=HTTPStatus.OK,
+            response_model=TestAuthResponse(is_authorized=auth.is_authorized),
         )
 
 
@@ -314,7 +317,7 @@ async def test_middleware_parameter(aiohttp_client):
 
     resp = await client.get("/test")
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["is_authorized"]
 
@@ -323,7 +326,8 @@ class TestInvalidAuthHandler:
     @api_handler
     async def handle_invalid_auth(self, auth: TestAuthInfo) -> APIResponse:
         return APIResponse.build(
-            status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
+            status_code=HTTPStatus.OK,
+            response_model=TestAuthResponse(is_authorized=auth.is_authorized),
         )
 
 
@@ -342,7 +346,7 @@ async def test_middleware_parameter_invalid_type(aiohttp_client):
     client = await aiohttp_client(app)
 
     resp = await client.get("/test")
-    assert resp.status == 500
+    assert resp.status == HTTPStatus.INTERNAL_SERVER_ERROR
 
     error_data = await resp.json()
     assert error_data["type"] == "https://api.backend.ai/probs/internal-server-error"
@@ -383,7 +387,7 @@ class TestMultipleParamsHandler:
         parsed_query = query.parsed
 
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestCombinedResponse(
                 user_name=parsed_body.user_name,
                 query=parsed_query.query,
@@ -409,7 +413,7 @@ async def test_multiple_parameters(aiohttp_client):
     test_data = {"user_name": "John"}
     resp = await client.post("/test?query=yes", json=test_data)
 
-    assert resp.status == 200
+    assert resp.status == HTTPStatus.OK
     data = await resp.json()
     assert data["user_name"] == "John"
     assert data["query"] == "yes"
@@ -431,7 +435,7 @@ class TestRegisterUserHandler:
     async def handle_register(self, user: BodyParam[TestRegisterUserModel]) -> APIResponse:
         test_user = user.parsed
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestRegisterUserResponse(name=test_user.name, age=test_user.age),
         )
 
@@ -445,7 +449,7 @@ async def test_invalid_body(aiohttp_client):
 
     test_data = {"name": "John"}  # age field missing
     error_response = await client.post("/test", json=test_data)
-    assert error_response.status == 400
+    assert error_response.status == HTTPStatus.BAD_REQUEST
 
 
 class TestProductSearchModel(BaseModel):
@@ -463,7 +467,7 @@ class TestProductSearchHandler:
     async def handle_product_search(self, query: QueryParam[TestProductSearchModel]) -> APIResponse:
         parsed_query = query.parsed
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=TestProductSearchResponse(
                 search=parsed_query.search, page=parsed_query.page
             ),
@@ -478,4 +482,4 @@ async def test_invalid_query_parameter(aiohttp_client):
     client = await aiohttp_client(app)
     # request with no query parameter
     error_response = await client.get("/test")
-    assert error_response.status == 400  # InvalidAPIParameters Error raised
+    assert error_response.status == HTTPStatus.BAD_REQUEST  # InvalidAPIParameters Error raised
