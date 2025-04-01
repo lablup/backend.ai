@@ -1,26 +1,56 @@
+import uuid
+from typing import (
+    Any,
+    Mapping,
+    Optional,
+)
+
 from ai.backend.manager.actions.action import BaseActionResult
 
 from .base import VFolderAction
 
 
-class UploadFileAction(VFolderAction):
+class CreateUploadSessionAction(VFolderAction):
+    keypair_resource_policy: Mapping[str, Any]
+    user_uuid: uuid.UUID
+
+    vfolder_uuid: uuid.UUID
+
+    path: str
+    size: str
+
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
+
+    # def operation_type(self) -> str:
+    #     return "create"
+
+
+class CreateUploadSessionActionResult(BaseActionResult):
     pass
 
 
-class UploadFileActionResult(BaseActionResult):
-    pass
+class CreateDownloadSessionAction(VFolderAction):
+    keypair_resource_policy: Mapping[str, Any]
+    user_uuid: uuid.UUID
+
+    vfolder_uuid: uuid.UUID
+
+    path: str
+    archive: bool
+
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
-class DownloadFileAction(VFolderAction):
-    pass
-
-
-class DownloadFileActionResult(BaseActionResult):
+class CreateDownloadSessionActionResult(BaseActionResult):
     pass
 
 
 class ListFilesAction(VFolderAction):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    path: str
 
 
 class ListFilesActionResult(BaseActionResult):
@@ -28,7 +58,13 @@ class ListFilesActionResult(BaseActionResult):
 
 
 class RenameFileAction(VFolderAction):
-    pass
+    user_uuid: uuid.UUID
+    keypair_resource_policy: Mapping[str, Any]
+
+    vfolder_uuid: uuid.UUID
+
+    target_path: str
+    new_name: str
 
 
 class RenameFileActionResult(BaseActionResult):
@@ -36,7 +72,10 @@ class RenameFileActionResult(BaseActionResult):
 
 
 class DeleteFilesAction(VFolderAction):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    files: list[str]
+    recursive: bool = False
 
 
 class DeleteFilesActionResult(BaseActionResult):
@@ -44,7 +83,11 @@ class DeleteFilesActionResult(BaseActionResult):
 
 
 class MkdirAction(VFolderAction):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    path: str | list[str]
+    parents: bool = True
+    exist_ok: bool = False
 
 
 class MkdirActionResult(BaseActionResult):

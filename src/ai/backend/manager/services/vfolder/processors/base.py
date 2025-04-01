@@ -9,6 +9,8 @@ from ..actions.base import (
     CreateVFolderActionResult,
     DeleteForeverVFolderAction,
     DeleteForeverVFolderActionResult,
+    GetVFolderAction,
+    GetVFolderActionResult,
     ListVFolderAction,
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
@@ -25,6 +27,7 @@ from ..services.base import VFolderService
 
 class VFolderBaseProcessors:
     create_vfolder = ActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
+    get_vfolder = ActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder = ActionProcessor[ListVFolderAction, ListVFolderActionResult]
     update_vfolder_attribute = ActionProcessor[
         UpdateVFolderAttributeAction, UpdateVFolderAttributeActionResult
@@ -44,6 +47,7 @@ class VFolderBaseProcessors:
 
     def __init__(self, service: VFolderService):
         self.create_vfolder = ActionProcessor(service.create)
+        self.get_vfolder = ActionProcessor(service.get)
         self.list_vfolder = ActionProcessor(service.list)
         self.update_vfolder_attribute = ActionProcessor(service.update_attribute)
         self.change_ownership = ActionProcessor(service.change_ownership)

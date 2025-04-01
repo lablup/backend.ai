@@ -34,6 +34,9 @@ class Sentinel(enum.Enum):
     token = 0
 
 
+SENTINEL = Sentinel.token
+
+
 @attr.define(slots=True)
 class UserScope:
     domain_name: str

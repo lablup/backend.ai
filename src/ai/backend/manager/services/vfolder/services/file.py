@@ -1,51 +1,238 @@
 from dataclasses import dataclass
+from typing import (
+    cast,
+)
 
-from ....models.utils import ExtendedAsyncSAEngine
-from ....registry import AgentRegistry
+import sqlalchemy as sa
+
+from ai.backend.common.types import (
+    VFolderHostPermission,
+    VFolderID,
+)
+from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import (
+    VFolderRow,
+    ensure_host_permission_allowed,
+    is_unmanaged,
+)
+
 from ..actions.file import (
+    CreateDownloadSessionAction,
+    CreateDownloadSessionActionResult,
+    CreateUploadSessionAction,
+    CreateUploadSessionActionResult,
     DeleteFilesAction,
     DeleteFilesActionResult,
-    DownloadFileAction,
-    DownloadFileActionResult,
     ListFilesAction,
     ListFilesActionResult,
     MkdirAction,
     MkdirActionResult,
     RenameFileAction,
     RenameFileActionResult,
-    UploadFileAction,
-    UploadFileActionResult,
 )
+from ..exceptions import InvalidParameter
 
 
 @dataclass
 class ServiceInitParameter:
     db: ExtendedAsyncSAEngine
-    registry: AgentRegistry
+    shared_config: SharedConfig
+    storage_manager: StorageSessionManager
 
 
 class VFolderFileService:
     _db: ExtendedAsyncSAEngine
-    _registry: AgentRegistry
+    _shared_config: SharedConfig
+    _storage_manager: StorageSessionManager
 
     def __init__(self, parameter: ServiceInitParameter) -> None:
         self._db = parameter.db
-        self._registry = parameter.registry
+        self._shared_config = parameter.shared_config
+        self._storage_manager = parameter.storage_manager
 
-    async def upload_file(self, action: UploadFileAction) -> UploadFileActionResult:
-        pass
+    async def upload_file(
+        self, action: CreateUploadSessionAction
+    ) -> CreateUploadSessionActionResult:
+        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        async with self._db.begin_readonly_session() as db_session:
+            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
+            vfolder_row = await db_session.scalar(query_vfolder)
+            vfolder_row = cast(VFolderRow, vfolder_row)
+            await ensure_host_permission_allowed(
+                db_session.bind,
+                vfolder_row.host,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=action.user_uuid,
+                resource_policy=action.keypair_resource_policy,
+                domain_name=vfolder_row.domain_name,
+                permission=VFolderHostPermission.UPLOAD_FILE,
+            )
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/upload",
+            json={
+                "volume": volume_name,
+                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "relpath": action.path,
+                "size": action.size,
+            },
+        ) as (client_api_url, storage_resp):
+            storage_reply = await storage_resp.json()
+            resp = {
+                "token": storage_reply["token"],
+                "url": str(client_api_url / "upload"),
+            }
 
-    async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
-        pass
+    async def download_file(
+        self, action: CreateDownloadSessionAction
+    ) -> CreateDownloadSessionActionResult:
+        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        async with self._db.begin_readonly_session() as db_session:
+            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
+            vfolder_row = await db_session.scalar(query_vfolder)
+            vfolder_row = cast(VFolderRow, vfolder_row)
+            unmanaged_path = vfolder_row.unmanaged_path
+            await ensure_host_permission_allowed(
+                db_session.bind,
+                vfolder_row.host,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=action.user_uuid,
+                resource_policy=action.keypair_resource_policy,
+                domain_name=vfolder_row.domain_name,
+                permission=VFolderHostPermission.DOWNLOAD_FILE,
+            )
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_row.host, is_unmanaged(unmanaged_path)
+        )
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/download",
+            json={
+                "volume": volume_name,
+                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "relpath": action.path,
+                "archive": action.archive,
+                "unmanaged_path": unmanaged_path if unmanaged_path else None,
+            },
+        ) as (client_api_url, storage_resp):
+            storage_reply = await storage_resp.json()
+            resp = {
+                "token": storage_reply["token"],
+                "url": str(client_api_url / "download"),
+            }
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
-        pass
+        async with self._db.begin_readonly_session() as db_session:
+            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
+            vfolder_row = await db_session.scalar(query_vfolder)
+            vfolder_row = cast(VFolderRow, vfolder_row)
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/list",
+            json={
+                "volume": volume_name,
+                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "relpath": action.path,
+            },
+        ) as (_, storage_resp):
+            result = await storage_resp.json()
+            resp = {
+                "items": [
+                    {
+                        "name": item["name"],
+                        "type": item["type"],
+                        "size": item["stat"]["size"],  # humanize?
+                        "mode": oct(item["stat"]["mode"])[2:][-3:],
+                        "created": item["stat"]["created"],
+                        "modified": item["stat"]["modified"],
+                    }
+                    for item in result["items"]
+                ],
+            }
 
     async def rename_file(self, action: RenameFileAction) -> RenameFileActionResult:
-        pass
+        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        async with self._db.begin_readonly_session() as db_session:
+            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
+            vfolder_row = await db_session.scalar(query_vfolder)
+            vfolder_row = cast(VFolderRow, vfolder_row)
+            await ensure_host_permission_allowed(
+                db_session.bind,
+                vfolder_row.host,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=action.user_uuid,
+                resource_policy=action.keypair_resource_policy,
+                domain_name=vfolder_row.domain_name,
+                permission=VFolderHostPermission.MODIFY,
+            )
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/rename",
+            json={
+                "volume": volume_name,
+                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "relpath": action.target_path,
+                "new_name": action.new_name,
+            },
+        ):
+            pass
 
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
-        pass
+        async with self._db.begin_readonly_session() as db_session:
+            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
+            vfolder_row = await db_session.scalar(query_vfolder)
+            vfolder_row = cast(VFolderRow, vfolder_row)
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/delete",
+            json={
+                "volume": volume_name,
+                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "relpaths": action.files,
+                "recursive": action.recursive,
+            },
+        ):
+            pass
 
     async def mkdir(self, action: MkdirAction) -> MkdirActionResult:
-        pass
+        if isinstance(action.path, list) and len(action.path) > 50:
+            raise InvalidParameter("Too many directories specified.")
+        async with self._db.begin_readonly_session() as db_session:
+            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
+            vfolder_row = await db_session.scalar(query_vfolder)
+            vfolder_row = cast(VFolderRow, vfolder_row)
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/mkdir",
+            json={
+                "volume": volume_name,
+                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "relpath": action.path,
+                "parents": action.parents,
+                "exist_ok": action.exist_ok,
+            },
+        ) as (_, storage_resp):
+            storage_reply = await storage_resp.json()
