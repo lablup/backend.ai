@@ -22,7 +22,6 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    MutableMapping,
     Optional,
     Set,
     Tuple,
@@ -30,7 +29,6 @@ from typing import (
     cast,
     get_args,
 )
-from urllib.parse import urlparse
 
 import aiohttp
 import aiohttp_cors
@@ -43,10 +41,9 @@ from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
-from ai.backend.common.json import load_json, read_json
+from ai.backend.common.json import read_json
 from ai.backend.manager.services.session.actions.commit_session import CommitSessionAction
 from ai.backend.manager.services.session.actions.complete import CompleteAction
 from ai.backend.manager.services.session.actions.convert_session_to_image import (
@@ -84,6 +81,7 @@ from ai.backend.manager.services.session.actions.match_sessions import MatchSess
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.restart_session import RestartSessionAction
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
+from ai.backend.manager.services.session.actions.start_service import StartServiceAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -119,7 +117,6 @@ from ..models import (
     kernels,
     keypairs,
     query_accessible_vfolders,
-    scaling_groups,
     vfolders,
 )
 from ..models.session import (
@@ -131,19 +128,13 @@ from ..models.vfolder import is_unmanaged
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
 from .exceptions import (
-    AppNotFound,
     BackendError,
     InsufficientPrivilege,
-    InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
-    ServiceUnavailable,
-    SessionNotFound,
     StorageProxyError,
-    TooManySessionsMatched,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
-from .scaling_group import query_wsproxy_status
 from .types import CORSOptions, WebMiddleware
 from .utils import (
     BaseResponseModel,
@@ -733,120 +724,26 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
-    app_ctx: PrivateContext = request.app["session.context"]
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
     myself = asyncio.current_task()
     assert myself is not None
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await asyncio.shield(
-                app_ctx.database_ptask_group.create_task(
-                    SessionRow.get_session(
-                        db_sess,
-                        session_name,
-                        access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                        eager_loading_op=[
-                            selectinload(SessionRow.routing).options(noload("*")),
-                        ],
-                    ),
-                )
-            )
-    except (SessionNotFound, TooManySessionsMatched):
-        raise
-
-    query = (
-        sa.select([scaling_groups.c.wsproxy_addr])
-        .select_from(scaling_groups)
-        .where((scaling_groups.c.name == session.scaling_group_name))
-    )
-
-    async with root_ctx.db.begin_readonly() as conn:
-        result = await conn.execute(query)
-        sgroup = result.first()
-    wsproxy_addr = sgroup["wsproxy_addr"]
-    if not wsproxy_addr:
-        raise ServiceUnavailable("No coordinator configured for this resource group")
-    wsproxy_status = await query_wsproxy_status(wsproxy_addr)
-    if advertise_addr := wsproxy_status.get("advertise_address"):
-        wsproxy_advertise_addr = advertise_addr
-    else:
-        wsproxy_advertise_addr = wsproxy_addr
-
-    if session.main_kernel.kernel_host is None:
-        kernel_host = urlparse(session.main_kernel.agent_addr).hostname
-    else:
-        kernel_host = session.main_kernel.kernel_host
-    for sport in session.main_kernel.service_ports:
-        if sport["name"] == service:
-            if sport["is_inference"]:
-                raise InvalidAPIParameters(
-                    f"{service} is an inference app. Starting inference apps can only be done by"
-                    " starting an inference service."
-                )
-            if params["port"]:
-                # using one of the primary/secondary ports of the app
-                try:
-                    hport_idx = sport["container_ports"].index(params["port"])
-                except ValueError:
-                    raise InvalidAPIParameters(
-                        f"Service {service} does not open the port number {params['port']}."
-                    )
-                host_port = sport["host_ports"][hport_idx]
-            else:
-                # using the default (primary) port of the app
-                if "host_ports" not in sport:
-                    host_port = sport["host_port"]  # legacy kernels
-                else:
-                    host_port = sport["host_ports"][0]
-            break
-    else:
-        raise AppNotFound(f"{session_name}:{service}")
-
-    await asyncio.shield(
-        app_ctx.database_ptask_group.create_task(
-            root_ctx.registry.increment_session_usage(session),
+    result = await root_ctx.processors.session.start_service.wait_for_complete(
+        StartServiceAction(
+            session_name=session_name,
+            access_key=access_key,
+            service=service,
+            login_session_token=params.get("login_session_token"),
+            port=params.get("port"),
+            envs=params.get("envs"),
+            arguments=params.get("arguments"),
         )
     )
 
-    opts: MutableMapping[str, Union[None, str, List[str]]] = {}
-    if params["arguments"] is not None:
-        opts["arguments"] = load_json(params["arguments"])
-    if params["envs"] is not None:
-        opts["envs"] = load_json(params["envs"])
-
-    result = await asyncio.shield(
-        app_ctx.rpc_ptask_group.create_task(
-            root_ctx.registry.start_service(session, service, opts),
-        ),
-    )
-    if result["status"] == "failed":
-        raise InternalServerError("Failed to launch the app service", extra_data=result["error"])
-
-    body = {
-        "login_session_token": params["login_session_token"],
-        "kernel_host": kernel_host,
-        "kernel_port": host_port,
-        "session": {
-            "id": str(session.id),
-            "user_uuid": str(session.user_uuid),
-            "group_id": str(session.group_id),
-            "access_key": session.access_key,
-            "domain_name": session.domain_name,
-        },
-    }
-
-    async with aiohttp.ClientSession() as req:
-        async with req.post(
-            f"{wsproxy_addr}/v2/conf",
-            json=body,
-        ) as resp:
-            token_json = await resp.json()
-            return web.json_response({
-                "token": token_json["token"],
-                "wsproxy_addr": wsproxy_advertise_addr,
-            })
+    return web.json_response({
+        "token": result.token,
+        "wsproxy_addr": result.wsproxy_addr,
+    })
 
 
 @server_status_required(ALL_ALLOWED)
