@@ -18,7 +18,7 @@ class GetCommitStatusAction(SessionAction):
 
     @override
     def operation_type(self):
-        return "get_abusing_report"
+        return "get_commit_status"
 
 
 @dataclass
