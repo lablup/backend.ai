@@ -75,6 +75,10 @@ from ai.backend.manager.services.session.actions.list_files import (
     ListFilesAction,
     ListFilesActionResult,
 )
+from ai.backend.manager.services.session.actions.match_sessions import (
+    MatchSessionsAction,
+    MatchSessionsActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -108,6 +112,7 @@ class SessionProcessors:
     get_task_logs: ActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
     interrupt: ActionProcessor[InterruptAction, InterruptActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
+    match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -129,3 +134,4 @@ class SessionProcessors:
         self.get_task_logs = ActionProcessor(service.get_task_logs)
         self.interrupt = ActionProcessor(service.interrupt)
         self.list_files = ActionProcessor(service.list_files)
+        self.match_sessions = ActionProcessor(service.match_sessions)
