@@ -22,6 +22,14 @@ _DEFAULT_AUTOCLAIM_COUNT = 64
 _DEFAULT_QUEUE_MAX_LEN = 128
 
 
+def _make_pieces(payload: dict[bytes, bytes]) -> list[bytes]:
+    pieces = []
+    for k, v in payload.items():
+        pieces.append(k)
+        pieces.append(v)
+    return pieces
+
+
 @dataclass
 class HiRedisMQArgs:
     # Required arguments
@@ -68,10 +76,7 @@ class HiRedisQueue(AbstractMessageQueue):
 
     async def send(self, payload: dict[bytes, bytes]) -> None:
         async with RedisConnection(self._conf, db=self._db) as client:
-            pieces = []
-            for k, v in payload.items():
-                pieces.append(k)
-                pieces.append(v)
+            pieces = _make_pieces(payload)
             await client.execute([
                 "XADD",
                 self._stream_key,
@@ -167,8 +172,32 @@ class HiRedisQueue(AbstractMessageQueue):
                         value = messages[i + 1]
                         payload[key] = value
                     msg = MQMessage(msg_id, payload)
-                    await self._consume_queue.put(msg)
+                    if msg.retry():
+                        await self._retry_message(msg)
+                    else:
+                        # discard the message
+                        await self.done(msg_id)
         return autoclaim_start_id, True
+
+    async def _retry_message(self, message: MQMessage) -> None:
+        pieces = _make_pieces(message.payload)
+        async with RedisConnection(self._conf, db=self._db) as client:
+            await client.pipeline([
+                [
+                    "XACK",
+                    self._stream_key,
+                    self._group_name,
+                    message.msg_id,
+                ],
+                [
+                    "XADD",
+                    self._stream_key,
+                    "MAXLEN",
+                    _DEFAULT_QUEUE_MAX_LEN,
+                    "*",
+                    *pieces,
+                ],
+            ])
 
     async def _read_messages_loop(self) -> None:
         log.debug("Reading messages from stream %s", self._stream_key)
@@ -180,7 +209,7 @@ class HiRedisQueue(AbstractMessageQueue):
             except Exception as e:
                 log.error("Error while reading messages: %s", e)
 
-    async def _read_messages(self):
+    async def _read_messages(self) -> None:
         log.debug("Reading messages from stream %s", self._stream_key)
         async with RedisConnection(self._conf, db=self._db) as client:
             reply = await client.execute(

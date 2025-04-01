@@ -158,7 +158,7 @@ class RedisQueue(AbstractMessageQueue):
     async def _retry_message(self, message: MQMessage) -> None:
         pipe = self._conn.client.pipeline(transaction=True)
         pipe.xack(self._stream_key, self._group_name, message.msg_id)
-        pipe.xadd(self._stream_key, message.payload)
+        pipe.xadd(self._stream_key, message.payload, maxlen=_DEFAULT_QUEUE_MAX_LEN)
         await pipe.execute()
 
     async def _read_messages_loop(self) -> None:
