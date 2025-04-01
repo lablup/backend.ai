@@ -127,35 +127,12 @@ async def server_main(
             log.exception("Unable to read config from etcd")
             raise e
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(redis_config)
-        stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
-        stream_redis = redis_helper.get_redis_object(
-            stream_redis_config,
-            name="event_producer.stream",
-            db=REDIS_STREAM_DB,
+        mq = _make_message_queue(
+            local_config,
+            etcd_redis_config,
         )
-        node_id = local_config["storage-proxy"]["node-id"]
-        redis_mq = RedisQueue(
-            stream_redis,
-            RedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-            ),
-        )
-        dispatcher_queue: AbstractMessageQueue = redis_mq
-        if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
-            dispatcher_queue = HiRedisQueue(
-                stream_redis_config,
-                HiRedisMQArgs(
-                    stream_key="events",
-                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                    node_id=node_id,
-                    db=REDIS_STREAM_DB,
-                ),
-            )
-
         event_producer = EventProducer(
-            redis_mq,
+            mq,
             log_events=local_config["debug"]["log-events"],
         )
         log.info(
@@ -164,7 +141,7 @@ async def server_main(
             safe_print_redis_config(redis_config),
         )
         event_dispatcher = EventDispatcher(
-            dispatcher_queue,
+            mq,
             log_events=local_config["debug"]["log-events"],
             event_observer=metric_registry.event,
         )
@@ -282,6 +259,38 @@ async def server_main(
     finally:
         if aiomon_started:
             m.close()
+
+
+def _make_message_queue(
+    local_config: dict[str, Any],
+    etcd_redis_config: EtcdRedisConfig,
+) -> AbstractMessageQueue:
+    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis = redis_helper.get_redis_object(
+        stream_redis_config,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
+    node_id = local_config["storage-proxy"]["node-id"]
+    if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
+        return HiRedisQueue(
+            stream_redis_config,
+            HiRedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+                db=REDIS_STREAM_DB,
+            ),
+        )
+
+    return RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
 
 
 @click.group(invoke_without_command=True)
