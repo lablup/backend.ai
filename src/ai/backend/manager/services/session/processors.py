@@ -43,6 +43,10 @@ from ai.backend.manager.services.session.actions.get_abusing_report import (
     GetAbusingReportAction,
     GetAbusingReportActionResult,
 )
+from ai.backend.manager.services.session.actions.get_commit_status import (
+    GetCommitStatusAction,
+    GetCommitStatusActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -66,6 +70,7 @@ class SessionProcessors:
     download_files: ActionProcessor[DownloadFilesAction, DownloadFilesActionResult]
     execute_session: ActionProcessor[ExecuteSessionAction, ExecuteSessionActionResult]
     get_abusing_report: ActionProcessor[GetAbusingReportAction, GetAbusingReportActionResult]
+    get_commit_status: ActionProcessor[GetCommitStatusAction, GetCommitStatusActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -79,3 +84,4 @@ class SessionProcessors:
         self.download_files = ActionProcessor(service.download_files)
         self.execute_session = ActionProcessor(service.execute_session)
         self.get_abusing_report = ActionProcessor(service.get_abusing_report)
+        self.get_commit_status = ActionProcessor(service.get_commit_status)

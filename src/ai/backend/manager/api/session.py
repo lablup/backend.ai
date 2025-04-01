@@ -69,6 +69,7 @@ from ai.backend.manager.services.session.actions.execute_session import (
     ExecuteSessionActionParams,
 )
 from ai.backend.manager.services.session.actions.get_abusing_report import GetAbusingReportAction
+from ai.backend.manager.services.session.actions.get_commit_status import GetCommitStatusAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -856,20 +857,13 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     log.info(
         "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            )
-        statuses = await root_ctx.registry.get_commit_status([session.main_kernel.id])
-    except BackendError:
-        log.exception("GET_COMMIT_STATUS: exception")
-        raise
-    resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
-    return web.json_response(resp, status=HTTPStatus.OK)
+    result = await root_ctx.processors.session.get_commit_status.wait_for_complete(
+        GetCommitStatusAction(
+            session_name=session_name,
+            owner_access_key=owner_access_key,
+        )
+    )
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
