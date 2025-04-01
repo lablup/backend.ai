@@ -106,6 +106,10 @@ from ai.backend.manager.services.session.actions.get_abusing_report import (
     GetAbusingReportAction,
     GetAbusingReportActionResult,
 )
+from ai.backend.manager.services.session.actions.get_commit_status import (
+    GetCommitStatusAction,
+    GetCommitStatusActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1178,3 +1182,22 @@ class SessionService:
             log.exception("GET_ABUSING_REPORT: exception")
             raise
         return GetAbusingReportActionResult(result=report, session_row=session)
+
+    async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+
+        try:
+            async with self._db.begin_readonly_session() as db_sess:
+                session = await SessionRow.get_session(
+                    db_sess,
+                    session_name,
+                    owner_access_key,
+                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                )
+            statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
+        except BackendError:
+            log.exception("GET_COMMIT_STATUS: exception")
+            raise
+        resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
+        return GetCommitStatusActionResult(result=resp, session_row=session)
