@@ -14,6 +14,7 @@ import attrs
 import multidict
 import sqlalchemy as sa
 import trafaret as t
+from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.orm import load_only, selectinload
@@ -32,11 +33,17 @@ from ai.backend.common.events import (
 from ai.backend.common.exception import BackendError, InvalidAPIParameters, UnknownImageReference
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPluginContext
-from ai.backend.common.types import ImageAlias, ImageRegistry, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import (
+    ImageAlias,
+    ImageRegistry,
+    RedisConnectionInfo,
+    SessionTypes,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
     GenericForbidden,
     InternalServerError,
+    ObjectNotFound,
     QuotaExceeded,
     SessionAlreadyExists,
     SessionNotFound,
@@ -67,7 +74,9 @@ from ai.backend.manager.models.session import (
     SessionRow,
 )
 from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import is_unmanaged, query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -132,6 +141,10 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
+)
+from ai.backend.manager.services.session.actions.get_task_logs import (
+    GetTaskLogsAction,
+    GetTaskLogsActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -237,6 +250,7 @@ class SessionService:
     _background_task_manager: BackgroundTaskManager
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
+    _storage_manager: StorageSessionManager
 
     def __init__(
         self,
@@ -249,6 +263,7 @@ class SessionService:
         background_task_manager: BackgroundTaskManager,
         error_monitor: ErrorPluginContext,
         idle_checker_host: IdleCheckerHost,
+        storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -259,6 +274,7 @@ class SessionService:
         self._background_task_manager = background_task_manager
         self._error_monitor = error_monitor
         self._idle_checker_host = idle_checker_host
+        self._storage_manager = storage_manager
         self.init_app_ctx()
 
     def init_app_ctx(self) -> None:
@@ -1368,3 +1384,67 @@ class SessionService:
         # TODO: factor out policy/image info as a common repository
 
         return GetSessionInfoActionResult(result=resp, session_row=sess)
+
+    async def get_task_logs(self, action: GetTaskLogsAction) -> GetTaskLogsActionResult:
+        user_uuid = action.user_id
+        user_role = action.user_role
+        domain_name = action.domain_name
+        # kernel_id_str = action.kernel_id
+
+        async with self._db.begin_readonly() as conn:
+            matched_vfolders = await query_accessible_vfolders(
+                conn,
+                user_uuid,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=["user"],
+                extra_vf_conds=(vfolders.c.name == ".logs"),
+            )
+            if not matched_vfolders:
+                raise ObjectNotFound(
+                    extra_data={"vfolder_name": ".logs"},
+                    object_name="vfolder",
+                )
+            log_vfolder = matched_vfolders[0]
+
+        _proxy_name, _volume_name = self._storage_manager.get_proxy_and_volume(
+            log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
+        )
+        response = web.StreamResponse(status=200)
+        response.headers[hdrs.CONTENT_TYPE] = "text/plain"
+        # prepared = False
+
+        # TODO: Fix this
+        # 여기는 뭔가 액션을 여러 개로 나눠 처리해야 할지?
+
+        # try:
+        #     async with self._storage_manager.request(
+        #         log_vfolder["host"],
+        #         "POST",
+        #         "folder/file/fetch",
+        #         json={
+        #             "volume": volume_name,
+        #             "vfid": str(VFolderID.from_row(log_vfolder)),
+        #             "relpath": str(
+        #                 PurePosixPath("task")
+        #                 / kernel_id_str[:2]
+        #                 / kernel_id_str[2:4]
+        #                 / f"{kernel_id_str[4:]}.log",
+        #             ),
+        #         },
+        #         raise_for_status=True,
+        #     ) as (_, storage_resp):
+        #         while True:
+        #             chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+        #             if not chunk:
+        #                 break
+        #             if not prepared:
+        #                 await response.prepare(request)
+        #                 prepared = True
+        #             await response.write(chunk)
+        # except aiohttp.ClientResponseError as e:
+        #     raise StorageProxyError(status=e.status, extra_msg=e.message)
+        # finally:
+        #     if prepared:
+        #         await response.write_eof()
+        return GetTaskLogsActionResult(result=response)
