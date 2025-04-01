@@ -150,6 +150,10 @@ from ai.backend.manager.services.session.actions.interrupt import (
     InterruptAction,
     InterruptActionResult,
 )
+from ai.backend.manager.services.session.actions.list_files import (
+    ListFilesAction,
+    ListFilesActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1468,3 +1472,35 @@ class SessionService:
         await self._agent_registry.interrupt_session(session)
 
         return InterruptActionResult(result=None, session_row=session)
+
+    async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        user_id = action.user_id
+        path = action.path
+
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+
+        resp: MutableMapping[str, Any] = {}
+        try:
+            await self._agent_registry.increment_session_usage(session)
+            result = await self._agent_registry.list_files(session, path)
+            resp.update(result)
+            log.debug("container file list for {0} retrieved", path)
+        except asyncio.CancelledError:
+            raise
+        except BackendError:
+            log.exception("LIST_FILES: exception")
+            raise
+        except Exception:
+            await self._error_monitor.capture_exception(context={"user": user_id})
+            log.exception("LIST_FILES: unexpected error!")
+            raise InternalServerError
+
+        return ListFilesActionResult(result=result, session_row=session)

@@ -79,6 +79,7 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
 )
 from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
 from ai.backend.manager.services.session.actions.interrupt import InterruptAction
+from ai.backend.manager.services.session.actions.list_files import ListFilesAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1685,32 +1686,19 @@ async def list_files(request: web.Request) -> web.Response:
             session_name,
             path,
         )
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session(
-                db_sess,
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        result = await root_ctx.processors.session.list_files.wait_for_complete(
+            ListFilesAction(
+                user_id=request["user"]["uuid"],
+                path=path,
+                session_name=session_name,
+                owner_access_key=owner_access_key,
             )
+        )
     except (asyncio.TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
-    resp: MutableMapping[str, Any] = {}
-    try:
-        await root_ctx.registry.increment_session_usage(session)
-        result = await root_ctx.registry.list_files(session, path)
-        resp.update(result)
-        log.debug("container file list for {0} retrieved", path)
-    except asyncio.CancelledError:
-        raise
-    except BackendError:
-        log.exception("LIST_FILES: exception")
-        raise
-    except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
-        log.exception("LIST_FILES: unexpected error!")
-        raise InternalServerError
-    return web.json_response(resp, status=HTTPStatus.OK)
+
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 class ContainerLogRequestModel(BaseModel):
