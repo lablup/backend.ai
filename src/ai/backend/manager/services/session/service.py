@@ -167,6 +167,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.shutdown_service import (
+    ShutdownServiceAction,
+    ShutdownServiceActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1576,3 +1580,18 @@ class SessionService:
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.restart_session(session)
         return RestartSessionActionResult(result=None, session_row=session)
+
+    async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        service_name = action.service_name
+
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        await self._agent_registry.shutdown_service(session, service_name)
+        return ShutdownServiceActionResult(result=None, session_row=session)

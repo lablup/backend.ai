@@ -83,6 +83,7 @@ from ai.backend.manager.services.session.actions.list_files import ListFilesActi
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.restart_session import RestartSessionAction
+from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1403,15 +1404,15 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
         "SHUTDOWN_SERVICE (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
     )
     service_name = params.get("service_name")
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
+
     try:
-        await root_ctx.registry.shutdown_service(session, service_name)
+        await root_ctx.processors.session.shutdown_service.wait_for_complete(
+            ShutdownServiceAction(
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+                service_name=service_name,
+            )
+        )
     except BackendError:
         log.exception("SHUTDOWN_SERVICE: exception")
         raise

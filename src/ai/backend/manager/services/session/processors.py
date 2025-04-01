@@ -87,6 +87,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.shutdown_service import (
+    ShutdownServiceAction,
+    ShutdownServiceActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -123,6 +127,7 @@ class SessionProcessors:
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
+    shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -147,3 +152,4 @@ class SessionProcessors:
         self.match_sessions = ActionProcessor(service.match_sessions)
         self.rename_session = ActionProcessor(service.rename_session)
         self.restart_session = ActionProcessor(service.restart_session)
+        self.shutdown_service = ActionProcessor(service.shutdown_service)
