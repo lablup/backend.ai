@@ -154,6 +154,10 @@ from ai.backend.manager.services.session.actions.list_files import (
     ListFilesAction,
     ListFilesActionResult,
 )
+from ai.backend.manager.services.session.actions.match_sessions import (
+    MatchSessionsAction,
+    MatchSessionsActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1504,3 +1508,25 @@ class SessionService:
             raise InternalServerError
 
         return ListFilesActionResult(result=result, session_row=session)
+
+    async def match_sessions(self, action: MatchSessionsAction) -> MatchSessionsActionResult:
+        id_or_name_prefix = action.id_or_name_prefix
+        owner_access_key = action.owner_access_key
+
+        matches: list[dict[str, Any]] = []
+        async with self._db.begin_readonly_session() as db_sess:
+            sessions = await SessionRow.match_sessions(
+                db_sess,
+                id_or_name_prefix,
+                owner_access_key,
+            )
+        if sessions:
+            matches.extend(
+                {
+                    "id": str(item.id),
+                    "name": item.name,
+                    "status": item.status.name,
+                }
+                for item in sessions
+            )
+        return MatchSessionsActionResult(result=matches)

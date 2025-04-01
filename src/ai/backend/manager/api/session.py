@@ -80,6 +80,7 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
 from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
 from ai.backend.manager.services.session.actions.interrupt import InterruptAction
 from ai.backend.manager.services.session.actions.list_files import ListFilesAction
+from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1232,25 +1233,16 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
         owner_access_key,
         id_or_name_prefix,
     )
-    matches: List[Dict[str, Any]] = []
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        sessions = await SessionRow.match_sessions(
-            db_sess,
-            id_or_name_prefix,
-            owner_access_key,
+    result = await root_ctx.processors.session.match_sessions.wait_for_complete(
+        MatchSessionsAction(
+            id_or_name_prefix=id_or_name_prefix,
+            owner_access_key=owner_access_key,
         )
-    if sessions:
-        matches.extend(
-            {
-                "id": str(item.id),
-                "name": item.name,
-                "status": item.status.name,
-            }
-            for item in sessions
-        )
+    )
+
     return web.json_response(
         {
-            "matches": matches,
+            "matches": result.result,
         },
         status=HTTPStatus.OK,
     )
