@@ -99,6 +99,10 @@ from ai.backend.manager.services.session.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
 )
+from ai.backend.manager.services.session.actions.upload_files import (
+    UploadFilesAction,
+    UploadFilesActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -138,6 +142,7 @@ class SessionProcessors:
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
+    upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -165,3 +170,4 @@ class SessionProcessors:
         self.shutdown_service = ActionProcessor(service.shutdown_service)
         self.start_service = ActionProcessor(service.start_service)
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry)
+        self.upload_files = ActionProcessor(service.upload_files)

@@ -83,6 +83,7 @@ from ai.backend.manager.services.session.actions.restart_session import RestartS
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
 from ai.backend.manager.services.session.actions.sync_agent_registry import SyncAgentRegistryAction
+from ai.backend.manager.services.session.actions.upload_files import UploadFilesAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -111,7 +112,6 @@ from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
     UserRole,
@@ -1448,7 +1448,6 @@ async def get_dependency_graph(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def upload_files(request: web.Request) -> web.Response:
-    loop = asyncio.get_event_loop()
     reader = await request.multipart()
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
@@ -1456,38 +1455,15 @@ async def upload_files(request: web.Request) -> web.Response:
     log.info(
         "UPLOAD_FILE (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        session = await SessionRow.get_session(
-            db_sess,
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-        )
+
     try:
-        await root_ctx.registry.increment_session_usage(session)
-        file_count = 0
-        upload_tasks = []
-        async for file in aiotools.aiter(reader.next, None):
-            if file_count == 20:
-                raise InvalidAPIParameters("Too many files")
-            file_count += 1
-            # This API handles only small files, so let's read it at once.
-            chunks = []
-            recv_size = 0
-            while True:
-                chunk = await file.read_chunk(size=1048576)
-                if not chunk:
-                    break
-                chunk_size = len(chunk)
-                if recv_size + chunk_size >= 1048576:
-                    raise InvalidAPIParameters("Too large file")
-                chunks.append(chunk)
-                recv_size += chunk_size
-            data = file.decode(b"".join(chunks))
-            log.debug("received file: {0} ({1:,} bytes)", file.filename, recv_size)
-            t = loop.create_task(root_ctx.registry.upload_file(session, file.filename, data))
-            upload_tasks.append(t)
-        await asyncio.gather(*upload_tasks)
+        await root_ctx.processors.session.upload_files.wait_for_complete(
+            UploadFilesAction(
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+                reader=reader,
+            )
+        )
     except BackendError:
         log.exception("UPLOAD_FILES: exception")
         raise

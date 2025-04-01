@@ -184,6 +184,10 @@ from ai.backend.manager.services.session.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
 )
+from ai.backend.manager.services.session.actions.upload_files import (
+    UploadFilesAction,
+    UploadFilesActionResult,
+)
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1740,3 +1744,45 @@ class SessionService:
         agent_id = action.agent_id
         await self._agent_registry.sync_agent_kernel_registry(agent_id)
         return SyncAgentRegistryActionResult(result=None)
+
+    async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+        reader = action.reader
+
+        loop = asyncio.get_event_loop()
+
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+
+        await self._agent_registry.increment_session_usage(session)
+        file_count = 0
+        upload_tasks = []
+        async for file in aiotools.aiter(reader.next, None):
+            if file_count == 20:
+                raise InvalidAPIParameters("Too many files")
+            file_count += 1
+            # This API handles only small files, so let's read it at once.
+            chunks = []
+            recv_size = 0
+            while True:
+                chunk = await file.read_chunk(size=1048576)
+                if not chunk:
+                    break
+                chunk_size = len(chunk)
+                if recv_size + chunk_size >= 1048576:
+                    raise InvalidAPIParameters("Too large file")
+                chunks.append(chunk)
+                recv_size += chunk_size
+            data = file.decode(b"".join(chunks))
+            log.debug("received file: {0} ({1:,} bytes)", file.filename, recv_size)
+            t = loop.create_task(self._agent_registry.upload_file(session, file.filename, data))
+            upload_tasks.append(t)
+        await asyncio.gather(*upload_tasks)
+
+        return UploadFilesActionResult(result=None)
