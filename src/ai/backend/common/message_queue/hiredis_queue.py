@@ -137,7 +137,7 @@ class HiRedisQueue(AbstractMessageQueue):
             except hiredis.HiredisError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error(f"Error while auto claiming messages: {e}")
+                log.error("Error while auto claiming messages: %s", e)
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int
@@ -178,10 +178,10 @@ class HiRedisQueue(AbstractMessageQueue):
             except hiredis.HiredisError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error(f"Error while reading messages: {e}")
+                log.error("Error while reading messages: %s", e)
 
     async def _read_messages(self):
-        log.debug(f"Reading messages from stream {self._stream_key}")
+        log.debug("Reading messages from stream %s", self._stream_key)
         async with RedisConnection(self._conf, db=self._db) as client:
             reply = await client.execute(
                 [
@@ -222,7 +222,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 await self._failover_consumer(e)
                 last_msg_id = "$"
             except Exception as e:
-                log.error(f"Error while reading broadcast messages: {e}")
+                log.error("Error while reading broadcast messages: %s", e)
 
     async def _read_broadcast_messages(self, last_msg_id: str) -> str:
         async with RedisConnection(self._conf, db=self._db) as client:
@@ -249,7 +249,7 @@ class HiRedisQueue(AbstractMessageQueue):
         # If the group does not exist, create it
         # and start the auto claim loop again
         if not e.args[0].startswith("NOGROUP "):
-            log.error(f"Error while auto claiming messages: {e}")
+            log.error("Error while auto claiming messages: %s", e)
             return
         try:
             async with RedisConnection(self._conf, db=self._db) as client:
@@ -261,10 +261,8 @@ class HiRedisQueue(AbstractMessageQueue):
                     "$",
                     "MKSTREAM",
                 ])
-        except hiredis.HiredisError as internal_e:
-            log.error(f"Error while creating group: {internal_e}")
         except Exception as internal_e:
-            log.error(f"Error while creating group: {internal_e}")
+            log.error("Error while creating group: %s", internal_e)
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:

@@ -19,6 +19,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT = 300_000  # 5 minutes
 _DEFAULT_AUTOCLAIM_INTERVAL = 60_000
 _DEFAULT_AUTOCLAIM_COUNT = 64
+_DEFAULT_AUTOCLAIM_MAX_RETRIES = 3
 _DEFAULT_QUEUE_MAX_LEN = 128
 
 
@@ -122,7 +123,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error(f"Error while auto claiming messages: {e}")
+                log.error("Error while auto claiming messages: %s", e)
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int
@@ -157,7 +158,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error(f"Error while reading messages: {e}")
+                log.error("Error while reading messages: %s", e)
 
     async def _read_messages(self) -> None:
         reply = await redis_helper.execute(
@@ -190,7 +191,7 @@ class RedisQueue(AbstractMessageQueue):
                 await self._failover_consumer(e)
                 last_msg_id = "$"
             except Exception as e:
-                log.error(f"Error while reading broadcast messages: {e}")
+                log.error("Error while reading broadcast messages: %s", e)
 
     async def _read_broadcast_messages(self, last_msg_id: str) -> str:
         reply = await redis_helper.execute(
@@ -218,7 +219,9 @@ class RedisQueue(AbstractMessageQueue):
         # and start the auto claim loop again
         if "NOGROUP" in str(e):
             log.warning(
-                f"Consumer group {self._group_name} does not exist, creating it",
+                "Consumer group does not exist. Creating group %s for stream %s",
+                self._group_name,
+                self._stream_key,
             )
             try:
                 await redis_helper.execute(
@@ -227,10 +230,13 @@ class RedisQueue(AbstractMessageQueue):
                 )
             except Exception as internal_exception:
                 log.warning(
-                    f"Error while creating consumer group {self._group_name}: {internal_exception}",
+                    "Error while creating consumer group %s for stream %s: %s",
+                    self._group_name,
+                    self._stream_key,
+                    internal_exception,
                 )
         else:
-            log.error(f"Error while reading messages: {e}")
+            log.error("Error while reading messages: %s", e)
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:
