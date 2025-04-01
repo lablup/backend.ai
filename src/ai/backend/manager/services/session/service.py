@@ -47,6 +47,7 @@ from ai.backend.manager.api.exceptions import (
 from ai.backend.manager.api.session import (
     CustomizedImageVisibilityScope,
     drop,
+    find_dependency_sessions,
     find_dependent_sessions,
     overwritten_param_check,
 )
@@ -117,6 +118,10 @@ from ai.backend.manager.services.session.actions.get_commit_status import (
 from ai.backend.manager.services.session.actions.get_container_logs import (
     GetContainerLogsAction,
     GetContainerLogsActionResult,
+)
+from ai.backend.manager.services.session.actions.get_dependency_graph import (
+    GetDependencyGraphAction,
+    GetDependencyGraphActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -1254,3 +1259,16 @@ class SessionService:
         log.debug("returning log from agent")
 
         return GetContainerLogsActionResult(result=resp, session_row=compute_session)
+
+    async def get_dependency_graph(
+        self, action: GetDependencyGraphAction
+    ) -> GetDependencyGraphActionResult:
+        root_session_name = action.root_session_name
+        owner_access_key = action.owner_access_key
+
+        async with self._db.begin_readonly_session() as db_session:
+            # TODO: Move `find_dependency_sessions` impl to Service layer
+            dependency_graph = (
+                await find_dependency_sessions(root_session_name, db_session, owner_access_key),
+            )
+        return GetDependencyGraphActionResult(result=dependency_graph)

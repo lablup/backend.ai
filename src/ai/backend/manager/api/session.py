@@ -71,6 +71,9 @@ from ai.backend.manager.services.session.actions.execute_session import (
 from ai.backend.manager.services.session.actions.get_abusing_report import GetAbusingReportAction
 from ai.backend.manager.services.session.actions.get_commit_status import GetCommitStatusAction
 from ai.backend.manager.services.session.actions.get_container_logs import GetContainerLogsAction
+from ai.backend.manager.services.session.actions.get_dependency_graph import (
+    GetDependencyGraphAction,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1595,11 +1598,17 @@ async def get_dependency_graph(request: web.Request) -> web.Response:
         root_session_name,
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        return web.json_response(
-            await find_dependency_sessions(root_session_name, db_session, owner_access_key),
-            status=HTTPStatus.OK,
+    result = await root_ctx.processors.session.get_dependency_graph.wait_for_complete(
+        GetDependencyGraphAction(
+            root_session_name=root_session_name,
+            owner_access_key=owner_access_key,
         )
+    )
+
+    return web.json_response(
+        result.result,
+        status=HTTPStatus.OK,
+    )
 
 
 @server_status_required(READ_ALLOWED)

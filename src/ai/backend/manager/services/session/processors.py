@@ -51,6 +51,10 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
     GetContainerLogsAction,
     GetContainerLogsActionResult,
 )
+from ai.backend.manager.services.session.actions.get_dependency_graph import (
+    GetDependencyGraphAction,
+    GetDependencyGraphActionResult,
+)
 from ai.backend.manager.services.session.service import SessionService
 
 
@@ -76,6 +80,7 @@ class SessionProcessors:
     get_abusing_report: ActionProcessor[GetAbusingReportAction, GetAbusingReportActionResult]
     get_commit_status: ActionProcessor[GetCommitStatusAction, GetCommitStatusActionResult]
     get_container_logs: ActionProcessor[GetContainerLogsAction, GetContainerLogsActionResult]
+    get_dependency_graph: ActionProcessor[GetDependencyGraphAction, GetDependencyGraphActionResult]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -91,3 +96,4 @@ class SessionProcessors:
         self.get_abusing_report = ActionProcessor(service.get_abusing_report)
         self.get_commit_status = ActionProcessor(service.get_commit_status)
         self.get_container_logs = ActionProcessor(service.get_container_logs)
+        self.get_dependency_graph = ActionProcessor(service.get_dependency_graph)
