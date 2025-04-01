@@ -3,12 +3,33 @@ from dataclasses import dataclass
 from typing import AsyncGenerator
 
 type MessageId = bytes
+_DEFAULT_RETRY_FIELD = b"_retry_count"
+_DEFAULT_MAX_RETRIES = 3
 
 
 @dataclass
 class MQMessage:
     msg_id: MessageId
     payload: dict[bytes, bytes]
+
+    def retry(self) -> bool:
+        """
+        Retry the message.
+        If the message has been retried more than the maximum number of retries,
+        the message will be discarded.
+        The retry count is stored in the message payload.
+        """
+        if self._retry_count() > _DEFAULT_MAX_RETRIES:
+            return False
+        self.payload[_DEFAULT_RETRY_FIELD] = str(self._retry_count() + 1).encode("utf-8")
+        return True
+
+    def _retry_count(self) -> int:
+        """
+        Get the retry count of the message.
+        The retry count is the number of times the message has been re-delivered.
+        """
+        return int(self.payload.get(_DEFAULT_RETRY_FIELD, b"0"))
 
 
 class AbstractMessageQueue(ABC):

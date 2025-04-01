@@ -19,7 +19,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT = 300_000  # 5 minutes
 _DEFAULT_AUTOCLAIM_INTERVAL = 60_000
 _DEFAULT_AUTOCLAIM_COUNT = 64
-_DEFAULT_AUTOCLAIM_MAX_RETRIES = 3
 _DEFAULT_QUEUE_MAX_LEN = 128
 
 
@@ -70,6 +69,8 @@ class RedisQueue(AbstractMessageQueue):
         If the queue is full, the oldest message will be removed.
         The new message will be added to the end of the queue.
         """
+        if self._closed:
+            raise RuntimeError("Queue is closed")
         await self._conn.client.xadd(self._stream_key, payload, maxlen=_DEFAULT_QUEUE_MAX_LEN)
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
@@ -146,9 +147,19 @@ class RedisQueue(AbstractMessageQueue):
         autoclaim_start_id = reply[0]
         for msg_id, msg_data in reply[1]:
             msg = MQMessage(msg_id, msg_data)
-            await self._consume_queue.put(msg)
+            if msg.retry():
+                await self._retry_message(msg)
+            else:
+                # discard the message
+                await self.done(msg_id)
 
         return autoclaim_start_id, True
+
+    async def _retry_message(self, message: MQMessage) -> None:
+        pipe = self._conn.client.pipeline(transaction=True)
+        pipe.xack(self._stream_key, self._group_name, message.msg_id)
+        pipe.xadd(self._stream_key, message.payload)
+        await pipe.execute()
 
     async def _read_messages_loop(self) -> None:
         log.debug("Reading messages from stream %s", self._stream_key)
