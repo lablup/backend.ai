@@ -6,7 +6,8 @@ import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, cast
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Union, cast
+from urllib.parse import urlparse
 
 import aiohttp
 import aiotools
@@ -17,7 +18,7 @@ import trafaret as t
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common import redis_helper
@@ -41,16 +42,19 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
+    AppNotFound,
     GenericForbidden,
     InternalServerError,
     ObjectNotFound,
     QuotaExceeded,
+    ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
     TaskTemplateNotFound,
     TooManySessionsMatched,
     UnknownImageReferenceError,
 )
+from ai.backend.manager.api.scaling_group import query_wsproxy_status
 from ai.backend.manager.api.session import (
     CustomizedImageVisibilityScope,
     drop,
@@ -67,6 +71,7 @@ from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
@@ -170,6 +175,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
+)
+from ai.backend.manager.services.session.actions.start_service import (
+    StartServiceAction,
+    StartServiceActionResult,
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -1595,3 +1604,128 @@ class SessionService:
             )
         await self._agent_registry.shutdown_service(session, service_name)
         return ShutdownServiceActionResult(result=None, session_row=session)
+
+    async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
+        session_name = action.session_name
+        access_key = action.access_key
+        service = action.service
+        port = action.port
+
+        arguments = action.arguments
+        envs = action.envs
+        login_session_token = action.login_session_token
+
+        try:
+            async with self._db.begin_readonly_session() as db_sess:
+                session = await asyncio.shield(
+                    self._app_ctx.database_ptask_group.create_task(
+                        SessionRow.get_session(
+                            db_sess,
+                            session_name,
+                            access_key,
+                            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                            eager_loading_op=[
+                                selectinload(SessionRow.routing).options(noload("*")),
+                            ],
+                        ),
+                    )
+                )
+        except (SessionNotFound, TooManySessionsMatched):
+            raise
+
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == session.scaling_group_name))
+        )
+
+        async with self._db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        if not wsproxy_addr:
+            raise ServiceUnavailable("No coordinator configured for this resource group")
+        wsproxy_status = await query_wsproxy_status(wsproxy_addr)
+        if advertise_addr := wsproxy_status.get("advertise_address"):
+            wsproxy_advertise_addr = advertise_addr
+        else:
+            wsproxy_advertise_addr = wsproxy_addr
+
+        if session.main_kernel.kernel_host is None:
+            kernel_host = urlparse(session.main_kernel.agent_addr).hostname
+        else:
+            kernel_host = session.main_kernel.kernel_host
+        for sport in session.main_kernel.service_ports:
+            if sport["name"] == service:
+                if sport["is_inference"]:
+                    raise InvalidAPIParameters(
+                        f"{service} is an inference app. Starting inference apps can only be done by"
+                        " starting an inference service."
+                    )
+                if port:
+                    # using one of the primary/secondary ports of the app
+                    try:
+                        hport_idx = sport["container_ports"].index(port)
+                    except ValueError:
+                        raise InvalidAPIParameters(
+                            f"Service {service} does not open the port number {port}."
+                        )
+                    host_port = sport["host_ports"][hport_idx]
+                else:
+                    # using the default (primary) port of the app
+                    if "host_ports" not in sport:
+                        host_port = sport["host_port"]  # legacy kernels
+                    else:
+                        host_port = sport["host_ports"][0]
+                break
+        else:
+            raise AppNotFound(f"{session_name}:{service}")
+
+        await asyncio.shield(
+            self._app_ctx.database_ptask_group.create_task(
+                self._agent_registry.increment_session_usage(session),
+            )
+        )
+
+        opts: MutableMapping[str, Union[None, str, list[str]]] = {}
+        if arguments is not None:
+            opts["arguments"] = load_json(arguments)
+        if envs is not None:
+            opts["envs"] = load_json(envs)
+
+        result = await asyncio.shield(
+            self._app_ctx.rpc_ptask_group.create_task(
+                self._agent_registry.start_service(session, service, opts),
+            ),
+        )
+        if result["status"] == "failed":
+            raise InternalServerError(
+                "Failed to launch the app service", extra_data=result["error"]
+            )
+
+        body = {
+            "login_session_token": login_session_token,
+            "kernel_host": kernel_host,
+            "kernel_port": host_port,
+            "session": {
+                "id": str(session.id),
+                "user_uuid": str(session.user_uuid),
+                "group_id": str(session.group_id),
+                "access_key": session.access_key,
+                "domain_name": session.domain_name,
+            },
+        }
+
+        async with aiohttp.ClientSession() as req:
+            async with req.post(
+                f"{wsproxy_addr}/v2/conf",
+                json=body,
+            ) as resp:
+                token_json = await resp.json()
+
+                return StartServiceActionResult(
+                    result=None,
+                    session_row=session,
+                    token=token_json["token"],
+                    wsproxy_addr=wsproxy_advertise_addr,
+                )
