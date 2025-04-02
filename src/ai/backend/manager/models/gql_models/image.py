@@ -56,8 +56,10 @@ from ai.backend.manager.services.image.actions.modify_image import (
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
-    PurgeImagesAction,
-    PurgeImagesKeyData,
+    PurgedImagesData,
+    PurgeImageAction,
+    PurgeImageActionResult,
+    PurgeImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
@@ -1178,31 +1180,44 @@ class PurgeImages(graphene.Mutation):
         log.info(f"purge images ({agent_images}) by API request")
 
         async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
-            action_result = await ctx.processors.image.purge_images.wait_for_complete(
-                PurgeImagesAction(
-                    keys=[
-                        PurgeImagesKeyData(
-                            agent_id=key.agent_id,
-                            images=[
+            total_result: PurgeImagesActionResult = PurgeImagesActionResult(
+                total_reserved_bytes=0,
+                purged_images=[],
+                errors=[],
+            )
+
+            for key in keys:
+                agent_id = key.agent_id
+                for img in key.images:
+                    # TODO: Use asyncio.gather?
+                    result: PurgeImageActionResult = (
+                        await ctx.processors.image.purge_image.wait_for_complete(
+                            PurgeImageAction(
                                 ImageRefData(
                                     name=img.name,
                                     registry=img.registry,
                                     architecture=img.architecture,
-                                )
-                                for img in key.images
-                            ],
+                                ),
+                                agent_id=agent_id,
+                                force=options.force,
+                                noprune=options.noprune,
+                            )
                         )
-                        for key in keys
-                    ],
-                    force=options.force,
-                    noprune=options.noprune,
-                )
-            )
+                    )
 
-            for error in action_result.errors:
-                log.error(error)
+                    total_result.total_reserved_bytes += result.reserved_bytes
+                    total_result.purged_images.append(
+                        PurgedImagesData(
+                            agent_id=agent_id,
+                            purged_images=[result.purged_image.name],
+                        )
+                    )
 
-            return DispatchResult.success(action_result)
+                    if result.error is not None:
+                        log.error(result.error)
+                        total_result.errors.append(result.error)
+
+            return DispatchResult.success(total_result)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return PurgeImagesPayload(task_id=task_id)

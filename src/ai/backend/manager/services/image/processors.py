@@ -32,6 +32,8 @@ from ai.backend.manager.services.image.actions.purge_image_by_id import (
     PurgeImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.purge_images import (
+    PurgeImageAction,
+    PurgeImageActionResult,
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
@@ -65,6 +67,7 @@ class ImageProcessors:
         UntagImageFromRegistryAction, UntagImageFromRegistryActionResult
     ]
     rescan_images: ActionProcessor[RescanImagesAction, RescanImagesActionResult]
+    purge_image: ActionProcessor[PurgeImageAction, PurgeImageActionResult]
     purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
 
     def __init__(self, service: ImageService) -> None:
@@ -79,4 +82,5 @@ class ImageProcessors:
         self.unload_image = ActionProcessor(service.unload_image)
         self.untag_image_from_registry = ActionProcessor(service.untag_image_from_registry)
         self.rescan_images = ActionProcessor(service.rescan_images)
+        self.purge_image = ActionProcessor(service.purge_image)
         self.purge_images = ActionProcessor(service.purge_images)
