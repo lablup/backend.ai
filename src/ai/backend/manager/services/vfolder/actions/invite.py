@@ -4,15 +4,23 @@ from dataclasses import dataclass
 from typing import (
     Any,
     Optional,
+    override,
 )
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 
-from .base import VFolderAction
+from ..types import VFolderInvitationInfo
 
 
-class InviteVFolderAction(VFolderAction):
+@dataclass
+class VFolderInvitationAction(BaseAction):
+    def entity_type(self):
+        return "vfolder_invitation"
+
+
+@dataclass
+class InviteVFolderAction(VFolderInvitationAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
@@ -20,53 +28,137 @@ class InviteVFolderAction(VFolderAction):
     mount_permission: VFolderMountPermission
     invitee_user_uuids: list[uuid.UUID]
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self):
+        return "invite"
+
+
+@dataclass
 class InviteVFolderActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+    invitation_ids: list[uuid.UUID]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
-class AcceptInvitationAction(VFolderAction):
+@dataclass
+class AcceptInvitationAction(VFolderInvitationAction):
     invitation_id: uuid.UUID
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.invitation_id)
 
+    @override
+    def operation_type(self):
+        return "accept"
+
+
+@dataclass
 class AcceptInvitationActionResult(BaseActionResult):
-    pass
+    invitation_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.invitation_id)
 
 
-class RejectInvitationAction(VFolderAction):
+@dataclass
+class RejectInvitationAction(VFolderInvitationAction):
     invitation_id: uuid.UUID
     requester_user_uuid: uuid.UUID
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.invitation_id)
 
+    @override
+    def operation_type(self):
+        return "reject"
+
+
+@dataclass
 class RejectInvitationActionResult(BaseActionResult):
-    pass
+    invitation_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.invitation_id)
 
 
-class UpdateInvitationAction(VFolderAction):
+@dataclass
+class UpdateInvitationAction(VFolderInvitationAction):
     invitation_id: uuid.UUID
 
     requester_user_uuid: uuid.UUID
     mount_permission: VFolderMountPermission
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.invitation_id)
 
-class UpdateInvitationActionResult(BaseActionResult):
-    pass
-
-
-class ListInvitationAction(VFolderAction):
-    requester_user_uuid: uuid.UUID
-
-
-class ListInvitationActionResult(BaseActionResult):
-    pass
+    @override
+    def operation_type(self):
+        return "update"
 
 
 @dataclass
-class LeaveInvitedVFolderAction(VFolderAction):
-    shared_user_uuid: uuid.UUID
+class UpdateInvitationActionResult(BaseActionResult):
+    invitation_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.invitation_id)
+
+
+@dataclass
+class ListInvitationAction(VFolderInvitationAction):
+    requester_user_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.requester_user_uuid)
+
+    @override
+    def operation_type(self):
+        return "get"
+
+
+@dataclass
+class ListInvitationActionResult(BaseActionResult):
+    requester_user_uuid: uuid.UUID
+    info: list[VFolderInvitationInfo]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.requester_user_uuid)
+
+
+@dataclass
+class LeaveInvitedVFolderAction(VFolderInvitationAction):
     vfolder_uuid: uuid.UUID
-    requester_user_uuid: Optional[uuid.UUID] = None
+    requester_user_uuid: uuid.UUID
+    shared_user_uuid: Optional[uuid.UUID] = None
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
+
+    @override
+    def operation_type(self):
+        return "leave"
 
 
+@dataclass
 class LeaveInvitedVFolderActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)

@@ -22,9 +22,6 @@ class VFolderBaseInfo:
     created_at: datetime
     cloneable: bool
 
-    num_files: int
-    used_bytes: int
-
 
 @dataclass
 class VFolderOwnershipInfo:
@@ -35,3 +32,26 @@ class VFolderOwnershipInfo:
 class VFolderUsageInfo:
     num_files: int
     used_bytes: int
+
+
+@dataclass
+class VFolderInvitationInfo:
+    id: uuid.UUID
+    vfolder_id: uuid.UUID
+    vfolder_name: str
+    invitee_user_email: str
+    inviter_user_email: str
+    mount_permission: VFolderMountPermission
+    created_at: datetime
+    modified_at: datetime
+    status: VFolderOperationStatus
+
+
+@dataclass
+class FileInfo:
+    name: str
+    type: str
+    size: int
+    mode: str
+    created: str
+    modified: str

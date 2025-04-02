@@ -1,15 +1,20 @@
 import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import (
     Any,
-    Mapping,
     Optional,
+    override,
 )
 
+from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
 
+from ..types import FileInfo
 from .base import VFolderAction
 
 
+@dataclass
 class CreateUploadSessionAction(VFolderAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
@@ -19,17 +24,28 @@ class CreateUploadSessionAction(VFolderAction):
     path: str
     size: str
 
+    @override
     def entity_id(self) -> Optional[str]:
         return str(self.vfolder_uuid)
 
-    # def operation_type(self) -> str:
-    #     return "create"
+    @override
+    def operation_type(self) -> str:
+        return "upload"
 
 
+@dataclass
 class CreateUploadSessionActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    token: str
+    url: str
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class CreateDownloadSessionAction(VFolderAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
@@ -39,24 +55,53 @@ class CreateDownloadSessionAction(VFolderAction):
     path: str
     archive: bool
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
+
+    @override
+    def operation_type(self) -> str:
+        return "download"
+
+
+@dataclass
+class CreateDownloadSessionActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
+
+    token: str
+    url: str
+
+    @override
     def entity_id(self) -> Optional[str]:
         return str(self.vfolder_uuid)
 
 
-class CreateDownloadSessionActionResult(BaseActionResult):
-    pass
-
-
+@dataclass
 class ListFilesAction(VFolderAction):
     vfolder_uuid: uuid.UUID
 
     path: str
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self) -> str:
+        return "list-files"
+
+
+@dataclass
 class ListFilesActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+    files: list[FileInfo]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class RenameFileAction(VFolderAction):
     user_uuid: uuid.UUID
     keypair_resource_policy: Mapping[str, Any]
@@ -66,22 +111,50 @@ class RenameFileAction(VFolderAction):
     target_path: str
     new_name: str
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self) -> str:
+        return "rename"
+
+
+@dataclass
 class RenameFileActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class DeleteFilesAction(VFolderAction):
     vfolder_uuid: uuid.UUID
 
     files: list[str]
     recursive: bool = False
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self) -> str:
+        return "delete-files"
+
+
+@dataclass
 class DeleteFilesActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class MkdirAction(VFolderAction):
     vfolder_uuid: uuid.UUID
 
@@ -89,6 +162,20 @@ class MkdirAction(VFolderAction):
     parents: bool = True
     exist_ok: bool = False
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self) -> str:
+        return "mkdir"
+
+
+@dataclass
 class MkdirActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+    results: ResultSet
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)

@@ -18,12 +18,12 @@ from ..services.file import VFolderFileService
 
 
 class VFolderFileProcessors:
-    upload_file = ActionProcessor[CreateUploadSessionAction, CreateUploadSessionActionResult]
-    download_file = ActionProcessor[CreateDownloadSessionAction, CreateDownloadSessionActionResult]
-    list_files = ActionProcessor[ListFilesAction, ListFilesActionResult]
-    rename_file = ActionProcessor[RenameFileAction, RenameFileActionResult]
-    delete_files = ActionProcessor[DeleteFilesAction, DeleteFilesActionResult]
-    mkdir = ActionProcessor[MkdirAction, MkdirActionResult]
+    upload_file: ActionProcessor[CreateUploadSessionAction, CreateUploadSessionActionResult]
+    download_file: ActionProcessor[CreateDownloadSessionAction, CreateDownloadSessionActionResult]
+    list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
+    rename_file: ActionProcessor[RenameFileAction, RenameFileActionResult]
+    delete_files: ActionProcessor[DeleteFilesAction, DeleteFilesActionResult]
+    mkdir: ActionProcessor[MkdirAction, MkdirActionResult]
 
     def __init__(self, service: VFolderFileService) -> None:
         self.upload_file = ActionProcessor(service.upload_file)

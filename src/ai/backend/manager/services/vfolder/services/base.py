@@ -168,14 +168,14 @@ class VFolderService:
                     result = await sess.execute(query)
                     group_row = cast(Optional[GroupRow], result.scalar())
                     if group_row is None:
-                        raise ProjectNotFound(extra_data=group_id_or_name)
+                        raise ProjectNotFound(group_id_or_name)
                     _gid, max_vfolder_count, max_quota_scope_size = (
                         cast(Optional[uuid.UUID], group_row.id),
                         cast(int, group_row.resource_policy_row.max_vfolder_count),
                         cast(int, group_row.resource_policy_row.max_quota_scope_size),
                     )
                     if _gid is None:
-                        raise ProjectNotFound(extra_data=group_id_or_name)
+                        raise ProjectNotFound(group_id_or_name)
                     group_uuid = _gid
                     group_type = cast(ProjectType, group_row.type)
                 case uuid.UUID():
@@ -216,7 +216,7 @@ class VFolderService:
                     )
                     container_uid = cast(Optional[int], user_row.container_uid)
                 case _:
-                    raise ProjectNotFound(extra_data=group_id_or_name)
+                    raise ProjectNotFound(group_id_or_name)
 
             vfolder_permission_mode = (
                 VFOLDER_GROUP_PERMISSION_MODE if container_uid is not None else None
@@ -224,7 +224,7 @@ class VFolderService:
 
             # Check if group exists when it's given a non-empty value.
             if group_id_or_name and group_uuid is None:
-                raise ProjectNotFound(extra_data=group_id_or_name)
+                raise ProjectNotFound(group_id_or_name)
 
             # Determine the ownership type and the quota scope ID.
             if group_uuid is not None:
@@ -311,7 +311,7 @@ class VFolderService:
                 extra_vf_conds=(sa.and_(*extra_vf_conds)),
             )
             if len(entries) > 0:
-                raise VFolderAlreadyExists(extra_data=action.name)
+                raise VFolderAlreadyExists(action.name)
             try:
                 folder_id = uuid.uuid4()
                 vfid = VFolderID(quota_scope_id, folder_id)
@@ -400,32 +400,47 @@ class VFolderService:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
             vfolder_row = await db_session.scalar(query_vfolder)
             vfolder_row = cast(VFolderRow, vfolder_row)
-            if update_input.name.has_value():
+            try:
+                new_name = update_input.name.value()
+            except ValueError:
+                pass
+            else:
                 query_vfolders = sa.select(VFolderRow).where(
                     VFolderRow.id.in_(action.accessible_vfolder_uuids)
                 )
-
                 vfolder_rows = await db_session.scalars(query_vfolders)
                 accessible_vfolder_rows = cast(list[VFolderRow], vfolder_rows)
                 for row in accessible_vfolder_rows:
-                    if row.name == action.name:
+                    if row.name == new_name:
                         raise InvalidParameter(
                             "One of your accessible vfolders already has the name you requested."
                         )
-                vfolder_row.name = action.name
 
             update_input.set_attr(vfolder_row)
 
         async with self._db.connect() as db_conn:
             await execute_with_txn_retry(db_conn, self._db.begin_session, _update)
+        return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def get(self, action: GetVFolderAction) -> GetVFolderActionResult:
-        query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
-        async with self._db.begin_readonly_session() as db_session:
-            vfolder_row = await db_session.scalar(query_vfolder)
-            vfolder_row = cast(VFolderRow, vfolder_row)
+        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        async with self._db.begin_session() as db_session:
+            requester_user_row = await db_session.scalar(
+                sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
+            )
+            requester_user_row = cast(UserRow, requester_user_row)
+            vfolder_dicts = await query_accessible_vfolders(
+                db_session.bind,
+                action.user_uuid,
+                allow_privileged_access=True,
+                user_role=requester_user_row.role,
+                allowed_vfolder_types=allowed_vfolder_types,
+                domain_name=requester_user_row.domain_name,
+                extra_vf_conds=(VFolderRow.id == action.vfolder_uuid),
+            )
+            vfolder_row = vfolder_dicts[0]
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+            vfolder_row["host"], is_unmanaged(vfolder_row["unmanaged_path"])
         )
         async with self._storage_manager.request(
             proxy_name,
@@ -433,7 +448,7 @@ class VFolderService:
             "folder/usage",
             json={
                 "volume": volume_name,
-                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "vfid": str(VFolderID(vfolder_row["quota_scope_id"], vfolder_row["id"])),
             },
         ) as (_, storage_resp):
             usage = await storage_resp.json()
@@ -442,49 +457,60 @@ class VFolderService:
                 num_files=usage["file_count"],
             )
         return GetVFolderActionResult(
+            user_uuid=action.user_uuid,
             base_info=VFolderBaseInfo(
-                id=vfolder_row.id,
-                quota_scope_id=vfolder_row.quota_scope_id,
-                name=vfolder_row.name,
-                host=vfolder_row.host,
-                status=vfolder_row.status,
-                unmanaged_path=vfolder_row.unmanaged_path,
-                mount_permission=vfolder_row.permission,
-                usage_mode=vfolder_row.usage_mode,
-                created_at=vfolder_row.created_at,
-                cloneable=vfolder_row.cloneable,
-                num_files=usage_info.num_files,
-                used_bytes=usage_info.used_bytes,
+                id=vfolder_row["id"],
+                quota_scope_id=vfolder_row["quota_scope_id"],
+                name=vfolder_row["name"],
+                host=vfolder_row["host"],
+                status=vfolder_row["status"],
+                unmanaged_path=vfolder_row["unmanaged_path"],
+                mount_permission=vfolder_row["permission"],
+                usage_mode=vfolder_row["usage_mode"],
+                created_at=vfolder_row["created_at"],
+                cloneable=vfolder_row["cloneable"],
             ),
-            ownership_info=VFolderOwnershipInfo(creator_email=vfolder_row.creator),
+            ownership_info=VFolderOwnershipInfo(creator_email=vfolder_row["creator"]),
             usage_info=usage_info,
         )
 
     async def list(self, action: ListVFolderAction) -> ListVFolderActionResult:
-        query_vfolder = sa.select(VFolderRow).where(VFolderRow.id.in_(action.vfolder_uuids))
-        async with self._db.begin_readonly_session() as db_session:
-            vfolder_rows = await db_session.scalars(query_vfolder)
-            vfolder_rows = cast(list[VFolderRow], vfolder_rows)
+        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        async with self._db.begin_session() as db_session:
+            requester_user_row = await db_session.scalar(
+                sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
+            )
+            requester_user_row = cast(UserRow, requester_user_row)
+            vfolder_dicts = await query_accessible_vfolders(
+                db_session.bind,
+                action.user_uuid,
+                allow_privileged_access=False,
+                user_role=requester_user_row.role,
+                allowed_vfolder_types=allowed_vfolder_types,
+                domain_name=requester_user_row.domain_name,
+            )
+        vfolders = [
+            (
+                VFolderBaseInfo(
+                    id=entry["id"],
+                    quota_scope_id=entry["quota_scope_id"],
+                    name=entry["name"],
+                    host=entry["host"],
+                    status=entry["status"],
+                    unmanaged_path=entry["unmanaged_path"],
+                    mount_permission=entry["permission"],
+                    usage_mode=entry["usage_mode"],
+                    created_at=entry["created_at"],
+                    cloneable=entry["cloneable"],
+                ),
+                VFolderOwnershipInfo(creator_email=entry["creator"]),
+            )
+            for entry in vfolder_dicts
+        ]
 
         return ListVFolderActionResult(
-            vfolders=[
-                (
-                    VFolderBaseInfo(
-                        id=row.id,
-                        quota_scope_id=row.quota_scope_id,
-                        name=row.name,
-                        host=row.host,
-                        status=row.status,
-                        unmanaged_path=row.unmanaged_path,
-                        mount_permission=row.permission,
-                        usage_mode=row.usage_mode,
-                        created_at=row.created_at,
-                        cloneable=row.cloneable,
-                    ),
-                    VFolderOwnershipInfo(creator_email=row.creator),
-                )
-                for row in vfolder_rows
-            ]
+            user_uuid=action.user_uuid,
+            vfolders=vfolders,
         )
 
     async def move_to_trash(
@@ -532,7 +558,6 @@ class VFolderService:
             )
 
             vfolder_row_ids = (vfolder_row["id"],)
-        async with self._db.connect() as db_conn:
             await delete_vfolder_relation_rows(
                 db_session.bind, self._db.begin_session, vfolder_row_ids
             )
@@ -541,6 +566,7 @@ class VFolderService:
             vfolder_row_ids,
             VFolderOperationStatus.DELETE_PENDING,
         )
+        return MoveToTrashVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def restore(
         self, action: RestoreVFolderFromTrashAction
@@ -567,7 +593,7 @@ class VFolderService:
                 raise InvalidParameter("No such vfolder.")
 
             row = restore_targets[0]
-            await _check_vfolder_status(row, VFolderStatusSet.RECOVERABLE)
+            await _check_vfolder_status(row["status"], VFolderStatusSet.RECOVERABLE)
 
         # Folder owner OR user who have DELETE permission can restore folder.
         if not row["is_owner"] and row["permission"] != VFolderPermission.RW_DELETE:
@@ -576,6 +602,7 @@ class VFolderService:
         # fs-level mv may fail or take longer time
         # but let's complete the db transaction to reflect that it's deleted.
         await update_vfolder_status(self._db, (row["id"],), VFolderOperationStatus.READY)
+        return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_forever(
         self, action: DeleteForeverVFolderAction
@@ -609,6 +636,7 @@ class VFolderService:
             [VFolderDeletionInfo(VFolderID.from_row(row), row["host"], row["unmanaged_path"])],
             self._storage_manager,
         )
+        return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def force_delete(
         self, action: ForceDeleteVFolderAction
@@ -630,14 +658,16 @@ class VFolderService:
             )
             row = entries[0]
             try:
-                await _check_vfolder_status(row, VFolderStatusSet.PURGABLE)
+                await _check_vfolder_status(row["status"], VFolderStatusSet.PURGABLE)
             except VFolderFilterStatusFailed:
-                await _check_vfolder_status(row, VFolderStatusSet.DELETABLE)
+                await _check_vfolder_status(row["status"], VFolderStatusSet.DELETABLE)
         await initiate_vfolder_deletion(
             self._db,
             [VFolderDeletionInfo(VFolderID.from_row(row), row["host"], row["unmanaged_path"])],
+            storage_manager=self._storage_manager,
             force=True,
         )
+        return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:
         allowed_vfolder_types = await self._shared_config.get_vfolder_types()
@@ -651,7 +681,7 @@ class VFolderService:
             )
             entries = await query_accessible_vfolders(
                 db_session.bind,
-                action.user_uuid,
+                action.requester_user_uuid,
                 allow_privileged_access=True,
                 user_role=requester_user_row.role,
                 allowed_vfolder_types=allowed_vfolder_types,
@@ -666,14 +696,14 @@ class VFolderService:
             domain_name = requester_user_row.domain_name
             source_folder_host = row["host"]
             source_folder_id = VFolderID(row["quota_scope_id"], row["id"])
-            target_folder_host = action.target_host
+            target_folder_host = action.target_host or source_folder_host
             target_quota_scope_id = "..."  # TODO: implement
             source_unmanaged_path = row["unmanaged_path"]
             source_proxy_name, source_volume_name = self._storage_manager.get_proxy_and_volume(
                 source_folder_host, is_unmanaged(source_unmanaged_path)
             )
             target_proxy_name, target_volume_name = self._storage_manager.get_proxy_and_volume(
-                target_folder_host
+                target_folder_host,
             )
 
             # check if the source vfolder is allowed to be cloned
@@ -767,16 +797,17 @@ class VFolderService:
         )
 
         # Return the information about the destination vfolder.
-        resp = {
-            "id": target_folder_id.hex,
-            "name": action.target_name,
-            "host": target_folder_host,
-            "usage_mode": action.usage_mode.value,
-            "permission": action.mount_permission.value,
-            "creator": requester_user_row.email,
-            "ownership_type": "user",
-            "user": str(requester_user_row.uuid),
-            "group": None,
-            "cloneable": action.cloneable,
-            "bgtask_id": str(task_id),
-        }
+        return CloneVFolderActionResult(
+            vfolder_uuid=source_folder_id.folder_id,
+            target_vfolder_id=target_folder_id,
+            target_vfolder_name=action.target_name,
+            target_vfolder_host=target_folder_host,
+            usage_mode=action.usage_mode,
+            mount_permission=action.mount_permission,
+            creator_email=requester_user_row.email,
+            ownership_type=VFolderOwnershipType.USER,
+            owner_user_uuid=requester_user_row.uuid,
+            owner_group_uuid=None,
+            cloneable=action.cloneable,
+            bgtask_id=task_id,
+        )

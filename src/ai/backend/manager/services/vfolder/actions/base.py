@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, override
 
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -14,7 +14,9 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-from ai.backend.manager.types import NonNullState
+
+# from ai.backend.manager.types import NonNullState
+from ai.backend.manager.types import NonNullStateField, TriStateData
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -31,7 +33,7 @@ class CreateVFolderAction(VFolderAction):
     keypair_resource_policy: Mapping[str, Any]
     domain_name: str
     group_id_or_name: Optional[str]
-    folder_host: str
+    folder_host: Optional[str]
     unmanaged_path: Optional[str]
     mount_permission: VFolderPermission
     usage_mode: VFolderUsageMode
@@ -57,7 +59,6 @@ class CreateVFolderActionResult(BaseActionResult):
     quota_scope_id: QuotaScopeID
     host: str
     unmanaged_path: Optional[str]
-    permission: VFolderPermission
     mount_permission: VFolderPermission
     usage_mode: VFolderUsageMode
     creator_email: str
@@ -70,86 +71,161 @@ class CreateVFolderActionResult(BaseActionResult):
 
 
 @dataclass
-class UpdateVFolderAttributeInput:
-    name: NonNullState[str] = field(default_factory=NonNullState.none("name"))
-    cloneable: NonNullState[bool] = field(default_factory=NonNullState.none("cloneable"))
-    mount_permission: NonNullState[VFolderPermission] = field(
-        default_factory=NonNullState.none("mount_permission")
+class UpdateVFolderAttributeInput(TriStateData):
+    name: NonNullStateField[str] = field(default_factory=NonNullStateField.nop)
+    cloneable: NonNullStateField[bool] = field(default_factory=NonNullStateField.nop)
+    mount_permission: NonNullStateField[VFolderPermission] = field(
+        default_factory=NonNullStateField.nop
     )
 
-    def set_attr(self, obj: Any) -> None:
-        self.name.set_attr(obj)
-        self.cloneable.set_attr(obj)
-        self.mount_permission.set_attr(obj)
 
-
+@dataclass
 class UpdateVFolderAttributeAction(VFolderAction):
     vfolder_uuid: uuid.UUID
     accessible_vfolder_uuids: Iterable[uuid.UUID]
     input: UpdateVFolderAttributeInput = field(default_factory=UpdateVFolderAttributeInput)
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self):
+        return "update"
+
+
+@dataclass
 class UpdateVFolderAttributeActionResult(BaseActionResult):
-    pass
-
-
-class ChangeOwnershipAction(VFolderAction):
-    pass
-
-
-class ChangeOwnershipActionResult(BaseActionResult):
-    pass
-
-
-class GetVFolderAction(VFolderAction):
     vfolder_uuid: uuid.UUID
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+
+@dataclass
+class GetVFolderAction(VFolderAction):
+    user_uuid: uuid.UUID
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
+
+    @override
+    def operation_type(self):
+        return "get"
+
+
+@dataclass
 class GetVFolderActionResult(BaseActionResult):
+    user_uuid: uuid.UUID
     base_info: VFolderBaseInfo
     ownership_info: VFolderOwnershipInfo
     usage_info: VFolderUsageInfo
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.user_uuid)
 
+
+@dataclass
 class ListVFolderAction(VFolderAction):
-    vfolder_uuids: Iterable[uuid.UUID]
+    user_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.user_uuid)
+
+    @override
+    def operation_type(self):
+        return "get"
 
 
+@dataclass
 class ListVFolderActionResult(BaseActionResult):
+    user_uuid: uuid.UUID
     vfolders: list[tuple[VFolderBaseInfo, VFolderOwnershipInfo]]
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.user_uuid)
 
+
+@dataclass
 class MoveToTrashVFolderAction(VFolderAction):
     user_uuid: uuid.UUID
     keypair_resource_policy: Mapping[str, Any]
 
     vfolder_uuid: uuid.UUID
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self):
+        return "move-to-trash"
+
+
+@dataclass
 class MoveToTrashVFolderActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class RestoreVFolderFromTrashAction(VFolderAction):
     user_uuid: uuid.UUID
 
     vfolder_uuid: uuid.UUID
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self):
+        return "delete-forever"
+
+
+@dataclass
 class RestoreVFolderFromTrashActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class DeleteForeverVFolderAction(VFolderAction):
     user_uuid: uuid.UUID
 
     vfolder_uuid: uuid.UUID
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self):
+        return "delete-forever"
+
+
+@dataclass
 class DeleteForeverVFolderActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class ForceDeleteVFolderAction(VFolderAction):
     """
     This action transits the state of vfolder from ready to delete-forever directly.
@@ -159,21 +235,60 @@ class ForceDeleteVFolderAction(VFolderAction):
 
     vfolder_uuid: uuid.UUID
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
+    @override
+    def operation_type(self):
+        return "force-delete"
+
+
+@dataclass
 class ForceDeleteVFolderActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
 
 
+@dataclass
 class CloneVFolderAction(VFolderAction):
     requester_user_uuid: uuid.UUID
 
-    cloneable: bool = False
+    source_vfolder_uuid: uuid.UUID
     target_name: str
     target_host: Optional[str] = None
-    source_vfolder_uuid: uuid.UUID
+    cloneable: bool = False
     usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
     mount_permission: VFolderPermission = VFolderPermission.READ_WRITE
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.source_vfolder_uuid)
 
+    @override
+    def operation_type(self):
+        return "clone"
+
+
+@dataclass
 class CloneVFolderActionResult(BaseActionResult):
-    pass
+    vfolder_uuid: uuid.UUID
+
+    target_vfolder_id: uuid.UUID
+    target_vfolder_name: str
+    target_vfolder_host: str
+    usage_mode: VFolderUsageMode
+    mount_permission: VFolderPermission
+    creator_email: str
+    ownership_type: VFolderOwnershipType
+    owner_user_uuid: Optional[uuid.UUID]
+    owner_group_uuid: Optional[uuid.UUID]
+    cloneable: bool
+    bgtask_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)

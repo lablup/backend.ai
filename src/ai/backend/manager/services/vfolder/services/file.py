@@ -33,6 +33,7 @@ from ..actions.file import (
     RenameFileActionResult,
 )
 from ..exceptions import InvalidParameter
+from ..types import FileInfo
 
 
 @dataclass
@@ -84,10 +85,11 @@ class VFolderFileService:
             },
         ) as (client_api_url, storage_resp):
             storage_reply = await storage_resp.json()
-            resp = {
-                "token": storage_reply["token"],
-                "url": str(client_api_url / "upload"),
-            }
+        return CreateUploadSessionActionResult(
+            vfolder_uuid=action.vfolder_uuid,
+            token=storage_reply["token"],
+            url=str(client_api_url / "upload"),
+        )
 
     async def download_file(
         self, action: CreateDownloadSessionAction
@@ -123,10 +125,11 @@ class VFolderFileService:
             },
         ) as (client_api_url, storage_resp):
             storage_reply = await storage_resp.json()
-            resp = {
-                "token": storage_reply["token"],
-                "url": str(client_api_url / "download"),
-            }
+        return CreateDownloadSessionActionResult(
+            vfolder_uuid=action.vfolder_uuid,
+            token=storage_reply["token"],
+            url=str(client_api_url / "download"),
+        )
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         async with self._db.begin_readonly_session() as db_session:
@@ -147,19 +150,20 @@ class VFolderFileService:
             },
         ) as (_, storage_resp):
             result = await storage_resp.json()
-            resp = {
-                "items": [
-                    {
-                        "name": item["name"],
-                        "type": item["type"],
-                        "size": item["stat"]["size"],  # humanize?
-                        "mode": oct(item["stat"]["mode"])[2:][-3:],
-                        "created": item["stat"]["created"],
-                        "modified": item["stat"]["modified"],
-                    }
-                    for item in result["items"]
-                ],
-            }
+        return ListFilesActionResult(
+            vfolder_uuid=action.vfolder_uuid,
+            files=[
+                FileInfo(
+                    name=item["name"],
+                    type=item["type"],
+                    size=item["size"],
+                    mode=item["mode"],
+                    created=item["created"],
+                    modified=item["modified"],
+                )
+                for item in result["items"]
+            ],
+        )
 
     async def rename_file(self, action: RenameFileAction) -> RenameFileActionResult:
         allowed_vfolder_types = await self._shared_config.get_vfolder_types()
@@ -191,6 +195,7 @@ class VFolderFileService:
             },
         ):
             pass
+        return RenameFileActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
         async with self._db.begin_readonly_session() as db_session:
@@ -212,6 +217,7 @@ class VFolderFileService:
             },
         ):
             pass
+        return DeleteFilesActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def mkdir(self, action: MkdirAction) -> MkdirActionResult:
         if isinstance(action.path, list) and len(action.path) > 50:
@@ -236,3 +242,8 @@ class VFolderFileService:
             },
         ) as (_, storage_resp):
             storage_reply = await storage_resp.json()
+            results = storage_reply["results"]
+        return MkdirActionResult(
+            vfolder_uuid=action.vfolder_uuid,
+            results=results,
+        )

@@ -48,6 +48,7 @@ from ..exceptions import (
     VFolderAlreadyExists,
     VFolderNotFound,
 )
+from ..types import VFolderInvitationInfo
 
 
 @dataclass
@@ -164,7 +165,9 @@ class VFolderInviteService:
                     invited_ids.append(invitee)
                 except sa.exc.DataError:
                     pass
-        resp = {"invited_ids": invited_ids}
+        return InviteVFolderActionResult(
+            vfolder_uuid=action.vfolder_uuid, invitation_ids=invited_ids
+        )
 
     async def accept_invitation(
         self, action: AcceptInvitationAction
@@ -237,6 +240,7 @@ class VFolderInviteService:
                 .values(state=VFolderInvitationState.ACCEPTED)
             )
             await db_session.execute(query)
+        return AcceptInvitationActionResult(action.invitation_id)
 
     async def reject_invitation(
         self,
@@ -275,6 +279,7 @@ class VFolderInviteService:
             raise
         except Exception as e:
             raise InternalServerError(f"unexpected error: {e}")
+        return RejectInvitationActionResult(action.invitation_id)
 
     async def update_invitation(
         self, action: UpdateInvitationAction
@@ -297,7 +302,7 @@ class VFolderInviteService:
                 )
             )
             await db_session.execute(query)
-        resp = {"msg": f"vfolder invitation updated: {inv_id}."}
+        return UpdateInvitationActionResult(inv_id)
 
     async def list_invitation(self, action: ListInvitationAction) -> ListInvitationActionResult:
         async with self._db.begin_session() as db_session:
@@ -320,21 +325,24 @@ class VFolderInviteService:
             )
             invitations_rows = await db_session.scalars(query)
             invitations_rows = cast(list[VFolderRow], invitations_rows)
-        invs_info = []
+        invs_info: list[VFolderInvitationInfo] = []
         for inv in invitations_rows:
             # TODO: Check query result
-            invs_info.append({
-                "id": str(inv.id),
-                "inviter": inv.inviter,
-                "invitee": inv.invitee,
-                "perm": inv.permission,
-                "state": inv.state,
-                "created_at": str(inv.created_at),
-                "modified_at": str(inv.modified_at),
-                "vfolder_id": str(inv.vfolder),
-                "vfolder_name": inv.name,
-            })
-        resp = {"invitations": invs_info}
+            info = VFolderInvitationInfo(
+                id=inv.id,
+                vfolder_id=inv.vfolder,
+                vfolder_name=inv.name,
+                invitee_user_email=inv.invitee,
+                inviter_user_email=inv.inviter,
+                mount_permission=inv.permission,
+                created_at=inv.created_at,
+                modified_at=inv.modified_at,
+                status=inv.state,
+            )
+            invs_info.append(info)
+        return ListInvitationActionResult(
+            requester_user_uuid=action.requester_user_uuid, info=invs_info
+        )
 
     async def leave_invited_vfolder(
         self, action: LeaveInvitedVFolderAction
@@ -367,4 +375,4 @@ class VFolderInviteService:
                 .where(VFolderPermissionRow.user == user_uuid)
             )
             await db_session.execute(query)
-        resp = {"msg": "left the shared vfolder"}
+        return LeaveInvitedVFolderActionResult(vfolder_row.id)
