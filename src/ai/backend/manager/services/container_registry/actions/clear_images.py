@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.image.base import ImageAction
 
 
@@ -22,11 +22,11 @@ class ClearImagesAction(ImageAction):
 
 @dataclass
 class ClearImagesActionResult(BaseActionResult):
-    registry_row: ContainerRegistryRow
+    registry: ContainerRegistryData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.registry_row.id)
+        return str(self.registry.id)
 
 
 # @dataclass

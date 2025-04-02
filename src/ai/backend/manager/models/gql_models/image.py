@@ -33,7 +33,7 @@ from ai.backend.common.types import (
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -936,13 +936,13 @@ class RescanImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
-            loaded_registries: list[ContainerRegistryRow]
+            loaded_registries: list[ContainerRegistryData]
 
             if registry is None:
                 all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
                     LoadAllContainerRegistriesAction()
                 )
-                loaded_registries = all_registries.registry_rows
+                loaded_registries = all_registries.registries
             else:
                 registries = await ctx.processors.container_registry.load_container_registries.wait_for_complete(
                     LoadContainerRegistriesAction(
@@ -950,14 +950,14 @@ class RescanImages(graphene.Mutation):
                         project=project,
                     )
                 )
-                loaded_registries = registries.registry_rows
+                loaded_registries = registries.registries
 
-            for registry_row in loaded_registries:
+            for registry_data in loaded_registries:
                 action_result = (
                     await ctx.processors.container_registry.rescan_images.wait_for_complete(
                         RescanImagesAction(
-                            registry=registry_row.registry_name,
-                            project=registry_row.project,
+                            registry=registry_data.registry_name,
+                            project=registry_data.project,
                         )
                     )
                 )
@@ -1058,11 +1058,11 @@ class ClearImages(graphene.Mutation):
             )
         )
 
-        for registry_row in result.registry_rows:
+        for registry_data in result.registries:
             await ctx.processors.container_registry.clear_images.wait_for_complete(
                 ClearImagesAction(
-                    registry=registry_row,
-                    project=registry_row.project,
+                    registry=registry_data.registry_name,
+                    project=registry_data.project,
                 )
             )
 
