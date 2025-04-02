@@ -170,6 +170,28 @@ async def load_configured_registries(
     return cast(dict[str, ContainerRegistryRow], registries)
 
 
+async def scan_registry(
+    db: ExtendedAsyncSAEngine,
+    registry_name: str,
+    project: str,
+    reporter: Optional[ProgressReporter] = None,
+) -> RescanImagesResult:
+    log.info('Scanning kernel images from the registry "{0}"', registry_name)
+
+    registry_row = await db.execute(
+        sa.select(ContainerRegistryRow).where(
+            sa.and_(
+                ContainerRegistryRow.registry_name == registry_name,
+                ContainerRegistryRow.project == project,
+            )
+        )
+    )
+    scanner_cls = get_container_registry_cls(registry_row)
+    scanner = scanner_cls(db, registry_name, registry_row)
+
+    return await scanner.rescan_single_registry(reporter)
+
+
 async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],

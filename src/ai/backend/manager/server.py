@@ -77,6 +77,7 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.processors import Processors
 
@@ -439,9 +440,13 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db=root_ctx.db,
         agent_registry=root_ctx.registry,
     )
+    container_registry_service = ContainerRegistryService(
+        db=root_ctx.db,
+    )
 
     root_ctx.processors = Processors(
         image_service=image_service,
+        container_registry_service=container_registry_service,
     )
     yield
 

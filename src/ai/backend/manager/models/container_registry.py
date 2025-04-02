@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, cast
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Self, cast
 
 import graphene
 import sqlalchemy as sa
@@ -15,6 +15,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 
 from ..defs import PASSWORD_PLACEHOLDER
 from .base import (
@@ -151,6 +152,35 @@ class ContainerRegistryRow(Base):
                 result[project] = {}
             result[project][registry_name] = yarl.URL(url)
         return result
+
+    @classmethod
+    def from_dataclass(cls, image_data: ContainerRegistryData) -> Self:
+        return cls(
+            id=image_data.id,
+            url=image_data.url,
+            registry_name=image_data.registry_name,
+            type=image_data.type,
+            project=image_data.project,
+            username=image_data.username,
+            password=image_data.password,
+            ssl_verify=image_data.ssl_verify,
+            is_global=image_data.is_global,
+            extra=image_data.extra,
+        )
+
+    def to_dataclass(self) -> ContainerRegistryData:
+        return ContainerRegistryData(
+            id=self.id,
+            url=self.url,
+            registry_name=self.registry_name,
+            type=self.type,
+            project=self.project,
+            username=self.username,
+            password=self.password,
+            ssl_verify=self.ssl_verify,
+            is_global=self.is_global,
+            extra=self.extra,
+        )
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):

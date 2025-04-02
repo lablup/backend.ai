@@ -1,3 +1,4 @@
+import functools
 import logging
 
 import sqlalchemy as sa
@@ -6,6 +7,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
+from ai.backend.common.utils import join_non_empty
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
@@ -14,8 +16,7 @@ from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageRow,
-    ImageStatus,
-    rescan_images,
+    scan_single_image,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -25,10 +26,6 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageActionDBError,
     AliasImageActionResult,
     AliasImageActionValueError,
-)
-from ai.backend.manager.services.image.actions.clear_images import (
-    ClearImagesAction,
-    ClearImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
@@ -70,9 +67,9 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.rescan_images import (
-    RescanImagesAction,
-    RescanImagesActionResult,
+from ai.backend.manager.services.image.actions.scan_image import (
+    ScanImageAction,
+    ScanImageActionResult,
 )
 from ai.backend.manager.services.image.actions.unload_image import (
     UnloadImageAction,
@@ -157,17 +154,6 @@ class ImageService:
             image_id=existing_alias.image_id,
             image_alias=existing_alias.to_dataclass(),
         )
-
-    async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
-        async with self._db.begin_session() as session:
-            await session.execute(
-                sa.update(ImageRow)
-                .where(ImageRow.registry == action.registry)
-                .where(ImageRow.status != ImageStatus.DELETED)
-                .values(status=ImageStatus.DELETED)
-            )
-
-        return ClearImagesActionResult()
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
         props = action.props
@@ -304,6 +290,22 @@ class ImageService:
             total_reserved_bytes=total_reserved_bytes,
         )
 
-    async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
-        result = await rescan_images(self._db, action.registry, action.project)
-        return RescanImagesActionResult(images=result.images, errors=result.errors)
+    async def scan_image(self, action: ScanImageAction) -> ScanImageActionResult:
+        image_canonical = action.canonical
+        architecture = action.architecture
+
+        async with self._db.begin_session() as db_session:
+            image_row = await ImageRow.resolve(
+                db_session,
+                [
+                    ImageIdentifier(image_canonical, architecture),
+                ],
+            )
+            join = functools.partial(join_non_empty, sep="/")
+            registry_key = join(
+                image_row.registry,
+                image_row.project,
+            )
+
+            result = await scan_single_image(db_session, registry_key, image_row, image_canonical)
+            return ScanImageActionResult(image=result.images[0], errors=result.errors)

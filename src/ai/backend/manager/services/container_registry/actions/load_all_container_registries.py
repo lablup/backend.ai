@@ -2,29 +2,26 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.services.image.base import ImageAction
 
 
-# TODO: Change this to Batch Action
+# TODO: load_configured_registries 해당 하는 부분은 단일 액션을 만들 수 없음.
+# BatchAction...
 @dataclass
-class RescanImagesAction(ImageAction):
-    registry: Optional[str]
-    project: Optional[str]
-
+class LoadAllContainerRegistriesAction(ImageAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
 
     @override
     def operation_type(self):
-        return "rescan_multi"
+        return "load_all"
 
 
 @dataclass
-class RescanImagesActionResult(BaseActionResult):
-    images: list[ImageData]
-    errors: list[str]
+class LoadAllContainerRegistriesActionResult(BaseActionResult):
+    registry_rows: list[ContainerRegistryRow]
 
     @override
     def entity_id(self) -> Optional[str]:
