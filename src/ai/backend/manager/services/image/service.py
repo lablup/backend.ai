@@ -3,12 +3,12 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-from ai.backend.manager.data.image.types import PurgeImageResponseData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
@@ -64,6 +64,7 @@ from ai.backend.manager.services.image.actions.purge_image_by_id import (
     PurgeImageByIdActionResult,
 )
 from ai.backend.manager.services.image.actions.purge_images import (
+    PurgedImagesData,
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
@@ -233,34 +234,46 @@ class ImageService:
 
     async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
         errors = []
-        image_canonicals = [image.name for image in action.images]
-        arch_per_images = {image.name: image.architecture for image in action.images}
-        reserved_bytes: int = 0
-        purged_images: list[PurgeImageResponseData] = []
+        total_reserved_bytes = 0
+        force, noprune = action.force, action.noprune
 
-        results = await self._agent_registry.purge_images(
-            AgentId(action.agent_id), image_canonicals
-        )
+        purged_images_data_list: list[PurgedImagesData] = []
+        for key in action.keys:
+            agent_id = key.agent_id
+            images = key.images
 
-        for result in results.responses:
-            image_canonical = result.image
-            arch = arch_per_images[result.image]
+            image_canonicals = [image.name for image in images]
+            arch_per_images = {image.name: image.architecture for image in images}
 
-            if not result.error:
-                image_identifier = ImageIdentifier(image_canonical, arch)
-                async with self._db.begin_session() as session:
-                    image_row = await ImageRow.resolve(session, [image_identifier])
-                    reserved_bytes += int(image_row.size_bytes)
-                    purged_images.append(PurgeImageResponseData(image_canonical=image_canonical))
-            else:
-                error_msg = f"Failed to purge images {image_canonical} from agent {action.agent_id}: {result.error}"
-                log.error(error_msg)
-                errors.append(error_msg)
+            purged_images_data = PurgedImagesData(purged_images=[], agent_id=agent_id)
+
+            results = await self._agent_registry.purge_images(
+                AgentId(agent_id),
+                PurgeImagesReq(images=image_canonicals, force=force, noprune=noprune),
+            )
+
+            for result in results.responses:
+                if not result.error:
+                    async with self._db.begin_session() as session:
+                        image_canonical = result.image
+                        arch = arch_per_images[image_canonical]
+                        image_identifier = ImageIdentifier(image_canonical, arch)
+                        image_row = await ImageRow.resolve(session, [image_identifier])
+                        purged_images_data.purged_images.append(image_canonical)
+                        total_reserved_bytes += image_row.size_bytes
+                else:
+                    errors.append(
+                        f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
+                    )
+
+            purged_images_data_list.append(purged_images_data)
 
         return PurgeImagesActionResult(
-            purged_images=purged_images, errors=errors, reserved_bytes=reserved_bytes
+            purged_images=purged_images_data_list,
+            errors=errors,
+            total_reserved_bytes=total_reserved_bytes,
         )
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
         result = await rescan_images(self._db, action.registry, action.project)
-        return RescanImagesActionResult(rescan_result=result)
+        return RescanImagesActionResult(images=result.images, errors=result.errors)

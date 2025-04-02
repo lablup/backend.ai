@@ -1,16 +1,29 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.image.types import PurgeImageResponseData
 from ai.backend.manager.services.image.base import ImageAction
 from ai.backend.manager.services.image.types import ImageRefData
 
 
 @dataclass
-class PurgeImagesAction(ImageAction):
-    agent_id: str
+class PurgedImagesData:
+    agent_id: AgentId
+    purged_images: list[str]
+
+
+@dataclass
+class PurgeImagesKeyData:
+    agent_id: AgentId
     images: list[ImageRefData]
+
+
+@dataclass
+class PurgeImagesAction(ImageAction):
+    keys: list[PurgeImagesKeyData]
+    force: bool
+    noprune: bool
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -23,8 +36,8 @@ class PurgeImagesAction(ImageAction):
 
 @dataclass
 class PurgeImagesActionResult(BaseActionResult):
-    reserved_bytes: int
-    purged_images: list[PurgeImageResponseData]
+    total_reserved_bytes: int
+    purged_images: list[PurgedImagesData]
     errors: list[str]
 
     @override

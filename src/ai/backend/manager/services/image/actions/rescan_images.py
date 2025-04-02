@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.image.types import RescanImagesResult
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.base import ImageAction
 
 
@@ -23,7 +23,8 @@ class RescanImagesAction(ImageAction):
 
 @dataclass
 class RescanImagesActionResult(BaseActionResult):
-    rescan_result: RescanImagesResult
+    images: list[ImageData]
+    errors: list[str]
 
     @override
     def entity_id(self) -> Optional[str]:
