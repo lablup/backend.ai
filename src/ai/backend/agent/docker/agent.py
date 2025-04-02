@@ -12,6 +12,7 @@ import signal
 import struct
 import sys
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -49,7 +50,8 @@ from async_timeout import timeout
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -188,6 +190,13 @@ def _DockerContainerError_reduce(self):
         type(self),
         (self.status, {"message": self.message}, self.container_id, *self.args),
     )
+
+
+@dataclass
+class DockerPurgeImageReq:
+    image: str
+    force: bool
+    noprune: bool
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
@@ -1696,25 +1705,35 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResponse:
+    async def _purge_image(self, docker: Docker, request: DockerPurgeImageReq) -> PurgeImageResp:
         try:
-            await docker.images.delete(image)
-            return PurgeImageResponse.success(image=image)
+            await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
+            return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error(f'Failed to purge image "{image}": {e}')
-            return PurgeImageResponse.failure(image=image, error=str(e))
+            log.error(f'Failed to purge image "{request.image}": {e}')
+            return PurgeImageResp.failure(image=request.image, error=str(e))
 
-    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
-                tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
+                tasks = [
+                    tg.create_task(
+                        self._purge_image(
+                            docker,
+                            DockerPurgeImageReq(
+                                image=image, force=request.force, noprune=request.noprune
+                            ),
+                        )
+                    )
+                    for image in request.images
+                ]
 
         results = []
         for task in tasks:
             deleted_info = task.result()
             results.append(deleted_info)
 
-        return PurgeImageResponses(responses=results)
+        return PurgeImagesResp(responses=results)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

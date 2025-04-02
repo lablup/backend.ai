@@ -66,7 +66,8 @@ from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STATISTICS_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
@@ -1696,10 +1697,7 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def purge_images(
-        self,
-        images: list[str],
-    ) -> PurgeImageResponses:
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         """
         Purge the given images from the agent.
         """
