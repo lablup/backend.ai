@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ai.backend.common.types import (
@@ -14,8 +14,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-from ai.backend.manager.types import SENTINEL
-from ai.backend.manager.types import Sentinel as SentinelType
+from ai.backend.manager.types import NonNullState
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -70,12 +69,24 @@ class CreateVFolderActionResult(BaseActionResult):
         return str(self.id)
 
 
+@dataclass
+class UpdateVFolderAttributeInput:
+    name: NonNullState[str] = field(default_factory=NonNullState.none("name"))
+    cloneable: NonNullState[bool] = field(default_factory=NonNullState.none("cloneable"))
+    mount_permission: NonNullState[VFolderPermission] = field(
+        default_factory=NonNullState.none("mount_permission")
+    )
+
+    def set_attr(self, obj: Any) -> None:
+        self.name.set_attr(obj)
+        self.cloneable.set_attr(obj)
+        self.mount_permission.set_attr(obj)
+
+
 class UpdateVFolderAttributeAction(VFolderAction):
     vfolder_uuid: uuid.UUID
     accessible_vfolder_uuids: Iterable[uuid.UUID]
-    name: str | SentinelType = SENTINEL
-    cloneable: bool | SentinelType = SENTINEL
-    mount_permission: VFolderPermission | SentinelType = SENTINEL
+    input: UpdateVFolderAttributeInput = field(default_factory=UpdateVFolderAttributeInput)
 
 
 class UpdateVFolderAttributeActionResult(BaseActionResult):

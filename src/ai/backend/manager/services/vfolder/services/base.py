@@ -47,9 +47,8 @@ from ai.backend.manager.models.vfolder import (
     verify_vfolder_name,
     vfolder_status_map,
 )
-from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.types import SENTINEL
 
+# from ai.backend.manager.types import SENTINEL
 from ..actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -102,7 +101,6 @@ async def _check_vfolder_status(
 @dataclass
 class ServiceInitParameter:
     db: ExtendedAsyncSAEngine
-    registry: AgentRegistry
     shared_config: SharedConfig
     storage_manager: StorageSessionManager
     background_task_manager: BackgroundTaskManager
@@ -110,14 +108,12 @@ class ServiceInitParameter:
 
 class VFolderService:
     _db: ExtendedAsyncSAEngine
-    _registry: AgentRegistry
     _shared_config: SharedConfig
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
 
     def __init__(self, parameter: ServiceInitParameter) -> None:
         self._db = parameter.db
-        self._registry = parameter.registry
         self._shared_config = parameter.shared_config
         self._storage_manager = parameter.storage_manager
         self._background_task_manager = parameter.background_task_manager
@@ -398,11 +394,13 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
+        update_input = action.input
+
         async def _update(db_session: AsyncSession) -> None:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
-            vfolder_row = await db_session.scalar(query_vfolders)
+            vfolder_row = await db_session.scalar(query_vfolder)
             vfolder_row = cast(VFolderRow, vfolder_row)
-            if action.name is not SENTINEL:
+            if update_input.name.has_value():
                 query_vfolders = sa.select(VFolderRow).where(
                     VFolderRow.id.in_(action.accessible_vfolder_uuids)
                 )
@@ -416,10 +414,7 @@ class VFolderService:
                         )
                 vfolder_row.name = action.name
 
-            if action.cloneable is not SENTINEL:
-                vfolder_row.cloneable = action.cloneable
-            if action.mount_permission is not SENTINEL:
-                vfolder_row.permission = action.mount_permission
+            update_input.set_attr(vfolder_row)
 
         async with self._db.connect() as db_conn:
             await execute_with_txn_retry(db_conn, self._db.begin_session, _update)

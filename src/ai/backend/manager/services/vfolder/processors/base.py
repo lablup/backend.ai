@@ -9,14 +9,14 @@ from ..actions.base import (
     CreateVFolderActionResult,
     DeleteForeverVFolderAction,
     DeleteForeverVFolderActionResult,
+    ForceDeleteVFolderAction,
+    ForceDeleteVFolderActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
     ListVFolderAction,
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
-    PurgeVFolderAction,
-    PurgeVFolderActionResult,
     RestoreVFolderFromTrashAction,
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
@@ -42,7 +42,7 @@ class VFolderBaseProcessors:
     delete_forever_vfolder = ActionProcessor[
         DeleteForeverVFolderAction, DeleteForeverVFolderActionResult
     ]
-    purge_vfolder = ActionProcessor[PurgeVFolderAction, PurgeVFolderActionResult]
+    force_delete_vfolder = ActionProcessor[ForceDeleteVFolderAction, ForceDeleteVFolderActionResult]
     clone_vfolder = ActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
 
     def __init__(self, service: VFolderService):
@@ -54,5 +54,5 @@ class VFolderBaseProcessors:
         self.move_to_trash_vfolder = ActionProcessor(service.move_to_trash)
         self.restore_vfolder_from_trash = ActionProcessor(service.restore)
         self.delete_forever_vfolder = ActionProcessor(service.delete_forever)
-        self.purge_vfolder = ActionProcessor(service.purge)
+        self.force_delete_vfolder = ActionProcessor(service.force_delete)
         self.clone_vfolder = ActionProcessor(service.clone)

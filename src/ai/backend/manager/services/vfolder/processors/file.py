@@ -1,25 +1,25 @@
 from ai.backend.manager.actions.processor import ActionProcessor
 
 from ..actions.file import (
+    CreateDownloadSessionAction,
+    CreateDownloadSessionActionResult,
+    CreateUploadSessionAction,
+    CreateUploadSessionActionResult,
     DeleteFilesAction,
     DeleteFilesActionResult,
-    DownloadFileAction,
-    DownloadFileActionResult,
     ListFilesAction,
     ListFilesActionResult,
     MkdirAction,
     MkdirActionResult,
     RenameFileAction,
     RenameFileActionResult,
-    UploadFileAction,
-    UploadFileActionResult,
 )
 from ..services.file import VFolderFileService
 
 
 class VFolderFileProcessors:
-    upload_file = ActionProcessor[UploadFileAction, UploadFileActionResult]
-    download_file = ActionProcessor[DownloadFileAction, DownloadFileActionResult]
+    upload_file = ActionProcessor[CreateUploadSessionAction, CreateUploadSessionActionResult]
+    download_file = ActionProcessor[CreateDownloadSessionAction, CreateDownloadSessionActionResult]
     list_files = ActionProcessor[ListFilesAction, ListFilesActionResult]
     rename_file = ActionProcessor[RenameFileAction, RenameFileActionResult]
     delete_files = ActionProcessor[DeleteFilesAction, DeleteFilesActionResult]
