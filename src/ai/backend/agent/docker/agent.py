@@ -730,7 +730,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
+
+            dotfile_content = dotfile["data"]
+            if not dotfile_content.endswith("\n"):
+                dotfile_content += "\n"
+            await loop.run_in_executor(None, file_path.write_text, dotfile_content)
 
             tmp = Path(file_path)
             while tmp != self.work_dir:
