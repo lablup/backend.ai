@@ -9,8 +9,8 @@ from ai.backend.manager.services.image.base import ImageAction
 # TODO: Change this to Batch Action
 @dataclass
 class RescanImagesAction(ImageAction):
-    registry: Optional[str] = None
-    project: Optional[str] = None
+    registry: Optional[str]
+    project: Optional[str]
 
     @override
     def entity_id(self) -> Optional[str]:
