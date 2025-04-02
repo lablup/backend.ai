@@ -40,6 +40,7 @@ from ai.backend.common.types import (
     ImageAlias,
     ImageRegistry,
     RedisConnectionInfo,
+    SessionId,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -87,9 +88,14 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.models.vfolder import is_unmanaged, query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.services.session.actions.check_and_transit_status import (
+    CheckAndTransitStatusAction,
+    CheckAndTransitStatusActionResult,
+)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -1849,3 +1855,38 @@ class SessionService:
             raise ValueError(f"Session not found (id:{session_id})")
 
         return ModifyComputeSessionActionResult(result=None, session_row=session_row)
+
+    async def check_and_transit_status(
+        self, action: CheckAndTransitStatusAction
+    ) -> CheckAndTransitStatusActionResult:
+        user_id = action.user_id
+        user_role = action.user_role
+        session_ids = action.session_ids
+        accessible_session_ids: list[SessionId] = []
+
+        async with self._db.begin_readonly_session() as db_session:
+            for sid in session_ids:
+                session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
+                if session_row.user_uuid == user_id or user_role in (
+                    UserRole.ADMIN,
+                    UserRole.SUPERADMIN,
+                ):
+                    accessible_session_ids.append(sid)
+                else:
+                    log.warning(
+                        f"You are not allowed to transit others's sessions status, skip (s:{sid})"
+                    )
+
+        now = datetime.now(tzutc())
+        if accessible_session_ids:
+            session_rows = await self._agent_registry.session_lifecycle_mgr.transit_session_status(
+                accessible_session_ids, now
+            )
+            await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
+                row.id for row, is_transited in session_rows if is_transited
+            ])
+            result = {row.id: row.status.name for row, _ in session_rows}
+        else:
+            result = {}
+
+        return CheckAndTransitStatusActionResult(session_status_map=result)
