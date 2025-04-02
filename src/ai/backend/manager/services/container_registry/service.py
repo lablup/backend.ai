@@ -33,7 +33,7 @@ class ContainerRegistryService:
         project = action.project
 
         async with self._db.begin_readonly_session() as db_session:
-            registry_row = await db_session.scalar(
+            registry_row: ContainerRegistryRow = await db_session.scalar(
                 sa.select(ContainerRegistryRow).where(
                     sa.and_(
                         ContainerRegistryRow.registry_name == registry_name,
@@ -46,7 +46,7 @@ class ContainerRegistryService:
             result = await scanner.rescan_single_registry(None)
 
         return RescanImagesActionResult(
-            images=result.images, errors=result.errors, registry_row=registry_row
+            images=result.images, errors=result.errors, registry=registry_row.to_dataclass()
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
@@ -62,7 +62,7 @@ class ContainerRegistryService:
                 .values(status=ImageStatus.DELETED)
             )
 
-            registry_row = await session.scalar(
+            registry_row: ContainerRegistryRow = await session.scalar(
                 sa.select(ContainerRegistryRow).where(
                     sa.and_(
                         ContainerRegistryRow.registry_name == action.registry,
@@ -71,7 +71,7 @@ class ContainerRegistryService:
                 )
             )
 
-        return ClearImagesActionResult(registry_row=registry_row)
+        return ClearImagesActionResult(registry=registry_row.to_dataclass())
 
     async def load_container_registries(
         self, action: LoadContainerRegistriesAction
@@ -87,7 +87,9 @@ class ContainerRegistryService:
             result = await db_session.execute(query)
             registries = result.scalars().all()
 
-        return LoadContainerRegistriesActionResult(registry_rows=registries)
+        return LoadContainerRegistriesActionResult(
+            registries=[registry.to_dataclass() for registry in registries]
+        )
 
     async def load_all_container_registries(
         self, action: LoadAllContainerRegistriesAction
@@ -95,5 +97,7 @@ class ContainerRegistryService:
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(ContainerRegistryRow)
             result = await db_session.execute(query)
-            registries = result.scalars().all()
-        return LoadAllContainerRegistriesActionResult(registry_rows=registries)
+            registries: list[ContainerRegistryRow] = result.scalars().all()
+        return LoadAllContainerRegistriesActionResult(
+            registries=[registry.to_dataclass() for registry in registries]
+        )
