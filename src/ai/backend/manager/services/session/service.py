@@ -18,6 +18,7 @@ import trafaret as t
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
@@ -35,6 +36,7 @@ from ai.backend.common.exception import BackendError, InvalidAPIParameters, Unkn
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AccessKey,
     ImageAlias,
     ImageRegistry,
     RedisConnectionInfo,
@@ -69,7 +71,11 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
-from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    kernels,
+)
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
@@ -81,7 +87,7 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.models.vfolder import is_unmanaged, query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.session.actions.commit_session import (
@@ -163,6 +169,10 @@ from ai.backend.manager.services.session.actions.list_files import (
 from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.modify_compute_session import (
+    ModifyComputeSessionAction,
+    ModifyComputeSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
@@ -1786,3 +1796,56 @@ class SessionService:
         await asyncio.gather(*upload_tasks)
 
         return UploadFilesActionResult(result=None)
+
+    async def modify_compute_session(
+        self, action: ModifyComputeSessionAction
+    ) -> ModifyComputeSessionActionResult:
+        session_id = action.session_id
+        props = action.props
+        session_name = action.props.name.get_value()
+
+        async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
+            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+            session_row = await db_session.scalar(query_stmt)
+            if session_row is None:
+                raise ValueError(f"Session not found (id:{session_id})")
+            session_row = cast(SessionRow, session_row)
+
+            if session_name:
+                # Check the owner of the target session has any session with the same name
+                try:
+                    sess = await SessionRow.get_session(
+                        db_session,
+                        session_name,
+                        AccessKey(session_row.access_key),
+                    )
+                except SessionNotFound:
+                    pass
+                else:
+                    raise ValueError(
+                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
+                    )
+            select_stmt = (
+                sa.select(SessionRow)
+                .options(selectinload(SessionRow.kernels))
+                .execution_options(populate_existing=True)
+                .where(SessionRow.id == session_id)
+            )
+
+            session_row = await db_session.scalar(select_stmt)
+            props.set_attr(session_row)
+
+            if session_name:
+                await db_session.execute(
+                    sa.update(KernelRow)
+                    .values(session_name=session_name)
+                    .where(KernelRow.session_id == session_id)
+                )
+            return session_row
+
+        async with self._db.connect() as db_conn:
+            session_row = await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
+        if session_row is None:
+            raise ValueError(f"Session not found (id:{session_id})")
+
+        return ModifyComputeSessionActionResult(result=None, session_row=session_row)
