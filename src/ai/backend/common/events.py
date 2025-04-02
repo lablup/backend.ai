@@ -199,6 +199,19 @@ class AgentHeartbeatEvent(AbstractEvent):
 
 
 @attrs.define(slots=True, frozen=True)
+class AgentImagesRemoveEvent(AbstractEvent):
+    name = "agent_images_remove"
+    image_canonicals: list[str] = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.image_canonicals,)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(value[0])
+
+
+@attrs.define(slots=True, frozen=True)
 class DoAgentResourceCheckEvent(AbstractEvent):
     name = "do_agent_resource_check"
 
