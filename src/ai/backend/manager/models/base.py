@@ -37,7 +37,6 @@ import trafaret as t
 import yarl
 from aiodataloader import DataLoader
 from aiotools import apartial
-from dateutil.parser import isoparse
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql import Undefined
@@ -1356,11 +1355,6 @@ async def populate_fixture(
         async with engine.begin() as conn:
             # Apply typedecorator manually for required columns
             for col in table.columns:
-                if isinstance(col.type, sa.sql.sqltypes.DateTime):
-                    for row in rows:
-                        if col.name in row:
-                            row[col.name] = isoparse(row[col.name])
-
                 if isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:
