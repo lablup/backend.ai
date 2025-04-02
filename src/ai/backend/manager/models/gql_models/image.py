@@ -962,8 +962,8 @@ class RescanImages(graphene.Mutation):
                     )
                 )
 
-            for error in action_result.errors:
-                log.error(error)
+                for error in action_result.errors:
+                    log.error(error)
 
             return DispatchResult.success(action_result)
 
