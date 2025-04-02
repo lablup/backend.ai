@@ -16,6 +16,22 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.0rc1 (2025-04-02)
+
+### Breaking Changes
+* Add `force`, `noprune` options to `PurgeImages` GQL API, and allow `PurgeImages` to be performed on multiple agents (breaking change). ([#3987](https://github.com/lablup/backend.ai/issues/3987))
+
+### Features
+* Add `AuditLog` GQL interface. ([#4001](https://github.com/lablup/backend.ai/issues/4001))
+* Refactor Redis message queue to follow ABC pattern ([#4064](https://github.com/lablup/backend.ai/issues/4064))
+* Use `http.HTTPStatus` enum for HTTP status codes ([#4069](https://github.com/lablup/backend.ai/issues/4069))
+
+### Fixes
+* Fix customized image visibility issue. ([#3939](https://github.com/lablup/backend.ai/issues/3939))
+* Add missing newline at end of customized dotfiles. ([#4047](https://github.com/lablup/backend.ai/issues/4047))
+* Setup source at producer creation ([#4068](https://github.com/lablup/backend.ai/issues/4068))
+
+
 ## 25.5.2 (2025-03-31)
 
 ### Features
