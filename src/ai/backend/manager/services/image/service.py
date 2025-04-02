@@ -65,6 +65,8 @@ from ai.backend.manager.services.image.actions.purge_image_by_id import (
 )
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgedImagesData,
+    PurgeImageAction,
+    PurgeImageActionResult,
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
@@ -231,6 +233,34 @@ class ImageService:
         scanner = HarborRegistry_v2(self._db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
         return UntagImageFromRegistryActionResult(image=image_row.to_dataclass())
+
+    async def purge_image(self, action: PurgeImageAction) -> PurgeImageActionResult:
+        force, noprune = action.force, action.noprune
+        agent_id = action.agent_id
+        image_canonical = action.image.name
+        arch = action.image.architecture
+
+        async with self._db.begin_session() as session:
+            image_identifier = ImageIdentifier(image_canonical, arch)
+            image_row = await ImageRow.resolve(session, [image_identifier])
+
+        results = await self._agent_registry.purge_images(
+            AgentId(agent_id),
+            PurgeImagesReq(images=[image_canonical], force=force, noprune=noprune),
+        )
+
+        error = None
+        for result in results.responses:
+            if result.error:
+                error = (
+                    f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
+                )
+
+        return PurgeImageActionResult(
+            purged_image=image_row.to_dataclass(),
+            error=error,
+            reserved_bytes=image_row.size_bytes,
+        )
 
     async def purge_images(self, action: PurgeImagesAction) -> PurgeImagesActionResult:
         errors = []
