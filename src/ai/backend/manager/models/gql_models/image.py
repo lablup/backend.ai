@@ -51,7 +51,6 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
 )
 from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
-from ai.backend.manager.services.image.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,

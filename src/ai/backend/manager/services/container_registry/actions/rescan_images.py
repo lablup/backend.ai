@@ -28,6 +28,8 @@ class RescanImagesActionResult(BaseActionResult):
     images: list[ImageData]
     registry: ContainerRegistryData
     errors: list[str]
+    # TODO: Add type
+    registry_row: ContainerRegistryRow
 
     @override
     def entity_id(self) -> Optional[str]:
