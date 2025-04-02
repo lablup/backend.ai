@@ -786,7 +786,8 @@ class AbstractAgent(
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
-            self.images = (await self.scan_images()).scanned_images
+            scan_images_result = await self.scan_images()
+            self.images = scan_images_result.scanned_images
             self.timer_tasks.append(aiotools.create_timer(self._scan_images_wrapper, 20.0))
             await self.scan_running_kernels()
 
