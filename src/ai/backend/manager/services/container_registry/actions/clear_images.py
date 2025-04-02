@@ -9,7 +9,7 @@ from ai.backend.manager.services.image.base import ImageAction
 @dataclass
 class ClearImagesAction(ImageAction):
     registry: str
-    project: str
+    project: Optional[str]
 
     @override
     def entity_id(self) -> Optional[str]:
