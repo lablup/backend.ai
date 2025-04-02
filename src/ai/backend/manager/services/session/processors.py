@@ -79,6 +79,10 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
 )
+from ai.backend.manager.services.session.actions.modify_compute_session import (
+    ModifyComputeSessionAction,
+    ModifyComputeSessionActionResult,
+)
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
@@ -143,6 +147,9 @@ class SessionProcessors:
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
+    modify_compute_session: ActionProcessor[
+        ModifyComputeSessionAction, ModifyComputeSessionActionResult
+    ]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -171,3 +178,4 @@ class SessionProcessors:
         self.start_service = ActionProcessor(service.start_service)
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry)
         self.upload_files = ActionProcessor(service.upload_files)
+        self.modify_compute_session = ActionProcessor(service.modify_compute_session)
