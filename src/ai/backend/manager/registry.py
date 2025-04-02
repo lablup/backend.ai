@@ -3154,7 +3154,7 @@ class AgentRegistry:
             if instance_rejoin:
                 await self.event_producer.produce_event(
                     AgentStartedEvent("revived"),
-                    source=agent_id,
+                    source_override=agent_id,
                 )
 
             # Update the mapping of kernel images to agents.

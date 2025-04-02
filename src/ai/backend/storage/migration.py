@@ -26,7 +26,7 @@ from ai.backend.common.events import (
     EventProducer,
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import EtcdRedisConfig
+from ai.backend.common.types import AGENTID_STORAGE, EtcdRedisConfig
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
 from .config import load_local_config, load_shared_config
@@ -248,6 +248,7 @@ async def check_and_upgrade(
     )
     event_producer = EventProducer(
         redis_mq,
+        source=AGENTID_STORAGE,
         log_events=local_config["debug"]["log-events"],
     )
     event_dispatcher = EventDispatcher(

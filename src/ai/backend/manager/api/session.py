@@ -1388,7 +1388,8 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
                 prev = datetime.fromtimestamp(float(prev), tzutc())
                 if now - prev > timeout:
                     await root_ctx.event_producer.produce_event(
-                        AgentTerminatedEvent("agent-lost"), source=agent_id.decode()
+                        AgentTerminatedEvent("agent-lost"),
+                        source_override=agent_id.decode(),
                     )
 
         await redis_helper.execute(root_ctx.redis_live, _check_impl)
