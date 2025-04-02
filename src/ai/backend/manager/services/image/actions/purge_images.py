@@ -20,6 +20,21 @@ class PurgeImagesKeyData:
 
 
 @dataclass
+class PurgeImageAction(ImageAction):
+    key: PurgeImagesKeyData
+    force: bool
+    noprune: bool
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def operation_type(self) -> str:
+        return "purge"
+
+
+@dataclass
 class PurgeImagesAction(ImageAction):
     keys: list[PurgeImagesKeyData]
     force: bool
