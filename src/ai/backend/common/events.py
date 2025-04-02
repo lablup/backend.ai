@@ -1422,10 +1422,12 @@ class EventProducer:
         self,
         msg_queue: AbstractMessageQueue,
         *,
+        source: AgentId,
         log_events: bool = False,
     ) -> None:
         self._closed = False
         self._msg_queue = msg_queue
+        self._source_bytes = source.encode()
         self._log_events = log_events
 
     async def close(self) -> None:
@@ -1435,14 +1437,17 @@ class EventProducer:
     async def produce_event(
         self,
         event: AbstractEvent,
-        *,
-        source: str = "manager",
+        source_override: Optional[AgentId] = None,
     ) -> None:
         if self._closed:
             return
+        source_bytes = self._source_bytes
+        if source_override is not None:
+            source_bytes = source_override.encode()
+
         raw_event = {
             b"name": event.name.encode(),
-            b"source": source.encode(),
+            b"source": source_bytes,
             b"args": msgpack.packb(event.serialize()),
         }
         await self._msg_queue.send(raw_event)

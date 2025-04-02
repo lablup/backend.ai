@@ -115,6 +115,7 @@ async def run_timer(
     )
     event_producer = EventProducer(
         redis_mq,
+        source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
 
@@ -170,6 +171,7 @@ def etcd_timer_node_process(
         )
         event_producer = EventProducer(
             redis_mq,
+            source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
 
@@ -262,6 +264,7 @@ class TimerNode(threading.Thread):
         )
         event_producer = EventProducer(
             redis_mq,
+            source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
 
@@ -474,6 +477,7 @@ async def test_global_timer_join_leave(
     )
     event_producer = EventProducer(
         redis_mq,
+        source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
 

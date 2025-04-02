@@ -63,6 +63,7 @@ from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import (
+    AGENTID_MANAGER,
     AgentSelectionStrategy,
     EtcdRedisConfig,
     HostPortPair,
@@ -455,6 +456,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mq = _make_message_queue(root_ctx)
     root_ctx.event_producer = EventProducer(
         mq,
+        source=AGENTID_MANAGER,
         log_events=root_ctx.local_config["debug"]["log-events"],
     )
     root_ctx.event_dispatcher = EventDispatcher(

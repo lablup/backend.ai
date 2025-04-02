@@ -61,7 +61,7 @@ async def test_dispatch(redis_container) -> None:
     dispatcher = EventDispatcher(
         redis_mq,
     )
-    producer = EventProducer(redis_mq)
+    producer = EventProducer(redis_mq, source=AgentId(node_id))
 
     records = set()
 
@@ -87,7 +87,7 @@ async def test_dispatch(redis_container) -> None:
     await asyncio.sleep(0.1)
 
     # Dispatch the event
-    await producer.produce_event(DummyEvent(999), source="i-test")
+    await producer.produce_event(DummyEvent(999), source_override=AgentId("i-test"))
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
@@ -131,7 +131,7 @@ async def test_error_on_dispatch(redis_container) -> None:
         consumer_exception_handler=handle_exception,  # type: ignore
         subscriber_exception_handler=handle_exception,  # type: ignore
     )
-    producer = EventProducer(redis_mq)
+    producer = EventProducer(redis_mq, source=AgentId(node_id))
 
     async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
@@ -149,7 +149,7 @@ async def test_error_on_dispatch(redis_container) -> None:
     dispatcher.subscribe(DummyEvent, app, acb)
     await asyncio.sleep(0.1)
 
-    await producer.produce_event(DummyEvent(0), source="i-test")
+    await producer.produce_event(DummyEvent(0), source_override=AgentId("i-test"))
     await asyncio.sleep(0.5)
     assert len(exception_log) == 2
     assert "ZeroDivisionError" in exception_log

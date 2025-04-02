@@ -32,7 +32,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import EtcdRedisConfig, safe_print_redis_config
+from ai.backend.common.types import AGENTID_STORAGE, EtcdRedisConfig, safe_print_redis_config
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -133,6 +133,7 @@ async def server_main(
         )
         event_producer = EventProducer(
             mq,
+            source=AGENTID_STORAGE,
             log_events=local_config["debug"]["log-events"],
         )
         log.info(

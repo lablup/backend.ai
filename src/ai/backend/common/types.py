@@ -346,6 +346,8 @@ ArchName = NewType("ArchName", str)
 
 ResourceGroupID = NewType("ResourceGroupID", str)
 AgentId = NewType("AgentId", str)
+AGENTID_MANAGER = AgentId("manager")
+AGENTID_STORAGE = AgentId("storage")
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
 SlotName = NewType("SlotName", str)

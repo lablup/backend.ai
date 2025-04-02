@@ -697,6 +697,7 @@ class AbstractAgent(
         mq = self._make_message_queue(stream_redis_config, stream_redis)
         self.event_producer = EventProducer(
             mq,
+            source=self.id,
             log_events=self.local_config["debug"]["log-events"],
         )
         self.event_dispatcher = EventDispatcher(
@@ -883,7 +884,7 @@ class AbstractAgent(
                             continue
         if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
             await self.save_last_registry()
-        await self.event_producer.produce_event(event, source=str(self.id))
+        await self.event_producer.produce_event(event)
 
     async def produce_error_event(
         self,
