@@ -967,6 +967,9 @@ class RescanImages(graphene.Mutation):
                 for error in action_result.errors:
                     log.error(error)
 
+            for error in action_result.errors:
+                log.error(error)
+
             return DispatchResult.success(action_result)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
