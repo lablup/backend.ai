@@ -11,6 +11,7 @@ import os
 import weakref
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
+from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -234,9 +235,9 @@ async def create_quota_scope(request: web.Request) -> web.Response:
             except QuotaScopeAlreadyExists:
                 return web.json_response(
                     {"msg": "Volume already exists with given quota scope."},
-                    status=409,
+                    status=HTTPStatus.CONFLICT,
                 )
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def get_quota_scope(request: web.Request) -> web.Response:
@@ -303,9 +304,9 @@ async def update_quota_scope(request: web.Request) -> web.Response:
                     except InvalidQuotaConfig:
                         return web.json_response(
                             {"msg": "Invalid quota config option"},
-                            status=400,
+                            status=HTTPStatus.BAD_REQUEST,
                         )
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def unset_quota(request: web.Request) -> web.Response:
@@ -333,7 +334,7 @@ async def unset_quota(request: web.Request) -> web.Response:
             if not quota_usage:
                 raise QuotaScopeNotFoundError
             await volume.quota_model.unset_quota(params["qsid"])
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def create_vfolder(request: web.Request) -> web.Response:
@@ -382,7 +383,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                     await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
                     raise ExternalError("Failed to create vfolder due to quota scope not found.")
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def delete_vfolder(request: web.Request) -> web.Response:
@@ -448,13 +449,13 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             ongoing_task = app_ctx.deletion_tasks.get(vfid)
             if ongoing_task is not None:
                 ongoing_task.cancel()
-            return web.Response(status=410)
+            return web.Response(status=HTTPStatus.GONE)
         else:
             ongoing_task = app_ctx.deletion_tasks.get(vfid)
             if ongoing_task is None or ongoing_task.done():
                 asyncio.create_task(_delete_vfolder(app_ctx.deletion_tasks))
 
-    return web.Response(status=202)
+    return web.Response(status=HTTPStatus.ACCEPTED)
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
@@ -491,7 +492,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                 params["src_vfid"],
                 params["dst_vfid"],
             )
-        return web.Response(status=204)
+        return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def get_vfolder_mount(request: web.Request) -> web.Response:
@@ -601,7 +602,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
     ) as params:
         await log_manager_api_entry(log, "fetch_file", params)
         ctx: RootContext = request.app["ctx"]
-        response = web.StreamResponse(status=200)
+        response = web.StreamResponse(status=HTTPStatus.OK)
         response.headers[hdrs.CONTENT_TYPE] = "application/octet-stream"
         prepared = False
         try:
@@ -618,7 +619,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
                             prepared = True
                         await response.write(chunk)
         except FileNotFoundError:
-            response = web.Response(status=404, reason="Log data not found")
+            response = web.Response(status=HTTPStatus.NOT_FOUND, reason="Log data not found")
         finally:
             if prepared:
                 await response.write_eof()
@@ -734,7 +735,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                 )
         except ExecutionError:
             return web.Response(
-                status=500,
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
             )
 
@@ -768,7 +769,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
                 )
         except ExecutionError:
             return web.Response(
-                status=500,
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
             )
 
@@ -792,7 +793,7 @@ async def get_quota(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "get_quota", params)
         return web.Response(
-            status=400,
+            status=HTTPStatus.BAD_REQUEST,
             reason="get_quota (for individual vfolder) is a deprecated API",
         )
 
@@ -818,7 +819,7 @@ async def set_quota(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "update_quota", params)
         return web.Response(
-            status=400,
+            status=HTTPStatus.BAD_REQUEST,
             reason="set_quota (for individual vfolder) is a deprecated API",
         )
 
@@ -979,7 +980,7 @@ async def rename_file(request: web.Request) -> web.Response:
                     params["relpath"],
                     params["relpath"].with_name(params["new_name"]),
                 )
-        return web.Response(status=204)
+        return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def move_file(request: web.Request) -> web.Response:
@@ -1012,7 +1013,7 @@ async def move_file(request: web.Request) -> web.Response:
                     params["src_relpath"],
                     params["dst_relpath"],
                 )
-        return web.Response(status=204)
+        return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def create_download_session(request: web.Request) -> web.Response:

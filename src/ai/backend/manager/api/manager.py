@@ -8,6 +8,7 @@ import logging
 import socket
 import textwrap
 from collections.abc import Iterable
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, FrozenSet, Optional, Tuple, cast
 
 import aiohttp_cors
@@ -202,7 +203,7 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
         await root_ctx.registry.kill_all_sessions()
     await root_ctx.shared_config.update_manager_status(status)
 
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def get_announcement(request: web.Request) -> web.Response:
@@ -230,7 +231,7 @@ async def update_announcement(request: web.Request, params: Any) -> web.Response
         await root_ctx.shared_config.etcd.put("manager/announcement", params["message"])
     else:
         await root_ctx.shared_config.etcd.delete("manager/announcement")
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 iv_scheduler_ops_args = {
@@ -267,7 +268,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
             await root_ctx.event_producer.produce_event(DoScheduleEvent())
     else:
         raise GenericBadRequest("Unknown scheduler operation")
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @superadmin_required
@@ -287,7 +288,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
             await root_ctx.event_producer.produce_event(DoStartSessionEvent())
         case SchedulerEvent.SCALE_SERVICES:
             await root_ctx.event_producer.produce_event(DoScaleEvent())
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @superadmin_required

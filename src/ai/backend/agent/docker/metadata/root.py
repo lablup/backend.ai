@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import Any, Mapping, Sequence
 
 from aiohttp import web
@@ -31,7 +32,7 @@ class ContainerMetadataPlugin(MetadataPlugin):
     async def get_envs(self, request: web.Request) -> web.Response:
         kernel: DockerKernel = request["kernel"]
         if kernel is None:
-            return web.Response(status=404)
+            return web.Response(status=HTTPStatus.NOT_FOUND)
         response = dict(kernel.environ)
         return web.json_response(response)
 

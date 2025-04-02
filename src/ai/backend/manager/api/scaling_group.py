@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass, field
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp
@@ -61,7 +62,7 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
             {
                 "scaling_groups": [{"name": sgroup["name"]} for sgroup in sgroups],
             },
-            status=200,
+            status=HTTPStatus.OK,
         )
 
 
