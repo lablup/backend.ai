@@ -6,6 +6,8 @@ Create Date: 2025-02-14 10:56:10.191119
 
 """
 
+import logging
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -17,8 +19,17 @@ down_revision = "70e0533aa49a"
 branch_labels = None
 depends_on = None
 
+logger = logging.getLogger("alembic.runtime.migration")
+
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+
+    if "audit_logs" in inspector.get_table_names():
+        logger.info("audit_logs table already exists, skipped creating audit_logs table.")
+        return
+
     op.create_table(
         "audit_logs",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
@@ -48,6 +59,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+
+    if "audit_logs" not in inspector.get_table_names():
+        logger.info("audit_logs table does not exist, skipped dropping audit_logs table.")
+        return
+
     op.drop_index(op.f("ix_audit_logs_created_at"), table_name="audit_logs")
     op.drop_index(op.f("ix_audit_logs_entity_type"), table_name="audit_logs")
     op.drop_index(op.f("ix_audit_logs_operation"), table_name="audit_logs")
