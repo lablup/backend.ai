@@ -18,12 +18,15 @@ import more_itertools
 import tqdm
 import yarl
 
+from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
+from ai.backend.common.types import EtcdRedisConfig
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
 from .config import load_local_config, load_shared_config
@@ -227,17 +230,29 @@ async def check_and_upgrade(
     redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )
-    event_producer = await EventProducer.new(
-        redis_config,
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(redis_config)
+    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis = redis_helper.get_redis_object(
+        stream_redis_config,
+        name="event_producer.stream",
         db=REDIS_STREAM_DB,
+    )
+    node_id = local_config["storage-proxy"]["node-id"]
+    redis_mq = RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
+    event_producer = EventProducer(
+        redis_mq,
         log_events=local_config["debug"]["log-events"],
     )
-    event_dispatcher = await EventDispatcher.new(
-        redis_config,
-        db=REDIS_STREAM_DB,
+    event_dispatcher = EventDispatcher(
+        redis_mq,
         log_events=local_config["debug"]["log-events"],
-        node_id=local_config["storage-proxy"]["node-id"],
-        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
     )
     ctx = RootContext(
         pid=os.getpid(),

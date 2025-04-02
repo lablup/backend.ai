@@ -50,7 +50,9 @@ from ai.backend.common.defs import (
     RedisRole,
 )
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
@@ -450,31 +452,53 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
-        event_dispatcher_cls = ExperimentalEventDispatcher
-    else:
-        event_dispatcher_cls = EventDispatcher
-
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data["redis"]
-    )
-    root_ctx.event_producer = await EventProducer.new(
-        etcd_redis_config.get_override_config(RedisRole.STREAM),
-        db=REDIS_STREAM_DB,
-    )
-    root_ctx.event_dispatcher = await event_dispatcher_cls.new(
-        etcd_redis_config.get_override_config(RedisRole.STREAM),
-        db=REDIS_STREAM_DB,
+    mq = _make_message_queue(root_ctx)
+    root_ctx.event_producer = EventProducer(
+        mq,
         log_events=root_ctx.local_config["debug"]["log-events"],
-        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
-        node_id=root_ctx.local_config["manager"]["id"],
+    )
+    root_ctx.event_dispatcher = EventDispatcher(
+        mq,
+        log_events=root_ctx.local_config["debug"]["log-events"],
         event_observer=root_ctx.metrics.event,
     )
     yield
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
     await root_ctx.event_dispatcher.close()
+
+
+def _make_message_queue(
+    root_ctx: RootContext,
+) -> AbstractMessageQueue:
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
+    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis = redis_helper.get_redis_object(
+        stream_redis_config,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
+    node_id = root_ctx.local_config["manager"]["id"]
+    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
+        return HiRedisQueue(
+            stream_redis_config,
+            HiRedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+                db=REDIS_STREAM_DB,
+            ),
+        )
+    return RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
 
 
 @actxmgr
@@ -635,6 +659,7 @@ class background_task_ctx:
 
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.redis_stream,
             self.root_ctx.event_producer,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
