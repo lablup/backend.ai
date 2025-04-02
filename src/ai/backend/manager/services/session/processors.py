@@ -1,4 +1,8 @@
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.services.session.actions.check_and_transit_status import (
+    CheckAndTransitStatusAction,
+    CheckAndTransitStatusActionResult,
+)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -150,6 +154,9 @@ class SessionProcessors:
     modify_compute_session: ActionProcessor[
         ModifyComputeSessionAction, ModifyComputeSessionActionResult
     ]
+    check_and_transit_status: ActionProcessor[
+        CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
+    ]
 
     def __init__(self, service: SessionService) -> None:
         self.commit_session = ActionProcessor(service.commit_session)
@@ -179,3 +186,4 @@ class SessionProcessors:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry)
         self.upload_files = ActionProcessor(service.upload_files)
         self.modify_compute_session = ActionProcessor(service.modify_compute_session)
+        self.check_and_transit_status = ActionProcessor(service.check_and_transit_status)

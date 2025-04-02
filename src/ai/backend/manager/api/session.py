@@ -44,6 +44,9 @@ from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.json import read_json
+from ai.backend.manager.services.session.actions.check_and_transit_status import (
+    CheckAndTransitStatusAction,
+)
 from ai.backend.manager.services.session.actions.commit_session import CommitSessionAction
 from ai.backend.manager.services.session.actions.complete import CompleteAction
 from ai.backend.manager.services.session.actions.convert_session_to_image import (
@@ -851,32 +854,14 @@ async def check_and_transit_status(
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_ids)
 
-    accessible_session_ids: list[SessionId] = []
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        for sid in session_ids:
-            session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
-            if session_row.user_uuid == user_id or user_role in (
-                UserRole.ADMIN,
-                UserRole.SUPERADMIN,
-            ):
-                accessible_session_ids.append(sid)
-            else:
-                log.warning(
-                    f"You are not allowed to transit others's sessions status, skip (s:{sid})"
-                )
-
-    now = datetime.now(tzutc())
-    if accessible_session_ids:
-        session_rows = await root_ctx.registry.session_lifecycle_mgr.transit_session_status(
-            accessible_session_ids, now
+    result = await root_ctx.processors.session.check_and_transit_status.wait_for_complete(
+        CheckAndTransitStatusAction(
+            user_id=user_id,
+            user_role=user_role,
+            session_ids=session_ids,
         )
-        await root_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
-            row.id for row, is_transited in session_rows if is_transited
-        ])
-        result = {row.id: row.status.name for row, _ in session_rows}
-    else:
-        result = {}
-    return SessionStatusResponseModel(session_status_map=result)
+    )
+    return SessionStatusResponseModel(session_status_map=result.session_status_map)
 
 
 @server_status_required(ALL_ALLOWED)
