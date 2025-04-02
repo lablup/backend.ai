@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 
 import aiohttp_cors
 from aiohttp import web
@@ -20,7 +21,7 @@ async def get_permission(request: web.Request) -> web.Response:
     access_key = request["keypair"]["access_key"]
     log.info("GET_PERMISSION (ak:{})", access_key)
 
-    return web.json_response(get_all_permissions(), status=200)
+    return web.json_response(get_all_permissions(), status=HTTPStatus.OK)
 
 
 async def init(app: web.Application) -> None:

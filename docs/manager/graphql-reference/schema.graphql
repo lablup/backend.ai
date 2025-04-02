@@ -2119,7 +2119,7 @@ type Mutations {
   clear_images(registry: String): ClearImages
 
   """Added in 25.4.0"""
-  purge_images(agent_id: String!, images: [ImageRefType]!): PurgeImages
+  purge_images(keys: [PurgeImagesKey]!, options: PurgeImagesOptions = {force: false, noprune: false}): PurgeImagesPayload
 
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
@@ -2719,15 +2719,32 @@ type ClearImages {
   msg: String
 }
 
-"""Added in 25.4.0."""
-type PurgeImages {
+"""Added in 25.6.0."""
+type PurgeImagesPayload {
   task_id: String
+}
+
+"""Added in 25.6.0."""
+input PurgeImagesKey {
+  agent_id: String!
+  images: [ImageRefType]!
 }
 
 input ImageRefType {
   name: String!
   registry: String
   architecture: String
+}
+
+"""Added in 25.6.0."""
+input PurgeImagesOptions {
+  """
+  Remove the images even if it is being used by stopped containers or has other tags, Added in 25.6.0.
+  """
+  force: Boolean = false
+
+  """Don't delete untagged parent images, Added in 25.6.0."""
+  noprune: Boolean = false
 }
 
 """Added in 24.09.0."""

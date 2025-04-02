@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import pytest
 from aioresponses import aioresponses
 from graphene import Schema
@@ -72,12 +74,14 @@ async def test_harbor_read_project_quota(
 
     with aioresponses() as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+        mocked.get(
+            get_project_id_url, status=HTTPStatus.OK, payload={"project_id": HARBOR_PROJECT_ID}
+        )
 
         get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
         mocked.get(
             get_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": HARBOR_QUOTA_VALUE}}],
         )
 

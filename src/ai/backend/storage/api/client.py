@@ -10,6 +10,7 @@ import logging
 import os
 import urllib.parse
 from datetime import datetime
+from http import HTTPStatus
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -108,7 +109,7 @@ async def check_status(request: web.Request) -> web.StreamResponse:
         ),
     ) as _:
         return web.json_response(
-            status=200,
+            status=HTTPStatus.OK,
             data={
                 "status": "ok",
                 "type": "client-facing",
@@ -371,7 +372,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 except OSError:
                     pass
             headers["Upload-Offset"] = str(current_size)
-    return web.Response(status=204, headers=headers)
+    return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
 async def tus_options(request: web.Request) -> web.Response:

@@ -11,6 +11,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -108,7 +109,7 @@ async def list_presets(request: web.Request) -> web.Response:
                 "shared_memory": str(row.shared_memory) if row.shared_memory else None,
                 "resource_slots": preset_slots.to_json(),
             })
-        return web.json_response(resp, status=200)
+        return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -317,7 +318,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         resp["group_remaining"] = group_remaining.to_json()
         resp["scaling_group_remaining"] = sgroup_remaining.to_json()
         resp["scaling_groups"] = per_sgroup
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -332,7 +333,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     log.info("RECALCULATE_USAGE ()")
     root_ctx: RootContext = request.app["_root.context"]
     await root_ctx.registry.recalc_resource_usage()
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 async def get_project_stats_for_period(
@@ -562,7 +563,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters(extra_msg="Invalid date values")
     resp = await get_container_stats_for_period(request, start_date, end_date, params["group_ids"])
     log.debug("container list are retrieved for month {0}", params["month"])
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -605,7 +606,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     )
     resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
@@ -746,7 +747,7 @@ async def user_month_stats(request: web.Request) -> web.Response:
     user_uuid = request["user"]["uuid"]
     log.info("USER_LAST_MONTH_STATS (ak:{}, u:{})", access_key, user_uuid)
     stats = await get_time_binned_monthly_stats(request, user_uuid=user_uuid)
-    return web.json_response(stats, status=200)
+    return web.json_response(stats, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -758,7 +759,7 @@ async def admin_month_stats(request: web.Request) -> web.Response:
     """
     log.info("ADMIN_LAST_MONTH_STATS ()")
     stats = await get_time_binned_monthly_stats(request, user_uuid=None)
-    return web.json_response(stats, status=200)
+    return web.json_response(stats, status=HTTPStatus.OK)
 
 
 async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
@@ -800,7 +801,7 @@ async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
         with _timeout(5.0):
             headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
             async with sess.get(watcher_info["addr"], headers=headers) as resp:
-                if resp.status == 200:
+                if resp.status == HTTPStatus.OK:
                     data = await resp.json()
                     return web.json_response(data, status=resp.status)
                 else:
@@ -824,7 +825,7 @@ async def watcher_agent_start(request: web.Request, params: Any) -> web.Response
             watcher_url = watcher_info["addr"] / "agent/start"
             headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
             async with sess.post(watcher_url, headers=headers) as resp:
-                if resp.status == 200:
+                if resp.status == HTTPStatus.OK:
                     data = await resp.json()
                     return web.json_response(data, status=resp.status)
                 else:
@@ -848,7 +849,7 @@ async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
             watcher_url = watcher_info["addr"] / "agent/stop"
             headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
             async with sess.post(watcher_url, headers=headers) as resp:
-                if resp.status == 200:
+                if resp.status == HTTPStatus.OK:
                     data = await resp.json()
                     return web.json_response(data, status=resp.status)
                 else:
@@ -872,7 +873,7 @@ async def watcher_agent_restart(request: web.Request, params: Any) -> web.Respon
             watcher_url = watcher_info["addr"] / "agent/restart"
             headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
             async with sess.post(watcher_url, headers=headers) as resp:
-                if resp.status == 200:
+                if resp.status == HTTPStatus.OK:
                     data = await resp.json()
                     return web.json_response(data, status=resp.status)
                 else:
@@ -895,7 +896,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
             if project not in known_registries:
                 known_registries[f"{project}/{registry_name}"] = url.human_repr()
 
-    return web.json_response(known_registries, status=200)
+    return web.json_response(known_registries, status=HTTPStatus.OK)
 
 
 def create_app(

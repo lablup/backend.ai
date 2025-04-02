@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 import aiohttp_cors
@@ -78,7 +79,7 @@ async def render_graphiql_html(request: web.Request) -> web.Response:
 
     return web.Response(
         body=GRAPHIQL_HTML,
-        status=200,
+        status=HTTPStatus.OK,
         content_type="text/html",
     )
 
@@ -91,7 +92,7 @@ async def render_openapi_html(request: web.Request) -> web.Response:
 
     return web.Response(
         body=OPENAPI_HTML,
-        status=200,
+        status=HTTPStatus.OK,
         content_type="text/html",
     )
 
