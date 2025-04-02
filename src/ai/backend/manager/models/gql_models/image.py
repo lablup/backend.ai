@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -41,8 +42,15 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
+from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
+    LoadAllContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.load_container_registries import (
+    LoadContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
-from ai.backend.manager.services.image.actions.clear_images import ClearImagesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
@@ -61,7 +69,6 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageActionResult,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -929,12 +936,31 @@ class RescanImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
-            action_result = await ctx.processors.image.rescan_images.wait_for_complete(
-                RescanImagesAction(
-                    registry=registry,
-                    project=project,
+            loaded_registries: list[ContainerRegistryRow]
+
+            if registry is None:
+                all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
+                    LoadAllContainerRegistriesAction()
                 )
-            )
+                loaded_registries = all_registries.registry_rows
+            else:
+                registries = await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                    LoadContainerRegistriesAction(
+                        registry=registry,
+                        project=project,
+                    )
+                )
+                loaded_registries = registries.registry_rows
+
+            for registry_row in loaded_registries:
+                action_result = (
+                    await ctx.processors.container_registry.rescan_images.wait_for_complete(
+                        RescanImagesAction(
+                            registry=registry_row.registry_name,
+                            project=registry_row.project,
+                        )
+                    )
+                )
 
             for error in action_result.errors:
                 log.error(error)
@@ -1022,11 +1048,23 @@ class ClearImages(graphene.Mutation):
     ) -> ClearImages:
         ctx: GraphQueryContext = info.context
         log.info("clear images from registry {0} by API request", registry)
-        await ctx.processors.image.clear_images.wait_for_complete(
-            ClearImagesAction(
-                registry=registry,
+
+        result = (
+            await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                LoadContainerRegistriesAction(
+                    registry=registry,
+                    project=None,
+                )
             )
         )
+
+        for registry_row in result.registry_rows:
+            await ctx.processors.container_registry.clear_images.wait_for_complete(
+                ClearImagesAction(
+                    registry=registry_row,
+                    project=registry_row.project,
+                )
+            )
 
         return ClearImages(ok=True, msg="")
 
