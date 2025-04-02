@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -28,8 +27,6 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImagesResp
-from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     DispatchResult,
@@ -58,10 +55,15 @@ from ai.backend.manager.services.image.actions.modify_image import (
     TriState,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import (
+    PurgeImagesAction,
+    PurgeImagesKeyData,
+)
 from ai.backend.manager.services.image.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
+from ai.backend.manager.services.image.types import ImageRefData
 
 from ...api.exceptions import ImageNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -932,6 +934,9 @@ class RescanImages(graphene.Mutation):
                 )
             )
 
+            for error in action_result.errors:
+                log.error(error)
+
             return DispatchResult.success(action_result)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
@@ -1115,20 +1120,6 @@ class ModifyImage(graphene.Mutation):
         return ModifyImage(ok=True, msg="")
 
 
-@dataclass
-class PurgeImagesResult:
-    agent_id: AgentId
-    results: PurgeImagesResp
-    reserved_bytes: int
-
-    def __str__(self) -> str:
-        results_str = ", ".join(
-            f"{r.image}: {'Success' if not r.error else f'Failed (error: {r.error})'}"
-            for r in self.results.responses
-        )
-        return f'Purge images on "{self.agent_id}", Reserved Bytes: {self.reserved_bytes}, Details: [{results_str}]'
-
-
 class PurgeImagesKey(graphene.InputObjectType):
     """
     Added in 25.6.0.
@@ -1186,50 +1177,32 @@ class PurgeImages(graphene.Mutation):
 
         log.info(f"purge images ({agent_images}) by API request")
 
-        async def _purge_images_task(
-            reporter: ProgressReporter,
-        ) -> DispatchResult[list[PurgeImagesResult]]:
-            errors = []
-            task_results: list[PurgeImagesResult] = []
-            for key in keys:
-                task_result = PurgeImagesResult(
-                    results=PurgeImagesResp([]), reserved_bytes=0, agent_id=key.agent_id
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            action_result = await ctx.processors.image.purge_images.wait_for_complete(
+                PurgeImagesAction(
+                    keys=[
+                        PurgeImagesKeyData(
+                            agent_id=key.agent_id,
+                            images=[
+                                ImageRefData(
+                                    name=img.name,
+                                    registry=img.registry,
+                                    architecture=img.architecture,
+                                )
+                                for img in key.images
+                            ],
+                        )
+                        for key in keys
+                    ],
+                    force=options.force,
+                    noprune=options.noprune,
                 )
-                image_canonicals = [image.name for image in key.images]
-                arch_per_images = {image.name: image.architecture for image in key.images}
-
-                results = await ctx.registry.purge_images(
-                    AgentId(key.agent_id),
-                    PurgeImagesReq(
-                        images=image_canonicals, force=options.force, noprune=options.noprune
-                    ),
-                )
-
-                for result in results.responses:
-                    image_canonical = result.image
-                    arch = arch_per_images[result.image]
-
-                    if not result.error:
-                        image_identifier = ImageIdentifier(image_canonical, arch)
-                        async with ctx.db.begin_session() as session:
-                            image_row = await ImageRow.resolve(session, [image_identifier])
-                            task_result.reserved_bytes += image_row.size_bytes
-                            task_result.results.responses.append(result)
-
-                    else:
-                        error_msg = f"Failed to purge image {image_canonical} from agent {key.agent_id}: {result.error}"
-                        log.error(error_msg)
-                        errors.append(error_msg)
-
-                log.info(
-                    f"purge images done, Task result: {task_result}",
-                )
-                task_results.append(task_result)
-
-            return DispatchResult(
-                result=task_results,
-                errors=errors,
             )
 
-        task_id = await ctx.background_task_manager.start(_purge_images_task)
+            for error in action_result.errors:
+                log.error(error)
+
+            return DispatchResult.success(action_result)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
         return PurgeImagesPayload(task_id=task_id)
