@@ -32,7 +32,7 @@ class ModifyImageInputData:
         default_factory=lambda: OptionalState.none("resources")
     )
 
-    def set_attr(self, image_row: ImageRow):
+    def set_attr(self, image_row: ImageRow) -> None:
         self.name.set_attr(image_row)
         self.registry.set_attr(image_row)
         self.image.set_attr(image_row)

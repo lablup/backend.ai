@@ -399,7 +399,6 @@ class ImageRow(Base):
         accelerators=None,
         labels=None,
         resources=None,
-        created_at=None,
         status=ImageStatus.ALIVE,
     ) -> None:
         self.name = name
@@ -417,7 +416,6 @@ class ImageRow(Base):
         self.labels = labels
         self.resources = resources
         self.status = status
-        self.created_at = created_at
 
     @property
     def trimmed_digest(self) -> str:
@@ -539,11 +537,10 @@ class ImageRow(Base):
 
     @classmethod
     def from_dataclass(cls, image_data: ImageData) -> Self:
-        return cls(
+        image_row = ImageRow(
             name=image_data.name,
             project=image_data.project,
             image=image_data.image,
-            created_at=image_data.created_at,
             tag=image_data.tag,
             registry=image_data.registry,
             registry_id=image_data.registry_id,
@@ -557,6 +554,8 @@ class ImageRow(Base):
             resources=image_data.resources.resources_data,
             status=image_data.status,
         )
+        image_row.created_at = image_data.created_at
+        return image_row
 
     @classmethod
     async def resolve(
