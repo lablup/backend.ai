@@ -51,25 +51,29 @@ class ContainerRegistryService:
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
         async with self._db.begin_session() as session:
-            await session.execute(
+            update_stmt = (
                 sa.update(ImageRow)
-                .where(
-                    sa.and_(
-                        ImageRow.registry == action.registry, ImageRow.project == action.project
-                    )
-                )
+                .where(ImageRow.registry == action.registry)
                 .where(ImageRow.status != ImageStatus.DELETED)
                 .values(status=ImageStatus.DELETED)
             )
+            if action.project:
+                update_stmt = update_stmt.where(ImageRow.project == action.project)
 
-            registry_row: ContainerRegistryRow = await session.scalar(
-                sa.select(ContainerRegistryRow).where(
-                    sa.and_(
-                        ContainerRegistryRow.registry_name == action.registry,
-                        ContainerRegistryRow.project == action.project,
-                    )
-                )
+            await session.execute(update_stmt)
+
+            get_registry_row_stmt = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == action.registry,
             )
+            if action.project:
+                get_registry_row_stmt = get_registry_row_stmt.where(
+                    ContainerRegistryRow.project == action.project
+                )
+
+            registry_row: ContainerRegistryRow = await session.scalar(get_registry_row_stmt)
+
+            if action.project:
+                update_stmt = update_stmt.where(ImageRow.project == action.project)
 
         return ClearImagesActionResult(registry=registry_row.to_dataclass())
 

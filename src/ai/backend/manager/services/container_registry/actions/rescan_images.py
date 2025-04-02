@@ -10,7 +10,7 @@ from ai.backend.manager.services.container_registry.base import ContainerRegistr
 @dataclass
 class RescanImagesAction(ContainerRegistryAction):
     registry: str
-    project: str
+    project: Optional[str]
     # TODO: Pass progress_reporter?
 
     @override
@@ -25,8 +25,8 @@ class RescanImagesAction(ContainerRegistryAction):
 @dataclass
 class RescanImagesActionResult(BaseActionResult):
     images: list[ImageData]
-    errors: list[str]
     registry: ContainerRegistryData
+    errors: list[str]
 
     @override
     def entity_id(self) -> Optional[str]:
