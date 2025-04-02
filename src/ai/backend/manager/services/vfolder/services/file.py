@@ -11,11 +11,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderRow,
     ensure_host_permission_allowed,
     is_unmanaged,
+    query_accessible_vfolders,
 )
 
 from ..actions.file import (
@@ -132,12 +134,26 @@ class VFolderFileService:
         )
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
-        async with self._db.begin_readonly_session() as db_session:
-            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
-            vfolder_row = await db_session.scalar(query_vfolder)
-            vfolder_row = cast(VFolderRow, vfolder_row)
+        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        async with self._db.begin_session() as db_session:
+            requester_user_row = await db_session.scalar(
+                sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
+            )
+            requester_user_row = cast(UserRow, requester_user_row)
+            vfolder_dicts = await query_accessible_vfolders(
+                db_session.bind,
+                action.user_uuid,
+                allow_privileged_access=True,
+                user_role=requester_user_row.role,
+                allowed_vfolder_types=allowed_vfolder_types,
+                domain_name=requester_user_row.domain_name,
+                extra_vf_conds=(VFolderRow.id == action.vfolder_uuid),
+            )
+            if not vfolder_dicts:
+                raise InvalidParameter("The specified vfolder is not accessible.")
+            vfolder_row = vfolder_dicts[0]
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+            vfolder_row["host"], is_unmanaged(vfolder_row["unmanaged_path"])
         )
         async with self._storage_manager.request(
             proxy_name,
@@ -145,7 +161,7 @@ class VFolderFileService:
             "folder/file/list",
             json={
                 "volume": volume_name,
-                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "vfid": str(VFolderID(vfolder_row["quota_scope_id"], vfolder_row["id"])),
                 "relpath": action.path,
             },
         ) as (_, storage_resp):
@@ -198,12 +214,26 @@ class VFolderFileService:
         return RenameFileActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
-        async with self._db.begin_readonly_session() as db_session:
-            query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
-            vfolder_row = await db_session.scalar(query_vfolder)
-            vfolder_row = cast(VFolderRow, vfolder_row)
+        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        async with self._db.begin_session() as db_session:
+            requester_user_row = await db_session.scalar(
+                sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
+            )
+            requester_user_row = cast(UserRow, requester_user_row)
+            vfolder_dicts = await query_accessible_vfolders(
+                db_session.bind,
+                action.user_uuid,
+                allow_privileged_access=True,
+                user_role=requester_user_row.role,
+                allowed_vfolder_types=allowed_vfolder_types,
+                domain_name=requester_user_row.domain_name,
+                extra_vf_conds=(VFolderRow.id == action.vfolder_uuid),
+            )
+            if not vfolder_dicts:
+                raise InvalidParameter("The specified vfolder is not accessible.")
+            vfolder_row = vfolder_dicts[0]
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            vfolder_row.host, is_unmanaged(vfolder_row.unmanaged_path)
+            vfolder_row["host"], is_unmanaged(vfolder_row["unmanaged_path"])
         )
         async with self._storage_manager.request(
             proxy_name,
@@ -211,7 +241,7 @@ class VFolderFileService:
             "folder/file/delete",
             json={
                 "volume": volume_name,
-                "vfid": str(VFolderID.from_row(vfolder_row)),
+                "vfid": str(VFolderID(vfolder_row["quota_scope_id"], vfolder_row["id"])),
                 "relpaths": action.files,
                 "recursive": action.recursive,
             },
@@ -246,4 +276,5 @@ class VFolderFileService:
         return MkdirActionResult(
             vfolder_uuid=action.vfolder_uuid,
             results=results,
+            storage_resp_status=storage_resp.status,
         )

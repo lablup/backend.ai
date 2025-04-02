@@ -78,6 +78,7 @@ class CreateDownloadSessionActionResult(BaseActionResult):
 
 @dataclass
 class ListFilesAction(VFolderAction):
+    user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
     path: str
@@ -131,6 +132,7 @@ class RenameFileActionResult(BaseActionResult):
 
 @dataclass
 class DeleteFilesAction(VFolderAction):
+    user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
     files: list[str]
@@ -175,6 +177,7 @@ class MkdirAction(VFolderAction):
 class MkdirActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
     results: ResultSet
+    storage_resp_status: int
 
     @override
     def entity_id(self) -> Optional[str]:

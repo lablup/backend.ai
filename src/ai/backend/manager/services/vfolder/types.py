@@ -5,7 +5,12 @@ from typing import (
     Optional,
 )
 
-from ai.backend.manager.models.vfolder import QuotaScopeID, VFolderOperationStatus, VFolderUsageMode
+from ai.backend.manager.models.vfolder import (
+    QuotaScopeID,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+    VFolderUsageMode,
+)
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 
 
@@ -26,6 +31,10 @@ class VFolderBaseInfo:
 @dataclass
 class VFolderOwnershipInfo:
     creator_email: str
+    is_owner: bool
+    ownership_type: VFolderOwnershipType
+    user_uuid: Optional[uuid.UUID]
+    group_uuid: Optional[uuid.UUID]
 
 
 @dataclass

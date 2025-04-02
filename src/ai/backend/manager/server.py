@@ -77,6 +77,15 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.vfolder.services import (
+    VFolderFileService,
+    VFolderFileServiceInitParameter,
+    VFolderInviteService,
+    VFolderInviteServiceInitParameter,
+    VFolderService,
+    VFolderServiceInitParameter,
+)
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -433,15 +442,29 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # image_service = ImageService(
-    #     db=root_ctx.db,
-    #     agent_registry=root_ctx.registry,
-    # )
-
-    # root_ctx.processors = Processors(
-    #     image_service=image_service,
-    # )
-
+    root_ctx.processors = Processors(
+        VFolderService(
+            VFolderServiceInitParameter(
+                db=root_ctx.db,
+                shared_config=root_ctx.shared_config,
+                storage_manager=root_ctx.storage_manager,
+                background_task_manager=root_ctx.background_task_manager,
+            ),
+        ),
+        VFolderInviteService(
+            VFolderInviteServiceInitParameter(
+                db=root_ctx.db,
+                shared_config=root_ctx.shared_config,
+            ),
+        ),
+        VFolderFileService(
+            VFolderFileServiceInitParameter(
+                db=root_ctx.db,
+                shared_config=root_ctx.shared_config,
+                storage_manager=root_ctx.storage_manager,
+            ),
+        ),
+    )
     yield
 
 

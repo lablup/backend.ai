@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
@@ -32,7 +32,7 @@ class CreateVFolderAction(VFolderAction):
 
     keypair_resource_policy: Mapping[str, Any]
     domain_name: str
-    group_id_or_name: Optional[str]
+    group_id_or_name: Optional[str | uuid.UUID]
     folder_host: Optional[str]
     unmanaged_path: Optional[str]
     mount_permission: VFolderPermission
@@ -63,6 +63,8 @@ class CreateVFolderActionResult(BaseActionResult):
     usage_mode: VFolderUsageMode
     creator_email: str
     ownership_type: VFolderOwnershipType
+    user_uuid: Optional[uuid.UUID]
+    group_uuid: Optional[uuid.UUID]
     cloneable: bool
     status: VFolderOperationStatus
 
@@ -81,8 +83,9 @@ class UpdateVFolderAttributeInput(TriStateData):
 
 @dataclass
 class UpdateVFolderAttributeAction(VFolderAction):
+    user_uuid: uuid.UUID
+
     vfolder_uuid: uuid.UUID
-    accessible_vfolder_uuids: Iterable[uuid.UUID]
     input: UpdateVFolderAttributeInput = field(default_factory=UpdateVFolderAttributeInput)
 
     @override
