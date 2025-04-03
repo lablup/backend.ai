@@ -195,10 +195,17 @@ LEADING_SESSION_STATUSES = tuple(
     if s not in FOLLOWING_SESSION_STATUSES
 )
 
-DEAD_SESSION_STATUSES = (
+DEAD_SESSION_STATUSES = frozenset([
     SessionStatus.CANCELLED,
     SessionStatus.TERMINATED,
-)
+    SessionStatus.ERROR,
+])
+
+DEAD_KERNEL_STATUSES = frozenset([
+    KernelStatus.CANCELLED,
+    KernelStatus.TERMINATED,
+    KernelStatus.ERROR,
+])
 
 # statuses to consider when calculating current resource usage
 AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
@@ -1339,6 +1346,12 @@ class SessionRow(Base):
                 return network_row.ref_name
             case _:
                 return None
+
+    @classmethod
+    def get_status_elapsed_time(
+        cls, status: SessionStatus, until: datetime
+    ) -> sa.sql.elements.BinaryExpression:
+        return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
 
 
 @dataclass

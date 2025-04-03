@@ -57,7 +57,8 @@ from yarl import URL
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -1151,6 +1152,8 @@ class AgentRegistry:
             session_data["network_id"] = str(network.id)
         elif use_host_network:
             session_data["network_type"] = NetworkType.HOST
+        else:
+            session_data["network_type"] = NetworkType.VOLATILE
 
         kernel_data = []
         session_images: list[str] = []
@@ -2250,6 +2253,7 @@ class AgentRegistry:
         kernels: Sequence[
             Mapping[str, Any]
         ],  # should have (id, agent, agent_addr, container_id) columns
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.FAILED_TO_START,
     ) -> None:
         """
         Destroy the kernels that belongs the to given session unconditionally
@@ -2278,7 +2282,7 @@ class AgentRegistry:
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
                             str(session_id),
-                            KernelLifecycleEventReason.FAILED_TO_START,
+                            reason,
                             suppress_events=True,
                         ),
                     )
@@ -2314,7 +2318,7 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        async def _force_destroy_for_suadmin(
+        async def _force_destroy_for_superadmin(
             target_status: Literal[SessionStatus.CANCELLED, SessionStatus.TERMINATED],
         ) -> None:
             current_time = datetime.now(tzutc())
@@ -2439,7 +2443,7 @@ class AgentRegistry:
                     if user_role == UserRole.SUPERADMIN:
                         # Exceptionally let superadmins set the session status to 'TERMINATED' and finish the function.
                         # TODO: refactor Session/Kernel status management and remove this.
-                        await _force_destroy_for_suadmin(SessionStatus.TERMINATED)
+                        await _force_destroy_for_superadmin(SessionStatus.TERMINATED)
                         return {}
                     else:
                         await SessionRow.set_session_status(
@@ -3151,7 +3155,7 @@ class AgentRegistry:
             if instance_rejoin:
                 await self.event_producer.produce_event(
                     AgentStartedEvent("revived"),
-                    source=agent_id,
+                    source_override=agent_id,
                 )
 
             # Update the mapping of kernel images to agents.
@@ -3657,21 +3661,19 @@ class AgentRegistry:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
 
-    async def purge_images(
-        self,
-        agent_id: AgentId,
-        images: list[str],
-    ) -> PurgeImageResponses:
+    async def purge_images(self, agent_id: AgentId, request: PurgeImagesReq) -> PurgeImagesResp:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            result = await rpc.call.purge_images(images)
+            result = await rpc.call.purge_images(request.images, request.force, request.noprune)
 
-            return PurgeImageResponses([
-                PurgeImageResponse(
-                    image=resp["image"],
-                    error=resp.get("error"),
-                )
-                for resp in result["responses"]
-            ])
+            return PurgeImagesResp(
+                responses=[
+                    PurgeImageResp(
+                        image=resp["image"],
+                        error=resp.get("error"),
+                    )
+                    for resp in result["responses"]
+                ],
+            )
 
     async def get_abusing_report(
         self,

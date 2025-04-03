@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 import aiohttp_cors
@@ -184,7 +185,7 @@ async def harbor_webhook_handler(
                 root_ctx, event_type, registry_row, project, img_name, resource.tag
             )
 
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 def create_app(

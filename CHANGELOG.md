@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.5.2 (2025-03-31)
+
+### Features
+* Split `hanging_session_scanner_ctx` into separate stale session and kernel sweepers to more robustly handle orphaned kernels, caused by session status update mismatches ([#3992](https://github.com/lablup/backend.ai/issues/3992))
+* Fix typo in keypair resource policy affecting `max_concurrent_sftp_sessions` ([#4050](https://github.com/lablup/backend.ai/issues/4050))
+* Add raise exception in action processor ([#4056](https://github.com/lablup/backend.ai/issues/4056))
+
+### Fixes
+* Fix image rescanning wrong exception handling logic. ([#4057](https://github.com/lablup/backend.ai/issues/4057))
+* Fix docker network not created when bootstraping multi-container session ([#4062](https://github.com/lablup/backend.ai/issues/4062))
+
+
 ## 25.5.1 (2025-03-27)
 
 ### Fixes
