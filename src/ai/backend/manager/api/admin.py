@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
 
 import aiohttp_cors
@@ -130,7 +131,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
 )
 async def handle_gql(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
-    return web.json_response(result.formatted, status=200)
+    return web.json_response(result.formatted, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -155,7 +156,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
                 errors.append(errmsg)
             log.error("ADMIN.GQL Exception: {}", errmsg)
         raise BackendGQLError(extra_data=errors)
-    return web.json_response(result.data, status=200)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @attrs.define(auto_attribs=True, slots=True, init=False)

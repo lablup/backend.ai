@@ -10,6 +10,7 @@ import pytest
 
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events import (
     BgtaskDoneEvent,
     BgtaskFailedEvent,
@@ -17,9 +18,14 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, EtcdRedisConfig
 from ai.backend.manager.api.context import RootContext
-from ai.backend.manager.server import background_task_ctx, event_dispatcher_ctx, shared_config_ctx
+from ai.backend.manager.server import (
+    background_task_ctx,
+    event_dispatcher_ctx,
+    redis_ctx,
+    shared_config_ctx,
+)
 
 
 class ContextSentinel(enum.Enum):
@@ -32,7 +38,7 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 @pytest.fixture
 async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
-        [shared_config_ctx, event_dispatcher_ctx, background_task_ctx],
+        [shared_config_ctx, redis_ctx, event_dispatcher_ctx, background_task_ctx],
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]
@@ -41,10 +47,20 @@ async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[B
 
     yield root_ctx.background_task_manager, producer, dispatcher
 
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
+    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis = redis_helper.get_redis_object(
+        stream_redis_config,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
+
     await root_ctx.background_task_manager.shutdown()
     await producer.close()
     await dispatcher.close()
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(stream_redis, lambda r: r.flushdb())
 
 
 @pytest.mark.timeout(60)

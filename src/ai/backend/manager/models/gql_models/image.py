@@ -28,7 +28,8 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AgentId,
@@ -722,7 +723,7 @@ class ForgetImageById(graphene.Mutation):
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
+                if not image_row.is_owned_by(ctx.user["uuid"]):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await image_row.mark_as_deleted(session)
             return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
@@ -767,7 +768,7 @@ class ForgetImage(graphene.Mutation):
                 ],
             )
             if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
+                if not image_row.is_owned_by(ctx.user["uuid"]):
                     return ForgetImage(ok=False, msg="Forbidden")
             await image_row.mark_as_deleted(session)
             return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
@@ -804,7 +805,7 @@ class PurgeImageById(graphene.Mutation):
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
+                if not image_row.is_owned_by(ctx.user["uuid"]):
                     raise GenericForbidden("Image is not owned by your account.")
             for alias in image_row.aliases:
                 await session.delete(alias)
@@ -848,7 +849,7 @@ class UntagImageFromRegistry(graphene.Mutation):
             if not image_row:
                 raise ImageNotFound
             if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
+                if not image_row.is_owned_by(ctx.user["uuid"]):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 
             query = sa.select(ContainerRegistryRow).where(
@@ -933,7 +934,11 @@ class RescanImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
-            return await rescan_images(ctx.db, registry, project, reporter=reporter)
+            result = await rescan_images(ctx.db, registry, project, reporter=reporter)
+            for error in result.errors:
+                log.error(error)
+
+            return result
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
@@ -1121,15 +1126,48 @@ class ModifyImage(graphene.Mutation):
 
 @dataclass
 class PurgeImagesResult:
-    results: PurgeImageResponses
+    agent_id: AgentId
+    results: PurgeImagesResp
     reserved_bytes: int
 
     def __str__(self) -> str:
-        results_str = "\n  ".join(
+        results_str = ", ".join(
             f"{r.image}: {'Success' if not r.error else f'Failed (error: {r.error})'}"
             for r in self.results.responses
         )
-        return f"PurgeImagesResult:\n  Reserved Bytes: {self.reserved_bytes}\n  Results:\n  {results_str}"
+        return f'Purge images on "{self.agent_id}", Reserved Bytes: {self.reserved_bytes}, Details: [{results_str}]'
+
+
+class PurgeImagesKey(graphene.InputObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    agent_id = graphene.String(required=True)
+    images = graphene.List(ImageRefType, required=True)
+
+
+class PurgeImagesOptions(graphene.InputObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    force = graphene.Boolean(
+        default_value=False,
+        description="Remove the images even if it is being used by stopped containers or has other tags, Added in 25.6.0.",
+    )
+    noprune = graphene.Boolean(
+        default_value=False, description="Don't delete untagged parent images, Added in 25.6.0."
+    )
+
+
+class PurgeImagesPayload(graphene.ObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    task_id = graphene.String()
+    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
 
 
 class PurgeImages(graphene.Mutation):
@@ -1137,53 +1175,70 @@ class PurgeImages(graphene.Mutation):
     Added in 25.4.0.
     """
 
-    allowed_roles = (UserRole.SUPERADMIN,)
-
     class Arguments:
-        agent_id = graphene.String(required=True)
-        images = graphene.List(ImageRefType, required=True)
+        keys = graphene.List(PurgeImagesKey, required=True)
+        options = PurgeImagesOptions(default_value={"force": False, "noprune": False})
 
-    task_id = graphene.String()
+    Output = PurgeImagesPayload
 
     @staticmethod
     async def mutate(
-        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[ImageRefType]
-    ) -> PurgeImages:
-        image_canonicals = [image.name for image in images]
-        log.info(
-            f"purge images ({image_canonicals}) from agent {agent_id} by API request",
-        )
+        root: Any,
+        info: graphene.ResolveInfo,
+        keys: list[PurgeImagesKey],
+        options: PurgeImagesOptions,
+    ) -> PurgeImagesPayload:
         ctx: GraphQueryContext = info.context
+        agent_images = ", ".join(
+            f"{key.agent_id}: [{', '.join(img.name for img in key.images)}]" for key in keys
+        )
+
+        log.info(f"purge images ({agent_images}) by API request")
 
         async def _purge_images_task(
             reporter: ProgressReporter,
-        ) -> DispatchResult[PurgeImagesResult]:
+        ) -> DispatchResult[list[PurgeImagesResult]]:
             errors = []
-            task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
-            arch_per_images = {image.name: image.architecture for image in images}
+            task_results: list[PurgeImagesResult] = []
+            for key in keys:
+                task_result = PurgeImagesResult(
+                    results=PurgeImagesResp([]), reserved_bytes=0, agent_id=key.agent_id
+                )
+                image_canonicals = [image.name for image in key.images]
+                arch_per_images = {image.name: image.architecture for image in key.images}
 
-            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
+                results = await ctx.registry.purge_images(
+                    AgentId(key.agent_id),
+                    PurgeImagesReq(
+                        images=image_canonicals, force=options.force, noprune=options.noprune
+                    ),
+                )
 
-            for result in results.responses:
-                image_canonical = result.image
-                arch = arch_per_images[result.image]
+                for result in results.responses:
+                    image_canonical = result.image
+                    arch = arch_per_images[result.image]
 
-                if not result.error:
-                    image_identifier = ImageIdentifier(image_canonical, arch)
-                    async with ctx.db.begin_session() as session:
-                        image_row = await ImageRow.resolve(session, [image_identifier])
-                        task_result.reserved_bytes += image_row.size_bytes
-                        task_result.results.responses.append(result)
+                    if not result.error:
+                        image_identifier = ImageIdentifier(image_canonical, arch)
+                        async with ctx.db.begin_session() as session:
+                            image_row = await ImageRow.resolve(session, [image_identifier])
+                            task_result.reserved_bytes += image_row.size_bytes
+                            task_result.results.responses.append(result)
 
-                else:
-                    error_msg = f"Failed to purge image {image_canonical} from agent {agent_id}: {result.error}"
-                    log.error(error_msg)
-                    errors.append(error_msg)
+                    else:
+                        error_msg = f"Failed to purge image {image_canonical} from agent {key.agent_id}: {result.error}"
+                        log.error(error_msg)
+                        errors.append(error_msg)
+
+                log.info(
+                    f"purge images done, Task result: {task_result}",
+                )
+                task_results.append(task_result)
 
             return DispatchResult(
-                result=task_result,
+                result=task_results,
                 errors=errors,
             )
 
         task_id = await ctx.background_task_manager.start(_purge_images_task)
-        return RescanImages(task_id=task_id)
+        return PurgeImagesPayload(task_id=task_id)

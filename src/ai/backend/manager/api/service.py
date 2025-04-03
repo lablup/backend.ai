@@ -5,6 +5,7 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -1200,7 +1201,7 @@ async def clear_error(request: web.Request) -> web.Response:
         query = sa.update(EndpointRow).values({"retries": 0}).where(EndpointRow.id == endpoint.id)
         await db_sess.execute(query)
 
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 class RuntimeInfo(BaseModel):

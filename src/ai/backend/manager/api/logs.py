@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 import uuid
 from datetime import datetime
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
 
 import aiohttp_cors
@@ -167,7 +168,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
                 .where(error_logs.c.id.in_([x["log_id"] for x in resp["logs"]]))
             )
             await conn.execute(read_update_query)
-        return web.json_response(resp, status=200)
+        return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -205,7 +206,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         result = await conn.execute(update_query)
         assert result.rowcount == 1
 
-        return web.json_response({"success": True}, status=200)
+        return web.json_response({"success": True}, status=HTTPStatus.OK)
 
 
 async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogCleanupEvent) -> None:

@@ -1,5 +1,6 @@
 import asyncio
 import json
+from http import HTTPStatus
 from typing import Callable
 
 import attr
@@ -228,7 +229,7 @@ async def test_image_rescan_on_docker_registry(
         # /v2/ endpoint
         mocked.get(
             f"{registry_url}/v2/",
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_dockerhub_responses["get_token"],
             repeat=True,
         )
@@ -236,7 +237,7 @@ async def test_image_rescan_on_docker_registry(
         # catalog
         mocked.get(
             f"{registry_url}/v2/_catalog?n=30",
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_dockerhub_responses["get_catalog"],
             repeat=True,
         )
@@ -247,7 +248,7 @@ async def test_image_rescan_on_docker_registry(
             # tags
             mock_value = mock_dockerhub_responses["get_tags"]
             params = {
-                "status": 200,
+                "status": HTTPStatus.OK,
                 "callback" if isinstance(mock_value, Callable) else "payload": mock_value,
             }
 
@@ -256,7 +257,7 @@ async def test_image_rescan_on_docker_registry(
             # manifest
             mocked.get(
                 f"{registry_url}/v2/{repo}/manifests/latest",
-                status=200,
+                status=HTTPStatus.OK,
                 payload=mock_dockerhub_responses["get_manifest"],
                 headers={
                     "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
@@ -270,7 +271,7 @@ async def test_image_rescan_on_docker_registry(
             # config blob (JSON)
             mocked.get(
                 f"{registry_url}/v2/{repo}/blobs/{image_digest}",
-                status=200,
+                status=HTTPStatus.OK,
                 body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
                 payload=mock_dockerhub_responses["get_config"],
                 repeat=True,

@@ -9,6 +9,37 @@ type Queries {
     """The ID of the object"""
     id: ID!
   ): Node
+
+  """Added in 25.6.0."""
+  audit_log_schema: AuditLogSchema
+
+  """Added in 25.6.0."""
+  audit_log_nodes(
+    """
+    Specifies the criteria used to narrow down the query results based on certain conditions.
+    """
+    filter: String
+
+    """Specifies the sorting order of the query result."""
+    order: String
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): AuditLogConnection
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
@@ -167,6 +198,11 @@ type Queries {
   ): [ResourcePreset]
   scaling_group(name: String): ScalingGroup
   scaling_groups(name: String, is_active: Boolean): [ScalingGroup]
+
+  """
+  Added in 25.5.0. This query is available for all users. It returns the resource groups(=scaling groups) that the user has access to. Only name, is_active, own_session_occupied_resource_slots and accelerator_quantum_size fields are returned.
+  """
+  accessible_scaling_groups(project_id: UUID!): [ScalingGroup]
   scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_user_group(user_group: String!, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_keypair(access_key: String!, is_active: Boolean): [ScalingGroup]
@@ -240,6 +276,23 @@ type Queries {
   compute_container_list(limit: Int!, offset: Int!, filter: String, order: String, session_id: ID!, role: String): ComputeContainerList
   legacy_compute_session_list(limit: Int!, offset: Int!, order_key: String, order_asc: Boolean, domain_name: String, group_id: String, access_key: String, status: String): LegacyComputeSessionList
   legacy_compute_session(sess_id: String!, domain_name: String, access_key: String): LegacyComputeSession
+
+  """Added in 25.5.0."""
+  total_resource_slot(
+    """
+    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
+    Default value is null.
+    """
+    statuses: [String] = null
+
+    """
+    `filter` argument is a string that is parsed into query conditions. It works in the same way as the `filter` argument in the `compute_session` query schema, meaning the values are parsed into an identical SQL query expression.
+    Default value is `null`.
+    """
+    filter: String
+    domain_name: String
+    resource_group_name: String
+  ): TotalResourceSlot
   vfolder_host_permissions: PredefinedAtomicPermission
   endpoint(endpoint_id: UUID!): Endpoint
   endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, user_uuid: String, project: UUID): EndpointList
@@ -285,6 +338,108 @@ interface Node {
   id: ID!
 }
 
+"""
+A schema that contains metadata related to the AuditLogNode.
+It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
+
+Added in 25.6.0.
+"""
+type AuditLogSchema {
+  """
+  Possible values of "AuditLogNode.entity_type"
+  """
+  entity_type_variants: [String]
+
+  """
+  Possible values of "AuditLogNode.status"
+  """
+  status_variants: [String]
+}
+
+"""Added in 25.6.0."""
+type AuditLogConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AuditLogEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""Added in 25.6.0. A Relay edge containing a `AuditLog` and its cursor."""
+type AuditLogEdge {
+  """The item at the end of the edge"""
+  node: AuditLogNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.6.0."""
+type AuditLogNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """UUID of the audit log row"""
+  row_id: UUID!
+
+  """Entity ID of the AuditLog"""
+  entity_type: String!
+
+  """Entity type of the AuditLog"""
+  operation: String!
+
+  """Operation type of the AuditLog"""
+  entity_id: String!
+
+  """The time the AuditLog was reported"""
+  created_at: DateTime!
+
+  """RequestID of the AuditLog"""
+  request_id: UUID!
+
+  """Description of the AuditLog"""
+  description: String!
+
+  """Duration taken to perform the operation"""
+  duration: String!
+
+  """Status of the AuditLog"""
+  status: String!
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
+
 type Agent implements Item {
   id: ID
   status: String
@@ -324,13 +479,6 @@ type Agent implements Item {
 interface Item {
   id: ID
 }
-
-"""
-The `DateTime` scalar type represents a DateTime
-value as specified by
-[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
-"""
-scalar DateTime
 
 """
 Allows use of a JSON String for input / output from the GraphQL schema.
@@ -385,12 +533,6 @@ type ComputeContainer implements Item {
   last_stat: JSONString
   preopen_ports: [Int]
 }
-
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
 
 type ImageNode implements Node {
   """The ID of the object"""
@@ -515,23 +657,6 @@ type ScalinGroupConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """
@@ -1221,6 +1346,9 @@ type ScalingGroup {
   scheduler_opts: JSONString
   use_host_network: Boolean
 
+  """Added in 25.5.0."""
+  accelerator_quantum_size: Float
+
   """Added in 24.03.7."""
   agent_count_by_status(
     """
@@ -1505,6 +1633,13 @@ type LegacyComputeSession implements Item {
   io_write_bytes: BigInt
   io_max_scratch_size: BigInt
   io_cur_scratch_size: BigInt
+}
+
+"""Added in 25.5.0."""
+type TotalResourceSlot implements Item {
+  id: ID
+  occupied_slots: JSONString
+  requested_slots: JSONString
 }
 
 type PredefinedAtomicPermission {
@@ -1984,7 +2119,7 @@ type Mutations {
   clear_images(registry: String): ClearImages
 
   """Added in 25.4.0"""
-  purge_images(agent_id: String!, images: [ImageRefType]!): PurgeImages
+  purge_images(keys: [PurgeImagesKey]!, options: PurgeImagesOptions = {force: false, noprune: false}): PurgeImagesPayload
 
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
@@ -2584,15 +2719,32 @@ type ClearImages {
   msg: String
 }
 
-"""Added in 25.4.0."""
-type PurgeImages {
+"""Added in 25.6.0."""
+type PurgeImagesPayload {
   task_id: String
+}
+
+"""Added in 25.6.0."""
+input PurgeImagesKey {
+  agent_id: String!
+  images: [ImageRefType]!
 }
 
 input ImageRefType {
   name: String!
   registry: String
   architecture: String
+}
+
+"""Added in 25.6.0."""
+input PurgeImagesOptions {
+  """
+  Remove the images even if it is being used by stopped containers or has other tags, Added in 25.6.0.
+  """
+  force: Boolean = false
+
+  """Don't delete untagged parent images, Added in 25.6.0."""
+  noprune: Boolean = false
 }
 
 """Added in 24.09.0."""

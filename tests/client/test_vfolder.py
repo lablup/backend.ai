@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import Mapping, Optional, Union
 from unittest import mock
 from uuid import UUID
@@ -35,7 +36,7 @@ def test_create_vfolder():
             "name": "fake-vfolder-name",
             "host": "local",
         }
-        m.post(build_url(session.config, "/folders"), status=201, payload=payload)
+        m.post(build_url(session.config, "/folders"), status=HTTPStatus.CREATED, payload=payload)
         resp = session.VFolder.create("fake-vfolder-name")
         assert resp == payload
 
@@ -47,7 +48,7 @@ def test_create_vfolder_in_other_host():
             "name": "fake-vfolder-name",
             "host": "fake-vfolder-host",
         }
-        m.post(build_url(session.config, "/folders"), status=201, payload=payload)
+        m.post(build_url(session.config, "/folders"), status=HTTPStatus.CREATED, payload=payload)
         resp = session.VFolder.create("fake-vfolder-name", "fake-vfolder-host")
         assert resp == payload
 
@@ -70,7 +71,7 @@ def test_list_vfolders():
                 "permissions": "wd",
             },
         ]
-        m.get(build_url(session.config, "/folders"), status=200, payload=payload)
+        m.get(build_url(session.config, "/folders"), status=HTTPStatus.OK, payload=payload)
         resp = session.VFolder.list()
         assert resp == payload
 
@@ -81,10 +82,10 @@ def test_delete_vfolder():
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
             build_url(session.config, "/folders/_/id"),
-            status=200,
+            status=HTTPStatus.OK,
             payload={"id": source_vfolder_uuid.hex},
         )
-        m.delete(build_url(session.config, "/folders"), status=204)
+        m.delete(build_url(session.config, "/folders"), status=HTTPStatus.NO_CONTENT)
         resp = session.VFolder(vfolder_name).delete()
         assert resp == {}
 
@@ -104,12 +105,12 @@ def test_vfolder_get_info():
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
             build_url(session.config, "/folders/_/id"),
-            status=200,
+            status=HTTPStatus.OK,
             payload={"id": source_vfolder_uuid.hex},
         )
         m.get(
             build_url(session.config, "/folders/{}".format(source_vfolder_uuid.hex)),
-            status=200,
+            status=HTTPStatus.OK,
             payload=payload,
         )
         resp = session.VFolder(vfolder_name).info()
@@ -123,12 +124,12 @@ def test_vfolder_delete_files():
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
             build_url(session.config, "/folders/_/id"),
-            status=200,
+            status=HTTPStatus.OK,
             payload={"id": source_vfolder_uuid.hex},
         )
         m.delete(
             build_url(session.config, "/folders/{}/delete-files".format(source_vfolder_uuid.hex)),
-            status=200,
+            status=HTTPStatus.OK,
             payload={},
         )
         resp = session.VFolder(vfolder_name).delete_files(files)
@@ -162,7 +163,7 @@ def test_vfolder_list_files():
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
             build_url(session.config, "/folders/_/id"),
-            status=200,
+            status=HTTPStatus.OK,
             payload={"id": source_vfolder_uuid.hex},
         )
         m.get(
@@ -171,7 +172,7 @@ def test_vfolder_list_files():
                 "/folders/{}/files".format(source_vfolder_uuid.hex),
                 params={"path": "."},
             ),
-            status=200,
+            status=HTTPStatus.OK,
             payload=payload,
         )
         resp = session.VFolder(vfolder_name).list_files(".")
@@ -186,12 +187,12 @@ def test_vfolder_invite():
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
             build_url(session.config, "/folders/_/id"),
-            status=200,
+            status=HTTPStatus.OK,
             payload={"id": source_vfolder_uuid.hex},
         )
         m.post(
             build_url(session.config, "/folders/{}/invite".format(source_vfolder_uuid.hex)),
-            status=201,
+            status=HTTPStatus.CREATED,
             payload=payload,
         )
         resp = session.VFolder(vfolder_name).invite("rw", user_ids)
@@ -210,7 +211,11 @@ def test_vfolder_invitations():
                 },
             ],
         }
-        m.get(build_url(session.config, "/folders/invitations/list"), status=200, payload=payload)
+        m.get(
+            build_url(session.config, "/folders/invitations/list"),
+            status=HTTPStatus.OK,
+            payload=payload,
+        )
         resp = session.VFolder.invitations()
         assert resp == payload
 
@@ -221,7 +226,9 @@ def test_vfolder_accept_invitation():
             "msg": "User invitee@lablup.com now can access vfolder fake-vfolder-id",
         }
         m.post(
-            build_url(session.config, "/folders/invitations/accept"), status=200, payload=payload
+            build_url(session.config, "/folders/invitations/accept"),
+            status=HTTPStatus.OK,
+            payload=payload,
         )
         resp = session.VFolder.accept_invitation("inv-id")
         assert resp == payload
@@ -231,7 +238,9 @@ def test_vfolder_delete_invitation():
     with Session() as session, aioresponses() as m:
         payload = {"msg": "Vfolder invitation is deleted: fake-inv-id."}
         m.delete(
-            build_url(session.config, "/folders/invitations/delete"), status=200, payload=payload
+            build_url(session.config, "/folders/invitations/delete"),
+            status=HTTPStatus.OK,
+            payload=payload,
         )
         resp = session.VFolder.delete_invitation("inv-id")
         assert resp == payload
@@ -250,12 +259,12 @@ def test_vfolder_clone():
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
             build_url(session.config, "/folders/_/id"),
-            status=200,
+            status=HTTPStatus.OK,
             payload={"id": source_vfolder_uuid.hex},
         )
         m.post(
             build_url(session.config, "/folders/{}/clone".format(source_vfolder_uuid.hex)),
-            status=201,
+            status=HTTPStatus.CREATED,
             payload=payload,
         )
         resp = session.VFolder(source_vfolder_name).clone(target_vfolder_name)
