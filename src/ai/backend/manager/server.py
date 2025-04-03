@@ -863,11 +863,11 @@ def build_root_app(
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
-            processors_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
+            processors_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
