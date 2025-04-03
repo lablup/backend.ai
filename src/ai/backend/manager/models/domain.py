@@ -98,14 +98,14 @@ domains = sa.Table(
         onupdate=sa.func.current_timestamp(),
     ),
     # TODO: separate resource-related fields with new domain resource policy table when needed.
-    sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
+    sa.Column("total_resource_slots", ResourceSlotColumn(), default={}),
     sa.Column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
         default={},
     ),
-    sa.Column("allowed_docker_registries", pgsql.ARRAY(sa.String), nullable=False, default="{}"),
+    sa.Column("allowed_docker_registries", pgsql.ARRAY(sa.String), nullable=False, default=[]),
     #: Field for synchronization with external services.
     sa.Column("integration_id", sa.String(length=512)),
     # dotfiles column, \x90 means empty list in msgpack
