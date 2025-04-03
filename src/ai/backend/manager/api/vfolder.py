@@ -2571,6 +2571,72 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     return web.json_response(resp, status=200)
 
 
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(
+    t.Dict({
+        tx.AliasedKey([
+            "vfolder_id",
+            "vfolder",
+        ]): tx.UUID,
+        t.Key("user_perm_list"): t.List(
+            t.Dict({
+                tx.AliasedKey(["user_id", "user"]): tx.UUID,
+                tx.AliasedKey(["perm", "permission"]): t.Null | VFolderPermissionValidator,
+            })
+        ),
+    }),
+)
+async def update_vfolder_sharing_status(request: web.Request, params: Any) -> web.Response:
+    """
+    Update permission for shared vfolders.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    vfolder_id = params["vfolder_id"]
+    user_perm_list = params["user_perm_list"]
+    log.info(
+        "VFOLDER.UPDATE_VFOLDER_SHARING_STATUS(email:{}, ak:{}, vfid:{}, data:{})",
+        request["user"]["email"],
+        access_key,
+        vfolder_id,
+        user_perm_list,
+    )
+
+    to_delete: list[uuid.UUID] = []
+    to_update: list[Mapping[str, Any]] = []
+    for mapping in user_perm_list:
+        if mapping["perm"] is None:
+            to_delete.append(mapping["user_id"])
+        else:
+            to_update.append({
+                "user_id": mapping["user_id"],
+                "perm": mapping["perm"],
+            })
+
+    async def _update_or_delete() -> None:
+        async with root_ctx.db.begin_session() as db_session:
+            if to_delete:
+                stmt = (
+                    sa.delete(vfolder_permissions)
+                    .where(vfolder_permissions.c.vfolder == vfolder_id)
+                    .where(vfolder_permissions.c.user.in_(to_delete))
+                )
+                await db_session.execute(stmt)
+
+            if to_update:
+                stmt = (
+                    sa.update(vfolder_permissions)
+                    .values(permission=sa.bindparam("perm"))
+                    .where(vfolder_permissions.c.vfolder == vfolder_id)
+                    .where(vfolder_permissions.c.user == sa.bindparam("user_id"))
+                )
+                await db_session.execute(stmt, to_update)
+
+    await execute_with_retry(_update_or_delete)
+    return web.Response(status=201)
+
+
 @superadmin_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
@@ -3154,6 +3220,7 @@ def create_app(default_cors_options):
     cors.add(add_route("DELETE", r"/invitations/delete", delete_invitation))
     cors.add(add_route("GET", r"/_/shared", list_shared_vfolders))
     cors.add(add_route("POST", r"/_/shared", update_shared_vfolder))
+    cors.add(add_route("POST", r"/_/sharing", update_vfolder_sharing_status))
     cors.add(add_route("GET", r"/_/fstab", get_fstab_contents))
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))
