@@ -10,7 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
+from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    kernels,
+)
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
@@ -45,6 +51,7 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainActionResult,
 )
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
+from ai.backend.manager.types import State
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -63,12 +70,10 @@ class DomainService:
         self._db = db
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        data = action.get_insert_data()
+        data = action.get_insertion_data()
         base_query = sa.insert(domains).values(data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
-            from ai.backend.manager.models.group import ProjectType, groups
-
             model_store_insert_query = sa.insert(groups).values({
                 "name": "model-store",
                 "description": "Model Store",
@@ -155,8 +160,6 @@ class DomainService:
         return DeleteDomainActionResult(success=res.success, description=res.message)
 
     async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
-        from ai.backend.manager.models import groups, users
-
         name = action.name
 
         async def _pre_func(conn: SAConnection) -> None:
@@ -195,8 +198,6 @@ class DomainService:
         return PurgeDomainActionResult(success=res.success, description=res.message)
 
     async def _delete_kernels(self, conn: SAConnection, domain_name: str) -> int:
-        from ai.backend.manager.models.kernel import kernels
-
         delete_query = sa.delete(kernels).where(kernels.c.domain_name == domain_name)
         result = await conn.execute(delete_query)
         if result.rowcount > 0:
@@ -204,11 +205,6 @@ class DomainService:
         return result.rowcount
 
     async def _domain_has_active_kernels(self, conn: SAConnection, domain_name: str) -> bool:
-        from ai.backend.manager.models.kernel import (
-            AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-            kernels,
-        )
-
         query = (
             sa.select([sa.func.count()])
             .select_from(kernels)
@@ -223,12 +219,12 @@ class DomainService:
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        if hasattr(action, "scaling_groups") and action.scaling_groups is not None:
-            scaling_groups = cast(list[str], action.scaling_groups)
+        if action.scaling_groups.state() == State.UPDATE:
+            scaling_groups = cast(list[str], action.scaling_groups.value())
         else:
             scaling_groups = None
 
-        async def _insert(db_session: AsyncSession):
+        async def _insert(db_session: AsyncSession) -> DomainRow:
             if scaling_groups is not None:
                 await self._ensure_sgroup_permission(
                     action.user_info, scaling_groups, db_session=db_session
@@ -269,13 +265,17 @@ class DomainService:
     ) -> ModifyDomainNodeActionResult:
         domain_name = action.name
 
-        sgroups_to_add_set = action.get_sgroups_to_add_as_set()
-        sgroups_to_remove_set = action.get_sgroups_to_remove_as_set()
+        if action.sgroups_to_add.state() == State.UPDATE:
+            sgroups_to_add = action.sgroups_to_add.value()
+        else:
+            sgroups_to_add = None
+        if action.sgroups_to_remove.state() == State.UPDATE:
+            sgroups_to_remove = action.sgroups_to_remove.value()
+        else:
+            sgroups_to_remove = None
 
-        if action.has_sgroups_to_add and action.has_sgroups_to_remove:
-            sgroups_to_add_set = cast(set[str], sgroups_to_add_set)
-            sgroups_to_remove_set = cast(set[str], sgroups_to_remove_set)
-            if union := sgroups_to_add_set & sgroups_to_remove_set:
+        if sgroups_to_add is not None and sgroups_to_remove is not None:
+            if union := sgroups_to_add | sgroups_to_remove:
                 raise ValueError(
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
                     f"(sg:{union})."
@@ -296,38 +296,31 @@ class DomainService:
             if not domain_models:
                 raise ValueError(f"Not allowed to update domain (id:{domain_name})")
 
-            # Redefine the variables to avoid type checker error
-            sgroups_to_add_set = action.get_sgroups_to_add_as_set()
-            sgroups_to_remove_set = action.get_sgroups_to_remove_as_set()
-
-            if action.has_sgroups_to_add:
-                sgroups_to_add_set = cast(set[str], sgroups_to_add_set)
+            if sgroups_to_add is not None:
                 await self._ensure_sgroup_permission(
-                    action.user_info, sgroups_to_add_set, db_session=db_session
+                    user_info, sgroups_to_add, db_session=db_session
                 )
                 await db_session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
                         {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add_set
+                        for sgroup_name in sgroups_to_add
                     ],
                 )
-            if action.has_sgroups_to_remove:
-                sgroups_to_remove_set = cast(set[str], sgroups_to_remove_set)
+            if sgroups_to_remove is not None:
                 await self._ensure_sgroup_permission(
-                    action.user_info, sgroups_to_remove_set, db_session=db_session
+                    user_info, sgroups_to_remove, db_session=db_session
                 )
                 await db_session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
                         (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove_set))
+                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
                     ),
                 )
-            update_data = action.get_modified_fields()
             _update_stmt = (
                 sa.update(DomainRow)
                 .where(DomainRow.name == domain_name)
-                .values(update_data)
+                .values(action.get_modified_fields())
                 .returning(DomainRow)
             )
             await db_session.execute(_update_stmt)

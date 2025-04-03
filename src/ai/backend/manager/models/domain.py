@@ -31,6 +31,7 @@ from sqlalchemy.orm import load_only, relationship
 from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, Sentinel, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.types import OptionalState, State, TriState
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
@@ -313,14 +314,49 @@ class DomainInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value=None)
 
     def to_action(self, domain_name: str) -> CreateDomainAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        def define_state(value):
+            if value is None:
+                return State.NULLIFY
+            elif value is Undefined:
+                return State.NOP
+            else:
+                return State.UPDATE
+
         return CreateDomainAction(
             name=domain_name,
-            description=self.description,
-            is_active=self.is_active,
-            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None),
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            allowed_docker_registries=self.allowed_docker_registries,
-            integration_id=self.integration_id,
+            description=TriState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active", define_state(self.is_active), value_or_none(self.is_active)
+            ),
+            total_resource_slots=TriState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                None
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            allowed_docker_registries=OptionalState(
+                "allowed_docker_registries",
+                define_state(self.allowed_docker_registries),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            integration_id=TriState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
         )
 
 
@@ -343,17 +379,50 @@ class ModifyDomainInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, domain_name: str) -> ModifyDomainAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        def define_state(value):
+            if value is None:
+                return State.NULLIFY
+            elif value is Undefined:
+                return State.NOP
+            else:
+                return State.UPDATE
+
         return ModifyDomainAction(
             domain_name=domain_name,
-            name=self._convert_field(self.name),
-            description=self._convert_field(self.description),
-            is_active=self._convert_field(self.is_active),
-            total_resource_slots=self._convert_field(
-                self.total_resource_slots, lambda x: ResourceSlot.from_user_input(x, None)
+            name=OptionalState("name", define_state(self.name), value_or_none(self.name)),
+            description=TriState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
             ),
-            allowed_vfolder_hosts=self._convert_field(self.allowed_vfolder_hosts),
-            allowed_docker_registries=self._convert_field(self.allowed_docker_registries),
-            integration_id=self._convert_field(self.integration_id),
+            is_active=OptionalState(
+                "is_active", define_state(self.is_active), value_or_none(self.is_active)
+            ),
+            total_resource_slots=TriState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                None
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            allowed_docker_registries=OptionalState(
+                "allowed_docker_registries",
+                define_state(self.allowed_docker_registries),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            integration_id=TriState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
         )
 
 
@@ -478,55 +547,6 @@ class PurgeDomain(graphene.Mutation):
         )
 
         return cls(ok=res.success, msg=res.description)
-
-    @classmethod
-    async def delete_kernels(
-        cls,
-        conn: SAConnection,
-        domain_name: str,
-    ) -> int:
-        """
-        Delete all kernels run from the target domain.
-
-        :param conn: DB connection
-        :param domain_name: domain's name to delete kernels
-
-        :return: number of deleted rows
-        """
-        from . import kernels
-
-        delete_query = sa.delete(kernels).where(kernels.c.domain_name == domain_name)
-        result = await conn.execute(delete_query)
-        if result.rowcount > 0:
-            log.info('deleted {0} domain"s kernels ({1})', result.rowcount, domain_name)
-        return result.rowcount
-
-    @classmethod
-    async def domain_has_active_kernels(
-        cls,
-        conn: SAConnection,
-        domain_name: str,
-    ) -> bool:
-        """
-        Check if the domain does not have active kernels.
-
-        :param conn: DB connection
-        :param domain_name: domain's name
-
-        :return: True if the domain has some active kernels.
-        """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
-
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(
-                (kernels.c.domain_name == domain_name)
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-            )
-        )
-        active_kernel_count = await conn.scalar(query)
-        return active_kernel_count > 0
 
 
 class DomainDotfile(TypedDict):

@@ -27,6 +27,7 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeActionResult,
 )
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
+from ai.backend.manager.types import OptionalState, State, TriState
 
 from ..base import (
     FilterExprArg,
@@ -326,17 +327,54 @@ class CreateDomainNodeInput(graphene.InputObjectType):
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
     def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
+        def value_or_none(value):
+            return value if value is not graphql.Undefined else None
+
+        def define_state(value):
+            if value is None:
+                return State.NULLIFY
+            elif value is graphql.Undefined:
+                return State.NOP
+            else:
+                return State.UPDATE
+
         return CreateDomainNodeAction(
             name=self.name,
-            description=self.description,
-            scaling_groups=self.scaling_groups,
             user_info=user_info,
-            is_active=self.is_active,
-            total_resource_slots=self.total_resource_slots,
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            allowed_docker_registries=self.allowed_docker_registries,
-            integration_id=self.integration_id,
-            dotfiles=self.dotfiles,
+            description=OptionalState(
+                "description", define_state(self.description), value_or_none(self.description)
+            ),
+            is_active=OptionalState(
+                "is_active", define_state(self.is_active), value_or_none(self.is_active)
+            ),
+            total_resource_slots=OptionalState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                value_or_none(self.total_resource_slots),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            allowed_docker_registries=OptionalState(
+                "allowed_docker_registries",
+                define_state(self.allowed_docker_registries),
+                value_or_none(self.allowed_docker_registries),
+            ),
+            integration_id=OptionalState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
+            dotfiles=OptionalState(
+                "dotfiles", define_state(self.dotfiles), value_or_none(self.dotfiles)
+            ),
+            scaling_groups=OptionalState(
+                "scaling_groups",
+                define_state(self.scaling_groups),
+                value_or_none(self.scaling_groups),
+            ),
         )
 
 
@@ -408,21 +446,68 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
+        def value_or_none(value):
+            return value if value is not graphql.Undefined else None
+
+        def define_state(value):
+            if value is None:
+                return State.NULLIFY
+            elif value is graphql.Undefined:
+                return State.NOP
+            else:
+                return State.UPDATE
+
+        def convert_to_set(value) -> Optional[set[str]]:
+            return set(value) if value is not graphql.Undefined else None
+
         return ModifyDomainNodeAction(
             name=name,
             user_info=user_info,
-            description=self._convert_field(self.description),
-            is_active=self._convert_field(self.is_active),
-            total_resource_slots=self._convert_field(
-                self.total_resource_slots, lambda x: ResourceSlot.from_user_input(x, None)
+            description=TriState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
             ),
-            allowed_vfolder_hosts=self._convert_field(self.allowed_vfolder_hosts),
-            allowed_docker_registries=self._convert_field(self.allowed_docker_registries),
-            integration_id=self._convert_field(self.integration_id),
-            dotfiles=self._convert_field(self.dotfiles),
-            sgroups_to_add=self._convert_field(self.sgroups_to_add),
-            sgroups_to_remove=self._convert_field(self.sgroups_to_remove),
-            client_mutation_id=self._convert_field(self.client_mutation_id),
+            is_active=OptionalState(
+                define_state(self.is_active),
+                define_state(self.is_active),
+                value_or_none(self.is_active),
+            ),
+            total_resource_slots=TriState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                None
+                if self.total_resource_slots is graphql.Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            allowed_docker_registries=OptionalState(
+                "allowed_docker_registries",
+                define_state(self.allowed_docker_registries),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            integration_id=TriState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
+            dotfiles=OptionalState(
+                "dotfiles", define_state(self.dotfiles), value_or_none(self.dotfiles)
+            ),
+            sgroups_to_add=OptionalState(
+                "sgroups_to_add",
+                define_state(self.sgroups_to_add),
+                convert_to_set(self.sgroups_to_add),
+            ),
+            sgroups_to_remove=OptionalState(
+                "sgroups_to_remove",
+                define_state(self.sgroups_to_remove),
+                convert_to_set(self.sgroups_to_remove),
+            ),
         )
 
 

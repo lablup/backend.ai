@@ -1,24 +1,35 @@
 from dataclasses import dataclass, field, fields
-from typing import Any, Optional, override
+from typing import Any, Optional, cast, override
 
-from ai.backend.common.types import ResourceSlot, Sentinel
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
 from ai.backend.manager.services.domain.types import DomainData
+from ai.backend.manager.types import OptionalState, State, TriState
 
 
 @dataclass
 class ModifyDomainAction(DomainAction):
     domain_name: str
-    name: Optional[str] | Sentinel = (
-        Sentinel.TOKEN
+    name: OptionalState[str] = field(
+        default_factory=lambda: OptionalState.nop("name")
     )  # Set if Name for the domain needs to be changed
-    description: Optional[str] | Sentinel = Sentinel.TOKEN
-    is_active: Optional[bool] | Sentinel = Sentinel.TOKEN
-    total_resource_slots: Optional[ResourceSlot] | Sentinel = Sentinel.TOKEN
-    allowed_vfolder_hosts: Optional[dict[str, str]] | Sentinel = Sentinel.TOKEN
-    allowed_docker_registries: Optional[list[str]] | Sentinel = Sentinel.TOKEN
-    integration_id: Optional[str] | Sentinel = Sentinel.TOKEN
+    description: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("description")
+    )
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
+        default_factory=lambda: TriState.nop("total_resource_slots")
+    )
+    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+    )
+    allowed_docker_registries: OptionalState[list[str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
+    )
+    integration_id: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("integration_id")
+    )
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -33,9 +44,9 @@ class ModifyDomainAction(DomainAction):
         for f in fields(self):
             if f.name == "domain_name":
                 continue
-            value = getattr(self, f.name)
-            if value is not Sentinel.TOKEN:
-                result[f.name] = value
+            field_value: TriState = getattr(self, f.name)
+            if field_value.state() != State.NOP:
+                result[f.name] = cast(Any, field_value.value())
         return result
 
 

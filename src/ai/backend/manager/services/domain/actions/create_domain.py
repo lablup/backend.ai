@@ -1,23 +1,32 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, Optional, cast, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
 from ai.backend.manager.services.domain.types import DomainData
+from ai.backend.manager.types import OptionalState, State, TriState
 
 
 @dataclass
 class CreateDomainAction(DomainAction):
     name: str
-    description: Optional[str] = ""
-    is_active: Optional[bool] = True
-    total_resource_slots: Optional[ResourceSlot] = field(
-        default_factory=lambda: ResourceSlot.from_user_input({}, None)
+    description: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("description")
     )
-    allowed_vfolder_hosts: Optional[dict[str, str]] = field(default_factory=dict)
-    allowed_docker_registries: Optional[list[str]] = field(default_factory=list)
-    integration_id: Optional[str] = None
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    total_resource_slots: TriState[ResourceSlot] = field(
+        default_factory=lambda: TriState.nop("total_resource_slots")
+    )
+    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+    )
+    allowed_docker_registries: OptionalState[list[str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
+    )
+    integration_id: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("integration_id")
+    )
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,16 +36,24 @@ class CreateDomainAction(DomainAction):
     def operation_type(self) -> str:
         return "create"
 
-    def get_insert_data(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "is_active": self.is_active,
-            "total_resource_slots": self.total_resource_slots,
-            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
-            "allowed_docker_registries": self.allowed_docker_registries,
-            "integration_id": self.integration_id,
-        }
+    def get_insertion_data(self) -> dict[str, Any]:
+        result = {"name": self.name}
+
+        optional_fields = [
+            "description",
+            "is_active",
+            "total_resource_slots",
+            "allowed_vfolder_hosts",
+            "allowed_docker_registries",
+            "integration_id",
+        ]
+
+        for field_name in optional_fields:
+            field_value: TriState = getattr(self, field_name)
+            if field_value.state() != State.NOP:
+                result[field_name] = cast(Any, field_value.value())
+
+        return result
 
 
 @dataclass

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Generic, Optional, Protocol, TypeVar
 
 import attr
@@ -58,51 +59,68 @@ class MountOptionModel(BaseModel):
     ]
 
 
+class State(enum.Enum):
+    UPDATE = "update"
+    NULLIFY = "nullify"
+    NOP = "nop"
+
+
 TVal = TypeVar("TVal")
 
 
+@dataclass
 class TriState(Generic[TVal]):
     _attr_name: str
-    _unset: bool
+    _state: State
     _value: Optional[TVal]
 
-    def __init__(self, attr_name: str, unset: bool, value: Optional[TVal]):
+    def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
         self._attr_name = attr_name
-        self._unset = unset
+        self._state = state
         self._value = value
 
     @classmethod
-    def set(cls, attr_name: str, value: TVal) -> TriState[TVal]:
-        return cls(attr_name, False, value)
+    def update(cls, attr_name: str, value: TVal) -> TriState[TVal]:
+        return cls(attr_name, state=State.UPDATE, value=value)
 
     @classmethod
-    def unset(cls, attr_name: str) -> TriState[TVal]:
-        return cls(attr_name, True, None)
+    def nullify(cls, attr_name: str) -> TriState[TVal]:
+        return cls(attr_name, state=State.NULLIFY, value=None)
 
     @classmethod
     def nop(cls, attr_name: str) -> TriState[TVal]:
-        return cls(attr_name, False, None)
+        return cls(attr_name, state=State.NOP, value=None)
 
-    def set_attr(self, row: Any):
-        if self._unset:
-            # TODO: Is this necessary?
-            assert self._value is None
-            setattr(row, self._attr_name, None)
-        else:
-            if self._value is not None:
-                setattr(row, self._attr_name, self._value)
-            else:
+    def value(self) -> Optional[TVal]:
+        if self._state == State.UPDATE:
+            return self._value
+        raise ValueError(f"Value is not set for {self._attr_name}")
+
+    def state(self) -> State:
+        return self._state
+
+    def set_attr(self, obj: Any) -> None:
+        match self._state:
+            case State.UPDATE:
+                setattr(obj, self._attr_name, self._value)
+            case State.NULLIFY:
+                setattr(obj, self._attr_name, None)
+            case State.NOP:
                 pass
 
 
 class OptionalState(TriState[TVal]):
-    def __init__(self, attr_name: str, value: Optional[TVal]):
-        super().__init__(attr_name, False, value)
+    def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
+        self._attr_name = attr_name
+        if state == State.NULLIFY:
+            raise ValueError("OptionalState cannot be NULLIFY")
+        self._state = state
+        self._value = value
 
     @classmethod
-    def set(cls, attr_name: str, value: TVal) -> OptionalState[TVal]:
-        return cls(attr_name, value)
+    def update(cls, attr_name: str, value: TVal) -> OptionalState[TVal]:
+        return cls(attr_name, state=State.UPDATE, value=value)
 
     @classmethod
     def nop(cls, attr_name: str) -> OptionalState[TVal]:
-        return cls(attr_name, None)
+        return cls(attr_name, state=State.NOP, value=None)

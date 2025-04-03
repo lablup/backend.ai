@@ -1,23 +1,36 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, Optional, cast, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
+from ai.backend.manager.types import OptionalState, State, TriState
 
 
 @dataclass
 class CreateDomainNodeAction(DomainAction):
     name: str
-    description: Optional[str]
-    scaling_groups: Optional[list[str]]
     user_info: UserInfo
-    is_active: Optional[bool] = True
-    total_resource_slots: Optional[dict[str, str]] = field(default_factory=dict)
-    allowed_vfolder_hosts: Optional[dict[str, str]] = field(default_factory=dict)
-    allowed_docker_registries: Optional[list[str]] = field(default_factory=list)
-    integration_id: Optional[str] = None
-    dotfiles: Optional[bytes] = b"\x90"
+    description: OptionalState[Optional[str]] = field(
+        default_factory=lambda: OptionalState.nop("description")
+    )
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    total_resource_slots: OptionalState[dict[str, str]] = field(
+        default_factory=lambda: OptionalState.nop("total_resource_slots")
+    )
+    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+    )
+    allowed_docker_registries: OptionalState[list[str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
+    )
+    integration_id: OptionalState[Optional[str]] = field(
+        default_factory=lambda: OptionalState.nop("integration_id")
+    )
+    dotfiles: OptionalState[bytes] = field(default_factory=lambda: OptionalState.nop("dotfiles"))
+    scaling_groups: OptionalState[list[str]] = field(
+        default_factory=lambda: OptionalState.nop("scaling_groups")
+    )
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -28,16 +41,25 @@ class CreateDomainNodeAction(DomainAction):
         return "create"
 
     def get_insertion_data(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "is_active": self.is_active,
-            "total_resource_slots": self.total_resource_slots,
-            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
-            "allowed_docker_registries": self.allowed_docker_registries,
-            "integration_id": self.integration_id,
-            "dotfiles": self.dotfiles,
-        }
+        result = {"name": self.name}
+
+        optional_fields = [
+            "description",
+            "is_active",
+            "total_resource_slots",
+            "allowed_vfolder_hosts",
+            "allowed_docker_registries",
+            "integration_id",
+            "dotfiles",
+            "scaling_groups",
+        ]
+
+        for field_name in optional_fields:
+            field_value: TriState = getattr(self, field_name)
+            if field_value.state() != State.NOP:
+                result[field_name] = cast(Any, field_value.value())
+
+        return result
 
 
 @dataclass
