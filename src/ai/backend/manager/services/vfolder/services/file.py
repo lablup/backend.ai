@@ -172,10 +172,10 @@ class VFolderFileService:
                 FileInfo(
                     name=item["name"],
                     type=item["type"],
-                    size=item["size"],
-                    mode=item["mode"],
-                    created=item["created"],
-                    modified=item["modified"],
+                    size=item["stat"]["size"],
+                    mode=item["stat"]["mode"],
+                    created=item["stat"]["created"],
+                    modified=item["stat"]["modified"],
                 )
                 for item in result["items"]
             ],

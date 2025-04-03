@@ -549,49 +549,50 @@ class VFolderService:
     ) -> MoveToTrashVFolderActionResult:
         # Only the effective folder owner can delete the folder.
         allowed_vfolder_types = await self._shared_config.get_vfolder_types()
-        async with self._db.begin_session() as db_session:
-            requester_user_row = await db_session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
-            )
-            requester_user_row = cast(UserRow, requester_user_row)
-            vfolder_dicts = await query_accessible_vfolders(
-                db_session.bind,
-                action.user_uuid,
-                allow_privileged_access=True,
-                user_role=requester_user_row.role,
-                allowed_vfolder_types=allowed_vfolder_types,
-                domain_name=requester_user_row.domain_name,
-                extra_vf_conds=(VFolderRow.id == action.vfolder_uuid),
-            )
-            vfolder_row = vfolder_dicts[0]
-            if not vfolder_row["is_owner"]:
-                raise InvalidParameter("Cannot delete the vfolder that is not owned by myself.")
-            await _check_vfolder_status(vfolder_row["status"], VFolderStatusSet.DELETABLE)
-            # perform extra check to make sure records of alive model service not removed by foreign key rule
-            if vfolder_row["usage_mode"] == VFolderUsageMode.MODEL:
-                live_endpoints = await EndpointRow.list_by_model(db_session, vfolder_row["id"])
-                if (
-                    len([
-                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
-                    ])
-                    > 0
-                ):
-                    raise ModelServiceDependencyNotCleared
-            folder_host = vfolder_row["host"]
-            await ensure_host_permission_allowed(
-                db_session.bind,
-                folder_host,
-                allowed_vfolder_types=allowed_vfolder_types,
-                user_uuid=action.user_uuid,
-                resource_policy=action.keypair_resource_policy,
-                domain_name=requester_user_row.domain_name,
-                permission=VFolderHostPermission.DELETE,
-            )
+        async with self._db.connect() as db_conn:
+            async with self._db.begin_session(db_conn) as db_session:
+                requester_user_row = await db_session.scalar(
+                    sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
+                )
+                requester_user_row = cast(UserRow, requester_user_row)
+                vfolder_dicts = await query_accessible_vfolders(
+                    db_session.bind,
+                    action.user_uuid,
+                    allow_privileged_access=True,
+                    user_role=requester_user_row.role,
+                    allowed_vfolder_types=allowed_vfolder_types,
+                    domain_name=requester_user_row.domain_name,
+                    extra_vf_conds=(VFolderRow.id == action.vfolder_uuid),
+                )
+                vfolder_row = vfolder_dicts[0]
+                if not vfolder_row["is_owner"]:
+                    raise InvalidParameter("Cannot delete the vfolder that is not owned by myself.")
+                await _check_vfolder_status(vfolder_row["status"], VFolderStatusSet.DELETABLE)
+                # perform extra check to make sure records of alive model service not removed by foreign key rule
+                if vfolder_row["usage_mode"] == VFolderUsageMode.MODEL:
+                    live_endpoints = await EndpointRow.list_by_model(db_session, vfolder_row["id"])
+                    if (
+                        len([
+                            e
+                            for e in live_endpoints
+                            if e.lifecycle_stage == EndpointLifecycle.CREATED
+                        ])
+                        > 0
+                    ):
+                        raise ModelServiceDependencyNotCleared
+                folder_host = vfolder_row["host"]
+                await ensure_host_permission_allowed(
+                    db_session.bind,
+                    folder_host,
+                    allowed_vfolder_types=allowed_vfolder_types,
+                    user_uuid=action.user_uuid,
+                    resource_policy=action.keypair_resource_policy,
+                    domain_name=requester_user_row.domain_name,
+                    permission=VFolderHostPermission.DELETE,
+                )
 
-            vfolder_row_ids = (vfolder_row["id"],)
-            await delete_vfolder_relation_rows(
-                db_session.bind, self._db.begin_session, vfolder_row_ids
-            )
+                vfolder_row_ids = (vfolder_row["id"],)
+            await delete_vfolder_relation_rows(db_conn, self._db.begin_session, vfolder_row_ids)
         await update_vfolder_status(
             self._db,
             vfolder_row_ids,

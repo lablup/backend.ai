@@ -6,6 +6,7 @@ from typing import (
 )
 
 import sqlalchemy as sa
+from sqlalchemy.orm import contains_eager
 
 from ai.backend.common.types import (
     VFolderHostPermission,
@@ -78,18 +79,18 @@ class VFolderInviteService:
             vfolder_row = cast(VFolderRow, vfolder_row)
 
             inviter_user_row = await db_session.scalar(
-                sa.select(UserRow).where(UserRow.id == action.user_uuid)
+                sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
             )
             inviter_user_row = cast(UserRow, inviter_user_row)
             invitee_user_rows = await db_session.scalars(
-                sa.select(UserRow).where(UserRow.id.in_(action.invitee_user_uuids))
+                sa.select(UserRow).where(UserRow.uuid.in_(action.invitee_user_uuids))
             )
-            invitee_user_rows = cast(list[UserRow], invitee_user_rows)
+            invitee_user_rows = cast(list[UserRow], invitee_user_rows.all())
         if vfolder_row.name.startswith("."):
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
 
         allowed_vfolder_types = await self._shared_config.get_vfolder_types()
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_session() as db_session:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
             vfolder_row = await db_session.scalar(query_vfolder)
             vfolder_row = cast(VFolderRow, vfolder_row)
@@ -128,7 +129,7 @@ class VFolderInviteService:
 
             # Create invitation.
             invited_ids = []
-            inviter = invitee_user_rows.email
+            inviter = inviter_user_row.email
             for invitee in set([row.email for row in invitee_user_rows]):
                 # Do not create invitation if already exists.
                 query = (
@@ -311,10 +312,10 @@ class VFolderInviteService:
             )
             user_row = cast(UserRow, user_row)
             j = sa.join(
-                VFolderRow, VFolderInvitationRow, VFolderRow.id == VFolderInvitationRow.vfolder
+                VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
             )
             query = (
-                sa.select(VFolderInvitationRow, VFolderRow)
+                sa.select(VFolderInvitationRow)
                 .select_from(j)
                 .where(
                     sa.and_(
@@ -322,16 +323,19 @@ class VFolderInviteService:
                         VFolderInvitationRow.state == VFolderInvitationState.PENDING,
                     )
                 )
+                .options(
+                    contains_eager(VFolderInvitationRow.vfolder_row),
+                )
             )
             invitations_rows = await db_session.scalars(query)
-            invitations_rows = cast(list[VFolderRow], invitations_rows)
+            invitations_rows = cast(list[VFolderInvitationRow], invitations_rows.all())
         invs_info: list[VFolderInvitationInfo] = []
         for inv in invitations_rows:
             # TODO: Check query result
             info = VFolderInvitationInfo(
                 id=inv.id,
                 vfolder_id=inv.vfolder,
-                vfolder_name=inv.name,
+                vfolder_name=inv.vfolder_row.name,
                 invitee_user_email=inv.invitee,
                 inviter_user_email=inv.inviter,
                 mount_permission=inv.permission,

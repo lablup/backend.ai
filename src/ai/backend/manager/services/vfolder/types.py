@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
+    Any,
     Optional,
 )
 
@@ -52,8 +53,21 @@ class VFolderInvitationInfo:
     inviter_user_email: str
     mount_permission: VFolderMountPermission
     created_at: datetime
-    modified_at: datetime
+    modified_at: Optional[datetime]
     status: VFolderOperationStatus
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "vfolder_id": str(self.vfolder_id),
+            "vfolder_name": self.vfolder_name,
+            "invitee_user_email": self.invitee_user_email,
+            "inviter_user_email": self.inviter_user_email,
+            "mount_permission": self.mount_permission.value,
+            "created_at": self.created_at.isoformat(),
+            "modified_at": self.modified_at.isoformat() if self.modified_at is not None else None,
+            "status": self.status.value,
+        }
 
 
 @dataclass
@@ -64,3 +78,13 @@ class FileInfo:
     mode: str
     created: str
     modified: str
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "type": self.type,
+            "size": self.size,
+            "mode": self.mode,
+            "created": self.created,
+            "modified": self.modified,
+        }

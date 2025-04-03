@@ -1268,7 +1268,7 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
         )
     )
     resp = {
-        "items": result.files,
+        "items": [info.to_json() for info in result.files],
     }
     return web.json_response(resp, status=HTTPStatus.OK)
 
@@ -1397,7 +1397,11 @@ async def invitations(request: web.Request) -> web.Response:
             requester_user_uuid=request["user"]["uuid"],
         )
     )
-    resp = {"invitations": result.info}
+    resp = {
+        "invitations": [
+            {**info.to_json(), "perm": info.mount_permission.value} for info in result.info
+        ]
+    }
     return web.json_response(resp, status=HTTPStatus.OK)
 
 
