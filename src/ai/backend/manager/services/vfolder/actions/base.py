@@ -142,7 +142,7 @@ class ListVFolderAction(VFolderAction):
 
     @override
     def operation_type(self):
-        return "get"
+        return "list"
 
 
 @dataclass
@@ -192,7 +192,7 @@ class RestoreVFolderFromTrashAction(VFolderAction):
 
     @override
     def operation_type(self):
-        return "delete-forever"
+        return "restore"
 
 
 @dataclass

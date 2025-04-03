@@ -127,7 +127,7 @@ class ListInvitationAction(VFolderInvitationAction):
 
     @override
     def operation_type(self):
-        return "get"
+        return "list"
 
 
 @dataclass
