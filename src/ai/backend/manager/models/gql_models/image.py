@@ -1158,9 +1158,6 @@ class PurgeImages(graphene.Mutation):
         async def _purge_images_task(
             reporter: ProgressReporter,
         ) -> DispatchResult[PurgeImagesResult]:
-            # # TODO: Fill me
-            # res = ctx.processors.image.purge_images.wait_for_complete(PurgeImagesAction())
-
             errors = []
             task_result = PurgeImagesResult(results=PurgeImageResponses([]), reserved_bytes=0)
             arch_per_images = {image.name: image.architecture for image in images}
@@ -1187,8 +1184,6 @@ class PurgeImages(graphene.Mutation):
                 result=task_result,
                 errors=errors,
             )
-
-            # return DispatchResult(res)
 
         task_id = await ctx.background_task_manager.start(_purge_images_task)
         return RescanImages(task_id=task_id)
