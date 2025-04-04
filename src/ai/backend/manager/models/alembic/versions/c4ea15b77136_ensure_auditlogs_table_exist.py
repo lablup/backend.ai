@@ -1,10 +1,12 @@
-"""Add AuditLogs table
+"""Ensure AuditLogs table exist
 
-Revision ID: 683ca0a32f41
-Revises: 70e0533aa49a
-Create Date: 2025-02-14 10:56:10.191119
+Revision ID: c4ea15b77136
+Revises: 683ca0a32f41
+Create Date: 2025-04-04 01:11:07.003523
 
 """
+
+import logging
 
 import sqlalchemy as sa
 from alembic import op
@@ -12,13 +14,22 @@ from alembic import op
 from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
-revision = "683ca0a32f41"
-down_revision = "70e0533aa49a"
+revision = "c4ea15b77136"
+down_revision = "683ca0a32f41"
 branch_labels = None
 depends_on = None
 
 
+logger = logging.getLogger("alembic.runtime.migration")
+
+
 def upgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+
+    if "audit_logs" in inspector.get_table_names():
+        return
+
     op.create_table(
         "audit_logs",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
@@ -48,6 +59,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+
+    if "audit_logs" not in inspector.get_table_names():
+        return
+
     op.drop_index(op.f("ix_audit_logs_created_at"), table_name="audit_logs")
     op.drop_index(op.f("ix_audit_logs_entity_type"), table_name="audit_logs")
     op.drop_index(op.f("ix_audit_logs_operation"), table_name="audit_logs")
