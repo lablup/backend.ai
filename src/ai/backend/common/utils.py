@@ -472,8 +472,15 @@ def dump_json(obj: Any, option: Optional[int] = None) -> bytes:
     return orjson.dumps(obj, option=option)
 
 
-def pretty_json(obj: Any) -> str:
+def pretty_json_str(obj: Any) -> str:
     """
     Dumps the given object into a pretty JSON string.
     """
     return dump_json_str(obj, orjson.OPT_INDENT_2)
+
+
+def pretty_json(obj: Any) -> bytes:
+    """ "
+    Dumps the given object into a pretty JSON bytes.
+    """
+    return dump_json(obj, orjson.OPT_INDENT_2)

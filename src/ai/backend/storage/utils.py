@@ -1,5 +1,4 @@
 import enum
-import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
@@ -9,6 +8,7 @@ from typing import Any, AsyncIterator, Optional, Union
 import trafaret as t
 from aiohttp import web
 
+from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from .volumes.types import LoggingInternalMeta
@@ -36,7 +36,7 @@ async def check_params(
     if checker is None:
         if request.can_read_body:
             raise web.HTTPBadRequest(
-                text=json.dumps(
+                text=dump_json_str(
                     {
                         "type": "https://api.backend.ai/probs/storage/malformed-request",
                         "title": "Malformed request (request body should be empty)",
@@ -59,7 +59,7 @@ async def check_params(
     except t.DataError as e:
         log.debug("check_params IV error", exc_info=e)
         raise web.HTTPBadRequest(
-            text=json.dumps(
+            text=dump_json_str(
                 {
                     "type": "https://api.backend.ai/probs/storage/invalid-api-params",
                     "title": "Invalid API parameters",
@@ -70,7 +70,7 @@ async def check_params(
         )
     except NotImplementedError:
         raise web.HTTPBadRequest(
-            text=json.dumps(
+            text=dump_json_str(
                 {
                     "type": "https://api.backend.ai/probs/storage/unsupported-operation",
                     "title": "Unsupported operation by the storage backend",

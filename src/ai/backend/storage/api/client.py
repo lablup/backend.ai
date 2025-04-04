@@ -5,7 +5,6 @@ Client-facing API
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import urllib.parse
@@ -33,6 +32,7 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.types import VFolderID
+from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
@@ -162,7 +162,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     raise FileNotFoundError
             except (ValueError, FileNotFoundError):
                 raise web.HTTPNotFound(
-                    body=json.dumps(
+                    body=dump_json_str(
                         {
                             "title": "File not found",
                             "type": "https://api.backend.ai/probs/storage/file-not-found",
@@ -407,7 +407,7 @@ async def prepare_tus_session_headers(
     upload_temp_path = vfpath / ".upload" / token_data["session"]
     if not Path(upload_temp_path).exists():
         raise web.HTTPNotFound(
-            body=json.dumps(
+            body=dump_json_str(
                 {
                     "title": "No such upload session",
                     "type": "https://api.backend.ai/probs/storage/no-such-upload-session",

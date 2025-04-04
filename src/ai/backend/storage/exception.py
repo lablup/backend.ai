@@ -1,8 +1,9 @@
-import json
 from typing import Any, Optional
 
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPNotFound
+
+from ai.backend.common.utils import dump_json_str
 
 
 class StorageProxyError(Exception):
@@ -74,6 +75,6 @@ class InvalidAPIParameters(web.HTTPBadRequest):
         if data is not None:
             payload["data"] = data
         super().__init__(
-            text=json.dumps(payload),
+            text=dump_json_str(payload),
             content_type="application/problem+json",
         )

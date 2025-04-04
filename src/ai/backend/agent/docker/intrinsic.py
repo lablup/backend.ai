@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import platform
@@ -45,7 +44,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.common.utils import current_loop, nmget
+from ai.backend.common.utils import current_loop, dump_json, nmget
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep
@@ -1039,7 +1038,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         scratch_dir = (
             self.local_config["container"]["scratch-root"] / str(kernel.kernel_id)
         ).resolve()
-        config_dir = scratch_dir / "config"
+        config_dir: Path = scratch_dir / "config"
 
         intrinsic_ports = {
             "replin": host_ports[0],
@@ -1052,7 +1051,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
 
         await current_loop().run_in_executor(
             None,
-            lambda: (config_dir / "intrinsic-ports.json").write_text(json.dumps(intrinsic_ports)),
+            lambda: (config_dir / "intrinsic-ports.json").write_bytes(dump_json(intrinsic_ports)),
         )
 
     async def expose_ports(

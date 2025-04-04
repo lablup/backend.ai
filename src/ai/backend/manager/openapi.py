@@ -15,7 +15,7 @@ from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
-from ai.backend.common.utils import pretty_json
+from ai.backend.common.utils import pretty_json_str
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.session import UndefChecker
@@ -408,10 +408,10 @@ def main(output: Path) -> None:
     """
     openapi = asyncio.run(generate())
     if output == "-" or output is None:
-        print(pretty_json(openapi))
+        print(pretty_json_str(openapi))
     else:
         with open(output, mode="w") as fw:
-            fw.write(pretty_json(openapi))
+            fw.write(pretty_json_str(openapi))
 
 
 if __name__ == "__main__":

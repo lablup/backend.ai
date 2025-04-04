@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 from datetime import datetime, timedelta
@@ -11,6 +10,7 @@ import aiofiles.os
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
+from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from ...types import CapacityUsage, FSPerfMetric, QuotaUsage
@@ -156,8 +156,8 @@ class WekaVolume(BaseVolume):
                 "status": health_status,
                 "status_info": None,
                 "metadata": {
-                    "quota": json.dumps([q.to_json() for q in quotas]),
-                    "cluster_info": json.dumps(cluster_info),
+                    "quota": dump_json_str([q.to_json() for q in quotas]),
+                    "cluster_info": dump_json_str(cluster_info),
                 },
             }
         except WekaAPIError:

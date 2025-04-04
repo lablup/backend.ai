@@ -1,4 +1,3 @@
-import json
 import logging
 from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
@@ -6,6 +5,7 @@ from typing import Any, FrozenSet, Mapping, Optional
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
+from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from ...types import CapacityUsage, FSPerfMetric
@@ -191,8 +191,8 @@ class GPFSVolume(BaseVolume):
             "status": status,
             "status_info": None,
             "metadata": {
-                "quota": json.dumps([q.to_json() for q in quotas]),
-                "cluster_info": json.dumps(cluster_info),
+                "quota": dump_json_str([q.to_json() for q in quotas]),
+                "cluster_info": dump_json_str(cluster_info),
             },
         }
 

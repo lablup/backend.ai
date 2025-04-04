@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
-import json
 import logging
 import logging.config
 import os
@@ -87,7 +86,7 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
-from ai.backend.common.utils import current_loop
+from ai.backend.common.utils import current_loop, pretty_json
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__ as VERSION
@@ -425,7 +424,7 @@ class AgentRPCServer(aobject):
                         for computer, computer_ctx in self.agent.computers.items()
                     },
                 }
-                writer.write(json.dumps(snapshot, ensure_ascii=False, indent=2).encode())
+                writer.write(pretty_json(snapshot))
             await writer.drain()
             writer.close()
             await writer.wait_closed()

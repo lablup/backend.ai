@@ -14,7 +14,7 @@ from alembic.runtime.migration import MigrationContext, MigrationStep
 from alembic.script import Script, ScriptDirectory
 from sqlalchemy.engine import Connection, Engine
 
-from ai.backend.common.utils import load_json, pretty_json
+from ai.backend.common.utils import load_json, pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 
@@ -119,10 +119,10 @@ def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     dump = RevisionHistory(manager_version=__version__, revisions=serialized_revisions)
 
     if output == "-" or output is None:
-        print(pretty_json(dump))
+        print(pretty_json_str(dump))
     else:
         with open(output, mode="w") as fw:
-            fw.write(pretty_json(dump))
+            fw.write(pretty_json_str(dump))
 
 
 @cli.command()

@@ -78,7 +78,12 @@ from ai.backend.common.types import (
     SlotName,
     current_resource_slots,
 )
-from ai.backend.common.utils import AsyncFileWriter, current_loop
+from ai.backend.common.utils import (
+    AsyncFileWriter,
+    current_loop,
+    dump_json,
+    load_json,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
@@ -664,7 +669,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 priv_key_path.chmod(0o600)
                 if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
                     port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
-                    port_mapping_json_path.write_text(json.dumps(cluster_ssh_port_mapping))
+                    port_mapping_json_path.write_bytes(dump_json(cluster_ssh_port_mapping))
             except Exception:
                 log.exception("error while writing cluster keypair")
 
@@ -780,8 +785,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if docker_creds:
             await loop.run_in_executor(
                 None,
-                (self.config_dir / "docker-creds.json").write_text,
-                json.dumps(docker_creds),
+                (self.config_dir / "docker-creds.json").write_bytes,
+                dump_json(docker_creds),
             )
 
         # Create SSH keypair only if ssh_keypair internal_data exists and
@@ -899,7 +904,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             return
 
         async with aiofiles.open(default_seccomp_path, mode="r") as fp:
-            seccomp_profile = json.loads(await fp.read())
+            seccomp_profile = load_json(await fp.read())
 
             additional_allowed_syscalls = self.additional_allowed_syscalls
             additional_allowed_syscall_rule = {
@@ -1081,7 +1086,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         ]:
             if extra_container_opts_file.is_file():
                 try:
-                    extra_container_opts = json.loads(extra_container_opts_file.read_bytes())
+                    extra_container_opts = load_json(extra_container_opts_file.read_bytes())
                     update_nested_dict(container_config, extra_container_opts)
                 except IOError:
                     pass

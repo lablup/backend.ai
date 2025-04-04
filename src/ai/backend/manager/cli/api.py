@@ -9,7 +9,7 @@ import aiofiles
 import click
 import graphene
 
-from ai.backend.common.utils import pretty_json
+from ai.backend.common.utils import pretty_json_str
 from ai.backend.manager.openapi import generate
 
 from ..models.gql import Mutations, Queries
@@ -63,7 +63,7 @@ def dump_openapi(cli_ctx: CLIContext, output: Path) -> None:
     """
     openapi = asyncio.run(generate())
     if output == "-" or output is None:
-        print(pretty_json(openapi))
+        print(pretty_json_str(openapi))
     else:
         with open(output, mode="w") as fw:
-            fw.write(pretty_json(openapi))
+            fw.write(pretty_json_str(openapi))
