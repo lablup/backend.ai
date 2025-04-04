@@ -6,6 +6,7 @@ import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta
+from pathlib import PurePosixPath
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Union, cast
 from urllib.parse import urlparse
 
@@ -42,6 +43,7 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     SessionId,
     SessionTypes,
+    VFolderID,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
@@ -53,6 +55,7 @@ from ai.backend.manager.api.exceptions import (
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
+    StorageProxyError,
     TaskTemplateNotFound,
     TooManySessionsMatched,
     UnknownImageReferenceError,
@@ -66,7 +69,7 @@ from ai.backend.manager.api.session import (
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import catch_unexpected, undefined
-from ai.backend.manager.config import LocalConfig
+from ai.backend.manager.config import DEFAULT_CHUNK_SIZE, LocalConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -1451,7 +1454,8 @@ class SessionService:
         user_uuid = action.user_id
         user_role = action.user_role
         domain_name = action.domain_name
-        # kernel_id_str = action.kernel_id
+        kernel_id_str = action.kernel_id
+        request = action.request
 
         async with self._db.begin_readonly() as conn:
             matched_vfolders = await query_accessible_vfolders(
@@ -1469,47 +1473,44 @@ class SessionService:
                 )
             log_vfolder = matched_vfolders[0]
 
-        _proxy_name, _volume_name = self._storage_manager.get_proxy_and_volume(
+        _proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
         )
         response = web.StreamResponse(status=200)
         response.headers[hdrs.CONTENT_TYPE] = "text/plain"
-        # prepared = False
+        prepared = False
 
-        # TODO: Fix this
-        # 여기는 뭔가 액션을 여러 개로 나눠 처리해야 할지?
-
-        # try:
-        #     async with self._storage_manager.request(
-        #         log_vfolder["host"],
-        #         "POST",
-        #         "folder/file/fetch",
-        #         json={
-        #             "volume": volume_name,
-        #             "vfid": str(VFolderID.from_row(log_vfolder)),
-        #             "relpath": str(
-        #                 PurePosixPath("task")
-        #                 / kernel_id_str[:2]
-        #                 / kernel_id_str[2:4]
-        #                 / f"{kernel_id_str[4:]}.log",
-        #             ),
-        #         },
-        #         raise_for_status=True,
-        #     ) as (_, storage_resp):
-        #         while True:
-        #             chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-        #             if not chunk:
-        #                 break
-        #             if not prepared:
-        #                 await response.prepare(request)
-        #                 prepared = True
-        #             await response.write(chunk)
-        # except aiohttp.ClientResponseError as e:
-        #     raise StorageProxyError(status=e.status, extra_msg=e.message)
-        # finally:
-        #     if prepared:
-        #         await response.write_eof()
-        return GetTaskLogsActionResult(result=response)
+        try:
+            async with self._storage_manager.request(
+                log_vfolder["host"],
+                "POST",
+                "folder/file/fetch",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(VFolderID.from_row(log_vfolder)),
+                    "relpath": str(
+                        PurePosixPath("task")
+                        / kernel_id_str[:2]
+                        / kernel_id_str[2:4]
+                        / f"{kernel_id_str[4:]}.log",
+                    ),
+                },
+                raise_for_status=True,
+            ) as (_, storage_resp):
+                while True:
+                    chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    if not prepared:
+                        await response.prepare(request)
+                        prepared = True
+                    await response.write(chunk)
+        except aiohttp.ClientResponseError as e:
+            raise StorageProxyError(status=e.status, extra_msg=e.message)
+        finally:
+            if prepared:
+                await response.write_eof()
+        return GetTaskLogsActionResult(response=response)
 
     async def interrupt(self, action: InterruptAction) -> InterruptActionResult:
         session_name = action.session_name
