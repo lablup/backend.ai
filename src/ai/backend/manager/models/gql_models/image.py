@@ -958,6 +958,7 @@ class RescanImages(graphene.Mutation):
                         RescanImagesAction(
                             registry=registry_data.registry_name,
                             project=registry_data.project,
+                            progress_reporter=reporter,
                         )
                     )
                 )

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
@@ -11,7 +12,7 @@ from ai.backend.manager.services.container_registry.base import ContainerRegistr
 class RescanImagesAction(ContainerRegistryAction):
     registry: str
     project: Optional[str]
-    # TODO: Pass progress_reporter?
+    progress_reporter: Optional[ProgressReporter]
 
     @override
     def entity_id(self) -> Optional[str]:
