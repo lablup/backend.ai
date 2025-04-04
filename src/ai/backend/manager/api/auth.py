@@ -7,6 +7,7 @@ import logging
 import secrets
 from collections import ChainMap
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple, cast
 
 import aiohttp_cors
@@ -885,7 +886,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
         "POST_SIGNUP",
         (params["email"], user.uuid, initial_user_prefs),
     )
-    return web.json_response(resp_data, status=201)
+    return web.json_response(resp_data, status=HTTPStatus.CREATED)
 
 
 @auth_required
@@ -946,7 +947,7 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
         user = result.first()
         if user is None:
             log.info(log_fmt + ": Unknown user", *log_args)
-            return web.json_response({"error_msg": "Unknown user"}, status=400)
+            return web.json_response({"error_msg": "Unknown user"}, status=HTTPStatus.BAD_REQUEST)
 
         # If user is not null, then it updates user full_name.
         data = {
@@ -954,7 +955,7 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
         }
         update_query = users.update().values(data).where(users.c.email == email)
         await conn.execute(update_query)
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -979,7 +980,9 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
         raise AuthorizationFailed("Old password mismatch")
     if params["new_password"] != params["new_password2"]:
         log.info(log_fmt + ": new password mismtach", *log_args)
-        return web.json_response({"error_msg": "new password mismatch"}, status=400)
+        return web.json_response(
+            {"error_msg": "new password mismatch"}, status=HTTPStatus.BAD_REQUEST
+        )
 
     # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
     # The hook handlers should accept the request and whole ``params` dict.
@@ -1003,7 +1006,7 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
         }
         query = users.update().values(data).where(users.c.email == email)
         await conn.execute(query)
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 @check_api_params(
@@ -1071,7 +1074,9 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
             return result.scalar()
 
     changed_at = await execute_with_retry(_update)
-    return web.json_response({"password_changed_at": changed_at.isoformat()}, status=201)
+    return web.json_response(
+        {"password_changed_at": changed_at.isoformat()}, status=HTTPStatus.CREATED
+    )
 
 
 @auth_required
@@ -1086,7 +1091,7 @@ async def get_ssh_keypair(request: web.Request) -> web.Response:
         # Get SSH public key. Return partial string from the public key just for checking.
         query = sa.select([keypairs.c.ssh_public_key]).where(keypairs.c.access_key == access_key)
         pubkey = await conn.scalar(query)
-    return web.json_response({"ssh_public_key": pubkey}, status=200)
+    return web.json_response({"ssh_public_key": pubkey}, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1105,7 +1110,7 @@ async def generate_ssh_keypair(request: web.Request) -> web.Response:
         }
         query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
         await conn.execute(query)
-    return web.json_response(data, status=200)
+    return web.json_response(data, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1131,7 +1136,7 @@ async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
         }
         query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
         await conn.execute(query)
-    return web.json_response(data, status=200)
+    return web.json_response(data, status=HTTPStatus.OK)
 
 
 def create_app(

@@ -14,6 +14,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
+from http import HTTPStatus
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -436,7 +437,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             callback_url=params["callback_url"],
             sudo_session_enabled=sudo_session_enabled,
         )
-        return web.json_response(resp, status=201)
+        return web.json_response(resp, status=HTTPStatus.CREATED)
     except UnknownImageReference:
         raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except BackendError:
@@ -798,7 +799,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             max_wait_seconds=params["max_wait_seconds"],
             sudo_session_enabled=sudo_session_enabled,
         )
-        return web.json_response(resp, status=201)
+        return web.json_response(resp, status=HTTPStatus.CREATED)
     except TooManySessionsMatched:
         raise SessionAlreadyExists
     except BackendError:
@@ -982,7 +983,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
         log.exception("GET_COMMIT_STATUS: exception")
         raise
     resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -1014,7 +1015,7 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
     except BackendError:
         log.exception("GET_ABUSING_REPORT: exception")
         raise
-    return web.json_response(report or {}, status=200)
+    return web.json_response(report or {}, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -1037,7 +1038,7 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
     except BackendError:
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 class TransitSessionStatusRequestModel(BaseModel):
@@ -1132,7 +1133,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     except BackendError:
         log.exception("COMMIT_SESSION: exception")
         raise
-    return web.json_response(resp, status=201)
+    return web.json_response(resp, status=HTTPStatus.CREATED)
 
 
 class CustomizedImageVisibilityScope(str, enum.Enum):
@@ -1387,7 +1388,8 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
                 prev = datetime.fromtimestamp(float(prev), tzutc())
                 if now - prev > timeout:
                     await root_ctx.event_producer.produce_event(
-                        AgentTerminatedEvent("agent-lost"), source=agent_id.decode()
+                        AgentTerminatedEvent("agent-lost"),
+                        source_override=agent_id.decode(),
                     )
 
         await redis_helper.execute(root_ctx.redis_live, _check_impl)
@@ -1479,7 +1481,7 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
             kernel.session_name = new_name
         await db_sess.commit()
 
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1559,7 +1561,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
             *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
         ]
 
-        return web.json_response(last_stats, status=200)
+        return web.json_response(last_stats, status=HTTPStatus.OK)
     else:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
@@ -1576,7 +1578,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         resp = {
             "stats": last_stat,
         }
-        return web.json_response(resp, status=200)
+        return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1619,7 +1621,7 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
         {
             "matches": matches,
         },
-        status=200,
+        status=HTTPStatus.OK,
     )
 
 
@@ -1714,7 +1716,7 @@ async def get_info(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("GET_INFO: exception")
         raise
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1746,7 +1748,7 @@ async def restart(request: web.Request, params: Any) -> web.Response:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("RESTART: unexpected error")
         raise web.HTTPInternalServerError
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1824,7 +1826,7 @@ async def execute(request: web.Request) -> web.Response:
                     "files": [],
                     "console": [],
                 }
-                return web.json_response(resp, status=200)
+                return web.json_response(resp, status=HTTPStatus.OK)
             # Keep internal/public API compatilibty
             result = {
                 "status": raw_result["status"],
@@ -1847,7 +1849,7 @@ async def execute(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("EXECUTE: exception")
         raise
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1870,7 +1872,7 @@ async def interrupt(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("INTERRUPT: exception")
         raise
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1912,7 +1914,7 @@ async def complete(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("COMPLETE: exception")
         raise
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1942,7 +1944,7 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
     except BackendError:
         log.exception("SHUTDOWN_SERVICE: exception")
         raise
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def find_dependent_sessions(
@@ -2059,7 +2061,7 @@ async def get_dependency_graph(request: web.Request) -> web.Response:
     async with root_ctx.db.begin_readonly_session() as db_session:
         return web.json_response(
             await find_dependency_sessions(root_session_name, db_session, owner_access_key),
-            status=200,
+            status=HTTPStatus.OK,
         )
 
 
@@ -2109,7 +2111,7 @@ async def upload_files(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("UPLOAD_FILES: exception")
         raise
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @server_status_required(READ_ALLOWED)
@@ -2165,7 +2167,7 @@ async def download_files(request: web.Request, params: Any) -> web.Response:
         headers = multidict.MultiDict({"Content-Encoding": "identity"})
         for tarbytes in results:
             mpwriter.append(tarbytes, headers)
-        return web.Response(body=mpwriter, status=200)
+        return web.Response(body=mpwriter, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -2211,7 +2213,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("DOWNLOAD_SINGLE: unexpected error!")
         raise InternalServerError
-    return web.Response(body=result, status=200)
+    return web.Response(body=result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -2255,7 +2257,7 @@ async def list_files(request: web.Request) -> web.Response:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("LIST_FILES: unexpected error!")
         raise InternalServerError
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 class ContainerLogRequestModel(BaseModel):
@@ -2317,7 +2319,7 @@ async def get_container_logs(
                 # Get logs from database record
                 log.debug("returning log from database record")
                 resp["result"]["logs"] = kernel_log.decode("utf-8")
-                return web.json_response(resp, status=200)
+                return web.json_response(resp, status=HTTPStatus.OK)
 
     try:
         registry = root_ctx.registry
@@ -2335,7 +2337,7 @@ async def get_container_logs(
             session_name,
         )
         raise
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -2371,7 +2373,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
         log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
     )
-    response = web.StreamResponse(status=200)
+    response = web.StreamResponse(status=HTTPStatus.OK)
     response.headers[hdrs.CONTENT_TYPE] = "text/plain"
     prepared = False
     try:

@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import pytest
 from aioresponses import aioresponses
 from graphene import Schema
@@ -113,13 +115,17 @@ async def test_harbor_create_project_quota(
 
     with aioresponses() as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        mocked.get(
+            get_project_id_url,
+            status=HTTPStatus.OK,
+            payload=mock_harbor_responses["get_project_id"],
+        )
 
         harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
         get_quotas_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quotas_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_quotas"],
         )
 
@@ -127,7 +133,7 @@ async def test_harbor_create_project_quota(
         put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
         )
 
         response = await client.execute_async(
@@ -203,14 +209,18 @@ async def test_harbor_update_project_quota(
 
     with aioresponses() as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        mocked.get(
+            get_project_id_url,
+            status=HTTPStatus.OK,
+            payload=mock_harbor_responses["get_project_id"],
+        )
 
         harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
         get_quotas_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quotas_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_quotas"],
         )
 
@@ -218,7 +228,7 @@ async def test_harbor_update_project_quota(
         put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
         )
 
         response = await client.execute_async(
@@ -292,14 +302,18 @@ async def test_harbor_delete_project_quota(
 
     with aioresponses() as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        mocked.get(
+            get_project_id_url,
+            status=HTTPStatus.OK,
+            payload=mock_harbor_responses["get_project_id"],
+        )
 
         harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
         get_quotas_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quotas_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_quotas"],
         )
 
@@ -307,7 +321,7 @@ async def test_harbor_delete_project_quota(
         put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
         )
 
         response = await client.execute_async(

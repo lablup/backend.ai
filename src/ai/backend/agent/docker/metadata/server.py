@@ -1,4 +1,5 @@
 import logging
+from http import HTTPStatus
 from typing import Any, Iterable, List, Mapping, MutableMapping
 from uuid import UUID
 
@@ -52,7 +53,7 @@ async def container_resolver_middleware(
     elif remote_ip := request.remote:
         container_ip = remote_ip
     else:
-        return web.Response(status=403)
+        return web.Response(status=HTTPStatus.FORBIDDEN)
     async with closing_async(Docker()) as docker:
         containers = await docker.containers.list(
             filters='{"label":["ai.backend.kernel-id"],"network":["bridge"],"status":["running"]}',
@@ -66,7 +67,7 @@ async def container_resolver_middleware(
     )
 
     if len(target_container) == 0:
-        return web.Response(status=403)
+        return web.Response(status=HTTPStatus.FORBIDDEN)
     request["container-ip"] = container_ip
     request["container"] = target_container[0]
     request["kernel"] = request.app["kernel-registry"].get(

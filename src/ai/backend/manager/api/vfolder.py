@@ -10,6 +10,7 @@ import textwrap
 import uuid
 from datetime import datetime
 from enum import StrEnum
+from http import HTTPStatus
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -687,7 +688,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1
-    return web.json_response(resp, status=201)
+    return web.json_response(resp, status=HTTPStatus.CREATED)
 
 
 @auth_required
@@ -752,7 +753,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                 "max_size": entry["max_size"],
                 "cur_size": entry["cur_size"],
             })
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 class ExposedVolumeInfoField(StrEnum):
@@ -901,7 +902,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         "allowed": sorted(allowed_hosts),
         "volume_info": volume_info,
     }
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @superadmin_required
@@ -922,7 +923,7 @@ async def list_all_hosts(request: web.Request) -> web.Response:
         "default": default_host,
         "allowed": sorted(all_hosts),
     }
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @superadmin_required
@@ -949,7 +950,7 @@ async def get_volume_perf_metric(request: web.Request, params: Any) -> web.Respo
         },
     ) as (_, storage_resp):
         storage_reply = await storage_resp.json()
-    return web.json_response(storage_reply, status=200)
+    return web.json_response(storage_reply, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -962,7 +963,7 @@ async def list_allowed_types(request: web.Request) -> web.Response:
         request["keypair"]["access_key"],
     )
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    return web.json_response(allowed_vfolder_types, status=200)
+    return web.json_response(allowed_vfolder_types, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1020,7 +1021,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "max_size": row["max_size"],
         "cur_size": row["cur_size"],
     }
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1078,7 +1079,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         },
     ) as (_, storage_resp):
         storage_reply = await storage_resp.json()
-    return web.json_response(storage_reply, status=200)
+    return web.json_response(storage_reply, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1168,7 +1169,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
         result = await conn.execute(query)
         assert result.rowcount == 1
 
-    return web.json_response({"size_bytes": quota}, status=200)
+    return web.json_response({"size_bytes": quota}, status=HTTPStatus.OK)
 
 
 @superadmin_required
@@ -1204,7 +1205,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
-    return web.json_response(usage, status=200)
+    return web.json_response(usage, status=HTTPStatus.OK)
 
 
 @superadmin_required
@@ -1235,7 +1236,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
-    return web.json_response(usage, status=200)
+    return web.json_response(usage, status=HTTPStatus.OK)
 
 
 class RenameRequestModel(BaseModel):
@@ -1303,7 +1304,7 @@ async def rename_vfolder(
                 )
                 await conn.execute(query)
                 break
-    return web.Response(status=201)
+    return web.Response(status=HTTPStatus.CREATED)
 
 
 @auth_required
@@ -1358,7 +1359,7 @@ async def update_vfolder_options(
         async with root_ctx.db.begin() as conn:
             query = sa.update(vfolders).values(**updated_fields).where(vfolders.c.id == row["id"])
             await conn.execute(query)
-    return web.Response(status=201)
+    return web.Response(status=HTTPStatus.CREATED)
 
 
 @auth_required
@@ -1466,7 +1467,7 @@ async def create_download_session(
             "token": storage_reply["token"],
             "url": str(client_api_url / "download"),
         }
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1523,7 +1524,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
             "token": storage_reply["token"],
             "url": str(client_api_url / "upload"),
         }
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1578,7 +1579,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
         },
     ):
         pass
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1617,7 +1618,7 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
         },
     ):
         pass
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1657,7 +1658,7 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
         },
     ):
         pass
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1719,7 +1720,7 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
                 for item in result["items"]
             ]),
         }
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1757,7 +1758,7 @@ async def list_sent_invitations(request: web.Request) -> web.Response:
             "vfolder_name": inv.name,
         })
     resp = {"invitations": invs_info}
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1792,7 +1793,7 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
         )
         await conn.execute(query)
     resp = {"msg": f"vfolder invitation updated: {inv_id}."}
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -1926,7 +1927,7 @@ async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Resp
             except sa.exc.DataError:
                 pass
     resp = {"invited_ids": invited_ids}
-    return web.json_response(resp, status=201)
+    return web.json_response(resp, status=HTTPStatus.CREATED)
 
 
 @auth_required
@@ -1964,7 +1965,7 @@ async def invitations(request: web.Request) -> web.Response:
             "vfolder_name": inv.name,
         })
     resp = {"invitations": invs_info}
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -2220,7 +2221,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             )
             await conn.execute(query)
 
-        return web.json_response({"shared_emails": emails_to_share}, status=201)
+        return web.json_response({"shared_emails": emails_to_share}, status=HTTPStatus.CREATED)
 
 
 @admin_required
@@ -2277,7 +2278,7 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
             & (vfolder_permissions.c.user.in_(users_to_unshare)),
         )
         await conn.execute(query)
-        return web.json_response({"unshared_emails": params["emails"]}, status=200)
+        return web.json_response({"unshared_emails": params["emails"]}, status=HTTPStatus.OK)
 
 
 async def _delete(
@@ -2364,7 +2365,7 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         domain_name,
         resource_policy,
     )
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @auth_required
@@ -2402,7 +2403,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
         domain_name,
         resource_policy,
     )
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 class IDRequestModel(BaseModel):
@@ -2509,7 +2510,7 @@ async def delete_from_trash_bin(
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @auth_required
@@ -2522,7 +2523,7 @@ async def force_delete(request: web.Request) -> web.Response:
         folder_id = uuid.UUID(piece)
     except ValueError:
         log.error(f"Not allowed UUID type value ({piece})")
-        return web.Response(status=400)
+        return web.Response(status=HTTPStatus.BAD_REQUEST)
 
     row = (
         await resolve_vfolder_rows(
@@ -2546,7 +2547,7 @@ async def force_delete(request: web.Request) -> web.Response:
         force=True,
     )
 
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 class PurgeRequestModel(BaseModel):
@@ -2586,7 +2587,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
         delete_stmt = sa.delete(VFolderDBRow).where(VFolderDBRow.id == folder_id)
         await db_session.execute(delete_stmt)
 
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 class RestoreRequestModel(BaseModel):
@@ -2656,7 +2657,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
     # fs-level mv may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
     await update_vfolder_status(root_ctx.db, (row["id"],), VFolderOperationStatus.READY)
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @auth_required
@@ -2712,7 +2713,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         )
         await conn.execute(query)
     resp = {"msg": "left the shared vfolder"}
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -2893,7 +2894,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         "cloneable": params["cloneable"],
         "bgtask_id": str(task_id),
     }
-    return web.json_response(resp, status=201)
+    return web.json_response(resp, status=HTTPStatus.CREATED)
 
 
 @auth_required
@@ -2951,7 +2952,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             "perm": shared.permission.value,
         })
     resp = {"shared": shared_info}
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -2998,7 +2999,7 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
             )
         await conn.execute(query)
     resp = {"msg": "shared vfolder permission updated"}
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 class UserPermMapping(BaseModel):
@@ -3092,7 +3093,7 @@ async def update_vfolder_sharing_status(
 
     async with root_ctx.db.connect() as db_conn:
         await execute_with_txn_retry(_update_or_delete, root_ctx.db.begin_session, db_conn)
-    return web.Response(status=201)
+    return web.Response(status=HTTPStatus.CREATED)
 
 
 @superadmin_required
@@ -3269,7 +3270,7 @@ async def list_mounts(request: web.Request) -> web.Response:
                 case _:
                     resp["agents"][mount[0]] = mount[1]
 
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @superadmin_required
@@ -3374,7 +3375,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
                 continue
             resp["agents"][result[0]] = result[1]
 
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @superadmin_required
@@ -3426,7 +3427,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
                     "title": "Target host is used in sessions",
                     "message": "Target host is used in sessions",
                 },
-                status=409,
+                status=HTTPStatus.CONFLICT,
             )
 
         query = (
@@ -3499,7 +3500,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
                 continue
             resp["agents"][result[0]] = result[1]
 
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 async def storage_task_exception_handler(
@@ -3609,7 +3610,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
 
     await execute_with_retry(_delete_vfolder_related_rows)
 
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

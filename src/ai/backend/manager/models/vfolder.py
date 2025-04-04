@@ -2748,11 +2748,12 @@ async def get_permission_ctx(
     requested_permission: VFolderRBACPermission,
 ) -> VFolderPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
-        host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
-            ctx, target_scope, host_permission
-        )
         builder = VFolderPermissionContextBuilder(db_session)
         permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        permission_ctx.apply_host_permission_ctx(host_permission_ctx)
+        # TODO: Plan how to check storage host permission with recursive scopes
+        # host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
+        # host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
+        #     ctx, target_scope, host_permission
+        # )
+        # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
     return permission_ctx

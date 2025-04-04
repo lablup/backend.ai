@@ -14,6 +14,7 @@ from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...types import CapacityUsage, FSPerfMetric, QuotaUsage
+from ...watcher import WatcherClient
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..vfs import BaseQuotaModel, BaseVolume
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
@@ -107,6 +108,7 @@ class WekaVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
+        watcher: Optional[WatcherClient] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         super().__init__(
@@ -116,6 +118,7 @@ class WekaVolume(BaseVolume):
             options=options,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
+            watcher=watcher,
         )
         ssl_verify = self.config.get("weka_verify_ssl", False)
         self.api_client = WekaAPIClient(

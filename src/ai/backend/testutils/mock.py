@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import Any, Callable
 from unittest import mock
 from unittest.mock import AsyncMock
@@ -178,6 +179,6 @@ def mock_aioresponses_sequential_payloads(
 
         data = mock_responses[cb_call_counter]
         cb_call_counter += 1
-        return CallbackResult(status=200, payload=data)
+        return CallbackResult(status=HTTPStatus.OK, payload=data)
 
     return _callback
