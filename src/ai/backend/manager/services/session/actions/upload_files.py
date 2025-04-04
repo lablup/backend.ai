@@ -5,6 +5,7 @@ from aiohttp import MultipartReader
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.base import SessionAction
 
 
@@ -28,9 +29,8 @@ class UploadFilesAction(SessionAction):
 class UploadFilesActionResult(BaseActionResult):
     # TODO: Add proper type
     result: Any
-    # session_row: SessionRow
+    session_row: SessionRow
 
     @override
     def entity_id(self) -> Optional[str]:
-        # return str(self.session_row.id)
-        return None
+        return str(self.session_row.id)
