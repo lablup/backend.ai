@@ -19,25 +19,16 @@ from .base import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-__all__ = ("AuditLogRow", "ImageAuditLogOperationType")
-
 
 class AuditLogEntityType(enum.StrEnum):
     IMAGE = "image"
-
-
-class ImageAuditLogOperationType(enum.StrEnum):
-    SESSION_CREATE = "session_create"
-    UPDATE = "update"  # Rescan and update image metadata
-    PULL = "pull"  # Pull image from the registry
+    CONTAINER_REGISTRY = "container_registry"
 
 
 class OperationStatus(enum.StrEnum):
     SUCCESS = "success"
     ERROR = "error"
-
-
-AuditLogOperationType = ImageAuditLogOperationType
+    UNKNOWN = "unknown"
 
 
 class AuditLogRow(Base):
@@ -76,16 +67,16 @@ class AuditLogRow(Base):
     def __init__(
         self,
         entity_type: AuditLogEntityType,
-        operation: AuditLogOperationType,
+        operation: str,
         entity_id: str | uuid.UUID,
         request_id: uuid.UUID,
         description: str,
         duration: timedelta,
         created_at: Optional[datetime] = None,
-        status: OperationStatus = OperationStatus.SUCCESS,
+        status: OperationStatus = OperationStatus.UNKNOWN,
     ):
         self.entity_type = entity_type.value
-        self.operation = operation.value
+        self.operation = operation
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
         self.request_id = request_id
         self.description = description
