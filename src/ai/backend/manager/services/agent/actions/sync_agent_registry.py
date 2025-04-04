@@ -4,11 +4,11 @@ from typing import Any, Optional, override
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.agent.base import AgentAction
 
 
 @dataclass
-class SyncAgentRegistryAction(SessionAction):
+class SyncAgentRegistryAction(AgentAction):
     agent_id: AgentId
 
     @override

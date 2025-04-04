@@ -67,10 +67,6 @@ from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
 )
-from ai.backend.manager.services.session.actions.get_task_logs import (
-    GetTaskLogsAction,
-    GetTaskLogsActionResult,
-)
 from ai.backend.manager.services.session.actions.interrupt import (
     InterruptAction,
     InterruptActionResult,
@@ -137,7 +133,6 @@ class SessionProcessors:
         GetDirectAccessInfoAction, GetDirectAccessInfoActionResult
     ]
     get_session_info: ActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
-    get_task_logs: ActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
     interrupt: ActionProcessor[InterruptAction, InterruptActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
@@ -170,7 +165,6 @@ class SessionProcessors:
         self.get_dependency_graph = ActionProcessor(service.get_dependency_graph)
         self.get_direct_access_info = ActionProcessor(service.get_direct_access_info)
         self.get_session_info = ActionProcessor(service.get_session_info)
-        self.get_task_logs = ActionProcessor(service.get_task_logs)
         self.interrupt = ActionProcessor(service.interrupt)
         self.list_files = ActionProcessor(service.list_files)
         self.match_sessions = ActionProcessor(service.match_sessions)

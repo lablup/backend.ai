@@ -80,6 +80,7 @@ from ai.backend.manager.service.container_registry.harbor import (
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.service import SessionService
+from ai.backend.manager.services.vfolder.service import VFolderService
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -450,12 +451,16 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         background_task_manager=root_ctx.background_task_manager,
         error_monitor=root_ctx.error_monitor,
         idle_checker_host=root_ctx.idle_checker_host,
+    )
+    vfolder_service = VFolderService(
+        db=root_ctx.db,
         storage_manager=root_ctx.storage_manager,
     )
 
     root_ctx.processors = Processors(
         agent_service=agent_service,
         session_service=session_service,
+        vfolder_service=vfolder_service,
     )
 
     yield
