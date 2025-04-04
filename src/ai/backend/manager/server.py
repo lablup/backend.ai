@@ -77,6 +77,8 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.services import (
     VFolderFileService,
@@ -442,6 +444,9 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    domain_service = DomainService(root_ctx.db)
+    domain_processor = DomainProcessors(domain_service)
+
     root_ctx.processors = Processors(
         VFolderService(
             VFolderServiceInitParameter(
@@ -464,6 +469,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 storage_manager=root_ctx.storage_manager,
             ),
         ),
+        domain=domain_processor,
     )
     yield
 

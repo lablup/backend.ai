@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import platform
@@ -33,6 +32,7 @@ from ai.backend.agent.plugin.network import (
     ContainerNetworkInfo,
 )
 from ai.backend.agent.types import MountInfo
+from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -1039,7 +1039,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
         scratch_dir = (
             self.local_config["container"]["scratch-root"] / str(kernel.kernel_id)
         ).resolve()
-        config_dir = scratch_dir / "config"
+        config_dir: Path = scratch_dir / "config"
 
         intrinsic_ports = {
             "replin": host_ports[0],
@@ -1052,7 +1052,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
 
         await current_loop().run_in_executor(
             None,
-            lambda: (config_dir / "intrinsic-ports.json").write_text(json.dumps(intrinsic_ports)),
+            lambda: (config_dir / "intrinsic-ports.json").write_bytes(dump_json(intrinsic_ports)),
         )
 
     async def expose_ports(

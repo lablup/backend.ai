@@ -11,13 +11,12 @@ future UX improvements.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from aiohttp import web
 
-from ai.backend.common.json import ExtendedJSONEncoder
+from ai.backend.common.json import dump_json
 from ai.backend.common.plugin.hook import HookResult
 
 from ..exceptions import AgentError
@@ -53,7 +52,7 @@ class BackendError(web.HTTPError):
             body["msg"] = extra_msg
         if extra_data is not None:
             body["data"] = extra_data
-        self.body = json.dumps(body, cls=ExtendedJSONEncoder).encode()
+        self.body = dump_json(body)
 
     def __str__(self):
         lines = []
@@ -470,11 +469,11 @@ class BackendAgentError(BackendError):
         self.agent_error_type = agent_error_type
         self.agent_error_title = agent_details["title"]
         self.agent_exception = agent_details.get("exception", "")
-        self.body = json.dumps({
+        self.body = dump_json({
             "type": self.error_type,
             "title": self.error_title,
             "agent-details": agent_details,
-        }).encode()
+        })
 
     def __str__(self):
         if self.agent_exception:

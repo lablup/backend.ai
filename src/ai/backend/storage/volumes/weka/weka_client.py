@@ -1,4 +1,3 @@
-import json
 import logging
 import ssl
 import time
@@ -10,6 +9,7 @@ from typing import Any, Iterable, Mapping, MutableMapping, Optional
 import aiohttp
 from aiohttp import web
 
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize
 from ai.backend.logging import BraceStyleAdapter
 
@@ -347,7 +347,7 @@ class WekaAPIClient:
             await sess.post(
                 self.api_endpoint + "/api/v1",
                 headers=self._req_header,
-                data=json.dumps(body),
+                data=dump_json_str(body),
                 ssl=self.ssl_context,
             )
 
