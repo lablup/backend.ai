@@ -1138,12 +1138,12 @@ class ComputeContainer(graphene.ObjectType):
             .where(KernelRow.agent.in_(agent_ids))
             .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
-        kerenl_status: tuple[KernelStatus, ...]
+        kernel_status: tuple[KernelStatus, ...]
         if status is not None:
-            kerenl_status = (status,)
+            kernel_status = (status,)
         else:
-            kerenl_status = AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
-        query_stmt = query_stmt.where(KernelRow.status.in_(kerenl_status))
+            kernel_status = AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        query_stmt = query_stmt.where(KernelRow.status.in_(kernel_status))
         async with ctx.db.begin_readonly_session() as db_session:
             return await batch_multiresult_in_scalar_stream(
                 ctx,
