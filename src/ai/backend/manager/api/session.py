@@ -44,6 +44,7 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.json import read_json
 from ai.backend.manager.data.session.types import CustomizedImageVisibilityScope
+from ai.backend.manager.services.agent.actions.sync_agent_registry import SyncAgentRegistryAction
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
@@ -85,7 +86,6 @@ from ai.backend.manager.services.session.actions.rename_session import RenameSes
 from ai.backend.manager.services.session.actions.restart_session import RestartSessionAction
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
-from ai.backend.manager.services.session.actions.sync_agent_registry import SyncAgentRegistryAction
 from ai.backend.manager.services.session.actions.upload_files import UploadFilesAction
 
 if TYPE_CHECKING:
