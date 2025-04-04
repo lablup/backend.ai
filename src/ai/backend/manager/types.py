@@ -21,6 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import MountPermission, MountTypes
 
+from .exceptions import InvalidArgument
+
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
 
@@ -154,14 +156,6 @@ class TriStateField(Generic[TVal]):
         return self._value is not _SENTINEL
 
     @classmethod
-    def set(cls, value: TVal) -> Self:
-        return cls(value)
-
-    @classmethod
-    def unset(cls) -> Self:
-        return cls(None)
-
-    @classmethod
     def nop(cls) -> Self:
         return cls(_SENTINEL)
 
@@ -170,6 +164,8 @@ class NonNullField(Generic[TVal]):
     _value: TVal | Sentinel
 
     def __init__(self, value: TVal | Sentinel = _SENTINEL) -> None:
+        if value is None:
+            raise InvalidArgument
         self._value = value
 
     def value(self) -> TVal:
@@ -179,10 +175,6 @@ class NonNullField(Generic[TVal]):
 
     def is_valid(self) -> bool:
         return self._value is not _SENTINEL
-
-    @classmethod
-    def set(cls, value: TVal) -> Self:
-        return cls(value)
 
     @classmethod
     def nop(cls) -> Self:
