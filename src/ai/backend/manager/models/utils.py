@@ -553,7 +553,7 @@ async def vacuum_db(
             await conn.exec_driver_sql(vacuum_sql)
 
 
-def define_state(value):
+def define_state(value: Any) -> State:
     if value is None:
         return State.NULLIFY
     elif value is Undefined:
