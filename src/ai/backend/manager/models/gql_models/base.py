@@ -177,7 +177,7 @@ def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name:
 
 def to_optional_state(attr_name: str, value: Any) -> OptionalState:
     if value is None:
-        raise ValueError("value is None")
+        raise ValueError("OptionalState cannot be NULLIFY")
     elif value is Undefined:
         return OptionalState.nop(attr_name)
     else:
