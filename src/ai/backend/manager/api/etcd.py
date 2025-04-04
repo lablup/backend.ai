@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import collections
-import json
 import logging
 from http import HTTPStatus
 from typing import (
@@ -19,6 +18,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import redis_helper
+from ai.backend.common.json import load_json
 from ai.backend.common.types import AcceleratorMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_container_registries
@@ -106,7 +106,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
 
     # Collect plugin-reported accelerator metadata
     reported_accelerator_metadata: dict[str, AcceleratorMetadata] = {
-        slot_name: cast(AcceleratorMetadata, json.loads(metadata_json))
+        slot_name: cast(AcceleratorMetadata, load_json(metadata_json))
         for slot_name, metadata_json in (
             await redis_helper.execute(
                 root_ctx.redis_stat,

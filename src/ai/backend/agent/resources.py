@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import copy
-import json
 import logging
 import pprint
 import textwrap
@@ -30,6 +29,7 @@ from typing import (
 import aiodocker
 import attrs
 
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -110,7 +110,7 @@ class KernelResourceSpec:
 
     def write_to_string(self) -> str:
         mounts_str = ",".join(map(str, self.mounts))
-        slots_str = json.dumps({k: str(v) for k, v in self.slots.items()})
+        slots_str = dump_json_str({k: str(v) for k, v in self.slots.items()})
 
         resource_str = ""
         resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"
@@ -180,7 +180,7 @@ class KernelResourceSpec:
         return cls(
             scratch_disk_size=BinarySize.finite_from_str(kvpairs["SCRATCH_SIZE"]),
             allocations=dict(allocations),
-            slots=ResourceSlot(json.loads(kvpairs["SLOTS"])),
+            slots=ResourceSlot(load_json(kvpairs["SLOTS"])),
             mounts=mounts,
         )
 
@@ -219,7 +219,7 @@ class KernelResourceSpec:
         return o
 
     def to_json(self) -> str:
-        return json.dumps(self.to_json_serializable_dict())
+        return dump_json_str(self.to_json_serializable_dict())
 
 
 class AbstractComputeDevice:

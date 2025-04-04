@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import secrets
 import uuid
@@ -50,6 +49,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -724,7 +724,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
         )
 
         await reporter.update(
-            message=json.dumps({
+            message=dump_json_str({
                 "event": "session_enqueued",
                 "session_id": str(result["sessionId"]),
             })
@@ -744,7 +744,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             match event:
                 case ModelServiceStatusEvent():
                     task_message["is_healthy"] = event.new_status.value
-            await reporter.update(message=json.dumps(task_message))
+            await reporter.update(message=dump_json_str(task_message))
 
             match event:
                 case SessionTerminatedEvent() | SessionCancelledEvent():

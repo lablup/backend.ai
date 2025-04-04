@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from collections.abc import Mapping
 from dataclasses import asdict
@@ -11,6 +10,7 @@ import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
@@ -261,8 +261,8 @@ class VASTVolume(BaseVolume):
             "status": healthy_status,
             "status_info": clsuter_info.state,
             "metadata": {
-                "quota": json.dumps([asdict(q) for q in quotas]),
-                "cluster_info": json.dumps(asdict(clsuter_info)),
+                "quota": dump_json_str([asdict(q) for q in quotas]),
+                "cluster_info": dump_json_str(asdict(clsuter_info)),
             },
         }
 
