@@ -33,4 +33,4 @@ class DownloadFilesActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return self.session_row.id
+        return str(self.session_row.id)

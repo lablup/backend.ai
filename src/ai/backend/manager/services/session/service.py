@@ -1224,7 +1224,7 @@ class SessionService:
                         "files": [],
                         "console": [],
                     }
-                    return ExecuteSessionActionResult(result=resp)
+                    return ExecuteSessionActionResult(result=resp, session_row=session)
                 # Keep internal/public API compatilibty
                 result = {
                     "status": raw_result["status"],
@@ -1248,7 +1248,7 @@ class SessionService:
             log.exception("EXECUTE: exception")
             raise
 
-        return ExecuteSessionActionResult(result=resp)
+        return ExecuteSessionActionResult(result=resp, session_row=session)
 
     async def get_abusing_report(
         self, action: GetAbusingReportAction
@@ -1721,7 +1721,7 @@ class SessionService:
             upload_tasks.append(t)
         await asyncio.gather(*upload_tasks)
 
-        return UploadFilesActionResult(result=None)
+        return UploadFilesActionResult(result=None, session_row=session)
 
     async def modify_compute_session(
         self, action: ModifyComputeSessionAction
