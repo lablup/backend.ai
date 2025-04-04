@@ -44,12 +44,12 @@ from tenacity import (
 
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.types import Sentinel, State
 
 if TYPE_CHECKING:
     from ..config import LocalConfig
 
 from ..defs import LockID
+from ..types import Sentinel, State
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
