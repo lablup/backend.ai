@@ -454,7 +454,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
                 value_or_none(self.description),
             ),
             is_active=OptionalState(
-                define_state(self.is_active),
+                "is_active",
                 define_state(self.is_active),
                 value_or_none(self.is_active),
             ),
