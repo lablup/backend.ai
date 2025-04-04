@@ -59,14 +59,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
-
-    if "audit_logs" not in inspector.get_table_names():
-        return
-
-    op.drop_index(op.f("ix_audit_logs_created_at"), table_name="audit_logs")
-    op.drop_index(op.f("ix_audit_logs_entity_type"), table_name="audit_logs")
-    op.drop_index(op.f("ix_audit_logs_operation"), table_name="audit_logs")
-    op.drop_index(op.f("ix_audit_logs_entity_id"), table_name="audit_logs")
-    op.drop_table("audit_logs")
+    # Downgrade should be performed in 683ca0a32f41
+    pass
