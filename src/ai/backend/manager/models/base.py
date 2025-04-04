@@ -699,7 +699,7 @@ LoaderKeyT = TypeVar("LoaderKeyT")
 LoaderResultT = TypeVar("LoaderResultT")
 
 
-class DataLoaderManager:
+class DataLoaderManager(Generic[ContextT, LoaderKeyT, LoaderResultT]):
     """
     For every different combination of filtering conditions, we need to make a
     new DataLoader instance because it "batches" the database queries.
@@ -710,7 +710,7 @@ class DataLoaderManager:
     for every incoming API request.
     """
 
-    cache: dict[int, DataLoader]
+    cache: dict[int, DataLoader[LoaderKeyT, LoaderResultT]]
 
     def __init__(self) -> None:
         self.cache = {}
@@ -762,7 +762,7 @@ class DataLoaderManager:
         # Using kwargs-only to prevent argument position confusion
         # when DataLoader calls `batch_load_func(keys)` which is `partial(batch_load_func, **kwargs)(keys)`.
         **kwargs,
-    ) -> DataLoader:
+    ) -> DataLoader[LoaderKeyT, LoaderResultT]:
         key = self._get_func_key(batch_load_func, **kwargs)
         loader = self.cache.get(key)
         if loader is None:
