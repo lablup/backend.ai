@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, TypeAlias, cast, override
+from typing import Optional, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -34,10 +34,6 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
-
-if TYPE_CHECKING:
-    pass
-
 
 __all__: Sequence[str] = (
     "agents",
