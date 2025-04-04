@@ -59,8 +59,6 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetI
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageInputData,
-    OptionalState,
-    TriState,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
@@ -101,6 +99,8 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     extract_object_uuid,
+    get_optional_state,
+    get_tri_state,
 )
 
 if TYPE_CHECKING:
@@ -1102,28 +1102,24 @@ class ModifyImageInput(graphene.InputObjectType):
             else None
         )
 
-        def value_or_none(value):
-            return value if value is not Undefined else None
-
         return ModifyImageInputData(
-            name=OptionalState("name", value_or_none(self.name)),
-            registry=OptionalState("registry", value_or_none(self.registry)),
-            image=OptionalState("image", value_or_none(self.image)),
-            tag=OptionalState("tag", value_or_none(self.tag)),
-            architecture=OptionalState("architecture", value_or_none(self.architecture)),
-            is_local=OptionalState("is_local", value_or_none(self.is_local)),
-            size_bytes=OptionalState("size_bytes", value_or_none(self.size_bytes)),
-            type=OptionalState("type", value_or_none(self.type)),
-            config_digest=OptionalState("config_digest", value_or_none(self.digest)),
-            labels=OptionalState("labels", {label.key: label.value for label in self.labels}),
-            accelerators=TriState(
+            name=get_optional_state("name", self.name),
+            registry=get_optional_state("registry", self.registry),
+            image=get_optional_state("image", self.image),
+            tag=get_optional_state("tag", self.tag),
+            architecture=get_optional_state("architecture", self.architecture),
+            is_local=get_optional_state("is_local", self.is_local),
+            size_bytes=get_optional_state("size_bytes", self.size_bytes),
+            type=get_optional_state("type", self.type),
+            config_digest=get_optional_state("config_digest", self.digest),
+            labels=get_optional_state("labels", {label.key: label.value for label in self.labels}),
+            accelerators=get_tri_state(
                 "accelerators",
-                unset=self.supported_accelerators is None,
-                value=accelerators,
+                accelerators,
             ),
-            resources=OptionalState(
+            resources=get_optional_state(
                 "resources",
-                value_or_none(resources_data),
+                resources_data,
             ),
         )
 
