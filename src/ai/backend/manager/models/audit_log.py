@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import enum
 import logging
+from typing import Optional
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
 
 import sqlalchemy as sa
 
