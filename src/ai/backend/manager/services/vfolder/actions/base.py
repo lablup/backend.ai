@@ -14,9 +14,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-
-# from ai.backend.manager.types import NonNullState
-from ai.backend.manager.types import NonNullStateField, TriStateData
+from ai.backend.manager.types import DataclassInput, NonNullField
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -73,12 +71,10 @@ class CreateVFolderActionResult(BaseActionResult):
 
 
 @dataclass
-class UpdateVFolderAttributeInput(TriStateData):
-    name: NonNullStateField[str] = field(default_factory=NonNullStateField.nop)
-    cloneable: NonNullStateField[bool] = field(default_factory=NonNullStateField.nop)
-    mount_permission: NonNullStateField[VFolderPermission] = field(
-        default_factory=NonNullStateField.nop
-    )
+class UpdateVFolderAttributeInput(DataclassInput):
+    name: NonNullField[str] = field(default_factory=NonNullField.nop)
+    cloneable: NonNullField[bool] = field(default_factory=NonNullField.nop)
+    mount_permission: NonNullField[VFolderPermission] = field(default_factory=NonNullField.nop)
 
 
 @dataclass

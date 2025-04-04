@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from collections import UserDict
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, fields
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -12,7 +12,6 @@ from typing import (
     Optional,
     Protocol,
     Self,
-    TypeAlias,
     TypeVar,
 )
 
@@ -151,6 +150,9 @@ class TriStateField(Generic[TVal]):
             return self._value
         raise ValueError(f"Value is not set for {self.__class__.__name__}")
 
+    def is_valid(self) -> bool:
+        return self._value is not SENTINEL
+
     @classmethod
     def set(cls, value: TVal) -> Self:
         return cls(value)
@@ -164,27 +166,63 @@ class TriStateField(Generic[TVal]):
         return cls(SENTINEL)
 
 
-NonNullValue: TypeAlias = TVal | Sentinel
-
-
-class NonNullStateField(TriStateField[TVal]):
+class NonNullField(Generic[TVal]):
     _value: TVal | Sentinel
 
     def __init__(self, value: TVal | Sentinel = SENTINEL) -> None:
         self._value = value
 
     def value(self) -> TVal:
-        if self._value is not SENTINEL and self._value is not None:
+        if self._value is not SENTINEL:
             return self._value
         raise ValueError(f"Value is not set for {self.__class__.__name__}")
+
+    def is_valid(self) -> bool:
+        return self._value is not SENTINEL
 
     @classmethod
     def set(cls, value: TVal) -> Self:
         return cls(value)
 
+    @classmethod
+    def nop(cls) -> Self:
+        return cls(SENTINEL)
 
-class TriStateData(UserDict):
+
+class AbstractInput(ABC):
+    @abstractmethod
     def set_attr(self, obj: Any) -> None:
-        for field_name, value in self.data.items():
-            if value is not SENTINEL:
-                setattr(obj, field_name, value)
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_dict(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class InputWithTriStateValue(ABC):
+    @abstractmethod
+    def get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
+        raise NotImplementedError
+
+
+@dataclass
+class DataclassInput(AbstractInput, InputWithTriStateValue):
+    """
+    Base class for inputs that are dataclasses.
+
+    The classes that inherit from this class should be dataclasses and
+    should have fields that are TriStateField or NonNullField.
+    """
+
+    def get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
+        return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
+
+    def set_attr(self, obj: Any) -> None:
+        for field_name, value in self.get_fields():
+            if value.is_valid():
+                setattr(obj, field_name, value.value())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            field_name: value.value() for field_name, value in self.get_fields() if value.is_valid()
+        }

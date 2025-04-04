@@ -432,7 +432,7 @@ class VFolderService:
             update_input.set_attr(vfolder_row)
 
         async with self._db.connect() as db_conn:
-            await execute_with_txn_retry(db_conn, self._db.begin_session, _update)
+            await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def get(self, action: GetVFolderAction) -> GetVFolderActionResult:

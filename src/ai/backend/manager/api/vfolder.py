@@ -120,7 +120,7 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
-from ..types import NonNullStateField
+from ..types import NonNullField
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -969,6 +969,11 @@ class RenameRequestModel(BaseModel):
         description="Name of the vfolder",
     )
 
+    def to_input(self) -> UpdateVFolderAttributeInput:
+        return UpdateVFolderAttributeInput(
+            name=NonNullField(self.new_name),
+        )
+
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
@@ -995,9 +1000,7 @@ async def rename_vfolder(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            input=UpdateVFolderAttributeInput(
-                name=NonNullStateField(params.new_name),
-            ),
+            input=params.to_input(),
         )
     )
     return web.Response(status=HTTPStatus.CREATED)
@@ -1029,8 +1032,8 @@ async def update_vfolder_options(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
             input=UpdateVFolderAttributeInput(
-                cloneable=NonNullStateField(params["cloneable"]),
-                mount_permission=NonNullStateField(params["permission"]),
+                cloneable=NonNullField(params["cloneable"]),
+                mount_permission=NonNullField(params["permission"]),
             ),
         )
     )
