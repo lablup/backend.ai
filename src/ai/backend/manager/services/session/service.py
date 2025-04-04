@@ -1355,10 +1355,14 @@ class SessionService:
 
         async with self._db.begin_readonly_session() as db_session:
             # TODO: Move `find_dependency_sessions` impl to Service layer
-            dependency_graph = (
-                await find_dependency_sessions(root_session_name, db_session, owner_access_key),
+            dependency_graph = await find_dependency_sessions(
+                root_session_name, db_session, owner_access_key
             )
-        return GetDependencyGraphActionResult(result=dependency_graph)
+            session_id = dependency_graph["session_id"]
+            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+            session = await db_session.scalar(stmt)
+
+        return GetDependencyGraphActionResult(result=dependency_graph, session_row=session)
 
     async def get_direct_access_info(
         self, action: GetDirectAccessInfoAction
