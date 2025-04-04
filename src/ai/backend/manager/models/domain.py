@@ -31,7 +31,8 @@ from sqlalchemy.orm import load_only, relationship
 from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, Sentinel, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.types import OptionalState, State, TriState
+from ai.backend.manager.models.utils import define_state
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
@@ -317,14 +318,6 @@ class DomainInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        def define_state(value):
-            if value is None:
-                return State.NULLIFY
-            elif value is Undefined:
-                return State.NOP
-            else:
-                return State.UPDATE
-
         return CreateDomainAction(
             name=domain_name,
             description=TriState(
@@ -381,14 +374,6 @@ class ModifyDomainInput(graphene.InputObjectType):
     def to_action(self, domain_name: str) -> ModifyDomainAction:
         def value_or_none(value):
             return value if value is not Undefined else None
-
-        def define_state(value):
-            if value is None:
-                return State.NULLIFY
-            elif value is Undefined:
-                return State.NOP
-            else:
-                return State.UPDATE
 
         return ModifyDomainAction(
             domain_name=domain_name,

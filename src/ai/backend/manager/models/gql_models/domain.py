@@ -18,6 +18,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.types import ResourceSlot, Sentinel
+from ai.backend.manager.models.utils import define_state
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
     CreateDomainNodeActionResult,
@@ -27,7 +28,7 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeActionResult,
 )
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import OptionalState, State, TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
     FilterExprArg,
@@ -330,14 +331,6 @@ class CreateDomainNodeInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not graphql.Undefined else None
 
-        def define_state(value):
-            if value is None:
-                return State.NULLIFY
-            elif value is graphql.Undefined:
-                return State.NOP
-            else:
-                return State.UPDATE
-
         return CreateDomainNodeAction(
             name=self.name,
             user_info=user_info,
@@ -448,14 +441,6 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
         def value_or_none(value):
             return value if value is not graphql.Undefined else None
-
-        def define_state(value):
-            if value is None:
-                return State.NULLIFY
-            elif value is graphql.Undefined:
-                return State.NOP
-            else:
-                return State.UPDATE
 
         def convert_to_set(value) -> Optional[set[str]]:
             return set(value) if value is not graphql.Undefined else None
