@@ -470,6 +470,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         image=image_processor,
         container_registry=container_registry_processor,
     )
+
     yield
 
 
