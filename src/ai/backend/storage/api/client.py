@@ -31,8 +31,8 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import VFolderID
-from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__

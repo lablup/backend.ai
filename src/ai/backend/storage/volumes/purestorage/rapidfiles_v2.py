@@ -4,7 +4,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from typing import AsyncIterator
 
-from ai.backend.common.utils import load_json
+from ai.backend.common.json import load_json
 
 from ...subproc import run
 from ...types import DirEntry, DirEntryType, Stat, TreeUsage

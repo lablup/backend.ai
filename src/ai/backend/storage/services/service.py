@@ -8,8 +8,8 @@ from typing import AsyncIterator, Optional
 from aiohttp import web
 
 from ai.backend.common.events import VFolderDeletionFailureEvent, VFolderDeletionSuccessEvent
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
-from ai.backend.common.utils import dump_json_str
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..exception import (

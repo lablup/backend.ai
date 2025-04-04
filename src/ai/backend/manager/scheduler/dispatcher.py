@@ -58,6 +58,7 @@ from ai.backend.common.events import (
     SessionScheduledEvent,
     SessionTerminatedEvent,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
@@ -74,7 +75,6 @@ from ai.backend.common.types import (
     SessionTypes,
     aobject,
 )
-from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.session import _build_session_fetch_query

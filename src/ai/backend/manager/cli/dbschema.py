@@ -14,7 +14,7 @@ from alembic.runtime.migration import MigrationContext, MigrationStep
 from alembic.script import Script, ScriptDirectory
 from sqlalchemy.engine import Connection, Engine
 
-from ai.backend.common.utils import load_json, pretty_json_str
+from ai.backend.common.json import load_json, pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 

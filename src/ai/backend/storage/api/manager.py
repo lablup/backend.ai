@@ -42,13 +42,13 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
-from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__

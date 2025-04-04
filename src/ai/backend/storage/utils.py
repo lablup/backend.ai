@@ -8,7 +8,7 @@ from typing import Any, AsyncIterator, Optional, Union
 import trafaret as t
 from aiohttp import web
 
-from ai.backend.common.utils import dump_json_str
+from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from .volumes.types import LoggingInternalMeta

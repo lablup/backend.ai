@@ -51,7 +51,7 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.utils import load_json, read_json
+from ai.backend.common.json import load_json, read_json
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
 

@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from aiohttp import web
 
+from ai.backend.common.json import dump_json
 from ai.backend.common.plugin.hook import HookResult
-from ai.backend.common.utils import dump_json
 
 from ..exceptions import AgentError
 

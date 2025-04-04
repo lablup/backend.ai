@@ -32,6 +32,7 @@ from ai.backend.agent.plugin.network import (
     ContainerNetworkInfo,
 )
 from ai.backend.agent.types import MountInfo
+from ai.backend.common.json import dump_json
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -44,7 +45,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.common.utils import current_loop, dump_json, nmget
+from ai.backend.common.utils import current_loop, nmget
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep

@@ -40,8 +40,8 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
+from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
-from ai.backend.common.utils import load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import UserRole, users

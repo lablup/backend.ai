@@ -29,6 +29,7 @@ from typing import (
 import aiodocker
 import attrs
 
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -44,7 +45,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.common.utils import dump_json_str, load_json
 from ai.backend.logging import BraceStyleAdapter
 
 # Expose legacy import names for plugins

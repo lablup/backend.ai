@@ -11,7 +11,7 @@ import yaml
 from aiohttp import web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.utils import dump_json, load_json
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import TemplateType, groups, session_templates, users

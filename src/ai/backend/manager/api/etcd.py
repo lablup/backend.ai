@@ -18,8 +18,8 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import redis_helper
+from ai.backend.common.json import load_json
 from ai.backend.common.types import AcceleratorMetadata
-from ai.backend.common.utils import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_container_registries
 

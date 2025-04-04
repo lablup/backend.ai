@@ -11,7 +11,7 @@ import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.utils import read_json
+from ai.backend.common.json import read_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 

@@ -97,6 +97,11 @@ from ai.backend.common.events import (
     VolumeUnmounted,
 )
 from ai.backend.common.exception import VolumeMountFailed
+from ai.backend.common.json import (
+    dump_json,
+    dump_json_str,
+    load_json,
+)
 from ai.backend.common.lock import FileLock
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -143,9 +148,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import (
     cancel_tasks,
     current_loop,
-    dump_json,
-    dump_json_str,
-    load_json,
     mount,
     umount,
 )

@@ -9,7 +9,7 @@ from urllib.parse import quote_plus as urlquote
 import click
 import sqlalchemy as sa
 
-from ai.backend.common.utils import load_json
+from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models.base import populate_fixture

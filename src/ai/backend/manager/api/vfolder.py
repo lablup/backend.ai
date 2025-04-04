@@ -50,6 +50,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -59,7 +60,6 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.storage import StorageSessionManager
 

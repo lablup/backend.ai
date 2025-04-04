@@ -66,6 +66,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
+from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
@@ -86,7 +87,7 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
-from ai.backend.common.utils import current_loop, pretty_json
+from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__ as VERSION

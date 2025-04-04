@@ -15,7 +15,7 @@ from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
-from ai.backend.common.utils import pretty_json_str
+from ai.backend.common.json import pretty_json_str
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.session import UndefChecker

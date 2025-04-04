@@ -3,7 +3,7 @@ from typing import Any, Optional
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPNotFound
 
-from ai.backend.common.utils import dump_json_str
+from ai.backend.common.json import dump_json_str
 
 
 class StorageProxyError(Exception):

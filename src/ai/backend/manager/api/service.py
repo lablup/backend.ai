@@ -49,6 +49,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -60,7 +61,6 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageIdentifier
 

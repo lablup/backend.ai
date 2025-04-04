@@ -9,7 +9,7 @@ import aiofiles
 import click
 import graphene
 
-from ai.backend.common.utils import pretty_json_str
+from ai.backend.common.json import pretty_json_str
 from ai.backend.manager.openapi import generate
 
 from ..models.gql import Mutations, Queries

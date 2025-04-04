@@ -35,8 +35,9 @@ from ai.backend.common.exception import (
     InvalidImageTag,
     ProjectMismatchWithCanonical,
 )
+from ai.backend.common.json import read_json
 from ai.backend.common.types import DispatchResult, SlotName, SSLContextType
-from ai.backend.common.utils import join_non_empty, read_json
+from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import INTRINSIC_SLOTS_MIN

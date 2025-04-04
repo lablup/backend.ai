@@ -8,7 +8,7 @@ from typing import Any, AsyncIterator, Dict, List, NotRequired, Optional, TypedD
 
 import aiohttp
 
-from ai.backend.common.utils import dump_json_str
+from ai.backend.common.json import dump_json_str
 
 
 class QuotaTypes(enum.StrEnum):

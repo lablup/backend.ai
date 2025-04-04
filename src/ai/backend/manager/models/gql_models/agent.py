@@ -21,13 +21,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     BinarySize,
     HardwareMetadata,
 )
-from ai.backend.common.utils import dump_json_str, load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..agent import (

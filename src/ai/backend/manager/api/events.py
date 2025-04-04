@@ -47,8 +47,8 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
-from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import UserRole, groups, kernels

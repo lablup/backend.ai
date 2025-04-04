@@ -44,6 +44,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
 )
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -53,7 +54,6 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
-from ai.backend.common.utils import dump_json, load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from .exception import InvalidSocket, UnsupportedBaseDistroError

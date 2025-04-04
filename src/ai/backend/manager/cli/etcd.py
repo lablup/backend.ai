@@ -12,7 +12,7 @@ from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
-from ai.backend.common.utils import load_json, pretty_json_str
+from ai.backend.common.json import load_json, pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from .context import etcd_ctx

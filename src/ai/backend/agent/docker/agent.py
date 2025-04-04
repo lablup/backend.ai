@@ -54,6 +54,10 @@ from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
+from ai.backend.common.json import (
+    dump_json,
+    load_json,
+)
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -81,8 +85,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import (
     AsyncFileWriter,
     current_loop,
-    dump_json,
-    load_json,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
