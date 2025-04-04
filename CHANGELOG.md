@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.0rc2 (2025-04-04)
+
+### Breaking Changes
+* Add `force`, `noprune` options to `PurgeImages` GQL API, and allow `PurgeImages` to be performed on multiple agents (breaking change). ([#3987](https://github.com/lablup/backend.ai/issues/3987))
+
+### Features
+* Add `AuditLog` GQL interface. ([#4001](https://github.com/lablup/backend.ai/issues/4001))
+* Refactor Redis message queue to follow ABC pattern ([#4064](https://github.com/lablup/backend.ai/issues/4064))
+* Use `http.HTTPStatus` enum for HTTP status codes ([#4069](https://github.com/lablup/backend.ai/issues/4069))
+*  ([#4091](https://github.com/lablup/backend.ai/issues/4091))
+
+### Fixes
+* Fix customized image visibility issue. ([#3939](https://github.com/lablup/backend.ai/issues/3939))
+* Add missing newline at end of customized dotfiles. ([#4047](https://github.com/lablup/backend.ai/issues/4047))
+* Setup source at producer creation ([#4068](https://github.com/lablup/backend.ai/issues/4068))
+* Add missing `AuditLog` module import to ensure AuditLog table created at initial installation. ([#4079](https://github.com/lablup/backend.ai/issues/4079))
+* Change default value of `domain` table columns ([#4081](https://github.com/lablup/backend.ai/issues/4081))
+* Avoid kernel DB full scan when resolving GQL Agent queries ([#4086](https://github.com/lablup/backend.ai/issues/4086))
+* Fix pydantic validation error from wrong type aliasing. ([#4094](https://github.com/lablup/backend.ai/issues/4094))
+
+
 ## 25.5.2 (2025-03-31)
 
 ### Features
