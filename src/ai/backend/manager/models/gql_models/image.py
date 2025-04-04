@@ -99,8 +99,8 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     extract_object_uuid,
-    get_optional_state,
-    get_tri_state,
+    to_optional_state,
+    to_tri_state,
 )
 
 if TYPE_CHECKING:
@@ -1103,21 +1103,21 @@ class ModifyImageInput(graphene.InputObjectType):
         )
 
         return ModifyImageInputData(
-            name=get_optional_state("name", self.name),
-            registry=get_optional_state("registry", self.registry),
-            image=get_optional_state("image", self.image),
-            tag=get_optional_state("tag", self.tag),
-            architecture=get_optional_state("architecture", self.architecture),
-            is_local=get_optional_state("is_local", self.is_local),
-            size_bytes=get_optional_state("size_bytes", self.size_bytes),
-            type=get_optional_state("type", self.type),
-            config_digest=get_optional_state("config_digest", self.digest),
-            labels=get_optional_state("labels", {label.key: label.value for label in self.labels}),
-            accelerators=get_tri_state(
+            name=to_optional_state("name", self.name),
+            registry=to_optional_state("registry", self.registry),
+            image=to_optional_state("image", self.image),
+            tag=to_optional_state("tag", self.tag),
+            architecture=to_optional_state("architecture", self.architecture),
+            is_local=to_optional_state("is_local", self.is_local),
+            size_bytes=to_optional_state("size_bytes", self.size_bytes),
+            type=to_optional_state("type", self.type),
+            config_digest=to_optional_state("config_digest", self.digest),
+            labels=to_optional_state("labels", {label.key: label.value for label in self.labels}),
+            accelerators=to_tri_state(
                 "accelerators",
                 accelerators,
             ),
-            resources=get_optional_state(
+            resources=to_optional_state(
                 "resources",
                 resources_data,
             ),

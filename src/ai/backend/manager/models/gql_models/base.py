@@ -175,7 +175,7 @@ def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name:
         raise ObjectNotFound(object_name)
 
 
-def get_optional_state(attr_name: str, value: Any) -> OptionalState:
+def to_optional_state(attr_name: str, value: Any) -> OptionalState:
     if value is None:
         raise ValueError("value is None")
     elif value is Undefined:
@@ -184,7 +184,7 @@ def get_optional_state(attr_name: str, value: Any) -> OptionalState:
         return OptionalState.update(attr_name, value)
 
 
-def get_tri_state(attr_name: str, value: Any) -> TriState:
+def to_tri_state(attr_name: str, value: Any) -> TriState:
     if value is None:
         return TriState.nullify(attr_name)
     elif value is Undefined:
