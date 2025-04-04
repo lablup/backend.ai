@@ -37,7 +37,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.types import OptionalState, State
+from ai.backend.manager.models.utils import define_state
+from ai.backend.manager.types import OptionalState
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
@@ -604,14 +605,6 @@ class GroupInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        def define_state(value):
-            if value is None:
-                return State.NULLIFY
-            elif value is Undefined:
-                return State.NOP
-            else:
-                return State.UPDATE
-
         return CreateGroupAction(
             name=name,
             domain_name=self.domain_name,
@@ -678,14 +671,6 @@ class ModifyGroupInput(graphene.InputObjectType):
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
         def value_or_none(value):
             return value if value is not Undefined else None
-
-        def define_state(value):
-            if value is None:
-                return State.NULLIFY
-            elif value is Undefined:
-                return State.NOP
-            else:
-                return State.UPDATE
 
         return ModifyGroupAction(
             group_id=group_id,
