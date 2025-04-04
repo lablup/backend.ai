@@ -1,7 +1,6 @@
 import asyncio
 import importlib
 import inspect
-import json
 import textwrap
 from collections import defaultdict
 from pathlib import Path
@@ -16,6 +15,7 @@ from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
+from ai.backend.common.utils import pretty_json
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.session import UndefChecker
@@ -408,10 +408,10 @@ def main(output: Path) -> None:
     """
     openapi = asyncio.run(generate())
     if output == "-" or output is None:
-        print(json.dumps(openapi, ensure_ascii=False, indent=2))
+        print(pretty_json(openapi))
     else:
         with open(output, mode="w") as fw:
-            fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+            fw.write(pretty_json(openapi))
 
 
 if __name__ == "__main__":

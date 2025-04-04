@@ -51,6 +51,7 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.utils import load_json, read_json
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
 
@@ -546,7 +547,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             group_name = await conn.scalar(query)
 
     if isinstance(template, str):
-        template = json.loads(template)
+        template = load_json(template)
     log.debug("Template: {0}", template)
 
     param_from_template = {
@@ -914,9 +915,9 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
 
     opts: MutableMapping[str, Union[None, str, List[str]]] = {}
     if params["arguments"] is not None:
-        opts["arguments"] = json.loads(params["arguments"])
+        opts["arguments"] = load_json(params["arguments"])
     if params["envs"] is not None:
-        opts["envs"] = json.loads(params["envs"])
+        opts["envs"] = load_json(params["envs"])
 
     result = await asyncio.shield(
         app_ctx.rpc_ptask_group.create_task(
@@ -1759,7 +1760,7 @@ async def execute(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     try:
-        params = await request.json(loads=json.loads)
+        params = await read_json(request)
         log.info("EXECUTE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     except json.decoder.JSONDecodeError:
         log.warning("EXECUTE: invalid/missing parameters")
@@ -1888,7 +1889,7 @@ async def complete(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     try:
-        params = await request.json(loads=json.loads)
+        params = await read_json(request)
         log.info(
             "COMPLETE(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
         )
@@ -2223,7 +2224,7 @@ async def list_files(request: web.Request) -> web.Response:
     try:
         session_name = request.match_info["session_name"]
         requester_access_key, owner_access_key = await get_access_key_scopes(request)
-        params = await request.json(loads=json.loads)
+        params = await read_json(request)
         path = params.get("path", ".")
         log.info(
             "LIST_FILES (ak:{0}/{1}, s:{2}, path:{3})",

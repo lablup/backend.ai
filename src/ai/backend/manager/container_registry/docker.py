@@ -1,5 +1,5 @@
-import json
 import logging
+from http import HTTPStatus
 from typing import AsyncIterator, Optional, cast, override
 
 import aiohttp
@@ -7,6 +7,7 @@ import typing_extensions
 import yarl
 
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.utils import read_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
@@ -86,8 +87,8 @@ class DockerRegistry_v2(BaseContainerRegistry):
         )
         while catalog_url is not None:
             async with sess.get(catalog_url, **rqst_args) as resp:
-                if resp.status == 200:
-                    data = json.loads(await resp.read())
+                if resp.status == HTTPStatus.OK:
+                    data = await read_json(resp)
                     for item in data["repositories"]:
                         if item.startswith(self.registry_info.project):
                             yield item

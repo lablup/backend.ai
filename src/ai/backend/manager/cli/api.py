@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -10,6 +9,7 @@ import aiofiles
 import click
 import graphene
 
+from ai.backend.common.utils import pretty_json
 from ai.backend.manager.openapi import generate
 
 from ..models.gql import Mutations, Queries
@@ -63,7 +63,7 @@ def dump_openapi(cli_ctx: CLIContext, output: Path) -> None:
     """
     openapi = asyncio.run(generate())
     if output == "-" or output is None:
-        print(json.dumps(openapi, ensure_ascii=False, indent=2))
+        print(pretty_json(openapi))
     else:
         with open(output, mode="w") as fw:
-            fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+            fw.write(pretty_json(openapi))

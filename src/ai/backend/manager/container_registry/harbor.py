@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import urllib.parse
 from typing import Any, AsyncIterator, Mapping, Optional, cast, override
@@ -12,6 +11,7 @@ import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.utils import read_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
@@ -107,7 +107,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
                     self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
                 ) as resp:
                     resp.raise_for_status()
-                    data = json.loads(await resp.read())
+                    data = await read_json(resp)
                     architecture = arch_name_aliases.get(data["architecture"], data["architecture"])
                     labels = {}
 
@@ -426,7 +426,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
             ) as resp:
                 resp.raise_for_status()
-                config_data = json.loads(await resp.read())
+                config_data = await read_json(resp)
 
         labels = {}
         if _config_labels := config_data.get("config", {}).get("Labels"):
@@ -558,7 +558,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
             ) as resp:
                 resp.raise_for_status()
-                data = json.loads(await resp.read())
+                data = await read_json(resp)
             labels = {}
             if _config_labels := data.get("config", {}).get("Labels"):
                 labels = _config_labels
@@ -612,7 +612,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
             ) as resp:
                 resp.raise_for_status()
-                data = json.loads(await resp.read())
+                data = await read_json(resp)
             labels = {}
             if _config_labels := data.get("config", {}).get("Labels"):
                 labels = _config_labels

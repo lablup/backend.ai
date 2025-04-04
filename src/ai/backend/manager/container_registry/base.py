@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
@@ -37,7 +36,7 @@ from ai.backend.common.exception import (
     ProjectMismatchWithCanonical,
 )
 from ai.backend.common.types import DispatchResult, SlotName, SSLContextType
-from ai.backend.common.utils import join_non_empty
+from ai.backend.common.utils import join_non_empty, read_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import INTRINSIC_SLOTS_MIN
@@ -272,7 +271,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         )
         while tag_list_url is not None:
             async with sess.get(tag_list_url, **rqst_args) as resp:
-                data = json.loads(await resp.read())
+                data = await read_json(resp)
                 tags_data = data.get("tags", [])
                 # sometimes there are dangling image names in the hub.
                 if not tags_data:
@@ -316,7 +315,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     return
                 content_type = resp.headers["Content-Type"]
                 resp.raise_for_status()
-                resp_json = json.loads(await resp.read())
+                resp_json = await read_json(resp)
 
                 try:
                     async with aiotools.TaskGroup() as tg:
@@ -417,7 +416,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
         ) as resp:
             resp.raise_for_status()
-            data = json.loads(await resp.read())
+            data = await read_json(resp)
         labels = {}
 
         # we should favor `config` instead of `container_config` since `config` can contain additional datas
@@ -480,7 +479,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 **rqst_args,
             ) as resp:
                 resp.raise_for_status()
-                config_data = json.loads(await resp.read())
+                config_data = await read_json(resp)
 
         labels = {}
         if _config_labels := config_data.get("config", {}).get("Labels"):
@@ -551,7 +550,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             **rqst_args,
         ) as resp:
             resp.raise_for_status()
-            blob_data = json.loads(await resp.read())
+            blob_data = await read_json(resp)
 
         manifest_arch = blob_data["architecture"]
         architecture = arch_name_aliases.get(manifest_arch, manifest_arch)

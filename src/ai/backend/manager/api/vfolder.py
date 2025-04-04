@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import json
 import logging
 import math
 import stat
@@ -60,6 +59,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.common.utils import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.storage import StorageSessionManager
 
@@ -1708,7 +1708,7 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
                 }
                 for item in result["items"]
             ],
-            "files": json.dumps([  # for legacy (to be removed in 21.03)
+            "files": dump_json_str([  # for legacy (to be removed in 21.03)
                 {
                     "filename": item["name"],
                     "size": item["stat"]["size"],

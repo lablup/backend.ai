@@ -46,6 +46,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import KernelTerminatingEvent
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
+from ai.backend.common.utils import dump_json, load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.idle import AppStreamingStatus
 
@@ -145,7 +146,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
         try:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
-                    data = json.loads(msg.data)
+                    data = load_json(msg.data)
                     if data["type"] == "stdin":
                         raw_data = base64.b64decode(data["chars"].encode("ascii"))
                         try:
@@ -246,14 +247,11 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                     continue
                 if ws.closed:
                     break
-                await ws.send_str(
-                    json.dumps(
-                        {
-                            "type": "out",
-                            "data": base64.b64encode(data[0]).decode("ascii"),
-                        },
-                        ensure_ascii=False,
-                    )
+                await ws.send_bytes(
+                    dump_json({
+                        "type": "out",
+                        "data": base64.b64encode(data[0]).decode("ascii"),
+                    })
                 )
         except asyncio.CancelledError:
             pass
@@ -588,9 +586,9 @@ async def stream_proxy(
 
         opts: MutableMapping[str, Union[None, str, List[str]]] = {}
         if params["arguments"] is not None:
-            opts["arguments"] = json.loads(params["arguments"])
+            opts["arguments"] = load_json(params["arguments"])
         if params["envs"] is not None:
-            opts["envs"] = json.loads(params["envs"])
+            opts["envs"] = load_json(params["envs"])
 
         result = await asyncio.shield(
             rpc_ptask_group.create_task(

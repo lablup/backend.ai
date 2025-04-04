@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib.resources
-import json
 import logging
 import sys
 from typing import TYPE_CHECKING, TypedDict
@@ -15,6 +14,7 @@ from alembic.runtime.migration import MigrationContext, MigrationStep
 from alembic.script import Script, ScriptDirectory
 from sqlalchemy.engine import Connection, Engine
 
+from ai.backend.common.utils import load_json, pretty_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 
@@ -119,10 +119,10 @@ def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     dump = RevisionHistory(manager_version=__version__, revisions=serialized_revisions)
 
     if output == "-" or output is None:
-        print(json.dumps(dump, ensure_ascii=False, indent=2))
+        print(pretty_json(dump))
     else:
         with open(output, mode="w") as fw:
-            fw.write(json.dumps(dump, ensure_ascii=False, indent=2))
+            fw.write(pretty_json(dump))
 
 
 @cli.command()
@@ -154,7 +154,7 @@ def apply_missing_revisions(
     ) as f:
         try:
             with open(f / f"{previous_version}.json", "r") as fr:
-                revision_history: RevisionHistory = json.loads(fr.read())
+                revision_history: RevisionHistory = load_json(fr.read())
         except FileNotFoundError:
             log.error(
                 "Could not find revision history dump as of Backend.AI version {}. Make sure you have upgraded this Backend.AI cluster to very latest version of prior major release before initiating this major upgrade.",

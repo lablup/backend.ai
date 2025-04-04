@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -28,6 +27,7 @@ from ai.backend.common.types import (
     BinarySize,
     HardwareMetadata,
 )
+from ai.backend.common.utils import dump_json_str, load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..agent import (
@@ -113,7 +113,7 @@ async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> d
     )
 
     if raw_alloc_map:
-        alloc_map = json.loads(raw_alloc_map)
+        alloc_map = load_json(raw_alloc_map)
         return UUIDFloatMap.parse_value({k: float(v) for k, v in alloc_map.items()})
     return {}
 
@@ -949,7 +949,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
                     graph_ctx.registry.redis_stat,
                     lambda r: r.setex(
                         name=key,
-                        value=json.dumps(alloc_map),
+                        value=dump_json_str(alloc_map),
                         time=GPU_ALLOC_MAP_CACHE_PERIOD,
                     ),
                 )

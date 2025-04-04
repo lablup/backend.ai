@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import sys
 from typing import TYPE_CHECKING
@@ -13,6 +12,7 @@ from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
+from ai.backend.common.utils import load_json, pretty_json
 from ai.backend.logging import BraceStyleAdapter
 
 from .context import etcd_ctx
@@ -79,7 +79,7 @@ def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
     async def _impl():
         async with etcd_ctx(cli_ctx) as etcd:
             try:
-                value = json.load(file)
+                value = load_json(file)
                 await etcd.put_prefix(key, value, scope=scope)
             except Exception:
                 log.exception("An error occurred.")
@@ -144,7 +144,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
             try:
                 if prefix:
                     data = await etcd.get_prefix(key, scope=scope)
-                    print(json.dumps(dict(data), indent=4))
+                    print(pretty_json(dict(data)))
                 else:
                     val = await etcd.get(key, scope=scope)
                     if val is None:
