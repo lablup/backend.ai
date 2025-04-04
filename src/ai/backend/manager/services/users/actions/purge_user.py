@@ -1,18 +1,22 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
-from ai.backend.common.types import Sentinel
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.users.actions.base import UserAction
 from ai.backend.manager.services.users.type import UserInfoContext
+from ai.backend.manager.types import OptionalState
 
 
 @dataclass
 class PurgeUserAction(UserAction):
     user_info_ctx: UserInfoContext
     email: str
-    purge_shared_vfolders: bool | Sentinel = False
-    delegate_endpoint_ownership: bool | Sentinel = False
+    purge_shared_vfolders: OptionalState[bool] = field(
+        default_factory=lambda: OptionalState.nop("purge_shared_vfolders")
+    )
+    delegate_endpoint_ownership: OptionalState[bool] = field(
+        default_factory=lambda: OptionalState.nop("delegate_endpoint_ownership")
+    )
 
     def entity_id(self) -> Optional[str]:
         return None

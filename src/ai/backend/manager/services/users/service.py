@@ -12,11 +12,35 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo, Sentinel, VFolderID
+from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import VFolderOperationFailed
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    VFolderDeletionInfo,
+    VFolderRow,
+    VFolderStatusSet,
+    initiate_vfolder_deletion,
+    kernels,
+    keypairs,
+    vfolder_invitations,
+    vfolder_permissions,
+    vfolder_status_map,
+    vfolders,
+)
+from ai.backend.manager.models.endpoint import (
+    EndpointLifecycle,
+    EndpointRow,
+    EndpointTokenRow,
+)
+from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
+from ai.backend.manager.models.keypair import CreateKeyPair, KeyPairRow
+from ai.backend.manager.models.session import (
+    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    SessionRow,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import (
@@ -42,6 +66,7 @@ from ai.backend.manager.services.users.actions.purge_user import (
     PurgeUserActionResult,
 )
 from ai.backend.manager.services.users.type import UserData
+from ai.backend.manager.types import State
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -69,27 +94,26 @@ class UserService:
         self._redis_stat = redis_stat
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
+        group_ids = (
+            []
+            if action.group_ids.state() == State.NOP
+            else cast(list[str], action.group_ids.value())
+        )
+
         user_data = action.get_insertion_data()
         user_insert_query = sa.insert(users).values(user_data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Optional[Row]:
-            from ai.backend.manager.models.group import (
-                ProjectType,
-                association_groups_users,
-                groups,
-            )
-
             if result.rowcount == 0:
                 return None
             created_user = result.first()
 
             # Create a default keypair for the user.
-            from ai.backend.manager.models.keypair import CreateKeyPair, keypairs
-
+            email = action.email
             kp_data = CreateKeyPair.prepare_new_keypair(
-                action.email,
+                email,
                 {
-                    "is_active": action.status == UserStatus.ACTIVE,
+                    "is_active": action.status.value() == UserStatus.ACTIVE,
                     "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
                     "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                     "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
@@ -117,9 +141,9 @@ class UserService:
                 dict[str, Any] | None, (await conn.execute(model_store_query)).first()
             )
             if model_store_project is not None:
-                gids_to_join = [*action.group_ids, model_store_project["id"]]
+                gids_to_join = [*group_ids, model_store_project["id"]]
             else:
-                gids_to_join = action.group_ids
+                gids_to_join = group_ids
 
             # Add user to groups if group_ids parameter is provided.
             if gids_to_join:
@@ -145,7 +169,7 @@ class UserService:
                 result = await conn.execute(query)
                 created_user = await _post_func(conn, result)
                 return MutationResult(
-                    success=True,
+                    success=True if created_user is not None else False,
                     message="User created successfully",
                     data=created_user,
                 )
@@ -157,14 +181,17 @@ class UserService:
         )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
-        data = action.get_modified_data()
+        data = action.get_modified_fields()
         email = action.email
+        if data.get("password") is None:
+            data.pop("password", None)
+        if not data and action.group_ids.value() is None:
+            return ModifyUserActionResult(data=None, success=False)
+        if data.get("status") is None and data.get("is_active") is not None:
+            data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
 
-        if not data and (action.group_ids != Sentinel.TOKEN and action.group_ids is None):
-            return ModifyUserActionResult(
-                success=False,
-                message="No data to update",
-            )
+        if data.get("password") is not None:
+            data["password_changed_at"] = sa.func.now()
 
         main_access_key: str | None = data.get("main_access_key")
         user_update_data: dict[str, Any] = {}
@@ -278,10 +305,9 @@ class UserService:
 
             # If domain is changed and no group is associated, clear previous domain's group.
             if prev_domain_name != updated_user.domain_name and (
-                action.group_ids == Sentinel.TOKEN or action.group_ids is None
+                action.group_ids.state() == State.NOP
+                or (action.group_ids.state() == State.UPDATE and action.group_ids.value() is None)
             ):
-                from ai.backend.manager.models import association_groups_users, groups
-
                 await conn.execute(
                     sa.delete(association_groups_users).where(
                         association_groups_users.c.user_id == updated_user.uuid
@@ -289,9 +315,9 @@ class UserService:
                 )
 
             # Update user's group if group_ids parameter is provided.
-            if action.has_group_ids and updated_user is not None:
-                from ai.backend.manager.models import association_groups_users, groups  # noqa
-
+            if (
+                action.group_ids.state() == State.UPDATE and action.group_ids.value() is not None
+            ) and updated_user is not None:
                 # Clear previous groups associated with the user.
                 await conn.execute(
                     sa.delete(association_groups_users).where(
@@ -303,7 +329,7 @@ class UserService:
                     sa.select([groups.c.id])
                     .select_from(groups)
                     .where(groups.c.domain_name == updated_user.domain_name)
-                    .where(groups.c.id.in_(action.group_ids)),
+                    .where(groups.c.id.in_(action.group_ids.value())),
                 )
                 grps = result.fetchall()
                 if grps:
@@ -337,8 +363,6 @@ class UserService:
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
         async def _pre_func(conn: SAConnection) -> None:
             # Make all user keypairs inactive.
-            from ai.backend.manager.models import keypairs
-
             await conn.execute(
                 sa.update(keypairs)
                 .values(is_active=False)
@@ -386,16 +410,20 @@ class UserService:
                     "Terminate those kernels first.",
                 )
 
-            if not action.purge_shared_vfolders:
+            if (
+                action.purge_shared_vfolders.state() == State.UPDATE
+                and not action.purge_shared_vfolders.value()
+            ):
                 await self.migrate_shared_vfolders(
                     conn,
                     deleted_user_uuid=user_uuid,
                     target_user_uuid=action.user_info_ctx.uuid,
                     target_user_email=action.user_info_ctx.email,
                 )
-            if action.delegate_endpoint_ownership:
-                from ai.backend.manager.models.endpoint import EndpointRow
-
+            if (
+                action.delegate_endpoint_ownership.state() == State.UPDATE
+                and action.delegate_endpoint_ownership.value()
+            ):
                 await EndpointRow.delegate_endpoint_ownership(
                     db_session,
                     user_uuid,
@@ -438,8 +466,6 @@ class UserService:
 
         :return: number of deleted rows
         """
-        from ai.backend.manager.models import vfolder_invitations, vfolder_permissions, vfolders
-
         # Gather target user's virtual folders' names.
         query = (
             sa.select([vfolders.c.name])
@@ -520,15 +546,6 @@ class UserService:
 
         :return: number of deleted rows
         """
-        from ai.backend.manager.models import (
-            VFolderDeletionInfo,
-            VFolderRow,
-            VFolderStatusSet,
-            initiate_vfolder_deletion,
-            vfolder_permissions,
-            vfolder_status_map,
-        )
-
         target_vfs: list[VFolderDeletionInfo] = []
         async with engine.begin_session() as db_session:
             await db_session.execute(
@@ -577,11 +594,6 @@ class UserService:
 
         :return: True if a virtual folder is mounted to active kernels.
         """
-        from ai.backend.manager.models import (
-            AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-            kernels,
-            vfolders,
-        )
 
         result = await conn.execute(
             sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.user == user_uuid),
@@ -611,11 +623,6 @@ class UserService:
         """
         Check if the user does not have active sessions.
         """
-        from ai.backend.manager.models.session import (
-            AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-            SessionRow,
-        )
-
         active_session_count = await db_session.scalar(
             sa.select(sa.func.count())
             .select_from(SessionRow)
@@ -638,12 +645,6 @@ class UserService:
         """
         Delete user's all endpoint.
         """
-        from ai.backend.manager.models.endpoint import (
-            EndpointLifecycle,
-            EndpointRow,
-            EndpointTokenRow,
-        )
-
         if delete_destroyed_only:
             status_filter = {EndpointLifecycle.DESTROYED}
         else:
@@ -675,8 +676,6 @@ class UserService:
         :param user_uuid: user's UUID to delete error logs
         :return: number of deleted rows
         """
-        from ai.backend.manager.models.error_logs import error_logs
-
         result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
         if result.rowcount > 0:
             log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
@@ -708,8 +707,6 @@ class UserService:
         :param user_uuid: user's UUID to delete keypairs
         :return: number of deleted rows
         """
-        from ai.backend.manager.models import keypairs
-
         ak_rows = await conn.execute(
             sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
         )

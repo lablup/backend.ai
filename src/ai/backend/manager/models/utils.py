@@ -24,6 +24,7 @@ from typing import (
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
+from graphql import Undefined
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
@@ -43,6 +44,7 @@ from tenacity import (
 
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.types import State
 
 if TYPE_CHECKING:
     from ..config import LocalConfig
@@ -550,3 +552,12 @@ async def vacuum_db(
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             await conn.exec_driver_sql(vacuum_sql)
+
+
+def define_state(value: Any) -> State:
+    if value is None:
+        return State.NULLIFY
+    elif value is Undefined:
+        return State.NOP
+    else:
+        return State.UPDATE

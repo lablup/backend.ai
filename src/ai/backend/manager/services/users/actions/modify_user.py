@@ -1,36 +1,58 @@
-from dataclasses import dataclass
-from typing import Any, Optional, override
+from dataclasses import dataclass, field, fields
+from typing import Any, Optional, cast, override
 
-import sqlalchemy as sa
-
-from ai.backend.common.types import Sentinel
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.users.actions.base import UserAction
 from ai.backend.manager.services.users.type import UserData
+from ai.backend.manager.types import OptionalState, State
 
 
 @dataclass
 class ModifyUserAction(UserAction):
     email: str
-    username: str | Sentinel = Sentinel.TOKEN
-    password: str | Sentinel = Sentinel.TOKEN
-    need_password_change: bool | Sentinel = Sentinel.TOKEN
-    full_name: str | Sentinel = Sentinel.TOKEN
-    description: str | Sentinel = Sentinel.TOKEN
-    is_active: bool | Sentinel = Sentinel.TOKEN
-    status: UserStatus | Sentinel = Sentinel.TOKEN
-    domain_name: str | Sentinel = Sentinel.TOKEN
-    role: UserRole | Sentinel = Sentinel.TOKEN
-    group_ids: list[str] | Sentinel = Sentinel.TOKEN
-    allowed_client_ip: Optional[list[str]] | Sentinel = Sentinel.TOKEN
-    totp_activated: bool | Sentinel = False
-    resource_policy: str | Sentinel = Sentinel.TOKEN
-    sudo_session_enabled: bool | Sentinel = False
-    main_access_key: Optional[str] | Sentinel = Sentinel.TOKEN
-    container_uid: Optional[int] | Sentinel = Sentinel.TOKEN
-    container_main_gid: Optional[int] | Sentinel = Sentinel.TOKEN
-    container_gids: Optional[list[int]] | Sentinel = Sentinel.TOKEN
+    username: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("username"))
+    password: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("password"))
+    need_password_change: OptionalState[bool] = field(
+        default_factory=lambda: OptionalState.nop("need_password_change")
+    )
+    full_name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("full_name"))
+    description: OptionalState[str] = field(
+        default_factory=lambda: OptionalState.nop("description")
+    )
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    status: OptionalState[UserStatus] = field(default_factory=lambda: OptionalState.nop("status"))
+    domain_name: OptionalState[str] = field(
+        default_factory=lambda: OptionalState.nop("domain_name")
+    )
+    role: OptionalState[UserRole] = field(default_factory=lambda: OptionalState.nop("role"))
+    group_ids: OptionalState[Optional[list[str]]] = field(
+        default_factory=lambda: OptionalState.nop("group_ids")
+    )
+    allowed_client_ip: OptionalState[Optional[list[str]]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_client_ip")
+    )
+    totp_activated: OptionalState[bool] = field(
+        default_factory=lambda: OptionalState.nop("totp_activated")
+    )
+    resource_policy: OptionalState[str] = field(
+        default_factory=lambda: OptionalState.nop("resource_policy")
+    )
+    sudo_session_enabled: OptionalState[bool] = field(
+        default_factory=lambda: OptionalState.nop("sudo_session_enabled")
+    )
+    main_access_key: OptionalState[Optional[str]] = field(
+        default_factory=lambda: OptionalState.nop("main_access_key")
+    )
+    container_uid: OptionalState[Optional[int]] = field(
+        default_factory=lambda: OptionalState.nop("container_uid")
+    )
+    container_main_gid: OptionalState[Optional[int]] = field(
+        default_factory=lambda: OptionalState.nop("container_main_gid")
+    )
+    container_gids: OptionalState[Optional[list[int]]] = field(
+        default_factory=lambda: OptionalState.nop("container_gids")
+    )
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -40,23 +62,15 @@ class ModifyUserAction(UserAction):
     def operation_type(self) -> str:
         return "modify"
 
-    def get_modified_data(self) -> dict[str, Any]:
-        sanitized_data = {k: v for k, v in self.__dict__.items() if v is not Sentinel.TOKEN}
-
-        if hasattr(sanitized_data, "password") and sanitized_data["password"] is None:
-            sanitized_data.pop("password", None)
-        if hasattr(sanitized_data, "status") and sanitized_data["is_activate"] is None:
-            sanitized_data["status"] = (
-                UserStatus.ACTIVE if sanitized_data["is_active"] else UserStatus.INACTIVE
-            )
-        if hasattr(sanitized_data, "password") and sanitized_data["password"] is not None:
-            sanitized_data["password_changed_at"] = sa.func.now()
-
-        return sanitized_data
-
-    @property
-    def has_group_ids(self) -> bool:
-        return (self.group_ids != Sentinel.TOKEN) and (self.group_ids is not None)
+    def get_modified_fields(self) -> dict[str, Any]:
+        result = {}
+        for f in fields(self):
+            if f.name == "email":
+                continue
+            field_value: OptionalState = getattr(self, f.name)
+            if field_value.state() != State.NOP:
+                result[f.name] = cast(Any, field_value.value())
+        return result
 
 
 @dataclass

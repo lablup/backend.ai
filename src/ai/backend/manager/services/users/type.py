@@ -23,8 +23,8 @@ class UserData:
     username: str
     email: str
     need_password_change: bool
-    full_name: str
-    description: str
+    full_name: Optional[str]
+    description: Optional[str]
     is_active: bool  # legacy
     status: str
     status_info: Optional[str]

@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-from ai.backend.common.types import Sentinel
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.users.actions.base import UserAction
 from ai.backend.manager.services.users.type import UserData
+from ai.backend.manager.types import OptionalState, State
 
 
 @dataclass
@@ -14,24 +14,46 @@ class CreateUserAction(UserAction):
     password: str
     email: str
     need_password_change: bool
-    full_name: str = ""
-    description: str = ""
-    is_active: Optional[bool] = True
-    status: Optional[UserStatus] = UserStatus.ACTIVE
-    domain_name: str = "default"
-    role: UserRole = UserRole.USER
-    allowed_client_ip: Optional[str] = None
-    totp_activated: bool = False
-    resource_policy: str = "default"
-    sudo_session_enabled: bool = False
-    group_ids: list[str] = field(default_factory=list)
-    container_uid: Optional[int] | Sentinel = Sentinel.TOKEN
-    container_main_gid: Optional[int] | Sentinel = Sentinel.TOKEN
-    container_gids: Optional[list[int]] | Sentinel = Sentinel.TOKEN
+    domain_name: str
+    full_name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("full_name"))
+    description: OptionalState[str] = field(
+        default_factory=lambda: OptionalState.nop("description")
+    )
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    status: OptionalState[UserStatus] = field(default_factory=lambda: OptionalState.nop("status"))
+    role: OptionalState[UserRole] = field(default_factory=lambda: OptionalState.nop("role"))
+    allowed_client_ip: OptionalState[Optional[str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_client_ip")
+    )
+    totp_activated: OptionalState[bool] = field(
+        default_factory=lambda: OptionalState.nop("totp_activated")
+    )
+    resource_policy: OptionalState[str] = field(
+        default_factory=lambda: OptionalState.nop("resource_policy")
+    )
+    sudo_session_enabled: OptionalState[bool] = field(
+        default_factory=lambda: OptionalState.nop("sudo_session_enabled")
+    )
+    group_ids: OptionalState[list[str]] = field(
+        default_factory=lambda: OptionalState.nop("group_ids")
+    )
+    container_uid: OptionalState[Optional[int]] = field(
+        default_factory=lambda: OptionalState.nop("container_uid")
+    )
+    container_main_gid: OptionalState[Optional[int]] = field(
+        default_factory=lambda: OptionalState.nop("container_main_gid")
+    )
+    container_gids: OptionalState[Optional[list[int]]] = field(
+        default_factory=lambda: OptionalState.nop("container_gids")
+    )
 
     def __post_init__(self) -> None:
-        if self.status is None and self.is_active is not None:
-            self.status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
+        if self.status.state() == State.NOP and self.is_active.state() == State.UPDATE:
+            self.status = (
+                OptionalState.update("status", UserStatus.ACTIVE)
+                if self.is_active.value()
+                else OptionalState.update("status", UserStatus.INACTIVE)
+            )
 
     def entity_id(self) -> Optional[str]:
         return None
@@ -41,34 +63,34 @@ class CreateUserAction(UserAction):
 
     def get_insertion_data(self) -> dict[str, Any]:
         username = self.username if self.username else self.email
-        if self.status is None and self.is_active is not None:
-            self.status = UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
 
         user_data = {
             "username": username,
             "email": self.email,
             "password": self.password,
             "need_password_change": self.need_password_change,
-            "full_name": self.full_name,
-            "description": self.description,
-            "status": self.status,
-            "status_info": "admin-requested",  # user mutation is only for admin
             "domain_name": self.domain_name,
-            "role": self.role,
-            "allowed_client_ip": self.allowed_client_ip,
-            "totp_activated": self.totp_activated,
-            "resource_policy": self.resource_policy,
-            "sudo_session_enabled": self.sudo_session_enabled,
+            "status_info": "admin-requested",  # user mutation is only for admin
         }
 
-        if self.container_uid is not Sentinel.TOKEN:
-            user_data["container_uid"] = self.container_uid
+        optional_fields = [
+            "full_name",
+            "description",
+            "status",
+            "role",
+            "allowed_client_ip",
+            "totp_activated",
+            "resource_policy",
+            "sudo_session_enabled",
+            "container_uid",
+            "container_main_gid",
+            "container_gids",
+        ]
 
-        if self.container_main_gid is not Sentinel.TOKEN:
-            user_data["container_main_gid"] = self.container_main_gid
-
-        if self.container_gids is not Sentinel.TOKEN:
-            user_data["container_gids"] = self.container_gids
+        for field_name in optional_fields:
+            field_value: OptionalState = getattr(self, field_name)
+            if field_value.state() != State.NOP:
+                user_data[field_name] = cast(Any, field_value.value())
 
         return user_data
 

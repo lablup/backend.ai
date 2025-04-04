@@ -11,6 +11,7 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -20,8 +21,9 @@ from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo, Sentinel, VFolderID
+from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.types import OptionalState
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
@@ -37,7 +39,7 @@ from .base import (
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from .utils import ExtendedAsyncSAEngine, define_state, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.users.actions.create_user import (
@@ -666,48 +668,81 @@ class UserInput(graphene.InputObjectType):
     # When modifying, set the field to "None" to skip setting the value.
 
     def to_action(self, email: str) -> CreateUserAction:
-        action = CreateUserAction(
+        def value_or_none(value: Any) -> Optional[Any]:
+            return value if value is not Undefined else None
+
+        return CreateUserAction(
             username=self.username,
             password=self.password,
             email=email,
             need_password_change=self.need_password_change,
             domain_name=self.domain_name,
+            full_name=OptionalState(
+                "full_name",
+                define_state(self.full_name),
+                value_or_none(self.full_name),
+            ),
+            description=OptionalState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active",
+                define_state(self.is_active),
+                value_or_none(self.is_active),
+            ),
+            status=OptionalState(
+                "status",
+                define_state(self.status),
+                UserStatus(self.status) if self.status is not Undefined else None,
+            ),
+            role=OptionalState(
+                "role",
+                define_state(self.role),
+                UserRole(self.role) if self.role is not Undefined else None,
+            ),
+            allowed_client_ip=OptionalState(
+                "allowed_client_ip",
+                define_state(self.allowed_client_ip),
+                value_or_none(self.allowed_client_ip),
+            ),
+            totp_activated=OptionalState(
+                "totp_activated",
+                define_state(self.totp_activated),
+                value_or_none(self.totp_activated),
+            ),
+            resource_policy=OptionalState(
+                "resource_policy",
+                define_state(self.resource_policy),
+                value_or_none(self.resource_policy),
+            ),
+            sudo_session_enabled=OptionalState(
+                "sudo_session_enabled",
+                define_state(self.sudo_session_enabled),
+                value_or_none(self.sudo_session_enabled),
+            ),
+            group_ids=OptionalState(
+                "group_ids",
+                define_state(self.group_ids),
+                value_or_none(self.group_ids),
+            ),
+            container_uid=OptionalState(
+                "container_uid",
+                define_state(self.container_uid),
+                value_or_none(self.container_uid),
+            ),
+            container_main_gid=OptionalState(
+                "container_main_gid",
+                define_state(self.container_main_gid),
+                value_or_none(self.container_main_gid),
+            ),
+            container_gids=OptionalState(
+                "container_gids",
+                define_state(self.container_gids),
+                value_or_none(self.container_gids),
+            ),
         )
-
-        if hasattr(self, "full_name"):
-            action.full_name = self.full_name
-        if hasattr(self, "description"):
-            action.description = self.description
-        if hasattr(self, "is_active"):
-            action.is_active = self.is_active
-        if hasattr(self, "status"):
-            action.status = UserStatus(self.status)
-        if hasattr(self, "role"):
-            action.role = UserRole(self.role)
-        if hasattr(self, "group_ids"):
-            action.group_ids = self.group_ids
-        if hasattr(self, "group_ids"):
-            action.group_ids = self.group_ids
-        if hasattr(self, "allowed_client_ip"):
-            action.allowed_client_ip = self.allowed_client_ip
-        if hasattr(self, "totp_activated"):
-            action.totp_activated = self.totp_activated
-        if hasattr(self, "resource_policy"):
-            action.resource_policy = self.resource_policy
-        if hasattr(self, "sudo_session_enabled"):
-            action.sudo_session_enabled = self.sudo_session_enabled
-
-        action.container_uid = (
-            self.container_uid if hasattr(self, "container_uid") else Sentinel.TOKEN
-        )
-        action.container_main_gid = (
-            self.container_main_gid if hasattr(self, "container_main_gid") else Sentinel.TOKEN
-        )
-        action.container_gids = (
-            self.container_gids if hasattr(self, "container_gids") else Sentinel.TOKEN
-        )
-
-        return action
 
 
 class ModifyUserInput(graphene.InputObjectType):
@@ -741,39 +776,102 @@ class ModifyUserInput(graphene.InputObjectType):
     )
 
     def to_action(self, email) -> ModifyUserAction:
-        fields = {}
+        def value_or_none(value: Any) -> Optional[Any]:
+            return value if value is not Undefined else None
 
-        for field in [
-            "username",
-            "password",
-            "need_password_change",
-            "full_name",
-            "description",
-            "is_active",
-            "status",
-            "domain_name",
-            "role",
-            "group_ids",
-            "allowed_client_ip",
-            "totp_activated",
-            "resource_policy",
-            "sudo_session_enabled",
-            "main_access_key",
-            "container_uid",
-            "container_main_gid",
-            "container_gids",
-        ]:
-            if hasattr(self, field):
-                value = getattr(self, field)
-                if field == "status":
-                    value = UserStatus(value)
-                elif field == "role":
-                    value = UserRole(value)
-                fields[field] = value
-            else:
-                fields[field] = Sentinel.TOKEN
-
-        return ModifyUserAction(email=email, **fields)
+        return ModifyUserAction(
+            email=email,
+            username=OptionalState(
+                "username",
+                define_state(self.username),
+                value_or_none(self.username),
+            ),
+            password=OptionalState(
+                "password",
+                define_state(self.password),
+                value_or_none(self.password),
+            ),
+            need_password_change=OptionalState(
+                "need_password_change",
+                define_state(self.need_password_change),
+                value_or_none(self.need_password_change),
+            ),
+            full_name=OptionalState(
+                "full_name",
+                define_state(self.full_name),
+                value_or_none(self.full_name),
+            ),
+            description=OptionalState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active",
+                define_state(self.is_active),
+                value_or_none(self.is_active),
+            ),
+            status=OptionalState(
+                "status",
+                define_state(self.status),
+                UserStatus(self.status) if self.status is not Undefined else None,
+            ),
+            domain_name=OptionalState(
+                "domain_name",
+                define_state(self.domain_name),
+                value_or_none(self.domain_name),
+            ),
+            role=OptionalState(
+                "role",
+                define_state(self.role),
+                UserRole(self.role) if self.role is not Undefined else None,
+            ),
+            group_ids=OptionalState(
+                "group_ids",
+                define_state(self.group_ids),
+                value_or_none(self.group_ids),
+            ),
+            allowed_client_ip=OptionalState(
+                "allowed_client_ip",
+                define_state(self.allowed_client_ip),
+                value_or_none(self.allowed_client_ip),
+            ),
+            totp_activated=OptionalState(
+                "totp_activated",
+                define_state(self.totp_activated),
+                value_or_none(self.totp_activated),
+            ),
+            resource_policy=OptionalState(
+                "resource_policy",
+                define_state(self.resource_policy),
+                value_or_none(self.resource_policy),
+            ),
+            sudo_session_enabled=OptionalState(
+                "sudo_session_enabled",
+                define_state(self.sudo_session_enabled),
+                value_or_none(self.sudo_session_enabled),
+            ),
+            main_access_key=OptionalState(
+                "main_access_key",
+                define_state(self.main_access_key),
+                value_or_none(self.main_access_key),
+            ),
+            container_uid=OptionalState(
+                "container_uid",
+                define_state(self.container_uid),
+                value_or_none(self.container_uid),
+            ),
+            container_main_gid=OptionalState(
+                "container_main_gid",
+                define_state(self.container_main_gid),
+                value_or_none(self.container_main_gid),
+            ),
+            container_gids=OptionalState(
+                "container_gids",
+                define_state(self.container_gids),
+                value_or_none(self.container_gids),
+            ),
+        )
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -791,12 +889,18 @@ class PurgeUserInput(graphene.InputObjectType):
         return PurgeUserAction(
             user_info_ctx=user_info_ctx,
             email=email,
-            purge_shared_vfolders=self.purge_shared_vfolders
-            if hasattr(self, "purge_shared_vfolders")
-            else False,
-            delegate_endpoint_ownership=self.delegate_endpoint_ownership
-            if hasattr(self, "delegate_endpoint_ownership")
-            else False,
+            purge_shared_vfolders=OptionalState(
+                "purge_shared_vfolders",
+                define_state(self.purge_shared_vfolders),
+                self.purge_shared_vfolders if self.purge_shared_vfolders is not Undefined else None,
+            ),
+            delegate_endpoint_ownership=OptionalState(
+                "delegate_endpoint_ownership",
+                define_state(self.delegate_endpoint_ownership),
+                self.delegate_endpoint_ownership
+                if self.delegate_endpoint_ownership is not Undefined
+                else None,
+            ),
         )
 
 
