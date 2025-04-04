@@ -30,6 +30,7 @@ from ai.backend.manager.services.groups.actions.purge_group import (
 from ai.backend.manager.services.groups.processors import GroupProcessors
 from ai.backend.manager.services.groups.service import GroupService
 from ai.backend.manager.services.groups.types import GroupData
+from ai.backend.manager.types import OptionalState
 
 from .test_utils import TestScenario
 
@@ -86,8 +87,12 @@ async def create_group(
             "Create a group",
             CreateGroupAction(
                 name="test_create_group",
-                type=ProjectType.GENERAL,
-                description="test group description",
+                type=OptionalState.update("type", ProjectType.GENERAL),
+                description=OptionalState.update("description", "test group description"),
+                resource_policy=OptionalState.update("resource_policy", "default"),
+                total_resource_slots=OptionalState.update(
+                    "total_resource_slots", ResourceSlot.from_user_input({}, None)
+                ),
                 domain_name="default",
             ),
             CreateGroupActionResult(
@@ -98,7 +103,7 @@ async def create_group(
                     is_active=True,
                     created_at=datetime.now(),
                     modified_at=datetime.now(),
-                    integration_id="",
+                    integration_id=None,
                     domain_name="default",
                     total_resource_slots=ResourceSlot.from_user_input({}, None),
                     allowed_vfolder_hosts=VFolderHostPermissionMap({}),
@@ -116,8 +121,29 @@ async def create_group(
             "Create a group with duplicated name",
             CreateGroupAction(
                 name="default",
-                type=ProjectType.GENERAL,
-                description="duplicate group name",
+                type=OptionalState.update("type", ProjectType.GENERAL),
+                description=OptionalState.update("description", "duplicate group"),
+                resource_policy=OptionalState.update("resource_policy", "default"),
+                total_resource_slots=OptionalState.update(
+                    "total_resource_slots", ResourceSlot.from_user_input({}, None)
+                ),
+                domain_name="default",
+            ),
+            CreateGroupActionResult(
+                data=None,
+                success=False,
+            ),
+        ),
+        TestScenario.success(
+            "Create a group without resource policy",
+            CreateGroupAction(
+                name="test_create_group_without_resource_policy",
+                type=OptionalState.update("type", ProjectType.GENERAL),
+                description=OptionalState.update("description", "test group description"),
+                resource_policy=OptionalState.update("resource_policy", ""),
+                total_resource_slots=OptionalState.update(
+                    "total_resource_slots", ResourceSlot.from_user_input({}, None)
+                ),
                 domain_name="default",
             ),
             CreateGroupActionResult(
@@ -144,9 +170,9 @@ async def test_modify_group(
     ) as group_id:
         action = ModifyGroupAction(
             group_id=group_id,
-            name="modified_name",
-            description="modified description",
-            is_active=False,
+            name=OptionalState.update("name", "modified_name"),
+            description=OptionalState.update("description", "modified description"),
+            is_active=OptionalState.update("is_active", False),
         )
         result: ModifyGroupActionResult = await processors.modify_group.wait_for_complete(action)
         group_data: Optional[GroupData] = result.data
@@ -162,9 +188,9 @@ async def test_modify_group_with_invalid_group_id(
 ) -> None:
     action = ModifyGroupAction(
         group_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
-        name="modified_name",
-        description="modified description",
-        is_active=False,
+        name=OptionalState.update("name", "modified_name"),
+        description=OptionalState.update("description", "modified description"),
+        is_active=OptionalState.update("is_active", False),
     )
     result: ModifyGroupActionResult = await processors.modify_group.wait_for_complete(action)
     assert result.data is None
