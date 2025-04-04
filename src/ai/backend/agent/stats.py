@@ -513,7 +513,7 @@ class StatContext:
                 session_id=session_id,
                 owner_user_id=owner_user_id,
                 owner_project_id=owner_project_id,
-                scoped_project_id=None,
+                scoped_project_id=None,  # TODO: Pass project id to kernels
                 key=metric_key,
                 value_pairs=value_pairs,
             )
