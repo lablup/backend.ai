@@ -103,10 +103,6 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
     StartServiceActionResult,
 )
-from ai.backend.manager.services.session.actions.sync_agent_registry import (
-    SyncAgentRegistryAction,
-    SyncAgentRegistryActionResult,
-)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -149,7 +145,6 @@ class SessionProcessors:
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
-    sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     modify_compute_session: ActionProcessor[
         ModifyComputeSessionAction, ModifyComputeSessionActionResult
@@ -183,7 +178,6 @@ class SessionProcessors:
         self.restart_session = ActionProcessor(service.restart_session)
         self.shutdown_service = ActionProcessor(service.shutdown_service)
         self.start_service = ActionProcessor(service.start_service)
-        self.sync_agent_registry = ActionProcessor(service.sync_agent_registry)
         self.upload_files = ActionProcessor(service.upload_files)
         self.modify_compute_session = ActionProcessor(service.modify_compute_session)
         self.check_and_transit_status = ActionProcessor(service.check_and_transit_status)
