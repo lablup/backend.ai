@@ -1,4 +1,5 @@
 """Ensure AuditLogs table exists
+
 Revision ID: c4ea15b77136
 Revises: 683ca0a32f41
 Create Date: 2025-04-04 01:11:07.003523
