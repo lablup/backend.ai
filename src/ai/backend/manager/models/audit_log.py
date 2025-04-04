@@ -4,7 +4,6 @@ import enum
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
 
 import sqlalchemy as sa
 
@@ -18,6 +17,8 @@ from .base import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+__all__ = ("AuditLogRow",)
 
 
 class AuditLogEntityType(enum.StrEnum):
@@ -72,8 +73,8 @@ class AuditLogRow(Base):
         request_id: uuid.UUID,
         description: str,
         duration: timedelta,
-        created_at: Optional[datetime] = None,
-        status: OperationStatus = OperationStatus.UNKNOWN,
+        created_at: datetime,
+        status: OperationStatus,
     ):
         self.entity_type = entity_type.value
         self.operation = operation
