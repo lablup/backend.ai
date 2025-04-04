@@ -503,7 +503,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         )
     )
 
-    return web.json_response(result.result, status=201)
+    return web.json_response(result.result, status=HTTPStatus.CREATED)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -643,7 +643,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
         )
     )
 
-    return web.json_response(result.result, status=201)
+    return web.json_response(result.result, status=HTTPStatus.CREATED)
 
 
 @server_status_required(ALL_ALLOWED)
