@@ -19,7 +19,7 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from graphql import Undefined
+from graphql import Undefined, UndefinedType
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
@@ -1085,7 +1085,7 @@ class ModifyImageInput(graphene.InputObjectType):
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
     def to_dataclass(self) -> ModifyImageInputData:
-        resources_data = None
+        resources_data: dict[str, Any] | UndefinedType = Undefined
         if self.resource_limits is not Undefined:
             resources_data = {}
             for limit_option in self.resource_limits:
