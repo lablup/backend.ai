@@ -468,7 +468,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         domain=domain_processor,
         user=user_processor,
         image=image_processor,
-        container_registry_service=container_registry_processor,
+        container_registry=container_registry_processor,
     )
     yield
 
