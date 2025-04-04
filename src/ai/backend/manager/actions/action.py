@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, Mapping, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 
 class BaseAction(ABC):
@@ -24,16 +24,6 @@ class BaseActionResult(ABC):
         raise NotImplementedError
 
 
-class BaseBatchActionResult(ABC):
-    @abstractmethod
-    def entity_ids(self) -> list[str]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def statuses(self) -> Mapping[str, str]:
-        raise NotImplementedError
-
-
 @dataclass
 class BaseActionResultMeta:
     status: str
@@ -50,4 +40,4 @@ TActionResult = TypeVar("TActionResult", bound=BaseActionResult)
 @dataclass
 class ProcessResult(Generic[TActionResult]):
     meta: BaseActionResultMeta
-    result: TActionResult
+    result: Optional[TActionResult]
