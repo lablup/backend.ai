@@ -149,6 +149,8 @@ __all__ = (
 
 
 if TYPE_CHECKING:
+    from ai.backend.common.data.vfolder.types import VFolderMountData
+
     from .docker import ImageRef
 
 
@@ -1093,8 +1095,33 @@ class VFolderMount(JSONSerializableMixin):
         }
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> VFolderMount:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def from_dataclass(cls, obj: VFolderMountData) -> Self:
+        return cls(
+            name=obj.name,
+            vfid=obj.vfid,
+            vfsubpath=obj.vfsubpath,
+            host_path=obj.host_path,
+            kernel_path=obj.kernel_path,
+            mount_perm=obj.mount_perm,
+            usage_mode=obj.usage_mode,
+        )
+
+    def to_dataclass(self) -> VFolderMountData:
+        from ai.backend.common.data.vfolder.types import VFolderMountData
+
+        return VFolderMountData(
+            name=self.name,
+            vfid=self.vfid,
+            vfsubpath=self.vfsubpath,
+            host_path=self.host_path,
+            kernel_path=self.kernel_path,
+            mount_perm=self.mount_perm,
+            usage_mode=self.usage_mode,
+        )
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
