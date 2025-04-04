@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, Mapping, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 
 class BaseAction(ABC):
