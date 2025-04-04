@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import json
 import logging
 import math
 import stat
@@ -51,6 +50,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -1708,7 +1708,7 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
                 }
                 for item in result["items"]
             ],
-            "files": json.dumps([  # for legacy (to be removed in 21.03)
+            "files": dump_json_str([  # for legacy (to be removed in 21.03)
                 {
                     "filename": item["name"],
                     "size": item["stat"]["size"],

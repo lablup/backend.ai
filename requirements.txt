@@ -46,6 +46,7 @@ msgpack~=1.1.0
 multidict>=6.1
 namedlist~=1.8
 networkx~=3.3.0
+orjson~=3.10.16
 pexpect~=4.8
 prometheus-client~=0.21.1
 psutil~=6.0
