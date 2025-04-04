@@ -8,7 +8,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 @dataclass
 class ContainerRegistryData:
     id: uuid.UUID
-    url: str  # TODO: yarl.URL?
+    url: str
     registry_name: str
     type: ContainerRegistryType
     project: Optional[str]
@@ -16,4 +16,5 @@ class ContainerRegistryData:
     password: Optional[str]
     ssl_verify: Optional[bool]
     is_global: Optional[bool]
+    # TODO: Add proper type
     extra: Optional[dict[str, Any]]
