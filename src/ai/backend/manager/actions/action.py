@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, Optional, TypeVar
 
+from ai.backend.manager.models.audit_log import OperationStatus
+
 
 class BaseAction(ABC):
     @abstractmethod
@@ -46,7 +48,7 @@ class BaseBatchActionResult(ABC):
 
 @dataclass
 class BaseActionResultMeta:
-    status: str
+    status: OperationStatus
     description: str
     started_at: datetime
     end_at: datetime
