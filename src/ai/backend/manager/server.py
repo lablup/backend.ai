@@ -482,6 +482,9 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         background_task_manager=root_ctx.background_task_manager,
         error_monitor=root_ctx.error_monitor,
         idle_checker_host=root_ctx.idle_checker_host,
+    )
+    vfolder_service = VFolderService(
+        db=root_ctx.db,
         storage_manager=root_ctx.storage_manager,
     )
     vfolder_processor = VFolderBaseProcessors(vfolder_service)

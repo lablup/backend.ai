@@ -5,11 +5,11 @@ from typing import Any, Optional, override
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.vfolder.base import VFolderAction
 
 
 @dataclass
-class GetTaskLogsAction(SessionAction):
+class GetTaskLogsAction(VFolderAction):
     user_id: uuid.UUID
     domain_name: str
     user_role: UserRole
@@ -34,9 +34,9 @@ class GetTaskLogsAction(SessionAction):
 class GetTaskLogsActionResult(BaseActionResult):
     # TODO: Add proper type
     response: Any
-    # session_row: SessionRow
+    # vfolder_row: VFolderRow
+    vfolder_row: Any
 
     @override
     def entity_id(self) -> Optional[str]:
-        # return str(self.session_row.id)
-        return None
+        return str(self.vfolder_row.id)

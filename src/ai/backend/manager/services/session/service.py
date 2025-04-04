@@ -6,7 +6,6 @@ import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta
-from pathlib import PurePosixPath
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Union, cast
 from urllib.parse import urlparse
 
@@ -16,7 +15,6 @@ import attrs
 import multidict
 import sqlalchemy as sa
 import trafaret as t
-from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,19 +41,16 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     SessionId,
     SessionTypes,
-    VFolderID,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
     AppNotFound,
     GenericForbidden,
     InternalServerError,
-    ObjectNotFound,
     QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
-    StorageProxyError,
     TaskTemplateNotFound,
     TooManySessionsMatched,
     UnknownImageReferenceError,
@@ -69,7 +64,7 @@ from ai.backend.manager.api.session import (
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import catch_unexpected, undefined
-from ai.backend.manager.config import DEFAULT_CHUNK_SIZE, LocalConfig
+from ai.backend.manager.config import LocalConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -93,7 +88,6 @@ from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
-from ai.backend.manager.models.vfolder import is_unmanaged, query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
@@ -162,10 +156,6 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
-)
-from ai.backend.manager.services.session.actions.get_task_logs import (
-    GetTaskLogsAction,
-    GetTaskLogsActionResult,
 )
 from ai.backend.manager.services.session.actions.interrupt import (
     InterruptAction,
@@ -320,7 +310,6 @@ class SessionService:
         background_task_manager: BackgroundTaskManager,
         error_monitor: ErrorPluginContext,
         idle_checker_host: IdleCheckerHost,
-        storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -331,7 +320,6 @@ class SessionService:
         self._background_task_manager = background_task_manager
         self._error_monitor = error_monitor
         self._idle_checker_host = idle_checker_host
-        self._storage_manager = storage_manager
         self.init_app_ctx()
 
     def init_app_ctx(self) -> None:
@@ -1445,68 +1433,6 @@ class SessionService:
         # TODO: factor out policy/image info as a common repository
 
         return GetSessionInfoActionResult(result=resp, session_row=sess)
-
-    async def get_task_logs(self, action: GetTaskLogsAction) -> GetTaskLogsActionResult:
-        user_uuid = action.user_id
-        user_role = action.user_role
-        domain_name = action.domain_name
-        kernel_id_str = action.kernel_id
-        request = action.request
-
-        async with self._db.begin_readonly() as conn:
-            matched_vfolders = await query_accessible_vfolders(
-                conn,
-                user_uuid,
-                user_role=user_role,
-                domain_name=domain_name,
-                allowed_vfolder_types=["user"],
-                extra_vf_conds=(vfolders.c.name == ".logs"),
-            )
-            if not matched_vfolders:
-                raise ObjectNotFound(
-                    extra_data={"vfolder_name": ".logs"},
-                    object_name="vfolder",
-                )
-            log_vfolder = matched_vfolders[0]
-
-        _proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
-        )
-        response = web.StreamResponse(status=200)
-        response.headers[hdrs.CONTENT_TYPE] = "text/plain"
-        prepared = False
-
-        try:
-            async with self._storage_manager.request(
-                log_vfolder["host"],
-                "POST",
-                "folder/file/fetch",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(VFolderID.from_row(log_vfolder)),
-                    "relpath": str(
-                        PurePosixPath("task")
-                        / kernel_id_str[:2]
-                        / kernel_id_str[2:4]
-                        / f"{kernel_id_str[4:]}.log",
-                    ),
-                },
-                raise_for_status=True,
-            ) as (_, storage_resp):
-                while True:
-                    chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    if not prepared:
-                        await response.prepare(request)
-                        prepared = True
-                    await response.write(chunk)
-        except aiohttp.ClientResponseError as e:
-            raise StorageProxyError(status=e.status, extra_msg=e.message)
-        finally:
-            if prepared:
-                await response.write_eof()
-        return GetTaskLogsActionResult(response=response)
 
     async def interrupt(self, action: InterruptAction) -> InterruptActionResult:
         session_name = action.session_name

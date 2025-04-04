@@ -77,7 +77,6 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
 )
 from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
-from ai.backend.manager.services.session.actions.get_task_logs import GetTaskLogsAction
 from ai.backend.manager.services.session.actions.interrupt import InterruptAction
 from ai.backend.manager.services.session.actions.list_files import ListFilesAction
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
@@ -86,6 +85,7 @@ from ai.backend.manager.services.session.actions.restart_session import RestartS
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
 from ai.backend.manager.services.session.actions.upload_files import UploadFilesAction
+from ai.backend.manager.services.vfolder.actions.get_task_logs import GetTaskLogsAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1605,7 +1605,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     user_uuid = request["user"]["uuid"]
     kernel_id_str = params["kernel_id"].hex
 
-    result = await root_ctx.processors.session.get_task_logs.wait_for_complete(
+    result = await root_ctx.processors.vfolder.get_task_logs.wait_for_complete(
         GetTaskLogsAction(
             user_id=user_uuid,
             domain_name=domain_name,
