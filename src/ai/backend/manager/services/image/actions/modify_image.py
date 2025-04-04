@@ -11,25 +11,25 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class ModifyImageInputData:
-    name: OptionalState[str] = field(default_factory=lambda: OptionalState.none("name"))
-    registry: OptionalState[str] = field(default_factory=lambda: OptionalState.none("registry"))
-    image: OptionalState[str] = field(default_factory=lambda: OptionalState.none("image"))
-    tag: OptionalState[str] = field(default_factory=lambda: OptionalState.none("tag"))
+    name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("name"))
+    registry: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("registry"))
+    image: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("image"))
+    tag: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("tag"))
     architecture: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.none("architecture")
+        default_factory=lambda: OptionalState.nop("architecture")
     )
-    is_local: OptionalState[bool] = field(default_factory=lambda: OptionalState.none("is_local"))
-    size_bytes: OptionalState[int] = field(default_factory=lambda: OptionalState.none("size_bytes"))
-    type: OptionalState[ImageType] = field(default_factory=lambda: OptionalState.none("type"))
+    is_local: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_local"))
+    size_bytes: OptionalState[int] = field(default_factory=lambda: OptionalState.nop("size_bytes"))
+    type: OptionalState[ImageType] = field(default_factory=lambda: OptionalState.nop("type"))
     config_digest: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.none("config_digest")
+        default_factory=lambda: OptionalState.nop("config_digest")
     )
     labels: OptionalState[dict[str, Any]] = field(
-        default_factory=lambda: OptionalState.none("labels")
+        default_factory=lambda: OptionalState.nop("labels")
     )
     accelerators: TriState[str] = field(default_factory=lambda: TriState.nop("accelerators"))
     resources: OptionalState[dict[str, Any]] = field(
-        default_factory=lambda: OptionalState.none("resources")
+        default_factory=lambda: OptionalState.nop("resources")
     )
 
     def set_attr(self, image_row: ImageRow) -> None:

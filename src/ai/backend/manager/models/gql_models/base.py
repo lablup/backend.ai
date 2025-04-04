@@ -8,9 +8,11 @@ import graphene
 import graphql
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
-from graphql import GraphQLError
+from graphql import GraphQLError, Undefined
 from graphql.language.ast import FloatValueNode, IntValueNode, ObjectValueNode, ValueNode
 from graphql.language.printer import print_ast
+
+from ai.backend.manager.types import OptionalState, TriState
 
 from ...api.exceptions import ObjectNotFound
 from ..gql_relay import AsyncNode
@@ -171,3 +173,21 @@ def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name:
         return UUID(raw_id)
     except ValueError:
         raise ObjectNotFound(object_name)
+
+
+def get_optional_state(attr_name: str, value: Any) -> OptionalState:
+    if value is None:
+        raise ValueError("value is None")
+    elif value is Undefined:
+        return OptionalState.nop(attr_name)
+    else:
+        return OptionalState.update(attr_name, value)
+
+
+def get_tri_state(attr_name: str, value: Any) -> TriState:
+    if value is None:
+        return TriState.nullify(attr_name)
+    elif value is Undefined:
+        return TriState.nop(attr_name)
+    else:
+        return TriState.update(attr_name, value)
