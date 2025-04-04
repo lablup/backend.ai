@@ -26,6 +26,7 @@ from typing import (
 )
 
 import aiofiles
+import orjson
 import yarl
 from async_timeout import timeout
 
@@ -434,3 +435,10 @@ def b64encode(s: str) -> str:
     """
     b: bytes = s.encode("utf-8") if isinstance(s, str) else s
     return base64.b64encode(b).decode("ascii")
+
+
+def dump_json_str(obj: Any, option: int) -> str:
+    """
+    Dumps the given object into a JSON string.
+    """
+    return orjson.dumps(obj, option=option).decode("utf-8")
