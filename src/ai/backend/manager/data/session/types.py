@@ -1,38 +1,18 @@
-import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, Optional
 
+from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
     ClusterMode,
-    MountPermission,
     SessionResult,
     SessionTypes,
-    VFolderID,
-    VFolderUsageMode,
 )
 from ai.backend.manager.models.network import NetworkType
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.session import SessionStatus
-
-
-class CustomizedImageVisibilityScope(str, enum.Enum):
-    USER = "user"
-    PROJECT = "project"
-
-
-@dataclass
-class VFolderMountData:
-    name: str
-    vfid: VFolderID
-    vfsubpath: PurePosixPath
-    host_path: PurePosixPath
-    kernel_path: PurePosixPath
-    mount_perm: MountPermission
-    usage_mode: VFolderUsageMode
 
 
 # TODO: Add proper types

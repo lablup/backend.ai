@@ -2,9 +2,9 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.base import SessionAction
 
