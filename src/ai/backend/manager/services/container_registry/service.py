@@ -33,14 +33,13 @@ class ContainerRegistryService:
         project = action.project
 
         async with self._db.begin_readonly_session() as db_session:
-            registry_row: ContainerRegistryRow = await db_session.scalar(
-                sa.select(ContainerRegistryRow).where(
-                    sa.and_(
-                        ContainerRegistryRow.registry_name == registry_name,
-                        ContainerRegistryRow.project == project,
-                    )
-                )
+            stmt = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == registry_name,
             )
+            if project:
+                stmt = stmt.where(ContainerRegistryRow.project == project)
+            registry_row: ContainerRegistryRow = await db_session.scalar(stmt)
+
             scanner_cls = get_container_registry_cls(registry_row)
             scanner = scanner_cls(self._db, registry_name, registry_row)
             result = await scanner.rescan_single_registry(None)
