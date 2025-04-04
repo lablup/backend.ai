@@ -448,7 +448,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     domain_processor = DomainProcessors(domain_service)
 
     root_ctx.processors = Processors(
-        VFolderService(
+        domain=domain_processor,
+        vfolder_service=VFolderService(
             VFolderServiceInitParameter(
                 db=root_ctx.db,
                 shared_config=root_ctx.shared_config,
@@ -456,20 +457,19 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 background_task_manager=root_ctx.background_task_manager,
             ),
         ),
-        VFolderInviteService(
+        vfolder_invite_service=VFolderInviteService(
             VFolderInviteServiceInitParameter(
                 db=root_ctx.db,
                 shared_config=root_ctx.shared_config,
             ),
         ),
-        VFolderFileService(
+        vfolder_file_service=VFolderFileService(
             VFolderFileServiceInitParameter(
                 db=root_ctx.db,
                 shared_config=root_ctx.shared_config,
                 storage_manager=root_ctx.storage_manager,
             ),
         ),
-        domain=domain_processor,
     )
     yield
 
