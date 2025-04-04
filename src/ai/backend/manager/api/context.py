@@ -7,6 +7,7 @@ import attrs
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.processors import Processors
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -60,6 +61,8 @@ class RootContext(BaseContext):
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
     metrics: CommonMetricRegistry
+
+    processors: Processors
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
         super().__init__(**kwargs)

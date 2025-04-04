@@ -20,6 +20,7 @@ from ai.backend.manager.models.gql_models.audit_log import (
 )
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.processors import Processors
 
 from .gql_models.container_registry import (
     ContainerRegistryConnection,
@@ -274,6 +275,7 @@ class GraphQueryContext:
     registry: AgentRegistry
     idle_checker_host: IdleCheckerHost
     metric_observer: GraphQLMetricObserver
+    processors: Processors
 
 
 class Mutations(graphene.ObjectType):
