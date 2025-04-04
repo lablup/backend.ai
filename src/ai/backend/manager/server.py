@@ -80,13 +80,15 @@ from ai.backend.manager.service.container_registry.harbor import (
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.vfolder.processors import (
+    VFolderBaseProcessors,
+    VFolderFileProcessors,
+    VFolderInviteProcessors,
+)
 from ai.backend.manager.services.vfolder.services import (
     VFolderFileService,
-    VFolderFileServiceInitParameter,
     VFolderInviteService,
-    VFolderInviteServiceInitParameter,
     VFolderService,
-    VFolderServiceInitParameter,
 )
 
 from . import __version__
@@ -447,29 +449,30 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     domain_service = DomainService(root_ctx.db)
     domain_processor = DomainProcessors(domain_service)
 
+    vfolder_service = VFolderService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        storage_manager=root_ctx.storage_manager,
+        background_task_manager=root_ctx.background_task_manager,
+    )
+    vfolder_processor = VFolderBaseProcessors(vfolder_service)
+    vfolder_invite_service = VFolderInviteService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+    )
+    vfolder_invite_processor = VFolderInviteProcessors(vfolder_invite_service)
+    vfolder_file_service = VFolderFileService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        storage_manager=root_ctx.storage_manager,
+    )
+    vfolder_file_processor = VFolderFileProcessors(vfolder_file_service)
+
     root_ctx.processors = Processors(
         domain=domain_processor,
-        vfolder_service=VFolderService(
-            VFolderServiceInitParameter(
-                db=root_ctx.db,
-                shared_config=root_ctx.shared_config,
-                storage_manager=root_ctx.storage_manager,
-                background_task_manager=root_ctx.background_task_manager,
-            ),
-        ),
-        vfolder_invite_service=VFolderInviteService(
-            VFolderInviteServiceInitParameter(
-                db=root_ctx.db,
-                shared_config=root_ctx.shared_config,
-            ),
-        ),
-        vfolder_file_service=VFolderFileService(
-            VFolderFileServiceInitParameter(
-                db=root_ctx.db,
-                shared_config=root_ctx.shared_config,
-                storage_manager=root_ctx.storage_manager,
-            ),
-        ),
+        vfolder=vfolder_processor,
+        vfolder_invite=vfolder_invite_processor,
+        vfolder_file=vfolder_file_processor,
     )
     yield
 

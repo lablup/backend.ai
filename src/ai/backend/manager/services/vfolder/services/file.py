@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import (
     cast,
 )
@@ -38,22 +37,20 @@ from ..exceptions import InvalidParameter
 from ..types import FileInfo
 
 
-@dataclass
-class ServiceInitParameter:
-    db: ExtendedAsyncSAEngine
-    shared_config: SharedConfig
-    storage_manager: StorageSessionManager
-
-
 class VFolderFileService:
     _db: ExtendedAsyncSAEngine
     _shared_config: SharedConfig
     _storage_manager: StorageSessionManager
 
-    def __init__(self, parameter: ServiceInitParameter) -> None:
-        self._db = parameter.db
-        self._shared_config = parameter.shared_config
-        self._storage_manager = parameter.storage_manager
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        shared_config: SharedConfig,
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        self._db = db
+        self._shared_config = shared_config
+        self._storage_manager = storage_manager
 
     async def upload_file(
         self, action: CreateUploadSessionAction

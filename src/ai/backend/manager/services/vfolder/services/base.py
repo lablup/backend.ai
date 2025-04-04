@@ -1,5 +1,4 @@
 import uuid
-from dataclasses import dataclass
 from typing import (
     Any,
     Optional,
@@ -99,25 +98,23 @@ async def _check_vfolder_status(
         raise VFolderFilterStatusFailed
 
 
-@dataclass
-class ServiceInitParameter:
-    db: ExtendedAsyncSAEngine
-    shared_config: SharedConfig
-    storage_manager: StorageSessionManager
-    background_task_manager: BackgroundTaskManager
-
-
 class VFolderService:
     _db: ExtendedAsyncSAEngine
     _shared_config: SharedConfig
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
 
-    def __init__(self, parameter: ServiceInitParameter) -> None:
-        self._db = parameter.db
-        self._shared_config = parameter.shared_config
-        self._storage_manager = parameter.storage_manager
-        self._background_task_manager = parameter.background_task_manager
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        shared_config: SharedConfig,
+        storage_manager: StorageSessionManager,
+        background_task_manager: BackgroundTaskManager,
+    ) -> None:
+        self._db = db
+        self._shared_config = shared_config
+        self._storage_manager = storage_manager
+        self._background_task_manager = background_task_manager
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role

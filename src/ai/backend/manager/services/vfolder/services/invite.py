@@ -1,5 +1,4 @@
 import asyncio
-from dataclasses import dataclass
 from typing import (
     Optional,
     cast,
@@ -51,13 +50,6 @@ from ..exceptions import (
 )
 from ..types import VFolderInvitationInfo
 
-
-@dataclass
-class ServiceInitParameter:
-    db: ExtendedAsyncSAEngine
-    shared_config: SharedConfig
-
-
 # TODO: Detach privilege check from the service.
 #       The service should only handle the business logic.
 #       The privilege check should be done before calling the service.
@@ -68,9 +60,9 @@ class VFolderInviteService:
     _db: ExtendedAsyncSAEngine
     _shared_config: SharedConfig
 
-    def __init__(self, parameter: ServiceInitParameter) -> None:
-        self._db = parameter.db
-        self._shared_config = parameter.shared_config
+    def __init__(self, db: ExtendedAsyncSAEngine, shared_config: SharedConfig) -> None:
+        self._db = db
+        self._shared_config = shared_config
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         async with self._db.begin_readonly_session() as db_session:
