@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.image.base import ImageAction
 
 
@@ -21,6 +22,8 @@ class UnloadImageAction(ImageAction):
 
 @dataclass
 class UnloadImageActionResult(BaseActionResult):
+    image: ImageData
+
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.image.id)
