@@ -18,6 +18,9 @@ class GetTaskLogsAction(SessionAction):
     session_name: str
     owner_access_key: AccessKey
 
+    # TODO: Remove this.
+    request: Any
+
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -30,7 +33,7 @@ class GetTaskLogsAction(SessionAction):
 @dataclass
 class GetTaskLogsActionResult(BaseActionResult):
     # TODO: Add proper type
-    result: Any
+    response: Any
     # session_row: SessionRow
 
     @override
