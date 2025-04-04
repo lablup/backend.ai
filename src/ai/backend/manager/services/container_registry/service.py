@@ -72,9 +72,6 @@ class ContainerRegistryService:
 
             registry_row: ContainerRegistryRow = await session.scalar(get_registry_row_stmt)
 
-            if action.project:
-                update_stmt = update_stmt.where(ImageRow.project == action.project)
-
         return ClearImagesActionResult(registry=registry_row.to_dataclass())
 
     async def load_container_registries(
