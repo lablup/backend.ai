@@ -23,6 +23,8 @@ depends_on = None
 logger = logging.getLogger("alembic.runtime.migration")
 
 
+# This migration script was intentionally created as a duplicate of 683ca0a32f41 to address an #4084.
+# See https://github.com/lablup/backend.ai/pull/4079.
 def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
