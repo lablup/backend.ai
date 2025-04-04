@@ -3,11 +3,11 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.services.image.base import ImageAction
+from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
 @dataclass
-class ClearImagesAction(ImageAction):
+class ClearImagesAction(ContainerRegistryAction):
     registry: str
     project: Optional[str]
 

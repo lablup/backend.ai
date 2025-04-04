@@ -5,7 +5,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.services.container_registry.base import ContainerRegistryAction
+from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
 @dataclass

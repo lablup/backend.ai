@@ -6,7 +6,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.image.base import ImageAction
+from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass

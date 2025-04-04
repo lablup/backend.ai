@@ -3,13 +3,13 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.services.image.base import ImageAction
+from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
 # TODO: load_configured_registries 해당 하는 부분은 단일 액션을 만들 수 없음.
 # BatchAction...
 @dataclass
-class LoadContainerRegistriesAction(ImageAction):
+class LoadContainerRegistriesAction(ContainerRegistryAction):
     registry: str
     project: Optional[str]
 
