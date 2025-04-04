@@ -62,10 +62,10 @@ class MountOptionModel(BaseModel):
 T = TypeVar("T")
 
 
-class State(enum.Enum):
-    UPDATE = "update"
-    NULLIFY = "nullify"
-    NOP = "nop"
+class State(enum.StrEnum):
+    UPDATE = "UPDATE"
+    NULLIFY = "NULLIFY"
+    NOP = "NOP"
 
 
 @dataclass
