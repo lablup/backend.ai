@@ -149,7 +149,7 @@ __all__ = (
 
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.session.types import VFolderMountData
+    from ai.backend.common.data.vfolder.types import VFolderMountData
 
     from .docker import ImageRef
 
@@ -1111,7 +1111,7 @@ class VFolderMount(JSONSerializableMixin):
         )
 
     def to_dataclass(self) -> VFolderMountData:
-        from ai.backend.manager.data.session.types import VFolderMountData
+        from ai.backend.common.data.vfolder.types import VFolderMountData
 
         return VFolderMountData(
             name=self.name,

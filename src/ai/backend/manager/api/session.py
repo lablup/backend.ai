@@ -42,8 +42,8 @@ from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
+from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.json import read_json
-from ai.backend.manager.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.manager.services.agent.actions.sync_agent_registry import SyncAgentRegistryAction
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
