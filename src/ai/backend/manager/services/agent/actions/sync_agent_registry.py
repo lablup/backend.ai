@@ -3,6 +3,7 @@ from typing import Any, Optional, override
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.services.session.base import SessionAction
 
 
@@ -23,7 +24,7 @@ class SyncAgentRegistryAction(SessionAction):
 class SyncAgentRegistryActionResult(BaseActionResult):
     # TODO: Add proper type
     result: Any
-    # session_row: SessionRow
+    agent_row: AgentRow
 
     @override
     def entity_id(self) -> Optional[str]:

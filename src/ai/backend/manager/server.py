@@ -77,6 +77,7 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.service import SessionService
 
@@ -435,6 +436,10 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    agent_service = AgentService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+    )
     session_service = SessionService(
         db=root_ctx.db,
         agent_registry=root_ctx.registry,
@@ -449,6 +454,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     root_ctx.processors = Processors(
+        agent_service=agent_service,
         session_service=session_service,
     )
 
