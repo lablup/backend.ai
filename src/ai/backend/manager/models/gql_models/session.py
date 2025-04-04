@@ -668,13 +668,13 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
 
-        name = input.get("name")
-        if name and name is not Undefined:
-            _validate_priority_input(name)
-
         priority = input.get("priority")
         if priority and priority is not Undefined:
             _validate_name_input(priority)
+
+        name = input.get("name")
+        if name and name is not Undefined:
+            _validate_priority_input(name)
 
         result = await graph_ctx.processors.session.modify_compute_session.wait_for_complete(
             ModifyComputeSessionAction(
