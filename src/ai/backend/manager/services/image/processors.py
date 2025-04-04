@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -65,16 +66,18 @@ class ImageProcessors:
     purge_image: ActionProcessor[PurgeImageAction, PurgeImageActionResult]
     purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
 
-    def __init__(self, service: ImageService) -> None:
-        self.forget_image = ActionProcessor(service.forget_image)
-        self.forget_image_by_id = ActionProcessor(service.forget_image_by_id)
-        self.purge_image_by_id = ActionProcessor(service.purge_image_by_id)
-        self.alias_image = ActionProcessor(service.alias_image)
-        self.dealias_image = ActionProcessor(service.dealias_image)
-        self.modify_image = ActionProcessor(service.modify_image)
-        self.preload_image = ActionProcessor(service.preload_image)
-        self.unload_image = ActionProcessor(service.unload_image)
-        self.untag_image_from_registry = ActionProcessor(service.untag_image_from_registry)
-        self.scan_image = ActionProcessor(service.scan_image)
-        self.purge_image = ActionProcessor(service.purge_image)
-        self.purge_images = ActionProcessor(service.purge_images)
+    def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
+        self.forget_image = ActionProcessor(service.forget_image, action_monitors)
+        self.forget_image_by_id = ActionProcessor(service.forget_image_by_id, action_monitors)
+        self.purge_image_by_id = ActionProcessor(service.purge_image_by_id, action_monitors)
+        self.alias_image = ActionProcessor(service.alias_image, action_monitors)
+        self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
+        self.modify_image = ActionProcessor(service.modify_image, action_monitors)
+        self.preload_image = ActionProcessor(service.preload_image, action_monitors)
+        self.unload_image = ActionProcessor(service.unload_image, action_monitors)
+        self.untag_image_from_registry = ActionProcessor(
+            service.untag_image_from_registry, action_monitors
+        )
+        self.scan_image = ActionProcessor(service.scan_image, action_monitors)
+        self.purge_image = ActionProcessor(service.purge_image, action_monitors)
+        self.purge_images = ActionProcessor(service.purge_images, action_monitors)
