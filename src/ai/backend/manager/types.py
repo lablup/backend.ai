@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from abc import ABC, abstractmethod
+from collections import UserDict
 from dataclasses import dataclass, fields
 from typing import (
     TYPE_CHECKING,
@@ -181,24 +181,8 @@ class NonNullField(Generic[TVal]):
         return cls(_SENTINEL)
 
 
-class AbstractInput(ABC):
-    @abstractmethod
-    def set_attr(self, obj: Any) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_dict(self) -> dict[str, Any]:
-        raise NotImplementedError
-
-
-class InputWithTriStateValue(ABC):
-    @abstractmethod
-    def get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
-        raise NotImplementedError
-
-
 @dataclass
-class DataclassInput(AbstractInput, InputWithTriStateValue):
+class DataclassInput:
     """
     Base class for inputs that are dataclasses.
 
@@ -206,15 +190,38 @@ class DataclassInput(AbstractInput, InputWithTriStateValue):
     should have fields that are TriStateField or NonNullField.
     """
 
-    def get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
+    def _get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
         return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
 
     def set_attr(self, obj: Any) -> None:
-        for field_name, value in self.get_fields():
+        for field_name, value in self._get_fields():
             if value.is_valid():
                 setattr(obj, field_name, value.value())
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            field_name: value.value() for field_name, value in self.get_fields() if value.is_valid()
+            field_name: value.value()
+            for field_name, value in self._get_fields()
+            if value.is_valid()
+        }
+
+
+class DictInput(UserDict[str, TriStateField | NonNullField]):
+    """
+    Base class for inputs that are UserDict.
+    """
+
+    def _get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
+        return [(k, v) for k, v in self.data.items()]
+
+    def set_attr(self, obj: Any) -> None:
+        for field_name, value in self._get_fields():
+            if value.is_valid():
+                setattr(obj, field_name, value.value())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            field_name: value.value()
+            for field_name, value in self._get_fields()
+            if value.is_valid()
         }
