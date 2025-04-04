@@ -11,9 +11,9 @@ if TYPE_CHECKING:
     from ...gql import GraphQueryContext
 
 
-class MetircResultValue(graphene.ObjectType):
+class MetricResultValue(graphene.ObjectType):
     class Meta:
-        description = "Added in 25.5.0. A pair of timestamp and value."
+        description = "Added in 25.6.0. A pair of timestamp and value."
 
     timestamp = graphene.Float()
     value = graphene.String()
@@ -21,7 +21,7 @@ class MetircResultValue(graphene.ObjectType):
 
 class ContainerUtilizationMetricMetadata(graphene.ObjectType):
     class Meta:
-        description = "Added in 25.5.0."
+        description = "Added in 25.6.0."
 
     metric_names = graphene.List(graphene.String)
 
@@ -43,11 +43,11 @@ class ContainerUtilizationMetricMetadata(graphene.ObjectType):
 
 class ContainerUtilizationMetric(graphene.ObjectType):
     class Meta:
-        description = "Added in 25.5.0."
+        description = "Added in 25.6.0."
 
     metric_name = graphene.String()
     value_type = graphene.String(description="One of 'current', 'capacity', 'pct'.")
-    values = graphene.List(MetircResultValue)
+    values = graphene.List(MetricResultValue)
 
     max_value = graphene.String(
         description="The maximum value of the metric in given time range. null if no data."

@@ -1138,13 +1138,13 @@ class Queries(graphene.ObjectType):
 
     user_utilization_metric = graphene.Field(
         UserUtilizationMetric,
-        description="Added in 25.5.0.",
+        description="Added in 25.6.0.",
         user_id=graphene.UUID(required=True),
         props=UserUtilizationMetricQueryInput(required=True),
     )
     container_utilization_metric_metadata = graphene.Field(
         ContainerUtilizationMetricMetadata,
-        description="Added in 25.5.0.",
+        description="Added in 25.6.0.",
     )
 
     @staticmethod

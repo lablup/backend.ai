@@ -16,7 +16,7 @@ from ai.backend.manager.services.metric.types import (
     MetricQueryParameter,
 )
 
-from .base import ContainerUtilizationMetric, MetircResultValue
+from .base import ContainerUtilizationMetric, MetricResultValue
 
 if TYPE_CHECKING:
     from ...gql import GraphQueryContext
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 class UserUtilizationMetricQueryInput(graphene.InputObjectType):
     class Meta:
-        description = "Added in 25.5.0."
+        description = "Added in 25.6.0."
 
     value_type = graphene.String(
         default_value=None,
@@ -47,7 +47,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):
 
 class UserUtilizationMetric(graphene.ObjectType):
     class Meta:
-        description = "Added in 25.5.0."
+        description = "Added in 25.6.0."
 
     user_id = graphene.UUID()
     metrics = graphene.List(ContainerUtilizationMetric)
@@ -76,7 +76,7 @@ class UserUtilizationMetric(graphene.ObjectType):
                     metric_name=param.metric_name,
                     value_type=result.metric.value_type,
                     values=[
-                        MetircResultValue(
+                        MetricResultValue(
                             timestamp=value.timestamp,
                             value=value.value,
                         )
