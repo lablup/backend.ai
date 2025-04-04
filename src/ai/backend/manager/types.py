@@ -45,7 +45,7 @@ class Sentinel(enum.Enum):
     token = 0
 
 
-SENTINEL = Sentinel.token
+_SENTINEL = Sentinel.token
 
 
 @attr.define(slots=True)
@@ -142,16 +142,16 @@ class OptionalState(TriState[TVal]):
 class TriStateField(Generic[TVal]):
     _value: Optional[TVal] | Sentinel
 
-    def __init__(self, value: Optional[TVal] | Sentinel = SENTINEL) -> None:
+    def __init__(self, value: Optional[TVal] | Sentinel = _SENTINEL) -> None:
         self._value = value
 
     def value(self) -> Optional[TVal]:
-        if self._value is not SENTINEL:
+        if self._value is not _SENTINEL:
             return self._value
         raise ValueError(f"Value is not set for {self.__class__.__name__}")
 
     def is_valid(self) -> bool:
-        return self._value is not SENTINEL
+        return self._value is not _SENTINEL
 
     @classmethod
     def set(cls, value: TVal) -> Self:
@@ -163,22 +163,22 @@ class TriStateField(Generic[TVal]):
 
     @classmethod
     def nop(cls) -> Self:
-        return cls(SENTINEL)
+        return cls(_SENTINEL)
 
 
 class NonNullField(Generic[TVal]):
     _value: TVal | Sentinel
 
-    def __init__(self, value: TVal | Sentinel = SENTINEL) -> None:
+    def __init__(self, value: TVal | Sentinel = _SENTINEL) -> None:
         self._value = value
 
     def value(self) -> TVal:
-        if self._value is not SENTINEL:
+        if self._value is not _SENTINEL:
             return self._value
         raise ValueError(f"Value is not set for {self.__class__.__name__}")
 
     def is_valid(self) -> bool:
-        return self._value is not SENTINEL
+        return self._value is not _SENTINEL
 
     @classmethod
     def set(cls, value: TVal) -> Self:
@@ -186,7 +186,7 @@ class NonNullField(Generic[TVal]):
 
     @classmethod
     def nop(cls) -> Self:
-        return cls(SENTINEL)
+        return cls(_SENTINEL)
 
 
 class AbstractInput(ABC):
