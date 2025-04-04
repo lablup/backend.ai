@@ -50,8 +50,6 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
-from ai.backend.manager.data.session.types import VFolderMountData
-
 from .defs import RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
@@ -151,6 +149,8 @@ __all__ = (
 
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.session.types import VFolderMountData
+
     from .docker import ImageRef
 
 
@@ -1111,6 +1111,8 @@ class VFolderMount(JSONSerializableMixin):
         )
 
     def to_dataclass(self) -> VFolderMountData:
+        from ai.backend.manager.data.session.types import VFolderMountData
+
         return VFolderMountData(
             name=self.name,
             vfid=self.vfid,

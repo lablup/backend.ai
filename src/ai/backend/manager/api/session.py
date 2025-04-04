@@ -5,7 +5,6 @@ REST-style session management APIs.
 from __future__ import annotations
 
 import asyncio
-import enum
 import functools
 import json
 import logging
@@ -44,6 +43,7 @@ from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.json import read_json
+from ai.backend.manager.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
@@ -893,11 +893,6 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     )
 
     return web.json_response(action_result.commit_result, status=HTTPStatus.CREATED)
-
-
-class CustomizedImageVisibilityScope(str, enum.Enum):
-    USER = "user"
-    PROJECT = "project"
 
 
 class ConvertSessionToImageRequesteModel(BaseModel):
