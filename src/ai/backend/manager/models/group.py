@@ -8,8 +8,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Any,
-    Callable,
     Iterable,
     Optional,
     Self,
@@ -22,7 +20,6 @@ from typing import (
     override,
 )
 
-import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
@@ -35,13 +32,13 @@ from sqlalchemy.orm import load_only, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import ResourceSlot, Sentinel, VFolderID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
+from ai.backend.manager.types import OptionalState, State
 
-from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
 from .base import (
     GUID,
@@ -71,7 +68,6 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
 from .user import UserRole
-from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.groups.actions.create_group import (
@@ -95,7 +91,6 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .rbac import ContainerRegistryScope
     from .scaling_group import ScalingGroup
-    from .storage import StorageSessionManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -606,17 +601,62 @@ class GroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, name: str) -> CreateGroupAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        def define_state(value):
+            if value is None:
+                return State.NULLIFY
+            elif value is Undefined:
+                return State.NOP
+            else:
+                return State.UPDATE
+
         return CreateGroupAction(
             name=name,
-            type=ProjectType[self.type],
-            description=self.description,
-            is_active=self.is_active,
             domain_name=self.domain_name,
-            total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None),
-            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
-            integration_id=self.integration_id,
-            resource_policy=self.resource_policy,
-            container_registry=self.container_registry,
+            type=OptionalState(
+                "type",
+                define_state(self.type),
+                None if self.type is Undefined else ProjectType[self.type],
+            ),
+            description=OptionalState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active",
+                define_state(self.is_active),
+                value_or_none(self.is_active),
+            ),
+            total_resource_slots=OptionalState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                None
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            integration_id=OptionalState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
+            resource_policy=OptionalState(
+                "resource_policy",
+                define_state(self.resource_policy),
+                value_or_none(self.resource_policy),
+            ),
+            container_registry=OptionalState(
+                "container_registry",
+                define_state(self.container_registry),
+                value_or_none(self.container_registry),
+            ),
         )
 
 
@@ -635,31 +675,77 @@ class ModifyGroupInput(graphene.InputObjectType):
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def _convert_field(
-        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
-    ) -> Any | Sentinel:
-        if field_value is Undefined:
-            return Sentinel.TOKEN
-        if converter is not None:
-            return converter(field_value)
-        return field_value
-
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        def define_state(value):
+            if value is None:
+                return State.NULLIFY
+            elif value is Undefined:
+                return State.NOP
+            else:
+                return State.UPDATE
+
         return ModifyGroupAction(
             group_id=group_id,
-            name=self._convert_field(self.name),
-            description=self._convert_field(self.description),
-            is_active=self._convert_field(self.is_active),
-            domain_name=self._convert_field(self.domain_name),
-            total_resource_slots=self._convert_field(
-                self.total_resource_slots, lambda x: ResourceSlot.from_user_input(x, None)
+            name=OptionalState(
+                "name",
+                define_state(self.name),
+                value_or_none(self.name),
             ),
-            user_update_mode=self._convert_field(self.user_update_mode),
-            user_uuids=self._convert_field(self.user_uuids),
-            allowed_vfolder_hosts=self._convert_field(self.allowed_vfolder_hosts),
-            integration_id=self._convert_field(self.integration_id),
-            resource_policy=self._convert_field(self.resource_policy),
-            container_registry=self._convert_field(self.container_registry),
+            domain_name=OptionalState(
+                "domain_name",
+                define_state(self.domain_name),
+                value_or_none(self.domain_name),
+            ),
+            description=OptionalState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active",
+                define_state(self.is_active),
+                value_or_none(self.is_active),
+            ),
+            total_resource_slots=OptionalState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                None
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            user_update_mode=OptionalState(
+                "user_update_mode",
+                define_state(self.user_update_mode),
+                value_or_none(self.user_update_mode),
+            ),
+            user_uuids=OptionalState(
+                "user_uuids",
+                define_state(self.user_uuids),
+                value_or_none(self.user_uuids),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            integration_id=OptionalState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
+            resource_policy=OptionalState(
+                "resource_policy",
+                define_state(self.resource_policy),
+                value_or_none(self.resource_policy),
+            ),
+            container_registry=OptionalState(
+                "container_registry",
+                define_state(self.container_registry),
+                value_or_none(self.container_registry),
+            ),
         )
 
 
@@ -797,161 +883,6 @@ class PurgeGroup(graphene.Mutation):
             ok=res.success,
             msg="success" if res.success else "failed",
         )
-
-    @classmethod
-    async def delete_vfolders(
-        cls,
-        engine: ExtendedAsyncSAEngine,
-        group_id: uuid.UUID,
-        storage_manager: StorageSessionManager,
-    ) -> int:
-        """
-        Delete group's all virtual folders as well as their physical data.
-
-        :param conn: DB connection
-        :param group_id: group's UUID to delete virtual folders
-
-        :return: number of deleted rows
-        """
-        from . import (
-            VFolderDeletionInfo,
-            VFolderRow,
-            VFolderStatusSet,
-            initiate_vfolder_deletion,
-            vfolder_status_map,
-        )
-
-        target_vfs: list[VFolderDeletionInfo] = []
-        async with engine.begin_session() as db_session:
-            query = sa.select(VFolderRow).where(
-                sa.and_(
-                    VFolderRow.group == group_id,
-                    VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
-                )
-            )
-            result = await db_session.scalars(query)
-            rows = cast(list[VFolderRow], result.fetchall())
-            for vf in rows:
-                target_vfs.append(
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
-                )
-
-        storage_ptask_group = aiotools.PersistentTaskGroup()
-        try:
-            await initiate_vfolder_deletion(
-                engine,
-                target_vfs,
-                storage_manager,
-                storage_ptask_group,
-            )
-        except VFolderOperationFailed as e:
-            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
-            raise
-        deleted_count = len(target_vfs)
-        if deleted_count > 0:
-            log.info("deleted {0} group's virtual folders ({1})", deleted_count, group_id)
-        return deleted_count
-
-    @classmethod
-    async def delete_kernels(
-        cls,
-        db_conn: SAConnection,
-        group_id: uuid.UUID,
-    ) -> int:
-        """
-        Delete all kernels run from the target groups.
-
-        :param conn: DB connection
-        :param group_id: group's UUID to delete kernels
-
-        :return: number of deleted rows
-        """
-        from . import kernels
-
-        query = sa.delete(kernels).where(kernels.c.group_id == group_id)
-        result = await db_conn.execute(query)
-        if result.rowcount > 0:
-            log.info("deleted {0} group's kernels ({1})", result.rowcount, group_id)
-        return result.rowcount
-
-    @classmethod
-    async def delete_sessions(
-        cls,
-        db_conn: SAConnection,
-        group_id: uuid.UUID,
-    ) -> None:
-        """
-        Delete all sessions run from the target groups.
-        """
-        from .session import SessionRow
-
-        stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
-        await db_conn.execute(stmt)
-
-    @classmethod
-    async def group_vfolder_mounted_to_active_kernels(
-        cls,
-        db_conn: SAConnection,
-        group_id: uuid.UUID,
-    ) -> bool:
-        """
-        Check if no active kernel is using the group's virtual folders.
-
-        :param conn: DB connection
-        :param group_id: group's ID
-
-        :return: True if a virtual folder is mounted to active kernels.
-        """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, vfolders
-
-        query = sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.group == group_id)
-        result = await db_conn.execute(query)
-        rows = result.fetchall()
-        group_vfolder_ids = [row["id"] for row in rows]
-        query = (
-            sa.select([kernels.c.mounts])
-            .select_from(kernels)
-            .where(
-                (kernels.c.group_id == group_id)
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-            )
-        )
-        async for row in await db_conn.stream(query):
-            for _mount in row["mounts"]:
-                try:
-                    vfolder_id = uuid.UUID(_mount[2])
-                    if vfolder_id in group_vfolder_ids:
-                        return True
-                except Exception:
-                    pass
-        return False
-
-    @classmethod
-    async def group_has_active_kernels(
-        cls,
-        db_conn: SAConnection,
-        group_id: uuid.UUID,
-    ) -> bool:
-        """
-        Check if the group does not have active kernels.
-
-        :param conn: DB connection
-        :param group_id: group's UUID
-
-        :return: True if the group has some active kernels.
-        """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
-
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(
-                (kernels.c.group_id == group_id)
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-            )
-        )
-        active_kernel_count = await db_conn.scalar(query)
-        return True if active_kernel_count > 0 else False
 
 
 class GroupDotfile(TypedDict):

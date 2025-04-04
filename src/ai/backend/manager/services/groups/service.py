@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, Optional, cast
 import aiotools
 import sqlalchemy as sa
 
-from ai.backend.common.types import Sentinel, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import VFolderOperationFailed
 from ai.backend.manager.models.group import association_groups_users, groups
@@ -30,6 +30,7 @@ from ai.backend.manager.services.groups.actions.purge_group import (
     PurgeGroupActionResult,
 )
 from ai.backend.manager.services.groups.types import GroupData
+from ai.backend.manager.types import OptionalState, State
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -73,11 +74,16 @@ class GroupService:
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
         data = action.get_modified_fields()
-        if action.user_update_mode not in (None, "add", "remove", Sentinel.TOKEN):
+
+        if action.user_update_mode.state() != State.NOP and action.user_update_mode.value() not in (
+            None,
+            "add",
+            "remove",
+        ):
             raise ValueError("invalid user_update_mode")
-        if not action.user_uuids:
-            action.user_update_mode = None
-        if not data and action.user_update_mode is None:
+        if action.user_uuids.state() == State.NOP:
+            action.user_update_mode = OptionalState.update("user_update_mode", None)
+        if not data and action.user_update_mode.value() is None:
             return ModifyGroupActionResult(data=None, success=False)
 
         async def _do_mutate() -> MutationResult:
@@ -85,19 +91,20 @@ class GroupService:
                 # TODO: refactor user addition/removal in groups as separate mutations
                 #       (to apply since 21.09)
                 gid = action.group_id
-                user_uuids = cast(list[str], action.user_uuids)
-                if action.user_update_mode == "add":
-                    values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]
-                    await conn.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
-                elif action.user_update_mode == "remove":
-                    await conn.execute(
-                        sa.delete(association_groups_users).where(
-                            (association_groups_users.c.user_id.in_(user_uuids))
-                            & (association_groups_users.c.group_id == gid),
-                        ),
-                    )
+                if action.user_uuids.state() == State.UPDATE:
+                    user_uuids = cast(list[str], action.user_uuids.value())
+                    if action.user_update_mode.value() == "add":
+                        values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]
+                        await conn.execute(
+                            sa.insert(association_groups_users).values(values),
+                        )
+                    elif action.user_update_mode.value() == "remove":
+                        await conn.execute(
+                            sa.delete(association_groups_users).where(
+                                (association_groups_users.c.user_id.in_(user_uuids))
+                                & (association_groups_users.c.group_id == gid),
+                            ),
+                        )
                 if data:
                     result = await conn.execute(
                         sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),

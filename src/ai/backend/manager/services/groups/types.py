@@ -23,7 +23,7 @@ class GroupData:
     dotfiles: bytes
     resource_policy: str
     type: ProjectType
-    container_registry: dict[str, str]
+    container_registry: Optional[dict[str, str]]
 
     @classmethod
     def from_row(cls, row: Optional[GroupRow]) -> Optional[Self]:

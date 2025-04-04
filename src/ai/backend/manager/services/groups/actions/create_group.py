@@ -1,27 +1,38 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, Optional, cast, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.services.groups.actions.base import GroupAction
 from ai.backend.manager.services.groups.types import GroupData
+from ai.backend.manager.types import OptionalState, State, TriState
 
 
 @dataclass
 class CreateGroupAction(GroupAction):
     name: str
     domain_name: str
-    type: Optional[ProjectType] = ProjectType.GENERAL
-    description: Optional[str] = ""
-    is_active: Optional[bool] = True
-    total_resource_slots: Optional[ResourceSlot] = field(
-        default_factory=lambda: ResourceSlot.from_user_input({}, None)
+    type: OptionalState[ProjectType] = field(default_factory=lambda: OptionalState.nop("type"))
+    description: OptionalState[Optional[str]] = field(
+        default_factory=lambda: OptionalState.nop("description")
     )
-    allowed_vfolder_hosts: Optional[dict[str, str]] = field(default_factory=dict)
-    integration_id: Optional[str] = ""
-    resource_policy: Optional[str] = "default"
-    container_registry: Optional[dict[str, str]] = field(default_factory=dict)
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    total_resource_slots: OptionalState[Optional[ResourceSlot]] = field(
+        default_factory=lambda: OptionalState.nop("total_resource_slots")
+    )
+    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+    )
+    integration_id: OptionalState[Optional[str]] = field(
+        default_factory=lambda: OptionalState.nop("integration_id")
+    )
+    resource_policy: OptionalState[str] = field(
+        default_factory=lambda: OptionalState.nop("resource_policy")
+    )
+    container_registry: OptionalState[Optional[dict[str, str]]] = field(
+        default_factory=lambda: OptionalState.nop("container_registry")
+    )
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -32,18 +43,25 @@ class CreateGroupAction(GroupAction):
         return "create"
 
     def get_insertion_data(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "domain_name": self.domain_name,
-            "type": self.type,
-            "description": self.description,
-            "is_active": self.is_active,
-            "total_resource_slots": self.total_resource_slots,
-            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
-            "integration_id": self.integration_id,
-            "resource_policy": self.resource_policy,
-            "container_registry": self.container_registry,
-        }
+        result = {"name": self.name, "domain_name": self.domain_name}
+
+        optional_fields = [
+            "type",
+            "description",
+            "is_active",
+            "total_resource_slots",
+            "allowed_vfolder_hosts",
+            "integration_id",
+            "resource_policy",
+            "container_registry",
+        ]
+
+        for field_name in optional_fields:
+            field_value: TriState = getattr(self, field_name)
+            if field_value.state() != State.NOP:
+                result[field_name] = cast(Any, field_value.value())
+
+        return result
 
 
 @dataclass
