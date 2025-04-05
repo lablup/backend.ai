@@ -1,7 +1,7 @@
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
-from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.users.processors import UserProcessors
 
 
 class Processors:
