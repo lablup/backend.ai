@@ -81,6 +81,8 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.groups.processors import GroupProcessors
+from ai.backend.manager.services.groups.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.processors import Processors
@@ -464,8 +466,11 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     container_registry_processor = ContainerRegistryProcessors(container_registry_service)
 
+    group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
+    group_processor = GroupProcessors(group_service)
     root_ctx.processors = Processors(
         domain=domain_processor,
+        group=group_processor,
         user=user_processor,
         image=image_processor,
         container_registry=container_registry_processor,
