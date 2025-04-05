@@ -95,8 +95,11 @@ class UserService:
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
         username = action.username if action.username else action.email
+        _status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
         if action.status is None and action.is_active is not None:
             _status = UserStatus.ACTIVE if action.is_active else UserStatus.INACTIVE
+        if action.status is not None:
+            _status = action.status
         group_ids = [] if action.group_ids is None else action.group_ids
 
         user_data = {
