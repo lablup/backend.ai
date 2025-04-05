@@ -19,7 +19,6 @@ from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.users.actions.modify_user import UserModifiableFields
 from ai.backend.manager.types import OptionalState
 
 from .base import (
@@ -49,6 +48,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.users.actions.modify_user import (
         ModifyUserAction,
         ModifyUserActionResult,
+        UserModifiableFields,
     )
     from ai.backend.manager.services.users.actions.purge_user import (
         PurgeUserAction,
