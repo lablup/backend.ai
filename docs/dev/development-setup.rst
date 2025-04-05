@@ -16,19 +16,19 @@ The installation guide in this page using ``scripts/install-dev.sh`` covers all 
 is that how you launch the Web UI from the mono-repo.
 
 .. _dev-setup-standard:
-.. figure:: dev-setup.svg
+.. figure:: dev-setup.png
    :align: center
 
    A standard development setup of Backend.AI open source components
 
 .. _dev-setup-app:
-.. figure:: dev-setup-app.svg
+.. figure:: dev-setup-app.png
    :align: center
 
    A development setup of Backend.AI open source components for Electron-based desktop app
 
 .. _dev-setup-staticwebui:
-.. figure:: dev-setup-staticwebui.svg
+.. figure:: dev-setup-staticwebui.png
    :width: 77%
    :align: center
 
