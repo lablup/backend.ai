@@ -31,6 +31,7 @@ class BaseBatchAction(ABC):
     def operation_type(self) -> str:
         raise NotImplementedError
 
+
 class BaseActionResult(ABC):
     @abstractmethod
     def entity_id(self) -> Optional[str]:
