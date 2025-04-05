@@ -3,9 +3,8 @@ from __future__ import annotations
 import enum
 import logging
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Self, Sequence, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
-import aiotools
 import bcrypt
 import graphene
 import sqlalchemy as sa
@@ -14,18 +13,14 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.types import OptionalState
 
-from ..api.exceptions import VFolderOperationFailed
 from .base import (
     Base,
     EnumValueType,
@@ -39,7 +34,7 @@ from .base import (
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .utils import ExtendedAsyncSAEngine, define_state, execute_with_txn_retry
+from .utils import define_state
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.users.actions.create_user import (
@@ -56,12 +51,12 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.users.actions.purge_user import (
         PurgeUserAction,
+        PurgeUserActionResult,
     )
     from ai.backend.manager.services.users.type import UserData, UserInfoContext
 
     from .gql import GraphQueryContext
     from .keypair import KeyPairRow
-    from .storage import StorageSessionManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -1038,360 +1033,22 @@ class PurgeUser(graphene.Mutation):
         email: str,
         props: PurgeUserInput,
     ) -> PurgeUser:
-        from .endpoint import EndpointRow
-
         graph_ctx: GraphQueryContext = info.context
-
-        async def _delete(db_session: SASession) -> None:
-            conn = await db_session.connection()
-            user_uuid = await db_session.scalar(
-                sa.select(UserRow.uuid).where(UserRow.email == email),
-            )
-            user_uuid = cast(Optional[UUID], user_uuid)
-            log.info("Purging all records of the user {0}...", email)
-            if user_uuid is None:
-                raise RuntimeError(f"User not found (email: {email})")
-
-            if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
-                raise RuntimeError(
-                    "Some of user's virtual folders are mounted to active kernels. "
-                    "Terminate those kernels first.",
-                )
-
-            if not props.purge_shared_vfolders:
-                await cls.migrate_shared_vfolders(
-                    conn,
-                    deleted_user_uuid=user_uuid,
-                    target_user_uuid=graph_ctx.user["uuid"],
-                    target_user_email=graph_ctx.user["email"],
-                )
-            if props.delegate_endpoint_ownership:
-                await EndpointRow.delegate_endpoint_ownership(
-                    db_session, user_uuid, graph_ctx.user["uuid"], graph_ctx.user["main_access_key"]
-                )
-                await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=True)
-            else:
-                await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=False)
-            if await cls._user_has_active_sessions(db_session, user_uuid):
-                raise RuntimeError("User has some active sessions. Terminate them first.")
-            await cls._delete_sessions(db_session, user_uuid)
-            await cls._delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
-            await cls.delete_error_logs(conn, user_uuid)
-            await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
-
-            await db_session.execute(sa.delete(users).where(users.c.email == email))
-
-        async with graph_ctx.db.connect() as db_conn:
-            await execute_with_txn_retry(_delete, graph_ctx.db.begin_session, db_conn)
-        return PurgeUser(True, "success")
-
-    @classmethod
-    async def migrate_shared_vfolders(
-        cls,
-        conn: SAConnection,
-        deleted_user_uuid: UUID,
-        target_user_uuid: UUID,
-        target_user_email: str,
-    ) -> int:
-        """
-        Migrate shared virtual folders' ownership to a target user.
-
-        If migrating virtual folder's name collides with target user's already
-        existing folder, append random string to the migrating one.
-
-        :param conn: DB connection
-        :param deleted_user_uuid: user's UUID who will be deleted
-        :param target_user_uuid: user's UUID who will get the ownership of virtual folders
-
-        :return: number of deleted rows
-        """
-        from . import vfolder_invitations, vfolder_permissions, vfolders
-
-        # Gather target user's virtual folders' names.
-        query = (
-            sa.select([vfolders.c.name])
-            .select_from(vfolders)
-            .where(vfolders.c.user == target_user_uuid)
+        user_info_ctx = UserInfoContext(
+            uuid=graph_ctx.user["uuid"],
+            email=graph_ctx.user["email"],
+            main_access_key=graph_ctx.user["main_access_key"],
         )
-        existing_vfolder_names = [row.name async for row in (await conn.stream(query))]
+        action = props.to_action(email, user_info_ctx)
 
-        # Migrate shared virtual folders.
-        # If virtual folder's name collides with target user's folder,
-        # append random string to the name of the migrating folder.
-        j = vfolder_permissions.join(
-            vfolders,
-            vfolder_permissions.c.vfolder == vfolders.c.id,
-        )
-        query = (
-            sa.select([vfolders.c.id, vfolders.c.name])
-            .select_from(j)
-            .where(vfolders.c.user == deleted_user_uuid)
-        )
-        migrate_updates = []
-        async for row in await conn.stream(query):
-            name = row.name
-            if name in existing_vfolder_names:
-                name += f"-{uuid4().hex[:10]}"
-            migrate_updates.append({"vid": row.id, "vname": name})
-        if migrate_updates:
-            # Remove invitations and vfolder_permissions from target user.
-            # Target user will be the new owner, and it does not make sense to have
-            # invitation and shared permission for its own folder.
-            migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
-            delete_query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == target_user_email)
-                & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
-            delete_query = sa.delete(vfolder_permissions).where(
-                (vfolder_permissions.c.user == target_user_uuid)
-                & (vfolder_permissions.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
-
-            rowcount = 0
-            for item in migrate_updates:
-                update_query = (
-                    sa.update(vfolders)
-                    .values(
-                        user=target_user_uuid,
-                        name=item["vname"],
-                    )
-                    .where(vfolders.c.id == item["vid"])
-                )
-                result = await conn.execute(update_query)
-                rowcount += result.rowcount
-            if rowcount > 0:
-                log.info(
-                    "{0} shared folders are detected and migrated to user {1}",
-                    rowcount,
-                    target_user_uuid,
-                )
-            return rowcount
-        else:
-            return 0
-
-    @classmethod
-    async def _delete_vfolders(
-        cls,
-        engine: ExtendedAsyncSAEngine,
-        user_uuid: UUID,
-        storage_manager: StorageSessionManager,
-        *,
-        delete_service: bool = False,
-    ) -> int:
-        """
-        Delete user's all virtual folders as well as their physical data.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID to delete virtual folders
-
-        :return: number of deleted rows
-        """
-        from . import (
-            VFolderDeletionInfo,
-            VFolderRow,
-            VFolderStatusSet,
-            initiate_vfolder_deletion,
-            vfolder_permissions,
-            vfolder_status_map,
+        res: PurgeUserActionResult = await graph_ctx.processors.user.purge_user.wait_for_complete(
+            action
         )
 
-        target_vfs: list[VFolderDeletionInfo] = []
-        async with engine.begin_session() as db_session:
-            await db_session.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-            )
-            result = await db_session.scalars(
-                sa.select(VFolderRow).where(
-                    sa.and_(
-                        VFolderRow.user == user_uuid,
-                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
-                    )
-                ),
-            )
-            rows = cast(list[VFolderRow], result.fetchall())
-            for vf in rows:
-                target_vfs.append(
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
-                )
-
-        storage_ptask_group = aiotools.PersistentTaskGroup()
-        try:
-            await initiate_vfolder_deletion(
-                engine,
-                target_vfs,
-                storage_manager,
-                storage_ptask_group,
-            )
-        except VFolderOperationFailed as e:
-            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
-            raise
-        deleted_count = len(target_vfs)
-        if deleted_count > 0:
-            log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
-        return deleted_count
-
-    @classmethod
-    async def user_vfolder_mounted_to_active_kernels(
-        cls,
-        conn: SAConnection,
-        user_uuid: UUID,
-    ) -> bool:
-        """
-        Check if no active kernel is using the user's virtual folders.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID
-
-        :return: True if a virtual folder is mounted to active kernels.
-        """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, vfolders
-
-        result = await conn.execute(
-            sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.user == user_uuid),
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
         )
-        rows = result.fetchall()
-        user_vfolder_ids = [row.id for row in rows]
-        query = (
-            sa.select([kernels.c.mounts])
-            .select_from(kernels)
-            .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-        )
-        async for row in await conn.stream(query):
-            for _mount in row["mounts"]:
-                try:
-                    vfolder_id = UUID(_mount[2])
-                    if vfolder_id in user_vfolder_ids:
-                        return True
-                except Exception:
-                    pass
-        return False
-
-    @classmethod
-    async def _user_has_active_sessions(
-        cls,
-        db_session: SASession,
-        user_uuid: UUID,
-    ) -> bool:
-        """
-        Check if the user does not have active sessions.
-        """
-        from .session import AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES, SessionRow
-
-        active_session_count = await db_session.scalar(
-            sa.select(sa.func.count())
-            .select_from(SessionRow)
-            .where(
-                sa.and_(
-                    SessionRow.user_uuid == user_uuid,
-                    SessionRow.status.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
-                )
-            ),
-        )
-        return active_session_count > 0
-
-    @classmethod
-    async def _delete_endpoint(
-        cls,
-        db_session: SASession,
-        user_uuid: UUID,
-        *,
-        delete_destroyed_only: bool = False,
-    ) -> None:
-        """
-        Delete user's all endpoint.
-        """
-        from .endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-
-        if delete_destroyed_only:
-            status_filter = {EndpointLifecycle.DESTROYED}
-        else:
-            status_filter = {status for status in EndpointLifecycle}
-        endpoint_rows = await EndpointRow.list(
-            db_session, user_uuid=user_uuid, load_tokens=True, status_filter=status_filter
-        )
-        token_ids_to_delete = []
-        endpoint_ids_to_delete = []
-        for row in endpoint_rows:
-            token_ids_to_delete.extend([token.id for token in row.tokens])
-            endpoint_ids_to_delete.append(row.id)
-        await db_session.execute(
-            sa.delete(EndpointTokenRow).where(EndpointTokenRow.id.in_(token_ids_to_delete))
-        )
-        await db_session.execute(
-            sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
-        )
-
-    @classmethod
-    async def delete_error_logs(
-        cls,
-        conn: SAConnection,
-        user_uuid: UUID,
-    ) -> int:
-        """
-        Delete user's all error logs.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID to delete error logs
-        :return: number of deleted rows
-        """
-        from .error_logs import error_logs
-
-        result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
-        if result.rowcount > 0:
-            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
-        return result.rowcount
-
-    @classmethod
-    async def _delete_sessions(
-        cls,
-        db_session: SASession,
-        user_uuid: UUID,
-    ) -> None:
-        """
-        Delete user's sessions.
-        """
-        from .session import SessionRow
-
-        await SessionRow.delete_by_user_id(user_uuid, db_session=db_session)
-
-    @classmethod
-    async def delete_keypairs(
-        cls,
-        conn: SAConnection,
-        redis_conn: RedisConnectionInfo,
-        user_uuid: UUID,
-    ) -> int:
-        """
-        Delete user's all keypairs.
-
-        :param conn: DB connection
-        :param redis_conn: redis connection info
-        :param user_uuid: user's UUID to delete keypairs
-        :return: number of deleted rows
-        """
-        from . import keypairs
-
-        ak_rows = await conn.execute(
-            sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
-        )
-        if (row := ak_rows.first()) and (access_key := row.access_key):
-            # Log concurrency used only when there is at least one keypair.
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-            )
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.sftp_concurrency_used.{access_key}"),
-            )
-        result = await conn.execute(
-            sa.delete(keypairs).where(keypairs.c.user == user_uuid),
-        )
-        if result.rowcount > 0:
-            log.info("deleted {0} user's keypairs ({1})", result.rowcount, user_uuid)
-        return result.rowcount
 
 
 def _hash_password(password: str) -> str:
