@@ -719,7 +719,7 @@ class ModifyUserInput(graphene.InputObjectType):
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email) -> ModifyUserAction:
+    def to_action(self, email: str) -> ModifyUserAction:
         def value_or_none(value: Any) -> Optional[Any]:
             return value if value is not Undefined else None
 
