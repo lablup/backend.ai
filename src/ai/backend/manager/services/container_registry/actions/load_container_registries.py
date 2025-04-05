@@ -6,8 +6,6 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
-# TODO: load_configured_registries 해당 하는 부분은 단일 액션을 만들 수 없음.
-# BatchAction...
 @dataclass
 class LoadContainerRegistriesAction(ContainerRegistryAction):
     registry: str
