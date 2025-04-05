@@ -26,7 +26,6 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -37,7 +36,6 @@ from ai.backend.common.types import (
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -774,6 +772,16 @@ class ForgetImage(graphene.Mutation):
             return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
+class PurgeImageOptions(graphene.InputObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    remove_from_registry = graphene.Boolean(
+        default_value=False, description="Only available in the HarborV2 registry."
+    )
+
+
 class PurgeImageById(graphene.Mutation):
     """Added in 25.4.0."""
 
@@ -785,6 +793,11 @@ class PurgeImageById(graphene.Mutation):
 
     class Arguments:
         image_id = graphene.String(required=True)
+        options = PurgeImageOptions(
+            required=False,
+            default_value={"remove_from_registry": False},
+            description="Added in 25.6.0.",
+        )
 
     image = graphene.Field(ImageNode)
 
@@ -793,6 +806,7 @@ class PurgeImageById(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         image_id: str,
+        options: PurgeImageOptions,
     ) -> PurgeImageById:
         log.info("purge image row {0} by API request", image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")
@@ -807,15 +821,20 @@ class PurgeImageById(graphene.Mutation):
             if client_role != UserRole.SUPERADMIN:
                 if not image_row.is_owned_by(ctx.user["uuid"]):
                     raise GenericForbidden("Image is not owned by your account.")
+
             for alias in image_row.aliases:
                 await session.delete(alias)
 
             await session.delete(image_row)
+
+            if options.remove_from_registry:
+                await image_row.untag_image_from_registry(ctx.db, session)
+
             return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Added in 24.03.1"""
+    """Deprecated since 25.6.0. Use `purge_image_by_id`, and `remove_from_registry` option instead."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
@@ -836,8 +855,6 @@ class UntagImageFromRegistry(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> UntagImageFromRegistry:
-        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-
         image_uuid = extract_object_uuid(info, image_id, "image")
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
@@ -852,17 +869,7 @@ class UntagImageFromRegistry(graphene.Mutation):
                 if not image_row.is_owned_by(ctx.user["uuid"]):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 
-            query = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == image_row.image_ref.registry
-            )
-
-            registry_info = (await session.execute(query)).scalar()
-
-            if registry_info.type != ContainerRegistryType.HARBOR2:
-                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
-
-        scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
-        await scanner.untag(image_row.image_ref)
+            await image_row.untag_image_from_registry(ctx.db, session)
 
         return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 

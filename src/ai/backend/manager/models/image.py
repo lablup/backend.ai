@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -743,6 +744,23 @@ class ImageRow(Base):
 
     def is_owned_by(self, user_id: UUID) -> bool:
         return self.customized and self.labels["ai.backend.customized-image.owner"] == str(user_id)
+
+    async def untag_image_from_registry(
+        self, db: ExtendedAsyncSAEngine, session: AsyncSession
+    ) -> None:
+        """
+        Works only for HarborV2 registries.
+        """
+        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
+
+        query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == self.registry_id)
+
+        registry_info: ContainerRegistryRow = (await session.execute(query)).scalar()
+        if registry_info.type != ContainerRegistryType.HARBOR2:
+            raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+
+        scanner = HarborRegistry_v2(db, self.image_ref.registry, registry_info)
+        await scanner.untag(self.image_ref)
 
 
 async def bulk_get_image_configs(
