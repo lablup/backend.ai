@@ -77,8 +77,12 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
@@ -438,14 +442,10 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # image_service = ImageService(
-    #     db=root_ctx.db,
-    #     agent_registry=root_ctx.registry,
-    # )
-
-    # root_ctx.processors = Processors(
-    #     image_service=image_service,
-    # )
+    image_service = ImageService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+    )
 
     user_service = UserService(
         db=root_ctx.db,
@@ -453,13 +453,22 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         redis_stat=root_ctx.redis_stat,
     )
     user_processor = UserProcessors(user_service)
-
     domain_service = DomainService(root_ctx.db)
     domain_processor = DomainProcessors(domain_service)
+
+    image_service = ImageService(root_ctx.db, root_ctx.registry)
+    image_processor = ImageProcessors(image_service)
+
+    container_registry_service = ContainerRegistryService(
+        db=root_ctx.db,
+    )
+    container_registry_processor = ContainerRegistryProcessors(container_registry_service)
 
     root_ctx.processors = Processors(
         domain=domain_processor,
         user=user_processor,
+        image=image_processor,
+        container_registry=container_registry_processor,
     )
 
     yield
