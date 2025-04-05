@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Self, Sequence, cast
-from uuid import UUID, uuid4
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Self, Sequence, cast
+from uuid import UUID
 
-import aiotools
 import bcrypt
 import graphene
 import sqlalchemy as sa
@@ -13,21 +12,15 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
-from sqlalchemy.sql.expression import bindparam
+from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.types import OptionalState
 
-from ..api.exceptions import VFolderOperationFailed
-from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from .base import (
     Base,
     EnumValueType,
@@ -38,18 +31,33 @@ from .base import (
     batch_multiresult,
     batch_result,
     mapper_registry,
-    set_if_set,
-    simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from .utils import define_state
 
 if TYPE_CHECKING:
+    from ai.backend.manager.services.users.actions.create_user import (
+        CreateUserAction,
+        CreateUserActionResult,
+    )
+    from ai.backend.manager.services.users.actions.delete_user import (
+        DeleteUserAction,
+        DeleteUserActionResult,
+    )
+    from ai.backend.manager.services.users.actions.modify_user import (
+        ModifyUserAction,
+        ModifyUserActionResult,
+        UserModifiableFields,
+    )
+    from ai.backend.manager.services.users.actions.purge_user import (
+        PurgeUserAction,
+        PurgeUserActionResult,
+    )
+    from ai.backend.manager.services.users.type import UserData, UserInfoContext
+
     from .gql import GraphQueryContext
     from .keypair import KeyPairRow
-    from .storage import StorageSessionManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -318,6 +326,34 @@ class User(graphene.ObjectType):
         manager = ctx.dataloader_manager
         loader = manager.get_loader(ctx, "UserGroup.by_user_id")
         return await loader.load(self.id)
+
+    @classmethod
+    def from_dto(cls, dto: UserData) -> Self:
+        return cls(
+            id=dto.id,
+            uuid=dto.uuid,  # legacy
+            username=dto.username,
+            email=dto.email,
+            need_password_change=dto.need_password_change,
+            full_name=dto.full_name,
+            description=dto.description,
+            is_active=dto.is_active,
+            status=dto.status,
+            status_info=dto.status_info,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            domain_name=dto.domain_name,
+            role=dto.role,
+            resource_policy=dto.resource_policy,
+            allowed_client_ip=dto.allowed_client_ip,
+            totp_activated=dto.totp_activated,
+            totp_activated_at=dto.totp_activated_at,
+            sudo_session_enabled=dto.sudo_session_enabled,
+            main_access_key=dto.main_access_key,
+            container_uid=dto.container_uid,
+            container_main_gid=dto.container_main_gid,
+            container_gids=dto.container_gids,
+        )
 
     @classmethod
     def from_row(
@@ -627,6 +663,31 @@ class UserInput(graphene.InputObjectType):
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
+    def to_action(self, email: str) -> CreateUserAction:
+        def value_or_none(value: Any) -> Optional[Any]:
+            return value if value is not Undefined else None
+
+        return CreateUserAction(
+            username=self.username,
+            password=self.password,
+            email=email,
+            need_password_change=self.need_password_change,
+            domain_name=self.domain_name,
+            full_name=value_or_none(self.full_name),
+            description=value_or_none(self.description),
+            is_active=value_or_none(self.is_active),
+            status=UserStatus(self.status) if self.status is not Undefined else None,
+            role=UserRole(self.role) if self.role is not Undefined else None,
+            allowed_client_ip=value_or_none(self.allowed_client_ip),
+            totp_activated=value_or_none(self.totp_activated),
+            resource_policy=value_or_none(self.resource_policy),
+            sudo_session_enabled=value_or_none(self.sudo_session_enabled),
+            group_ids=value_or_none(self.group_ids),
+            container_uid=value_or_none(self.container_uid),
+            container_main_gid=value_or_none(self.container_main_gid),
+            container_gids=value_or_none(self.container_gids),
+        )
+
 
 class ModifyUserInput(graphene.InputObjectType):
     username = graphene.String(required=False)
@@ -658,6 +719,108 @@ class ModifyUserInput(graphene.InputObjectType):
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
+    def to_action(self, email: str) -> ModifyUserAction:
+        def value_or_none(value: Any) -> Optional[Any]:
+            return value if value is not Undefined else None
+
+        modfifialble_fields = UserModifiableFields(
+            username=OptionalState(
+                "username",
+                define_state(self.username),
+                value_or_none(self.username),
+            ),
+            password=OptionalState(
+                "password",
+                define_state(self.password),
+                value_or_none(self.password),
+            ),
+            need_password_change=OptionalState(
+                "need_password_change",
+                define_state(self.need_password_change),
+                value_or_none(self.need_password_change),
+            ),
+            full_name=OptionalState(
+                "full_name",
+                define_state(self.full_name),
+                value_or_none(self.full_name),
+            ),
+            description=OptionalState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active",
+                define_state(self.is_active),
+                value_or_none(self.is_active),
+            ),
+            status=OptionalState(
+                "status",
+                define_state(self.status),
+                UserStatus(self.status) if self.status is not Undefined else None,
+            ),
+            domain_name=OptionalState(
+                "domain_name",
+                define_state(self.domain_name),
+                value_or_none(self.domain_name),
+            ),
+            role=OptionalState(
+                "role",
+                define_state(self.role),
+                UserRole(self.role) if self.role is not Undefined else None,
+            ),
+            group_ids=OptionalState(
+                "group_ids",
+                define_state(self.group_ids),
+                value_or_none(self.group_ids),
+            ),
+            allowed_client_ip=OptionalState(
+                "allowed_client_ip",
+                define_state(self.allowed_client_ip),
+                value_or_none(self.allowed_client_ip),
+            ),
+            totp_activated=OptionalState(
+                "totp_activated",
+                define_state(self.totp_activated),
+                value_or_none(self.totp_activated),
+            ),
+            resource_policy=OptionalState(
+                "resource_policy",
+                define_state(self.resource_policy),
+                value_or_none(self.resource_policy),
+            ),
+            sudo_session_enabled=OptionalState(
+                "sudo_session_enabled",
+                define_state(self.sudo_session_enabled),
+                value_or_none(self.sudo_session_enabled),
+            ),
+            main_access_key=OptionalState(
+                "main_access_key",
+                define_state(self.main_access_key),
+                value_or_none(self.main_access_key),
+            ),
+            container_uid=OptionalState(
+                "container_uid",
+                define_state(self.container_uid),
+                value_or_none(self.container_uid),
+            ),
+            container_main_gid=OptionalState(
+                "container_main_gid",
+                define_state(self.container_main_gid),
+                value_or_none(self.container_main_gid),
+            ),
+            container_gids=OptionalState(
+                "container_gids",
+                define_state(self.container_gids),
+                value_or_none(self.container_gids),
+            ),
+        )
+
+        return ModifyUserAction(
+            email=email,
+            modifiable_fields=modfifialble_fields,
+        )
+
 
 class PurgeUserInput(graphene.InputObjectType):
     purge_shared_vfolders = graphene.Boolean(required=False, default=False)
@@ -669,6 +832,24 @@ class PurgeUserInput(graphene.InputObjectType):
             "Indicates whether the user's existing endpoints are delegated to the requester."
         ),
     )
+
+    def to_action(self, email: str, user_info_ctx: UserInfoContext) -> PurgeUserAction:
+        return PurgeUserAction(
+            user_info_ctx=user_info_ctx,
+            email=email,
+            purge_shared_vfolders=OptionalState(
+                "purge_shared_vfolders",
+                define_state(self.purge_shared_vfolders),
+                self.purge_shared_vfolders if self.purge_shared_vfolders is not Undefined else None,
+            ),
+            delegate_endpoint_ownership=OptionalState(
+                "delegate_endpoint_ownership",
+                define_state(self.delegate_endpoint_ownership),
+                self.delegate_endpoint_ownership
+                if self.delegate_endpoint_ownership is not Undefined
+                else None,
+            ),
+        )
 
 
 class CreateUser(graphene.Mutation):
@@ -691,103 +872,16 @@ class CreateUser(graphene.Mutation):
         props: UserInput,
     ) -> CreateUser:
         graph_ctx: GraphQueryContext = info.context
-        username = props.username if props.username else email
-        if props.status is None and props.is_active is not None:
-            _status = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
-        else:
-            _status = UserStatus(props.status)
-        group_ids = [] if props.group_ids is Undefined else props.group_ids
+        action: CreateUserAction = props.to_action(email)
 
-        user_data = {
-            "username": username,
-            "email": email,
-            "password": props.password,
-            "need_password_change": props.need_password_change,
-            "full_name": props.full_name,
-            "description": props.description,
-            "status": _status,
-            "status_info": "admin-requested",  # user mutation is only for admin
-            "domain_name": props.domain_name,
-            "role": UserRole(props.role),
-            "allowed_client_ip": props.allowed_client_ip,
-            "totp_activated": props.totp_activated,
-            "resource_policy": props.resource_policy,
-            "sudo_session_enabled": props.sudo_session_enabled,
-        }
-        set_if_set(props, user_data, "container_uid")
-        set_if_set(props, user_data, "container_main_gid")
-        set_if_set(props, user_data, "container_gids")
-        user_insert_query = sa.insert(users).values(user_data)
+        res: CreateUserActionResult = await graph_ctx.processors.user.create_user.wait_for_complete(
+            action
+        )
 
-        async def _post_func(conn: SAConnection, result: Result) -> Row:
-            from .group import ProjectType, association_groups_users, groups
-
-            if result.rowcount == 0:
-                return
-            created_user = result.first()
-
-            # Create a default keypair for the user.
-            from .keypair import CreateKeyPair, keypairs
-
-            kp_data = CreateKeyPair.prepare_new_keypair(
-                email,
-                {
-                    "is_active": _status == UserStatus.ACTIVE,
-                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                    "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                    "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
-                },
-            )
-            kp_insert_query = sa.insert(keypairs).values(
-                **kp_data,
-                user=created_user.uuid,
-            )
-            await conn.execute(kp_insert_query)
-
-            # Update user main_keypair
-            main_ak = kp_data["access_key"]
-            update_query = (
-                sa.update(users)
-                .where(users.c.uuid == created_user.uuid)
-                .values(main_access_key=main_ak)
-            )
-            await conn.execute(update_query)
-
-            model_store_query = sa.select([groups.c.id]).where(
-                groups.c.type == ProjectType.MODEL_STORE
-            )
-            model_store_project = cast(
-                dict[str, Any] | None, (await conn.execute(model_store_query)).first()
-            )
-            if model_store_project is not None:
-                gids_to_join = [*group_ids, model_store_project["id"]]
-            else:
-                gids_to_join = group_ids
-
-            # Add user to groups if group_ids parameter is provided.
-            if gids_to_join:
-                query = (
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == props.domain_name)
-                    .where(groups.c.id.in_(gids_to_join))
-                )
-                grps = (await conn.execute(query)).all()
-                if grps:
-                    group_data = [
-                        {"user_id": created_user.uuid, "group_id": grp.id} for grp in grps
-                    ]
-                    group_insert_query = sa.insert(association_groups_users).values(group_data)
-                    await conn.execute(group_insert_query)
-
-            return created_user
-
-        return await simple_db_mutate_returning_item(
-            cls,
-            graph_ctx,
-            user_insert_query,
-            item_cls=User,
-            post_func=_post_func,
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+            user=User.from_dto(res.data) if res.data else None,
         )
 
 
@@ -810,190 +904,17 @@ class ModifyUser(graphene.Mutation):
         email: str,
         props: ModifyUserInput,
     ) -> ModifyUser:
-        from .keypair import KeyPairRow
-
         graph_ctx: GraphQueryContext = info.context
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "username")
-        set_if_set(props, data, "password")
-        set_if_set(props, data, "need_password_change")
-        set_if_set(props, data, "full_name")
-        set_if_set(props, data, "description")
-        set_if_set(props, data, "status", clean_func=UserStatus)
-        set_if_set(props, data, "domain_name")
-        set_if_set(props, data, "role", clean_func=UserRole)
-        set_if_set(props, data, "allowed_client_ip")
-        set_if_set(props, data, "totp_activated")
-        set_if_set(props, data, "resource_policy")
-        set_if_set(props, data, "sudo_session_enabled")
-        set_if_set(props, data, "main_access_key")
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "container_uid")
-        set_if_set(props, data, "container_main_gid")
-        set_if_set(props, data, "container_gids")
-        if data.get("password") is None:
-            data.pop("password", None)
-        if not data and not props.group_ids:
-            return cls(ok=False, msg="nothing to update", user=None)
-        if data.get("status") is None and data.get("is_active") is not None:
-            data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
 
-        if data.get("password") is not None:
-            data["password_changed_at"] = sa.func.now()
-
-        main_access_key: str | None = data.get("main_access_key")
-        user_update_data: Dict[str, Any] = {}
-        prev_domain_name: str
-        prev_role: UserRole
-
-        async def _pre_func(conn: SAConnection) -> None:
-            nonlocal user_update_data, prev_domain_name, prev_role, main_access_key
-            result = await conn.execute(
-                sa.select([users.c.domain_name, users.c.role, users.c.status])
-                .select_from(users)
-                .where(users.c.email == email),
-            )
-            row = result.first()
-            prev_domain_name = row.domain_name
-            prev_role = row.role
-            user_update_data = data.copy()
-            if "status" in data and row.status != data["status"]:
-                user_update_data["status_info"] = (
-                    "admin-requested"  # user mutation is only for admin
-                )
-            if main_access_key is not None:
-                db_session = SASession(conn)
-                keypair_query = (
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == main_access_key)
-                    .options(
-                        noload("*"),
-                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
-                    )
-                )
-                keypair_row: KeyPairRow | None = (await db_session.scalars(keypair_query)).first()
-                if keypair_row is None:
-                    raise RuntimeError("Cannot set non-existing access key as the main access key.")
-                if keypair_row.user_row.email != email:
-                    raise RuntimeError(
-                        "Cannot set another user's access key as the main access key."
-                    )
-                await conn.execute(
-                    sa.update(users)
-                    .where(users.c.email == email)
-                    .values(main_access_key=main_access_key)
-                )
-
-        update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()
-            sa.update(users).values(user_update_data).where(users.c.email == email)
+        action: ModifyUserAction = props.to_action(email)
+        res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
+            action
         )
 
-        async def _post_func(conn: SAConnection, result: Result) -> Row:
-            nonlocal prev_domain_name, prev_role
-            updated_user = result.first()
-            if "role" in data and data["role"] != prev_role:
-                from ai.backend.manager.models import keypairs
-
-                result = await conn.execute(
-                    sa.select([
-                        keypairs.c.user,
-                        keypairs.c.is_active,
-                        keypairs.c.is_admin,
-                        keypairs.c.access_key,
-                    ])
-                    .select_from(keypairs)
-                    .where(keypairs.c.user == updated_user.uuid)
-                    .order_by(sa.desc(keypairs.c.is_admin))
-                    .order_by(sa.desc(keypairs.c.is_active)),
-                )
-                if data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]:
-                    # User's becomes admin. Set the keypair as active admin.
-                    # TODO: Should we update the role of all users related to keypair?
-                    kp = result.first()
-                    kp_data = dict()
-                    if not kp.is_admin:
-                        kp_data["is_admin"] = True
-                    if not kp.is_active:
-                        kp_data["is_active"] = True
-                    if kp_data:
-                        await conn.execute(
-                            sa.update(keypairs)
-                            .values(kp_data)
-                            .where(keypairs.c.user == updated_user.uuid),
-                        )
-                else:
-                    # User becomes non-admin. Make the keypair non-admin as well.
-                    # If there are multiple admin keypairs, inactivate them.
-                    # TODO: Should elaborate keypair inactivation policy.
-                    rows = result.fetchall()
-                    kp_updates = []
-                    for idx, row in enumerate(rows):
-                        kp_data = {
-                            "b_access_key": row.access_key,
-                            "is_admin": row.is_admin,
-                            "is_active": row.is_active,
-                        }
-                        if idx == 0:
-                            kp_data["is_admin"] = False
-                            kp_updates.append(kp_data)
-                            continue
-                        if row.is_admin and row.is_active:
-                            kp_data["is_active"] = False
-                            kp_updates.append(kp_data)
-                    if kp_updates:
-                        await conn.execute(
-                            sa.update(keypairs)
-                            .values({
-                                "is_admin": bindparam("is_admin"),
-                                "is_active": bindparam("is_active"),
-                            })
-                            .where(keypairs.c.access_key == bindparam("b_access_key")),
-                            kp_updates,
-                        )
-
-            # If domain is changed and no group is associated, clear previous domain's group.
-            if prev_domain_name != updated_user.domain_name and not props.group_ids:
-                from .group import association_groups_users, groups
-
-                await conn.execute(
-                    sa.delete(association_groups_users).where(
-                        association_groups_users.c.user_id == updated_user.uuid
-                    ),
-                )
-
-            # Update user's group if group_ids parameter is provided.
-            if props.group_ids and updated_user is not None:
-                from .group import association_groups_users, groups  # noqa
-
-                # Clear previous groups associated with the user.
-                await conn.execute(
-                    sa.delete(association_groups_users).where(
-                        association_groups_users.c.user_id == updated_user.uuid
-                    ),
-                )
-                # Add user to new groups.
-                result = await conn.execute(
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == updated_user.domain_name)
-                    .where(groups.c.id.in_(props.group_ids)),
-                )
-                grps = result.fetchall()
-                if grps:
-                    values = [{"user_id": updated_user.uuid, "group_id": grp.id} for grp in grps]
-                    await conn.execute(
-                        sa.insert(association_groups_users).values(values),
-                    )
-
-            return updated_user
-
-        return await simple_db_mutate_returning_item(
-            cls,
-            graph_ctx,
-            update_query,
-            item_cls=User,
-            pre_func=_pre_func,
-            post_func=_post_func,
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+            user=User.from_dto(res.data) if res.data else None,
         )
 
 
@@ -1021,20 +942,15 @@ class DeleteUser(graphene.Mutation):
     ) -> DeleteUser:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _pre_func(conn: SAConnection) -> None:
-            # Make all user keypairs inactive.
-            from ai.backend.manager.models import keypairs
-
-            await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user_id == email),
-            )
-
-        update_query = (
-            sa.update(users)
-            .values(status=UserStatus.DELETED, status_info="admin-requested")
-            .where(users.c.email == email)
+        action = DeleteUserAction(email)
+        res: DeleteUserActionResult = await graph_ctx.processors.user.delete_user.wait_for_complete(
+            action
         )
-        return await simple_db_mutate(cls, graph_ctx, update_query, pre_func=_pre_func)
+
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
+        )
 
 
 class PurgeUser(graphene.Mutation):
@@ -1070,360 +986,22 @@ class PurgeUser(graphene.Mutation):
         email: str,
         props: PurgeUserInput,
     ) -> PurgeUser:
-        from .endpoint import EndpointRow
-
         graph_ctx: GraphQueryContext = info.context
-
-        async def _delete(db_session: SASession) -> None:
-            conn = await db_session.connection()
-            user_uuid = await db_session.scalar(
-                sa.select(UserRow.uuid).where(UserRow.email == email),
-            )
-            user_uuid = cast(Optional[UUID], user_uuid)
-            log.info("Purging all records of the user {0}...", email)
-            if user_uuid is None:
-                raise RuntimeError(f"User not found (email: {email})")
-
-            if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
-                raise RuntimeError(
-                    "Some of user's virtual folders are mounted to active kernels. "
-                    "Terminate those kernels first.",
-                )
-
-            if not props.purge_shared_vfolders:
-                await cls.migrate_shared_vfolders(
-                    conn,
-                    deleted_user_uuid=user_uuid,
-                    target_user_uuid=graph_ctx.user["uuid"],
-                    target_user_email=graph_ctx.user["email"],
-                )
-            if props.delegate_endpoint_ownership:
-                await EndpointRow.delegate_endpoint_ownership(
-                    db_session, user_uuid, graph_ctx.user["uuid"], graph_ctx.user["main_access_key"]
-                )
-                await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=True)
-            else:
-                await cls._delete_endpoint(db_session, user_uuid, delete_destroyed_only=False)
-            if await cls._user_has_active_sessions(db_session, user_uuid):
-                raise RuntimeError("User has some active sessions. Terminate them first.")
-            await cls._delete_sessions(db_session, user_uuid)
-            await cls._delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
-            await cls.delete_error_logs(conn, user_uuid)
-            await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
-
-            await db_session.execute(sa.delete(users).where(users.c.email == email))
-
-        async with graph_ctx.db.connect() as db_conn:
-            await execute_with_txn_retry(_delete, graph_ctx.db.begin_session, db_conn)
-        return PurgeUser(True, "success")
-
-    @classmethod
-    async def migrate_shared_vfolders(
-        cls,
-        conn: SAConnection,
-        deleted_user_uuid: UUID,
-        target_user_uuid: UUID,
-        target_user_email: str,
-    ) -> int:
-        """
-        Migrate shared virtual folders' ownership to a target user.
-
-        If migrating virtual folder's name collides with target user's already
-        existing folder, append random string to the migrating one.
-
-        :param conn: DB connection
-        :param deleted_user_uuid: user's UUID who will be deleted
-        :param target_user_uuid: user's UUID who will get the ownership of virtual folders
-
-        :return: number of deleted rows
-        """
-        from . import vfolder_invitations, vfolder_permissions, vfolders
-
-        # Gather target user's virtual folders' names.
-        query = (
-            sa.select([vfolders.c.name])
-            .select_from(vfolders)
-            .where(vfolders.c.user == target_user_uuid)
+        user_info_ctx = UserInfoContext(
+            uuid=graph_ctx.user["uuid"],
+            email=graph_ctx.user["email"],
+            main_access_key=graph_ctx.user["main_access_key"],
         )
-        existing_vfolder_names = [row.name async for row in (await conn.stream(query))]
+        action = props.to_action(email, user_info_ctx)
 
-        # Migrate shared virtual folders.
-        # If virtual folder's name collides with target user's folder,
-        # append random string to the name of the migrating folder.
-        j = vfolder_permissions.join(
-            vfolders,
-            vfolder_permissions.c.vfolder == vfolders.c.id,
-        )
-        query = (
-            sa.select([vfolders.c.id, vfolders.c.name])
-            .select_from(j)
-            .where(vfolders.c.user == deleted_user_uuid)
-        )
-        migrate_updates = []
-        async for row in await conn.stream(query):
-            name = row.name
-            if name in existing_vfolder_names:
-                name += f"-{uuid4().hex[:10]}"
-            migrate_updates.append({"vid": row.id, "vname": name})
-        if migrate_updates:
-            # Remove invitations and vfolder_permissions from target user.
-            # Target user will be the new owner, and it does not make sense to have
-            # invitation and shared permission for its own folder.
-            migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
-            delete_query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == target_user_email)
-                & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
-            delete_query = sa.delete(vfolder_permissions).where(
-                (vfolder_permissions.c.user == target_user_uuid)
-                & (vfolder_permissions.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
-
-            rowcount = 0
-            for item in migrate_updates:
-                update_query = (
-                    sa.update(vfolders)
-                    .values(
-                        user=target_user_uuid,
-                        name=item["vname"],
-                    )
-                    .where(vfolders.c.id == item["vid"])
-                )
-                result = await conn.execute(update_query)
-                rowcount += result.rowcount
-            if rowcount > 0:
-                log.info(
-                    "{0} shared folders are detected and migrated to user {1}",
-                    rowcount,
-                    target_user_uuid,
-                )
-            return rowcount
-        else:
-            return 0
-
-    @classmethod
-    async def _delete_vfolders(
-        cls,
-        engine: ExtendedAsyncSAEngine,
-        user_uuid: UUID,
-        storage_manager: StorageSessionManager,
-        *,
-        delete_service: bool = False,
-    ) -> int:
-        """
-        Delete user's all virtual folders as well as their physical data.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID to delete virtual folders
-
-        :return: number of deleted rows
-        """
-        from . import (
-            VFolderDeletionInfo,
-            VFolderRow,
-            VFolderStatusSet,
-            initiate_vfolder_deletion,
-            vfolder_permissions,
-            vfolder_status_map,
+        res: PurgeUserActionResult = await graph_ctx.processors.user.purge_user.wait_for_complete(
+            action
         )
 
-        target_vfs: list[VFolderDeletionInfo] = []
-        async with engine.begin_session() as db_session:
-            await db_session.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-            )
-            result = await db_session.scalars(
-                sa.select(VFolderRow).where(
-                    sa.and_(
-                        VFolderRow.user == user_uuid,
-                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
-                    )
-                ),
-            )
-            rows = cast(list[VFolderRow], result.fetchall())
-            for vf in rows:
-                target_vfs.append(
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
-                )
-
-        storage_ptask_group = aiotools.PersistentTaskGroup()
-        try:
-            await initiate_vfolder_deletion(
-                engine,
-                target_vfs,
-                storage_manager,
-                storage_ptask_group,
-            )
-        except VFolderOperationFailed as e:
-            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
-            raise
-        deleted_count = len(target_vfs)
-        if deleted_count > 0:
-            log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
-        return deleted_count
-
-    @classmethod
-    async def user_vfolder_mounted_to_active_kernels(
-        cls,
-        conn: SAConnection,
-        user_uuid: UUID,
-    ) -> bool:
-        """
-        Check if no active kernel is using the user's virtual folders.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID
-
-        :return: True if a virtual folder is mounted to active kernels.
-        """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, vfolders
-
-        result = await conn.execute(
-            sa.select([vfolders.c.id]).select_from(vfolders).where(vfolders.c.user == user_uuid),
+        return cls(
+            ok=res.success,
+            msg="success" if res.success else "failed",
         )
-        rows = result.fetchall()
-        user_vfolder_ids = [row.id for row in rows]
-        query = (
-            sa.select([kernels.c.mounts])
-            .select_from(kernels)
-            .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-        )
-        async for row in await conn.stream(query):
-            for _mount in row["mounts"]:
-                try:
-                    vfolder_id = UUID(_mount[2])
-                    if vfolder_id in user_vfolder_ids:
-                        return True
-                except Exception:
-                    pass
-        return False
-
-    @classmethod
-    async def _user_has_active_sessions(
-        cls,
-        db_session: SASession,
-        user_uuid: UUID,
-    ) -> bool:
-        """
-        Check if the user does not have active sessions.
-        """
-        from .session import AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES, SessionRow
-
-        active_session_count = await db_session.scalar(
-            sa.select(sa.func.count())
-            .select_from(SessionRow)
-            .where(
-                sa.and_(
-                    SessionRow.user_uuid == user_uuid,
-                    SessionRow.status.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
-                )
-            ),
-        )
-        return active_session_count > 0
-
-    @classmethod
-    async def _delete_endpoint(
-        cls,
-        db_session: SASession,
-        user_uuid: UUID,
-        *,
-        delete_destroyed_only: bool = False,
-    ) -> None:
-        """
-        Delete user's all endpoint.
-        """
-        from .endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-
-        if delete_destroyed_only:
-            status_filter = {EndpointLifecycle.DESTROYED}
-        else:
-            status_filter = {status for status in EndpointLifecycle}
-        endpoint_rows = await EndpointRow.list(
-            db_session, user_uuid=user_uuid, load_tokens=True, status_filter=status_filter
-        )
-        token_ids_to_delete = []
-        endpoint_ids_to_delete = []
-        for row in endpoint_rows:
-            token_ids_to_delete.extend([token.id for token in row.tokens])
-            endpoint_ids_to_delete.append(row.id)
-        await db_session.execute(
-            sa.delete(EndpointTokenRow).where(EndpointTokenRow.id.in_(token_ids_to_delete))
-        )
-        await db_session.execute(
-            sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
-        )
-
-    @classmethod
-    async def delete_error_logs(
-        cls,
-        conn: SAConnection,
-        user_uuid: UUID,
-    ) -> int:
-        """
-        Delete user's all error logs.
-
-        :param conn: DB connection
-        :param user_uuid: user's UUID to delete error logs
-        :return: number of deleted rows
-        """
-        from .error_logs import error_logs
-
-        result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
-        if result.rowcount > 0:
-            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
-        return result.rowcount
-
-    @classmethod
-    async def _delete_sessions(
-        cls,
-        db_session: SASession,
-        user_uuid: UUID,
-    ) -> None:
-        """
-        Delete user's sessions.
-        """
-        from .session import SessionRow
-
-        await SessionRow.delete_by_user_id(user_uuid, db_session=db_session)
-
-    @classmethod
-    async def delete_keypairs(
-        cls,
-        conn: SAConnection,
-        redis_conn: RedisConnectionInfo,
-        user_uuid: UUID,
-    ) -> int:
-        """
-        Delete user's all keypairs.
-
-        :param conn: DB connection
-        :param redis_conn: redis connection info
-        :param user_uuid: user's UUID to delete keypairs
-        :return: number of deleted rows
-        """
-        from . import keypairs
-
-        ak_rows = await conn.execute(
-            sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
-        )
-        if (row := ak_rows.first()) and (access_key := row.access_key):
-            # Log concurrency used only when there is at least one keypair.
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-            )
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.sftp_concurrency_used.{access_key}"),
-            )
-        result = await conn.execute(
-            sa.delete(keypairs).where(keypairs.c.user == user_uuid),
-        )
-        if result.rowcount > 0:
-            log.info("deleted {0} user's keypairs ({1})", result.rowcount, user_uuid)
-        return result.rowcount
 
 
 def _hash_password(password: str) -> str:
