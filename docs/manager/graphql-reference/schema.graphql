@@ -956,6 +956,9 @@ type UserNode implements Node {
   Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
   """
   container_gids: [Int]
+
+  """Added in 25.5.0."""
+  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """Added in 24.03.0"""
