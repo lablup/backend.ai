@@ -80,6 +80,8 @@ from ai.backend.manager.service.container_registry.harbor import (
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.users.processors import UserProcessors
+from ai.backend.manager.services.users.service import UserService
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -445,11 +447,19 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     #     image_service=image_service,
     # )
 
+    user_service = UserService(
+        db=root_ctx.db,
+        storage_manager=root_ctx.storage_manager,
+        redis_stat=root_ctx.redis_stat,
+    )
+    user_processor = UserProcessors(user_service)
+
     domain_service = DomainService(root_ctx.db)
     domain_processor = DomainProcessors(domain_service)
 
     root_ctx.processors = Processors(
         domain=domain_processor,
+        user=user_processor,
     )
 
     yield
