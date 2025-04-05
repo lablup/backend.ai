@@ -1591,6 +1591,14 @@ class DispatchResult(Generic[ResultType]):
         else:
             return "errors: " + "\n".join(self.errors)
 
+    @classmethod
+    def success(cls, result_type: ResultType) -> DispatchResult[ResultType]:
+        return cls(result=result_type)
+
+    @classmethod
+    def error(cls, error_message: str) -> DispatchResult[ResultType]:
+        return cls(errors=[error_message])
+
 
 class PurgeImageResult(TypedDict):
     image: str
