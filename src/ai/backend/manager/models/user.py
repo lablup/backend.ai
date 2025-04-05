@@ -19,6 +19,7 @@ from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.services.users.actions.modify_user import UserModifiableFields
 from ai.backend.manager.types import OptionalState
 
 from .base import (
@@ -722,8 +723,7 @@ class ModifyUserInput(graphene.InputObjectType):
         def value_or_none(value: Any) -> Optional[Any]:
             return value if value is not Undefined else None
 
-        return ModifyUserAction(
-            email=email,
+        modfifialble_fields = UserModifiableFields(
             username=OptionalState(
                 "username",
                 define_state(self.username),
@@ -814,6 +814,11 @@ class ModifyUserInput(graphene.InputObjectType):
                 define_state(self.container_gids),
                 value_or_none(self.container_gids),
             ),
+        )
+
+        return ModifyUserAction(
+            email=email,
+            modifiable_fields=modfifialble_fields,
         )
 
 

@@ -9,8 +9,7 @@ from ai.backend.manager.types import OptionalState, State
 
 
 @dataclass
-class ModifyUserAction(UserAction):
-    email: str
+class UserModifiableFields:
     username: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("username"))
     password: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("password"))
     need_password_change: OptionalState[bool] = field(
@@ -54,6 +53,20 @@ class ModifyUserAction(UserAction):
         default_factory=lambda: OptionalState.nop("container_gids")
     )
 
+    def get_updated_fields(self) -> dict[str, Any]:
+        result = {}
+        for f in fields(self):
+            field_value: OptionalState = getattr(self, f.name)
+            if field_value.state() != State.NOP:
+                result[f.name] = cast(Any, field_value.value())
+        return result
+
+
+@dataclass
+class ModifyUserAction(UserAction):
+    email: str
+    modifiable_fields: UserModifiableFields
+
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -62,15 +75,8 @@ class ModifyUserAction(UserAction):
     def operation_type(self) -> str:
         return "modify"
 
-    def get_modified_fields(self) -> dict[str, Any]:
-        result = {}
-        for f in fields(self):
-            if f.name == "email":
-                continue
-            field_value: OptionalState = getattr(self, f.name)
-            if field_value.state() != State.NOP:
-                result[f.name] = cast(Any, field_value.value())
-        return result
+    def get_updated_fields(self) -> dict[str, Any]:
+        return self.modifiable_fields.get_updated_fields()
 
 
 @dataclass

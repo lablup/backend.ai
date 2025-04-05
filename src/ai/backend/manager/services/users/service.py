@@ -66,7 +66,7 @@ from ai.backend.manager.services.users.actions.purge_user import (
     PurgeUserActionResult,
 )
 from ai.backend.manager.services.users.type import UserData
-from ai.backend.manager.types import State
+from ai.backend.manager.types import OptionalState, State
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -202,11 +202,14 @@ class UserService:
         )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
-        data = action.get_modified_fields()
+        data = action.get_updated_fields()
         email = action.email
         if data.get("password") is None:
             data.pop("password", None)
-        if not data and action.group_ids.value() is None:
+
+        group_ids: OptionalState = action.modifiable_fields.group_ids
+
+        if not data and (group_ids.state() == State.UPDATE and group_ids.value() is None):
             return ModifyUserActionResult(data=None, success=False)
         if data.get("status") is None and data.get("is_active") is not None:
             data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
@@ -326,8 +329,8 @@ class UserService:
 
             # If domain is changed and no group is associated, clear previous domain's group.
             if prev_domain_name != updated_user.domain_name and (
-                action.group_ids.state() == State.NOP
-                or (action.group_ids.state() == State.UPDATE and action.group_ids.value() is None)
+                group_ids.state() == State.NOP
+                or (group_ids.state() == State.UPDATE and group_ids.value() is None)
             ):
                 await conn.execute(
                     sa.delete(association_groups_users).where(
@@ -337,7 +340,7 @@ class UserService:
 
             # Update user's group if group_ids parameter is provided.
             if (
-                action.group_ids.state() == State.UPDATE and action.group_ids.value() is not None
+                group_ids.state() == State.UPDATE and group_ids.value() is not None
             ) and updated_user is not None:
                 # Clear previous groups associated with the user.
                 await conn.execute(
@@ -350,7 +353,7 @@ class UserService:
                     sa.select([groups.c.id])
                     .select_from(groups)
                     .where(groups.c.domain_name == updated_user.domain_name)
-                    .where(groups.c.id.in_(action.group_ids.value())),
+                    .where(groups.c.id.in_(group_ids.value())),
                 )
                 grps = result.fetchall()
                 if grps:
