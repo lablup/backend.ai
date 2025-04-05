@@ -11,7 +11,6 @@ from typing import (
     Generic,
     Optional,
     Protocol,
-    Self,
     TypeVar,
 )
 
@@ -20,8 +19,6 @@ from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import MountPermission, MountTypes
-
-from .exceptions import InvalidArgument
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
@@ -142,30 +139,9 @@ class OptionalState(TriState[TVal]):
 
 
 class TriStateField(Generic[TVal]):
-    _value: Optional[TVal] | Sentinel
-
-    def __init__(self, value: Optional[TVal] | Sentinel = _SENTINEL) -> None:
-        self._value = value
-
-    def value(self) -> Optional[TVal]:
-        if self._value is not _SENTINEL:
-            return self._value
-        raise ValueError(f"Value is not set for {self.__class__.__name__}")
-
-    def is_valid(self) -> bool:
-        return self._value is not _SENTINEL
-
-    @classmethod
-    def nop(cls) -> Self:
-        return cls(_SENTINEL)
-
-
-class NonNullField(Generic[TVal]):
     _value: TVal | Sentinel
 
     def __init__(self, value: TVal | Sentinel = _SENTINEL) -> None:
-        if value is None:
-            raise InvalidArgument
         self._value = value
 
     def value(self) -> TVal:
@@ -176,10 +152,6 @@ class NonNullField(Generic[TVal]):
     def is_valid(self) -> bool:
         return self._value is not _SENTINEL
 
-    @classmethod
-    def nop(cls) -> Self:
-        return cls(_SENTINEL)
-
 
 @dataclass
 class DataclassInput:
@@ -187,10 +159,10 @@ class DataclassInput:
     Base class for inputs that are dataclasses.
 
     The classes that inherit from this class should be dataclasses and
-    should have fields that are TriStateField or NonNullField.
+    should have fields that are TriStateField.
     """
 
-    def _get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
+    def _get_fields(self) -> list[tuple[str, TriStateField]]:
         return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
 
     def set_attr(self, obj: Any) -> None:
@@ -206,12 +178,12 @@ class DataclassInput:
         }
 
 
-class DictInput(UserDict[str, TriStateField | NonNullField]):
+class DictInput(UserDict[str, TriStateField]):
     """
     Base class for inputs that are UserDict.
     """
 
-    def _get_fields(self) -> list[tuple[str, TriStateField | NonNullField]]:
+    def _get_fields(self) -> list[tuple[str, TriStateField]]:
         return [(k, v) for k, v in self.data.items()]
 
     def set_attr(self, obj: Any) -> None:
