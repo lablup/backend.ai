@@ -672,71 +672,19 @@ class UserInput(graphene.InputObjectType):
             email=email,
             need_password_change=self.need_password_change,
             domain_name=self.domain_name,
-            full_name=OptionalState(
-                "full_name",
-                define_state(self.full_name),
-                value_or_none(self.full_name),
-            ),
-            description=OptionalState(
-                "description",
-                define_state(self.description),
-                value_or_none(self.description),
-            ),
-            is_active=OptionalState(
-                "is_active",
-                define_state(self.is_active),
-                value_or_none(self.is_active),
-            ),
-            status=OptionalState(
-                "status",
-                define_state(self.status),
-                UserStatus(self.status) if self.status is not Undefined else None,
-            ),
-            role=OptionalState(
-                "role",
-                define_state(self.role),
-                UserRole(self.role) if self.role is not Undefined else None,
-            ),
-            allowed_client_ip=OptionalState(
-                "allowed_client_ip",
-                define_state(self.allowed_client_ip),
-                value_or_none(self.allowed_client_ip),
-            ),
-            totp_activated=OptionalState(
-                "totp_activated",
-                define_state(self.totp_activated),
-                value_or_none(self.totp_activated),
-            ),
-            resource_policy=OptionalState(
-                "resource_policy",
-                define_state(self.resource_policy),
-                value_or_none(self.resource_policy),
-            ),
-            sudo_session_enabled=OptionalState(
-                "sudo_session_enabled",
-                define_state(self.sudo_session_enabled),
-                value_or_none(self.sudo_session_enabled),
-            ),
-            group_ids=OptionalState(
-                "group_ids",
-                define_state(self.group_ids),
-                value_or_none(self.group_ids),
-            ),
-            container_uid=OptionalState(
-                "container_uid",
-                define_state(self.container_uid),
-                value_or_none(self.container_uid),
-            ),
-            container_main_gid=OptionalState(
-                "container_main_gid",
-                define_state(self.container_main_gid),
-                value_or_none(self.container_main_gid),
-            ),
-            container_gids=OptionalState(
-                "container_gids",
-                define_state(self.container_gids),
-                value_or_none(self.container_gids),
-            ),
+            full_name=value_or_none(self.full_name),
+            description=value_or_none(self.description),
+            is_active=value_or_none(self.is_active),
+            status=UserStatus(self.status) if self.status is not Undefined else None,
+            role=UserRole(self.role) if self.role is not Undefined else None,
+            allowed_client_ip=value_or_none(self.allowed_client_ip),
+            totp_activated=value_or_none(self.totp_activated),
+            resource_policy=value_or_none(self.resource_policy),
+            sudo_session_enabled=value_or_none(self.sudo_session_enabled),
+            group_ids=value_or_none(self.group_ids),
+            container_uid=value_or_none(self.container_uid),
+            container_main_gid=value_or_none(self.container_main_gid),
+            container_gids=value_or_none(self.container_gids),
         )
 
 

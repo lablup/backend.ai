@@ -94,13 +94,34 @@ class UserService:
         self._redis_stat = redis_stat
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
-        group_ids = (
-            []
-            if action.group_ids.state() == State.NOP
-            else cast(list[str], action.group_ids.value())
-        )
+        username = action.username if action.username else action.email
+        if action.status is None and action.is_active is not None:
+            _status = UserStatus.ACTIVE if action.is_active else UserStatus.INACTIVE
+        group_ids = [] if action.group_ids is None else action.group_ids
 
-        user_data = action.get_insertion_data()
+        user_data = {
+            "username": username,
+            "email": action.email,
+            "password": action.password,
+            "need_password_change": action.need_password_change,
+            "full_name": action.full_name,
+            "description": action.description,
+            "status": _status,
+            "status_info": "admin-requested",  # user mutation is only for admin
+            "domain_name": action.domain_name,
+            "role": action.role,
+            "allowed_client_ip": action.allowed_client_ip,
+            "totp_activated": action.totp_activated,
+            "resource_policy": action.resource_policy,
+            "sudo_session_enabled": action.sudo_session_enabled,
+        }
+        if action.container_uid is not None:
+            user_data["container_uid"] = action.container_uid
+        if action.container_main_gid is not None:
+            user_data["container_main_gid"] = action.container_main_gid
+        if action.container_gids is not None:
+            user_data["container_gids"] = action.container_gids
+
         user_insert_query = sa.insert(users).values(user_data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Optional[Row]:
@@ -113,7 +134,7 @@ class UserService:
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
                 {
-                    "is_active": action.status.value() == UserStatus.ACTIVE,
+                    "is_active": action.status == UserStatus.ACTIVE,
                     "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
                     "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                     "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
