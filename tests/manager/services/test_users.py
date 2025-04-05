@@ -17,7 +17,10 @@ from ai.backend.manager.services.users.actions.create_user import (
     CreateUserActionResult,
 )
 from ai.backend.manager.services.users.actions.delete_user import DeleteUserAction
-from ai.backend.manager.services.users.actions.modify_user import ModifyUserAction
+from ai.backend.manager.services.users.actions.modify_user import (
+    ModifyUserAction,
+    UserModifiableFields,
+)
 from ai.backend.manager.services.users.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
@@ -76,14 +79,20 @@ def create_user(
             password=password,
             email=email,
             need_password_change=need_password_change,
-            full_name=OptionalState.update("full_name", full_name),
+            full_name=full_name,
             domain_name=domain_name,
-            is_active=OptionalState.update("is_active", is_active),
-            role=OptionalState.update("role", role),
-            resource_policy=OptionalState.update("resource_policy_name", resource_policy_name),
-            description=OptionalState.update("description", description),
-            totp_activated=OptionalState.update("totp_activated", totp_activated),
-            sudo_session_enabled=OptionalState.update("sudo_session_enabled", sudo_session_enabled),
+            is_active=is_active,
+            role=role,
+            status=UserStatus.ACTIVE,
+            allowed_client_ip=None,
+            group_ids=None,
+            resource_policy=resource_policy_name,
+            description=description,
+            totp_activated=totp_activated,
+            sudo_session_enabled=sudo_session_enabled,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
         )
         result: CreateUserActionResult = await processors.create_user.wait_for_complete(
             create_user_action
@@ -114,9 +123,19 @@ def create_user(
                 email="test_user@test.com",
                 need_password_change=False,
                 domain_name="default",
-                role=OptionalState.update("role", UserRole.USER),
-                resource_policy=OptionalState.update("resource_policy", "default"),
-                is_active=OptionalState.update("is_active", True),
+                full_name="Test User",
+                description="Test user description",
+                is_active=True,
+                status=UserStatus.ACTIVE,
+                role=UserRole.USER,
+                allowed_client_ip=None,
+                totp_activated=False,
+                resource_policy="default",
+                sudo_session_enabled=False,
+                group_ids=None,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
             ),
             CreateUserActionResult(
                 data=UserData(
@@ -125,8 +144,8 @@ def create_user(
                     username="testuser",
                     email="test_user@test.com",
                     need_password_change=False,
-                    full_name=None,
-                    description=None,
+                    full_name="Test User",
+                    description="Test user description",
                     is_active=True,
                     status=UserStatus.ACTIVE,
                     status_info="admin-requested",
@@ -155,6 +174,19 @@ def create_user(
                 email="test@test.com",
                 need_password_change=False,
                 domain_name="non_existing_domain",
+                full_name="Test User",
+                description="Test user description",
+                is_active=True,
+                status=UserStatus.ACTIVE,
+                role=UserRole.USER,
+                allowed_client_ip=None,
+                totp_activated=False,
+                resource_policy="default",
+                sudo_session_enabled=False,
+                group_ids=None,
+                container_uid=None,
+                container_main_gid=None,
+                container_gids=None,
             ),
             CreateUserActionResult(
                 data=None,
@@ -180,11 +212,20 @@ async def test_modify_user(
         password="password123",
         email="modify-user@test.com",
         need_password_change=False,
-        full_name=OptionalState.update("full_name", "Modify User"),
+        full_name="Modify User",
         domain_name="default",
-        role=OptionalState.update("role", UserRole.USER),
-        resource_policy=OptionalState.update("resource_policy", "default"),
-        status=OptionalState.update("status", UserStatus.ACTIVE),
+        role=UserRole.USER,
+        resource_policy="default",
+        status=UserStatus.ACTIVE,
+        description="Test user description",
+        is_active=True,
+        allowed_client_ip=None,
+        totp_activated=False,
+        sudo_session_enabled=False,
+        group_ids=None,
+        container_uid=None,
+        container_main_gid=None,
+        container_gids=None,
     )
     create_result = await processors.create_user.wait_for_complete(create_user_action)
     user_data = create_result.data
@@ -208,11 +249,13 @@ async def test_modify_user(
 
     action = ModifyUserAction(
         email="modify-user@test.com",
-        username=OptionalState.update("username", "modify_user"),
-        domain_name=OptionalState.update("domain_name", "default"),
-        full_name=OptionalState.update("full_name", "Modified User"),
-        totp_activated=OptionalState.update("totp_activated", True),
-        role=OptionalState.update("role", UserRole.ADMIN),
+        modifiable_fields=UserModifiableFields(
+            username=OptionalState.update("username", "modify_user"),
+            domain_name=OptionalState.update("domain_name", "default"),
+            full_name=OptionalState.update("full_name", "Modified User"),
+            totp_activated=OptionalState.update("totp_activated", True),
+            role=OptionalState.update("role", UserRole.ADMIN),
+        ),
     )
 
     result = await processors.modify_user.wait_for_complete(action)
