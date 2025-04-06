@@ -192,8 +192,8 @@ async def test_image_rescan_on_docker_registry(
             network_plugin_ctx,
             storage_manager_ctx,
             agent_registry_ctx,
-            processors_ctx,
             background_task_ctx,
+            processors_ctx,
         ],
         [".events", ".auth"],
     )

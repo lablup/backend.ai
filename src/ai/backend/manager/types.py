@@ -2,8 +2,17 @@ from __future__ import annotations
 
 import enum
 import uuid
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, Any, Generic, Optional, Protocol, TypeVar
+from collections import UserDict
+from dataclasses import dataclass, fields
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Generic,
+    Optional,
+    Protocol,
+    TypeVar,
+)
 
 import attr
 from pydantic import AliasChoices, BaseModel, Field
@@ -33,6 +42,9 @@ class SessionGetter(Protocol):
 
 class Sentinel(enum.Enum):
     token = 0
+
+
+_SENTINEL = Sentinel.token
 
 
 @attr.define(slots=True)
@@ -124,3 +136,64 @@ class OptionalState(TriState[TVal]):
     @classmethod
     def nop(cls, attr_name: str) -> OptionalState[TVal]:
         return cls(attr_name, state=State.NOP, value=None)
+
+
+class TriStateField(Generic[TVal]):
+    _value: TVal | Sentinel
+
+    def __init__(self, value: TVal | Sentinel = _SENTINEL) -> None:
+        self._value = value
+
+    def value(self) -> TVal:
+        if self._value is not _SENTINEL:
+            return self._value
+        raise ValueError(f"Value is not set for {self.__class__.__name__}")
+
+    def is_valid(self) -> bool:
+        return self._value is not _SENTINEL
+
+
+@dataclass
+class DataclassInput:
+    """
+    Base class for inputs that are dataclasses.
+
+    The classes that inherit from this class should be dataclasses and
+    should have fields that are TriStateField.
+    """
+
+    def _get_fields(self) -> list[tuple[str, TriStateField]]:
+        return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
+
+    def set_attr(self, obj: Any) -> None:
+        for field_name, value in self._get_fields():
+            if value.is_valid():
+                setattr(obj, field_name, value.value())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            field_name: value.value()
+            for field_name, value in self._get_fields()
+            if value.is_valid()
+        }
+
+
+class DictInput(UserDict[str, TriStateField]):
+    """
+    Base class for inputs that are UserDict.
+    """
+
+    def _get_fields(self) -> list[tuple[str, TriStateField]]:
+        return [(k, v) for k, v in self.data.items()]
+
+    def set_attr(self, obj: Any) -> None:
+        for field_name, value in self._get_fields():
+            if value.is_valid():
+                setattr(obj, field_name, value.value())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            field_name: value.value()
+            for field_name, value in self._get_fields()
+            if value.is_valid()
+        }
