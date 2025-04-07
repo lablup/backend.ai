@@ -250,8 +250,8 @@ async def admin_month_stats(request: web.Request) -> web.Response:
     return web.json_response(result, status=200)
 
 
-# TODO: get_watcher_info는 서비스쪽 메서드랑 겹침.
-# vfolder 쪽에서 쓰고 있어서 냅둠.
+# TODO: get_watcher_info overlaps with service-side method.
+# Keeping it because it's used by vfolder.
 async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     """
     Get watcher information.

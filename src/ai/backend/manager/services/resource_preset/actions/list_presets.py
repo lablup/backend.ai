@@ -26,5 +26,5 @@ class ListResourcePresetsResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        # TODO: Batching 으로 바꾼 뒤 preset row ids 반환해야함.
+        # TODO: Should return preset row ids after changing to batching.
         return None

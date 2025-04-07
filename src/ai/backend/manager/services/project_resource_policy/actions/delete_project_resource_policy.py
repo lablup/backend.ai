@@ -23,7 +23,7 @@ class DeleteProjectResourcePolicyAction(ProjectResourcePolicyAction):
 
 @dataclass
 class DeleteProjectResourcePolicyActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
+    # TODO: Create return type.
     project_resource_policy: ProjectResourcePolicyRow
 
     @override

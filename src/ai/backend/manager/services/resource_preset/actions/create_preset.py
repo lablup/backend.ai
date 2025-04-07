@@ -8,7 +8,7 @@ from ai.backend.manager.services.resource_preset.base import ResourcePresetActio
 
 @dataclass
 class CreateResourcePresetInput:
-    # TODO: 타입 주기.
+    # TODO: Add types.
     resource_slots: dict[str, Any]
     shared_memory: Optional[str] = None
     scaling_group_name: Optional[str] = None
@@ -30,7 +30,7 @@ class CreateResourcePresetAction(ResourcePresetAction):
 
 @dataclass
 class CreateResourcePresetActionResult(BaseActionResult):
-    # TODO: ResourcePresetRow 타입 만들기
+    # TODO: Create ResourcePresetRow type
     resource_preset: ResourcePresetRow
 
     @override
@@ -38,4 +38,4 @@ class CreateResourcePresetActionResult(BaseActionResult):
         return self.resource_preset.id
 
 
-# TODO: 예외 만들 것.
+# TODO: Create exceptions.

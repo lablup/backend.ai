@@ -6,7 +6,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.groups.actions.base import GroupAction
 
 
-# TODO: Batch action 변경
+# TODO: Change to batch action
 @dataclass
 class UsagePerPeriodAction(GroupAction):
     start_date: str
@@ -24,7 +24,7 @@ class UsagePerPeriodAction(GroupAction):
 
 @dataclass
 class UsagePerPeriodActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
+    # TODO: Define return type
     result: list[Any]
 
     @override

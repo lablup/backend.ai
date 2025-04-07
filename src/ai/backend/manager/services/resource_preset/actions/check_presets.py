@@ -37,7 +37,7 @@ class CheckResourcePresetsActionResult(BaseActionResult):
     scaling_group_remaining: Mapping[str, str]
     scaling_groups: dict[str | Any, dict[str, ResourceSlot]]
 
-    # TODO: Batching 으로 바꾼 뒤 preset row ids 반환해야함.
+    # TODO: Should return preset row ids after changing to batching.
     @override
     def entity_id(self) -> Optional[str]:
         return None

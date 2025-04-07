@@ -22,7 +22,7 @@ class DeleteResourcePresetAction(ResourcePresetAction):
 
 @dataclass
 class DeleteResourcePresetActionResult(BaseActionResult):
-    # TODO: ResourcePresetRow 필드 추가해야함.
+    # TODO: Add ResourcePresetRow field.
     # resource_preset: ResourcePresetRow
 
     @override
@@ -31,4 +31,4 @@ class DeleteResourcePresetActionResult(BaseActionResult):
         return None
 
 
-# TODO: 예외 만들 것.
+# TODO: Create exceptions.

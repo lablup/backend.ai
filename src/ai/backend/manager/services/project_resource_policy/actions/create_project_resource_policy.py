@@ -32,7 +32,7 @@ class CreateProjectResourcePolicyAction(ProjectResourcePolicyAction):
 
 @dataclass
 class CreateProjectResourcePolicyActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
+    # TODO: Create a return type.
     project_resource_policy: ProjectResourcePolicyRow
 
     @override
