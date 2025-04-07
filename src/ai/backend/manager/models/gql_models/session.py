@@ -25,7 +25,7 @@ from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
-from ai.backend.manager.services.session.actions.modify_compute_session import (
+from ai.backend.manager.services.session.actions.modify_session import (
     ModifySessionAction,
     ModifySessionInputData,
 )

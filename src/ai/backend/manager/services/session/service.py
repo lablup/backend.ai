@@ -168,7 +168,7 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
 )
-from ai.backend.manager.services.session.actions.modify_compute_session import (
+from ai.backend.manager.services.session.actions.modify_session import (
     ModifySessionAction,
     ModifySessionActionResult,
 )
