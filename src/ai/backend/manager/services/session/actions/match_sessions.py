@@ -6,6 +6,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.session.base import SessionAction
 
 
+# TODO: Make this BatchAction
 @dataclass
 class MatchSessionsAction(SessionAction):
     id_or_name_prefix: str
@@ -24,9 +25,8 @@ class MatchSessionsAction(SessionAction):
 class MatchSessionsActionResult(BaseActionResult):
     # TODO: Add proper type
     result: Any
-    # session_row: SessionRow
+    # session_rows: list[SessionRow]
 
     @override
     def entity_id(self) -> Optional[str]:
-        # return str(self.session_row.id)
         return None
