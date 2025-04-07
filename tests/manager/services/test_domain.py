@@ -38,7 +38,7 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import OptionalState, State, TriState
+from ai.backend.manager.types import State, TriState
 
 from .test_utils import TestScenario
 
@@ -90,18 +90,19 @@ async def create_domain(
             "Create a domain node",
             CreateDomainNodeAction(
                 name="test-create-domain-node",
-                description=OptionalState.update("description", "Test domain"),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                total_resource_slots=OptionalState.update("total_resource_slots", {}),
-                allowed_vfolder_hosts=OptionalState.update("allowed_vfolder_hosts", {}),
-                allowed_docker_registries=OptionalState.update("allowed_docker_registries", []),
-                integration_id=OptionalState.update("integration_id", None),
-                dotfiles=OptionalState.update("dotfiles", b"\x90"),
-                scaling_groups=OptionalState.nop("scaling_groups"),
+                description="Test domain",
+                is_active=True,
+                total_resource_slots={},
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                integration_id=None,
+                dotfiles=b"\x90",
+                scaling_groups=None,
             ),
             CreateDomainNodeActionResult(
                 domain_data=DomainData(
@@ -124,12 +125,19 @@ async def create_domain(
             "Create domain node with duplicated name",
             CreateDomainNodeAction(
                 name="default",
-                description=OptionalState.update("description", "Test domain"),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
+                description=None,
+                is_active=None,
+                total_resource_slots=None,
+                allowed_vfolder_hosts=None,
+                allowed_docker_registries=None,
+                integration_id=None,
+                dotfiles=None,
+                scaling_groups=None,
             ),
             ValueError,
         ),
@@ -219,7 +227,12 @@ async def test_modify_domain_node(
             "Create a domain",
             CreateDomainAction(
                 name="test-create-domain",
-                description=TriState("description", State.UPDATE, "Test domain"),
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot.from_user_input({}, None),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+                integration_id=None,
             ),
             CreateDomainActionResult(
                 domain_data=DomainData(
@@ -242,7 +255,12 @@ async def test_modify_domain_node(
             "Create a domain with duplicated name, return none",
             CreateDomainAction(
                 name="default",
-                description=TriState("description", State.UPDATE, "Test domain"),
+                description=None,
+                is_active=None,
+                total_resource_slots=None,
+                allowed_vfolder_hosts=None,
+                allowed_docker_registries=None,
+                integration_id=None,
             ),
             CreateDomainActionResult(
                 domain_data=None,
@@ -264,7 +282,15 @@ async def test_create_model_store_after_domain_created(
     processors: DomainProcessors, database_engine
 ) -> None:
     domain_name = "test-create-domain-post-func"
-    action = CreateDomainAction(name=domain_name)
+    action = CreateDomainAction(
+        name=domain_name,
+        description=None,
+        is_active=None,
+        total_resource_slots=None,
+        allowed_vfolder_hosts=None,
+        allowed_docker_registries=None,
+        integration_id=None,
+    )
 
     await processors.create_domain.wait_for_complete(action)
 

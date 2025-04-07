@@ -258,10 +258,10 @@ class CloneVFolderAction(VFolderAction):
 
     source_vfolder_uuid: uuid.UUID
     target_name: str
-    target_host: Optional[str] = None
-    cloneable: bool = False
-    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
-    mount_permission: VFolderPermission = VFolderPermission.READ_WRITE
+    target_host: Optional[str]
+    cloneable: bool
+    usage_mode: VFolderUsageMode
+    mount_permission: VFolderPermission
 
     @override
     def entity_id(self) -> Optional[str]:

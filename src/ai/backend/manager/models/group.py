@@ -605,51 +605,30 @@ class GroupInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
+        type_val = None if self.type is Undefined else ProjectType[self.type]
+        description_val = value_or_none(self.description)
+        is_active_val = value_or_none(self.is_active)
+        total_resource_slots_val = (
+            None
+            if self.total_resource_slots is Undefined
+            else ResourceSlot.from_user_input(self.total_resource_slots, None)
+        )
+        allowed_vfolder_hosts_val = value_or_none(self.allowed_vfolder_hosts)
+        integration_id_val = value_or_none(self.integration_id)
+        resource_policy_val = value_or_none(self.resource_policy)
+        container_registry_val = value_or_none(self.container_registry)
+
         return CreateGroupAction(
             name=name,
             domain_name=self.domain_name,
-            type=OptionalState(
-                "type",
-                define_state(self.type),
-                None if self.type is Undefined else ProjectType[self.type],
-            ),
-            description=OptionalState(
-                "description",
-                define_state(self.description),
-                value_or_none(self.description),
-            ),
-            is_active=OptionalState(
-                "is_active",
-                define_state(self.is_active),
-                value_or_none(self.is_active),
-            ),
-            total_resource_slots=OptionalState(
-                "total_resource_slots",
-                define_state(self.total_resource_slots),
-                None
-                if self.total_resource_slots is Undefined
-                else ResourceSlot.from_user_input(self.total_resource_slots, None),
-            ),
-            allowed_vfolder_hosts=OptionalState(
-                "allowed_vfolder_hosts",
-                define_state(self.allowed_vfolder_hosts),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            integration_id=OptionalState(
-                "integration_id",
-                define_state(self.integration_id),
-                value_or_none(self.integration_id),
-            ),
-            resource_policy=OptionalState(
-                "resource_policy",
-                define_state(self.resource_policy),
-                value_or_none(self.resource_policy),
-            ),
-            container_registry=OptionalState(
-                "container_registry",
-                define_state(self.container_registry),
-                value_or_none(self.container_registry),
-            ),
+            type=type_val,
+            description=description_val,
+            is_active=is_active_val,
+            total_resource_slots=total_resource_slots_val,
+            allowed_vfolder_hosts=allowed_vfolder_hosts_val,
+            integration_id=integration_id_val,
+            resource_policy=resource_policy_val,
+            container_registry=container_registry_val,
         )
 
 

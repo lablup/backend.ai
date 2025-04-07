@@ -9,9 +9,9 @@ from ai.backend.manager.services.users.type import UserData
 
 @dataclass
 class CreateUserAction(UserAction):
+    email: str
     username: str
     password: str
-    email: str
     need_password_change: bool
     domain_name: str
     full_name: Optional[str]
