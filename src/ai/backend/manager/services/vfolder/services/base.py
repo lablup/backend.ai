@@ -1,4 +1,5 @@
 import uuid
+from pathlib import PurePosixPath
 from typing import (
     Any,
     Optional,
@@ -7,6 +8,7 @@ from typing import (
 
 import aiohttp
 import sqlalchemy as sa
+from aiohttp import hdrs, web
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,7 +21,8 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.api.exceptions import ObjectNotFound, StorageProxyError
+from ai.backend.manager.config import DEFAULT_CHUNK_SIZE, SharedConfig
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -45,6 +48,7 @@ from ai.backend.manager.models.vfolder import (
     update_vfolder_status,
     verify_vfolder_name,
     vfolder_status_map,
+    vfolders,
 )
 
 # from ai.backend.manager.types import SENTINEL
@@ -57,6 +61,8 @@ from ..actions.base import (
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
     ForceDeleteVFolderActionResult,
+    GetTaskLogsAction,
+    GetTaskLogsActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
     ListVFolderAction,
@@ -840,3 +846,66 @@ class VFolderService:
             cloneable=action.cloneable,
             bgtask_id=task_id,
         )
+
+    async def get_task_logs(self, action: GetTaskLogsAction) -> GetTaskLogsActionResult:
+        user_uuid = action.user_id
+        user_role = action.user_role
+        domain_name = action.domain_name
+        kernel_id_str = action.kernel_id
+        request = action.request
+
+        async with self._db.begin_readonly() as conn:
+            matched_vfolders = await query_accessible_vfolders(
+                conn,
+                user_uuid,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=["user"],
+                extra_vf_conds=(vfolders.c.name == ".logs"),
+            )
+            if not matched_vfolders:
+                raise ObjectNotFound(
+                    extra_data={"vfolder_name": ".logs"},
+                    object_name="vfolder",
+                )
+            log_vfolder = matched_vfolders[0]
+
+        _proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
+        )
+        response = web.StreamResponse(status=200)
+        response.headers[hdrs.CONTENT_TYPE] = "text/plain"
+        prepared = False
+
+        try:
+            async with self._storage_manager.request(
+                log_vfolder["host"],
+                "POST",
+                "folder/file/fetch",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(VFolderID.from_row(log_vfolder)),
+                    "relpath": str(
+                        PurePosixPath("task")
+                        / kernel_id_str[:2]
+                        / kernel_id_str[2:4]
+                        / f"{kernel_id_str[4:]}.log",
+                    ),
+                },
+                raise_for_status=True,
+            ) as (_, storage_resp):
+                while True:
+                    chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    if not prepared:
+                        await response.prepare(request)
+                        prepared = True
+                    await response.write(chunk)
+        except aiohttp.ClientResponseError as e:
+            raise StorageProxyError(status=e.status, extra_msg=e.message)
+        finally:
+            if prepared:
+                await response.write_eof()
+        # TODO: log_vfolder is not a VFolderRow, but a dict, fix this.
+        return GetTaskLogsActionResult(response=response, vfolder_row=log_vfolder)

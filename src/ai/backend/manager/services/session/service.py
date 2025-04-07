@@ -85,7 +85,6 @@ from ai.backend.manager.models.session import (
     SessionStatus,
 )
 from ai.backend.manager.models.session_template import session_templates
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.registry import AgentRegistry
@@ -297,7 +296,6 @@ class SessionService:
     _background_task_manager: BackgroundTaskManager
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
-    _storage_manager: StorageSessionManager
 
     def __init__(
         self,
@@ -341,7 +339,7 @@ class SessionService:
             5.0,
         )
         app_ctx.stats_task.set_name("stats_task")
-        self.app_ctx = app_ctx
+        self._app_ctx = app_ctx
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
