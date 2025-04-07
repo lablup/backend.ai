@@ -18,7 +18,6 @@ class GetContainerRegistriesAction(ContainerRegistryAction):
 
 @dataclass
 class GetContainerRegistriesActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
     registries: Any
 
     @override

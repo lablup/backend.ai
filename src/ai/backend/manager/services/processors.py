@@ -22,6 +22,7 @@ class Processors:
     keypair_resource_policy: KeypairResourcePolicyProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
+    resource_preset: ResourcePresetProcessors
 
     vfolder: VFolderBaseProcessors
     vfolder_invitation: VFolderInviteProcessors

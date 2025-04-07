@@ -1,30 +1,25 @@
 from dataclasses import dataclass
 from typing import Any, Optional, override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.group.base import GroupAction
+from ai.backend.manager.services.users.actions.base import UserAction
 
 
-# TODO: Batch action 변경
+# TODO: Batch action으로 만든 후 entity_id엔 모든 user_id를 넣어야 함.
 @dataclass
-class UsagePerMonthAction(GroupAction):
-    month: str
-    group_ids: Optional[list[UUID]] = None
-
+class AdminMonthStatsAction(UserAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
 
     @override
     def operation_type(self):
-        return "usage_per_month"
+        return "admin_month_stats"
 
 
 @dataclass
-class UsagePerMonthActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
-    result: list[Any]
+class AdminMonthStatsActionResult(BaseActionResult):
+    stats: list[Any]
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -359,23 +359,13 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
         name: str,
         props: CreateKeyPairResourcePolicyInput,
     ) -> CreateKeyPairResourcePolicy:
-        data = {
-            "name": name,
-            "default_for_unspecified": DefaultForUnspecified[props.default_for_unspecified],
-            "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
-            "max_session_lifetime": props.max_session_lifetime,
-            "max_concurrent_sessions": props.max_concurrent_sessions,
-            "max_concurrent_sftp_sessions": props.max_concurrent_sftp_sessions,
-            "max_containers_per_session": props.max_containers_per_session,
-            "idle_timeout": props.idle_timeout,
-            "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
-        }
-        set_if_set(props, data, "max_pending_session_count")
-        set_if_set(
-            props,
-            data,
-            "max_pending_session_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None) if v is not None else None,
+        from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
+            CreateKeyPairResourcePolicyAction,
+        )
+
+        graph_ctx: GraphQueryContext = info.context
+        await graph_ctx.processors.keypair_resource_policy.create_keypair_resource_policy.wait_for_complete(
+            CreateKeyPairResourcePolicyAction(name, props)
         )
 
         return CreateKeyPairResourcePolicy(

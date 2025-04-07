@@ -8,6 +8,10 @@ from ai.backend.manager.services.container_registry.actions.clear_images import 
     ClearImagesAction,
     ClearImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.get_container_registries import (
+    GetContainerRegistriesAction,
+    GetContainerRegistriesActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
     LoadAllContainerRegistriesActionResult,
@@ -101,3 +105,16 @@ class ContainerRegistryService:
         return LoadAllContainerRegistriesActionResult(
             registries=[registry.to_dataclass() for registry in registries]
         )
+
+    async def get_container_registries(
+        self, action: GetContainerRegistriesAction
+    ) -> GetContainerRegistriesActionResult:
+        async with self._db.begin_session() as session:
+            _registries = await ContainerRegistryRow.get_known_container_registries(session)
+
+        known_registries = {}
+        for project, registries in _registries.items():
+            for registry_name, url in registries.items():
+                if project not in known_registries:
+                    known_registries[f"{project}/{registry_name}"] = url.human_repr()
+        return GetContainerRegistriesActionResult(registries=known_registries)

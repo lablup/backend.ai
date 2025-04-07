@@ -3,7 +3,7 @@ from typing import Any, Optional, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.group.base import GroupAction
+from ai.backend.manager.services.groups.actions.base import GroupAction
 
 
 # TODO: Batch action 변경

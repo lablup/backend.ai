@@ -87,6 +87,10 @@ from ai.backend.manager.services.groups.processors import GroupProcessors
 from ai.backend.manager.services.groups.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
+from ai.backend.manager.services.keypair_resource_policy.processors import (
+    KeypairResourcePolicyProcessors,
+)
+from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService
@@ -461,6 +465,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     agent_service = AgentService(
         db=root_ctx.db,
         agent_registry=root_ctx.registry,
+        shared_config=root_ctx.shared_config,
     )
     agent_processor = AgentProcessors(agent_service)
 
@@ -502,7 +507,12 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     vfolder_file_processor = VFolderFileProcessors(vfolder_file_service)
 
-    group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
+    group_service = GroupService(
+        db=root_ctx.db,
+        storage_manager=root_ctx.storage_manager,
+        shared_config=root_ctx.shared_config,
+        redis_stat=root_ctx.redis_stat,
+    )
     group_processor = GroupProcessors(group_service)
 
     session_service = SessionService(

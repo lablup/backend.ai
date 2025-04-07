@@ -9,7 +9,6 @@ import json
 import logging
 import re
 from decimal import Decimal
-from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -34,8 +33,8 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import Watcher
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
-from ai.backend.manager.services.group.actions.usage_per_month import UsagePerMonthAction
-from ai.backend.manager.services.group.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.groups.actions.usage_per_month import UsagePerMonthAction
+from ai.backend.manager.services.groups.actions.usage_per_period import UsagePerPeriodAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
 )
@@ -66,27 +65,15 @@ async def list_presets(request: web.Request) -> web.Response:
     """
     log.info("LIST_PRESETS (ak:{})", request["keypair"]["access_key"])
     root_ctx: RootContext = request.app["_root.context"]
-    await root_ctx.shared_config.get_resource_slots()
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        query = sa.select(ResourcePresetRow)
-        query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
-        scaling_group_name = request.query.get("scaling_group")
-        if scaling_group_name is not None:
-            query_condition = sa.or_(
-                query_condition, ResourcePresetRow.scaling_group_name == scaling_group_name
-            )
-        query = query.where(query_condition)
-        resp: MutableMapping[str, Any] = {"presets": []}
-        async for row in await db_session.stream_scalars(query):
-            row = cast(ResourcePresetRow, row)
-            preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
-            resp["presets"].append({
-                "id": str(row.id),
-                "name": row.name,
-                "shared_memory": str(row.shared_memory) if row.shared_memory else None,
-                "resource_slots": preset_slots.to_json(),
-            })
-        return web.json_response(resp, status=HTTPStatus.OK)
+
+    scaling_group_name = request.query.get("scaling_group")
+    result = await root_ctx.processors.resource_preset.list_presets.wait_for_complete(
+        ListResourcePresetsAction(
+            access_key=request["keypair"]["access_key"],
+            scaling_group=scaling_group_name,
+        )
+    )
+    return web.json_response({"presets": result}, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -144,132 +131,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         "scaling_groups": result.scaling_groups,
     }
 
-        # Check domain resource limit.
-        query = sa.select([domains.c.total_resource_slots]).where(domains.c.name == domain_name)
-        domain_resource_slots = await conn.scalar(query)
-        domain_resource_policy = {
-            "total_resource_slots": domain_resource_slots,
-            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-        }
-        domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await root_ctx.registry.get_domain_occupancy(
-            domain_name, db_sess=SASession(conn)
-        )
-        domain_remaining = domain_limits - domain_occupied
-
-        # Take minimum remaining resources. There's no need to merge limits and occupied.
-        # To keep legacy, we just merge all remaining slots into `keypair_remainig`.
-        for slot in known_slot_types:
-            keypair_remaining[slot] = min(
-                keypair_remaining[slot],
-                group_remaining[slot],
-                domain_remaining[slot],
-            )
-
-        # Prepare per scaling group resource.
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id, access_key)
-        sgroup_names = [sg.name for sg in sgroups]
-        if params["scaling_group"] is not None:
-            if params["scaling_group"] not in sgroup_names:
-                raise InvalidAPIParameters("Unknown scaling group")
-            sgroup_names = [params["scaling_group"]]
-        per_sgroup = {
-            sgname: {
-                "using": ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()}),
-                "remaining": ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()}),
-            }
-            for sgname in sgroup_names
-        }
-
-        # Per scaling group resource using from resource occupying kernels.
-        j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
-        query = (
-            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
-            .select_from(j)
-            .where(
-                (KernelRow.user_uuid == request["user"]["uuid"])
-                & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (SessionRow.scaling_group_name.in_(sgroup_names)),
-            )
-        )
-        async for row in await conn.stream(query):
-            per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
-
-        # Per scaling group resource remaining from agents stats.
-        sgroup_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
-        query = (
-            sa.select([agents.c.available_slots, agents.c.occupied_slots, agents.c.scaling_group])
-            .select_from(agents)
-            .where(
-                (agents.c.status == AgentStatus.ALIVE) & (agents.c.scaling_group.in_(sgroup_names)),
-            )
-        )
-        agent_slots = []
-        async for row in await conn.stream(query):
-            remaining = row["available_slots"] - row["occupied_slots"]
-            remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
-            sgroup_remaining += remaining
-            agent_slots.append(remaining)
-            per_sgroup[row["scaling_group"]]["remaining"] += remaining
-
-        # Take maximum allocatable resources per sgroup.
-        for sgname, sgfields in per_sgroup.items():
-            for rtype, slots in sgfields.items():
-                if rtype == "remaining":
-                    for slot in known_slot_types.keys():
-                        if slot in slots:
-                            slots[slot] = min(keypair_remaining[slot], slots[slot])
-                per_sgroup[sgname][rtype] = slots.to_json()  # type: ignore  # it's serialization
-        for slot in known_slot_types.keys():
-            sgroup_remaining[slot] = min(keypair_remaining[slot], sgroup_remaining[slot])
-
-        # Fetch all resource presets in the current scaling group.
-        resource_preset_query = sa.select(ResourcePresetRow)
-        query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
-        if params["scaling_group"] is not None:
-            query_condition = sa.or_(
-                query_condition,
-                ResourcePresetRow.scaling_group_name == params["scaling_group"],
-            )
-        resource_preset_query = resource_preset_query.where(query_condition)
-        async for row in await SASession(conn).stream_scalars(resource_preset_query):
-            # Check if there are any agent that can allocate each preset.
-            row = cast(ResourcePresetRow, row)
-            allocatable = False
-            preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
-            for agent_slot in agent_slots:
-                if agent_slot >= preset_slots and keypair_remaining >= preset_slots:
-                    allocatable = True
-                    break
-            resp["presets"].append({
-                "id": str(row.id),
-                "name": row.name,
-                "resource_slots": preset_slots.to_json(),
-                "shared_memory": (
-                    str(row.shared_memory) if row.shared_memory is not None else None
-                ),
-                "allocatable": allocatable,
-            })
-
-        # Return group resource status as NaN if not allowed.
-        group_resource_visibility = await root_ctx.shared_config.get_raw(
-            "config/api/resources/group_resource_visibility"
-        )
-        group_resource_visibility = t.ToBool().check(group_resource_visibility)
-        if not group_resource_visibility:
-            group_limits = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
-            group_occupied = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
-            group_remaining = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
-
-        resp["keypair_limits"] = keypair_limits.to_json()
-        resp["keypair_using"] = keypair_occupied.to_json()
-        resp["keypair_remaining"] = keypair_remaining.to_json()
-        resp["group_limits"] = group_limits.to_json()
-        resp["group_using"] = group_occupied.to_json()
-        resp["group_remaining"] = group_remaining.to_json()
-        resp["scaling_group_remaining"] = sgroup_remaining.to_json()
-        resp["scaling_groups"] = per_sgroup
-    return web.json_response(resp, status=HTTPStatus.OK)
+    return web.json_response(resp, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -283,8 +145,9 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     """
     log.info("RECALCULATE_USAGE ()")
     root_ctx: RootContext = request.app["_root.context"]
-    await root_ctx.registry.recalc_resource_usage()
-    return web.json_response({}, status=HTTPStatus.OK)
+    await root_ctx.processors.agent.recalculate_usage.wait_for_complete(RecalculateUsageAction())
+
+    return web.json_response({}, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -306,15 +169,14 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     """
     log.info("USAGE_PER_MONTH (g:[{}], month:{})", ",".join(params["group_ids"]), params["month"])
     root_ctx: RootContext = request.app["_root.context"]
-    local_tz = root_ctx.shared_config["system"]["timezone"]
-    try:
-        start_date = datetime.strptime(params["month"], "%Y%m").replace(tzinfo=local_tz)
-        end_date = start_date + relativedelta(months=+1)
-    except ValueError:
-        raise InvalidAPIParameters(extra_msg="Invalid date values")
-    resp = await get_container_stats_for_period(request, start_date, end_date, params["group_ids"])
-    log.debug("container list are retrieved for month {0}", params["month"])
-    return web.json_response(resp, status=HTTPStatus.OK)
+
+    result = await root_ctx.processors.group.usage_per_month.wait_for_complete(
+        UsagePerMonthAction(
+            group_ids=params["group_ids"],
+            month=params["month"],
+        )
+    )
+    return web.json_response(result, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -346,9 +208,8 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
             end_date=params["end_date"],
         )
     )
-    resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
-    log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
-    return web.json_response(resp, status=HTTPStatus.OK)
+
+    return web.json_response(result, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -361,8 +222,15 @@ async def user_month_stats(request: web.Request) -> web.Response:
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
     log.info("USER_LAST_MONTH_STATS (ak:{}, u:{})", access_key, user_uuid)
-    stats = await get_time_binned_monthly_stats(request, user_uuid=user_uuid)
-    return web.json_response(stats, status=HTTPStatus.OK)
+    root_ctx: RootContext = request.app["_root.context"]
+
+    result = await root_ctx.processors.user.user_month_stats.wait_for_complete(
+        UserMonthStatsAction(
+            user_id=user_uuid,
+        )
+    )
+
+    return web.json_response(result, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -373,8 +241,13 @@ async def admin_month_stats(request: web.Request) -> web.Response:
     over last 30 days.
     """
     log.info("ADMIN_LAST_MONTH_STATS ()")
-    stats = await get_time_binned_monthly_stats(request, user_uuid=None)
-    return web.json_response(stats, status=HTTPStatus.OK)
+    root_ctx: RootContext = request.app["_root.context"]
+
+    result = await root_ctx.processors.user.admin_month_stats.wait_for_complete(
+        AdminMonthStatsAction()
+    )
+
+    return web.json_response(result, status=200)
 
 
 # TODO: get_watcher_info는 서비스쪽 메서드랑 겹침.
@@ -412,18 +285,18 @@ async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
 )
 async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
     log.info("GET_WATCHER_STATUS (ag:{})", params["agent_id"])
-    watcher_info = await get_watcher_info(request, params["agent_id"])
-    connector = aiohttp.TCPConnector()
-    async with aiohttp.ClientSession(connector=connector) as sess:
-        with _timeout(5.0):
-            headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-            async with sess.get(watcher_info["addr"], headers=headers) as resp:
-                if resp.status == HTTPStatus.OK:
-                    data = await resp.json()
-                    return web.json_response(data, status=resp.status)
-                else:
-                    data = await resp.text()
-                    return web.Response(text=data, status=resp.status)
+    root_ctx: RootContext = request.app["_root.context"]
+
+    result = await root_ctx.processors.agent.get_watcher_status.wait_for_complete(
+        GetWatcherStatusAction(agent_id=params["agent_id"])
+    )
+
+    if result.resp.status == 200:
+        data = await result.resp.json()
+        return web.json_response(data, status=result.resp.status)
+    else:
+        data = await result.resp.text()
+        return web.Response(text=data, status=result.resp.status)
 
 
 @server_status_required(READ_ALLOWED)
@@ -435,19 +308,18 @@ async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
 )
 async def watcher_agent_start(request: web.Request, params: Any) -> web.Response:
     log.info("WATCHER_AGENT_START (ag:{})", params["agent_id"])
-    watcher_info = await get_watcher_info(request, params["agent_id"])
-    connector = aiohttp.TCPConnector()
-    async with aiohttp.ClientSession(connector=connector) as sess:
-        with _timeout(20.0):
-            watcher_url = watcher_info["addr"] / "agent/start"
-            headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-            async with sess.post(watcher_url, headers=headers) as resp:
-                if resp.status == HTTPStatus.OK:
-                    data = await resp.json()
-                    return web.json_response(data, status=resp.status)
-                else:
-                    data = await resp.text()
-                    return web.Response(text=data, status=resp.status)
+    root_ctx: RootContext = request.app["_root.context"]
+
+    result = await root_ctx.processors.agent.watcher_agent_start.wait_for_complete(
+        WatcherAgentStartAction(agent_id=params["agent_id"])
+    )
+
+    if result.resp.status == 200:
+        data = await result.resp.json()
+        return web.json_response(data, status=result.resp.status)
+    else:
+        data = await result.resp.text()
+        return web.Response(text=data, status=result.resp.status)
 
 
 @server_status_required(READ_ALLOWED)
@@ -459,19 +331,18 @@ async def watcher_agent_start(request: web.Request, params: Any) -> web.Response
 )
 async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
     log.info("WATCHER_AGENT_STOP (ag:{})", params["agent_id"])
-    watcher_info = await get_watcher_info(request, params["agent_id"])
-    connector = aiohttp.TCPConnector()
-    async with aiohttp.ClientSession(connector=connector) as sess:
-        with _timeout(20.0):
-            watcher_url = watcher_info["addr"] / "agent/stop"
-            headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-            async with sess.post(watcher_url, headers=headers) as resp:
-                if resp.status == HTTPStatus.OK:
-                    data = await resp.json()
-                    return web.json_response(data, status=resp.status)
-                else:
-                    data = await resp.text()
-                    return web.Response(text=data, status=resp.status)
+    root_ctx: RootContext = request.app["_root.context"]
+
+    result = await root_ctx.processors.agent.watcher_agent_stop.wait_for_complete(
+        WatcherAgentStopAction(agent_id=params["agent_id"])
+    )
+
+    if result.resp.status == 200:
+        data = await result.resp.json()
+        return web.json_response(data, status=result.resp.status)
+    else:
+        data = await result.resp.text()
+        return web.Response(text=data, status=result.resp.status)
 
 
 @server_status_required(READ_ALLOWED)
@@ -483,19 +354,20 @@ async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
 )
 async def watcher_agent_restart(request: web.Request, params: Any) -> web.Response:
     log.info("WATCHER_AGENT_RESTART (ag:{})", params["agent_id"])
-    watcher_info = await get_watcher_info(request, params["agent_id"])
-    connector = aiohttp.TCPConnector()
-    async with aiohttp.ClientSession(connector=connector) as sess:
-        with _timeout(20.0):
-            watcher_url = watcher_info["addr"] / "agent/restart"
-            headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-            async with sess.post(watcher_url, headers=headers) as resp:
-                if resp.status == HTTPStatus.OK:
-                    data = await resp.json()
-                    return web.json_response(data, status=resp.status)
-                else:
-                    data = await resp.text()
-                    return web.Response(text=data, status=resp.status)
+    root_ctx: RootContext = request.app["_root.context"]
+
+    result = await root_ctx.processors.agent.watcher_agent_restart.wait_for_complete(
+        WatcherAgentRestartAction(
+            agent_id=params["agent_id"],
+        )
+    )
+
+    if result.resp.status == 200:
+        data = await result.resp.json()
+        return web.json_response(data, status=result.resp.status)
+    else:
+        data = await result.resp.text()
+        return web.Response(text=data, status=result.resp.status)
 
 
 @superadmin_required
@@ -511,7 +383,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(known_registries, status=HTTPStatus.OK)
+    return web.json_response(result, status=200)
 
 
 def create_app(

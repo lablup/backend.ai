@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Generic, Optional, TypeVar
 
 
-@dataclass
 class BaseAction(ABC):
     @abstractmethod
     def entity_id(self) -> Optional[str]:
@@ -36,28 +35,6 @@ class BaseBatchAction(ABC):
 class BaseActionResult(ABC):
     @abstractmethod
     def entity_id(self) -> Optional[str]:
-        raise NotImplementedError
-
-
-@dataclass
-class BaseBatchAction(ABC):
-    @abstractmethod
-    def entity_ids(self) -> list[str]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def entity_type(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def operation_type(self) -> str:
-        raise NotImplementedError
-
-
-@dataclass
-class BaseBatchActionResult(ABC):
-    @abstractmethod
-    def entity_ids(self) -> list[str]:
         raise NotImplementedError
 
 
