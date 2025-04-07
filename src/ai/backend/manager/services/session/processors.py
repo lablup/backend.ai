@@ -67,9 +67,9 @@ from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
 )
-from ai.backend.manager.services.session.actions.interrupt import (
-    InterruptAction,
-    InterruptActionResult,
+from ai.backend.manager.services.session.actions.interrupt_session import (
+    InterruptSessionAction,
+    InterruptSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.list_files import (
     ListFilesAction,
@@ -133,7 +133,7 @@ class SessionProcessors:
         GetDirectAccessInfoAction, GetDirectAccessInfoActionResult
     ]
     get_session_info: ActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
-    interrupt: ActionProcessor[InterruptAction, InterruptActionResult]
+    interrupt: ActionProcessor[InterruptSessionAction, InterruptSessionActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]

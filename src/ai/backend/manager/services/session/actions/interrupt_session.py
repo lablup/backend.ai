@@ -8,7 +8,7 @@ from ai.backend.manager.services.session.base import SessionAction
 
 
 @dataclass
-class InterruptAction(SessionAction):
+class InterruptSessionAction(SessionAction):
     session_name: str
     owner_access_key: AccessKey
 
@@ -22,7 +22,7 @@ class InterruptAction(SessionAction):
 
 
 @dataclass
-class InterruptActionResult(BaseActionResult):
+class InterruptSessionActionResult(BaseActionResult):
     # TODO: Add proper type
     result: Any
     session_row: SessionRow

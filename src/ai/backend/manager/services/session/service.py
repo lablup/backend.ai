@@ -156,9 +156,9 @@ from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
 )
-from ai.backend.manager.services.session.actions.interrupt import (
-    InterruptAction,
-    InterruptActionResult,
+from ai.backend.manager.services.session.actions.interrupt_session import (
+    InterruptSessionAction,
+    InterruptSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.list_files import (
     ListFilesAction,
@@ -1433,7 +1433,7 @@ class SessionService:
 
         return GetSessionInfoActionResult(result=resp, session_row=sess)
 
-    async def interrupt(self, action: InterruptAction) -> InterruptActionResult:
+    async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
@@ -1447,7 +1447,7 @@ class SessionService:
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.interrupt_session(session)
 
-        return InterruptActionResult(result=None, session_row=session)
+        return InterruptSessionActionResult(result=None, session_row=session)
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         session_name = action.session_name

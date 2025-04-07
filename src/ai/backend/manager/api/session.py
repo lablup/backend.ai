@@ -77,7 +77,7 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
 )
 from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
-from ai.backend.manager.services.session.actions.interrupt import InterruptAction
+from ai.backend.manager.services.session.actions.interrupt_session import InterruptSessionAction
 from ai.backend.manager.services.session.actions.list_files import ListFilesAction
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
@@ -1224,7 +1224,7 @@ async def interrupt(request: web.Request) -> web.Response:
 
     try:
         await root_ctx.processors.session.interrupt.wait_for_complete(
-            InterruptAction(
+            InterruptSessionAction(
                 session_name=session_name,
                 owner_access_key=owner_access_key,
             )
