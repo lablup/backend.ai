@@ -2,6 +2,7 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.groups.processors import GroupProcessors
 from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors import (
     VFolderBaseProcessors,
@@ -20,6 +21,7 @@ class Processors:
     vfolder: VFolderBaseProcessors
     vfolder_invitation: VFolderInviteProcessors
     vfolder_file: VFolderFileProcessors
+    session: SessionProcessors
 
     def __init__(
         self,
@@ -31,6 +33,7 @@ class Processors:
         vfolder: VFolderBaseProcessors,
         vfolder_invite: VFolderInviteProcessors,
         vfolder_file: VFolderFileProcessors,
+        session: SessionProcessors,
     ) -> None:
         self.domain = domain
         self.group = group
@@ -40,3 +43,4 @@ class Processors:
         self.vfolder = vfolder
         self.vfolder_invitation = vfolder_invite
         self.vfolder_file = vfolder_file
+        self.session = session

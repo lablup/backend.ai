@@ -63,8 +63,6 @@ class RootContext(BaseContext):
     metrics: CommonMetricRegistry
     processors: Processors
 
-    processors: Processors
-
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
         super().__init__(**kwargs)
         self.metrics = metrics

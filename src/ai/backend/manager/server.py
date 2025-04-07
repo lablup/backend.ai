@@ -86,6 +86,8 @@ from ai.backend.manager.services.groups.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.service import SessionService
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
 from ai.backend.manager.services.vfolder.processors import (
@@ -475,24 +477,21 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db=root_ctx.db,
     )
     container_registry_processor = ContainerRegistryProcessors(container_registry_service)
+
     vfolder_service = VFolderService(
         db=root_ctx.db,
         shared_config=root_ctx.shared_config,
         storage_manager=root_ctx.storage_manager,
         background_task_manager=root_ctx.background_task_manager,
-        error_monitor=root_ctx.error_monitor,
-        idle_checker_host=root_ctx.idle_checker_host,
-    )
-    vfolder_service = VFolderService(
-        db=root_ctx.db,
-        storage_manager=root_ctx.storage_manager,
     )
     vfolder_processor = VFolderBaseProcessors(vfolder_service)
+
     vfolder_invite_service = VFolderInviteService(
         db=root_ctx.db,
         shared_config=root_ctx.shared_config,
     )
     vfolder_invite_processor = VFolderInviteProcessors(vfolder_invite_service)
+
     vfolder_file_service = VFolderFileService(
         db=root_ctx.db,
         shared_config=root_ctx.shared_config,
@@ -502,6 +501,20 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
     group_processor = GroupProcessors(group_service)
+
+    session_service = SessionService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+        redis_live=root_ctx.redis_live,
+        local_config=root_ctx.local_config,
+        stats_monitor=root_ctx.stats_monitor,
+        event_producer=root_ctx.event_producer,
+        background_task_manager=root_ctx.background_task_manager,
+        error_monitor=root_ctx.error_monitor,
+        idle_checker_host=root_ctx.idle_checker_host,
+    )
+    session_processor = SessionProcessors(session_service)
+
     root_ctx.processors = Processors(
         domain=domain_processor,
         group=group_processor,
@@ -511,6 +524,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         vfolder=vfolder_processor,
         vfolder_invite=vfolder_invite_processor,
         vfolder_file=vfolder_file_processor,
+        session=session_processor,
     )
     yield
 
