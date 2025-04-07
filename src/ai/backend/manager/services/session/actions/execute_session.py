@@ -9,11 +9,11 @@ from ai.backend.manager.services.session.base import SessionAction
 
 @dataclass
 class ExecuteSessionActionParams:
-    mode: Optional[str] = None
+    mode: Optional[str]
     # TODO: Add proper type
-    options: Optional[Any] = None
-    code: Optional[str] = None
-    run_id: Optional[str] = None
+    options: Optional[Any]
+    code: Optional[str]
+    run_id: Optional[str]
 
 
 @dataclass

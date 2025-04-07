@@ -26,15 +26,15 @@ class CreateFromParamsActionParams:
     tag: str
     priority: int
     owner_access_key: AccessKey
-    enqueue_only: bool = False
-    max_wait_seconds: int = 0
-    starts_at: Optional[str] = None
-    reuse_if_exists: bool = True
-    startup_command: Optional[str] = None
-    batch_timeout: Optional[timedelta] = None
-    bootstrap_script: Optional[str] = None
-    dependencies: Optional[list[uuid.UUID]] = None
-    callback_url: Optional[yarl.URL] = None
+    enqueue_only: bool
+    max_wait_seconds: int
+    starts_at: Optional[str]
+    reuse_if_exists: bool
+    startup_command: Optional[str]
+    batch_timeout: Optional[timedelta]
+    bootstrap_script: Optional[str]
+    dependencies: Optional[list[uuid.UUID]]
+    callback_url: Optional[yarl.URL]
 
 
 @dataclass
@@ -44,7 +44,7 @@ class CreateFromParamsAction(SessionAction):
     user_role: UserRole
     sudo_session_enabled: bool
     requester_access_key: AccessKey
-    keypair_resource_policy: Optional[dict] = None
+    keypair_resource_policy: Optional[dict]
 
     @override
     def entity_id(self) -> Optional[str]:

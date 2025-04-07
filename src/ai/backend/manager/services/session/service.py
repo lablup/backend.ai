@@ -91,6 +91,8 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
+    CheckAndTransitStatusBatchAction,
+    CheckAndTransitStatusBatchActionResult,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -1778,6 +1780,35 @@ class SessionService:
     ) -> CheckAndTransitStatusActionResult:
         user_id = action.user_id
         user_role = action.user_role
+        session_id = action.session_id
+
+        async with self._db.begin_readonly_session() as db_session:
+            session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
+            if session_row.user_uuid == user_id or user_role not in (
+                UserRole.ADMIN,
+                UserRole.SUPERADMIN,
+            ):
+                log.warning(
+                    f"You are not allowed to transit others's sessions status, skip (s:{session_id})"
+                )
+                return CheckAndTransitStatusActionResult(result={}, session_row=session_row)
+
+        now = datetime.now(tzutc())
+        session_rows = await self._agent_registry.session_lifecycle_mgr.transit_session_status(
+            [session_id], now
+        )
+        await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
+            row.id for row, is_transited in session_rows if is_transited
+        ])
+
+        result = {row.id: row.status.name for row, _ in session_rows}
+        return CheckAndTransitStatusActionResult(result=result, session_row=session_row)
+
+    async def check_and_transit_status_multi(
+        self, action: CheckAndTransitStatusBatchAction
+    ) -> CheckAndTransitStatusBatchActionResult:
+        user_id = action.user_id
+        user_role = action.user_role
         session_ids = action.session_ids
         accessible_session_ids: list[SessionId] = []
 
@@ -1806,4 +1837,4 @@ class SessionService:
         else:
             result = {}
 
-        return CheckAndTransitStatusActionResult(session_status_map=result)
+        return CheckAndTransitStatusBatchActionResult(session_status_map=result)

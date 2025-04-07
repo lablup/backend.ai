@@ -14,7 +14,7 @@ class CompleteAction(SessionAction):
     owner_access_key: AccessKey
     code: str
     # TODO: Add type
-    options: Optional[Mapping[str, Any]] = None
+    options: Optional[Mapping[str, Any]]
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -846,14 +846,17 @@ async def check_and_transit_status(
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_ids)
 
-    result = await root_ctx.processors.session.check_and_transit_status.wait_for_complete(
-        CheckAndTransitStatusAction(
-            user_id=user_id,
-            user_role=user_role,
-            session_ids=session_ids,
+    session_status_map = {}
+    for session_id in session_ids:
+        result = await root_ctx.processors.session.check_and_transit_status.wait_for_complete(
+            CheckAndTransitStatusAction(
+                user_id=user_id,
+                user_role=user_role,
+                session_id=session_id,
+            )
         )
-    )
-    return SessionStatusResponseModel(session_status_map=result.session_status_map)
+        session_status_map.update(result.result)
+    return SessionStatusResponseModel(session_status_map=session_status_map)
 
 
 @server_status_required(ALL_ALLOWED)

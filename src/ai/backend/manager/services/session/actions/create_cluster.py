@@ -22,9 +22,9 @@ class CreateClusterAction(SessionAction):
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     tag: str
-    enqueue_only: bool = False
-    keypair_resource_policy: Optional[dict] = None
-    max_wait_seconds: int = 0
+    enqueue_only: bool
+    keypair_resource_policy: Optional[dict]
+    max_wait_seconds: int
 
     @override
     def entity_id(self) -> Optional[str]:

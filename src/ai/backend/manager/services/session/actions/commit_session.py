@@ -11,7 +11,7 @@ from ai.backend.manager.services.session.base import SessionAction
 class CommitSessionAction(SessionAction):
     session_name: str
     owner_access_key: AccessKey
-    filename: Optional[str] = None
+    filename: Optional[str]
 
     @override
     def entity_id(self) -> Optional[str]:
