@@ -14,7 +14,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-from ai.backend.manager.types import DataclassInput, TriStateField
+from ai.backend.manager.types import DataclassInput, TriState
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -72,9 +72,11 @@ class CreateVFolderActionResult(BaseActionResult):
 
 @dataclass
 class UpdateVFolderAttributeInput(DataclassInput):
-    name: TriStateField[str] = field(default_factory=TriStateField)
-    cloneable: TriStateField[bool] = field(default_factory=TriStateField)
-    mount_permission: TriStateField[VFolderPermission] = field(default_factory=TriStateField)
+    name: TriState[str] = field(default_factory=lambda: TriState.nop("name"))
+    cloneable: TriState[bool] = field(default_factory=lambda: TriState.nop("cloneable"))
+    mount_permission: TriState[VFolderPermission] = field(
+        default_factory=lambda: TriState.nop("mount_permission")
+    )
 
 
 @dataclass

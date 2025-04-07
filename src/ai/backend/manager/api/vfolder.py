@@ -120,7 +120,7 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
-from ..types import TriStateField
+from ..types import TriState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -971,7 +971,7 @@ class RenameRequestModel(BaseModel):
 
     def to_input(self) -> UpdateVFolderAttributeInput:
         return UpdateVFolderAttributeInput(
-            name=TriStateField(self.new_name),
+            name=TriState.update("name", self.new_name),
         )
 
 
@@ -1032,8 +1032,8 @@ async def update_vfolder_options(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
             input=UpdateVFolderAttributeInput(
-                cloneable=TriStateField(params["cloneable"]),
-                mount_permission=TriStateField(params["permission"]),
+                cloneable=TriState.update("cloneable", params["cloneable"]),
+                mount_permission=TriState.update("mount_permission", params["permission"]),
             ),
         )
     )

@@ -156,62 +156,45 @@ class OptionalState(TriState[TVal]):
         return cls(attr_name, state=State.NOP, value=None)
 
 
-class TriStateField(Generic[TVal]):
-    _value: TVal | Sentinel
-
-    def __init__(self, value: TVal | Sentinel = _SENTINEL) -> None:
-        self._value = value
-
-    def value(self) -> TVal:
-        if self._value is not _SENTINEL:
-            return self._value
-        raise ValueError(f"Value is not set for {self.__class__.__name__}")
-
-    def is_valid(self) -> bool:
-        return self._value is not _SENTINEL
-
-
 @dataclass
 class DataclassInput:
     """
     Base class for inputs that are dataclasses.
 
     The classes that inherit from this class should be dataclasses and
-    should have fields that are TriStateField.
+    should have fields that are TriState.
     """
 
-    def _get_fields(self) -> list[tuple[str, TriStateField]]:
+    def _get_fields(self) -> list[tuple[str, TriState]]:
         return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
 
     def set_attr(self, obj: Any) -> None:
-        for field_name, value in self._get_fields():
-            if value.is_valid():
-                setattr(obj, field_name, value.value())
+        for field_name, field in self._get_fields():
+            field.set_attr(obj)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            field_name: value.value()
-            for field_name, value in self._get_fields()
-            if value.is_valid()
-        }
+        result = {}
+        for field_name, field in self._get_fields():
+            if field.state() == State.UPDATE:
+                result[field_name] = field.value()
+        return result
 
 
-class DictInput(UserDict[str, TriStateField]):
+class DictInput(UserDict[str, TriState]):
     """
     Base class for inputs that are UserDict.
     """
 
-    def _get_fields(self) -> list[tuple[str, TriStateField]]:
+    def _get_fields(self) -> list[tuple[str, TriState]]:
         return [(k, v) for k, v in self.data.items()]
 
     def set_attr(self, obj: Any) -> None:
-        for field_name, value in self._get_fields():
-            if value.is_valid():
-                setattr(obj, field_name, value.value())
+        for field_name, field in self._get_fields():
+            field.set_attr(obj)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            field_name: value.value()
-            for field_name, value in self._get_fields()
-            if value.is_valid()
-        }
+        result = {}
+        for field_name, field in self._get_fields():
+            if field.state() != State.NOP:
+                result[field_name] = field.value()
+        return result
