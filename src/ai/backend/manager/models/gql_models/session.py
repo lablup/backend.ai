@@ -30,7 +30,7 @@ from ai.backend.manager.services.session.actions.modify_compute_session import (
     ModifyComputeSessionAction,
     ModifyComputeSessionInputData,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import TriStateField
 
 from ..base import (
     BigInt,
@@ -668,11 +668,11 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
 
-        priority = input.get("priority")
+        priority: Any = input.get("priority")
         if priority and priority is not Undefined:
             _validate_name_input(priority)
 
-        name = input.get("name")
+        name: Any = input.get("name")
         if name and name is not Undefined:
             _validate_priority_input(name)
 
@@ -680,8 +680,8 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
             ModifyComputeSessionAction(
                 session_id=session_id,
                 props=ModifyComputeSessionInputData(
-                    name=TriState("name", name is None, name),
-                    priority=TriState("priority", priority is None, priority),
+                    name=TriStateField(name),
+                    priority=TriStateField(priority),
                 ),
             )
         )

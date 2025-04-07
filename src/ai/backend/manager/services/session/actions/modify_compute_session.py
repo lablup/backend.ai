@@ -5,17 +5,13 @@ from typing import Any, Optional, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.base import SessionAction
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import DataclassInput, TriStateField
 
 
 @dataclass
-class ModifyComputeSessionInputData:
-    name: TriState[str] = field(default_factory=lambda: TriState.nop("name"))
-    priority: TriState[int] = field(default_factory=lambda: TriState.nop("priority"))
-
-    def set_attr(self, row: SessionRow) -> None:
-        self.name.set_attr(row.name)
-        self.priority.set_attr(row.priority)
+class ModifyComputeSessionInputData(DataclassInput):
+    name: TriStateField[str] = field(default_factory=TriStateField)
+    priority: TriStateField[int] = field(default_factory=TriStateField)
 
 
 # TODO: Rename ModifySessionAction?

@@ -1202,6 +1202,7 @@ class SessionService:
                 # For legacy
                 resp["result"] = await self._agent_registry.get_completions(session, code, opts)
             else:
+                run_id = cast(str, run_id)
                 raw_result = await self._agent_registry.execute(
                     session,
                     api_version,
@@ -1726,7 +1727,7 @@ class SessionService:
     ) -> ModifyComputeSessionActionResult:
         session_id = action.session_id
         props = action.props
-        session_name = action.props.name.get_value()
+        session_name = action.props.name.value()
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
