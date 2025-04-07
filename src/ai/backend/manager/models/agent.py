@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Sequence
+from collections.abc import Sequence, Mapping, Callable, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, TypeAlias, cast, override
+from typing import TYPE_CHECKING, Optional, TypeAlias, cast, override, Self
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -34,6 +34,7 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
+from .utils import ExtendedAsyncSAEngine,execute_with_txn_retry
 
 if TYPE_CHECKING:
     pass
@@ -97,6 +98,100 @@ class AgentRow(Base):
     __table__ = agents
     kernels = relationship("KernelRow", back_populates="agent_row")
     scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
+
+    @classmethod
+    async def get_agents_by_condition(
+        cls,
+        conditions: Iterable[QueryCondition],
+        *,
+        db: ExtendedAsyncSAEngine
+    ) -> list[Self]:
+        query_stmt = sa.select(AgentRow)
+        condition: Optional[sa.sql.expression.BinaryExpression] = None
+        for cond_callable in conditions:
+            condition = cond_callable(condition)
+        if condition is not None:
+            query_stmt = query_stmt.where(condition)
+
+        async def fetch(db_session: SASession) -> list[AgentRow]:
+            return (await db_session.scalars(query_stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
+
+    @classmethod
+    async def get_schedulable_agents_by_sgroup(
+        cls,
+        sgroup_name: str,
+        *,
+        db: ExtendedAsyncSAEngine
+    ) -> list[Self]:
+        return await cls.get_agents_by_condition(
+            [
+                by_scaling_group(sgroup_name, ConditionMerger.AND),
+                by_schedulable(True, ConditionMerger.AND),
+                by_status(AgentStatus.ALIVE, ConditionMerger.AND),
+            ],
+            db=db,
+        )
+
+
+type QueryConditionCallable = Callable[
+    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
+]
+type QueryCondition = Callable[..., QueryConditionCallable]
+
+
+class ConditionMerger(enum.Enum):
+    AND = "AND"
+    OR = "OR"
+
+
+_COND_SQL_OPERATOR_MAP: Mapping[ConditionMerger, Callable] = {
+    ConditionMerger.AND: sa.and_,
+    ConditionMerger.OR: sa.or_,
+}
+
+def _append_condition(
+    condition: Optional[sa.sql.expression.BinaryExpression],
+    new_condition: sa.sql.expression.BinaryExpression,
+    operator: ConditionMerger,
+) -> sa.sql.expression.BinaryExpression:
+    return _COND_SQL_OPERATOR_MAP[operator](condition, new_condition) if condition is not None else new_condition
+
+
+def by_scaling_group(
+    scaling_group: str,
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_scaling_group(condition: Optional[sa.sql.expression.BinaryExpression]) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(
+            condition, AgentRow.scaling_group == scaling_group, operator
+        )
+    return _by_scaling_group
+
+
+def by_status(
+    status: AgentStatus,
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_status(condition: Optional[sa.sql.expression.BinaryExpression]) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(
+            condition, AgentRow.status == status, operator
+        )
+    return _by_status
+
+
+def by_schedulable(
+    schedulable: bool,
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_schedulable(condition: Optional[sa.sql.expression.BinaryExpression]) -> sa.sql.expression.BinaryExpression:
+        schedulable_ = true() if schedulable else false()
+        return _append_condition(
+            condition, AgentRow.schedulable == schedulable_, operator
+        )
+    return _by_schedulable
 
 
 async def list_schedulable_agents_by_sgroup(

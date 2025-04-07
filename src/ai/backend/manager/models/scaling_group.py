@@ -455,6 +455,12 @@ class ScalingGroup(graphene.ObjectType):
         graphene.Float,
         description="Added in 25.5.0.",
     )
+    min_available_slots_for_each_resource = graphene.JSONString(
+        description="Added in 25.6.0. Minimum available slots for each resource.",
+    )
+    max_available_slots_for_each_resource = graphene.JSONString(
+        description="Added in 25.6.0. Maximum available slots for each resource.",
+    )
 
     # Dynamic fields.
     agent_count_by_status = graphene.Field(
@@ -487,6 +493,51 @@ class ScalingGroup(graphene.ObjectType):
     def __init__(self, is_masked: bool = False, *args, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._is_masked = is_masked
+    
+    async def resolve_min_available_slots_for_each_resource(
+        self, info: graphene.ResolveInfo,
+    ) -> dict[str, str]:
+        from .agent import AgentRow
+
+        graph_ctx = info.context
+        agent_list = await AgentRow.get_schedulable_agents_by_sgroup(self.name, db=graph_ctx.db)
+        agent_info = [(agent_row.id, agent_row.available_slots) for agent_row in agent_list]
+
+        def _compare_each_resource_and_get_min(val1: ResourceSlot, val2: Optional[ResourceSlot]) -> ResourceSlot:
+            if val2 is None:
+                return val1
+            return_val = ResourceSlot()
+            val1.sync_keys(val2)
+            for key in val1:
+                return_val[key] = min(val1[key], val2[key])
+            return return_val
+
+        result: Optional[ResourceSlot] = None
+        for agent_row in agent_list:
+            result = _compare_each_resource_and_get_min(agent_row.available_slots, result)
+        return result.to_json() if result is not None else {}
+
+    async def resolve_max_available_slots_for_each_resource(
+        self, info: graphene.ResolveInfo,
+    )-> dict[str, str]:
+        from .agent import AgentRow
+
+        graph_ctx = info.context
+        agent_list = await AgentRow.get_schedulable_agents_by_sgroup(self.name, db=graph_ctx.db)
+
+        def _compare_each_resource_and_get_max(val1: ResourceSlot, val2: Optional[ResourceSlot]) -> ResourceSlot:
+            if val2 is None:
+                return val1
+            return_val = ResourceSlot()
+            val1.sync_keys(val2)
+            for key in val1:
+                return_val[key] = max(val1[key], val2[key])
+            return return_val
+
+        result: Optional[ResourceSlot] = None
+        for agent_row in agent_list:
+            result = _compare_each_resource_and_get_max(agent_row.available_slots, result)
+        return result.to_json() if result is not None else {}
 
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
