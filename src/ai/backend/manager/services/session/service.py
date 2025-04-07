@@ -1784,7 +1784,7 @@ class SessionService:
 
         async with self._db.begin_readonly_session() as db_session:
             session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
-            if session_row.user_uuid == user_id or user_role not in (
+            if session_row.user_uuid != user_id and user_role not in (
                 UserRole.ADMIN,
                 UserRole.SUPERADMIN,
             ):

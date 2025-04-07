@@ -977,24 +977,15 @@ class SessionRow(Base):
 
     @classmethod
     async def get_session_to_determine_status(
-        cls, db_session: SASession, session_id: SessionId
+        cls,
+        db_session: SASession,
+        session_id: SessionId,
     ) -> SessionRow:
         stmt = (
             sa.select(SessionRow)
             .where(SessionRow.id == session_id)
-            .options(
-                selectinload(SessionRow.kernels).options(
-                    load_only(
-                        KernelRow.agent,
-                        KernelRow.agent_addr,
-                        KernelRow.startup_command,
-                        KernelRow.status,
-                        KernelRow.cluster_role,
-                        KernelRow.status_info,
-                        KernelRow.occupied_slots,
-                    )
-                ),
-            )
+            # TODO: Add kernel loading strategy?
+            .options(selectinload(SessionRow.kernels))
         )
         session_row = cast(SessionRow | None, await db_session.scalar(stmt))
         if session_row is None:

@@ -724,12 +724,17 @@ class CheckAndTransitStatus(graphene.Mutation):
         user_role = cast(UserRole, graph_ctx.user["role"])
         user_id = cast(uuid.UUID, graph_ctx.user["uuid"])
 
-        result = await graph_ctx.processors.session.check_and_transit_status.wait_for_complete(
-            CheckAndTransitStatusAction(
-                user_id=user_id,
-                user_role=user_role,
-                session_ids=session_ids,
+        session_nodes = []
+        for session_id in session_ids:
+            action_result = (
+                await graph_ctx.processors.session.check_and_transit_status.wait_for_complete(
+                    CheckAndTransitStatusAction(
+                        user_id=user_id,
+                        user_role=user_role,
+                        session_id=session_id,
+                    )
+                )
             )
-        )
+            session_nodes.append(ComputeSessionNode.from_row(graph_ctx, action_result.session_row))
 
-        return CheckAndTransitStatus(result, input.get("client_mutation_id"))
+        return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))
