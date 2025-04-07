@@ -5,6 +5,7 @@ from typing import Any, Optional, override
 
 from ai.backend.common.types import (
     AccessKey,
+    KernelId,
     QuotaScopeID,
     VFolderUsageMode,
 )
@@ -299,8 +300,7 @@ class GetTaskLogsAction(VFolderAction):
     user_id: uuid.UUID
     domain_name: str
     user_role: UserRole
-    # TODO: Change this to KernelId
-    kernel_id: str
+    kernel_id: KernelId
     owner_access_key: AccessKey
 
     # TODO: Remove this.

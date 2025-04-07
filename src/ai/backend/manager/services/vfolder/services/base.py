@@ -851,7 +851,7 @@ class VFolderService:
         user_uuid = action.user_id
         user_role = action.user_role
         domain_name = action.domain_name
-        kernel_id_str = action.kernel_id
+        kernel_id_str = action.kernel_id.hex
         request = action.request
 
         async with self._db.begin_readonly() as conn:

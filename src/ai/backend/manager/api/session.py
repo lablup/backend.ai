@@ -1606,14 +1606,14 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-    kernel_id_str = params["kernel_id"].hex
+    kernel_id_str = KernelId(params["kernel_id"])
 
     result = await root_ctx.processors.vfolder.get_task_logs.wait_for_complete(
         GetTaskLogsAction(
             user_id=user_uuid,
             domain_name=domain_name,
             user_role=user_role,
-            kernel_id=kernel_id_str,
+            kernel_id=KernelId(kernel_id_str),
             owner_access_key=request["keypair"]["access_key"],
             request=request,
         )
