@@ -319,9 +319,9 @@ class GetTaskLogsAction(VFolderAction):
 class GetTaskLogsActionResult(BaseActionResult):
     # TODO: Add proper type
     response: Any
-    # vfolder_row: VFolderRow
-    vfolder_row: Any
+    # TODO: Replace this with VFolderData
+    vfolder_data: Any
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.vfolder_row.id)
+        return str(self.vfolder_data["id"])

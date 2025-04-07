@@ -1053,7 +1053,6 @@ class SessionService:
                 *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
             ]
 
-            # TODO: 왜 아래랑 타입이 다른지 확인할 것.
             return DestroySessionActionResult(result=last_stats, destroyed_sessions=sessions)
         else:
             async with self._db.begin_readonly_session() as db_sess:
