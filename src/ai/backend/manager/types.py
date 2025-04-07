@@ -82,6 +82,15 @@ TVal = TypeVar("TVal")
 
 @dataclass
 class TriState(Generic[TVal]):
+    """
+    TriState is a class that represents partial updates to an attribute of an object.
+    It is used to indicate whether an attribute should be updated, set to None, or not modified at all.
+    It can be in one of three states:
+    - UPDATE: The attribute should be updated with the given value.
+    - NULLIFY: The attribute should be set to None.
+    - NOP: No operation should be performed on the attribute.
+    """
+
     _attr_name: str
     _state: State
     _value: Optional[TVal]
@@ -122,6 +131,15 @@ class TriState(Generic[TVal]):
 
 
 class OptionalState(TriState[TVal]):
+    """
+    OptionalState is a class that represents partial updates to an attribute of an object.
+    It is used to indicate whether an attribute should be updated or not modified at all.
+    It can be in one of two states:
+    - UPDATE: The attribute should be updated with the given value.
+    - NOP: No operation should be performed on the attribute.
+    This class is similar to TriState, but it cannot be in the NULLIFY state.
+    """
+
     def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
         self._attr_name = attr_name
         if state == State.NULLIFY:
