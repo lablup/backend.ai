@@ -1,17 +1,22 @@
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.base import SessionAction
-from ai.backend.manager.types import DataclassInput, TriStateField
 
 
 @dataclass
-class ModifyComputeSessionInputData(DataclassInput):
-    name: TriStateField[str] = field(default_factory=TriStateField)
-    priority: TriStateField[int] = field(default_factory=TriStateField)
+class ModifyComputeSessionInputData:
+    name: Optional[str]
+    priority: Optional[int]
+
+    def set_attr(self, row: SessionRow):
+        if self.name is not None:
+            row.name = self.name
+        if self.priority is not None:
+            row.priority = self.priority
 
 
 # TODO: Rename ModifySessionAction?

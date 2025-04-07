@@ -18,7 +18,6 @@ import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from graphql import Undefined
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionResult
@@ -30,7 +29,6 @@ from ai.backend.manager.services.session.actions.modify_compute_session import (
     ModifyComputeSessionAction,
     ModifyComputeSessionInputData,
 )
-from ai.backend.manager.types import TriStateField
 
 from ..base import (
     BigInt,
@@ -668,20 +666,20 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
 
-        priority: Any = input.get("priority")
-        if priority and priority is not Undefined:
-            _validate_name_input(priority)
+        priority = input.get("priority")
+        if priority:
+            _validate_priority_input(priority)
 
-        name: Any = input.get("name")
-        if name and name is not Undefined:
-            _validate_priority_input(name)
+        name = input.get("name")
+        if name:
+            _validate_name_input(name)
 
         result = await graph_ctx.processors.session.modify_compute_session.wait_for_complete(
             ModifyComputeSessionAction(
                 session_id=session_id,
                 props=ModifyComputeSessionInputData(
-                    name=TriStateField(name),
-                    priority=TriStateField(priority),
+                    name=name,
+                    priority=priority,
                 ),
             )
         )

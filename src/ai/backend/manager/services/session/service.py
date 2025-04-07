@@ -1727,7 +1727,7 @@ class SessionService:
     ) -> ModifyComputeSessionActionResult:
         session_id = action.session_id
         props = action.props
-        session_name = action.props.name.value()
+        session_name = action.props.name
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
