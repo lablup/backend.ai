@@ -1059,10 +1059,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         UserRole.SUPERADMIN,
     ):
         raise InsufficientPrivilege("You are not allowed to force-terminate others's sessions")
-    # domain_name = None
-    # if requester_access_key != owner_access_key and \
-    #         not request['is_superadmin'] and request['is_admin']:
-    #     domain_name = request['user']['domain_name']
+
     log.info(
         "DESTROY (ak:{0}/{1}, s:{2}, forced:{3}, recursive: {4})",
         requester_access_key,

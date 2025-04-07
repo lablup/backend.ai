@@ -23,6 +23,8 @@ class DestroySessionAction(SessionAction):
 
     @override
     def operation_type(self):
+        if self.recursive:
+            return "destory_multi"
         return "destory"
 
 
@@ -36,4 +38,4 @@ class DestroySessionActionResult(BaseActionResult):
     # TODO: Change this to `entity_ids`
     @override
     def entity_id(self) -> Optional[str]:
-        return ""
+        return None
