@@ -18,7 +18,7 @@ def current_request_id() -> Optional[str]:
 
 
 @contextmanager
-def with_request_id(request_id: Optional[str] = None) -> Iterator[str]:
+def with_request_id(request_id: Optional[str] = None) -> Iterator[None]:
     """
     context manager to set up the request ID.
     If request_id is not provided, generates a new UUID.
@@ -30,7 +30,7 @@ def with_request_id(request_id: Optional[str] = None) -> Iterator[str]:
 
     token = request_id_var.set(request_id)
     try:
-        yield token
+        yield
     finally:
         # Reset the context variable to its previous state
         request_id_var.reset(token)
