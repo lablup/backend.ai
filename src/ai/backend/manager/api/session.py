@@ -672,7 +672,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
     }
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
     log.info(
-        "CREAT_CLUSTER (ak:{0}/{1}, s:{3})",
+        "CREAT_CLUSTER (ak:{0}/{1}, s:{2})",
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
         params["session_name"],
