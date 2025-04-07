@@ -9,7 +9,6 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction, SessionBatchAction
 
 
-# TODO: Change this to BatchAction
 @dataclass
 class CheckAndTransitStatusAction(SessionAction):
     user_id: uuid.UUID

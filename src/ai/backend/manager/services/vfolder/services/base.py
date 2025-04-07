@@ -907,5 +907,4 @@ class VFolderService:
         finally:
             if prepared:
                 await response.write_eof()
-        # TODO: log_vfolder is not a VFolderRow, but a dict, fix this.
         return GetTaskLogsActionResult(response=response, vfolder_data=log_vfolder)

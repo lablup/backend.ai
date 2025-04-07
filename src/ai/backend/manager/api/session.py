@@ -493,6 +493,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             user_role=request["user"]["role"],
             requester_access_key=requester_access_key,
             sudo_session_enabled=request["user"]["sudo_session_enabled"],
+            keypair_resource_policy=request["keypair"]["resource_policy"],
         )
     )
 
@@ -632,6 +633,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             user_role=request["user"]["role"],
             requester_access_key=requester_access_key,
             sudo_session_enabled=request["user"]["sudo_session_enabled"],
+            keypair_resource_policy=request["keypair"]["resource_policy"],
         )
     )
 
@@ -692,6 +694,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             template_id=params["template_id"],
             sudo_session_enabled=request["user"]["sudo_session_enabled"],
             max_wait_seconds=params["max_wait_seconds"],
+            keypair_resource_policy=request["keypair"]["resource_policy"],
         )
     )
 
