@@ -1,38 +1,25 @@
-from dataclasses import dataclass, field
-from typing import Any, Optional, cast, override
+from dataclasses import dataclass
+from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.services.groups.actions.base import GroupAction
 from ai.backend.manager.services.groups.types import GroupData
-from ai.backend.manager.types import OptionalState, State, TriState
 
 
 @dataclass
 class CreateGroupAction(GroupAction):
     name: str
     domain_name: str
-    type: OptionalState[ProjectType] = field(default_factory=lambda: OptionalState.nop("type"))
-    description: OptionalState[Optional[str]] = field(
-        default_factory=lambda: OptionalState.nop("description")
-    )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    total_resource_slots: OptionalState[Optional[ResourceSlot]] = field(
-        default_factory=lambda: OptionalState.nop("total_resource_slots")
-    )
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
-    )
-    integration_id: OptionalState[Optional[str]] = field(
-        default_factory=lambda: OptionalState.nop("integration_id")
-    )
-    resource_policy: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("resource_policy")
-    )
-    container_registry: OptionalState[Optional[dict[str, str]]] = field(
-        default_factory=lambda: OptionalState.nop("container_registry")
-    )
+    type: Optional[ProjectType]
+    description: Optional[str]
+    is_active: Optional[bool]
+    total_resource_slots: Optional[ResourceSlot]
+    allowed_vfolder_hosts: Optional[dict[str, str]]
+    integration_id: Optional[str]
+    resource_policy: Optional[str]
+    container_registry: Optional[dict[str, str]]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -57,9 +44,9 @@ class CreateGroupAction(GroupAction):
         ]
 
         for field_name in optional_fields:
-            field_value: TriState = getattr(self, field_name)
-            if field_value.state() != State.NOP:
-                result[field_name] = cast(Any, field_value.value())
+            field_value = getattr(self, field_name)
+            if field_value is not None:
+                result[field_name] = field_value
 
         return result
 

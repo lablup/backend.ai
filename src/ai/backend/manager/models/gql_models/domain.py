@@ -334,40 +334,16 @@ class CreateDomainNodeInput(graphene.InputObjectType):
         return CreateDomainNodeAction(
             name=self.name,
             user_info=user_info,
-            description=OptionalState(
-                "description", define_state(self.description), value_or_none(self.description)
-            ),
-            is_active=OptionalState(
-                "is_active", define_state(self.is_active), value_or_none(self.is_active)
-            ),
-            total_resource_slots=OptionalState(
-                "total_resource_slots",
-                define_state(self.total_resource_slots),
-                value_or_none(self.total_resource_slots),
-            ),
-            allowed_vfolder_hosts=OptionalState(
-                "allowed_vfolder_hosts",
-                define_state(self.allowed_vfolder_hosts),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            allowed_docker_registries=OptionalState(
-                "allowed_docker_registries",
-                define_state(self.allowed_docker_registries),
-                value_or_none(self.allowed_docker_registries),
-            ),
-            integration_id=OptionalState(
-                "integration_id",
-                define_state(self.integration_id),
-                value_or_none(self.integration_id),
-            ),
-            dotfiles=OptionalState(
-                "dotfiles", define_state(self.dotfiles), value_or_none(self.dotfiles)
-            ),
-            scaling_groups=OptionalState(
-                "scaling_groups",
-                define_state(self.scaling_groups),
-                value_or_none(self.scaling_groups),
-            ),
+            description=value_or_none(self.description),
+            is_active=value_or_none(self.is_active),
+            total_resource_slots=value_or_none(self.total_resource_slots)
+            if self.total_resource_slots is not graphql.Undefined
+            else None,
+            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+            allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+            integration_id=value_or_none(self.integration_id),
+            dotfiles=value_or_none(self.dotfiles),
+            scaling_groups=value_or_none(self.scaling_groups),
         )
 
 

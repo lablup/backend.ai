@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Iterable, Optional, cast
+from typing import Any, Awaitable, Callable, Iterable, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.engine.result import Result
@@ -219,10 +219,7 @@ class DomainService:
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        if action.scaling_groups.state() == State.UPDATE:
-            scaling_groups = cast(list[str], action.scaling_groups.value())
-        else:
-            scaling_groups = None
+        scaling_groups = action.scaling_groups
 
         async def _insert(db_session: AsyncSession) -> DomainRow:
             if scaling_groups is not None:

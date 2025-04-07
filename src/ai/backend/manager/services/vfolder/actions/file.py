@@ -136,7 +136,7 @@ class DeleteFilesAction(VFolderAction):
     vfolder_uuid: uuid.UUID
 
     files: list[str]
-    recursive: bool = False
+    recursive: bool
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -161,8 +161,8 @@ class MkdirAction(VFolderAction):
     vfolder_uuid: uuid.UUID
 
     path: str | list[str]
-    parents: bool = True
-    exist_ok: bool = False
+    parents: bool
+    exist_ok: bool
 
     @override
     def entity_id(self) -> Optional[str]:

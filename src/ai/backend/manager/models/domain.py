@@ -320,36 +320,12 @@ class DomainInput(graphene.InputObjectType):
 
         return CreateDomainAction(
             name=domain_name,
-            description=TriState(
-                "description",
-                define_state(self.description),
-                value_or_none(self.description),
-            ),
-            is_active=OptionalState(
-                "is_active", define_state(self.is_active), value_or_none(self.is_active)
-            ),
-            total_resource_slots=TriState(
-                "total_resource_slots",
-                define_state(self.total_resource_slots),
-                None
-                if self.total_resource_slots is Undefined
-                else ResourceSlot.from_user_input(self.total_resource_slots, None),
-            ),
-            allowed_vfolder_hosts=OptionalState(
-                "allowed_vfolder_hosts",
-                define_state(self.allowed_vfolder_hosts),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            allowed_docker_registries=OptionalState(
-                "allowed_docker_registries",
-                define_state(self.allowed_docker_registries),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            integration_id=TriState(
-                "integration_id",
-                define_state(self.integration_id),
-                value_or_none(self.integration_id),
-            ),
+            description=value_or_none(self.description),
+            is_active=value_or_none(self.is_active),
+            total_resource_slots=value_or_none(self.total_resource_slots),
+            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+            allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+            integration_id=value_or_none(self.integration_id),
         )
 
 

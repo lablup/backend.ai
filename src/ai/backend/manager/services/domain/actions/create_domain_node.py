@@ -1,36 +1,23 @@
-from dataclasses import dataclass, field
-from typing import Any, Optional, cast, override
+from dataclasses import dataclass
+from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import OptionalState, State, TriState
 
 
 @dataclass
 class CreateDomainNodeAction(DomainAction):
     name: str
     user_info: UserInfo
-    description: OptionalState[Optional[str]] = field(
-        default_factory=lambda: OptionalState.nop("description")
-    )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    total_resource_slots: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("total_resource_slots")
-    )
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
-    )
-    allowed_docker_registries: OptionalState[list[str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
-    )
-    integration_id: OptionalState[Optional[str]] = field(
-        default_factory=lambda: OptionalState.nop("integration_id")
-    )
-    dotfiles: OptionalState[bytes] = field(default_factory=lambda: OptionalState.nop("dotfiles"))
-    scaling_groups: OptionalState[list[str]] = field(
-        default_factory=lambda: OptionalState.nop("scaling_groups")
-    )
+    description: Optional[str]
+    is_active: Optional[bool]
+    total_resource_slots: Optional[dict[str, str]]
+    allowed_vfolder_hosts: Optional[dict[str, str]]
+    allowed_docker_registries: Optional[list[str]]
+    integration_id: Optional[str]
+    dotfiles: Optional[bytes]
+    scaling_groups: Optional[list[str]]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -41,7 +28,7 @@ class CreateDomainNodeAction(DomainAction):
         return "create"
 
     def get_insertion_data(self) -> dict[str, Any]:
-        result = {"name": self.name}
+        result: dict[str, Any] = {"name": self.name}
 
         optional_fields = [
             "description",
@@ -55,9 +42,8 @@ class CreateDomainNodeAction(DomainAction):
         ]
 
         for field_name in optional_fields:
-            field_value: TriState = getattr(self, field_name)
-            if field_value.state() != State.NOP:
-                result[field_name] = cast(Any, field_value.value())
+            field_value = getattr(self, field_name)
+            result[field_name] = field_value
 
         return result
 
