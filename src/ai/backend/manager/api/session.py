@@ -85,7 +85,7 @@ from ai.backend.manager.services.session.actions.restart_session import RestartS
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
 from ai.backend.manager.services.session.actions.upload_files import UploadFilesAction
-from ai.backend.manager.services.vfolder.actions.get_task_logs import GetTaskLogsAction
+from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1610,7 +1610,6 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             domain_name=domain_name,
             user_role=user_role,
             kernel_id=kernel_id_str,
-            session_name=request.match_info["session_name"],
             owner_access_key=request["keypair"]["access_key"],
             request=request,
         )

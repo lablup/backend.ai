@@ -301,7 +301,6 @@ class GetTaskLogsAction(VFolderAction):
     user_role: UserRole
     # TODO: Change this to KernelId
     kernel_id: str
-    session_name: str
     owner_access_key: AccessKey
 
     # TODO: Remove this.
