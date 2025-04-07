@@ -1151,6 +1151,7 @@ class SessionService:
     async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
+        api_version = action.api_version
 
         resp = {}
         async with self._db.begin_readonly_session() as db_sess:
@@ -1162,7 +1163,6 @@ class SessionService:
             )
         try:
             await self._agent_registry.increment_session_usage(session)
-            api_version = action.api_version
 
             run_id: Optional[str]
             mode: Optional[str]
@@ -1176,9 +1176,9 @@ class SessionService:
                 run_id = action.params.run_id
                 mode = action.params.mode
 
-                if run_id is None or mode is None:
+                if mode is None:
                     # TODO: Create new exception
-                    raise RuntimeError("runId is missing!")
+                    raise RuntimeError("runId or mode is missing!")
 
                 assert mode in {
                     "query",

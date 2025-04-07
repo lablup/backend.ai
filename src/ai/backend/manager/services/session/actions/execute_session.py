@@ -19,7 +19,7 @@ class ExecuteSessionActionParams:
 @dataclass
 class ExecuteSessionAction(SessionAction):
     session_name: str
-    api_version: Any
+    api_version: tuple[Any, ...]
     owner_access_key: AccessKey
     params: ExecuteSessionActionParams
 
