@@ -748,7 +748,8 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
     @staticmethod
     def _get_func_key(
         func: Callable[
-            Concatenate[TContext, Sequence[TLoaderKey], ...], Awaitable[Sequence[TLoaderResult]]
+            Concatenate[TContext, Sequence[TLoaderKey], ...],
+            Awaitable[Sequence[TLoaderResult]],
         ],
         **kwargs,
     ) -> int:
@@ -759,7 +760,8 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
         self,
         context: TContext,
         batch_load_func: Callable[
-            Concatenate[TContext, Sequence[TLoaderKey], ...], Awaitable[Sequence[TLoaderResult]]
+            Concatenate[TContext, Sequence[TLoaderKey], ...],
+            Awaitable[Sequence[TLoaderResult]],
         ],
         # Using kwargs-only to prevent argument position confusion
         # when DataLoader calls `batch_load_func(keys)` which is `partial(batch_load_func, **kwargs)(keys)`.
