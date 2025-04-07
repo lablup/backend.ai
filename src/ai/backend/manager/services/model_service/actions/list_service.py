@@ -1,10 +1,17 @@
+import uuid
+from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_service.types import CompactServiceInfo
 
 
+@dataclass
 class ListModelServiceAction(ModelServiceAction):
+    session_owener_id: uuid.UUID
+    name: Optional[str]
+
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -14,7 +21,10 @@ class ListModelServiceAction(ModelServiceAction):
         return "list_serve"
 
 
+@dataclass
 class ListModelServiceActionResult(BaseActionResult):
+    data: list[CompactServiceInfo]
+
     @override
     def entity_id(self) -> Optional[str]:
         return None

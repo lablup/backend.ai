@@ -468,6 +468,9 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     model_service = ModelService(
         db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+        background_task_manager=root_ctx.background_task_manager,
+        event_dispatcher=root_ctx.event_dispatcher,
     )
     model_service_processor = ModelServiceProcessors(model_service)
     user_processor = UserProcessors(user_service)

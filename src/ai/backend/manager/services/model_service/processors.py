@@ -31,10 +31,6 @@ from ai.backend.manager.services.model_service.actions.list_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.list_supported_runtimes import (
-    ListSupportedRuntimesAction,
-    ListSupportedRuntimesActionResult,
-)
 from ai.backend.manager.services.model_service.actions.scale import ScaleAction, ScaleActionResult
 from ai.backend.manager.services.model_service.actions.start_service import (
     StartModelServiceAction,
@@ -53,9 +49,6 @@ class ModelServiceProcessors:
     list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
     delete_model_service: ActionProcessor[DeleteModelServiceAction, DeleteModelServiceActionResult]
     start_model_service: ActionProcessor[StartModelServiceAction, StartModelServiceActionResult]
-    list_supported_runtimes: ActionProcessor[
-        ListSupportedRuntimesAction, ListSupportedRuntimesActionResult
-    ]
     get_info: ActionProcessor[GetInfoAction, GetInfoActionResult]
     list_errors: ActionProcessor[ListErrorsAction, ListErrorsActionResult]
     clear_error: ActionProcessor[ClearErrorAction, ClearErrorActionResult]
@@ -70,7 +63,6 @@ class ModelServiceProcessors:
         self.list_model_service = ActionProcessor(service.list_serve)
         self.delete_model_service = ActionProcessor(service.delete)
         self.start_model_service = ActionProcessor(service.try_start)
-        self.list_supported_runtimes = ActionProcessor(service.list_supported_runtimes)
         self.get_info = ActionProcessor(service.get_info)
         self.list_errors = ActionProcessor(service.list_errors)
         self.clear_error = ActionProcessor(service.clear_error)
