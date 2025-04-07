@@ -980,7 +980,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-type VolumeID = uuid.UUID
+VolumeID: TypeAlias = uuid.UUID
 
 
 @attrs.define(slots=True, frozen=True)
@@ -1590,6 +1590,14 @@ class DispatchResult(Generic[ResultType]):
             return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
         else:
             return "errors: " + "\n".join(self.errors)
+
+    @classmethod
+    def success(cls, result_type: ResultType) -> DispatchResult[ResultType]:
+        return cls(result=result_type)
+
+    @classmethod
+    def error(cls, error_message: str) -> DispatchResult[ResultType]:
+        return cls(errors=[error_message])
 
 
 class PurgeImageResult(TypedDict):

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -10,6 +9,7 @@ from urllib.parse import quote_plus as urlquote
 import click
 import sqlalchemy as sa
 
+from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models.base import populate_fixture
@@ -32,7 +32,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
     async def _impl():
         log.info("Populating fixture '{0}' ...", fixture_path)
         try:
-            fixture = json.loads(fixture_path.read_text(encoding="utf8"))
+            fixture = load_json(fixture_path.read_text(encoding="utf8"))
         except AttributeError:
             log.error("No such fixture.")
             return

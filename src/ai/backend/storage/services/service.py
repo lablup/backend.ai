@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import uuid
 import weakref
@@ -9,6 +8,7 @@ from typing import AsyncIterator, Optional
 from aiohttp import web
 
 from ai.backend.common.events import VFolderDeletionFailureEvent, VFolderDeletionSuccessEvent
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -57,7 +57,7 @@ class VolumeService:
             log.exception("An external error occurred: %s", str(e))
             # TODO: Extract exception handling to middleware
             raise web.HTTPInternalServerError(
-                body=json.dumps({
+                text=dump_json_str({
                     "msg": "An internal error has occurred.",
                 }),
                 content_type="application/json",

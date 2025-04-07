@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import io
 import ipaddress
-import json
 import logging
 import platform
 import re
@@ -37,6 +36,7 @@ from ai.backend.common.cgroup import (
     get_container_pids,
 )
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
@@ -231,7 +231,7 @@ async def get_container_process_table(
         f"exec/{exec_id}/start",
         method="POST",
         headers={"content-type": "application/json"},
-        data=json.dumps({
+        data=dump_json_str({
             "Stream": False,  # get response immediately
             "Detach": False,
             "Tty": False,
