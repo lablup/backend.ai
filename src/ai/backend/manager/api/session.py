@@ -605,7 +605,6 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     result = await root_ctx.processors.session.create_from_params.wait_for_complete(
         CreateFromParamsAction(
             params=CreateFromParamsActionParams(
-                template_id=params["template_id"],
                 session_name=params["session_name"],
                 image=params["image"],
                 architecture=params["architecture"],

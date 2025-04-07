@@ -14,7 +14,6 @@ from ai.backend.manager.services.session.base import SessionAction
 # TODO: Idea: Refactor this type using pydantic and utilize as API model
 @dataclass
 class CreateFromParamsActionParams:
-    template_id: uuid.UUID
     session_name: str
     image: str
     architecture: str
