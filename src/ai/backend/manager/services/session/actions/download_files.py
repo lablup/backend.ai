@@ -8,7 +8,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.base import SessionAction
 
 
-# TODO: Change this to BatchAction
 @dataclass
 class DownloadFilesAction(SessionAction):
     user_id: uuid.UUID
@@ -22,7 +21,7 @@ class DownloadFilesAction(SessionAction):
 
     @override
     def operation_type(self):
-        return "download_file_multi"
+        return "download_files"
 
 
 @dataclass
