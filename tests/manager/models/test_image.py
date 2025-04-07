@@ -27,8 +27,10 @@ from ai.backend.manager.server import (
     agent_registry_ctx,
     background_task_ctx,
     database_ctx,
+    distributed_lock_ctx,
     event_dispatcher_ctx,
     hook_plugin_ctx,
+    idle_checker_ctx,
     monitoring_ctx,
     network_plugin_ctx,
     processors_ctx,
@@ -72,7 +74,7 @@ def get_graphquery_context(
         network_plugin_ctx=None,  # type: ignore
         services_ctx=services_ctx,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
-        processors=processor_ctx,  # type: ignore
+        processors=processor_ctx,
     )
 
 
@@ -193,6 +195,8 @@ async def test_image_rescan_on_docker_registry(
             storage_manager_ctx,
             agent_registry_ctx,
             background_task_ctx,
+            distributed_lock_ctx,
+            idle_checker_ctx,
             processors_ctx,
         ],
         [".events", ".auth"],
