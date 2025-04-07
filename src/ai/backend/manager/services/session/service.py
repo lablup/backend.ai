@@ -169,8 +169,8 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsActionResult,
 )
 from ai.backend.manager.services.session.actions.modify_compute_session import (
-    ModifyComputeSessionAction,
-    ModifyComputeSessionActionResult,
+    ModifySessionAction,
+    ModifySessionActionResult,
 )
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
@@ -1722,9 +1722,7 @@ class SessionService:
 
         return UploadFilesActionResult(result=None, session_row=session)
 
-    async def modify_compute_session(
-        self, action: ModifyComputeSessionAction
-    ) -> ModifyComputeSessionActionResult:
+    async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
         props = action.props
         session_name = action.props.name
@@ -1773,7 +1771,7 @@ class SessionService:
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
 
-        return ModifyComputeSessionActionResult(result=None, session_row=session_row)
+        return ModifySessionActionResult(result=None, session_row=session_row)
 
     async def check_and_transit_status(
         self, action: CheckAndTransitStatusAction

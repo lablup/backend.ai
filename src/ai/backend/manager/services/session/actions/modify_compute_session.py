@@ -8,7 +8,7 @@ from ai.backend.manager.services.session.base import SessionAction
 
 
 @dataclass
-class ModifyComputeSessionInputData:
+class ModifySessionInputData:
     name: Optional[str]
     priority: Optional[int]
 
@@ -19,11 +19,10 @@ class ModifyComputeSessionInputData:
             row.priority = self.priority
 
 
-# TODO: Rename ModifySessionAction?
 @dataclass
-class ModifyComputeSessionAction(SessionAction):
+class ModifySessionAction(SessionAction):
     session_id: uuid.UUID
-    props: ModifyComputeSessionInputData
+    props: ModifySessionInputData
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -35,7 +34,7 @@ class ModifyComputeSessionAction(SessionAction):
 
 
 @dataclass
-class ModifyComputeSessionActionResult(BaseActionResult):
+class ModifySessionActionResult(BaseActionResult):
     # TODO: Add proper type
     result: Any
     session_row: SessionRow

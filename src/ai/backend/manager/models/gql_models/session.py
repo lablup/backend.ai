@@ -26,8 +26,8 @@ from ai.backend.manager.services.session.actions.check_and_transit_status import
     CheckAndTransitStatusAction,
 )
 from ai.backend.manager.services.session.actions.modify_compute_session import (
-    ModifyComputeSessionAction,
-    ModifyComputeSessionInputData,
+    ModifySessionAction,
+    ModifySessionInputData,
 )
 
 from ..base import (
@@ -674,10 +674,10 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         if name:
             _validate_name_input(name)
 
-        result = await graph_ctx.processors.session.modify_compute_session.wait_for_complete(
-            ModifyComputeSessionAction(
+        result = await graph_ctx.processors.session.modify_session.wait_for_complete(
+            ModifySessionAction(
                 session_id=session_id,
-                props=ModifyComputeSessionInputData(
+                props=ModifySessionInputData(
                     name=name,
                     priority=priority,
                 ),

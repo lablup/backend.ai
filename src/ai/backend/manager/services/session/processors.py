@@ -80,8 +80,8 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsActionResult,
 )
 from ai.backend.manager.services.session.actions.modify_compute_session import (
-    ModifyComputeSessionAction,
-    ModifyComputeSessionActionResult,
+    ModifySessionAction,
+    ModifySessionActionResult,
 )
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
@@ -141,9 +141,7 @@ class SessionProcessors:
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
-    modify_compute_session: ActionProcessor[
-        ModifyComputeSessionAction, ModifyComputeSessionActionResult
-    ]
+    modify_session: ActionProcessor[ModifySessionAction, ModifySessionActionResult]
     check_and_transit_status: ActionProcessor[
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
@@ -173,5 +171,5 @@ class SessionProcessors:
         self.shutdown_service = ActionProcessor(service.shutdown_service)
         self.start_service = ActionProcessor(service.start_service)
         self.upload_files = ActionProcessor(service.upload_files)
-        self.modify_compute_session = ActionProcessor(service.modify_compute_session)
+        self.modify_session = ActionProcessor(service.modify_session)
         self.check_and_transit_status = ActionProcessor(service.check_and_transit_status)
