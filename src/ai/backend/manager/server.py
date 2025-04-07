@@ -85,6 +85,8 @@ from ai.backend.manager.services.groups.processors import GroupProcessors
 from ai.backend.manager.services.groups.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
+from ai.backend.manager.services.model_service.processors import ModelServiceProcessors
+from ai.backend.manager.services.model_service.service import ModelService
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
@@ -464,6 +466,10 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         storage_manager=root_ctx.storage_manager,
         redis_stat=root_ctx.redis_stat,
     )
+    model_service = ModelService(
+        db=root_ctx.db,
+    )
+    model_service_processor = ModelServiceProcessors(model_service)
     user_processor = UserProcessors(user_service)
     domain_service = DomainService(root_ctx.db)
     domain_processor = DomainProcessors(domain_service)
@@ -505,6 +511,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         vfolder=vfolder_processor,
         vfolder_invite=vfolder_invite_processor,
         vfolder_file=vfolder_file_processor,
+        model_service=model_service_processor,
     )
     yield
 
