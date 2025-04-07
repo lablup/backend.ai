@@ -41,19 +41,12 @@ if TYPE_CHECKING:
         CreateUserAction,
         CreateUserActionResult,
     )
-    from ai.backend.manager.services.users.actions.delete_user import (
-        DeleteUserAction,
-        DeleteUserActionResult,
-    )
+    from ai.backend.manager.services.users.actions.delete_user import DeleteUserActionResult
     from ai.backend.manager.services.users.actions.modify_user import (
         ModifyUserAction,
         ModifyUserActionResult,
-        UserModifiableFields,
     )
-    from ai.backend.manager.services.users.actions.purge_user import (
-        PurgeUserAction,
-        PurgeUserActionResult,
-    )
+    from ai.backend.manager.services.users.actions.purge_user import PurgeUserAction
     from ai.backend.manager.services.users.type import UserData, UserInfoContext
 
     from .gql import GraphQueryContext
@@ -664,6 +657,8 @@ class UserInput(graphene.InputObjectType):
     # When modifying, set the field to "None" to skip setting the value.
 
     def to_action(self, email: str) -> CreateUserAction:
+        from ai.backend.manager.services.users.actions.create_user import CreateUserAction
+
         def value_or_none(value: Any) -> Optional[Any]:
             return value if value is not Undefined else None
 
@@ -720,10 +715,15 @@ class ModifyUserInput(graphene.InputObjectType):
     )
 
     def to_action(self, email: str) -> ModifyUserAction:
+        from ai.backend.manager.services.users.actions.modify_user import (
+            ModifyUserAction,
+            UserModifiableFields,
+        )
+
         def value_or_none(value: Any) -> Optional[Any]:
             return value if value is not Undefined else None
 
-        modfifialble_fields = UserModifiableFields(
+        modifiable_fields = UserModifiableFields(
             username=OptionalState(
                 "username",
                 define_state(self.username),
@@ -818,7 +818,7 @@ class ModifyUserInput(graphene.InputObjectType):
 
         return ModifyUserAction(
             email=email,
-            modifiable_fields=modfifialble_fields,
+            modifiable_fields=modifiable_fields,
         )
 
 
@@ -834,6 +834,8 @@ class PurgeUserInput(graphene.InputObjectType):
     )
 
     def to_action(self, email: str, user_info_ctx: UserInfoContext) -> PurgeUserAction:
+        from ai.backend.manager.services.users.actions.purge_user import PurgeUserAction
+
         return PurgeUserAction(
             user_info_ctx=user_info_ctx,
             email=email,
@@ -940,6 +942,8 @@ class DeleteUser(graphene.Mutation):
         info: graphene.ResolveInfo,
         email: str,
     ) -> DeleteUser:
+        from ai.backend.manager.services.users.actions.delete_user import DeleteUserAction
+
         graph_ctx: GraphQueryContext = info.context
 
         action = DeleteUserAction(email)
@@ -986,6 +990,9 @@ class PurgeUser(graphene.Mutation):
         email: str,
         props: PurgeUserInput,
     ) -> PurgeUser:
+        from ai.backend.manager.services.users.actions.purge_user import PurgeUserActionResult
+        from ai.backend.manager.services.users.type import UserInfoContext
+
         graph_ctx: GraphQueryContext = info.context
         user_info_ctx = UserInfoContext(
             uuid=graph_ctx.user["uuid"],

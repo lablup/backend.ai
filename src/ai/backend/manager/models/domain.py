@@ -65,7 +65,6 @@ if TYPE_CHECKING:
         CreateDomainActionResult,
     )
     from ai.backend.manager.services.domain.actions.delete_domain import (
-        DeleteDomainAction,
         DeleteDomainActionResult,
     )
     from ai.backend.manager.services.domain.actions.modify_domain import (
@@ -73,7 +72,6 @@ if TYPE_CHECKING:
         ModifyDomainActionResult,
     )
     from ai.backend.manager.services.domain.actions.purge_domain import (
-        PurgeDomainAction,
         PurgeDomainActionResult,
     )
     from ai.backend.manager.services.domain.types import DomainData
@@ -315,6 +313,8 @@ class DomainInput(graphene.InputObjectType):
     integration_id = graphene.String(required=False, default_value=None)
 
     def to_action(self, domain_name: str) -> CreateDomainAction:
+        from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
+
         def value_or_none(value):
             return value if value is not Undefined else None
 
@@ -348,6 +348,8 @@ class ModifyDomainInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, domain_name: str) -> ModifyDomainAction:
+        from ai.backend.manager.services.domain.actions.modify_domain import ModifyDomainAction
+
         def value_or_none(value):
             return value if value is not Undefined else None
 
@@ -472,6 +474,8 @@ class DeleteDomain(graphene.Mutation):
 
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
+        from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
+
         ctx: GraphQueryContext = info.context
 
         action = DeleteDomainAction(name)
@@ -500,6 +504,8 @@ class PurgeDomain(graphene.Mutation):
 
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
+        from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+
         ctx: GraphQueryContext = info.context
 
         action = PurgeDomainAction(name)
