@@ -7,35 +7,37 @@ import yarl
 
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.api.utils import Undefined
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionAction
 
 
 # TODO: Idea: Refactor this type using pydantic and utilize as API model
+# TODO: Remove Undefined before passing to Service layer
 @dataclass
 class CreateFromTemplateActionParams:
     template_id: uuid.UUID
-    session_name: str
-    image: str
-    architecture: str
-    session_type: SessionTypes
-    group_name: str
-    domain_name: str
+    session_name: str | Undefined
+    image: str | Undefined
+    architecture: str | Undefined
+    session_type: SessionTypes | Undefined
+    group_name: str | Undefined
+    domain_name: str | Undefined
     cluster_size: int
     cluster_mode: ClusterMode
     config: dict[str, Any]
-    tag: str
+    tag: str | Undefined
     priority: int
-    owner_access_key: AccessKey
-    enqueue_only: bool = False
-    max_wait_seconds: int = 0
-    starts_at: Optional[str] = None
-    reuse_if_exists: bool = True
-    startup_command: Optional[str] = None
-    batch_timeout: Optional[timedelta] = None
-    bootstrap_script: Optional[str] = None
-    dependencies: Optional[list[uuid.UUID]] = None
-    callback_url: Optional[yarl.URL] = None
+    owner_access_key: AccessKey | Undefined
+    enqueue_only: bool
+    max_wait_seconds: int
+    starts_at: Optional[str]
+    reuse_if_exists: bool
+    startup_command: Optional[str]
+    batch_timeout: Optional[timedelta]
+    bootstrap_script: Optional[str] | Undefined
+    dependencies: Optional[list[uuid.UUID]]
+    callback_url: Optional[yarl.URL]
 
 
 @dataclass

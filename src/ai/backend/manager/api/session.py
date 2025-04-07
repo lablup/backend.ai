@@ -134,6 +134,7 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import (
     BaseResponseModel,
+    Undefined,
     catch_unexpected,
     check_api_params,
     deprecated_stub,
@@ -335,14 +336,14 @@ def sub(d, old, new):
     return d
 
 
-def drop(d, dropval):
+def drop_undefined(d):
     newd = {}
     for k, v in d.items():
         if isinstance(v, Mapping) or isinstance(v, dict):
-            newval = drop(v, dropval)
+            newval = drop_undefined(v)
             if len(newval.keys()) > 0:  # exclude empty dict always
                 newd[k] = newval
-        elif v != dropval:
+        elif not isinstance(v, Undefined):
             newd[k] = v
     return newd
 

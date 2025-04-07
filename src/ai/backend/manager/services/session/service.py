@@ -58,7 +58,7 @@ from ai.backend.manager.api.exceptions import (
 from ai.backend.manager.api.scaling_group import query_wsproxy_status
 from ai.backend.manager.api.session import (
     CustomizedImageVisibilityScope,
-    drop,
+    drop_undefined,
     find_dependency_sessions,
     find_dependent_sessions,
     overwritten_param_check,
@@ -789,32 +789,11 @@ class SessionService:
         self, action: CreateFromTemplateAction
     ) -> CreateFromTemplateActionResult:
         template_id = action.params.template_id
-        domain_name = action.params.domain_name
         user_id = action.user_id
         user_role = action.user_role
         sudo_session_enabled = action.sudo_session_enabled
         keypair_resource_policy = action.keypair_resource_policy
         requester_access_key = action.requester_access_key
-
-        owner_access_key = action.params.owner_access_key
-        config = action.params.config
-        cluster_size = action.params.cluster_size
-        cluster_mode = action.params.cluster_mode
-        session_name = action.params.session_name
-        session_type = action.params.session_type
-        enqueue_only = action.params.enqueue_only
-        max_wait_seconds = action.params.max_wait_seconds
-        tag = action.params.tag
-        image = action.params.image
-        architecture = action.params.architecture
-        priority = action.params.priority
-        bootstrap_script = action.params.bootstrap_script
-        dependencies = action.params.dependencies
-        startup_command = action.params.startup_command
-        starts_at = action.params.starts_at
-        batch_timeout = action.params.batch_timeout
-        callback_url = action.params.callback_url
-        reuse_if_exists = action.params.reuse_if_exists
 
         async with self._db.begin_readonly() as conn:
             query = (
@@ -886,8 +865,8 @@ class SessionService:
         if "agent_list" in template["spec"]:
             config_from_template["agent_list"] = template["spec"]["agent_list"]
 
-        override_config = drop(dict(action.params.config), undefined)
-        override_params = drop(dataclasses.asdict(action.params), undefined)
+        override_config = drop_undefined(dict(action.params.config))
+        override_params = drop_undefined(dict(dataclasses.asdict(action.params)))
 
         log.debug("Default config: {0}", config_from_template)
         log.debug("Default params: {0}", param_from_template)
@@ -938,6 +917,27 @@ class SessionService:
             bootstrap += cmd_builder
             params["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
 
+        owner_access_key = params["owner_access_key"]
+        config = params["config"]
+        cluster_size = params["cluster_size"]
+        cluster_mode = params["cluster_mode"]
+        session_name = params["session_name"]
+        session_type = params["session_type"]
+        enqueue_only = params["enqueue_only"]
+        max_wait_seconds = params["max_wait_seconds"]
+        tag = params["tag"]
+        image = params["image"]
+        architecture = params["architecture"]
+        priority = params["priority"]
+        bootstrap_script = params["bootstrap_script"]
+        dependencies = params["dependencies"]
+        startup_command = params["startup_command"]
+        starts_at = params["starts_at"]
+        batch_timeout = params["batch_timeout"]
+        callback_url = params["callback_url"]
+        reuse_if_exists = params["reuse_if_exists"]
+        domain_name = params["domain_name"]
+
         async with self._db.begin_readonly() as conn:
             owner_uuid, group_id, resource_policy = await query_userinfo(
                 conn,
@@ -947,7 +947,7 @@ class SessionService:
                 domain_name,
                 keypair_resource_policy,
                 domain_name,
-                action.params.group_name,
+                params["group_name"],
                 query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
             )
 
