@@ -13,7 +13,7 @@
 //     "PyJWT~=2.0",
 //     "PyYAML~=6.0",
 //     "SQLAlchemy[postgresql_asyncpg]~=1.4.54",
-//     "aiodataloader-ng~=0.2.1",
+//     "aiodataloader~=0.4.2",
 //     "aiodns>=3.2",
 //     "aiodocker==0.24.0",
 //     "aiofiles~=24.1.0",
@@ -154,29 +154,33 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c705656ae8cab12f8d313ddac4d68d6036bafe403f172c9687ece027cde21acc",
-              "url": "https://files.pythonhosted.org/packages/d4/f7/9b837b7893d2db59c21df28434f31637a37884ce6b9e29b92d4dd1e68435/aiodataloader_ng-0.2.1-py3-none-any.whl"
+              "hash": "3c9780867631326a2ae931c322fac5e2a2ad5a48bf7646e5250834630536ef57",
+              "url": "https://files.pythonhosted.org/packages/ef/20/8700336be44dcccab78741f2513b1b1474ba4070134e8c2b5a50865f07bd/aiodataloader-0.4.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f655efa53d72f9887617443161e7920eaa10b79ba6710326223bf9de395515ec",
-              "url": "https://files.pythonhosted.org/packages/e0/09/9d11e527dcd81e770526a32c95e207fa6ef0aeb92de6b31b418573ebfd0b/aiodataloader-ng-0.2.1.tar.gz"
+              "hash": "c92f6f2fb7ee13939ffd68274895aca44ccc0294a1275179bfb8af2b29b788e1",
+              "url": "https://files.pythonhosted.org/packages/bc/3b/405fe771e782054509f976db2a29c69bb6250be8bde16ac1fa93755070c6/aiodataloader-0.4.2.tar.gz"
             }
           ],
-          "project_name": "aiodataloader-ng",
+          "project_name": "aiodataloader",
           "requires_dists": [
+            "black; extra == \"lint\"",
             "coveralls; extra == \"test\"",
-            "flake8>=3.9.0; extra == \"lint\"",
+            "flake8-import-order; extra == \"lint\"",
+            "flake8; extra == \"lint\"",
+            "hatch; extra == \"build\"",
+            "hatch; extra == \"lint\"",
+            "hatch; extra == \"test\"",
             "mock; extra == \"test\"",
-            "mypy>=0.930; extra == \"typecheck\"",
+            "mypy; extra == \"lint\"",
             "pytest-asyncio; extra == \"test\"",
             "pytest-cov; extra == \"test\"",
-            "pytest>=6.2.5; extra == \"test\"",
-            "twine>=3.7.1; extra == \"build\"",
-            "wheel>=0.37.1; extra == \"build\""
+            "pytest>=3.6; extra == \"test\"",
+            "typing-extensions>=4.1.1"
           ],
-          "requires_python": null,
-          "version": "0.2.1"
+          "requires_python": ">=3.7",
+          "version": "0.4.2"
         },
         {
           "artifacts": [
@@ -5251,7 +5255,7 @@
     "PyJWT~=2.0",
     "PyYAML~=6.0",
     "SQLAlchemy[postgresql_asyncpg]~=1.4.54",
-    "aiodataloader-ng~=0.2.1",
+    "aiodataloader~=0.4.2",
     "aiodns>=3.2",
     "aiodocker==0.24.0",
     "aiofiles~=24.1.0",
