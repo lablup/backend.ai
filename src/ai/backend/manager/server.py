@@ -87,9 +87,21 @@ from ai.backend.manager.services.groups.processors import GroupProcessors
 from ai.backend.manager.services.groups.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
+from ai.backend.manager.services.keypair_resource_policy.processors import (
+    KeypairResourcePolicyProcessors,
+)
+from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project_resource_policy.processors import (
+    ProjectResourcePolicyProcessors,
+)
+from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
+from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
+from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService
+from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
+from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
 from ai.backend.manager.services.vfolder.processors import (
@@ -461,6 +473,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     agent_service = AgentService(
         db=root_ctx.db,
         agent_registry=root_ctx.registry,
+        shared_config=root_ctx.shared_config,
     )
     agent_processor = AgentProcessors(agent_service)
 
@@ -502,7 +515,12 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     vfolder_file_processor = VFolderFileProcessors(vfolder_file_service)
 
-    group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
+    group_service = GroupService(
+        db=root_ctx.db,
+        storage_manager=root_ctx.storage_manager,
+        shared_config=root_ctx.shared_config,
+        redis_stat=root_ctx.redis_stat,
+    )
     group_processor = GroupProcessors(group_service)
 
     session_service = SessionService(
@@ -518,6 +536,24 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     session_processor = SessionProcessors(session_service)
 
+    keypair_resource_policy_service = KeypairResourcePolicyService(db=root_ctx.db)
+    keypair_resource_policy_processor = KeypairResourcePolicyProcessors(
+        keypair_resource_policy_service
+    )
+    project_resource_policy_service = ProjectResourcePolicyService(db=root_ctx.db)
+    project_resource_policy_processors = ProjectResourcePolicyProcessors(
+        project_resource_policy_service
+    )
+    user_resource_policy_service = UserResourcePolicyService(db=root_ctx.db)
+    user_resource_policy_processors = UserResourcePolicyProcessors(user_resource_policy_service)
+
+    resource_preset_service = ResourcePresetService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        agent_registry=root_ctx.registry,
+    )
+    resource_preset_processors = ResourcePresetProcessors(resource_preset_service)
+
     root_ctx.processors = Processors(
         agent=agent_processor,
         domain=domain_processor,
@@ -529,6 +565,10 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         vfolder_invite=vfolder_invite_processor,
         vfolder_file=vfolder_file_processor,
         session=session_processor,
+        keypair_resource_policy=keypair_resource_policy_processor,
+        user_resource_policy=user_resource_policy_processors,
+        project_resource_policy=project_resource_policy_processors,
+        resource_preset=resource_preset_processors,
     )
     yield
 

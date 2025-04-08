@@ -15,6 +15,14 @@ from ai.backend.manager.services.groups.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
+from ai.backend.manager.services.groups.actions.usage_per_month import (
+    UsagePerMonthAction,
+    UsagePerMonthActionResult,
+)
+from ai.backend.manager.services.groups.actions.usage_per_period import (
+    UsagePerPeriodAction,
+    UsagePerPeriodActionResult,
+)
 from ai.backend.manager.services.groups.service import GroupService
 
 
@@ -23,6 +31,8 @@ class GroupProcessors:
     modify_group: ActionProcessor[ModifyGroupAction, ModifyGroupActionResult]
     delete_group: ActionProcessor[DeleteGroupAction, DeleteGroupActionResult]
     purge_group: ActionProcessor[PurgeGroupAction, PurgeGroupActionResult]
+    usage_per_month: ActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
+    usage_per_period: ActionProcessor[UsagePerPeriodAction, UsagePerPeriodActionResult]
 
     def __init__(self, group_service: GroupService) -> None:
         self.create_group = ActionProcessor(group_service.create_group)

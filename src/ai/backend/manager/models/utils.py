@@ -397,6 +397,7 @@ async def reenter_txn_session(
             yield sess
 
 
+# TODO: How to apply the missing execute_with_retry logic?
 async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
     max_attempts = 20
     result: TQueryResult | Sentinel = Sentinel.token

@@ -1,4 +1,8 @@
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.services.users.actions.admin_month_stats import (
+    AdminMonthStatsAction,
+    AdminMonthStatsActionResult,
+)
 from ai.backend.manager.services.users.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
@@ -15,6 +19,10 @@ from ai.backend.manager.services.users.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
+from ai.backend.manager.services.users.actions.user_month_stats import (
+    UserMonthStatsAction,
+    UserMonthStatsActionResult,
+)
 from ai.backend.manager.services.users.service import UserService
 
 
@@ -23,9 +31,13 @@ class UserProcessors:
     modify_user: ActionProcessor[ModifyUserAction, ModifyUserActionResult]
     delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
     purge_user: ActionProcessor[PurgeUserAction, PurgeUserActionResult]
+    user_month_stats: ActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
+    admin_month_stats: ActionProcessor[AdminMonthStatsAction, AdminMonthStatsActionResult]
 
     def __init__(self, user_service: UserService) -> None:
         self.create_user = ActionProcessor(user_service.create_user)
         self.modify_user = ActionProcessor(user_service.modify_user)
         self.delete_user = ActionProcessor(user_service.delete_user)
         self.purge_user = ActionProcessor(user_service.purge_user)
+        self.user_month_stats = ActionProcessor(user_service.user_month_stats)
+        self.admin_month_stats = ActionProcessor(user_service.admin_month_stats)
