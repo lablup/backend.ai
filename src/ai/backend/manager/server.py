@@ -59,6 +59,7 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -918,6 +919,7 @@ def build_root_app(
     root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
     app = web.Application(
         middlewares=[
+            request_id_middleware,
             exception_middleware,
             api_middleware,
             build_api_metric_middleware(root_ctx.metrics.api),
