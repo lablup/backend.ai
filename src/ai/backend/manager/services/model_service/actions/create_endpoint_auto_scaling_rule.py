@@ -29,8 +29,8 @@ class CreateEndpointAutoScalingRuleAction(EndpointAction):
         return None
 
     @override
-    def entity_type(self) -> str:
-        return "endpoint"
+    def operation_type(self) -> str:
+        return "create"
 
 
 @dataclass
@@ -40,4 +40,4 @@ class CreateEndpointAutoScalingRuleActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.id) if self.data is not None else None

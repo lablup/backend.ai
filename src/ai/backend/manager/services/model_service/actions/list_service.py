@@ -18,7 +18,7 @@ class ListModelServiceAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "list_serve"
+        return "list"
 
 
 @dataclass

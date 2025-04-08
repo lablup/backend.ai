@@ -19,7 +19,7 @@ class ScaleAction(ModelServiceAction):
         return None
 
     def operation_type(self) -> str:
-        return "scale_model_service"
+        return "scale"
 
 
 @dataclass

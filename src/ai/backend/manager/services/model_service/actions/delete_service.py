@@ -18,7 +18,7 @@ class DeleteModelServiceAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "delete_model_service"
+        return "delete"
 
 
 @dataclass

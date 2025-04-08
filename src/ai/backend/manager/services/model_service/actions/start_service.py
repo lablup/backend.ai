@@ -41,7 +41,7 @@ class StartModelServiceAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "try_start"
+        return "start"
 
 
 @dataclass

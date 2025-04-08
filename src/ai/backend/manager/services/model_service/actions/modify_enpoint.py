@@ -77,7 +77,7 @@ class ModifyEndpointAction(EndpointAction):
 
     @override
     def operation_type(self) -> str:
-        return "modify_endpoint"
+        return "modify"
 
 
 @dataclass
@@ -87,4 +87,4 @@ class ModifyEndpointActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.id) if self.data is not None else None

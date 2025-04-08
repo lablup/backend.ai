@@ -19,7 +19,7 @@ class DeleteRouteAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "delete_route"
+        return "delete"
 
 
 @dataclass

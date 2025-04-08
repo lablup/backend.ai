@@ -69,7 +69,7 @@ from ai.backend.manager.services.model_service.actions.create_service import (
     CreateModelServiceActionResult,
     ServiceInfo,
 )
-from ai.backend.manager.services.model_service.actions.delete_enpoint_auto_scaling_rule_node import (
+from ai.backend.manager.services.model_service.actions.delete_enpoint_auto_scaling_rule import (
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
 )
@@ -97,7 +97,7 @@ from ai.backend.manager.services.model_service.actions.list_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.modify_endpoint_auto_scaling_rule_node import (
+from ai.backend.manager.services.model_service.actions.modify_endpoint_auto_scaling_rule import (
     ModifyEndpointAutoScalingRuleAction,
     ModifyEndpointAutoScalingRuleActionResult,
 )

@@ -17,7 +17,7 @@ class GetInfoAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "get_info"
+        return "get"
 
 
 @dataclass
@@ -26,4 +26,4 @@ class GetInfoActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.endpoint_id)

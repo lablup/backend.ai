@@ -23,7 +23,7 @@ class GenerateTokenAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "generate_token"
+        return "generate"
 
 
 @dataclass
@@ -32,4 +32,4 @@ class GenerateTokenActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return self.token

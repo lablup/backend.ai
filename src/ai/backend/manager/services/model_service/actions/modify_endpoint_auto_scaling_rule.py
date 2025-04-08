@@ -43,7 +43,7 @@ class ModifyEndpointAutoScalingRuleAction(EndpointAction):
 
     @override
     def operation_type(self) -> str:
-        return "modify-endpoint-auto-scaling-rule"
+        return "modify"
 
 
 @dataclass
@@ -53,4 +53,4 @@ class ModifyEndpointAutoScalingRuleActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.endpoint) if self.data is not None else None

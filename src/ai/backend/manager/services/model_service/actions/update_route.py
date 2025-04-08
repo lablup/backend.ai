@@ -20,7 +20,7 @@ class UpdateRouteAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "update_route"
+        return "update"
 
 
 @dataclass

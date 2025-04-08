@@ -16,7 +16,7 @@ class SyncAction(ModelServiceAction):
         return None
 
     def operation_type(self) -> str:
-        return "sync_model_service"
+        return "sync"
 
 
 @dataclass

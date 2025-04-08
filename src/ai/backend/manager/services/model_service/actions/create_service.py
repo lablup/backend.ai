@@ -45,7 +45,7 @@ class CreateModelServiceAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "create_model_service"
+        return "create"
 
 
 @dataclass
@@ -54,4 +54,4 @@ class CreateModelServiceActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.data.endpoint_id)

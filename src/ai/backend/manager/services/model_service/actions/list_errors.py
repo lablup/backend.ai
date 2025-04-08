@@ -18,7 +18,7 @@ class ListErrorsAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "list_errors"
+        return "list"
 
 
 @dataclass

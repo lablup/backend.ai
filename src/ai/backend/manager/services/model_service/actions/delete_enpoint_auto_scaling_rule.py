@@ -18,7 +18,7 @@ class DeleteEndpointAutoScalingRuleAction(EndpointAction):
 
     @override
     def operation_type(self) -> str:
-        return "delete-endpoint-auto-scaling-rule"
+        return "delete"
 
 
 @dataclass

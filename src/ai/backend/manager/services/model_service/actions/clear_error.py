@@ -18,7 +18,7 @@ class ClearErrorAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "clear_error"
+        return "clear"
 
 
 @dataclass
