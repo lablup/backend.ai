@@ -52,7 +52,7 @@ class CreateProjectResourcePolicyAction(ProjectResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "create_project_resource_policy"
+        return "create"
 
 
 @dataclass

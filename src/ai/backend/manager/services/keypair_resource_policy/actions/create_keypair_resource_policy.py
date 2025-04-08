@@ -85,7 +85,7 @@ class CreateKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "create_keypair_resource_policy"
+        return "create"
 
 
 @dataclass

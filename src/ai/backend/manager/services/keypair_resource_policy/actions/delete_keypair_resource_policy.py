@@ -18,7 +18,7 @@ class DeleteKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "delete_keypair_resource_policy"
+        return "delete"
 
 
 @dataclass

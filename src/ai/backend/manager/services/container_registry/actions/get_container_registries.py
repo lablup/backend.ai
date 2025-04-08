@@ -13,7 +13,7 @@ class GetContainerRegistriesAction(ContainerRegistryAction):
 
     @override
     def operation_type(self):
-        return "get_container_registries"
+        return "get_multi"
 
 
 @dataclass

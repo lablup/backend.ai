@@ -58,7 +58,7 @@ class CreateUserResourcePolicyAction(UserResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "create_user_resource_policy"
+        return "create"
 
 
 @dataclass

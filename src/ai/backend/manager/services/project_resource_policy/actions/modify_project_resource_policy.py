@@ -42,7 +42,7 @@ class ModifyProjectResourcePolicyAction(ProjectResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "modify_project_resource_policy"
+        return "modify"
 
 
 @dataclass

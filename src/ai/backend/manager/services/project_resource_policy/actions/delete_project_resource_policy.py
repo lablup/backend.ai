@@ -18,7 +18,7 @@ class DeleteProjectResourcePolicyAction(ProjectResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "delete_project_resource_policy"
+        return "delete"
 
 
 @dataclass

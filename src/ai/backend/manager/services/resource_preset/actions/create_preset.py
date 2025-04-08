@@ -25,7 +25,7 @@ class CreateResourcePresetAction(ResourcePresetAction):
 
     @override
     def operation_type(self):
-        return "create_resource_preset"
+        return "create"
 
 
 @dataclass

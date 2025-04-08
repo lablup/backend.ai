@@ -16,7 +16,7 @@ class DeleteUserResourcePolicyAction(UserResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "delete_user_resource_policy"
+        return "delete"
 
 
 @dataclass

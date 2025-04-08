@@ -78,7 +78,7 @@ class ModifyKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "modify_keypair_resource_policy"
+        return "modify"
 
 
 @dataclass

@@ -16,7 +16,7 @@ class ListResourcePresetsAction(ResourcePresetAction):
 
     @override
     def operation_type(self):
-        return "list_resource_presets"
+        return "list_multi"
 
 
 @dataclass

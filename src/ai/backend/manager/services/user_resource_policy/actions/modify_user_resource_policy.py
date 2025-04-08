@@ -40,7 +40,7 @@ class ModifyUserResourcePolicyAction(UserResourcePolicyAction):
 
     @override
     def operation_type(self):
-        return "modify_user_resource_policy"
+        return "modify"
 
 
 @dataclass

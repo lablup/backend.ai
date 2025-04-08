@@ -22,7 +22,7 @@ class CheckResourcePresetsAction(ResourcePresetAction):
 
     @override
     def operation_type(self):
-        return "check_resource_presets"
+        return "check_multi"
 
 
 @dataclass

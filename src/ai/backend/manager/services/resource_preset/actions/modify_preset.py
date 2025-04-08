@@ -39,7 +39,7 @@ class ModifyResourcePresetAction(ResourcePresetAction):
 
     @override
     def operation_type(self):
-        return "modify_resource_preset"
+        return "modify"
 
 
 @dataclass

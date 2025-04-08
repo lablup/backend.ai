@@ -18,7 +18,7 @@ class DeleteResourcePresetAction(ResourcePresetAction):
 
     @override
     def operation_type(self):
-        return "delete_resource_preset"
+        return "delete"
 
 
 @dataclass
