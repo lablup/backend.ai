@@ -5,7 +5,14 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
-from . import ArrayFieldItem, EnumFieldItem, FieldSpecItem, JSONFieldItem, get_col_from_table
+from . import (
+    ArrayFieldItem,
+    EnumFieldItem,
+    FieldSpecItem,
+    JSONFieldItem,
+    ORMFieldItem,
+    get_col_from_table,
+)
 
 __all__ = (
     "FieldSpecType",
@@ -184,6 +191,8 @@ class QueryFilterTransformer(Transformer):
                             except KeyError:
                                 raise ValueError(f"Invalid enum value: {val}")
                         expr = build_expr(op, col, enum_val)
+                    case ORMFieldItem(column):
+                        expr = build_expr(op, column, val)
                     case str(col_name):
                         col = get_col_from_table(self._sa_table, col_name)
                         expr = build_expr(op, col, val)

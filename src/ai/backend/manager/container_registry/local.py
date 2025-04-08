@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
@@ -10,6 +9,7 @@ import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.docker import arch_name_aliases, get_docker_connector
+from ai.backend.common.json import pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models.image import ImageRow, ImageStatus
@@ -77,7 +77,7 @@ class LocalRegistry(BaseContainerRegistry):
                 "ContainerConfig.Image": data.get("ContainerConfig", {}).get("Image", None),
                 "Architecture": architecture,
             }
-            log.debug("scanned image info: {}:{}\n{}", image, tag, json.dumps(summary, indent=2))
+            log.debug("scanned image info: {}:{}\n{}", image, tag, pretty_json_str(summary))
             already_exists = 0
             config_digest = data["Id"]
             async with self.db.begin_readonly_session() as db_session:

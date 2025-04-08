@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import pickle
@@ -73,7 +72,8 @@ from ai.backend.common.docker import (
     KernelFeatures,
     LabelName,
 )
-from ai.backend.common.dto.agent.response import PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
@@ -103,9 +103,16 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
+from ai.backend.common.json import (
+    dump_json,
+    dump_json_str,
+    load_json,
+)
 from ai.backend.common.lock import FileLock
+from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -132,6 +139,8 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
+    RedisConfig,
+    RedisConnectionInfo,
     RuntimeVariant,
     Sentinel,
     ServicePort,
@@ -143,7 +152,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
     aobject,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop, mount, umount
+from ai.backend.common.utils import (
+    cancel_tasks,
+    current_loop,
+    mount,
+    umount,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
@@ -690,25 +704,22 @@ class AbstractAgent(
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
 
-        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
-            event_dispatcher_cls = ExperimentalEventDispatcher
-        else:
-            event_dispatcher_cls = EventDispatcher
-
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
-
-        self.event_producer = await EventProducer.new(
-            etcd_redis_config.get_override_config(RedisRole.STREAM),
+        stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+        stream_redis = redis_helper.get_redis_object(
+            stream_redis_config,
+            name="event_producer.stream",
             db=REDIS_STREAM_DB,
+        )
+        mq = self._make_message_queue(stream_redis_config, stream_redis)
+        self.event_producer = EventProducer(
+            mq,
+            source=self.id,
             log_events=self.local_config["debug"]["log-events"],
         )
-        self.event_dispatcher = await event_dispatcher_cls.new(
-            etcd_redis_config.get_override_config(RedisRole.STREAM),
-            db=REDIS_STREAM_DB,
+        self.event_dispatcher = EventDispatcher(
+            mq,
             log_events=self.local_config["debug"]["log-events"],
-            node_id=self.local_config["agent"]["id"],
-            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
@@ -723,6 +734,7 @@ class AbstractAgent(
         )
 
         self.background_task_manager = BackgroundTaskManager(
+            stream_redis,
             self.event_producer,
             bgtask_observer=self._metric_registry.bgtask,
         )
@@ -750,7 +762,7 @@ class AbstractAgent(
                 await pipe.hset(
                     "computer.metadata",
                     metadata["slot_name"],
-                    json.dumps(metadata),
+                    dump_json_str(metadata),
                 )
             return pipe
 
@@ -804,6 +816,32 @@ class AbstractAgent(
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
+
+    def _make_message_queue(
+        self, stream_redis_config: RedisConfig, stream_redis: RedisConnectionInfo
+    ) -> AbstractMessageQueue:
+        """
+        Returns the message queue object.
+        """
+        node_id = self.local_config["agent"]["id"]
+        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
+            return HiRedisQueue(
+                stream_redis_config,
+                HiRedisMQArgs(
+                    stream_key="events",
+                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                    node_id=node_id,
+                    db=REDIS_STREAM_DB,
+                ),
+            )
+        return RedisQueue(
+            stream_redis,
+            RedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+            ),
+        )
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         """
@@ -863,7 +901,7 @@ class AbstractAgent(
                             continue
         if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
             await self.save_last_registry()
-        await self.event_producer.produce_event(event, source=str(self.id))
+        await self.event_producer.produce_event(event)
 
     async def produce_error_event(
         self,
@@ -1575,7 +1613,7 @@ class AbstractAgent(
             async with FileLock(path=dest_path / "report.lock"):
                 for reported_kernel in dest_path.glob("report.*.json"):
                     raw_body = await self.loop.run_in_executor(None, _read, reported_kernel)
-                    body: dict[str, str] = json.loads(raw_body)
+                    body: dict[str, str] = load_json(raw_body)
                     kern_id = body["ID"]
                     if auto_terminate:
                         log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
@@ -1636,7 +1674,7 @@ class AbstractAgent(
                 "report_abusing_kernels",
                 abuse_report_script,
                 [hash_name],
-                [json.dumps(abuse_report)],
+                [dump_json_str(abuse_report)],
             )
 
     @abstractmethod
@@ -1675,10 +1713,7 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def purge_images(
-        self,
-        images: list[str],
-    ) -> PurgeImageResponses:
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         """
         Purge the given images from the agent.
         """
@@ -2183,7 +2218,7 @@ class AbstractAgent(
                     await self.restart_kernel__store_config(
                         kernel_id,
                         "cluster.json",
-                        json.dumps(cluster_info).encode("utf8"),
+                        dump_json(cluster_info),
                     )
 
                 if self.local_config["debug"]["log-kernel-config"]:
@@ -2634,7 +2669,7 @@ class AbstractAgent(
         existing_kernel_config = pickle.loads(
             await self.restart_kernel__load_config(kernel_id, "kconfig.dat"),
         )
-        existing_cluster_info = json.loads(
+        existing_cluster_info = load_json(
             await self.restart_kernel__load_config(kernel_id, "cluster.json"),
         )
         kernel_config = cast(

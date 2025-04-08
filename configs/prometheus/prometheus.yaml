@@ -21,16 +21,16 @@ scrape_configs:
       - targets: ['backendai-half-prometheus:9090']
   - job_name: backendai-half-manager
     static_configs:
-      - targets: ['host.docker.internal:8092']
+      - targets: ['host.docker.internal:18080']
   - job_name: backendai-half-account-manager
     static_configs:
-      - targets: ['host.docker.internal:8087']
+      - targets: ['host.docker.internal:18088']
   - job_name: backendai-half-storage-proxy
     static_configs:
-      - targets: ['host.docker.internal:6023']
+      - targets: ['host.docker.internal:16023']
   - job_name: backendai-half-wsproxy
     static_configs:
-      - targets: ['host.docker.internal:5051']
+      - targets: ['host.docker.internal:15050']
   - job_name: backendai-half-agent
     static_configs:
       - targets: ['host.docker.internal:6003']

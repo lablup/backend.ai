@@ -1,14 +1,15 @@
-import json
 import logging
 from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...types import CapacityUsage, FSPerfMetric
+from ...watcher import WatcherClient
 from ..abc import (
     CAP_FAST_FS_SIZE,
     CAP_METRIC,
@@ -119,6 +120,7 @@ class GPFSVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
+        watcher: Optional[WatcherClient] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         super().__init__(
@@ -128,6 +130,7 @@ class GPFSVolume(BaseVolume):
             options=options,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
+            watcher=watcher,
         )
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
         self.api_client = GPFSAPIClient(
@@ -188,8 +191,8 @@ class GPFSVolume(BaseVolume):
             "status": status,
             "status_info": None,
             "metadata": {
-                "quota": json.dumps([q.to_json() for q in quotas]),
-                "cluster_info": json.dumps(cluster_info),
+                "quota": dump_json_str([q.to_json() for q in quotas]),
+                "cluster_info": dump_json_str(cluster_info),
             },
         }
 

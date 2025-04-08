@@ -12,6 +12,7 @@ import signal
 import struct
 import sys
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -49,9 +50,14 @@ from async_timeout import timeout
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, KernelFeatures
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
+from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
+from ai.backend.common.json import (
+    dump_json,
+    load_json,
+)
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -76,7 +82,10 @@ from ai.backend.common.types import (
     SlotName,
     current_resource_slots,
 )
-from ai.backend.common.utils import AsyncFileWriter, current_loop
+from ai.backend.common.utils import (
+    AsyncFileWriter,
+    current_loop,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
@@ -188,6 +197,13 @@ def _DockerContainerError_reduce(self):
         type(self),
         (self.status, {"message": self.message}, self.container_id, *self.args),
     )
+
+
+@dataclass
+class DockerPurgeImageReq:
+    image: str
+    force: bool
+    noprune: bool
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
@@ -655,7 +671,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 priv_key_path.chmod(0o600)
                 if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
                     port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
-                    port_mapping_json_path.write_text(json.dumps(cluster_ssh_port_mapping))
+                    port_mapping_json_path.write_bytes(dump_json(cluster_ssh_port_mapping))
             except Exception:
                 log.exception("error while writing cluster keypair")
 
@@ -771,8 +787,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if docker_creds:
             await loop.run_in_executor(
                 None,
-                (self.config_dir / "docker-creds.json").write_text,
-                json.dumps(docker_creds),
+                (self.config_dir / "docker-creds.json").write_bytes,
+                dump_json(docker_creds),
             )
 
         # Create SSH keypair only if ssh_keypair internal_data exists and
@@ -829,7 +845,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
+
+            dotfile_content = dotfile["data"]
+            if not dotfile_content.endswith("\n"):
+                dotfile_content += "\n"
+            await loop.run_in_executor(None, file_path.write_text, dotfile_content)
 
             tmp = Path(file_path)
             tmp_paths: list[Path] = []
@@ -886,7 +906,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             return
 
         async with aiofiles.open(default_seccomp_path, mode="r") as fp:
-            seccomp_profile = json.loads(await fp.read())
+            seccomp_profile = load_json(await fp.read())
 
             additional_allowed_syscalls = self.additional_allowed_syscalls
             additional_allowed_syscall_rule = {
@@ -1068,7 +1088,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         ]:
             if extra_container_opts_file.is_file():
                 try:
-                    extra_container_opts = json.loads(extra_container_opts_file.read_bytes())
+                    extra_container_opts = load_json(extra_container_opts_file.read_bytes())
                     update_nested_dict(container_config, extra_container_opts)
                 except IOError:
                     pass
@@ -1692,25 +1712,35 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResponse:
+    async def _purge_image(self, docker: Docker, request: DockerPurgeImageReq) -> PurgeImageResp:
         try:
-            await docker.images.delete(image)
-            return PurgeImageResponse.success(image=image)
+            await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
+            return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error(f'Failed to purge image "{image}": {e}')
-            return PurgeImageResponse.failure(image=image, error=str(e))
+            log.error(f'Failed to purge image "{request.image}": {e}')
+            return PurgeImageResp.failure(image=request.image, error=str(e))
 
-    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
-                tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
+                tasks = [
+                    tg.create_task(
+                        self._purge_image(
+                            docker,
+                            DockerPurgeImageReq(
+                                image=image, force=request.force, noprune=request.noprune
+                            ),
+                        )
+                    )
+                    for image in request.images
+                ]
 
         results = []
         for task in tasks:
             deleted_info = task.result()
             results.append(deleted_info)
 
-        return PurgeImageResponses(responses=results)
+        return PurgeImagesResp(responses=results)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

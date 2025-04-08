@@ -49,8 +49,10 @@ from ai.backend.common.defs import (
     REDIS_STREAM_LOCK,
     RedisRole,
 )
-from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
@@ -61,6 +63,7 @@ from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import (
+    AGENTID_MANAGER,
     AgentSelectionStrategy,
     EtcdRedisConfig,
     HostPortPair,
@@ -73,6 +76,27 @@ from ai.backend.manager.service.container_registry.base import PerProjectRegistr
 from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
+)
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.groups.processors import GroupProcessors
+from ai.backend.manager.services.groups.service import GroupService
+from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.users.processors import UserProcessors
+from ai.backend.manager.services.users.service import UserService
+from ai.backend.manager.services.vfolder.processors import (
+    VFolderBaseProcessors,
+    VFolderFileProcessors,
+    VFolderInviteProcessors,
+)
+from ai.backend.manager.services.vfolder.services import (
+    VFolderFileService,
+    VFolderInviteService,
+    VFolderService,
 )
 
 from . import __version__
@@ -95,7 +119,8 @@ from .api.types import (
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
-from .models import SessionRow
+from .sweeper.kernel import stale_kernel_sweeper_ctx
+from .sweeper.session import stale_session_sweeper_ctx
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset([
@@ -429,15 +454,58 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # image_service = ImageService(
-    #     db=root_ctx.db,
-    #     agent_registry=root_ctx.registry,
-    # )
+    image_service = ImageService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+    )
 
-    # root_ctx.processors = Processors(
-    #     image_service=image_service,
-    # )
+    user_service = UserService(
+        db=root_ctx.db,
+        storage_manager=root_ctx.storage_manager,
+        redis_stat=root_ctx.redis_stat,
+    )
+    user_processor = UserProcessors(user_service)
+    domain_service = DomainService(root_ctx.db)
+    domain_processor = DomainProcessors(domain_service)
 
+    image_service = ImageService(root_ctx.db, root_ctx.registry)
+    image_processor = ImageProcessors(image_service)
+
+    container_registry_service = ContainerRegistryService(
+        db=root_ctx.db,
+    )
+    container_registry_processor = ContainerRegistryProcessors(container_registry_service)
+    vfolder_service = VFolderService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        storage_manager=root_ctx.storage_manager,
+        background_task_manager=root_ctx.background_task_manager,
+    )
+    vfolder_processor = VFolderBaseProcessors(vfolder_service)
+    vfolder_invite_service = VFolderInviteService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+    )
+    vfolder_invite_processor = VFolderInviteProcessors(vfolder_invite_service)
+    vfolder_file_service = VFolderFileService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        storage_manager=root_ctx.storage_manager,
+    )
+    vfolder_file_processor = VFolderFileProcessors(vfolder_file_service)
+
+    group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
+    group_processor = GroupProcessors(group_service)
+    root_ctx.processors = Processors(
+        domain=domain_processor,
+        group=group_processor,
+        user=user_processor,
+        image=image_processor,
+        container_registry=container_registry_processor,
+        vfolder=vfolder_processor,
+        vfolder_invite=vfolder_invite_processor,
+        vfolder_file=vfolder_file_processor,
+    )
     yield
 
 
@@ -449,31 +517,54 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
-        event_dispatcher_cls = ExperimentalEventDispatcher
-    else:
-        event_dispatcher_cls = EventDispatcher
-
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data["redis"]
-    )
-    root_ctx.event_producer = await EventProducer.new(
-        etcd_redis_config.get_override_config(RedisRole.STREAM),
-        db=REDIS_STREAM_DB,
-    )
-    root_ctx.event_dispatcher = await event_dispatcher_cls.new(
-        etcd_redis_config.get_override_config(RedisRole.STREAM),
-        db=REDIS_STREAM_DB,
+    mq = _make_message_queue(root_ctx)
+    root_ctx.event_producer = EventProducer(
+        mq,
+        source=AGENTID_MANAGER,
         log_events=root_ctx.local_config["debug"]["log-events"],
-        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
-        node_id=root_ctx.local_config["manager"]["id"],
+    )
+    root_ctx.event_dispatcher = EventDispatcher(
+        mq,
+        log_events=root_ctx.local_config["debug"]["log-events"],
         event_observer=root_ctx.metrics.event,
     )
     yield
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
     await root_ctx.event_dispatcher.close()
+
+
+def _make_message_queue(
+    root_ctx: RootContext,
+) -> AbstractMessageQueue:
+    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        root_ctx.shared_config.data["redis"]
+    )
+    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis = redis_helper.get_redis_object(
+        stream_redis_config,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
+    node_id = root_ctx.local_config["manager"]["id"]
+    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
+        return HiRedisQueue(
+            stream_redis_config,
+            HiRedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+                db=REDIS_STREAM_DB,
+            ),
+        )
+    return RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
 
 
 @actxmgr
@@ -614,116 +705,6 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from contextlib import suppress
-    from datetime import timedelta
-    from typing import TYPE_CHECKING
-
-    import sqlalchemy as sa
-    from dateutil.relativedelta import relativedelta
-    from dateutil.tz import tzutc
-    from sqlalchemy.orm import load_only, noload
-
-    from .config import session_hang_tolerance_iv
-    from .models.session import SessionStatus
-
-    if TYPE_CHECKING:
-        from .models.utils import ExtendedAsyncSAEngine
-
-    async def _fetch_hanging_sessions(
-        db: ExtendedAsyncSAEngine,
-        status: SessionStatus,
-        threshold: relativedelta | timedelta,
-    ) -> tuple[SessionRow, ...]:
-        query = (
-            sa.select(SessionRow)
-            .where(SessionRow.status == status)
-            .where(
-                (
-                    datetime.now(tz=tzutc())
-                    - SessionRow.status_history[status.name].astext.cast(
-                        sa.types.DateTime(timezone=True)
-                    )
-                )
-                > threshold
-            )
-            .options(
-                noload("*"),
-                load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
-            )
-        )
-        async with db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            return result.fetchall()
-
-    async def _force_terminate_hanging_sessions(
-        status: SessionStatus,
-        threshold: relativedelta | timedelta,
-        interval: float,
-    ) -> None:
-        try:
-            sessions = await _fetch_hanging_sessions(root_ctx.db, status, threshold)
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            log.error("fetching hanging sessions error: {}", repr(e), exc_info=e)
-            return
-
-        log.debug(f"{len(sessions)} {status.name} sessions found.")
-
-        results_and_exceptions = await asyncio.gather(
-            *[
-                asyncio.create_task(
-                    root_ctx.registry.destroy_session(
-                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
-                    ),
-                )
-                for session in sessions
-            ],
-            return_exceptions=True,
-        )
-        for result_or_exception in results_and_exceptions:
-            if isinstance(result_or_exception, (BaseException, Exception)):
-                log.error(
-                    "hanging session force-termination error: {}",
-                    repr(result_or_exception),
-                    exc_info=result_or_exception,
-                )
-
-    session_hang_tolerance = session_hang_tolerance_iv.check(
-        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
-    )
-
-    session_force_termination_tasks = []
-    heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
-    max_interval = timedelta(hours=1).total_seconds()
-    threshold: relativedelta | timedelta
-    for status, threshold in session_hang_tolerance["threshold"].items():
-        try:
-            session_status = SessionStatus[status]
-        except KeyError:
-            continue
-        if isinstance(threshold, relativedelta):  # years, months
-            interval = max_interval
-        else:  # timedelta
-            interval = min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
-        session_force_termination_tasks.append(
-            aiotools.create_timer(
-                functools.partial(_force_terminate_hanging_sessions, session_status, threshold),
-                interval,
-            )
-        )
-
-    yield
-
-    for task in session_force_termination_tasks:
-        if not task.done():
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-
-
-@actxmgr
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     db = root_ctx.db
 
@@ -744,6 +725,7 @@ class background_task_ctx:
 
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.redis_stream,
             self.root_ctx.event_producer,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
@@ -922,10 +904,11 @@ def build_root_app(
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
-            processors_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            hanging_session_scanner_ctx,
+            stale_session_sweeper_ctx,
+            stale_kernel_sweeper_ctx,
+            processors_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:

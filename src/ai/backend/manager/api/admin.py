@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
 
 import aiohttp_cors
@@ -92,6 +93,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         registry=root_ctx.registry,
         idle_checker_host=root_ctx.idle_checker_host,
         metric_observer=root_ctx.metrics.gql,
+        processors=root_ctx.processors,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],
@@ -129,7 +131,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
 )
 async def handle_gql(request: web.Request, params: Any) -> web.Response:
     result = await _handle_gql_common(request, params)
-    return web.json_response(result.formatted, status=200)
+    return web.json_response(result.formatted, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -154,7 +156,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
                 errors.append(errmsg)
             log.error("ADMIN.GQL Exception: {}", errmsg)
         raise BackendGQLError(extra_data=errors)
-    return web.json_response(result.data, status=200)
+    return web.json_response(result.data, status=HTTPStatus.OK)
 
 
 @attrs.define(auto_attribs=True, slots=True, init=False)

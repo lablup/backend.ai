@@ -1,5 +1,6 @@
 import asyncio
 import json
+from http import HTTPStatus
 from typing import Callable
 
 import attr
@@ -23,14 +24,18 @@ from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.server import (
+    agent_registry_ctx,
     background_task_ctx,
     database_ctx,
     event_dispatcher_ctx,
     hook_plugin_ctx,
     monitoring_ctx,
+    network_plugin_ctx,
+    processors_ctx,
     redis_ctx,
     services_ctx,
     shared_config_ctx,
+    storage_manager_ctx,
 )
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
@@ -43,6 +48,7 @@ def client() -> Client:
 def get_graphquery_context(
     background_task_manager,
     services_ctx,
+    processor_ctx,
     database_engine: ExtendedAsyncSAEngine,
 ) -> GraphQueryContext:
     return GraphQueryContext(
@@ -66,6 +72,7 @@ def get_graphquery_context(
         network_plugin_ctx=None,  # type: ignore
         services_ctx=services_ctx,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
+        processors=processor_ctx,  # type: ignore
     )
 
 
@@ -182,7 +189,11 @@ async def test_image_rescan_on_docker_registry(
             redis_ctx,
             event_dispatcher_ctx,
             services_ctx,
+            network_plugin_ctx,
+            storage_manager_ctx,
+            agent_registry_ctx,
             background_task_ctx,
+            processors_ctx,
         ],
         [".events", ".auth"],
     )
@@ -227,7 +238,7 @@ async def test_image_rescan_on_docker_registry(
         # /v2/ endpoint
         mocked.get(
             f"{registry_url}/v2/",
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_dockerhub_responses["get_token"],
             repeat=True,
         )
@@ -235,7 +246,7 @@ async def test_image_rescan_on_docker_registry(
         # catalog
         mocked.get(
             f"{registry_url}/v2/_catalog?n=30",
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_dockerhub_responses["get_catalog"],
             repeat=True,
         )
@@ -246,7 +257,7 @@ async def test_image_rescan_on_docker_registry(
             # tags
             mock_value = mock_dockerhub_responses["get_tags"]
             params = {
-                "status": 200,
+                "status": HTTPStatus.OK,
                 "callback" if isinstance(mock_value, Callable) else "payload": mock_value,
             }
 
@@ -255,7 +266,7 @@ async def test_image_rescan_on_docker_registry(
             # manifest
             mocked.get(
                 f"{registry_url}/v2/{repo}/manifests/latest",
-                status=200,
+                status=HTTPStatus.OK,
                 payload=mock_dockerhub_responses["get_manifest"],
                 headers={
                     "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
@@ -269,7 +280,7 @@ async def test_image_rescan_on_docker_registry(
             # config blob (JSON)
             mocked.get(
                 f"{registry_url}/v2/{repo}/blobs/{image_digest}",
-                status=200,
+                status=HTTPStatus.OK,
                 body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
                 payload=mock_dockerhub_responses["get_config"],
                 repeat=True,
@@ -279,7 +290,10 @@ async def test_image_rescan_on_docker_registry(
         setup_dockerhub_mocking(mocked)
 
         context = get_graphquery_context(
-            root_ctx.background_task_manager, root_ctx.services_ctx, root_ctx.db
+            root_ctx.background_task_manager,
+            root_ctx.services_ctx,
+            root_ctx.processors,
+            root_ctx.db,
         )
         image_rescan_query = """
             mutation ($registry: String, $project: String) {

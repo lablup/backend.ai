@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 import signal
+from http import HTTPStatus
 from pickle import PickleError
 from typing import Any, Mapping
 from unittest.mock import AsyncMock, MagicMock
@@ -106,7 +107,7 @@ async def test_auto_pull_digest_when_missing(agent, mocker):
     docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(
         side_effect=DockerError(
-            status=404,
+            status=HTTPStatus.NOT_FOUND,
             data={"message": "Simulated missing image"},
         ),
     )
@@ -153,7 +154,7 @@ async def test_auto_pull_tag_when_missing(agent, mocker):
     docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(
         side_effect=DockerError(
-            status=404,
+            status=HTTPStatus.NOT_FOUND,
             data={"message": "Simulated missing image"},
         ),
     )
@@ -200,7 +201,7 @@ async def test_auto_pull_none_when_missing(agent, mocker):
     docker_mock.images = MagicMock()
     inspect_mock = AsyncMock(
         side_effect=DockerError(
-            status=404,
+            status=HTTPStatus.NOT_FOUND,
             data={"message": "Simulated missing image"},
         ),
     )

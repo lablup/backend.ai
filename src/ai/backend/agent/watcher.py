@@ -6,6 +6,7 @@ import ssl
 import subprocess
 import sys
 from collections.abc import AsyncIterator, Sequence
+from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any
@@ -40,7 +41,7 @@ async def auth_middleware(request, handler):
         except FileNotFoundError as e:
             log.info(repr(e))
             message = "Agent is not loaded with systemctl."
-            return web.json_response({"message": message}, status=200)
+            return web.json_response({"message": message}, status=HTTPStatus.OK)
         except Exception as e:
             log.exception(repr(e))
             raise
@@ -178,7 +179,7 @@ async def handle_mount(request: web.Request) -> web.Response:
     await proc.wait()
     if err:
         log.error("Mount error: " + err)
-        return web.Response(text=err, status=500)
+        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
     log.info("Mounted " + params["name"] + " on " + mount_prefix)
     if params["edit_fstab"]:
         fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
@@ -215,7 +216,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     await proc.wait()
     if err:
         log.error("Unmount error: " + err)
-        return web.Response(text=err, status=500)
+        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
     log.info("Unmounted " + params["name"] + " from " + mount_prefix)
     try:
         mountpoint.rmdir()  # delete directory if empty

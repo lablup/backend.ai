@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import itertools
-import json
 import logging
 import uuid
 from collections import defaultdict
@@ -59,6 +58,7 @@ from ai.backend.common.events import (
     SessionScheduledEvent,
     SessionTerminatedEvent,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
@@ -1697,7 +1697,7 @@ class SchedulerDispatcher(aobject):
             )
         for endpoint in endpoints:
             active_routings = [
-                r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
+                r for r in endpoint.routings if r.status in RouteStatus.active_route_statuses()
             ]
             replicas = endpoint.replicas
             if (
@@ -1775,7 +1775,7 @@ class SchedulerDispatcher(aobject):
             lambda r: r.hset(
                 redis_key,
                 "down",
-                json.dumps([str(s.id) for s in target_sessions_to_destroy]),
+                dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
             ),
         )
 
@@ -1803,7 +1803,7 @@ class SchedulerDispatcher(aobject):
             lambda r: r.hset(
                 redis_key,
                 mapping={
-                    "up": json.dumps([str(e.id) for e in endpoints_to_expand.keys()]),
+                    "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
                     "finish_time": datetime.now(tzutc()).isoformat(),
                 },
             ),

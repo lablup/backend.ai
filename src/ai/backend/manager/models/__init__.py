@@ -1,6 +1,7 @@
 from . import acl as _acl
 from . import agent as _agent
 from . import association_container_registries_groups as _association_container_registries_groups
+from . import audit_log as _auditlog
 from . import container_registry as _container_registry
 from . import domain as _domain
 from . import dotfile as _dotfile
@@ -31,6 +32,7 @@ from .gql_models import session as _relay_session
 __all__ = (
     "metadata",
     *_acl.__all__,
+    *_auditlog.__all__,
     *_agent.__all__,
     *_association_container_registries_groups.__all__,
     *_container_registry.__all__,
@@ -61,6 +63,7 @@ __all__ = (
 )
 
 from .acl import *  # noqa
+from .audit_log import *  # noqa
 from .agent import *  # noqa
 from .association_container_registries_groups import *  # noqa
 from .container_registry import *  # noqa
@@ -74,7 +77,6 @@ from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
 from .network import *  # noqa
-from .rbac import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa

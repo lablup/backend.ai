@@ -1,10 +1,10 @@
 import asyncio
-import json
 import os
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import AsyncIterator
 
+from ai.backend.common.json import load_json
 from ai.backend.common.types import BinarySize
 
 from ...subproc import run
@@ -70,7 +70,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                     if not line:
                         break
                     line = line.rstrip(b"\n")
-                    item = json.loads(line)
+                    item = load_json(line)
                     item_path = Path(item["path"])
                     entry_type = DirEntryType.FILE
                     if item["filetype"] == 40000:

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import socket
-from typing import Any, AsyncContextManager, Final, Sequence
+from typing import Any, AsyncContextManager, Final, Optional, Sequence
 
 import hiredis
 
@@ -191,46 +191,46 @@ class RedisClient(aobject):
 
 
 class RedisConnection(AsyncContextManager[RedisClient]):
-    redis_config: RedisConfig
-    db: int
+    _redis_config: RedisConfig
+    _db: int
 
-    socket_timeout: float | None
-    socket_connect_timeout: float | None
+    _socket_timeout: Optional[float]
+    _socket_connect_timeout: Optional[float]
+    _keepalive_options: dict[int, int]
 
     def __init__(
         self,
         redis_config: RedisConfig,
         *,
         db: int = 0,
-        socket_timeout: float | None = 5.0,
-        socket_connect_timeout: float | None = 2.0,
+        socket_timeout: Optional[float] = 5.0,
+        socket_connect_timeout: Optional[float] = 2.0,
         keepalive_options: dict[int, int] = _keepalive_options,
     ) -> None:
-        self.redis_config = redis_config
-        self.db = db
-        self.hiredis_reader = hiredis.Reader()
+        self._redis_config = redis_config
+        self._db = db
 
-        self.socket_timeout = socket_timeout
-        self.socket_connect_timeout = socket_connect_timeout
-        self.keepalive_options = keepalive_options
+        self._socket_timeout = socket_timeout
+        self._socket_connect_timeout = socket_connect_timeout
+        self._keepalive_options = keepalive_options
 
     async def connect(self) -> RedisClient:
-        if self.redis_config.get("sentinel"):
+        if self._redis_config.sentinel:
             raise RuntimeError("Redis with sentinel not supported for this library")
 
-        redis_url = self.redis_config.get("addr")
+        redis_url = self._redis_config.addr
         assert redis_url is not None
 
         host = str(redis_url[0])
         port = redis_url[1]
-        password = self.redis_config.get("password")
+        password = self._redis_config.password
 
-        async with asyncio.timeout(self.socket_connect_timeout):
+        async with asyncio.timeout(self._socket_connect_timeout):
             reader, writer = await asyncio.open_connection(host, port)
             sock: socket.socket = writer.get_extra_info("socket")
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
 
-            for opt, val in self.keepalive_options.items():
+            for opt, val in self._keepalive_options.items():
                 sock.setsockopt(socket.IPPROTO_TCP, opt, val)
 
         self.writer = writer
@@ -241,16 +241,16 @@ class RedisConnection(AsyncContextManager[RedisClient]):
         if password:
             await client.execute(
                 ["AUTH", password],
-                command_timeout=self.socket_timeout,
+                command_timeout=self._socket_timeout,
             )
 
         await client.execute(
             ["HELLO", "3"],
-            command_timeout=self.socket_timeout,
+            command_timeout=self._socket_timeout,
         )
         await client.execute(
-            ["SELECT", self.db],
-            command_timeout=self.socket_timeout,
+            ["SELECT", self._db],
+            command_timeout=self._socket_timeout,
         )
 
         return client

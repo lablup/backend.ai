@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
-import json
 import logging
 import logging.config
 import os
@@ -57,7 +56,8 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import AbstractAgentResponse, PurgeImageResponses
+from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     ImagePullFailedEvent,
@@ -66,6 +66,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
+from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
@@ -212,7 +213,7 @@ class RPCFunctionRegistryV2:
 
     def __call__(
         self,
-        meth: Callable[..., Coroutine[None, None, AbstractAgentResponse]],
+        meth: Callable[..., Coroutine[None, None, AbstractAgentResp]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
         @_collect_metrics(self._metric_observer)
@@ -424,7 +425,7 @@ class AgentRPCServer(aobject):
                         for computer, computer_ctx in self.agent.computers.items()
                     },
                 }
-                writer.write(json.dumps(snapshot, ensure_ascii=False, indent=2).encode())
+                writer.write(pretty_json(snapshot))
             await writer.drain()
             writer.close()
             await writer.wait_closed()
@@ -935,9 +936,18 @@ class AgentRPCServer(aobject):
 
     @rpc_function_v2
     @collect_error
-    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
-        log.info("rpc::purge_images(images:{0})", images)
-        return await self.agent.purge_images(images)
+    async def purge_images(
+        self, image_canonicals: list[str], force: bool, noprune: bool
+    ) -> PurgeImagesResp:
+        log.info(
+            "rpc::purge_images(images:{0}, force:{1}, noprune:{2})",
+            image_canonicals,
+            force,
+            noprune,
+        )
+        return await self.agent.purge_images(
+            PurgeImagesReq(images=image_canonicals, force=force, noprune=noprune)
+        )
 
     @rpc_function
     @collect_error
