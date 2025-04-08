@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
         ModifyKeyPairResourcePolicyInputData,
     )
+    from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
+        CreateUserResourcePolicyInputData,
+    )
 
 from .base import (
     Base,
@@ -659,6 +662,25 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
+    def to_dataclass(self) -> CreateUserResourcePolicyInputData:
+        from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
+            CreateUserResourcePolicyInputData,
+        )
+
+        return CreateUserResourcePolicyInputData(
+            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
+            max_quota_scope_size=to_optional_state(
+                "max_quota_scope_size", self.max_quota_scope_size
+            ),
+            max_session_count_per_model_session=to_optional_state(
+                "max_session_count_per_model_session", self.max_session_count_per_model_session
+            ),
+            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
+            max_customized_image_count=to_optional_state(
+                "max_customized_image_count", self.max_customized_image_count
+            ),
+        )
+
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
@@ -700,7 +722,7 @@ class CreateUserResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         result = await graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
-            CreateUserResourcePolicyAction(name, props)
+            CreateUserResourcePolicyAction(name, props.to_dataclass())
         )
 
         return CreateUserResourcePolicy(

@@ -41,16 +41,9 @@ class UserResourcePolicyService:
         props = action.props
 
         async with self._db.begin_session() as db_sess:
-            row = UserResourcePolicyRow(
-                name,
-                props.max_vfolder_count,
-                props.max_quota_scope_size,
-                props.max_session_count_per_model_session,
-                props.max_customized_image_count,
-            )
+            row = props.to_db_row(name)
             db_sess.add(row)
             await db_sess.flush()
-
         return CreateUserResourcePolicyActionResult(user_resource_policy=row)
 
     async def modify_user_resource_policy(
