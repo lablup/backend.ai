@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Self
 
-from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.models.image import ImageRow, ImageStatus, ImageType
 
 
@@ -72,38 +71,3 @@ class RescanImagesResult:
 class ImageAliasData:
     id: uuid.UUID
     alias: str
-
-
-@dataclass
-class EndpointAutoScalingRuleData:
-    id: uuid.UUID
-    metric_source: AutoScalingMetricSource
-    metric_name: str
-    threshold: str
-    comparator: AutoScalingMetricComparator
-    step_size: int
-    cooldown_seconds: int
-    min_replicas: int
-    max_replicas: int
-    created_at: datetime
-    last_triggered_at: datetime
-    endpoint: uuid.UUID
-
-    @classmethod
-    def from_row(cls, row) -> Optional[Self]:
-        if row is None:
-            return None
-        return cls(
-            id=row.id,
-            metric_source=row.metric_source,
-            metric_name=row.metric_name,
-            threshold=row.threshold,
-            comparator=row.comparator,
-            step_size=row.step_size,
-            cooldown_seconds=row.cooldown_seconds,
-            min_replicas=row.min_replicas,
-            max_replicas=row.max_replicas,
-            created_at=row.created_at,
-            last_triggered_at=row.last_triggered_at,
-            endpoint=row.endpoint,
-        )

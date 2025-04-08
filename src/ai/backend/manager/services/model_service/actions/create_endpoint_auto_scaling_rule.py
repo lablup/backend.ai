@@ -4,9 +4,11 @@ from typing import Optional, override
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.image.types import EndpointAutoScalingRuleData
 from ai.backend.manager.services.model_service.actions.base import EndpointAction
-from ai.backend.manager.services.model_service.types import RequesterCtx
+from ai.backend.manager.services.model_service.types import (
+    EndpointAutoScalingRuleData,
+    RequesterCtx,
+)
 
 
 @dataclass

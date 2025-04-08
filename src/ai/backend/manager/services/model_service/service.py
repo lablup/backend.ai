@@ -38,7 +38,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config import SharedConfig
-from ai.backend.manager.data.image.types import EndpointAutoScalingRuleData
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
@@ -127,6 +126,7 @@ from ai.backend.manager.services.model_service.exceptions import (
 )
 from ai.backend.manager.services.model_service.types import (
     CompactServiceInfo,
+    EndpointAutoScalingRuleData,
     EndpointData,
     ErrorInfo,
     MutationResult,

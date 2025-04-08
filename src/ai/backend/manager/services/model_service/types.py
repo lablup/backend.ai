@@ -8,6 +8,8 @@ from pydantic import HttpUrl
 
 from ai.backend.common.types import (
     AccessKey,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ClusterMode,
     MountPermission,
     MountTypes,
@@ -253,4 +255,39 @@ class EndpointData:
             routings=RoutingData.from_row(row.routings),
             lifecycle_stage=row.lifecycle_stage,
             runtime_variant=row.runtime_variant,
+        )
+
+
+@dataclass
+class EndpointAutoScalingRuleData:
+    id: uuid.UUID
+    metric_source: AutoScalingMetricSource
+    metric_name: str
+    threshold: str
+    comparator: AutoScalingMetricComparator
+    step_size: int
+    cooldown_seconds: int
+    min_replicas: int
+    max_replicas: int
+    created_at: datetime
+    last_triggered_at: datetime
+    endpoint: uuid.UUID
+
+    @classmethod
+    def from_row(cls, row) -> Optional[Self]:
+        if row is None:
+            return None
+        return cls(
+            id=row.id,
+            metric_source=row.metric_source,
+            metric_name=row.metric_name,
+            threshold=row.threshold,
+            comparator=row.comparator,
+            step_size=row.step_size,
+            cooldown_seconds=row.cooldown_seconds,
+            min_replicas=row.min_replicas,
+            max_replicas=row.max_replicas,
+            created_at=row.created_at,
+            last_triggered_at=row.last_triggered_at,
+            endpoint=row.endpoint,
         )
