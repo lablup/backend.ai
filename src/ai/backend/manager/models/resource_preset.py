@@ -14,6 +14,11 @@ from sqlalchemy.orm import relationship
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 
+if TYPE_CHECKING:
+    from ai.backend.manager.services.resource_preset.actions.create_preset import (
+        CreateResourcePresetInputData,
+    )
+
 from .base import (
     Base,
     BigInt,
@@ -280,6 +285,17 @@ class CreateResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
+    def to_dataclass(self) -> CreateResourcePresetInputData:
+        from ai.backend.manager.services.resource_preset.actions.create_preset import (
+            CreateResourcePresetInputData,
+        )
+
+        return CreateResourcePresetInputData(
+            resource_slots=ResourceSlot.from_json(self.resource_slots),
+            shared_memory=self.shared_memory if self.shared_memory else None,
+            scaling_group_name=self.scaling_group_name if self.scaling_group_name else None,
+        )
+
 
 class ModifyResourcePresetInput(graphene.InputObjectType):
     name = graphene.String(
@@ -322,7 +338,7 @@ class CreateResourcePreset(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         result = await graph_ctx.processors.resource_preset.create_preset.wait_for_complete(
-            CreateResourcePresetAction(name=name, props=props)
+            CreateResourcePresetAction(name=name, props=props.to_dataclass())
         )
 
         return cls(True, "success", ResourcePreset.from_row(graph_ctx, result.resource_preset))

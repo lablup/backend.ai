@@ -1,23 +1,23 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Optional, override
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.services.resource_preset.base import ResourcePresetAction
 
 
 @dataclass
-class CreateResourcePresetInput:
-    # TODO: Add types.
-    resource_slots: dict[str, Any]
-    shared_memory: Optional[str] = None
-    scaling_group_name: Optional[str] = None
+class CreateResourcePresetInputData:
+    resource_slots: ResourceSlot
+    shared_memory: Optional[str]
+    scaling_group_name: Optional[str]
 
 
 @dataclass
 class CreateResourcePresetAction(ResourcePresetAction):
     name: str
-    props: CreateResourcePresetInput
+    props: CreateResourcePresetInputData
 
     @override
     def entity_id(self) -> Optional[str]:
