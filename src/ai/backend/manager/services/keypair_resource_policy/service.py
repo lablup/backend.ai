@@ -37,18 +37,16 @@ class KeypairResourcePolicyService:
     async def create_keypair_resource_policy(
         self, action: CreateKeyPairResourcePolicyAction
     ) -> CreateKeyPairResourcePolicyActionResult:
-        props = dataclasses.asdict(action.props)
+        dict_props = dataclasses.asdict(action.props)
         # Ignore deprecated fields
-        del props["max_vfolder_count"]
-        del props["max_vfolder_size"]
-        del props["max_quota_scope_size"]
+        del dict_props["max_vfolder_count"]
+        del dict_props["max_vfolder_size"]
+        del dict_props["max_quota_scope_size"]
 
         async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.insert(KeyPairResourcePolicyRow)
-                .values(**props)
-                .returning(KeyPairResourcePolicyRow)
-            )
+            db_row = KeyPairResourcePolicyRow(**dict_props)
+            db_sess.add(db_row)
+            result = db_row.to_dataclass()
 
         return CreateKeyPairResourcePolicyActionResult(keypair_resource_policy=result)
 

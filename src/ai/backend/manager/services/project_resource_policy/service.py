@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 
 import sqlalchemy as sa
@@ -38,15 +39,18 @@ class ProjectResourcePolicyService:
     ) -> CreateProjectResourcePolicyActionResult:
         name = action.name
         props = action.props
+        dict_props = dataclasses.asdict(props)
+        dict_props["name"] = name
+        # Ignore deprecated fields
+        del dict_props["max_vfolder_size"]
 
         async with self._db.begin_session() as db_sess:
-            db_row = props.to_db_row(name)
-            db_sess.add(db_row)
+            new_row = ProjectResourcePolicyRow(**dict_props)
+            db_sess.add(new_row)
+            result = new_row.to_dataclass()
             await db_sess.flush()
 
-        return CreateProjectResourcePolicyActionResult(
-            project_resource_policy=db_row.to_dataclass()
-        )
+        return CreateProjectResourcePolicyActionResult(project_resource_policy=result)
 
     async def modify_project_resource_policy(
         self, action: ModifyProjectResourcePolicyAction
