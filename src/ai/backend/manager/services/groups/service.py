@@ -125,7 +125,7 @@ class GroupService:
         ):
             raise ValueError("invalid user_update_mode")
         if action.user_uuids.state() == State.NOP:
-            action.user_update_mode = OptionalState.update("user_update_mode", None)
+            action.modifier.user_update_mode = OptionalState.nop("user_update_mode")
         if not data and action.user_update_mode.value() is None:
             return ModifyGroupActionResult(data=None, success=False)
 

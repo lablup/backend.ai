@@ -9,6 +9,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    Dict,
     Generic,
     Optional,
     Protocol,
@@ -83,6 +84,15 @@ class Creator(ABC):
         """
         Returns a dictionary of data that should be stored in the database.
         This is different from to_dict() as it specifically maps fields to their storage keys.
+        """
+        pass
+
+
+class PartialModifier(ABC):
+    @abstractmethod
+    def get_modified_fields(self) -> Dict[str, Any]:
+        """
+        Returns a dictionary of field name to value for modified fields.
         """
         pass
 

@@ -1,35 +1,15 @@
-from dataclasses import dataclass, field, fields
-from typing import Any, Optional, cast, override
+from dataclasses import dataclass, field
+from typing import Optional, override
 
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
-from ai.backend.manager.services.domain.types import DomainData
-from ai.backend.manager.types import OptionalState, State, TriState
+from ai.backend.manager.services.domain.types import DomainData, DomainModifier
 
 
 @dataclass
 class ModifyDomainAction(DomainAction):
     domain_name: str
-    name: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("name")
-    )  # Set if Name for the domain needs to be changed
-    description: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("description")
-    )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
-        default_factory=lambda: TriState.nop("total_resource_slots")
-    )
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
-    )
-    allowed_docker_registries: OptionalState[list[str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
-    )
-    integration_id: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("integration_id")
-    )
+    modifier: DomainModifier = field(default_factory=DomainModifier)
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -39,15 +19,8 @@ class ModifyDomainAction(DomainAction):
     def operation_type(self) -> str:
         return "modify"
 
-    def get_modified_fields(self) -> dict[str, Any]:
-        result = {}
-        for f in fields(self):
-            if f.name == "domain_name":
-                continue
-            field_value: TriState = getattr(self, f.name)
-            if field_value.state() != State.NOP:
-                result[f.name] = cast(Any, field_value.value())
-        return result
+    def get_modified_fields(self):
+        return self.modifier.get_modified_fields()
 
 
 @dataclass

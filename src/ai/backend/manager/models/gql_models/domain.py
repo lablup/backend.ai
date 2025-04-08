@@ -27,7 +27,12 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeAction,
     ModifyDomainNodeActionResult,
 )
-from ai.backend.manager.services.domain.types import DomainData, DomainNodeCreator, UserInfo
+from ai.backend.manager.services.domain.types import (
+    DomainData,
+    DomainNodeCreator,
+    DomainNodeModifier,
+    UserInfo,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
@@ -426,40 +431,42 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
         return ModifyDomainNodeAction(
             name=name,
             user_info=user_info,
-            description=TriState(
-                "description",
-                define_state(self.description),
-                value_or_none(self.description),
-            ),
-            is_active=OptionalState(
-                "is_active",
-                define_state(self.is_active),
-                value_or_none(self.is_active),
-            ),
-            total_resource_slots=TriState(
-                "total_resource_slots",
-                define_state(self.total_resource_slots),
-                None
-                if self.total_resource_slots is graphql.Undefined
-                else ResourceSlot.from_user_input(self.total_resource_slots, None),
-            ),
-            allowed_vfolder_hosts=OptionalState(
-                "allowed_vfolder_hosts",
-                define_state(self.allowed_vfolder_hosts),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            allowed_docker_registries=OptionalState(
-                "allowed_docker_registries",
-                define_state(self.allowed_docker_registries),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            integration_id=TriState(
-                "integration_id",
-                define_state(self.integration_id),
-                value_or_none(self.integration_id),
-            ),
-            dotfiles=OptionalState(
-                "dotfiles", define_state(self.dotfiles), value_or_none(self.dotfiles)
+            modifier=DomainNodeModifier(
+                description=TriState(
+                    "description",
+                    define_state(self.description),
+                    value_or_none(self.description),
+                ),
+                is_active=OptionalState(
+                    "is_active",
+                    define_state(self.is_active),
+                    value_or_none(self.is_active),
+                ),
+                total_resource_slots=TriState(
+                    "total_resource_slots",
+                    define_state(self.total_resource_slots),
+                    None
+                    if self.total_resource_slots is graphql.Undefined
+                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
+                ),
+                allowed_vfolder_hosts=OptionalState(
+                    "allowed_vfolder_hosts",
+                    define_state(self.allowed_vfolder_hosts),
+                    value_or_none(self.allowed_vfolder_hosts),
+                ),
+                allowed_docker_registries=OptionalState(
+                    "allowed_docker_registries",
+                    define_state(self.allowed_docker_registries),
+                    value_or_none(self.allowed_vfolder_hosts),
+                ),
+                integration_id=TriState(
+                    "integration_id",
+                    define_state(self.integration_id),
+                    value_or_none(self.integration_id),
+                ),
+                dotfiles=OptionalState(
+                    "dotfiles", define_state(self.dotfiles), value_or_none(self.dotfiles)
+                ),
             ),
             sgroups_to_add=OptionalState(
                 "sgroups_to_add",

@@ -40,7 +40,9 @@ from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.domain.types import (
     DomainCreator,
     DomainData,
+    DomainModifier,
     DomainNodeCreator,
+    DomainNodeModifier,
     UserInfo,
 )
 from ai.backend.manager.types import State, TriState
@@ -172,7 +174,11 @@ async def test_create_domain_node(
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainNodeModifier(
+                    description=TriState(
+                        "description", State.UPDATE, "Domain Description Modified"
+                    ),
+                ),
             ),
             ModifyDomainNodeActionResult(
                 domain_data=DomainData(
@@ -200,7 +206,11 @@ async def test_create_domain_node(
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainNodeModifier(
+                    description=TriState(
+                        "description", State.UPDATE, "Domain Description Modified"
+                    ),
+                ),
             ),
             ValueError,
         ),
@@ -213,7 +223,11 @@ async def test_create_domain_node(
                     role=UserRole.USER,
                     domain_name="default",
                 ),
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainNodeModifier(
+                    description=TriState(
+                        "description", State.UPDATE, "Domain Description Modified"
+                    ),
+                ),
             ),
             ValueError,
         ),
@@ -327,7 +341,11 @@ async def test_create_model_store_after_domain_created(
             "Modify domain",
             ModifyDomainAction(
                 domain_name="test-modify-domain",
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainModifier(
+                    description=TriState(
+                        "description", State.UPDATE, "Domain Description Modified"
+                    ),
+                ),
             ),
             ModifyDomainActionResult(
                 domain_data=DomainData(
@@ -350,7 +368,11 @@ async def test_create_model_store_after_domain_created(
             "Modify a domain not exists",
             ModifyDomainAction(
                 domain_name="not-exist-domain",
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainModifier(
+                    description=TriState(
+                        "description", State.UPDATE, "Domain Description Modified"
+                    ),
+                ),
             ),
             ModifyDomainActionResult(
                 domain_data=None,

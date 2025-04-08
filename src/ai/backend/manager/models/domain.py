@@ -32,7 +32,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, Sentinel, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.utils import define_state
-from ai.backend.manager.services.domain.types import DomainCreator
+from ai.backend.manager.services.domain.types import DomainCreator, DomainModifier
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..defs import RESERVED_DOTFILES
@@ -356,36 +356,38 @@ class ModifyDomainInput(graphene.InputObjectType):
 
         return ModifyDomainAction(
             domain_name=domain_name,
-            name=OptionalState("name", define_state(self.name), value_or_none(self.name)),
-            description=TriState(
-                "description",
-                define_state(self.description),
-                value_or_none(self.description),
-            ),
-            is_active=OptionalState(
-                "is_active", define_state(self.is_active), value_or_none(self.is_active)
-            ),
-            total_resource_slots=TriState(
-                "total_resource_slots",
-                define_state(self.total_resource_slots),
-                None
-                if self.total_resource_slots is Undefined
-                else ResourceSlot.from_user_input(self.total_resource_slots, None),
-            ),
-            allowed_vfolder_hosts=OptionalState(
-                "allowed_vfolder_hosts",
-                define_state(self.allowed_vfolder_hosts),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            allowed_docker_registries=OptionalState(
-                "allowed_docker_registries",
-                define_state(self.allowed_docker_registries),
-                value_or_none(self.allowed_vfolder_hosts),
-            ),
-            integration_id=TriState(
-                "integration_id",
-                define_state(self.integration_id),
-                value_or_none(self.integration_id),
+            modifier=DomainModifier(
+                name=OptionalState("name", define_state(self.name), value_or_none(self.name)),
+                description=TriState(
+                    "description",
+                    define_state(self.description),
+                    value_or_none(self.description),
+                ),
+                is_active=OptionalState(
+                    "is_active", define_state(self.is_active), value_or_none(self.is_active)
+                ),
+                total_resource_slots=TriState(
+                    "total_resource_slots",
+                    define_state(self.total_resource_slots),
+                    None
+                    if self.total_resource_slots is Undefined
+                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
+                ),
+                allowed_vfolder_hosts=OptionalState(
+                    "allowed_vfolder_hosts",
+                    define_state(self.allowed_vfolder_hosts),
+                    value_or_none(self.allowed_vfolder_hosts),
+                ),
+                allowed_docker_registries=OptionalState(
+                    "allowed_docker_registries",
+                    define_state(self.allowed_docker_registries),
+                    value_or_none(self.allowed_vfolder_hosts),
+                ),
+                integration_id=TriState(
+                    "integration_id",
+                    define_state(self.integration_id),
+                    value_or_none(self.integration_id),
+                ),
             ),
         )
 

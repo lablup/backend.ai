@@ -8,7 +8,7 @@ from sqlalchemy.engine.result import Row
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.types import Creator
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, State, TriState
 
 
 @dataclass
@@ -82,3 +82,83 @@ class DomainNodeCreator(DomainCreator):
         data = super().get_creation_data()
         data["scaling_groups"] = self.scaling_groups
         return data
+
+
+@dataclass
+class DomainModifier(PartialModifier):
+    name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("name"))
+    description: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("description")
+    )
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
+        default_factory=lambda: TriState.nop("total_resource_slots")
+    )
+    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+    )
+    allowed_docker_registries: OptionalState[list[str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
+    )
+    integration_id: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("integration_id")
+    )
+
+    @override
+    def get_modified_fields(self) -> dict[str, Any]:
+        modified: dict[str, Any] = {}
+        if self.name.state() != State.NOP:
+            modified["name"] = self.name.value()
+        if self.description.state() != State.NOP:
+            modified["description"] = self.description.value()
+        if self.is_active.state() != State.NOP:
+            modified["is_active"] = self.is_active.value()
+        if self.total_resource_slots.state() != State.NOP:
+            modified["total_resource_slots"] = self.total_resource_slots.value()
+        if self.allowed_vfolder_hosts.state() != State.NOP:
+            modified["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts.value()
+        if self.allowed_docker_registries.state() != State.NOP:
+            modified["allowed_docker_registries"] = self.allowed_docker_registries.value()
+        if self.integration_id.state() != State.NOP:
+            modified["integration_id"] = self.integration_id.value()
+        return modified
+
+
+@dataclass
+class DomainNodeModifier(PartialModifier):
+    description: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("description")
+    )
+    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
+    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
+        default_factory=lambda: TriState.nop("total_resource_slots")
+    )
+    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+    )
+    allowed_docker_registries: OptionalState[list[str]] = field(
+        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
+    )
+    integration_id: TriState[Optional[str]] = field(
+        default_factory=lambda: TriState.nop("integration_id")
+    )
+    dotfiles: OptionalState[bytes] = field(default_factory=lambda: OptionalState.nop("dotfiles"))
+
+    @override
+    def get_modified_fields(self) -> dict[str, Any]:
+        modified: dict[str, Any] = {}
+        if self.description.state() != State.NOP:
+            modified["description"] = self.description.value()
+        if self.is_active.state() != State.NOP:
+            modified["is_active"] = self.is_active.value()
+        if self.total_resource_slots.state() != State.NOP:
+            modified["total_resource_slots"] = self.total_resource_slots.value()
+        if self.allowed_vfolder_hosts.state() != State.NOP:
+            modified["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts.value()
+        if self.allowed_docker_registries.state() != State.NOP:
+            modified["allowed_docker_registries"] = self.allowed_docker_registries.value()
+        if self.integration_id.state() != State.NOP:
+            modified["integration_id"] = self.integration_id.value()
+        if self.dotfiles.state() != State.NOP:
+            modified["dotfiles"] = self.dotfiles.value()
+        return modified

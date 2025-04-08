@@ -124,7 +124,7 @@ class DomainService:
                     )
                 else:
                     return MutationResult(
-                        success=False, message=f"no matching {action.name}", data=None
+                        success=False, message=f"no matching {action.modifier.name}", data=None
                     )
 
         res = await self._db_mutation_wrapper(_do_mutate)
