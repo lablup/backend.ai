@@ -65,7 +65,7 @@ from .user import UserConnection, UserNode
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
     from ..rbac import ContainerRegistryScope, ScopeType
-    from ..scaling_group import ScalingGroup
+    from .scaling_group import ScalingGroup
 
 
 class GroupNode(graphene.ObjectType):

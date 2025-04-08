@@ -82,7 +82,6 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
-from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.agent import (
     Agent,
@@ -100,11 +99,16 @@ from .gql_models.container_registry import (
     UpdateContainerRegistryQuota,
 )
 from .gql_models.domain import (
+    CreateDomain,
     CreateDomainNode,
+    DeleteDomain,
+    Domain,
     DomainConnection,
     DomainNode,
     DomainPermissionValueField,
+    ModifyDomain,
     ModifyDomainNode,
+    PurgeDomain,
 )
 from .gql_models.endpoint import (
     CreateEndpointAutoScalingRuleNode,
@@ -142,6 +146,26 @@ from .gql_models.image import (
     RescanImages,
     UnloadImage,
     UntagImageFromRegistry,
+)
+from .gql_models.scaling_group import (
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
+    AssociateScalingGroupWithDomain,
+    AssociateScalingGroupWithKeyPair,
+    AssociateScalingGroupWithUserGroup,
+    CreateScalingGroup,
+    DeleteScalingGroup,
+    DisassociateAllScalingGroupsWithDomain,
+    DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
+    DisassociateScalingGroupWithDomain,
+    DisassociateScalingGroupWithKeyPair,
+    DisassociateScalingGroupWithUserGroup,
+    ModifyScalingGroup,
+    ScalingGroup,
 )
 from .gql_models.session import (
     CheckAndTransitStatus,
@@ -215,24 +239,6 @@ from .resource_preset import (
 )
 from .routing import Routing, RoutingList
 from .scaling_group import (
-    AssociateScalingGroupsWithDomain,
-    AssociateScalingGroupsWithKeyPair,
-    AssociateScalingGroupsWithUserGroup,
-    AssociateScalingGroupWithDomain,
-    AssociateScalingGroupWithKeyPair,
-    AssociateScalingGroupWithUserGroup,
-    CreateScalingGroup,
-    DeleteScalingGroup,
-    DisassociateAllScalingGroupsWithDomain,
-    DisassociateAllScalingGroupsWithGroup,
-    DisassociateScalingGroupsWithDomain,
-    DisassociateScalingGroupsWithKeyPair,
-    DisassociateScalingGroupsWithUserGroup,
-    DisassociateScalingGroupWithDomain,
-    DisassociateScalingGroupWithKeyPair,
-    DisassociateScalingGroupWithUserGroup,
-    ModifyScalingGroup,
-    ScalingGroup,
     ScalingGroupRow,
     and_names,
     query_allowed_sgroups,
