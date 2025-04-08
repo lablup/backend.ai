@@ -1,25 +1,40 @@
-from dataclasses import dataclass
-from typing import Optional, override
+from dataclasses import dataclass, field
+from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
 )
 from ai.backend.manager.services.project_resource_policy.base import ProjectResourcePolicyAction
+from ai.backend.manager.types import OptionalState
 
 
 @dataclass
-class ModifyProjectResourcePolicyInput:
-    max_vfolder_count: Optional[int] = None
-    max_quota_scope_size: Optional[int] = None
-    max_vfolder_size: Optional[int] = None
-    max_network_count: Optional[int] = None
+class ModifyProjectResourcePolicyInputData:
+    max_vfolder_count: OptionalState[int] = field(
+        default_factory=lambda: OptionalState.nop("max_vfolder_count")
+    )
+    max_quota_scope_size: OptionalState[int] = field(
+        default_factory=lambda: OptionalState.nop("max_quota_scope_size")
+    )
+    max_vfolder_size: OptionalState[int] = field(
+        default_factory=lambda: OptionalState.nop("max_vfolder_size")
+    )
+    max_network_count: OptionalState[int] = field(
+        default_factory=lambda: OptionalState.nop("max_network_count")
+    )
+
+    def set_attr(self, row: Any) -> None:
+        self.max_vfolder_count.set_attr(row)
+        self.max_quota_scope_size.set_attr(row)
+        self.max_vfolder_size.set_attr(row)
+        self.max_network_count.set_attr(row)
 
 
 @dataclass
 class ModifyProjectResourcePolicyAction(ProjectResourcePolicyAction):
     name: str
-    props: ModifyProjectResourcePolicyInput
+    props: ModifyProjectResourcePolicyInputData
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -1,10 +1,9 @@
 import logging
-from typing import Any
 
 import sqlalchemy as sa
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.base import set_if_set
+from ai.backend.manager.api.exceptions import ObjectNotFound
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
 )
@@ -53,21 +52,15 @@ class ProjectResourcePolicyService:
         name = action.name
         props = action.props
 
-        data: dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_count")
-        set_if_set(props, data, "max_quota_scope_size")
-        set_if_set(props, data, "max_network_count")
-
         async with self._db.begin_session() as db_sess:
-            update_query = (
-                sa.update(ProjectResourcePolicyRow)
-                .values(data)
-                .where(ProjectResourcePolicyRow.name == name)
-                .returning(ProjectResourcePolicyRow.__table__.c)
-            )
-            result = await db_sess.execute(update_query)
+            query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
+            db_row = (await db_sess.execute(query)).scalar_one_or_none()
+            if db_row is None:
+                raise ObjectNotFound(f"Project resource policy with name {name} not found.")
 
-        return ModifyProjectResourcePolicyActionResult(project_resource_policy=result)
+            props.set_attr(db_row)
+
+        return ModifyProjectResourcePolicyActionResult(project_resource_policy=db_row)
 
     async def delete_project_resource_policy(
         self, action: DeleteProjectResourcePolicyAction

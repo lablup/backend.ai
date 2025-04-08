@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
         CreateProjectResourcePolicyInputData,
     )
+    from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
+        ModifyProjectResourcePolicyInputData,
+    )
     from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
         CreateUserResourcePolicyInputData,
     )
@@ -952,6 +955,20 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
+    def to_dataclass(self) -> ModifyProjectResourcePolicyInputData:
+        from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
+            ModifyProjectResourcePolicyInputData,
+        )
+
+        return ModifyProjectResourcePolicyInputData(
+            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
+            max_quota_scope_size=to_optional_state(
+                "max_quota_scope_size", self.max_quota_scope_size
+            ),
+            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
+            max_network_count=to_optional_state("max_network_count", self.max_network_count),
+        )
+
 
 class CreateProjectResourcePolicy(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -1014,7 +1031,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         result = await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
-            ModifyProjectResourcePolicyAction(name, props)
+            ModifyProjectResourcePolicyAction(name, props.to_dataclass())
         )
 
         return ModifyProjectResourcePolicy(
