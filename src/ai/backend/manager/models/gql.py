@@ -114,7 +114,16 @@ from .gql_models.endpoint import (
     ModifyEndpointAutoScalingRuleNode,
 )
 from .gql_models.fields import AgentPermissionField, ScopeField
-from .gql_models.group import GroupConnection, GroupNode, GroupPermissionField
+from .gql_models.group import (
+    CreateGroup,
+    DeleteGroup,
+    Group,
+    GroupConnection,
+    GroupNode,
+    GroupPermissionField,
+    ModifyGroup,
+    PurgeGroup,
+)
 from .gql_models.image import (
     AliasImage,
     ClearImages,
@@ -160,12 +169,7 @@ from .gql_models.vfolder import (
     VirtualFolderNode,
 )
 from .group import (
-    CreateGroup,
-    DeleteGroup,
-    Group,
-    ModifyGroup,
     ProjectType,
-    PurgeGroup,
 )
 from .image import (
     ImageLoadFilter,
