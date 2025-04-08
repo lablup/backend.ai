@@ -40,10 +40,10 @@ class UserResourcePolicyService:
         props = action.props
 
         async with self._db.begin_session() as db_sess:
-            row = props.to_db_row(name)
-            db_sess.add(row)
+            db_row = props.to_db_row(name)
+            db_sess.add(db_row)
             await db_sess.flush()
-        return CreateUserResourcePolicyActionResult(user_resource_policy=row.to_dataclass())
+        return CreateUserResourcePolicyActionResult(user_resource_policy=db_row.to_dataclass())
 
     async def modify_user_resource_policy(
         self, action: ModifyUserResourcePolicyAction
@@ -53,10 +53,10 @@ class UserResourcePolicyService:
 
         async with self._db.begin_session() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-            row = (await db_sess.execute(query)).scalar_one_or_none()
-            props.set_attr(row)
+            db_row = (await db_sess.execute(query)).scalar_one_or_none()
+            props.set_attr(db_row)
 
-        return ModifyUserResourcePolicyActionResult(user_resource_policy=row.to_dataclass())
+        return ModifyUserResourcePolicyActionResult(user_resource_policy=db_row.to_dataclass())
 
     async def delete_user_resource_policy(
         self, action: DeleteUserResourcePolicyAction
@@ -65,9 +65,9 @@ class UserResourcePolicyService:
 
         async with self._db.begin_session() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-            row = (await db_sess.execute(query)).scalar_one_or_none()
-            if not row:
+            db_row = (await db_sess.execute(query)).scalar_one_or_none()
+            if not db_row:
                 raise ObjectNotFound(f"User resource policy with name {name} not found.")
-            await db_sess.delete(row)
+            await db_sess.delete(db_row)
 
-        return DeleteUserResourcePolicyActionResult(user_resource_policy=row.to_dataclass())
+        return DeleteUserResourcePolicyActionResult(user_resource_policy=db_row.to_dataclass())

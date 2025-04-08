@@ -72,13 +72,12 @@ class ProjectResourcePolicyService:
         name = action.name
 
         async with self._db.begin_session() as db_sess:
-            delete_query = (
-                sa.delete(ProjectResourcePolicyRow)
-                .where(ProjectResourcePolicyRow.name == name)
-                .returning(ProjectResourcePolicyRow.__table__.c)
-            )
-            result = await db_sess.execute(delete_query)
+            query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
+            db_row = (await db_sess.execute(query)).scalar_one_or_none()
+            if not db_row:
+                raise ObjectNotFound(f"Project resource policy with name {name} not found.")
+            await db_sess.delete(db_row)
 
         return DeleteProjectResourcePolicyActionResult(
-            project_resource_policy=result.to_dataclass()
+            project_resource_policy=db_row.to_dataclass()
         )

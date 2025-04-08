@@ -1066,16 +1066,13 @@ class CreateProjectResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        result = await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
+        await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
             CreateProjectResourcePolicyAction(name, props.to_dataclass())
         )
 
         return CreateProjectResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=ProjectResourcePolicy.from_row(
-                graph_ctx, ProjectResourcePolicyRow.from_dataclass(result.project_resource_policy)
-            ),
         )
 
 
@@ -1102,16 +1099,13 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        result = await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
+        await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
             ModifyProjectResourcePolicyAction(name, props.to_dataclass())
         )
 
         return ModifyProjectResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=ProjectResourcePolicy.from_row(
-                graph_ctx, ProjectResourcePolicyRow.from_dataclass(result.project_resource_policy)
-            ),
         )
 
 
@@ -1136,14 +1130,11 @@ class DeleteProjectResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        result = await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.wait_for_complete(
+        await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.wait_for_complete(
             DeleteProjectResourcePolicyAction(name)
         )
 
         return DeleteProjectResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=ProjectResourcePolicy.from_row(
-                graph_ctx, ProjectResourcePolicyRow.from_dataclass(result.project_resource_policy)
-            ),
         )
