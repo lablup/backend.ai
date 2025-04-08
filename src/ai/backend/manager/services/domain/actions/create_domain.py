@@ -26,22 +26,15 @@ class CreateDomainAction(DomainAction):
         return "create"
 
     def get_insertion_data(self) -> dict[str, Any]:
-        result: dict[str, Any] = {"name": self.name}
-
-        optional_fields = [
-            "description",
-            "is_active",
-            "total_resource_slots",
-            "allowed_vfolder_hosts",
-            "allowed_docker_registries",
-            "integration_id",
-        ]
-
-        for field_name in optional_fields:
-            field_value = getattr(self, field_name)
-            result[field_name] = field_value
-
-        return result
+        return {
+            "name": self.name,
+            "description": self.description,
+            "is_active": self.is_active,
+            "total_resource_slots": self.total_resource_slots,
+            "allowed_vfolder_hosts": self.allowed_vfolder_hosts,
+            "allowed_docker_registries": self.allowed_docker_registries,
+            "integration_id": self.integration_id,
+        }
 
 
 @dataclass
