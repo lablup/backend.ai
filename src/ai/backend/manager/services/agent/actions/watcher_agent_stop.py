@@ -23,7 +23,8 @@ class WatcherAgentStopAction(AgentAction):
 class WatcherAgentStopActionResult(BaseActionResult):
     # TODO: Add proper type
     resp: Any
+    agent_id: AgentId
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.agent_id)

@@ -5,8 +5,6 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.agent.base import AgentAction
 
 
-# TODO: 이게 AgentService가 맞나? SessionService가 맞나?
-# TODO: BatchAction으로 만들기.
 @dataclass
 class RecalculateUsageAction(AgentAction):
     @override
@@ -18,6 +16,7 @@ class RecalculateUsageAction(AgentAction):
         return "recalculate_usage"
 
 
+# TODO: Change this to BatchAction and return the list of all agent ids.
 @dataclass
 class RecalculateUsageActionResult(BaseActionResult):
     @override
