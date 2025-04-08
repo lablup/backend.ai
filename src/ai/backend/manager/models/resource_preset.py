@@ -13,10 +13,14 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.gql_models.base import to_tri_state
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.resource_preset.actions.create_preset import (
         CreateResourcePresetInputData,
+    )
+    from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+        ModifyResourcePresetInputData,
     )
 
 from .base import (
@@ -311,6 +315,22 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
+    def to_dataclass(self) -> ModifyResourcePresetInputData:
+        from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+            ModifyResourcePresetInputData,
+        )
+
+        resource_slots = (
+            ResourceSlot.from_json(self.resource_slots) if self.resource_slots else None
+        )
+
+        return ModifyResourcePresetInputData(
+            resource_slots=to_tri_state("resource_slots", resource_slots),
+            name=to_tri_state("name", self.name),
+            shared_memory=to_tri_state("shared_memory", self.shared_memory),
+            scaling_group_name=to_tri_state("scaling_group_name", self.scaling_group_name),
+        )
+
 
 class CreateResourcePreset(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -377,7 +397,7 @@ class ModifyResourcePreset(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.resource_preset.modify_preset.wait_for_complete(
-            ModifyResourcePresetAction(id=id, name=name, props=props)
+            ModifyResourcePresetAction(id=id, name=name, props=props.to_dataclass())
         )
 
         return cls(True, "success")

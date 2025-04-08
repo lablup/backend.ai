@@ -15,6 +15,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import ObjectNotFound
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.base import set_if_set
@@ -114,43 +115,35 @@ class ResourcePresetService:
         self, action: ModifyResourcePresetAction
     ) -> ModifyResourcePresetActionResult:
         name = action.name
-        id = action.id
+        preset_id = action.id
         props = action.props
 
-        data: dict[str, Any] = {}
-        preset_id = id
         if preset_id is None and name is None:
             raise ValueError("One of (`id` or `name`) parameter should be not null")
 
-        set_if_set(
-            props,
-            data,
-            "name",
-        )
-        set_if_set(
-            props,
-            data,
-            "resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
-        )
-        set_if_set(
-            props, data, "shared_memory", clean_func=lambda v: BinarySize.from_str(v) if v else None
-        )
-        set_if_set(props, data, "scaling_group_name")
-
-        async def _update(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
+        async with self._db.begin_session() as db_sess:
             if preset_id is not None:
-                query_option = filter_by_id(preset_id)
+                preset_row = (
+                    await db_sess.execute(
+                        sa.select(
+                            ResourcePresetRow,
+                        ).where(ResourcePresetRow.id == preset_id)
+                    )
+                ).scalar_one_or_none()
             else:
-                if name is None:
-                    raise ValueError("One of (`id` or `name`) parameter should be not null")
-                query_option = filter_by_name(name)
-            return await ResourcePresetRow.update(query_option, data, db_session=db_session)
+                preset_row = (
+                    await db_sess.execute(
+                        sa.select(
+                            ResourcePresetRow,
+                        ).where(ResourcePresetRow.name == name)
+                    )
+                ).scalar_one_or_none()
 
-        async with self._db.connect() as db_conn:
-            preset_row = await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
             if preset_row is None:
-                raise ValueError("Duplicate resource preset record")
+                raise ObjectNotFound("Resource preset not found")
+
+            props.set_attr(preset_row)
+            await db_sess.flush()
 
         return ModifyResourcePresetActionResult(resource_preset=preset_row)
 
@@ -158,9 +151,8 @@ class ResourcePresetService:
         self, action: DeleteResourcePresetAction
     ) -> DeleteResourcePresetActionResult:
         name = action.name
-        id = action.id
+        preset_id = action.id
 
-        preset_id = id
         if preset_id is None and name is None:
             raise ValueError("One of (`id` or `name`) parameter should be not null")
 
