@@ -1,16 +1,21 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from datetime import datetime
+from typing import Any, Mapping, Optional, Self, Sequence
 
+import yarl
 from pydantic import HttpUrl
 
 from ai.backend.common.types import (
     AccessKey,
+    ClusterMode,
     MountPermission,
     MountTypes,
     RuntimeVariant,
     VFolderMount,
 )
+from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.user import UserRole
 
 
@@ -112,3 +117,140 @@ class RequesterCtx:
 class ErrorInfo:
     session_id: Optional[uuid.UUID]
     error: dict[str, Any]
+
+
+@dataclass
+class MutationResult:
+    success: bool
+    message: str
+    data: Optional[Any]
+
+
+@dataclass
+class InferenceSessionErrorInfo:
+    src: str
+    name: str
+    repr: str
+
+
+@dataclass
+class InferenceSessionError:
+    session_id: uuid.UUID
+    errors: list[InferenceSessionErrorInfo]
+
+
+@dataclass
+class RoutingData:
+    id: uuid.UUID
+    endpoint: str
+    session: uuid.UUID
+    status: str
+    traffic_ratio: float
+    created_at: datetime
+    error: InferenceSessionError
+    error_data: dict[str, Any]
+    live_stat: dict[str, Any]
+
+    @classmethod
+    def from_row(cls, row) -> Self:
+        return cls(
+            id=row.id,
+            endpoint=row.endpoint,
+            session=row.session,
+            status=row.status,
+            traffic_ratio=row.traffic_ratio,
+            created_at=row.created_at,
+            error=InferenceSessionError(session_id=row.session_id, errors=row.errors),
+            error_data=row.error_data,
+            live_stat=row.live_stat,
+        )
+
+
+@dataclass
+class RuntimeVariantData:
+    name: str
+    human_readable_name: str
+
+
+@dataclass
+class EndpointData:
+    id: uuid.UUID
+    image: Optional[ImageData]
+    domain: str
+    project: uuid.UUID
+    resource_group: str
+    resource_slots: Mapping[str, Any]
+    url: str
+
+    model: uuid.UUID
+    model_definition_path: str | None
+    model_mount_destination: Optional[str]
+
+    created_user: uuid.UUID
+    created_user_email: Optional[str]
+
+    session_owner: uuid.UUID
+    session_owner_email: str
+
+    tag: Optional[str]
+
+    startup_command: Optional[str]
+    bootstrap_script: Optional[str]
+    callback_url: Optional[yarl.URL]
+    environ: Optional[Mapping[str, Any]]
+
+    name: str
+
+    resource_opts: Optional[Mapping[str, Any]]
+    replicas: int
+    desired_session_count: int
+
+    cluster_mode: ClusterMode
+    cluster_size: int
+    open_to_public: bool
+    created_at: datetime
+    destroyed_at: datetime
+    retries: int
+
+    routings: RoutingData
+    lifecycle_stage: str
+    runtime_variant: RuntimeVariant
+
+    @classmethod
+    def from_row(cls, row: Optional[EndpointRow]) -> Optional[Self]:
+        if row is None:
+            return None
+        return cls(
+            id=row.id,
+            image=ImageData.from_row(row.image_row),
+            domain=row.domain,
+            project=row.project,
+            resource_group=row.resource_group,
+            resource_slots=row.resource_slots,
+            url=row.url,
+            model=row.model,
+            model_definition_path=row.model_definition_path,
+            model_mount_destination=row.model_mount_destination,
+            created_user=row.created_user,
+            created_user_email=row.created_user_email,
+            session_owner=row.session_owner,
+            session_owner_email=row.session_owner_email,
+            tag=row.tag,
+            startup_command=row.startup_command,
+            bootstrap_script=row.bootstrap_script,
+            callback_url=row.callback_url,
+            environ=row.environ,
+            name=row.name,
+            resource_opts=row.resource_opts,
+            replicas=row.replicas,
+            desired_session_count=row.desired_session_count,
+            cluster_mode=ClusterMode(row.cluster_mode),
+            cluster_size=row.cluster_size,
+            open_to_public=row.open_to_public,
+            created_at=row.created_at,
+            destroyed_at=row.destroyed_at,
+            retries=row.retries,
+            routings=RoutingData.from_row(row.routings),
+            lifecycle_stage=row.lifecycle_stage,
+            runtime_variant=row.runtime_variant,
+        )

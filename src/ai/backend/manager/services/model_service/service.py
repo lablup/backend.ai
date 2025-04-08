@@ -1,7 +1,9 @@
 import asyncio
+import decimal
 import logging
 import secrets
 import uuid
+from typing import Any, Awaitable, Callable, cast
 
 import aiohttp
 import sqlalchemy as sa
@@ -22,26 +24,55 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import AgentId, ImageAlias, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    EndpointId,
+    ImageAlias,
+    MountPermission,
+    MountTypes,
+    ResourceSlot,
+    RuleId,
+    RuntimeVariant,
+    SessionTypes,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
+from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.data.image.types import EndpointAutoScalingRuleData
+from ai.backend.manager.models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointLifecycle,
+    EndpointRow,
+    EndpointTokenRow,
+    ModelServicePredicateChecker,
+)
 from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.model_service.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
 )
+from ai.backend.manager.services.model_service.actions.create_endpoint_auto_scaling_rule import (
+    CreateEndpointAutoScalingRuleAction,
+    CreateEndpointAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.model_service.actions.create_service import (
     CreateModelServiceAction,
     CreateModelServiceActionResult,
     ServiceInfo,
+)
+from ai.backend.manager.services.model_service.actions.delete_enpoint_auto_scaling_rule_node import (
+    DeleteEndpointAutoScalingRuleAction,
+    DeleteEndpointAutoScalingRuleActionResult,
 )
 from ai.backend.manager.services.model_service.actions.delete_route import (
     DeleteRouteAction,
@@ -67,6 +98,16 @@ from ai.backend.manager.services.model_service.actions.list_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
+from ai.backend.manager.services.model_service.actions.modify_endpoint_auto_scaling_rule_node import (
+    ModifyEndpointAutoScalingRuleAction,
+    ModifyEndpointAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.model_service.actions.modify_enpoint import (
+    ExtraMount,
+    ImageRef,
+    ModifyEndpointAction,
+    ModifyEndpointActionResult,
+)
 from ai.backend.manager.services.model_service.actions.scale import ScaleAction, ScaleActionResult
 from ai.backend.manager.services.model_service.actions.start_service import (
     StartModelServiceAction,
@@ -78,17 +119,21 @@ from ai.backend.manager.services.model_service.actions.update_route import (
     UpdateRouteActionResult,
 )
 from ai.backend.manager.services.model_service.exceptions import (
+    EndpointAutoScalingRuleNotFound,
+    EndpointNotFound,
     GenericForbidden,
     InvalidAPIParameters,
     ModelServiceNotFound,
 )
 from ai.backend.manager.services.model_service.types import (
     CompactServiceInfo,
+    EndpointData,
     ErrorInfo,
+    MutationResult,
     RequesterCtx,
     RouteInfo,
 )
-from ai.backend.manager.types import UserScope
+from ai.backend.manager.types import MountOptionModel, State, UserScope
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user_uuid
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -99,6 +144,8 @@ class ModelService:
     _agent_registry: AgentRegistry
     _background_task_manager: BackgroundTaskManager
     _event_dispatcher: EventDispatcher
+    _storage_manager: StorageSessionManager
+    _shared_config: SharedConfig
 
     def __init__(
         self,
@@ -106,11 +153,15 @@ class ModelService:
         agent_registry: AgentRegistry,
         background_task_manager: BackgroundTaskManager,
         event_dispatcher: EventDispatcher,
+        storage_manager: StorageSessionManager,
+        shared_config: SharedConfig,
     ) -> None:
         self._db = db
         self._registry = agent_registry
         self._background_task_manager = background_task_manager
         self._event_dispatcher = event_dispatcher
+        self._storage_manager = storage_manager
+        self._shared_config = shared_config
 
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         validation_result = action.validation_result
@@ -677,3 +728,391 @@ class ModelService:
                 raise InvalidAPIParameters(str(e))
             except RuntimeError as e:
                 raise GenericForbidden(str(e))
+
+    async def modify_endpoint(self, action: ModifyEndpointAction) -> ModifyEndpointActionResult:
+        async def _do_mutate() -> MutationResult:
+            async with self._db.begin_session() as db_session:
+                try:
+                    endpoint_row = await EndpointRow.get(
+                        db_session,
+                        action.endpoint_id,
+                        load_session_owner=True,
+                        load_model=True,
+                        load_routes=True,
+                    )
+                    match action.requester_ctx.user_role:
+                        case UserRole.SUPERADMIN:
+                            pass
+                        case UserRole.ADMIN:
+                            domain_name = action.requester_ctx.domain_name
+                            if endpoint_row.domain != domain_name:
+                                raise EndpointNotFound
+                        case _:
+                            user_id = action.requester_ctx.user_id
+                            if endpoint_row.session_owner != user_id:
+                                raise EndpointNotFound
+                except NoResultFound:
+                    raise EndpointNotFound
+                if endpoint_row.lifecycle_stage in (
+                    EndpointLifecycle.DESTROYING,
+                    EndpointLifecycle.DESTROYED,
+                ):
+                    raise InvalidAPIParameters("Cannot update endpoint marked for removal")
+
+                if action.resource_slots.state() == State.UPDATE:
+                    endpoint_row.resource_slots = ResourceSlot.from_user_input(
+                        cast(dict[str, Any], action.resource_slots.value()), None
+                    )
+
+                action.resource_opts.set_attr(endpoint_row)
+                action.cluster_mode.set_attr(endpoint_row)
+                action.cluster_size.set_attr(endpoint_row)
+                action.model_definition_path.set_attr(endpoint_row)
+
+                if action.environ.state() == State.UPDATE and action.environ.value() is not None:
+                    endpoint_row.environ = action.environ.value()
+
+                if action.runtime_variant.state() == State.UPDATE:
+                    try:
+                        endpoint_row.runtime_variant = RuntimeVariant(
+                            cast(str, action.runtime_variant.value())
+                        )
+                    except KeyError:
+                        raise InvalidAPIParameters(
+                            f"Unsupported runtime {action.runtime_variant.value()}"
+                        )
+
+                if (
+                    action.desired_session_count.state() == State.UPDATE
+                    and action.replicas.state() == State.UPDATE
+                ):
+                    raise InvalidAPIParameters(
+                        "Cannot set both desired_session_count and replicas. Use replicas for future use."
+                    )
+
+                if (
+                    action.desired_session_count.state() == State.UPDATE
+                    and action.desired_session_count.value() is not None
+                ):
+                    endpoint_row.replicas = action.desired_session_count.value()
+
+                if action.replicas.state() == State.UPDATE and action.replicas.value() is not None:
+                    endpoint_row.replicas = action.replicas.value()
+
+                action.resource_group.set_attr(endpoint_row)
+
+                if action.image.state() == State.UPDATE and action:
+                    image_ref = cast(ImageRef, action.image.value())
+                    image_name = image_ref.name
+                    arch = cast(str, image_ref.architecture.value())
+                    image_row = await ImageRow.resolve(
+                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
+                    )
+                    endpoint_row.image = image_row.id
+
+                session_owner: UserRow = endpoint_row.session_owner_row
+
+                conn = await db_session.connection()
+                assert conn
+
+                await ModelServicePredicateChecker.check_scaling_group(
+                    conn,
+                    endpoint_row.resource_group,
+                    session_owner.main_access_key,
+                    endpoint_row.domain,
+                    endpoint_row.project,
+                )
+
+                user_scope = UserScope(
+                    domain_name=endpoint_row.domain,
+                    group_id=endpoint_row.project,
+                    user_uuid=session_owner.uuid,
+                    user_role=session_owner.role,
+                )
+
+                query = (
+                    sa.select([keypair_resource_policies])
+                    .select_from(keypair_resource_policies)
+                    .where(keypair_resource_policies.c.name == session_owner.resource_policy)
+                )
+                result = await conn.execute(query)
+
+                resource_policy = result.first()
+                if action.extra_mounts.state() == State.UPDATE:
+                    extra_mounts_input = cast(list[ExtraMount], action.extra_mounts.value())
+                    extra_mounts = {
+                        cast(uuid.UUID, m.vfolder_id.value()): MountOptionModel(
+                            mount_destination=(
+                                m.mount_destination.value()
+                                if m.mount_destination.state() == State.UPDATE
+                                else None
+                            ),
+                            type=MountTypes(cast(str, m.type.value()))
+                            if m.type.state() == State.UPDATE
+                            else MountTypes.BIND,
+                            permission=(
+                                MountPermission(cast(str, m.permission.value()))
+                                if m.permission.state() == State.UPDATE
+                                else None
+                            ),
+                        )
+                        for m in extra_mounts_input
+                    }
+                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+                        conn,
+                        self._shared_config,
+                        self._storage_manager,
+                        endpoint_row.model,
+                        endpoint_row.model_mount_destination,
+                        extra_mounts,
+                        user_scope,
+                        resource_policy,
+                    )
+                    endpoint_row.extra_mounts = vfolder_mounts
+
+                if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
+                    await ModelServicePredicateChecker.validate_model_definition(
+                        self._storage_manager,
+                        endpoint_row.model_row,
+                        endpoint_row.model_definition_path,
+                    )
+                elif (
+                    endpoint_row.runtime_variant != RuntimeVariant.CMD
+                    and endpoint_row.model_mount_destination != "/models"
+                ):
+                    raise InvalidAPIParameters(
+                        "Model mount destination must be /models for non-custom runtimes"
+                    )
+
+                async with self._db.begin_session() as db_session:
+                    image_row = await ImageRow.resolve(
+                        db_session,
+                        [
+                            ImageIdentifier(
+                                endpoint_row.image_row.name, endpoint_row.image_row.architecture
+                            ),
+                        ],
+                    )
+
+                await self._registry.create_session(
+                    "",
+                    image_row.image_ref,
+                    user_scope,
+                    session_owner.main_access_key,
+                    resource_policy,
+                    SessionTypes.INFERENCE,
+                    {
+                        "mounts": [
+                            endpoint_row.model,
+                            *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
+                        ],
+                        "mount_map": {
+                            endpoint_row.model: endpoint_row.model_mount_destination,
+                            **{
+                                m.vfid.folder_id: m.kernel_path.as_posix()
+                                for m in endpoint_row.extra_mounts
+                            },
+                        },
+                        "mount_options": {
+                            m.vfid.folder_id: {"permission": m.mount_perm}
+                            for m in endpoint_row.extra_mounts
+                        },
+                        "environ": endpoint_row.environ,
+                        "scaling_group": endpoint_row.resource_group,
+                        "resources": endpoint_row.resource_slots,
+                        "resource_opts": endpoint_row.resource_opts,
+                        "preopen_ports": None,
+                        "agent_list": None,
+                    },
+                    ClusterMode[endpoint_row.cluster_mode],
+                    endpoint_row.cluster_size,
+                    bootstrap_script=endpoint_row.bootstrap_script,
+                    startup_command=endpoint_row.startup_command,
+                    tag=endpoint_row.tag,
+                    callback_url=endpoint_row.callback_url,
+                    sudo_session_enabled=session_owner.sudo_session_enabled,
+                    dry_run=True,
+                )
+
+                await db_session.commit()
+                return MutationResult(
+                    success=True,
+                    message="success",
+                    data=endpoint_row,
+                )
+
+        result = await self._db_mutation_wrapper(_do_mutate)
+        return ModifyEndpointActionResult(
+            success=result.success, data=EndpointData.from_row(result.data)
+        )
+
+    async def create_endpoint_auto_scaling_rule(
+        self, action: CreateEndpointAutoScalingRuleAction
+    ) -> CreateEndpointAutoScalingRuleActionResult:
+        if not action.metric_source:
+            raise InvalidAPIParameters("metric_source is a required field")
+        if not action.comparator:
+            raise InvalidAPIParameters("comparator is a required field")
+
+        try:
+            _endpoint_id = EndpointId(action.endpoint_id)
+        except ValueError:
+            raise EndpointNotFound
+
+        async with self._db.begin_session(commit_on_end=True) as db_session:
+            try:
+                row = await EndpointRow.get(db_session, _endpoint_id)
+            except NoResultFound:
+                raise EndpointNotFound
+
+            match action.requester_ctx.user_role:
+                case UserRole.SUPERADMIN:
+                    pass
+                case UserRole.ADMIN:
+                    if row.domain != action.requester_ctx.domain_name:
+                        raise GenericForbidden
+                case UserRole.USER:
+                    if row.created_user != action.requester_ctx.user_id:
+                        raise GenericForbidden
+
+            try:
+                _threshold = decimal.Decimal(action.threshold)
+            except decimal.InvalidOperation:
+                raise InvalidAPIParameters(f"Cannot convert {action.threshold} to Decimal")
+
+            async def _do_mutate() -> MutationResult:
+                created_rule = await row.create_auto_scaling_rule(
+                    db_session,
+                    action.metric_source,
+                    action.metric_name,
+                    _threshold,
+                    action.comparator,
+                    action.step_size,
+                    cooldown_seconds=action.cooldown_seconds,
+                    min_replicas=action.min_replicas,
+                    max_replicas=action.max_replicas,
+                )
+                return MutationResult(
+                    success=True,
+                    message="Auto scaling rule created",
+                    data=created_rule,
+                )
+
+            res = await self._db_mutation_wrapper(_do_mutate)
+
+            return CreateEndpointAutoScalingRuleActionResult(
+                success=res.success,
+                data=EndpointAutoScalingRuleData.from_row(res.data),
+            )
+
+    async def modify_endpoint_auto_scaling_rule(
+        self, action: ModifyEndpointAutoScalingRuleAction
+    ) -> ModifyEndpointAutoScalingRuleActionResult:
+        try:
+            _rule_id = RuleId(action.id)
+        except ValueError:
+            raise EndpointAutoScalingRuleNotFound
+
+        async with self._db.begin_session(commit_on_end=True) as db_session:
+            try:
+                row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
+            except NoResultFound:
+                raise EndpointAutoScalingRuleNotFound
+
+            match action.requester_ctx.user_role:
+                case UserRole.SUPERADMIN:
+                    pass
+                case UserRole.ADMIN:
+                    if row.endpoint_row.domain != action.requester_ctx.domain_name:
+                        raise GenericForbidden
+                case UserRole.USER:
+                    if row.endpoint_row.created_user != action.requester_ctx.user_id:
+                        raise GenericForbidden
+
+            async def _do_mutate() -> MutationResult:
+                if (_newval := action.threshold) and _newval.state() == State.UPDATE:
+                    try:
+                        row.threshold = decimal.Decimal(cast(str, _newval.value()))
+                    except decimal.InvalidOperation:
+                        raise InvalidAPIParameters(f"Cannot convert {_newval} to Decimal")
+
+                action.metric_source.set_attr(row)
+                action.metric_name.set_attr(row)
+                action.comparator.set_attr(row)
+                action.step_size.set_attr(row)
+                action.cooldown_seconds.set_attr(row)
+                action.min_replicas.set_attr(row)
+                action.max_replicas.set_attr(row)
+
+                return MutationResult(
+                    success=True,
+                    message="Auto scaling rule updated",
+                    data=row,
+                )
+
+            res = await self._db_mutation_wrapper(_do_mutate)
+
+            return ModifyEndpointAutoScalingRuleActionResult(
+                success=res.success,
+                data=EndpointAutoScalingRuleData.from_row(res.data),
+            )
+
+    async def delete_endpoint_auto_scaling_rule(
+        self, action: DeleteEndpointAutoScalingRuleAction
+    ) -> DeleteEndpointAutoScalingRuleActionResult:
+        try:
+            _rule_id = RuleId(action.id)
+        except ValueError:
+            raise EndpointAutoScalingRuleNotFound
+
+        async with self._db.begin_session(commit_on_end=True) as db_session:
+            try:
+                row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
+            except NoResultFound:
+                raise EndpointAutoScalingRuleNotFound
+
+            match action.requester_ctx.user_role:
+                case UserRole.SUPERADMIN:
+                    pass
+                case UserRole.ADMIN:
+                    if row.endpoint_row.domain != action.requester_ctx.domain_name:
+                        raise GenericForbidden
+                case UserRole.USER:
+                    if row.endpoint_row.created_user != action.requester_ctx.user_id:
+                        raise GenericForbidden
+
+            async def _do_mutate() -> MutationResult:
+                await db_session.delete(row)
+                return MutationResult(
+                    success=True,
+                    message="Auto scaling rule removed",
+                    data=None,
+                )
+
+            res = await self._db_mutation_wrapper(_do_mutate)
+
+            return DeleteEndpointAutoScalingRuleActionResult(
+                success=res.success,
+            )
+
+    async def _db_mutation_wrapper(
+        self, _do_mutate: Callable[[], Awaitable[MutationResult]]
+    ) -> MutationResult:
+        try:
+            return await execute_with_retry(_do_mutate)
+        except sa.exc.IntegrityError as e:
+            log.warning("db_mutation_wrapper(): integrity error ({})", repr(e))
+            return MutationResult(success=False, message=f"integrity error: {e}", data=None)
+        except sa.exc.StatementError as e:
+            log.warning(
+                "db_mutation_wrapper(): statement error ({})\n{}",
+                repr(e),
+                e.statement or "(unknown)",
+            )
+            orig_exc = e.orig
+            return MutationResult(success=False, message=str(orig_exc), data=None)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            raise
+        except Exception:
+            log.exception("db_mutation_wrapper(): other error")
+            raise

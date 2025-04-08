@@ -16,3 +16,13 @@ class ModelServiceNotFound(BackendError, web.HTTPNotFound):
 class GenericForbidden(BackendError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/forbidden"
     error_title = "Forbidden."
+
+
+class EndpointNotFound(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/endpoint-not-found"
+    error_title = "Endpoint not found."
+
+
+class EndpointAutoScalingRuleNotFound(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/endpoint-auto-scaling-rule-not-found"
+    error_title = "Endpoint auto scaling rule not found."
