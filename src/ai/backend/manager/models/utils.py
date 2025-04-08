@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from ..config import LocalConfig
 
 from ..defs import LockID
-from ..types import Sentinel, State
+from ..types import Sentinel, TriStateEnum
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
@@ -554,10 +554,10 @@ async def vacuum_db(
             await conn.exec_driver_sql(vacuum_sql)
 
 
-def define_state(value: Any) -> State:
+def define_state(value: Any) -> TriStateEnum:
     if value is None:
-        return State.NULLIFY
+        return TriStateEnum.NULLIFY
     elif value is Undefined:
-        return State.NOP
+        return TriStateEnum.NOP
     else:
-        return State.UPDATE
+        return TriStateEnum.UPDATE

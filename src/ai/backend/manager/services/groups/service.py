@@ -61,7 +61,7 @@ from ai.backend.manager.services.groups.actions.usage_per_period import (
     UsagePerPeriodActionResult,
 )
 from ai.backend.manager.services.groups.types import GroupData
-from ai.backend.manager.types import OptionalState, State
+from ai.backend.manager.types import OptionalState, TriStateEnum
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -118,13 +118,17 @@ class GroupService:
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
         data = action.get_modified_fields()
 
-        if action.user_update_mode.state() != State.NOP and action.user_update_mode.value() not in (
-            None,
-            "add",
-            "remove",
+        if (
+            action.user_update_mode.state() != TriStateEnum.NOP
+            and action.user_update_mode.value()
+            not in (
+                None,
+                "add",
+                "remove",
+            )
         ):
             raise ValueError("invalid user_update_mode")
-        if action.user_uuids.state() == State.NOP:
+        if action.user_uuids.state() == TriStateEnum.NOP:
             action.modifier.user_update_mode = OptionalState.nop("user_update_mode")
         if not data and action.user_update_mode.value() is None:
             return ModifyGroupActionResult(data=None, success=False)
@@ -134,7 +138,7 @@ class GroupService:
                 # TODO: refactor user addition/removal in groups as separate mutations
                 #       (to apply since 21.09)
                 gid = action.group_id
-                if action.user_uuids.state() == State.UPDATE:
+                if action.user_uuids.state() == TriStateEnum.UPDATE:
                     user_uuids = cast(list[str], action.user_uuids.value())
                     if action.user_update_mode.value() == "add":
                         values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]

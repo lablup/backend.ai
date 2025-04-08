@@ -142,7 +142,16 @@ from .gql_models.session import (
     SessionPermissionValueField,
     TotalResourceSlot,
 )
-from .gql_models.user import UserConnection, UserNode
+from .gql_models.user import (
+    CreateUser,
+    DeleteUser,
+    ModifyUser,
+    PurgeUser,
+    User,
+    UserConnection,
+    UserList,
+    UserNode,
+)
 from .gql_models.vfolder import (
     ModelCard,
     ModelCardConnection,
@@ -232,12 +241,6 @@ from .session import (
 )
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
-    CreateUser,
-    DeleteUser,
-    ModifyUser,
-    PurgeUser,
-    User,
-    UserList,
     UserRole,
     UserStatus,
 )

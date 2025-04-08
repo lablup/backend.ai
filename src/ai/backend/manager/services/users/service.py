@@ -82,7 +82,7 @@ from ai.backend.manager.services.users.actions.user_month_stats import (
     UserMonthStatsActionResult,
 )
 from ai.backend.manager.services.users.type import UserData
-from ai.backend.manager.types import OptionalState, State
+from ai.backend.manager.types import OptionalState, TriStateEnum
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -228,7 +228,7 @@ class UserService:
 
         group_ids: OptionalState = action.modifiable_fields.group_ids
 
-        if not data and (group_ids.state() == State.UPDATE and group_ids.value() is None):
+        if not data and (group_ids.state() == TriStateEnum.UPDATE and group_ids.value() is None):
             return ModifyUserActionResult(data=None, success=False)
         if data.get("status") is None and data.get("is_active") is not None:
             data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
@@ -348,8 +348,8 @@ class UserService:
 
             # If domain is changed and no group is associated, clear previous domain's group.
             if prev_domain_name != updated_user.domain_name and (
-                group_ids.state() == State.NOP
-                or (group_ids.state() == State.UPDATE and group_ids.value() is None)
+                group_ids.state() == TriStateEnum.NOP
+                or (group_ids.state() == TriStateEnum.UPDATE and group_ids.value() is None)
             ):
                 await conn.execute(
                     sa.delete(association_groups_users).where(
@@ -359,7 +359,7 @@ class UserService:
 
             # Update user's group if group_ids parameter is provided.
             if (
-                group_ids.state() == State.UPDATE and group_ids.value() is not None
+                group_ids.state() == TriStateEnum.UPDATE and group_ids.value() is not None
             ) and updated_user is not None:
                 # Clear previous groups associated with the user.
                 await conn.execute(
@@ -454,7 +454,7 @@ class UserService:
                 )
 
             if (
-                action.purge_shared_vfolders.state() == State.UPDATE
+                action.purge_shared_vfolders.state() == TriStateEnum.UPDATE
                 and not action.purge_shared_vfolders.value()
             ):
                 await self.migrate_shared_vfolders(
@@ -464,7 +464,7 @@ class UserService:
                     target_user_email=action.user_info_ctx.email,
                 )
             if (
-                action.delegate_endpoint_ownership.state() == State.UPDATE
+                action.delegate_endpoint_ownership.state() == TriStateEnum.UPDATE
                 and action.delegate_endpoint_ownership.value()
             ):
                 await EndpointRow.delegate_endpoint_ownership(

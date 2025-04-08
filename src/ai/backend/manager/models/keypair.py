@@ -40,9 +40,10 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
+from .gql_models.user import ModifyUserInput
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from .user import ModifyUserInput, UserRole
+from .user import UserRole
 from .utils import agg_to_array
 
 __all__: Sequence[str] = (

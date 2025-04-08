@@ -97,7 +97,7 @@ class PartialModifier(ABC):
         pass
 
 
-class State(enum.Enum):
+class TriStateEnum(enum.Enum):
     UPDATE = "update"
     NULLIFY = "nullify"
     NOP = "nop"
@@ -118,41 +118,41 @@ class TriState(Generic[TVal]):
     """
 
     _attr_name: str
-    _state: State
+    _state: TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
+    def __init__(self, attr_name: str, state: TriStateEnum, value: Optional[TVal]):
         self._attr_name = attr_name
         self._state = state
         self._value = value
 
     @classmethod
     def update(cls, attr_name: str, value: TVal) -> TriState[TVal]:
-        return cls(attr_name, state=State.UPDATE, value=value)
+        return cls(attr_name, state=TriStateEnum.UPDATE, value=value)
 
     @classmethod
     def nullify(cls, attr_name: str) -> TriState[TVal]:
-        return cls(attr_name, state=State.NULLIFY, value=None)
+        return cls(attr_name, state=TriStateEnum.NULLIFY, value=None)
 
     @classmethod
     def nop(cls, attr_name: str) -> TriState[TVal]:
-        return cls(attr_name, state=State.NOP, value=None)
+        return cls(attr_name, state=TriStateEnum.NOP, value=None)
 
     def value(self) -> Optional[TVal]:
-        if self._state == State.UPDATE:
+        if self._state == TriStateEnum.UPDATE:
             return self._value
         raise ValueError(f"Value is not set for {self._attr_name}")
 
-    def state(self) -> State:
+    def state(self) -> TriStateEnum:
         return self._state
 
     def set_attr(self, obj: Any) -> None:
         match self._state:
-            case State.UPDATE:
+            case TriStateEnum.UPDATE:
                 setattr(obj, self._attr_name, self._value)
-            case State.NULLIFY:
+            case TriStateEnum.NULLIFY:
                 setattr(obj, self._attr_name, None)
-            case State.NOP:
+            case TriStateEnum.NOP:
                 pass
 
 
@@ -166,20 +166,20 @@ class OptionalState(TriState[TVal]):
     This class is similar to TriState, but it cannot be in the NULLIFY state.
     """
 
-    def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
+    def __init__(self, attr_name: str, state: TriStateEnum, value: Optional[TVal]):
         self._attr_name = attr_name
-        if state == State.NULLIFY:
+        if state == TriStateEnum.NULLIFY:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state
         self._value = value
 
     @classmethod
     def update(cls, attr_name: str, value: TVal) -> OptionalState[TVal]:
-        return cls(attr_name, state=State.UPDATE, value=value)
+        return cls(attr_name, state=TriStateEnum.UPDATE, value=value)
 
     @classmethod
     def nop(cls, attr_name: str) -> OptionalState[TVal]:
-        return cls(attr_name, state=State.NOP, value=None)
+        return cls(attr_name, state=TriStateEnum.NOP, value=None)
 
 
 @dataclass
@@ -196,14 +196,14 @@ class DataclassInput:
 
     def set_attr(self, obj: Any) -> None:
         for field_name, value in self._get_fields():
-            if value.state() != State.NOP:
+            if value.state() != TriStateEnum.NOP:
                 setattr(obj, field_name, value.value())
 
     def to_dict(self) -> dict[str, Any]:
         return {
             field_name: value.value()
             for field_name, value in self._get_fields()
-            if value.state() != State.NOP
+            if value.state() != TriStateEnum.NOP
         }
 
 
@@ -222,6 +222,6 @@ class DictInput(UserDict[str, TriState]):
     def to_dict(self) -> dict[str, Any]:
         result = {}
         for field_name, field in self._get_fields():
-            if field.state() != State.NOP:
+            if field.state() != TriStateEnum.NOP:
                 result[field_name] = field.value()
         return result

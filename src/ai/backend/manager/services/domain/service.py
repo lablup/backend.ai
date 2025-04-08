@@ -51,7 +51,7 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainActionResult,
 )
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import State
+from ai.backend.manager.types import TriStateEnum
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -262,11 +262,11 @@ class DomainService:
     ) -> ModifyDomainNodeActionResult:
         domain_name = action.name
 
-        if action.sgroups_to_add.state() == State.UPDATE:
+        if action.sgroups_to_add.state() == TriStateEnum.UPDATE:
             sgroups_to_add = action.sgroups_to_add.value()
         else:
             sgroups_to_add = None
-        if action.sgroups_to_remove.state() == State.UPDATE:
+        if action.sgroups_to_remove.state() == TriStateEnum.UPDATE:
             sgroups_to_remove = action.sgroups_to_remove.value()
         else:
             sgroups_to_remove = None

@@ -7,7 +7,7 @@ from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.user import UserRole, UserStatus
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, State, TriState
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState, TriStateEnum
 
 
 @dataclass
@@ -166,38 +166,38 @@ class UserModifier(PartialModifier):
     @override
     def get_modified_fields(self) -> dict[str, Any]:
         modified: dict[str, Any] = {}
-        if self.username.state() != State.NOP:
+        if self.username.state() != TriStateEnum.NOP:
             modified["username"] = self.username.value()
-        if self.password.state() != State.NOP:
+        if self.password.state() != TriStateEnum.NOP:
             modified["password"] = self.password.value()
-        if self.need_password_change.state() != State.NOP:
+        if self.need_password_change.state() != TriStateEnum.NOP:
             modified["need_password_change"] = self.need_password_change.value()
-        if self.full_name.state() != State.NOP:
+        if self.full_name.state() != TriStateEnum.NOP:
             modified["full_name"] = self.full_name.value()
-        if self.description.state() != State.NOP:
+        if self.description.state() != TriStateEnum.NOP:
             modified["description"] = self.description.value()
-        if self.is_active.state() != State.NOP:
+        if self.is_active.state() != TriStateEnum.NOP:
             modified["is_active"] = self.is_active.value()
-        if self.status.state() != State.NOP:
+        if self.status.state() != TriStateEnum.NOP:
             modified["status"] = self.status.value()
-        if self.domain_name.state() != State.NOP:
+        if self.domain_name.state() != TriStateEnum.NOP:
             modified["domain_name"] = self.domain_name.value()
-        if self.role.state() != State.NOP:
+        if self.role.state() != TriStateEnum.NOP:
             modified["role"] = self.role.value()
-        if self.allowed_client_ip.state() != State.NOP:
+        if self.allowed_client_ip.state() != TriStateEnum.NOP:
             modified["allowed_client_ip"] = self.allowed_client_ip.value()
-        if self.totp_activated.state() != State.NOP:
+        if self.totp_activated.state() != TriStateEnum.NOP:
             modified["totp_activated"] = self.totp_activated.value()
-        if self.resource_policy.state() != State.NOP:
+        if self.resource_policy.state() != TriStateEnum.NOP:
             modified["resource_policy"] = self.resource_policy.value()
-        if self.sudo_session_enabled.state() != State.NOP:
+        if self.sudo_session_enabled.state() != TriStateEnum.NOP:
             modified["sudo_session_enabled"] = self.sudo_session_enabled.value()
-        if self.container_uid.state() != State.NOP:
+        if self.container_uid.state() != TriStateEnum.NOP:
             modified["container_uid"] = self.container_uid.value()
-        if self.container_main_gid.state() != State.NOP:
+        if self.container_main_gid.state() != TriStateEnum.NOP:
             modified["container_main_gid"] = self.container_main_gid.value()
-        if self.container_gids.state() != State.NOP:
+        if self.container_gids.state() != TriStateEnum.NOP:
             modified["container_gids"] = self.container_gids.value()
-        if self.main_access_key.state() != State.NOP:
+        if self.main_access_key.state() != TriStateEnum.NOP:
             modified["main_access_key"] = self.main_access_key.value()
         return modified

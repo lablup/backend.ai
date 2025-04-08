@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Self, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, State, TriState
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState, TriStateEnum
 
 
 @dataclass
@@ -111,22 +111,22 @@ class GroupModifier(PartialModifier):
     @override
     def get_modified_fields(self) -> dict[str, Any]:
         modified: dict[str, Any] = {}
-        if self.name.state() != State.NOP:
+        if self.name.state() != TriStateEnum.NOP:
             modified["name"] = self.name.value()
-        if self.description.state() != State.NOP:
+        if self.description.state() != TriStateEnum.NOP:
             modified["description"] = self.description.value()
-        if self.is_active.state() != State.NOP:
+        if self.is_active.state() != TriStateEnum.NOP:
             modified["is_active"] = self.is_active.value()
-        if self.total_resource_slots.state() != State.NOP:
+        if self.total_resource_slots.state() != TriStateEnum.NOP:
             modified["total_resource_slots"] = self.total_resource_slots.value()
-        if self.allowed_vfolder_hosts.state() != State.NOP:
+        if self.allowed_vfolder_hosts.state() != TriStateEnum.NOP:
             modified["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts.value()
-        if self.integration_id.state() != State.NOP:
+        if self.integration_id.state() != TriStateEnum.NOP:
             modified["integration_id"] = self.integration_id.value()
-        if self.resource_policy.state() != State.NOP:
+        if self.resource_policy.state() != TriStateEnum.NOP:
             modified["resource_policy"] = self.resource_policy.value()
-        if self.type.state() != State.NOP:
+        if self.type.state() != TriStateEnum.NOP:
             modified["type"] = self.type.value()
-        if self.container_registry.state() != State.NOP:
+        if self.container_registry.state() != TriStateEnum.NOP:
             modified["container_registry"] = self.container_registry.value()
         return modified

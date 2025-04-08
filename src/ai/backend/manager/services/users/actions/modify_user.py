@@ -5,7 +5,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.users.actions.base import UserAction
 from ai.backend.manager.services.users.type import UserData
-from ai.backend.manager.types import OptionalState, State
+from ai.backend.manager.types import OptionalState, TriStateEnum
 
 
 @dataclass
@@ -57,7 +57,7 @@ class UserModifiableFields:
         result = {}
         for f in fields(self):
             field_value: OptionalState = getattr(self, f.name)
-            if field_value.state() != State.NOP:
+            if field_value.state() != TriStateEnum.NOP:
                 result[f.name] = cast(Any, field_value.value())
         return result
 

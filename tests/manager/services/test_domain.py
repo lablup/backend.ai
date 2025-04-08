@@ -45,7 +45,7 @@ from ai.backend.manager.services.domain.types import (
     DomainNodeModifier,
     UserInfo,
 )
-from ai.backend.manager.types import State, TriState
+from ai.backend.manager.types import TriState, TriStateEnum
 
 from .test_utils import TestScenario
 
@@ -176,7 +176,7 @@ async def test_create_domain_node(
                 ),
                 modifier=DomainNodeModifier(
                     description=TriState(
-                        "description", State.UPDATE, "Domain Description Modified"
+                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
                     ),
                 ),
             ),
@@ -208,7 +208,7 @@ async def test_create_domain_node(
                 ),
                 modifier=DomainNodeModifier(
                     description=TriState(
-                        "description", State.UPDATE, "Domain Description Modified"
+                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
                     ),
                 ),
             ),
@@ -225,7 +225,7 @@ async def test_create_domain_node(
                 ),
                 modifier=DomainNodeModifier(
                     description=TriState(
-                        "description", State.UPDATE, "Domain Description Modified"
+                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
                     ),
                 ),
             ),
@@ -343,7 +343,7 @@ async def test_create_model_store_after_domain_created(
                 domain_name="test-modify-domain",
                 modifier=DomainModifier(
                     description=TriState(
-                        "description", State.UPDATE, "Domain Description Modified"
+                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
                     ),
                 ),
             ),
@@ -370,7 +370,7 @@ async def test_create_model_store_after_domain_created(
                 domain_name="not-exist-domain",
                 modifier=DomainModifier(
                     description=TriState(
-                        "description", State.UPDATE, "Domain Description Modified"
+                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
                     ),
                 ),
             ),
