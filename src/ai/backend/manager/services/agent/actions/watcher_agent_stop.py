@@ -21,7 +21,7 @@ class WatcherAgentStopAction(AgentAction):
 
 @dataclass
 class WatcherAgentStopActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
+    # TODO: Add proper type
     resp: Any
 
     @override

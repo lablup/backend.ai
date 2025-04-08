@@ -23,7 +23,7 @@ class DeleteUserResourcePolicyAction(UserResourcePolicyAction):
 
 @dataclass
 class DeleteUserResourcePolicyActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
+    # TODO: Add proper type
     user_resource_policy: UserResourcePolicyRow
 
     @override

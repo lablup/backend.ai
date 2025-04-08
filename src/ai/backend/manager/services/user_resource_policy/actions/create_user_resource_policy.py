@@ -33,7 +33,7 @@ class CreateUserResourcePolicyAction(UserResourcePolicyAction):
 
 @dataclass
 class CreateUserResourcePolicyActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
+    # TODO: Add proper type
     user_resource_policy: UserResourcePolicyRow
 
     @override

@@ -21,7 +21,7 @@ class GetWatcherStatusAction(AgentAction):
 
 @dataclass
 class GetWatcherStatusActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
+    # TODO: Add proper type
     resp: Any
 
     @override
