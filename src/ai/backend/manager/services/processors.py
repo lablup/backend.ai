@@ -51,7 +51,6 @@ class ServiceArgs:
     shared_config: SharedConfig
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
-    redis_live: RedisConnectionInfo
     background_task_manager: BackgroundTaskManager
     agent_registry: AgentRegistry
     error_monitor: ErrorPluginContext
@@ -98,9 +97,6 @@ class Services:
             SessionServiceArgs(
                 db=args.db,
                 agent_registry=args.agent_registry,
-                redis_live=args.redis_live,
-                # stats_monitor=args.shared_config.stats_monitor,
-                # event_producer=args.shared_config.event_producer,
                 background_task_manager=args.background_task_manager,
                 error_monitor=args.error_monitor,
                 idle_checker_host=args.idle_checker_host,

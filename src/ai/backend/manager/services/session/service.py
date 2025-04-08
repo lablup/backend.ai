@@ -5,40 +5,33 @@ import logging
 import secrets
 import uuid
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Union, cast
 from urllib.parse import urlparse
 
 import aiohttp
 import aiotools
-import attrs
 import multidict
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
-from sqlalchemy.sql.expression import null, true
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
-    AgentTerminatedEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
-    EventProducer,
 )
 from ai.backend.common.exception import BackendError, InvalidAPIParameters, UnknownImageReference
 from ai.backend.common.json import load_json
-from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPluginContext
+from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
     ImageAlias,
     ImageRegistry,
-    RedisConnectionInfo,
     SessionId,
     SessionTypes,
 )
@@ -63,19 +56,14 @@ from ai.backend.manager.api.session import (
     find_dependent_sessions,
     overwritten_param_check,
 )
-from ai.backend.manager.api.utils import catch_unexpected, undefined
-from ai.backend.manager.config import LocalConfig
-from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
 from ai.backend.manager.models.kernel import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
-    kernels,
 )
-from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
@@ -200,101 +188,10 @@ from ai.backend.manager.utils import query_userinfo
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-@attrs.define(slots=True, auto_attribs=True, init=False)
-class PrivateContext:
-    agent_lost_checker: asyncio.Task[None]
-    stats_task: asyncio.Task[None]
-    database_ptask_group: aiotools.PersistentTaskGroup
-    rpc_ptask_group: aiotools.PersistentTaskGroup
-    webhook_ptask_group: aiotools.PersistentTaskGroup
-
-
-@catch_unexpected(log)
-async def check_agent_lost(
-    local_config: LocalConfig,
-    event_producer: EventProducer,
-    redis_live: RedisConnectionInfo,
-    interval: float,
-) -> None:
-    try:
-        now = datetime.now(tzutc())
-        timeout = timedelta(seconds=local_config["manager"]["heartbeat-timeout"])
-
-        async def _check_impl(r: Redis):
-            async for agent_id, prev in r.hscan_iter("agent.last_seen"):
-                prev = datetime.fromtimestamp(float(prev), tzutc())
-                if now - prev > timeout:
-                    await event_producer.produce_event(
-                        AgentTerminatedEvent("agent-lost"), source_override=agent_id.decode()
-                    )
-
-        await redis_helper.execute(redis_live, _check_impl)
-    except asyncio.CancelledError:
-        pass
-
-
-@catch_unexpected(log)
-async def report_stats(
-    db: ExtendedAsyncSAEngine,
-    stats_monitor: StatsPluginContext,
-    registry: AgentRegistry,
-    interval: float,
-) -> None:
-    try:
-        stats_monitor = stats_monitor
-        await stats_monitor.report_metric(
-            GAUGE, "ai.backend.manager.coroutines", len(asyncio.all_tasks())
-        )
-
-        all_inst_ids = [inst_id async for inst_id in registry.enumerate_instances()]
-        await stats_monitor.report_metric(
-            GAUGE, "ai.backend.manager.agent_instances", len(all_inst_ids)
-        )
-
-        async with db.begin_readonly() as conn:
-            query = (
-                sa.select([sa.func.count()])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.cluster_role == DEFAULT_ROLE)
-                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-                )
-            )
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(GAUGE, "ai.backend.manager.active_kernels", n)
-            subquery = (
-                sa.select([sa.func.count()])
-                .select_from(keypairs)
-                .where(keypairs.c.is_active == true())
-                .group_by(keypairs.c.user_id)
-            )
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_active_key", n)
-
-            subquery = subquery.where(keypairs.c.last_used != null())
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_used_key", n)
-
-            """
-            query = sa.select([sa.func.count()]).select_from(usage)
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(
-                GAUGE, 'ai.backend.manager.accum_kernels', n)
-            """
-    except (sa.exc.InterfaceError, ConnectionRefusedError):
-        log.warning("report_stats(): error while connecting to PostgreSQL server")
-
-
 @dataclass
 class SessionServiceArgs:
     db: ExtendedAsyncSAEngine
     agent_registry: AgentRegistry
-    redis_live: RedisConnectionInfo
-    local_config: LocalConfig
-    stats_monitor: StatsPluginContext
-    event_producer: EventProducer
     background_task_manager: BackgroundTaskManager
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
@@ -303,14 +200,11 @@ class SessionServiceArgs:
 class SessionService:
     _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
-    _redis_live: RedisConnectionInfo
-    _local_config: LocalConfig
-    _stats_monitor: StatsPluginContext
-    _app_ctx: PrivateContext
-    _event_producer: EventProducer
     _background_task_manager: BackgroundTaskManager
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
+    _database_ptask_group: aiotools.PersistentTaskGroup
+    _rpc_ptask_group: aiotools.PersistentTaskGroup
 
     def __init__(
         self,
@@ -318,35 +212,12 @@ class SessionService:
     ) -> None:
         self._db = args.db
         self._agent_registry = args.agent_registry
-        self._redis_live = args.redis_live
-        self._local_config = args.local_config
-        self._stats_monitor = args.stats_monitor
-        self._event_producer = args.event_producer
         self._background_task_manager = args.background_task_manager
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
-        self.init_app_ctx()
-
-    def init_app_ctx(self) -> None:
-        app_ctx: PrivateContext = PrivateContext()
-        app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
-        app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
-        app_ctx.webhook_ptask_group = aiotools.PersistentTaskGroup()
-
-        # Scan ALIVE agents
-        app_ctx.agent_lost_checker = aiotools.create_timer(
-            functools.partial(
-                check_agent_lost, self._local_config, self._event_producer, self._redis_live
-            ),
-            1.0,
-        )
-        app_ctx.agent_lost_checker.set_name("agent_lost_checker")
-        app_ctx.stats_task = aiotools.create_timer(
-            functools.partial(report_stats, self._db, self._stats_monitor, self._agent_registry),
-            5.0,
-        )
-        app_ctx.stats_task.set_name("stats_task")
-        self._app_ctx = app_ctx
+        self._database_ptask_group = aiotools.PersistentTaskGroup()
+        self._rpc_ptask_group = aiotools.PersistentTaskGroup()
+        self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
@@ -366,7 +237,7 @@ class SessionService:
                 )
 
             resp: Mapping[str, Any] = await asyncio.shield(
-                self._app_ctx.rpc_ptask_group.create_task(
+                self._rpc_ptask_group.create_task(
                     self._agent_registry.commit_session_to_file(session, filename),
                 ),
             )
@@ -1574,7 +1445,7 @@ class SessionService:
         try:
             async with self._db.begin_readonly_session() as db_sess:
                 session = await asyncio.shield(
-                    self._app_ctx.database_ptask_group.create_task(
+                    self._database_ptask_group.create_task(
                         SessionRow.get_session(
                             db_sess,
                             session_name,
@@ -1638,7 +1509,7 @@ class SessionService:
             raise AppNotFound(f"{session_name}:{service}")
 
         await asyncio.shield(
-            self._app_ctx.database_ptask_group.create_task(
+            self._database_ptask_group.create_task(
                 self._agent_registry.increment_session_usage(session),
             )
         )
@@ -1650,7 +1521,7 @@ class SessionService:
             opts["envs"] = load_json(envs)
 
         result = await asyncio.shield(
-            self._app_ctx.rpc_ptask_group.create_task(
+            self._rpc_ptask_group.create_task(
                 self._agent_registry.start_service(session, service, opts),
             ),
         )

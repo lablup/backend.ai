@@ -442,7 +442,6 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 shared_config=root_ctx.shared_config,
                 storage_manager=root_ctx.storage_manager,
                 redis_stat=root_ctx.redis_stat,
-                redis_live=root_ctx.redis_live,
                 background_task_manager=root_ctx.background_task_manager,
                 agent_registry=root_ctx.registry,
                 error_monitor=root_ctx.error_monitor,
