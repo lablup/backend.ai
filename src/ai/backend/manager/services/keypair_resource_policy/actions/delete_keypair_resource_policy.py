@@ -3,7 +3,9 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.services.keypair_resource_policy.base import KeypairResourcePolicyAction
+from ai.backend.manager.services.keypair_resource_policy.actions.base import (
+    KeypairResourcePolicyAction,
+)
 
 
 @dataclass

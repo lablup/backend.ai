@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.container_registry.base import ContainerRegistryAction
+from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
 @dataclass

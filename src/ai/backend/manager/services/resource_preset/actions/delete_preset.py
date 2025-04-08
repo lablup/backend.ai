@@ -4,7 +4,7 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.services.resource_preset.base import ResourcePresetAction
+from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
 
 
 @dataclass

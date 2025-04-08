@@ -3,7 +3,7 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.services.user_resource_policy.base import UserResourcePolicyAction
+from ai.backend.manager.services.user_resource_policy.actions.base import UserResourcePolicyAction
 
 
 @dataclass

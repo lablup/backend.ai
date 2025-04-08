@@ -3,7 +3,9 @@ from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
-from ai.backend.manager.services.project_resource_policy.base import ProjectResourcePolicyAction
+from ai.backend.manager.services.project_resource_policy.actions.base import (
+    ProjectResourcePolicyAction,
+)
 from ai.backend.manager.types import OptionalState
 
 

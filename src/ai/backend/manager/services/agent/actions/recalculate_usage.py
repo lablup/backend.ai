@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.agent.base import AgentAction
+from ai.backend.manager.services.agent.actions.base import AgentAction
 
 
 @dataclass
