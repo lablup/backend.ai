@@ -1,10 +1,11 @@
-
 from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -17,9 +18,11 @@ from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.groups.processors import GroupProcessors
 from ai.backend.manager.services.groups.service import GroupService
 from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
+from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -27,9 +30,8 @@ from ai.backend.manager.services.project_resource_policy.service import ProjectR
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.session.processors import SessionProcessors
-from ai.backend.manager.services.session.service import SessionService
+from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
-from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 from ai.backend.manager.services.users.processors import UserProcessors
 from ai.backend.manager.services.users.service import UserService
@@ -49,8 +51,11 @@ class ServiceArgs:
     shared_config: SharedConfig
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
+    redis_live: RedisConnectionInfo
     background_task_manager: BackgroundTaskManager
     agent_registry: AgentRegistry
+    error_monitor: ErrorPluginContext
+    idle_checker_host: IdleCheckerHost
 
 
 @dataclass
@@ -65,6 +70,7 @@ class Services:
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     session: SessionService
+    keypair_resource_policy: KeypairResourcePolicyService
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
@@ -72,10 +78,14 @@ class Services:
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
         agent_service = AgentService(
-            args.db, args.agent_registry, args.shared_config,
+            args.db,
+            args.agent_registry,
+            args.shared_config,
         )
         domain_service = DomainService(args.db)
-        group_service = GroupService(args.db, args.storage_manager)
+        group_service = GroupService(
+            args.db, args.storage_manager, args.shared_config, args.redis_stat
+        )
         user_service = UserService(args.db, args.storage_manager, args.redis_stat)
         image_service = ImageService(args.db, args.agent_registry)
         container_registry_service = ContainerRegistryService(args.db)
@@ -84,10 +94,24 @@ class Services:
         )
         vfolder_file_service = VFolderFileService(args.db, args.shared_config, args.storage_manager)
         vfolder_invite_service = VFolderInviteService(args.db, args.shared_config)
-        session_service = SessionService(args.db, args.shared_config)
+        session_service = SessionService(
+            SessionServiceArgs(
+                db=args.db,
+                agent_registry=args.agent_registry,
+                redis_live=args.redis_live,
+                # stats_monitor=args.shared_config.stats_monitor,
+                # event_producer=args.shared_config.event_producer,
+                background_task_manager=args.background_task_manager,
+                error_monitor=args.error_monitor,
+                idle_checker_host=args.idle_checker_host,
+            )
+        )
+        keypair_resource_policy_service = KeypairResourcePolicyService(args.db)
         user_resource_policy_service = UserResourcePolicyService(args.db)
         project_resource_policy_service = ProjectResourcePolicyService(args.db)
-        resource_preset_service = ResourcePresetService(args.db, args.agent_registry, args.shared_config)
+        resource_preset_service = ResourcePresetService(
+            args.db, args.agent_registry, args.shared_config
+        )
 
         return cls(
             agent=agent_service,
@@ -99,6 +123,11 @@ class Services:
             vfolder=vfolder_service,
             vfolder_file=vfolder_file_service,
             vfolder_invite=vfolder_invite_service,
+            session=session_service,
+            keypair_resource_policy=keypair_resource_policy_service,
+            user_resource_policy=user_resource_policy_service,
+            project_resource_policy=project_resource_policy_service,
+            resource_preset=resource_preset_service,
         )
 
 
@@ -136,6 +165,17 @@ class Processors:
         vfolder_processors = VFolderProcessors(services.vfolder)
         vfolder_file_processors = VFolderFileProcessors(services.vfolder_file)
         vfolder_invite_processors = VFolderInviteProcessors(services.vfolder_invite)
+        session_processors = SessionProcessors(services.session)
+        keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
+            services.keypair_resource_policy
+        )
+        user_resource_policy_processors = UserResourcePolicyProcessors(
+            services.user_resource_policy
+        )
+        project_resource_policy_processors = ProjectResourcePolicyProcessors(
+            services.project_resource_policy
+        )
+        resource_preset_processors = ResourcePresetProcessors(services.resource_preset)
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -146,4 +186,9 @@ class Processors:
             vfolder=vfolder_processors,
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
+            session=session_processors,
+            keypair_resource_policy=keypair_resource_policy_processors,
+            user_resource_policy=user_resource_policy_processors,
+            project_resource_policy=project_resource_policy_processors,
+            resource_preset=resource_preset_processors,
         )

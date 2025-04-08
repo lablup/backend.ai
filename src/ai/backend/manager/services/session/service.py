@@ -1,10 +1,10 @@
 import asyncio
 import base64
-import dataclasses
 import functools
 import logging
 import secrets
 import uuid
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Union, cast
 from urllib.parse import urlparse
@@ -287,6 +287,19 @@ async def report_stats(
         log.warning("report_stats(): error while connecting to PostgreSQL server")
 
 
+@dataclass
+class SessionServiceArgs:
+    db: ExtendedAsyncSAEngine
+    agent_registry: AgentRegistry
+    redis_live: RedisConnectionInfo
+    local_config: LocalConfig
+    stats_monitor: StatsPluginContext
+    event_producer: EventProducer
+    background_task_manager: BackgroundTaskManager
+    error_monitor: ErrorPluginContext
+    idle_checker_host: IdleCheckerHost
+
+
 class SessionService:
     _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
@@ -301,25 +314,17 @@ class SessionService:
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
-        agent_registry: AgentRegistry,
-        redis_live: RedisConnectionInfo,
-        local_config: LocalConfig,
-        stats_monitor: StatsPluginContext,
-        event_producer: EventProducer,
-        background_task_manager: BackgroundTaskManager,
-        error_monitor: ErrorPluginContext,
-        idle_checker_host: IdleCheckerHost,
+        args: SessionServiceArgs,
     ) -> None:
-        self._db = db
-        self._agent_registry = agent_registry
-        self._redis_live = redis_live
-        self._local_config = local_config
-        self._stats_monitor = stats_monitor
-        self._event_producer = event_producer
-        self._background_task_manager = background_task_manager
-        self._error_monitor = error_monitor
-        self._idle_checker_host = idle_checker_host
+        self._db = args.db
+        self._agent_registry = args.agent_registry
+        self._redis_live = args.redis_live
+        self._local_config = args.local_config
+        self._stats_monitor = args.stats_monitor
+        self._event_producer = args.event_producer
+        self._background_task_manager = args.background_task_manager
+        self._error_monitor = args.error_monitor
+        self._idle_checker_host = args.idle_checker_host
         self.init_app_ctx()
 
     def init_app_ctx(self) -> None:
@@ -868,7 +873,7 @@ class SessionService:
             config_from_template["agent_list"] = template["spec"]["agent_list"]
 
         override_config = drop_undefined(dict(action.params.config))
-        override_params = drop_undefined(dict(dataclasses.asdict(action.params)))
+        override_params = drop_undefined(dict(asdict(action.params)))
 
         log.debug("Default config: {0}", config_from_template)
         log.debug("Default params: {0}", param_from_template)
