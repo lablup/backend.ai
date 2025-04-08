@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.services.keypair_resource_policy.base import KeypairResourcePolicyAction
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -81,7 +81,7 @@ class ModifyKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
 
 @dataclass
 class ModifyKeyPairResourcePolicyActionResult(BaseActionResult):
-    keypair_resource_policy: KeyPairResourcePolicyRow
+    keypair_resource_policy: KeyPairResourcePolicyData
 
     @override
     def entity_id(self) -> Optional[str]:

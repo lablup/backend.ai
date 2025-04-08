@@ -44,7 +44,9 @@ class ProjectResourcePolicyService:
             db_sess.add(db_row)
             await db_sess.flush()
 
-        return CreateProjectResourcePolicyActionResult(project_resource_policy=db_row)
+        return CreateProjectResourcePolicyActionResult(
+            project_resource_policy=db_row.to_dataclass()
+        )
 
     async def modify_project_resource_policy(
         self, action: ModifyProjectResourcePolicyAction
@@ -60,7 +62,9 @@ class ProjectResourcePolicyService:
 
             props.set_attr(db_row)
 
-        return ModifyProjectResourcePolicyActionResult(project_resource_policy=db_row)
+        return ModifyProjectResourcePolicyActionResult(
+            project_resource_policy=db_row.to_dataclass()
+        )
 
     async def delete_project_resource_policy(
         self, action: DeleteProjectResourcePolicyAction
@@ -75,4 +79,6 @@ class ProjectResourcePolicyService:
             )
             result = await db_sess.execute(delete_query)
 
-        return DeleteProjectResourcePolicyActionResult(project_resource_policy=result)
+        return DeleteProjectResourcePolicyActionResult(
+            project_resource_policy=result.to_dataclass()
+        )

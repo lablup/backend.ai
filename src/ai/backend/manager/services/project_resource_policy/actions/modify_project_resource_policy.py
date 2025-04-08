@@ -2,9 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.resource_policy import (
-    ProjectResourcePolicyRow,
-)
+from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.services.project_resource_policy.base import ProjectResourcePolicyAction
 from ai.backend.manager.types import OptionalState
 
@@ -48,7 +46,7 @@ class ModifyProjectResourcePolicyAction(ProjectResourcePolicyAction):
 @dataclass
 class ModifyProjectResourcePolicyActionResult(BaseActionResult):
     # TODO: Add proper type
-    project_resource_policy: ProjectResourcePolicyRow
+    project_resource_policy: ProjectResourcePolicyData
 
     @override
     def entity_id(self) -> Optional[str]:

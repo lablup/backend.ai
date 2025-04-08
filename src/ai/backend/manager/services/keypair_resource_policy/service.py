@@ -43,7 +43,9 @@ class KeypairResourcePolicyService:
             db_sess.add(inserted_row)
             await db_sess.flush()
 
-        return CreateKeyPairResourcePolicyActionResult(keypair_resource_policy=inserted_row)
+        return CreateKeyPairResourcePolicyActionResult(
+            keypair_resource_policy=inserted_row.to_dataclass()
+        )
 
     async def modify_keypair_resource_policy(
         self, action: ModifyKeyPairResourcePolicyAction
@@ -54,12 +56,12 @@ class KeypairResourcePolicyService:
         async with self._db.begin_session() as db_sess:
             query = sa.select(KeyPairResourcePolicyRow).where(KeyPairResourcePolicyRow.name == name)
             result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
+            row: KeyPairResourcePolicyRow = result.scalar_one_or_none()
             if row is None:
                 raise ValueError(f"Keypair resource policy with name {name} not found.")
             props.set_attr(row)
 
-        return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=row)
+        return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=row.to_dataclass())
 
     async def delete_keypair_resource_policy(
         self, action: DeleteKeyPairResourcePolicyAction
@@ -72,5 +74,7 @@ class KeypairResourcePolicyService:
                 .returning(*keypair_resource_policies.c)
             )
             result = await db_sess.execute(delete_query)
-            deleted_row = result.fetchone()
-        return DeleteKeyPairResourcePolicyActionResult(keypair_resource_policy=deleted_row)
+            deleted_row: KeyPairResourcePolicyRow = result.fetchone()
+        return DeleteKeyPairResourcePolicyActionResult(
+            keypair_resource_policy=deleted_row.to_dataclass()
+        )

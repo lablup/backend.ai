@@ -501,19 +501,6 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
             if self.default_for_unspecified
             else None
         )
-        print("default_for_unspecified!", default_for_unspecified)
-
-        # total_resource_slots = (
-        #     ResourceSlot.from_user_input(self.total_resource_slots, None)
-        #     if self.total_resource_slots
-        #     else None
-        # )
-
-        # max_pending_session_resource_slots = (
-        #     ResourceSlot.from_user_input(self.max_pending_session_resource_slots, None)
-        #     if self.max_pending_session_resource_slots
-        #     else None
-        # )
 
         return ModifyKeyPairResourcePolicyInputData(
             default_for_unspecified=to_optional_state(
@@ -837,7 +824,9 @@ class CreateUserResourcePolicy(graphene.Mutation):
         return CreateUserResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+            resource_policy=UserResourcePolicy.from_row(
+                graph_ctx, UserResourcePolicyRow.from_dataclass(result.user_resource_policy)
+            ),
         )
 
 
@@ -871,7 +860,9 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         return ModifyUserResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+            resource_policy=UserResourcePolicy.from_row(
+                graph_ctx, UserResourcePolicyRow.from_dataclass(result.user_resource_policy)
+            ),
         )
 
 
@@ -903,7 +894,9 @@ class DeleteUserResourcePolicy(graphene.Mutation):
         return DeleteUserResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=UserResourcePolicy.from_row(graph_ctx, result.user_resource_policy),
+            resource_policy=UserResourcePolicy.from_row(
+                graph_ctx, UserResourcePolicyRow.from_dataclass(result.user_resource_policy)
+            ),
         )
 
 
@@ -1084,7 +1077,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):
             ok=True,
             msg="",
             resource_policy=ProjectResourcePolicy.from_row(
-                graph_ctx, result.project_resource_policy
+                graph_ctx, ProjectResourcePolicyRow.from_dataclass(result.project_resource_policy)
             ),
         )
 
@@ -1120,7 +1113,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
             ok=True,
             msg="",
             resource_policy=ProjectResourcePolicy.from_row(
-                graph_ctx, result.project_resource_policy
+                graph_ctx, ProjectResourcePolicyRow.from_dataclass(result.project_resource_policy)
             ),
         )
 
@@ -1154,6 +1147,6 @@ class DeleteProjectResourcePolicy(graphene.Mutation):
             ok=True,
             msg="",
             resource_policy=ProjectResourcePolicy.from_row(
-                graph_ctx, result.project_resource_policy
+                graph_ctx, ProjectResourcePolicyRow.from_dataclass(result.project_resource_policy)
             ),
         )
