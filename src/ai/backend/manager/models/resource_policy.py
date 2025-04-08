@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
         ModifyKeyPairResourcePolicyInputData,
     )
+    from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
+        CreateProjectResourcePolicyInputData,
+    )
     from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
         CreateUserResourcePolicyInputData,
     )
@@ -922,6 +925,20 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
+    def to_dataclass(self) -> CreateProjectResourcePolicyInputData:
+        from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
+            CreateProjectResourcePolicyInputData,
+        )
+
+        return CreateProjectResourcePolicyInputData(
+            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
+            max_quota_scope_size=to_optional_state(
+                "max_quota_scope_size", self.max_quota_scope_size
+            ),
+            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
+            max_network_count=to_optional_state("max_network_count", self.max_network_count),
+        )
+
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
@@ -961,7 +978,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         result = await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
-            CreateProjectResourcePolicyAction(name, props)
+            CreateProjectResourcePolicyAction(name, props.to_dataclass())
         )
 
         return CreateProjectResourcePolicy(

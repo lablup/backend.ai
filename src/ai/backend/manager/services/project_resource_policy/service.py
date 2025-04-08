@@ -40,17 +40,12 @@ class ProjectResourcePolicyService:
         name = action.name
         props = action.props
 
-        async with self._db.begin_session() as sess:
-            row = ProjectResourcePolicyRow(
-                name,
-                props.max_vfolder_count,
-                props.max_quota_scope_size,
-                props.max_network_count,
-            )
-            sess.add(row)
-            await sess.flush()
+        async with self._db.begin_session() as db_sess:
+            db_row = props.to_db_row(name)
+            db_sess.add(db_row)
+            await db_sess.flush()
 
-        return CreateProjectResourcePolicyActionResult(project_resource_policy=row)
+        return CreateProjectResourcePolicyActionResult(project_resource_policy=db_row)
 
     async def modify_project_resource_policy(
         self, action: ModifyProjectResourcePolicyAction
