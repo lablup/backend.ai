@@ -41,11 +41,10 @@ from ai.backend.manager.services.domain.types import (
     DomainCreator,
     DomainData,
     DomainModifier,
-    DomainNodeCreator,
     DomainNodeModifier,
     UserInfo,
 )
-from ai.backend.manager.types import TriState, TriStateEnum
+from ai.backend.manager.types import TriState
 
 from .test_utils import TestScenario
 
@@ -96,22 +95,21 @@ async def create_domain(
         TestScenario.success(
             "Create a domain node",
             CreateDomainNodeAction(
-                input=DomainNodeCreator(
+                input=DomainCreator(
                     name="test-create-domain-node",
                     description="Test domain",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot.from_user_input({}, None),
+                    total_resource_slots={},
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                     integration_id=None,
                     dotfiles=b"\x90",
-                    scaling_groups=None,
                 ),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
+                scaling_groups=None,
             ),
             CreateDomainNodeActionResult(
                 domain_data=DomainData(
@@ -133,16 +131,9 @@ async def create_domain(
         TestScenario.failure(
             "Create domain node with duplicated name",
             CreateDomainNodeAction(
-                input=DomainNodeCreator(
+                input=DomainCreator(
                     name="default",
-                    description=None,
-                    is_active=None,
-                    total_resource_slots=None,
-                    allowed_vfolder_hosts=None,
-                    allowed_docker_registries=None,
-                    integration_id=None,
-                    dotfiles=None,
-                    scaling_groups=None,
+                    description="Test domain",
                 ),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
@@ -175,9 +166,7 @@ async def test_create_domain_node(
                     domain_name="default",
                 ),
                 modifier=DomainNodeModifier(
-                    description=TriState(
-                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
-                    ),
+                    description=TriState.update("description", "Domain Description Modified"),
                 ),
             ),
             ModifyDomainNodeActionResult(
@@ -207,9 +196,7 @@ async def test_create_domain_node(
                     domain_name="default",
                 ),
                 modifier=DomainNodeModifier(
-                    description=TriState(
-                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
-                    ),
+                    description=TriState.update("description", "Domain Description Modified"),
                 ),
             ),
             ValueError,
@@ -224,9 +211,7 @@ async def test_create_domain_node(
                     domain_name="default",
                 ),
                 modifier=DomainNodeModifier(
-                    description=TriState(
-                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
-                    ),
+                    description=TriState.update("description", "Domain Description Modified"),
                 ),
             ),
             ValueError,
@@ -252,11 +237,6 @@ async def test_modify_domain_node(
                 input=DomainCreator(
                     name="test-create-domain",
                     description="Test domain",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot.from_user_input({}, None),
-                    allowed_vfolder_hosts={},
-                    allowed_docker_registries=[],
-                    integration_id=None,
                 ),
             ),
             CreateDomainActionResult(
@@ -281,12 +261,7 @@ async def test_modify_domain_node(
             CreateDomainAction(
                 input=DomainCreator(
                     name="default",
-                    description=None,
-                    is_active=None,
-                    total_resource_slots=None,
-                    allowed_vfolder_hosts=None,
-                    allowed_docker_registries=None,
-                    integration_id=None,
+                    description="Test domain",
                 ),
             ),
             CreateDomainActionResult(
@@ -309,17 +284,7 @@ async def test_create_model_store_after_domain_created(
     processors: DomainProcessors, database_engine
 ) -> None:
     domain_name = "test-create-domain-post-func"
-    action = CreateDomainAction(
-        input=DomainCreator(
-            name=domain_name,
-            description=None,
-            is_active=None,
-            total_resource_slots=None,
-            allowed_vfolder_hosts=None,
-            allowed_docker_registries=None,
-            integration_id=None,
-        ),
-    )
+    action = CreateDomainAction(input=DomainCreator(name=domain_name))
 
     await processors.create_domain.wait_for_complete(action)
 
@@ -342,9 +307,7 @@ async def test_create_model_store_after_domain_created(
             ModifyDomainAction(
                 domain_name="test-modify-domain",
                 modifier=DomainModifier(
-                    description=TriState(
-                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
-                    ),
+                    description=TriState.update("description", "Domain Description Modified"),
                 ),
             ),
             ModifyDomainActionResult(
@@ -369,9 +332,7 @@ async def test_create_model_store_after_domain_created(
             ModifyDomainAction(
                 domain_name="not-exist-domain",
                 modifier=DomainModifier(
-                    description=TriState(
-                        "description", TriStateEnum.UPDATE, "Domain Description Modified"
-                    ),
+                    description=TriState.update("description", "Domain Description Modified"),
                 ),
             ),
             ModifyDomainActionResult(

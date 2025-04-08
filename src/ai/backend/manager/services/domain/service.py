@@ -94,12 +94,11 @@ class DomainService:
                 row = result.first()
                 await _post_func(conn, result)
                 # TODO: Raise Error if rowcount is 0
-                if result.rowcount > 0:
-                    return MutationResult(success=True, message="domain creation succeed", data=row)
-                else:
-                    return MutationResult(
-                        success=False, message=f"no matching {action.input.name}", data=None
+                if result.rowcount != 1:
+                    raise RuntimeError(
+                        f"No domain created. rowcount: {result.rowcount}, data: {data}"
                     )
+                return MutationResult(success=True, message="domain creation succeed", data=row)
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
@@ -219,7 +218,7 @@ class DomainService:
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        scaling_groups = action.input.scaling_groups
+        scaling_groups = action.scaling_groups
 
         async def _insert(db_session: AsyncSession) -> DomainRow:
             if scaling_groups is not None:
@@ -228,7 +227,7 @@ class DomainService:
                 )
             data = action.input.get_creation_data()
             _insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(data).returning(DomainRow)
+                sa.insert(DomainRow).values(**data).returning(DomainRow)
             )
             domain_row = await db_session.scalar(_insert_and_returning)
             if scaling_groups is not None:

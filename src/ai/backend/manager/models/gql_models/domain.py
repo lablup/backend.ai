@@ -38,7 +38,6 @@ from ai.backend.manager.services.domain.types import (
     DomainCreator,
     DomainData,
     DomainModifier,
-    DomainNodeCreator,
     DomainNodeModifier,
     UserInfo,
 )
@@ -347,7 +346,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
-            input=DomainNodeCreator(
+            input=DomainCreator(
                 name=self.name,
                 description=value_or_none(self.description),
                 is_active=value_or_none(self.is_active),
@@ -358,9 +357,9 @@ class CreateDomainNodeInput(graphene.InputObjectType):
                 allowed_docker_registries=value_or_none(self.allowed_docker_registries),
                 integration_id=value_or_none(self.integration_id),
                 dotfiles=value_or_none(self.dotfiles),
-                scaling_groups=value_or_none(self.scaling_groups),
             ),
             user_info=user_info,
+            scaling_groups=value_or_none(self.scaling_groups),
         )
 
 

@@ -62,6 +62,38 @@ class DomainCreator(Creator):
 
     @override
     def get_creation_data(self) -> dict[str, Any]:
+        res: dict[str, Any] = {"name": self.name}
+
+        if self.description is not None:
+            res["description"] = self.description
+        if self.is_active is not None:
+            res["is_active"] = self.is_active
+        if self.total_resource_slots is not None:
+            res["total_resource_slots"] = self.total_resource_slots
+        if self.allowed_vfolder_hosts is not None:
+            res["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts
+        if self.allowed_docker_registries is not None:
+            res["allowed_docker_registries"] = self.allowed_docker_registries
+        if self.integration_id is not None:
+            res["integration_id"] = self.integration_id
+        if self.dotfiles is not None:
+            res["dotfiles"] = self.dotfiles
+        return res
+
+
+@dataclass
+class DomainNodeCreator(Creator):
+    name: str
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    total_resource_slots: Optional[ResourceSlot] = None
+    allowed_vfolder_hosts: Optional[dict[str, str]] = None
+    allowed_docker_registries: Optional[list[str]] = None
+    integration_id: Optional[str] = None
+    dotfiles: Optional[bytes] = None
+    scaling_groups: Optional[list[str]] = None
+
+    def get_creation_data(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -71,17 +103,8 @@ class DomainCreator(Creator):
             "allowed_docker_registries": self.allowed_docker_registries,
             "integration_id": self.integration_id,
             "dotfiles": self.dotfiles,
+            "scaling_groups": self.scaling_groups,
         }
-
-
-@dataclass
-class DomainNodeCreator(DomainCreator):
-    scaling_groups: Optional[list[str]] = None
-
-    def get_creation_data(self) -> dict[str, Any]:
-        data = super().get_creation_data()
-        data["scaling_groups"] = self.scaling_groups
-        return data
 
 
 @dataclass
