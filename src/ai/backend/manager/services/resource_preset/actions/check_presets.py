@@ -14,7 +14,7 @@ class CheckResourcePresetsAction(ResourcePresetAction):
     domain_name: str
     user_id: uuid.UUID
     group: str
-    scaling_group: Optional[str] = None
+    scaling_group: Optional[str]
 
     @override
     def entity_id(self) -> Optional[str]:

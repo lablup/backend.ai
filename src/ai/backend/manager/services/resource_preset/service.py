@@ -156,19 +156,30 @@ class ResourcePresetService:
         if preset_id is None and name is None:
             raise ValueError("One of (`id` or `name`) parameter should be not null")
 
-        async def _delete(db_session: AsyncSession) -> None:
+        async with self._db.begin_session() as db_sess:
             if preset_id is not None:
-                query_option = filter_by_id(preset_id)
+                preset_row = (
+                    await db_sess.execute(
+                        sa.select(
+                            ResourcePresetRow,
+                        ).where(ResourcePresetRow.id == preset_id)
+                    )
+                ).scalar_one_or_none()
             else:
-                if name is None:
-                    raise ValueError("One of (`id` or `name`) parameter should be not null")
-                query_option = filter_by_name(name)
-            return await ResourcePresetRow.delete(query_option, db_session=db_session)
+                preset_row = (
+                    await db_sess.execute(
+                        sa.select(
+                            ResourcePresetRow,
+                        ).where(ResourcePresetRow.name == name)
+                    )
+                ).scalar_one_or_none()
 
-        async with self._db.connect() as db_conn:
-            await execute_with_txn_retry(_delete, self._db.begin_session, db_conn)
+            if preset_row is None:
+                raise ObjectNotFound("Resource preset not found")
 
-        return DeleteResourcePresetActionResult()
+            await db_sess.delete(preset_row)
+
+        return DeleteResourcePresetActionResult(resource_preset=preset_row)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
         # TODO: Remove this?

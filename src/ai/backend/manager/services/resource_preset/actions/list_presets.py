@@ -8,7 +8,7 @@ from ai.backend.manager.services.resource_preset.base import ResourcePresetActio
 @dataclass
 class ListResourcePresetsAction(ResourcePresetAction):
     access_key: str
-    scaling_group: Optional[str] = None
+    scaling_group: Optional[str]
 
     @override
     def entity_id(self) -> Optional[str]:
