@@ -17,7 +17,8 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow, EndpointRow
+from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.user import UserRole
 
 
@@ -129,32 +130,20 @@ class MutationResult:
 
 
 @dataclass
-class InferenceSessionErrorInfo:
-    src: str
-    name: str
-    repr: str
-
-
-@dataclass
-class InferenceSessionError:
-    session_id: uuid.UUID
-    errors: list[InferenceSessionErrorInfo]
-
-
-@dataclass
 class RoutingData:
     id: uuid.UUID
-    endpoint: str
-    session: uuid.UUID
-    status: str
+    endpoint: uuid.UUID
+    session: Optional[uuid.UUID]
+    status: RouteStatus
     traffic_ratio: float
     created_at: datetime
-    error: InferenceSessionError
     error_data: dict[str, Any]
     live_stat: dict[str, Any]
 
     @classmethod
-    def from_row(cls, row) -> Self:
+    def from_row(cls, row: Optional[RoutingRow]) -> Optional[Self]:
+        if row is None:
+            return None
         return cls(
             id=row.id,
             endpoint=row.endpoint,
@@ -162,7 +151,6 @@ class RoutingData:
             status=row.status,
             traffic_ratio=row.traffic_ratio,
             created_at=row.created_at,
-            error=InferenceSessionError(session_id=row.session_id, errors=row.errors),
             error_data=row.error_data,
             live_stat=row.live_stat,
         )
@@ -214,7 +202,7 @@ class EndpointData:
     destroyed_at: datetime
     retries: int
 
-    routings: RoutingData
+    routings: Optional[RoutingData]
     lifecycle_stage: str
     runtime_variant: RuntimeVariant
 
@@ -274,7 +262,7 @@ class EndpointAutoScalingRuleData:
     endpoint: uuid.UUID
 
     @classmethod
-    def from_row(cls, row) -> Optional[Self]:
+    def from_row(cls, row: Optional[EndpointAutoScalingRuleRow]) -> Optional[Self]:
         if row is None:
             return None
         return cls(
