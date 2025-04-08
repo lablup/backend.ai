@@ -3,6 +3,7 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import ObjectNotFound
 from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
@@ -63,11 +64,10 @@ class UserResourcePolicyService:
         name = action.name
 
         async with self._db.begin_session() as db_sess:
-            delete_query = (
-                sa.delete(UserResourcePolicyRow)
-                .where(UserResourcePolicyRow.name == name)
-                .returning(*UserResourcePolicyRow.__table__.c)
-            )
-            row = await db_sess.execute(delete_query)
+            query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
+            row = (await db_sess.execute(query)).scalar_one_or_none()
+            if not row:
+                raise ObjectNotFound(f"User resource policy with name {name} not found.")
+            await db_sess.delete(row)
 
         return DeleteUserResourcePolicyActionResult(user_resource_policy=row.to_dataclass())

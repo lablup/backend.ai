@@ -817,16 +817,15 @@ class CreateUserResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        result = await graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
-            CreateUserResourcePolicyAction(name, props.to_dataclass())
+        await (
+            graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
+                CreateUserResourcePolicyAction(name, props.to_dataclass())
+            )
         )
 
         return CreateUserResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=UserResourcePolicy.from_row(
-                graph_ctx, UserResourcePolicyRow.from_dataclass(result.user_resource_policy)
-            ),
         )
 
 
@@ -853,16 +852,15 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        result = await graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
-            ModifyUserResourcePolicyAction(name, props.to_dataclass())
+        await (
+            graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
+                ModifyUserResourcePolicyAction(name, props.to_dataclass())
+            )
         )
 
         return ModifyUserResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=UserResourcePolicy.from_row(
-                graph_ctx, UserResourcePolicyRow.from_dataclass(result.user_resource_policy)
-            ),
         )
 
 
@@ -887,16 +885,15 @@ class DeleteUserResourcePolicy(graphene.Mutation):
         )
 
         graph_ctx: GraphQueryContext = info.context
-        result = await graph_ctx.processors.user_resource_policy.delete_user_resource_policy.wait_for_complete(
-            DeleteUserResourcePolicyAction(name)
+        await (
+            graph_ctx.processors.user_resource_policy.delete_user_resource_policy.wait_for_complete(
+                DeleteUserResourcePolicyAction(name)
+            )
         )
 
         return DeleteUserResourcePolicy(
             ok=True,
             msg="",
-            resource_policy=UserResourcePolicy.from_row(
-                graph_ctx, UserResourcePolicyRow.from_dataclass(result.user_resource_policy)
-            ),
         )
 
 
