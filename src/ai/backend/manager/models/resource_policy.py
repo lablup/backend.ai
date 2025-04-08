@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Self, Sequence
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import relationship, selectinload
 
@@ -434,39 +435,24 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
             else None
         )
 
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
         return CreateKeyPairResourcePolicyInputData(
-            name=to_optional_state("name", name),
-            default_for_unspecified=to_optional_state(
-                "default_for_unspecified", default_for_unspecified
-            ),
-            total_resource_slots=to_optional_state("total_resource_slots", total_resource_slots),
-            max_session_lifetime=to_optional_state(
-                "max_session_lifetime", self.max_session_lifetime
-            ),
-            max_concurrent_sessions=to_optional_state(
-                "max_concurrent_sessions", self.max_concurrent_sessions
-            ),
-            max_concurrent_sftp_sessions=to_optional_state(
-                "max_concurrent_sftp_sessions", self.max_concurrent_sftp_sessions
-            ),
-            max_containers_per_session=to_optional_state(
-                "max_containers_per_session", self.max_containers_per_session
-            ),
-            idle_timeout=to_optional_state("idle_timeout", self.idle_timeout),
-            allowed_vfolder_hosts=to_optional_state(
-                "allowed_vfolder_hosts", self.allowed_vfolder_hosts
-            ),
-            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
-            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
-            max_quota_scope_size=to_optional_state(
-                "max_quota_scope_size", self.max_quota_scope_size
-            ),
-            max_pending_session_count=to_optional_state(
-                "max_pending_session_count", self.max_pending_session_count
-            ),
-            max_pending_session_resource_slots=to_tri_state(
-                "max_pending_session_resource_slots", max_pending_session_resource_slots
-            ),
+            name=name,
+            default_for_unspecified=default_for_unspecified,
+            total_resource_slots=total_resource_slots,
+            max_session_lifetime=value_or_none(self.max_session_lifetime),
+            max_concurrent_sessions=value_or_none(self.max_concurrent_sessions),
+            max_concurrent_sftp_sessions=value_or_none(self.max_concurrent_sftp_sessions),
+            max_containers_per_session=value_or_none(self.max_containers_per_session),
+            idle_timeout=value_or_none(self.idle_timeout),
+            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+            max_vfolder_count=value_or_none(self.max_vfolder_count),
+            max_vfolder_size=value_or_none(self.max_vfolder_size),
+            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+            max_pending_session_count=value_or_none(self.max_pending_session_count),
+            max_pending_session_resource_slots=value_or_none(max_pending_session_resource_slots),
         )
 
 
