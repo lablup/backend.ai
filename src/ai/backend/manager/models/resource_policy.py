@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Self, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -12,6 +12,11 @@ from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.resource.types import (
+    KeyPairResourcePolicyData,
+    ProjectResourcePolicyData,
+    UserResourcePolicyData,
+)
 from ai.backend.manager.models.gql_models.base import to_optional_state, to_tri_state
 
 if TYPE_CHECKING:
@@ -110,6 +115,47 @@ class KeyPairResourcePolicyRow(Base):
     __table__ = keypair_resource_policies
     keypairs = relationship("KeyPairRow", back_populates="resource_policy_row")
 
+    def to_dataclass(
+        self,
+    ) -> KeyPairResourcePolicyData:
+        return KeyPairResourcePolicyData(
+            name=self.__table__.name,
+            created_at=self.__table__.created_at,
+            default_for_unspecified=self.__table__.default_for_unspecified,
+            total_resource_slots=self.__table__.total_resource_slots.to_json(),
+            max_session_lifetime=self.__table__.max_session_lifetime,
+            max_concurrent_sessions=self.__table__.max_concurrent_sessions,
+            max_pending_session_count=self.__table__.max_pending_session_count,
+            max_pending_session_resource_slots=self.__table__.max_pending_session_resource_slots.to_json()
+            if self.__table__.max_pending_session_resource_slots
+            else None,
+            max_concurrent_sftp_sessions=self.__table__.max_concurrent_sftp_sessions,
+            max_containers_per_session=self.__table__.max_containers_per_session,
+            idle_timeout=self.__table__.idle_timeout,
+            allowed_vfolder_hosts=self.__table__.allowed_vfolder_hosts.to_json(),
+        )
+
+    @classmethod
+    def from_dataclass(cls, data: KeyPairResourcePolicyData) -> Self:
+        return cls(
+            name=data.name,
+            created_at=data.created_at,
+            default_for_unspecified=data.default_for_unspecified,
+            total_resource_slots=ResourceSlot.from_json(data.total_resource_slots),
+            max_session_lifetime=data.max_session_lifetime,
+            max_concurrent_sessions=data.max_concurrent_sessions,
+            max_pending_session_count=data.max_pending_session_count,
+            max_pending_session_resource_slots=ResourceSlot.from_json(
+                data.max_pending_session_resource_slots
+            )
+            if data.max_pending_session_resource_slots
+            else None,
+            max_concurrent_sftp_sessions=data.max_concurrent_sftp_sessions,
+            max_containers_per_session=data.max_containers_per_session,
+            idle_timeout=data.idle_timeout,
+            allowed_vfolder_hosts=VFolderHostPermissionColumn.from_json(data.allowed_vfolder_hosts),
+        )
+
 
 user_resource_policies = sa.Table(
     "user_resource_policies",
@@ -141,6 +187,25 @@ class UserResourcePolicyRow(Base):
         self.max_session_count_per_model_session = max_session_count_per_model_session
         self.max_customized_image_count = max_customized_image_count
 
+    @classmethod
+    def from_dataclass(cls, data: UserResourcePolicyData) -> Self:
+        return cls(
+            name=data.name,
+            max_vfolder_count=data.max_vfolder_count,
+            max_quota_scope_size=data.max_quota_scope_size,
+            max_session_count_per_model_session=data.max_session_count_per_model_session,
+            max_customized_image_count=data.max_customized_image_count,
+        )
+
+    def to_dataclass(self) -> UserResourcePolicyData:
+        return UserResourcePolicyData(
+            name=self.name,
+            max_vfolder_count=self.max_vfolder_count,
+            max_quota_scope_size=self.max_quota_scope_size,
+            max_session_count_per_model_session=self.max_session_count_per_model_session,
+            max_customized_image_count=self.max_customized_image_count,
+        )
+
 
 project_resource_policies = sa.Table(
     "project_resource_policies",
@@ -162,6 +227,23 @@ class ProjectResourcePolicyRow(Base):
         self.max_vfolder_count = max_vfolder_count
         self.max_quota_scope_size = max_quota_scope_size
         self.max_network_count = max_network_count
+
+    @classmethod
+    def from_dataclass(cls, data: ProjectResourcePolicyData) -> Self:
+        return cls(
+            name=data.name,
+            max_vfolder_count=data.max_vfolder_count,
+            max_quota_scope_size=data.max_quota_scope_size,
+            max_network_count=data.max_network_count,
+        )
+
+    def to_dataclass(self) -> ProjectResourcePolicyData:
+        return ProjectResourcePolicyData(
+            name=self.name,
+            max_vfolder_count=self.max_vfolder_count,
+            max_quota_scope_size=self.max_quota_scope_size,
+            max_network_count=self.max_network_count,
+        )
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):
