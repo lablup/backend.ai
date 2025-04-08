@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
 
-from ai.backend.common.types import DefaultForUnspecified
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 
 
 @dataclass
@@ -27,7 +27,7 @@ class KeyPairResourcePolicyData:
     name: str
     created_at: datetime
     default_for_unspecified: DefaultForUnspecified
-    total_resource_slots: Any
+    total_resource_slots: ResourceSlot
     max_session_lifetime: int
     max_concurrent_sessions: int
     max_pending_session_count: Optional[int]

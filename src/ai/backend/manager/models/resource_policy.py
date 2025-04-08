@@ -119,20 +119,18 @@ class KeyPairResourcePolicyRow(Base):
         self,
     ) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
-            name=self.__table__.name,
-            created_at=self.__table__.created_at,
-            default_for_unspecified=self.__table__.default_for_unspecified,
-            total_resource_slots=self.__table__.total_resource_slots.to_json(),
-            max_session_lifetime=self.__table__.max_session_lifetime,
-            max_concurrent_sessions=self.__table__.max_concurrent_sessions,
-            max_pending_session_count=self.__table__.max_pending_session_count,
-            max_pending_session_resource_slots=self.__table__.max_pending_session_resource_slots.to_json()
-            if self.__table__.max_pending_session_resource_slots
-            else None,
-            max_concurrent_sftp_sessions=self.__table__.max_concurrent_sftp_sessions,
-            max_containers_per_session=self.__table__.max_containers_per_session,
-            idle_timeout=self.__table__.idle_timeout,
-            allowed_vfolder_hosts=self.__table__.allowed_vfolder_hosts.to_json(),
+            name=self.name,
+            created_at=self.created_at,
+            default_for_unspecified=self.default_for_unspecified,
+            total_resource_slots=self.total_resource_slots,
+            max_session_lifetime=self.max_session_lifetime,
+            max_concurrent_sessions=self.max_concurrent_sessions,
+            max_pending_session_count=self.max_pending_session_count,
+            max_pending_session_resource_slots=self.max_pending_session_resource_slots,
+            max_concurrent_sftp_sessions=self.max_concurrent_sftp_sessions,
+            max_containers_per_session=self.max_containers_per_session,
+            idle_timeout=self.idle_timeout,
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
         )
 
     @classmethod
@@ -141,19 +139,15 @@ class KeyPairResourcePolicyRow(Base):
             name=data.name,
             created_at=data.created_at,
             default_for_unspecified=data.default_for_unspecified,
-            total_resource_slots=ResourceSlot.from_json(data.total_resource_slots),
+            total_resource_slots=data.total_resource_slots,
             max_session_lifetime=data.max_session_lifetime,
             max_concurrent_sessions=data.max_concurrent_sessions,
             max_pending_session_count=data.max_pending_session_count,
-            max_pending_session_resource_slots=ResourceSlot.from_json(
-                data.max_pending_session_resource_slots
-            )
-            if data.max_pending_session_resource_slots
-            else None,
+            max_pending_session_resource_slots=data.max_pending_session_resource_slots,
             max_concurrent_sftp_sessions=data.max_concurrent_sftp_sessions,
             max_containers_per_session=data.max_containers_per_session,
             idle_timeout=data.idle_timeout,
-            allowed_vfolder_hosts=VFolderHostPermissionColumn.from_json(data.allowed_vfolder_hosts),
+            allowed_vfolder_hosts=data.allowed_vfolder_hosts,
         )
 
 

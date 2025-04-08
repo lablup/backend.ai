@@ -3,9 +3,9 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import ObjectNotFound
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
-    keypair_resource_policies,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
@@ -41,11 +41,10 @@ class KeypairResourcePolicyService:
         async with self._db.begin_session() as db_sess:
             inserted_row = props.to_db_row()
             db_sess.add(inserted_row)
+            result = inserted_row.to_dataclass()
             await db_sess.flush()
 
-        return CreateKeyPairResourcePolicyActionResult(
-            keypair_resource_policy=inserted_row.to_dataclass()
-        )
+        return CreateKeyPairResourcePolicyActionResult(keypair_resource_policy=result)
 
     async def modify_keypair_resource_policy(
         self, action: ModifyKeyPairResourcePolicyAction
@@ -58,23 +57,22 @@ class KeypairResourcePolicyService:
             result = await db_sess.execute(query)
             row: KeyPairResourcePolicyRow = result.scalar_one_or_none()
             if row is None:
-                raise ValueError(f"Keypair resource policy with name {name} not found.")
+                raise ObjectNotFound(f"Keypair resource policy with name {name} not found.")
             props.set_attr(row)
+            result = row.to_dataclass()
 
-        return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=row.to_dataclass())
+        return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=result)
 
     async def delete_keypair_resource_policy(
         self, action: DeleteKeyPairResourcePolicyAction
     ) -> DeleteKeyPairResourcePolicyActionResult:
         name = action.name
         async with self._db.begin_session() as db_sess:
-            delete_query = (
-                sa.delete(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name == name)
-                .returning(*keypair_resource_policies.c)
-            )
-            result = await db_sess.execute(delete_query)
-            deleted_row: KeyPairResourcePolicyRow = result.fetchone()
-        return DeleteKeyPairResourcePolicyActionResult(
-            keypair_resource_policy=deleted_row.to_dataclass()
-        )
+            query = sa.select(KeyPairResourcePolicyRow).where(KeyPairResourcePolicyRow.name == name)
+            db_row = (await db_sess.execute(query)).scalar_one_or_none()
+            if not db_row:
+                raise ObjectNotFound(f"Keypair resource policy with name {name} not found.")
+            await db_sess.delete(db_row)
+            result = db_row.to_dataclass()
+
+        return DeleteKeyPairResourcePolicyActionResult(keypair_resource_policy=result)
