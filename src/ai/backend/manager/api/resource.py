@@ -9,6 +9,7 @@ import json
 import logging
 import re
 from decimal import Decimal
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -73,7 +74,7 @@ async def list_presets(request: web.Request) -> web.Response:
             scaling_group=scaling_group_name,
         )
     )
-    return web.json_response({"presets": result.presets}, status=200)
+    return web.json_response({"presets": result.presets}, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -131,7 +132,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         "scaling_groups": result.scaling_groups,
     }
 
-    return web.json_response(resp, status=200)
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -147,7 +148,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     await root_ctx.processors.agent.recalculate_usage.wait_for_complete(RecalculateUsageAction())
 
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -176,7 +177,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
             month=params["month"],
         )
     )
-    return web.json_response(result, status=200)
+    return web.json_response(result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -209,7 +210,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=200)
+    return web.json_response(result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -230,7 +231,7 @@ async def user_month_stats(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=200)
+    return web.json_response(result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -247,7 +248,7 @@ async def admin_month_stats(request: web.Request) -> web.Response:
         AdminMonthStatsAction()
     )
 
-    return web.json_response(result, status=200)
+    return web.json_response(result, status=HTTPStatus.OK)
 
 
 # TODO: get_watcher_info overlaps with service-side method.
@@ -291,7 +292,7 @@ async def get_watcher_status(request: web.Request, params: Any) -> web.Response:
         GetWatcherStatusAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == 200:
+    if result.resp.status == HTTPStatus.OK:
         data = await result.resp.json()
         return web.json_response(data, status=result.resp.status)
     else:
@@ -314,7 +315,7 @@ async def watcher_agent_start(request: web.Request, params: Any) -> web.Response
         WatcherAgentStartAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == 200:
+    if result.resp.status == HTTPStatus.OK:
         data = await result.resp.json()
         return web.json_response(data, status=result.resp.status)
     else:
@@ -337,7 +338,7 @@ async def watcher_agent_stop(request: web.Request, params: Any) -> web.Response:
         WatcherAgentStopAction(agent_id=params["agent_id"])
     )
 
-    if result.resp.status == 200:
+    if result.resp.status == HTTPStatus.OK:
         data = await result.resp.json()
         return web.json_response(data, status=result.resp.status)
     else:
@@ -362,7 +363,7 @@ async def watcher_agent_restart(request: web.Request, params: Any) -> web.Respon
         )
     )
 
-    if result.resp.status == 200:
+    if result.resp.status == HTTPStatus.OK:
         data = await result.resp.json()
         return web.json_response(data, status=result.resp.status)
     else:
@@ -383,7 +384,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=200)
+    return web.json_response(result, status=HTTPStatus.OK)
 
 
 def create_app(
