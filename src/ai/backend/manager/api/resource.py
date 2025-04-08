@@ -73,7 +73,7 @@ async def list_presets(request: web.Request) -> web.Response:
             scaling_group=scaling_group_name,
         )
     )
-    return web.json_response({"presets": result}, status=200)
+    return web.json_response({"presets": result.presets}, status=200)
 
 
 @server_status_required(READ_ALLOWED)
