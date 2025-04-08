@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
         CreateUserResourcePolicyInputData,
     )
+    from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+        ModifyUserResourcePolicyInputData,
+    )
 
 from .base import (
     Base,
@@ -696,6 +699,24 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
+    def to_dataclass(self) -> ModifyUserResourcePolicyInputData:
+        from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+            ModifyUserResourcePolicyInputData,
+        )
+
+        return ModifyUserResourcePolicyInputData(
+            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
+            max_quota_scope_size=to_optional_state(
+                "max_quota_scope_size", self.max_quota_scope_size
+            ),
+            max_session_count_per_model_session=to_optional_state(
+                "max_session_count_per_model_session", self.max_session_count_per_model_session
+            ),
+            max_customized_image_count=to_optional_state(
+                "max_customized_image_count", self.max_customized_image_count
+            ),
+        )
+
 
 class CreateUserResourcePolicy(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -756,7 +777,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         result = await graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
-            ModifyUserResourcePolicyAction(name, props)
+            ModifyUserResourcePolicyAction(name, props.to_dataclass())
         )
 
         return ModifyUserResourcePolicy(

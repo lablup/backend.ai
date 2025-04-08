@@ -1,10 +1,8 @@
 import logging
-from typing import Any
 
 import sqlalchemy as sa
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.base import set_if_set
 from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
@@ -53,18 +51,9 @@ class UserResourcePolicyService:
         props = action.props
 
         async with self._db.begin_session() as db_sess:
-            data: dict[str, Any] = {}
-            set_if_set(props, data, "max_vfolder_count")
-            set_if_set(props, data, "max_quota_scope_size")
-            set_if_set(props, data, "max_session_count_per_model_session")
-            set_if_set(props, data, "max_customized_image_count")
-            update_query = (
-                sa.update(UserResourcePolicyRow)
-                .values(data)
-                .where(UserResourcePolicyRow.name == name)
-                .returning(*UserResourcePolicyRow.__table__.c)
-            )
-            row = await db_sess.execute(update_query)
+            query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
+            row = (await db_sess.execute(query)).scalar_one_or_none()
+            props.set_attr(row)
 
         return ModifyUserResourcePolicyActionResult(user_resource_policy=row)
 
