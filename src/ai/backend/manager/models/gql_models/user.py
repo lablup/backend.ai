@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Mapping,
+    Optional,
     Self,
+    cast,
 )
 
 import graphene
@@ -14,6 +16,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from ..base import (
     FilterExprArg,
     OrderExprArg,
+    PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
@@ -23,6 +26,7 @@ from ..user import UserRole, UserRow, UserStatus
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+    from .group import GroupNode
 
 
 class UserNode(graphene.ObjectType):
@@ -61,6 +65,11 @@ class UserNode(graphene.ObjectType):
     container_gids = graphene.List(
         lambda: graphene.Int,
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
+
+    project_nodes = PaginatedConnectionField(
+        "ai.backend.manager.models.gql_models.group.GroupConnection",
+        description="Added in 25.5.0.",
     )
 
     @classmethod
@@ -187,6 +196,61 @@ class UserNode(graphene.ObjectType):
             user_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def resolve_project_nodes(
+        self,
+        info: graphene.ResolveInfo,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[GroupNode]:
+        from ..group import AssocGroupUserRow, GroupRow
+        from .group import GroupNode
+
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter, QueryFilterParser(GroupNode.queryfilter_fieldspec))
+            if filter is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order, QueryOrderParser(GroupNode.queryorder_colmap))
+            if order is not None
+            else None
+        )
+        (
+            query,
+            cnt_query,
+            _,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            GroupRow,
+            GroupRow.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        j = sa.join(GroupRow, AssocGroupUserRow)
+        prj_query = query.select_from(j).where(AssocGroupUserRow.user_id == self.id)
+        cnt_query = cnt_query.select_from(j).where(AssocGroupUserRow.user_id == self.id)
+        result: list[GroupNode] = []
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            total_cnt = await db_session.scalar(cnt_query)
+            async for row in await db_session.stream_scalars(prj_query):
+                prj_row = cast(GroupRow, row)
+                result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
