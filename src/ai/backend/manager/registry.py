@@ -3283,9 +3283,8 @@ class AgentRegistry:
             key=keyfunc,
         ):
             grouped_kernels = [*group_iterator]
-            aid = grouped_kernels[0].agent
             async with self.agent_cache.rpc_context(
-                aid,
+                agent_id,
             ) as rpc:
                 return await rpc.call.sync_kernel_registry([
                     (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels

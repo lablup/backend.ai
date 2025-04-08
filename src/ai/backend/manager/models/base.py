@@ -694,12 +694,12 @@ def ForeignKeyIDColumn(name, fk_field, nullable=True):
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
-ContextT = TypeVar("ContextT")
-LoaderKeyT = TypeVar("LoaderKeyT")
-LoaderResultT = TypeVar("LoaderResultT")
+TContext = TypeVar("TContext")
+TLoaderKey = TypeVar("TLoaderKey")
+TLoaderResult = TypeVar("TLoaderResult")
 
 
-class DataLoaderManager:
+class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
     """
     For every different combination of filtering conditions, we need to make a
     new DataLoader instance because it "batches" the database queries.
@@ -710,7 +710,7 @@ class DataLoaderManager:
     for every incoming API request.
     """
 
-    cache: dict[int, DataLoader]
+    cache: dict[int, DataLoader[TLoaderKey, TLoaderResult]]
 
     def __init__(self) -> None:
         self.cache = {}
@@ -747,7 +747,10 @@ class DataLoaderManager:
 
     @staticmethod
     def _get_func_key(
-        func: Callable[Concatenate[ContextT, Sequence[LoaderKeyT], ...], Awaitable[LoaderResultT]],
+        func: Callable[
+            Concatenate[TContext, Sequence[TLoaderKey], ...],
+            Awaitable[Sequence[TLoaderResult]],
+        ],
         **kwargs,
     ) -> int:
         func_and_kwargs = (func, *[(k, kwargs[k]) for k in sorted(kwargs.keys())])
@@ -755,23 +758,25 @@ class DataLoaderManager:
 
     def get_loader_by_func(
         self,
-        context: ContextT,
+        context: TContext,
         batch_load_func: Callable[
-            Concatenate[ContextT, Sequence[LoaderKeyT], ...], Awaitable[LoaderResultT]
+            Concatenate[TContext, Sequence[TLoaderKey], ...],
+            Awaitable[Sequence[TLoaderResult]],
         ],
         # Using kwargs-only to prevent argument position confusion
         # when DataLoader calls `batch_load_func(keys)` which is `partial(batch_load_func, **kwargs)(keys)`.
         **kwargs,
-    ) -> DataLoader:
+    ) -> DataLoader[TLoaderKey, TLoaderResult]:
+        async def batch_load_wrapper(keys: Sequence[TLoaderKey]) -> list[TLoaderResult]:
+            # aiodataloader always converts the result via list(),
+            # so we can enforce type-casting here.
+            return cast(list[TLoaderResult], await batch_load_func(context, keys, **kwargs))
+
         key = self._get_func_key(batch_load_func, **kwargs)
         loader = self.cache.get(key)
         if loader is None:
             loader = DataLoader(
-                functools.partial(
-                    batch_load_func,
-                    context,
-                    **kwargs,
-                ),
+                batch_load_wrapper,
                 max_batch_size=128,
             )
             self.cache[key] = loader
