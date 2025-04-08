@@ -1,44 +1,19 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
-from ai.backend.manager.models.resource_policy import (
-    ProjectResourcePolicyRow,
-)
 from ai.backend.manager.services.project_resource_policy.actions.base import (
     ProjectResourcePolicyAction,
 )
-from ai.backend.manager.types import OptionalState
 
 
 @dataclass
 class CreateProjectResourcePolicyInputData:
-    max_vfolder_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_count")
-    )
-    max_quota_scope_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_quota_scope_size")
-    )
-    max_vfolder_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_size")
-    )
-    max_network_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_network_count")
-    )
-
-    def to_db_row(self, name: str) -> ProjectResourcePolicyRow:
-        db_row = ProjectResourcePolicyRow(
-            name,
-            0,
-            0,
-            0,
-        )
-        self.max_vfolder_count.set_attr(db_row)
-        self.max_quota_scope_size.set_attr(db_row)
-        self.max_vfolder_size.set_attr(db_row)
-        self.max_network_count.set_attr(db_row)
-        return db_row
+    max_vfolder_count: Optional[int]
+    max_quota_scope_size: Optional[int]
+    max_vfolder_size: Optional[int]
+    max_network_count: Optional[int]
 
 
 @dataclass

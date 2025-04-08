@@ -725,18 +725,17 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
             CreateUserResourcePolicyInputData,
         )
 
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
         return CreateUserResourcePolicyInputData(
-            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
-            max_quota_scope_size=to_optional_state(
-                "max_quota_scope_size", self.max_quota_scope_size
+            max_vfolder_count=value_or_none(self.max_vfolder_count),
+            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+            max_session_count_per_model_session=value_or_none(
+                self.max_session_count_per_model_session
             ),
-            max_session_count_per_model_session=to_optional_state(
-                "max_session_count_per_model_session", self.max_session_count_per_model_session
-            ),
-            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
-            max_customized_image_count=to_optional_state(
-                "max_customized_image_count", self.max_customized_image_count
-            ),
+            max_vfolder_size=value_or_none(self.max_vfolder_size),
+            max_customized_image_count=value_or_none(self.max_customized_image_count),
         )
 
 
@@ -985,13 +984,14 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
             CreateProjectResourcePolicyInputData,
         )
 
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
         return CreateProjectResourcePolicyInputData(
-            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
-            max_quota_scope_size=to_optional_state(
-                "max_quota_scope_size", self.max_quota_scope_size
-            ),
-            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
-            max_network_count=to_optional_state("max_network_count", self.max_network_count),
+            max_vfolder_count=value_or_none(self.max_vfolder_count),
+            max_quota_scope_size=value_or_none(self.max_quota_scope_size),
+            max_vfolder_size=value_or_none(self.max_vfolder_size),
+            max_network_count=value_or_none(self.max_network_count),
         )
 
 
