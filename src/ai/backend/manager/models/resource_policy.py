@@ -18,6 +18,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
         CreateKeyPairResourcePolicyInputData,
     )
+    from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
+        ModifyKeyPairResourcePolicyInputData,
+    )
 
 from .base import (
     Base,
@@ -394,6 +397,66 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
+    def to_dataclass(self) -> ModifyKeyPairResourcePolicyInputData:
+        from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
+            ModifyKeyPairResourcePolicyInputData,
+        )
+
+        default_for_unspecified = (
+            DefaultForUnspecified[self.default_for_unspecified]
+            if self.default_for_unspecified
+            else None
+        )
+        print("default_for_unspecified!", default_for_unspecified)
+
+        # total_resource_slots = (
+        #     ResourceSlot.from_user_input(self.total_resource_slots, None)
+        #     if self.total_resource_slots
+        #     else None
+        # )
+
+        # max_pending_session_resource_slots = (
+        #     ResourceSlot.from_user_input(self.max_pending_session_resource_slots, None)
+        #     if self.max_pending_session_resource_slots
+        #     else None
+        # )
+
+        return ModifyKeyPairResourcePolicyInputData(
+            default_for_unspecified=to_optional_state(
+                "default_for_unspecified", default_for_unspecified
+            ),
+            total_resource_slots=to_optional_state(
+                "total_resource_slots", self.total_resource_slots
+            ),
+            max_session_lifetime=to_optional_state(
+                "max_session_lifetime", self.max_session_lifetime
+            ),
+            max_concurrent_sessions=to_optional_state(
+                "max_concurrent_sessions", self.max_concurrent_sessions
+            ),
+            max_concurrent_sftp_sessions=to_optional_state(
+                "max_concurrent_sftp_sessions", self.max_concurrent_sftp_sessions
+            ),
+            max_containers_per_session=to_optional_state(
+                "max_containers_per_session", self.max_containers_per_session
+            ),
+            idle_timeout=to_optional_state("idle_timeout", self.idle_timeout),
+            allowed_vfolder_hosts=to_optional_state(
+                "allowed_vfolder_hosts", self.allowed_vfolder_hosts
+            ),
+            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
+            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
+            max_quota_scope_size=to_optional_state(
+                "max_quota_scope_size", self.max_quota_scope_size
+            ),
+            max_pending_session_count=to_optional_state(
+                "max_pending_session_count", self.max_pending_session_count
+            ),
+            max_pending_session_resource_slots=to_tri_state(
+                "max_pending_session_resource_slots", self.max_pending_session_resource_slots
+            ),
+        )
+
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -453,7 +516,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.wait_for_complete(
-            ModifyKeyPairResourcePolicyAction(name, props)
+            ModifyKeyPairResourcePolicyAction(name, props.to_dataclass())
         )
 
         return ModifyKeyPairResourcePolicy(

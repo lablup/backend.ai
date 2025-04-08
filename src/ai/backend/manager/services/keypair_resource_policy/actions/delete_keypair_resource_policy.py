@@ -21,7 +21,6 @@ class DeleteKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
 
 @dataclass
 class DeleteKeyPairResourcePolicyActionResult(BaseActionResult):
-    # TODO: 리턴 타입 만들 것.
     keypair_resource_policy: KeyPairResourcePolicyRow
 
     @override
