@@ -10,7 +10,7 @@ from ai.backend.manager.services.groups.actions.create_group import (
     CreateGroupActionResult,
 )
 from ai.backend.manager.services.groups.processors import GroupProcessors
-from ai.backend.manager.services.groups.types import GroupData
+from ai.backend.manager.services.groups.types import GroupCreator, GroupData
 
 from .test_utils import TestScenario
 
@@ -22,16 +22,18 @@ from .test_utils import TestScenario
         TestScenario.success(
             "Create a group",
             CreateGroupAction(
-                name="test-create-group",
-                domain_name="default",
-                type=ProjectType.GENERAL,
-                description="Test group",
-                is_active=True,
-                total_resource_slots=ResourceSlot.from_user_input({}, None),
-                allowed_vfolder_hosts={},
-                integration_id=None,
-                resource_policy=None,
-                container_registry=None,
+                input=GroupCreator(
+                    name="test-create-group",
+                    domain_name="default",
+                    type=ProjectType.GENERAL,
+                    description="Test group",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot.from_user_input({}, None),
+                    allowed_vfolder_hosts={},
+                    integration_id=None,
+                    resource_policy=None,
+                    container_registry=None,
+                ),
             ),
             CreateGroupActionResult(
                 data=GroupData(
@@ -56,16 +58,18 @@ from .test_utils import TestScenario
         TestScenario.success(
             "Create a group with duplicated name, return none",
             CreateGroupAction(
-                name="test-create-group-duplicated",
-                domain_name="default",
-                type=None,
-                description=None,
-                is_active=None,
-                total_resource_slots=None,
-                allowed_vfolder_hosts=None,
-                integration_id=None,
-                resource_policy=None,
-                container_registry=None,
+                input=GroupCreator(
+                    name="test-create-group-duplicated",
+                    domain_name="default",
+                    type=None,
+                    description=None,
+                    is_active=None,
+                    total_resource_slots=None,
+                    allowed_vfolder_hosts=None,
+                    integration_id=None,
+                    resource_policy=None,
+                    container_registry=None,
+                ),
             ),
             CreateGroupActionResult(
                 data=None,

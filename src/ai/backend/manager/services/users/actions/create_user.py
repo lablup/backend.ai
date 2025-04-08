@@ -1,36 +1,20 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.users.actions.base import UserAction
-from ai.backend.manager.services.users.type import UserData
+from ai.backend.manager.services.users.type import UserCreator, UserData
 
 
 @dataclass
 class CreateUserAction(UserAction):
-    email: str
-    username: str
-    password: str
-    need_password_change: bool
-    domain_name: str
-    full_name: Optional[str]
-    description: Optional[str]
-    is_active: Optional[bool]
-    status: Optional[UserStatus]
-    role: Optional[UserRole]
-    allowed_client_ip: Optional[str]
-    totp_activated: Optional[bool]
-    resource_policy: Optional[str]
-    sudo_session_enabled: Optional[bool]
-    group_ids: Optional[list[str]]
-    container_uid: Optional[int]
-    container_main_gid: Optional[int]
-    container_gids: Optional[list[int]]
+    input: UserCreator
 
+    @override
     def entity_id(self) -> Optional[str]:
         return None
 
+    @override
     def operation_type(self) -> str:
         return "create"
 
@@ -40,5 +24,6 @@ class CreateUserActionResult(BaseActionResult):
     data: Optional[UserData]
     success: bool
 
+    @override
     def entity_id(self) -> Optional[str]:
         return str(self.data.id) if self.data else None

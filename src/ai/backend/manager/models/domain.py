@@ -32,6 +32,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, Sentinel, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.utils import define_state
+from ai.backend.manager.services.domain.types import DomainCreator
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..defs import RESERVED_DOTFILES
@@ -319,13 +320,15 @@ class DomainInput(graphene.InputObjectType):
             return value if value is not Undefined else None
 
         return CreateDomainAction(
-            name=domain_name,
-            description=value_or_none(self.description),
-            is_active=value_or_none(self.is_active),
-            total_resource_slots=value_or_none(self.total_resource_slots),
-            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-            allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-            integration_id=value_or_none(self.integration_id),
+            input=DomainCreator(
+                name=domain_name,
+                description=value_or_none(self.description),
+                is_active=value_or_none(self.is_active),
+                total_resource_slots=value_or_none(self.total_resource_slots),
+                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                integration_id=value_or_none(self.integration_id),
+            ),
         )
 
 

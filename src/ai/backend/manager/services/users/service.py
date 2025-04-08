@@ -110,36 +110,36 @@ class UserService:
         self._redis_stat = redis_stat
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
-        username = action.username if action.username else action.email
+        username = action.input.username if action.input.username else action.input.email
         _status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
-        if action.status is None and action.is_active is not None:
-            _status = UserStatus.ACTIVE if action.is_active else UserStatus.INACTIVE
-        if action.status is not None:
-            _status = action.status
-        group_ids = [] if action.group_ids is None else action.group_ids
+        if action.input.status is None and action.input.is_active is not None:
+            _status = UserStatus.ACTIVE if action.input.is_active else UserStatus.INACTIVE
+        if action.input.status is not None:
+            _status = action.input.status
+        group_ids = [] if action.input.group_ids is None else action.input.group_ids
 
         user_data = {
             "username": username,
-            "email": action.email,
-            "password": action.password,
-            "need_password_change": action.need_password_change,
-            "full_name": action.full_name,
-            "description": action.description,
+            "email": action.input.email,
+            "password": action.input.password,
+            "need_password_change": action.input.need_password_change,
+            "full_name": action.input.full_name,
+            "description": action.input.description,
             "status": _status,
             "status_info": "admin-requested",  # user mutation is only for admin
-            "domain_name": action.domain_name,
-            "role": action.role,
-            "allowed_client_ip": action.allowed_client_ip,
-            "totp_activated": action.totp_activated,
-            "resource_policy": action.resource_policy,
-            "sudo_session_enabled": action.sudo_session_enabled,
+            "domain_name": action.input.domain_name,
+            "role": action.input.role,
+            "allowed_client_ip": action.input.allowed_client_ip,
+            "totp_activated": action.input.totp_activated,
+            "resource_policy": action.input.resource_policy,
+            "sudo_session_enabled": action.input.sudo_session_enabled,
         }
-        if action.container_uid is not None:
-            user_data["container_uid"] = action.container_uid
-        if action.container_main_gid is not None:
-            user_data["container_main_gid"] = action.container_main_gid
-        if action.container_gids is not None:
-            user_data["container_gids"] = action.container_gids
+        if action.input.container_uid is not None:
+            user_data["container_uid"] = action.input.container_uid
+        if action.input.container_main_gid is not None:
+            user_data["container_main_gid"] = action.input.container_main_gid
+        if action.input.container_gids is not None:
+            user_data["container_gids"] = action.input.container_gids
 
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -149,11 +149,11 @@ class UserService:
             created_user = result.first()
 
             # Create a default keypair for the user.
-            email = action.email
+            email = action.input.email
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
                 {
-                    "is_active": action.status == UserStatus.ACTIVE,
+                    "is_active": action.input.status == UserStatus.ACTIVE,
                     "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
                     "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                     "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
@@ -190,7 +190,7 @@ class UserService:
                 query = (
                     sa.select([groups.c.id])
                     .select_from(groups)
-                    .where(groups.c.domain_name == action.domain_name)
+                    .where(groups.c.domain_name == action.input.domain_name)
                     .where(groups.c.id.in_(gids_to_join))
                 )
                 grps = (await conn.execute(query)).all()

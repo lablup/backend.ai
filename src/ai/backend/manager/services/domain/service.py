@@ -70,7 +70,7 @@ class DomainService:
         self._db = db
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        data = action.get_insertion_data()
+        data = action.input.get_creation_data()
         base_query = sa.insert(domains).values(data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
@@ -78,7 +78,7 @@ class DomainService:
                 "name": "model-store",
                 "description": "Model Store",
                 "is_active": True,
-                "domain_name": action.name,
+                "domain_name": action.input.name,
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
                 "integration_id": None,
@@ -98,7 +98,7 @@ class DomainService:
                     return MutationResult(success=True, message="domain creation succeed", data=row)
                 else:
                     return MutationResult(
-                        success=False, message=f"no matching {action.name}", data=None
+                        success=False, message=f"no matching {action.input.name}", data=None
                     )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
@@ -219,14 +219,14 @@ class DomainService:
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        scaling_groups = action.scaling_groups
+        scaling_groups = action.input.scaling_groups
 
         async def _insert(db_session: AsyncSession) -> DomainRow:
             if scaling_groups is not None:
                 await self._ensure_sgroup_permission(
                     action.user_info, scaling_groups, db_session=db_session
                 )
-            data = action.get_insertion_data()
+            data = action.input.get_creation_data()
             _insert_and_returning = sa.select(DomainRow).from_statement(
                 sa.insert(DomainRow).values(data).returning(DomainRow)
             )
@@ -235,7 +235,7 @@ class DomainService:
                 await db_session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group": sgroup_name, "domain": action.name}
+                        {"scaling_group": sgroup_name, "domain": action.input.name}
                         for sgroup_name in scaling_groups
                     ],
                 )
@@ -254,7 +254,7 @@ class DomainService:
         return CreateDomainNodeActionResult(
             domain_data=DomainData.from_row(domain_row),
             success=True,
-            description=f"domain {action.name} created",
+            description=f"domain {action.input.name} created",
         )
 
     async def modify_domain_node(

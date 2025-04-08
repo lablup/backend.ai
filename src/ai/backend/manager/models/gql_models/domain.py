@@ -27,7 +27,7 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeAction,
     ModifyDomainNodeActionResult,
 )
-from ai.backend.manager.services.domain.types import DomainData, UserInfo
+from ai.backend.manager.services.domain.types import DomainData, DomainNodeCreator, UserInfo
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
@@ -332,18 +332,20 @@ class CreateDomainNodeInput(graphene.InputObjectType):
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
-            name=self.name,
+            input=DomainNodeCreator(
+                name=self.name,
+                description=value_or_none(self.description),
+                is_active=value_or_none(self.is_active),
+                total_resource_slots=value_or_none(self.total_resource_slots)
+                if self.total_resource_slots is not graphql.Undefined
+                else None,
+                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                integration_id=value_or_none(self.integration_id),
+                dotfiles=value_or_none(self.dotfiles),
+                scaling_groups=value_or_none(self.scaling_groups),
+            ),
             user_info=user_info,
-            description=value_or_none(self.description),
-            is_active=value_or_none(self.is_active),
-            total_resource_slots=value_or_none(self.total_resource_slots)
-            if self.total_resource_slots is not graphql.Undefined
-            else None,
-            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-            allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-            integration_id=value_or_none(self.integration_id),
-            dotfiles=value_or_none(self.dotfiles),
-            scaling_groups=value_or_none(self.scaling_groups),
         )
 
 

@@ -19,6 +19,7 @@ from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.services.users.type import UserCreator
 from ai.backend.manager.types import OptionalState
 
 from .base import (
@@ -668,24 +669,26 @@ class UserInput(graphene.InputObjectType):
             return value if value is not Undefined else None
 
         return CreateUserAction(
-            username=self.username,
-            password=self.password,
-            email=email,
-            need_password_change=self.need_password_change,
-            domain_name=self.domain_name,
-            full_name=value_or_none(self.full_name),
-            description=value_or_none(self.description),
-            is_active=value_or_none(self.is_active),
-            status=UserStatus(self.status) if self.status is not Undefined else None,
-            role=UserRole(self.role) if self.role is not Undefined else None,
-            allowed_client_ip=value_or_none(self.allowed_client_ip),
-            totp_activated=value_or_none(self.totp_activated),
-            resource_policy=value_or_none(self.resource_policy),
-            sudo_session_enabled=value_or_none(self.sudo_session_enabled),
-            group_ids=value_or_none(self.group_ids),
-            container_uid=value_or_none(self.container_uid),
-            container_main_gid=value_or_none(self.container_main_gid),
-            container_gids=value_or_none(self.container_gids),
+            input=UserCreator(
+                username=self.username,
+                password=self.password,
+                email=email,
+                need_password_change=self.need_password_change,
+                domain_name=self.domain_name,
+                full_name=value_or_none(self.full_name),
+                description=value_or_none(self.description),
+                is_active=value_or_none(self.is_active),
+                status=UserStatus(self.status) if self.status is not Undefined else None,
+                role=UserRole(self.role) if self.role is not Undefined else None,
+                allowed_client_ip=value_or_none(self.allowed_client_ip),
+                totp_activated=value_or_none(self.totp_activated),
+                resource_policy=value_or_none(self.resource_policy),
+                sudo_session_enabled=value_or_none(self.sudo_session_enabled),
+                group_ids=value_or_none(self.group_ids),
+                container_uid=value_or_none(self.container_uid),
+                container_main_gid=value_or_none(self.container_main_gid),
+                container_gids=value_or_none(self.container_gids),
+            ),
         )
 
 

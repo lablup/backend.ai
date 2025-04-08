@@ -92,7 +92,7 @@ class GroupService:
         self._redis_stat = redis_stat
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        data = action.get_insertion_data()
+        data = action.input.get_creation_data()
         base_query = sa.insert(groups).values(data)
 
         async def _do_mutate() -> MutationResult:
@@ -102,11 +102,13 @@ class GroupService:
                 row = result.first()
                 if result.rowcount > 0:
                     return MutationResult(
-                        success=True, message=f"Group {action.name} creation succeed", data=row
+                        success=True,
+                        message=f"Group {action.input.name} creation succeed",
+                        data=row,
                     )
                 else:
                     return MutationResult(
-                        success=False, message=f"no matching {action.name}", data=None
+                        success=False, message=f"no matching {action.input.name}", data=None
                     )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)

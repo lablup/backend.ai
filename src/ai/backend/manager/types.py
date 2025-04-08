@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass, fields
 from typing import (
@@ -69,6 +70,21 @@ class MountOptionModel(BaseModel):
         MountPermission | None,
         Field(validation_alias=AliasChoices("permission", "perm"), default=None),
     ]
+
+
+class Creator(ABC):
+    """
+    Base class for all creation operations.
+    Implementations should directly map fields to storage keys instead of using reflection.
+    """
+
+    @abstractmethod
+    def get_creation_data(self) -> dict[str, Any]:
+        """
+        Returns a dictionary of data that should be stored in the database.
+        This is different from to_dict() as it specifically maps fields to their storage keys.
+        """
+        pass
 
 
 class State(enum.Enum):
@@ -162,22 +178,23 @@ class DataclassInput:
     Base class for inputs that are dataclasses.
 
     The classes that inherit from this class should be dataclasses and
-    should have fields that are TriState.
+    should have fields that are TriStateField.
     """
 
     def _get_fields(self) -> list[tuple[str, TriState]]:
         return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
 
     def set_attr(self, obj: Any) -> None:
-        for field_name, field in self._get_fields():
-            field.set_attr(obj)
+        for field_name, value in self._get_fields():
+            if value.state() != State.NOP:
+                setattr(obj, field_name, value.value())
 
     def to_dict(self) -> dict[str, Any]:
-        result = {}
-        for field_name, field in self._get_fields():
-            if field.state() == State.UPDATE:
-                result[field_name] = field.value()
-        return result
+        return {
+            field_name: value.value()
+            for field_name, value in self._get_fields()
+            if value.state() != State.NOP
+        }
 
 
 class DictInput(UserDict[str, TriState]):

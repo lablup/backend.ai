@@ -37,7 +37,12 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.domain.types import DomainData, UserInfo
+from ai.backend.manager.services.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainNodeCreator,
+    UserInfo,
+)
 from ai.backend.manager.types import State, TriState
 
 from .test_utils import TestScenario
@@ -89,20 +94,22 @@ async def create_domain(
         TestScenario.success(
             "Create a domain node",
             CreateDomainNodeAction(
-                name="test-create-domain-node",
+                input=DomainNodeCreator(
+                    name="test-create-domain-node",
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot.from_user_input({}, None),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                    integration_id=None,
+                    dotfiles=b"\x90",
+                    scaling_groups=None,
+                ),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                description="Test domain",
-                is_active=True,
-                total_resource_slots={},
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-                integration_id=None,
-                dotfiles=b"\x90",
-                scaling_groups=None,
             ),
             CreateDomainNodeActionResult(
                 domain_data=DomainData(
@@ -124,20 +131,22 @@ async def create_domain(
         TestScenario.failure(
             "Create domain node with duplicated name",
             CreateDomainNodeAction(
-                name="default",
+                input=DomainNodeCreator(
+                    name="default",
+                    description=None,
+                    is_active=None,
+                    total_resource_slots=None,
+                    allowed_vfolder_hosts=None,
+                    allowed_docker_registries=None,
+                    integration_id=None,
+                    dotfiles=None,
+                    scaling_groups=None,
+                ),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                description=None,
-                is_active=None,
-                total_resource_slots=None,
-                allowed_vfolder_hosts=None,
-                allowed_docker_registries=None,
-                integration_id=None,
-                dotfiles=None,
-                scaling_groups=None,
             ),
             ValueError,
         ),
@@ -226,13 +235,15 @@ async def test_modify_domain_node(
         TestScenario.success(
             "Create a domain",
             CreateDomainAction(
-                name="test-create-domain",
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot.from_user_input({}, None),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-                integration_id=None,
+                input=DomainCreator(
+                    name="test-create-domain",
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot.from_user_input({}, None),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                    integration_id=None,
+                ),
             ),
             CreateDomainActionResult(
                 domain_data=DomainData(
@@ -254,13 +265,15 @@ async def test_modify_domain_node(
         TestScenario.success(
             "Create a domain with duplicated name, return none",
             CreateDomainAction(
-                name="default",
-                description=None,
-                is_active=None,
-                total_resource_slots=None,
-                allowed_vfolder_hosts=None,
-                allowed_docker_registries=None,
-                integration_id=None,
+                input=DomainCreator(
+                    name="default",
+                    description=None,
+                    is_active=None,
+                    total_resource_slots=None,
+                    allowed_vfolder_hosts=None,
+                    allowed_docker_registries=None,
+                    integration_id=None,
+                ),
             ),
             CreateDomainActionResult(
                 domain_data=None,
@@ -283,13 +296,15 @@ async def test_create_model_store_after_domain_created(
 ) -> None:
     domain_name = "test-create-domain-post-func"
     action = CreateDomainAction(
-        name=domain_name,
-        description=None,
-        is_active=None,
-        total_resource_slots=None,
-        allowed_vfolder_hosts=None,
-        allowed_docker_registries=None,
-        integration_id=None,
+        input=DomainCreator(
+            name=domain_name,
+            description=None,
+            is_active=None,
+            total_resource_slots=None,
+            allowed_vfolder_hosts=None,
+            allowed_docker_registries=None,
+            integration_id=None,
+        ),
     )
 
     await processors.create_domain.wait_for_complete(action)

@@ -1,12 +1,57 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Self
+from typing import Any, Optional, Self
 from uuid import UUID
 
 from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.user import UserStatus
+from ai.backend.manager.types import Creator, DataclassInput
+
+
+@dataclass
+class UserCreator(Creator):
+    email: str
+    username: str
+    password: str
+    need_password_change: bool
+    domain_name: str
+    full_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    status: Optional[UserStatus] = None
+    role: Optional[str] = None
+    allowed_client_ip: Optional[list[str]] = None
+    totp_activated: Optional[bool] = None
+    resource_policy: Optional[str] = None
+    sudo_session_enabled: Optional[bool] = None
+    group_ids: Optional[list[str]] = None
+    container_uid: Optional[int] = None
+    container_main_gid: Optional[int] = None
+    container_gids: Optional[list[int]] = None
+
+    def get_creation_data(self) -> dict[str, Any]:
+        return {
+            "email": self.email,
+            "username": self.username,
+            "password": self.password,
+            "need_password_change": self.need_password_change,
+            "domain_name": self.domain_name,
+            "full_name": self.full_name,
+            "description": self.description,
+            "is_active": self.is_active,
+            "status": self.status,
+            "role": self.role,
+            "allowed_client_ip": self.allowed_client_ip,
+            "totp_activated": self.totp_activated,
+            "resource_policy": self.resource_policy,
+            "sudo_session_enabled": self.sudo_session_enabled,
+            "group_ids": self.group_ids,
+            "container_uid": self.container_uid,
+            "container_main_gid": self.container_main_gid,
+            "container_gids": self.container_gids,
+        }
 
 
 @dataclass
@@ -71,3 +116,25 @@ class UserData:
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
         )
+
+
+@dataclass
+class UserCreationInput(DataclassInput):
+    email: str
+    username: str
+    password: str
+    need_password_change: bool
+    domain_name: str
+    full_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    status: Optional[UserStatus] = None
+    role: Optional[str] = None
+    allowed_client_ip: Optional[list[str]] = None
+    totp_activated: Optional[bool] = None
+    resource_policy: Optional[str] = None
+    sudo_session_enabled: Optional[bool] = None
+    group_ids: Optional[list[str]] = None
+    container_uid: Optional[int] = None
+    container_main_gid: Optional[int] = None
+    container_gids: Optional[list[int]] = None

@@ -38,6 +38,7 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.utils import define_state
+from ai.backend.manager.services.groups.types import GroupCreator
 from ai.backend.manager.types import OptionalState
 
 from ..defs import RESERVED_DOTFILES
@@ -619,16 +620,18 @@ class GroupInput(graphene.InputObjectType):
         container_registry_val = value_or_none(self.container_registry)
 
         return CreateGroupAction(
-            name=name,
-            domain_name=self.domain_name,
-            type=type_val,
-            description=description_val,
-            is_active=is_active_val,
-            total_resource_slots=total_resource_slots_val,
-            allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-            integration_id=integration_id_val,
-            resource_policy=resource_policy_val,
-            container_registry=container_registry_val,
+            input=GroupCreator(
+                name=name,
+                domain_name=self.domain_name,
+                type=type_val,
+                description=description_val,
+                is_active=is_active_val,
+                total_resource_slots=total_resource_slots_val,
+                allowed_vfolder_hosts=allowed_vfolder_hosts_val,
+                integration_id=integration_id_val,
+                resource_policy=resource_policy_val,
+                container_registry=container_registry_val,
+            ),
         )
 
 
