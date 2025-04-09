@@ -26,10 +26,14 @@ python_distribution(
     dependencies=[
         ":src",
         "src/ai/backend/common/auth:src",
+        "src/ai/backend/common/contexts:src",
+        "src/ai/backend/common/data/session:src",
+        "src/ai/backend/common/data/vfolder:src",
         "src/ai/backend/common/dto/agent:src",
         "src/ai/backend/common/dto/manager:src",
         "src/ai/backend/common/dto/storage:src",
         "src/ai/backend/common/message_queue:src",
+        "src/ai/backend/common/middlewares:src",
         "src/ai/backend/common/metrics:src",
         "src/ai/backend/common/plugin:src",
         "src/ai/backend/common/web/session:src",  # not auto-inferred

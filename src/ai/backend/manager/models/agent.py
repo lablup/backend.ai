@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Sequence, Mapping, Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, TypeAlias, cast, override, Self
+from typing import Optional, Self, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -34,11 +34,7 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
-from .utils import ExtendedAsyncSAEngine,execute_with_txn_retry
-
-if TYPE_CHECKING:
-    pass
-
+from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 __all__: Sequence[str] = (
     "agents",
@@ -101,10 +97,7 @@ class AgentRow(Base):
 
     @classmethod
     async def get_agents_by_condition(
-        cls,
-        conditions: Iterable[QueryCondition],
-        *,
-        db: ExtendedAsyncSAEngine
+        cls, conditions: Iterable[QueryCondition], *, db: ExtendedAsyncSAEngine
     ) -> list[Self]:
         query_stmt = sa.select(AgentRow)
         condition: Optional[sa.sql.expression.BinaryExpression] = None
@@ -121,10 +114,7 @@ class AgentRow(Base):
 
     @classmethod
     async def get_schedulable_agents_by_sgroup(
-        cls,
-        sgroup_name: str,
-        *,
-        db: ExtendedAsyncSAEngine
+        cls, sgroup_name: str, *, db: ExtendedAsyncSAEngine
     ) -> list[Self]:
         return await cls.get_agents_by_condition(
             [
@@ -152,22 +142,28 @@ _COND_SQL_OPERATOR_MAP: Mapping[ConditionMerger, Callable] = {
     ConditionMerger.OR: sa.or_,
 }
 
+
 def _append_condition(
     condition: Optional[sa.sql.expression.BinaryExpression],
     new_condition: sa.sql.expression.BinaryExpression,
     operator: ConditionMerger,
 ) -> sa.sql.expression.BinaryExpression:
-    return _COND_SQL_OPERATOR_MAP[operator](condition, new_condition) if condition is not None else new_condition
+    return (
+        _COND_SQL_OPERATOR_MAP[operator](condition, new_condition)
+        if condition is not None
+        else new_condition
+    )
 
 
 def by_scaling_group(
     scaling_group: str,
     operator: ConditionMerger,
 ) -> QueryCondition:
-    def _by_scaling_group(condition: Optional[sa.sql.expression.BinaryExpression]) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(
-            condition, AgentRow.scaling_group == scaling_group, operator
-        )
+    def _by_scaling_group(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, AgentRow.scaling_group == scaling_group, operator)
+
     return _by_scaling_group
 
 
@@ -175,10 +171,11 @@ def by_status(
     status: AgentStatus,
     operator: ConditionMerger,
 ) -> QueryCondition:
-    def _by_status(condition: Optional[sa.sql.expression.BinaryExpression]) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(
-            condition, AgentRow.status == status, operator
-        )
+    def _by_status(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, AgentRow.status == status, operator)
+
     return _by_status
 
 
@@ -186,11 +183,12 @@ def by_schedulable(
     schedulable: bool,
     operator: ConditionMerger,
 ) -> QueryCondition:
-    def _by_schedulable(condition: Optional[sa.sql.expression.BinaryExpression]) -> sa.sql.expression.BinaryExpression:
+    def _by_schedulable(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
         schedulable_ = true() if schedulable else false()
-        return _append_condition(
-            condition, AgentRow.schedulable == schedulable_, operator
-        )
+        return _append_condition(condition, AgentRow.schedulable == schedulable_, operator)
+
     return _by_schedulable
 
 
