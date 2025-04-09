@@ -8,9 +8,9 @@ from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
 from ai.backend.manager.services.model_service.types import (
+    ModelServicePrepareCtx,
     ServiceConfig,
     ServiceInfo,
-    ValidationResult,
 )
 
 
@@ -33,11 +33,10 @@ class CreateModelServiceAction(ModelServiceAction):
     open_to_public: bool
     config: ServiceConfig
 
-    created_user_id: uuid.UUID
-
+    request_user_id: uuid.UUID
     sudo_session_enabled: bool
 
-    validation_result: ValidationResult
+    model_service_prepare_ctx: ModelServicePrepareCtx
 
     @override
     def entity_id(self) -> Optional[str]:

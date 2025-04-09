@@ -81,13 +81,17 @@ from ai.backend.manager.services.model_service.actions.delete_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
 )
+from ai.backend.manager.services.model_service.actions.force_sync import (
+    ForceSyncAction,
+    ForceSyncActionResult,
+)
 from ai.backend.manager.services.model_service.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
 )
 from ai.backend.manager.services.model_service.actions.get_info import (
-    GetInfoAction,
-    GetInfoActionResult,
+    GetModelServiceInfoAction,
+    GetModelServiceInfoActionResult,
 )
 from ai.backend.manager.services.model_service.actions.list_errors import (
     ListErrorsAction,
@@ -107,12 +111,14 @@ from ai.backend.manager.services.model_service.actions.modify_enpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
 )
-from ai.backend.manager.services.model_service.actions.scale import ScaleAction, ScaleActionResult
+from ai.backend.manager.services.model_service.actions.scale import (
+    ScaleServiceReplicasAction,
+    ScaleServiceReplicasActionResult,
+)
 from ai.backend.manager.services.model_service.actions.start_service import (
     StartModelServiceAction,
     StartModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.sync import SyncAction, SyncActionResult
 from ai.backend.manager.services.model_service.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
@@ -123,6 +129,7 @@ from ai.backend.manager.services.model_service.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
     ModelServiceNotFound,
+    RouteNotFound,
 )
 from ai.backend.manager.services.model_service.types import (
     CompactServiceInfo,
@@ -164,7 +171,7 @@ class ModelService:
         self._shared_config = shared_config
 
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
-        validation_result = action.validation_result
+        service_prepare_ctx = action.model_service_prepare_ctx
         async with self._db.begin_readonly_session() as session:
             image_row = await ImageRow.resolve(
                 session,
@@ -176,15 +183,17 @@ class ModelService:
 
         creation_config = action.config.to_dict()
         creation_config["mounts"] = [
-            validation_result.model_id,
-            *[m.vfid.folder_id for m in validation_result.extra_mounts],
+            service_prepare_ctx.model_id,
+            *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
         ]
         creation_config["mount_map"] = {
-            validation_result.model_id: action.config.model_mount_destination,
-            **{m.vfid.folder_id: m.kernel_path.as_posix() for m in validation_result.extra_mounts},
+            service_prepare_ctx.model_id: action.config.model_mount_destination,
+            **{
+                m.vfid.folder_id: m.kernel_path.as_posix() for m in service_prepare_ctx.extra_mounts
+            },
         }
         creation_config["mount_options"] = {
-            m.vfid.folder_id: {"permission": m.mount_perm} for m in validation_result.extra_mounts
+            m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
         }
         sudo_session_enabled = action.sudo_session_enabled
 
@@ -194,12 +203,12 @@ class ModelService:
             image_row.image_ref,
             UserScope(
                 domain_name=action.domain,
-                group_id=validation_result.group_id,
-                user_uuid=validation_result.owner_uuid,
-                user_role=validation_result.owner_role,
+                group_id=service_prepare_ctx.group_id,
+                user_uuid=service_prepare_ctx.owner_uuid,
+                user_role=service_prepare_ctx.owner_role,
             ),
-            validation_result.owner_access_key,
-            validation_result.resource_policy,
+            service_prepare_ctx.owner_access_key,
+            service_prepare_ctx.resource_policy,
             SessionTypes.INFERENCE,
             creation_config,
             action.cluster_mode,
@@ -229,19 +238,19 @@ class ModelService:
                 raise InvalidAPIParameters(f"Invalid group name {project_id}")
             endpoint = EndpointRow(
                 action.service_name,
-                validation_result.model_definition_path,
-                action.created_user_id,
-                validation_result.owner_uuid,
+                service_prepare_ctx.model_definition_path,
+                action.request_user_id,
+                service_prepare_ctx.owner_uuid,
                 action.replicas,
                 image_row,
-                validation_result.model_id,
+                service_prepare_ctx.model_id,
                 action.domain,
                 project_id,
-                validation_result.scaling_group,
+                service_prepare_ctx.scaling_group,
                 action.config.resources,
                 action.cluster_mode,
                 action.cluster_size,
-                validation_result.extra_mounts,
+                service_prepare_ctx.extra_mounts,
                 model_mount_destination=action.config.model_mount_destination,
                 tag=action.tag,
                 startup_command=action.startup_command,
@@ -264,7 +273,7 @@ class ModelService:
                 model_id=endpoint.model,
                 extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
                 name=action.service_name,
-                model_definition_path=validation_result.model_definition_path,
+                model_definition_path=service_prepare_ctx.model_definition_path,
                 replicas=endpoint.replicas,
                 desired_session_count=endpoint.replicas,
                 active_routes=[],
@@ -337,7 +346,7 @@ class ModelService:
         return DeleteModelServiceActionResult(success=True)
 
     async def try_start(self, action: StartModelServiceAction) -> StartModelServiceActionResult:
-        validation_result = action.validation_result
+        service_prepare_ctx = action.model_service_prepare_ctx
         async with self._db.begin_readonly_session() as session:
             image_row = await ImageRow.resolve(
                 session,
@@ -347,13 +356,13 @@ class ModelService:
                 ],
             )
             query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
-                UserRow.uuid == action.owner_id
+                UserRow.uuid == action.request_user_id
             )
             created_user = (await session.execute(query)).fetchone()
 
         creation_config = action.config.to_dict()
         creation_config["mount_map"] = {
-            validation_result.model_id: action.config.model_mount_destination
+            service_prepare_ctx.model_id: action.config.model_mount_destination
         }
         sudo_session_enabled = action.sudo_session_enabled
 
@@ -365,28 +374,29 @@ class ModelService:
                 image_row.image_ref,
                 UserScope(
                     domain_name=action.domain,
-                    group_id=validation_result.group_id,
+                    group_id=service_prepare_ctx.group_id,
                     user_uuid=created_user.uuid,
                     user_role=created_user.role,
                 ),
-                validation_result.owner_access_key,
-                validation_result.resource_policy,
+                service_prepare_ctx.owner_access_key,
+                service_prepare_ctx.resource_policy,
                 SessionTypes.INFERENCE,
                 {
                     "mounts": [
-                        validation_result.model_id,
-                        *[m.vfid for m in validation_result.extra_mounts],
+                        service_prepare_ctx.model_id,
+                        *[m.vfid for m in service_prepare_ctx.extra_mounts],
                     ],
                     "mount_map": {
-                        validation_result.model_id: action.config.model_mount_destination,
-                        **{m.vfid: m.kernel_path for m in validation_result.extra_mounts},
+                        service_prepare_ctx.model_id: action.config.model_mount_destination,
+                        **{m.vfid: m.kernel_path for m in service_prepare_ctx.extra_mounts},
                     },
                     "mount_options": {
-                        m.vfid: {"permission": m.mount_perm} for m in validation_result.extra_mounts
+                        m.vfid: {"permission": m.mount_perm}
+                        for m in service_prepare_ctx.extra_mounts
                     },
-                    "model_definition_path": validation_result.model_definition_path,
+                    "model_definition_path": service_prepare_ctx.model_definition_path,
                     "environ": creation_config["environ"],
-                    "scaling_group": validation_result.scaling_group,
+                    "scaling_group": service_prepare_ctx.scaling_group,
                     "resources": creation_config["resources"],
                     "resource_opts": creation_config["resource_opts"],
                     "preopen_ports": None,
@@ -488,14 +498,18 @@ class ModelService:
         task_id = await self._background_task_manager.start(_task)
         return StartModelServiceActionResult(task_id)
 
-    async def get_info(self, action: GetInfoAction) -> GetInfoActionResult:
+    async def get_model_service_info(
+        self, action: GetModelServiceInfoAction
+    ) -> GetModelServiceInfoActionResult:
         async with self._db.begin_readonly_session() as db_sess:
             try:
                 endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
             except NoResultFound:
                 raise ModelServiceNotFound
 
-        return GetInfoActionResult(
+        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
+
+        return GetModelServiceInfoActionResult(
             ServiceInfo(
                 endpoint_id=endpoint.id,
                 model_id=endpoint.model,
@@ -560,7 +574,9 @@ class ModelService:
 
         return ClearErrorActionResult(success=True)
 
-    async def scale(self, action: ScaleAction) -> ScaleActionResult:
+    async def scale_service_replicas(
+        self, action: ScaleServiceReplicasAction
+    ) -> ScaleServiceReplicasActionResult:
         async with self._db.begin_readonly_session() as db_sess:
             try:
                 endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
@@ -584,11 +600,11 @@ class ModelService:
                 .values({"replicas": action.to})
             )
             await db_sess.execute(query)
-            return ScaleActionResult(
+            return ScaleServiceReplicasActionResult(
                 current_route_count=len(endpoint.routings), target_count=action.to
             )
 
-    async def sync(self, action: SyncAction) -> SyncActionResult:
+    async def force_sync_with_app_proxy(self, action: ForceSyncAction) -> ForceSyncActionResult:
         async with self._db.begin_readonly_session() as db_sess:
             try:
                 endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
@@ -601,16 +617,16 @@ class ModelService:
                 db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
             )
 
-        return SyncActionResult(success=True)
+        return ForceSyncActionResult(success=True)
 
     async def update_route(self, action: UpdateRouteAction) -> UpdateRouteActionResult:
         async with self._db.begin_session() as db_sess:
             try:
                 route = await RoutingRow.get(db_sess, action.route_id, load_endpoint=True)
             except NoResultFound:
-                raise ModelServiceNotFound
+                raise RouteNotFound
             if route.endpoint != action.service_id:
-                raise ModelServiceNotFound
+                raise RouteNotFound
             await self._verify_user_access_scopes(
                 action.requester_ctx, route.endpoint_row.session_owner
             )
@@ -638,9 +654,9 @@ class ModelService:
             try:
                 route = await RoutingRow.get(db_sess, action.route_id, load_session=True)
             except NoResultFound:
-                raise ModelServiceNotFound
+                raise RouteNotFound
             if route.endpoint != action.service_id:
-                raise ModelServiceNotFound
+                raise RouteNotFound
         await self._verify_user_access_scopes(
             action.requester_ctx, route.endpoint_row.session_owner
         )

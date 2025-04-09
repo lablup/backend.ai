@@ -26,3 +26,8 @@ class EndpointNotFound(BackendError, web.HTTPNotFound):
 class EndpointAutoScalingRuleNotFound(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/endpoint-auto-scaling-rule-not-found"
     error_title = "Endpoint auto scaling rule not found."
+
+
+class RouteNotFound(BackendError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/route-not-found"
+    error_title = "Route not found."

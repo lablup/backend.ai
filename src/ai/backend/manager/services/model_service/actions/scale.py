@@ -8,7 +8,7 @@ from ai.backend.manager.services.model_service.types import RequesterCtx
 
 
 @dataclass
-class ScaleAction(ModelServiceAction):
+class ScaleServiceReplicasAction(ModelServiceAction):
     requester_ctx: RequesterCtx
     max_session_count_per_model_session: int
     service_id: uuid.UUID
@@ -23,7 +23,7 @@ class ScaleAction(ModelServiceAction):
 
 
 @dataclass
-class ScaleActionResult(BaseActionResult):
+class ScaleServiceReplicasActionResult(BaseActionResult):
     current_route_count: int
     target_count: int
 

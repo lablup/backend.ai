@@ -8,7 +8,7 @@ from ai.backend.manager.services.model_service.types import RequesterCtx
 
 
 @dataclass
-class SyncAction(ModelServiceAction):
+class ForceSyncAction(ModelServiceAction):
     service_id: uuid.UUID
     requester_ctx: RequesterCtx
 
@@ -20,7 +20,7 @@ class SyncAction(ModelServiceAction):
 
 
 @dataclass
-class SyncActionResult(BaseActionResult):
+class ForceSyncActionResult(BaseActionResult):
     success: bool
 
     @override

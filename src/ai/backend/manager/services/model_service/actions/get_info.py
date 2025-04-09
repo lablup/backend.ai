@@ -4,11 +4,12 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_service.types import ServiceInfo
+from ai.backend.manager.services.model_service.types import RequesterCtx, ServiceInfo
 
 
 @dataclass
-class GetInfoAction(ModelServiceAction):
+class GetModelServiceInfoAction(ModelServiceAction):
+    requester_ctx: RequesterCtx
     service_id: uuid.UUID
 
     @override
@@ -21,7 +22,7 @@ class GetInfoAction(ModelServiceAction):
 
 
 @dataclass
-class GetInfoActionResult(BaseActionResult):
+class GetModelServiceInfoActionResult(BaseActionResult):
     data: ServiceInfo
 
     @override

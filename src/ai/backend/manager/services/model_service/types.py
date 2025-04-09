@@ -23,7 +23,7 @@ from ai.backend.manager.models.user import UserRole
 
 
 @dataclass
-class ValidationResult:
+class ModelServicePrepareCtx:
     model_id: uuid.UUID
     model_definition_path: Optional[str]
     requester_access_key: AccessKey
@@ -40,13 +40,13 @@ class ValidationResult:
 class MountOption:
     mount_destination: Optional[str]
     type: MountTypes
-    permission: MountPermission
+    permission: Optional[MountPermission]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "mount_destination": self.mount_destination,
             "type": self.type.value,
-            "permission": self.permission.value,
+            "permission": self.permission.value if self.permission else None,
         }
 
 
