@@ -107,6 +107,7 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedis
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -769,9 +770,15 @@ class AbstractAgent(
             await self.scan_running_kernels()
 
         # Prepare stat collector tasks.
-        self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))
-        self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))
-        self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
+        self.timer_tasks.append(
+            aiotools.create_timer(self.collect_node_stat, UTILIZATION_METRIC_INTERVAL)
+        )
+        self.timer_tasks.append(
+            aiotools.create_timer(self.collect_container_stat, UTILIZATION_METRIC_INTERVAL)
+        )
+        self.timer_tasks.append(
+            aiotools.create_timer(self.collect_process_stat, UTILIZATION_METRIC_INTERVAL)
+        )
 
         # Prepare heartbeats.
         heartbeat_interval = self.local_config["debug"]["heartbeat-interval"]

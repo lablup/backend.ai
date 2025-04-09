@@ -6,7 +6,10 @@ from typing import (
 import aiohttp
 import yarl
 
-from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
+from ai.backend.common.metrics.types import (
+    CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
+    UTILIZATION_METRIC_INTERVAL,
+)
 from ai.backend.common.types import HostPortPair
 
 from .actions.container import (
@@ -84,35 +87,30 @@ class MetricService:
         result = await self._query_label_values(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
         return ContainerMetricMetadataActionResult(result["data"])
 
+    def _parse_query_string_by_metric_spec(
+        self,
+        metric_name: str,
+        sum_by: str,
+        labels: str,
+    ) -> str:
+        match metric_name:
+            case "cpu_util":
+                return f"sum by ({sum_by}) (rate(backendai_container_utilization{{{labels}}}[1m]))"
+            case "net_rx" | "net_tx":
+                return f"sum by ({sum_by}) (rate(backendai_container_utilization{{{labels}}}[1m])) / {UTILIZATION_METRIC_INTERVAL}"
+            case _:
+                return f"sum by ({sum_by}) (backendai_container_utilization{{{labels}}})"
+
     def _get_query_string(
         self,
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> str:
-        label_values: list[str] = [
-            f'container_metric_name="{metric_name}"',
-        ]
-        sum_by_values = ["value_type"]
-        if label.value_type is not None:
-            label_values.append(f'value_type="{label.value_type}"')
-        if label.agent_id is not None:
-            label_values.append(f'agent_id="{label.agent_id}"')
-            sum_by_values.append("agent_id")
-        if label.kernel_id is not None:
-            label_values.append(f'kernel_id="{label.kernel_id}"')
-            sum_by_values.append("kernel_id")
-        if label.session_id is not None:
-            label_values.append(f'session_id="{label.session_id}"')
-            sum_by_values.append("session_id")
-        if label.user_id is not None:
-            label_values.append(f'owner_user_id="{label.user_id}"')
-            sum_by_values.append("owner_user_id")
-        if label.project_id is not None:
-            label_values.append(f'owner_project_id="{label.project_id}"')
-            sum_by_values.append("owner_project_id")
+        label_values = label.get_label_values_for_query(metric_name)
+        sum_by_values = label.get_sum_by_for_query()
         labels = ",".join(label_values)
         sum_by = ",".join(sum_by_values)
-        return f"sum by ({sum_by}) (backendai_container_utilization{{{labels}}})"
+        return self._parse_query_string_by_metric_spec(metric_name, sum_by, labels)
 
     async def query_metric(
         self,
