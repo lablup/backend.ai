@@ -66,33 +66,13 @@ class UtilizationMetricObserver:
                 "agent_id",
                 "kernel_id",
                 "session_id",
-                "owner_user_id",
-                "owner_project_id",
+                "user_id",
+                "project_id",
                 "value_type",
             ],
         )
         self._device_metric = Gauge(
             name="backendai_device_utilization",
-            documentation="Device utilization metrics",
-            labelnames=["device_metric_name", "agent_id", "device_id", "value_type"],
-        )
-
-        self._raw_container_metric = Gauge(
-            name="backendai_raw_container_utilization",
-            documentation="Container utilization metrics",
-            labelnames=[
-                "container_metric_name",
-                "agent_id",
-                "kernel_id",
-                "session_id",
-                "owner_user_id",
-                "owner_project_id",
-                "scoped_project_id",
-                "value_type",
-            ],
-        )
-        self._raw_device_metric = Gauge(
-            name="backendai_raw_device_utilization",
             documentation="Device utilization metrics",
             labelnames=["device_metric_name", "agent_id", "device_id", "value_type"],
         )
@@ -114,8 +94,8 @@ class UtilizationMetricObserver:
                 agent_id=metric.agent_id,
                 kernel_id=metric.kernel_id,
                 session_id=metric.session_id or UNDEFINED,
-                owner_user_id=metric.owner_user_id or UNDEFINED,
-                owner_project_id=metric.owner_project_id or UNDEFINED,
+                user_id=metric.owner_user_id or UNDEFINED,
+                project_id=metric.project_id or UNDEFINED,
                 value_type=metric_value_type,
             ).set(float(value))
 
@@ -126,36 +106,6 @@ class UtilizationMetricObserver:
     ) -> None:
         for metric_value_type, value in metric.value_pairs:
             self._device_metric.labels(
-                device_metric_name=metric.key,
-                agent_id=metric.agent_id,
-                device_id=metric.device_id,
-                value_type=metric_value_type,
-            ).set(float(value))
-
-    def observe_raw_container_metric(
-        self,
-        *,
-        metric: FlattenedKernelMetric,
-    ) -> None:
-        for metric_value_type, value in metric.value_pairs:
-            self._raw_container_metric.labels(
-                container_metric_name=metric.key,
-                agent_id=metric.agent_id,
-                kernel_id=metric.kernel_id,
-                session_id=metric.session_id or UNDEFINED,
-                owner_user_id=metric.owner_user_id or UNDEFINED,
-                owner_project_id=metric.owner_project_id or UNDEFINED,
-                scoped_project_id=metric.scoped_project_id or UNDEFINED,
-                value_type=metric_value_type,
-            ).set(float(value))
-
-    def observe_raw_device_metric(
-        self,
-        *,
-        metric: FlattenedDeviceMetric,
-    ) -> None:
-        for metric_value_type, value in metric.value_pairs:
-            self._raw_device_metric.labels(
                 device_metric_name=metric.key,
                 agent_id=metric.agent_id,
                 device_id=metric.device_id,
