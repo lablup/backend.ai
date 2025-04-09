@@ -37,6 +37,10 @@ class SMTPReporter(ActionMonitor):
     def __init__(self, config: SMTPReporterConfig, concurrency_limit: int = 5) -> None:
         self._config = config
         self._semaphore = asyncio.Semaphore(concurrency_limit)
+        self._smtp = aiosmtplib.SMTP(
+            hostname=self._config.host, port=self._config.port, use_tls=self._config.use_tls
+        )
+        self._smtp_lock = asyncio.Lock()
 
     def _make_action_type(self, action: BaseAction) -> str:
         return f"{action.entity_type()}:{action.operation_type()}"
@@ -53,22 +57,24 @@ class SMTPReporter(ActionMonitor):
             message["From"] = self._config.sender
             message["To"] = ",".join(self._config.recipients)
 
-            smtp = aiosmtplib.SMTP(
-                hostname=self._config.host,
-                port=self._config.port,
-                use_tls=self._config.use_tls,
-            )
-
             try:
-                await smtp.connect()
-                await smtp.login(self._config.username, self._config.password)
-                await smtp.send_message(
+                await self.connect_smtp()
+                await self._smtp.send_message(
                     message, sender=self._config.sender, recipients=self._config.recipients
                 )
             except Exception as e:
                 print(f"Failed to send email: {e}")
-            finally:
-                await smtp.quit()
+
+    async def connect_smtp(self) -> None:
+        async with self._smtp_lock:
+            if not self._smtp.is_connected:
+                await self._smtp.connect()
+                await self._smtp.login(self._config.username, self._config.password)
+
+    async def close_smtp(self) -> None:
+        async with self._smtp_lock:
+            if self._smtp.is_connected:
+                await self._smtp.quit()
 
     @override
     async def prepare(self, action: BaseAction) -> None:
