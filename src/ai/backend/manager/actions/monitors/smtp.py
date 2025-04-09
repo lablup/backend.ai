@@ -38,8 +38,11 @@ class SMTPReporter(ActionMonitor):
         self._config = config
         self._semaphore = asyncio.Semaphore(concurrency_limit)
 
+    def _make_action_type(self, action: BaseAction) -> str:
+        return f"{action.entity_type()}:{action.operation_type()}"
+
     def _make_subject(self, action: BaseAction) -> str:
-        return f"Backend.AI SMTP Log Alert ({action.entity_type()}:{action.operation_type()})"
+        return f"Backend.AI SMTP Log Alert ({self._make_action_type(action)})"
 
     async def _send_email(self, subject: str, email_body: str) -> None:
         async with self._semaphore:
@@ -72,6 +75,8 @@ class SMTPReporter(ActionMonitor):
         if SMTPTriggerPolicy.PRE_ACTION in self._config.trigger_policy:
             subject = self._make_subject(action)
             body = (
+                "Action has been triggered.\n\n"
+                f"Action type: ({self._make_action_type(action)})\n"
                 f"Status: {OperationStatus.RUNNING}\n"
                 f"Description: Task is running...\n"
                 f"Started at: {datetime.now()}\n"
@@ -84,6 +89,8 @@ class SMTPReporter(ActionMonitor):
             if result.meta.status == OperationStatus.ERROR:
                 subject = self._make_subject(action)
                 body = (
+                    "Action has resulted in an error.\n\n"
+                    f"Action type: ({self._make_action_type(action)})\n"
                     f"Entity ID: {result.result.entity_id() if result.result else UNKNOWN_ENTITY_ID}\n"
                     f"Status: {result.meta.status}\n"
                     f"Description: {result.meta.description}\n"
@@ -96,6 +103,8 @@ class SMTPReporter(ActionMonitor):
         if SMTPTriggerPolicy.POST_ACTION in self._config.trigger_policy:
             subject = self._make_subject(action)
             body = (
+                "Action has been completed.\n\n"
+                f"Action type: ({self._make_action_type(action)})\n"
                 f"Entity ID: {result.result.entity_id() if result.result else UNKNOWN_ENTITY_ID}\n"
                 f"Status: {result.meta.status}\n"
                 f"Description: {result.meta.description}\n"
