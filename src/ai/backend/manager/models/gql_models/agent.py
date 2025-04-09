@@ -74,6 +74,11 @@ __all__ = (
     "Agent",
     "AgentNode",
     "AgentConnection",
+    "AgentSummary",
+    "AgentList",
+    "AgentSummaryList",
+    "ModifyAgent",
+    "ModifyAgentInput",
 )
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {

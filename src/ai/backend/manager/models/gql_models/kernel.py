@@ -68,6 +68,10 @@ if TYPE_CHECKING:
 __all__ = (
     "KernelNode",
     "KernelConnection",
+    "ComputeContainer",
+    "ComputeContainerList",
+    "LegacyComputeSession",
+    "LegacyComputeSessionList",
 )
 
 
