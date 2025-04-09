@@ -3,7 +3,7 @@ import enum
 from dataclasses import dataclass
 from datetime import datetime
 from email.mime.text import MIMEText
-from typing import Final
+from typing import Final, override
 
 import aiosmtplib
 
@@ -15,7 +15,7 @@ from .monitor import ActionMonitor
 UNKNOWN_ENTITY_ID: Final[str] = "(unknown)"
 
 
-class TriggerPolicy(enum.Flag):
+class SMTPTriggerPolicy(enum.Flag):
     PRE_ACTION = enum.auto()
     POST_ACTION = enum.auto()
     ON_ERROR = enum.auto()
@@ -30,7 +30,7 @@ class SMTPReporterConfig:
     sender: str
     recipients: list[str]
     use_tls: bool
-    trigger_policy: TriggerPolicy
+    trigger_policy: SMTPTriggerPolicy
 
 
 class SMTPReporter(ActionMonitor):
@@ -67,8 +67,9 @@ class SMTPReporter(ActionMonitor):
             finally:
                 await smtp.quit()
 
+    @override
     async def prepare(self, action: BaseAction) -> None:
-        if TriggerPolicy.PRE_ACTION in self._config.trigger_policy:
+        if SMTPTriggerPolicy.PRE_ACTION in self._config.trigger_policy:
             subject = self._make_subject(action)
             body = (
                 f"Status: {OperationStatus.RUNNING}\n"
@@ -77,8 +78,9 @@ class SMTPReporter(ActionMonitor):
             )
             asyncio.create_task(self._send_email(subject, body))
 
+    @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
-        if TriggerPolicy.ON_ERROR in self._config.trigger_policy:
+        if SMTPTriggerPolicy.ON_ERROR in self._config.trigger_policy:
             if result.meta.status == OperationStatus.ERROR:
                 subject = self._make_subject(action)
                 body = (
@@ -91,7 +93,7 @@ class SMTPReporter(ActionMonitor):
                 )
                 asyncio.create_task(self._send_email(subject, body))
 
-        if TriggerPolicy.POST_ACTION in self._config.trigger_policy:
+        if SMTPTriggerPolicy.POST_ACTION in self._config.trigger_policy:
             subject = self._make_subject(action)
             body = (
                 f"Entity ID: {result.result.entity_id() if result.result else UNKNOWN_ENTITY_ID}\n"
