@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
