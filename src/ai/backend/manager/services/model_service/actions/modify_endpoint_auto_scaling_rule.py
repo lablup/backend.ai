@@ -9,7 +9,7 @@ from ai.backend.manager.services.model_service.types import (
     EndpointAutoScalingRuleData,
     RequesterCtx,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
@@ -30,12 +30,8 @@ class ModifyEndpointAutoScalingRuleAction(EndpointAction):
     cooldown_seconds: OptionalState[int] = field(
         default_factory=lambda: OptionalState.nop("cooldown_seconds")
     )
-    min_replicas: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("min_replicas")
-    )
-    max_replicas: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_replicas")
-    )
+    min_replicas: TriState[int] = field(default_factory=lambda: TriState.nop("min_replicas"))
+    max_replicas: TriState[int] = field(default_factory=lambda: TriState.nop("max_replicas"))
 
     @override
     def entity_id(self) -> Optional[str]:
