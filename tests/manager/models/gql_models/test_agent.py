@@ -55,6 +55,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         network_plugin_ctx=None,  # type: ignore
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
+        processors=None,  # type: ignore
     )
 
 

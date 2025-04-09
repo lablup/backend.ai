@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Self
+from typing import TYPE_CHECKING, Any, Callable, Optional, Self
 from uuid import UUID
 
 import graphene
@@ -11,8 +11,17 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.gql_models.base import to_tri_state
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.resource_preset.actions.create_preset import (
+        CreateResourcePresetInputData,
+    )
+    from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+        ModifyResourcePresetInputData,
+    )
 
 from .base import (
     Base,
@@ -21,13 +30,10 @@ from .base import (
     ResourceSlotColumn,
     batch_result,
     batch_result_in_scalar_stream,
-    cast,
-    set_if_set,
 )
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import UserRole
-from .utils import execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -283,6 +289,17 @@ class CreateResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
+    def to_dataclass(self) -> CreateResourcePresetInputData:
+        from ai.backend.manager.services.resource_preset.actions.create_preset import (
+            CreateResourcePresetInputData,
+        )
+
+        return CreateResourcePresetInputData(
+            resource_slots=ResourceSlot.from_json(self.resource_slots),
+            shared_memory=self.shared_memory if self.shared_memory else None,
+            scaling_group_name=self.scaling_group_name if self.scaling_group_name else None,
+        )
+
 
 class ModifyResourcePresetInput(graphene.InputObjectType):
     name = graphene.String(
@@ -297,6 +314,22 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
             "Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with."
         ),
     )
+
+    def to_dataclass(self) -> ModifyResourcePresetInputData:
+        from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+            ModifyResourcePresetInputData,
+        )
+
+        resource_slots = (
+            ResourceSlot.from_json(self.resource_slots) if self.resource_slots else None
+        )
+
+        return ModifyResourcePresetInputData(
+            resource_slots=to_tri_state("resource_slots", resource_slots),
+            name=to_tri_state("name", self.name),
+            shared_memory=to_tri_state("shared_memory", self.shared_memory),
+            scaling_group_name=to_tri_state("scaling_group_name", self.scaling_group_name),
+        )
 
 
 class CreateResourcePreset(graphene.Mutation):
@@ -318,33 +351,17 @@ class CreateResourcePreset(graphene.Mutation):
         name: str,
         props: CreateResourcePresetInput,
     ) -> CreateResourcePreset:
-        graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {
-            "name": name,
-            "resource_slots": ResourceSlot.from_user_input(props.resource_slots, None),
-        }
-        set_if_set(
-            props, data, "shared_memory", clean_func=lambda v: BinarySize.from_str(v) if v else None
+        from ai.backend.manager.services.resource_preset.actions.create_preset import (
+            CreateResourcePresetAction,
         )
-        set_if_set(props, data, "scaling_group_name")
-        scaling_group_name = cast(Optional[str], data.get("scaling_group_name"))
 
-        async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
-            return await ResourcePresetRow.create(
-                name,
-                cast(ResourceSlot, data["resource_slots"]),
-                scaling_group_name,
-                cast(Optional[int], data.get("shared_memory")),
-                db_session=db_session,
-            )
+        graph_ctx: GraphQueryContext = info.context
 
-        async with graph_ctx.db.connect() as db_conn:
-            preset_row = await execute_with_txn_retry(_create, graph_ctx.db.begin_session, db_conn)
-        if preset_row is None:
-            raise ValueError(
-                f"Duplicate resource preset name (name:{name}, scaling_group:{scaling_group_name})"
-            )
-        return cls(True, "success", ResourcePreset.from_row(graph_ctx, preset_row))
+        result = await graph_ctx.processors.resource_preset.create_preset.wait_for_complete(
+            CreateResourcePresetAction(name=name, props=props.to_dataclass())
+        )
+
+        return cls(True, "success", ResourcePreset.from_row(graph_ctx, result.resource_preset))
 
 
 class ModifyResourcePreset(graphene.Mutation):
@@ -373,42 +390,16 @@ class ModifyResourcePreset(graphene.Mutation):
         name: Optional[str],
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
+        from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+            ModifyResourcePresetAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
 
-        data: Dict[str, Any] = {}
-        preset_id = id
-        if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
-
-        set_if_set(
-            props,
-            data,
-            "name",
+        await graph_ctx.processors.resource_preset.modify_preset.wait_for_complete(
+            ModifyResourcePresetAction(id=id, name=name, props=props.to_dataclass())
         )
-        set_if_set(
-            props,
-            data,
-            "resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
-        )
-        set_if_set(
-            props, data, "shared_memory", clean_func=lambda v: BinarySize.from_str(v) if v else None
-        )
-        set_if_set(props, data, "scaling_group_name")
 
-        async def _update(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
-            if preset_id is not None:
-                query_option = filter_by_id(preset_id)
-            else:
-                if name is None:
-                    raise ValueError("One of (`id` or `name`) parameter should be not null")
-                query_option = filter_by_name(name)
-            return await ResourcePresetRow.update(query_option, data, db_session=db_session)
-
-        async with graph_ctx.db.connect() as db_conn:
-            preset_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
-            if preset_row is None:
-                raise ValueError("Duplicate resource preset record")
         return cls(True, "success")
 
 
@@ -436,21 +427,14 @@ class DeleteResourcePreset(graphene.Mutation):
         id: Optional[UUID],
         name: Optional[str],
     ) -> DeleteResourcePreset:
+        from ai.backend.manager.services.resource_preset.actions.delete_preset import (
+            DeleteResourcePresetAction,
+        )
+
         graph_ctx: GraphQueryContext = info.context
 
-        preset_id = id
-        if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
+        await graph_ctx.processors.resource_preset.delete_preset.wait_for_complete(
+            DeleteResourcePresetAction(id=id, name=name)
+        )
 
-        async def _delete(db_session: AsyncSession) -> None:
-            if preset_id is not None:
-                query_option = filter_by_id(preset_id)
-            else:
-                if name is None:
-                    raise ValueError("One of (`id` or `name`) parameter should be not null")
-                query_option = filter_by_name(name)
-            return await ResourcePresetRow.delete(query_option, db_session=db_session)
-
-        async with graph_ctx.db.connect() as db_conn:
-            await execute_with_txn_retry(_delete, graph_ctx.db.begin_session, db_conn)
         return cls(True, "success")
