@@ -727,7 +727,7 @@ class ModelService:
     async def _verify_user_access_scopes(
         self, requester_ctx: RequesterCtx, owner_uuid: uuid.UUID
     ) -> None:
-        if not requester_ctx.is_authorized:
+        if requester_ctx.is_authorized is False:
             raise GenericForbidden("Only authorized requests may have access key scopes.")
         if owner_uuid is None or owner_uuid == requester_ctx.user_id:
             return

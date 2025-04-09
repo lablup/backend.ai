@@ -3,9 +3,17 @@ from ai.backend.manager.services.model_service.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
 )
+from ai.backend.manager.services.model_service.actions.create_endpoint_auto_scaling_rule import (
+    CreateEndpointAutoScalingRuleAction,
+    CreateEndpointAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.model_service.actions.create_service import (
     CreateModelServiceAction,
     CreateModelServiceActionResult,
+)
+from ai.backend.manager.services.model_service.actions.delete_enpoint_auto_scaling_rule import (
+    DeleteEndpointAutoScalingRuleAction,
+    DeleteEndpointAutoScalingRuleActionResult,
 )
 from ai.backend.manager.services.model_service.actions.delete_route import (
     DeleteRouteAction,
@@ -34,6 +42,14 @@ from ai.backend.manager.services.model_service.actions.list_errors import (
 from ai.backend.manager.services.model_service.actions.list_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
+)
+from ai.backend.manager.services.model_service.actions.modify_endpoint_auto_scaling_rule import (
+    ModifyEndpointAutoScalingRuleAction,
+    ModifyEndpointAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.model_service.actions.modify_enpoint import (
+    ModifyEndpointAction,
+    ModifyEndpointActionResult,
 )
 from ai.backend.manager.services.model_service.actions.scale import (
     ScaleServiceReplicasAction,
@@ -67,6 +83,16 @@ class ModelServiceProcessors:
     update_route: ActionProcessor[UpdateRouteAction, UpdateRouteActionResult]
     delete_route: ActionProcessor[DeleteRouteAction, DeleteRouteActionResult]
     generate_token: ActionProcessor[GenerateTokenAction, GenerateTokenActionResult]
+    modify_endpoint: ActionProcessor[ModifyEndpointAction, ModifyEndpointActionResult]
+    create_endpoint_auto_scaling_rule: ActionProcessor[
+        CreateEndpointAutoScalingRuleAction, CreateEndpointAutoScalingRuleActionResult
+    ]
+    delete_endpoint_auto_scaling_rule: ActionProcessor[
+        DeleteEndpointAutoScalingRuleAction, DeleteEndpointAutoScalingRuleActionResult
+    ]
+    modify_endpoint_auto_scaling_rule: ActionProcessor[
+        ModifyEndpointAutoScalingRuleAction, ModifyEndpointAutoScalingRuleActionResult
+    ]
 
     def __init__(self, service: ModelService) -> None:
         self.create_model_service = ActionProcessor(service.create)
@@ -81,3 +107,13 @@ class ModelServiceProcessors:
         self.update_route = ActionProcessor(service.update_route)
         self.delete_route = ActionProcessor(service.delete_route)
         self.generate_token = ActionProcessor(service.generate_token)
+        self.modify_endpoint = ActionProcessor(service.modify_endpoint)
+        self.create_endpoint_auto_scaling_rule = ActionProcessor(
+            service.create_endpoint_auto_scaling_rule
+        )
+        self.delete_endpoint_auto_scaling_rule = ActionProcessor(
+            service.delete_endpoint_auto_scaling_rule
+        )
+        self.modify_endpoint_auto_scaling_rule = ActionProcessor(
+            service.modify_endpoint_auto_scaling_rule
+        )

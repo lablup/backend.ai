@@ -1,7 +1,7 @@
 import logging
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -12,6 +12,7 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.services.model_service.types import RoutingData
 
 from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
@@ -222,6 +223,20 @@ class Routing(graphene.ObjectType):
     live_stat = graphene.JSONString(description="Added in 24.12.0.")
 
     _endpoint_row: "EndpointRow"
+
+    @classmethod
+    def from_dto(cls, dto: Optional[RoutingData]) -> Optional[Self]:
+        if dto is None:
+            return None
+        return cls(
+            routing_id=dto.id,
+            endpoint=dto.endpoint,
+            session=dto.session,
+            status=dto.status.name,
+            traffic_ratio=dto.traffic_ratio,
+            created_at=dto.created_at,
+            error_data=dto.error_data,
+        )
 
     @classmethod
     async def from_row(

@@ -13,6 +13,7 @@ from ai.backend.common.types import (
     ClusterMode,
     MountPermission,
     MountTypes,
+    ResourceSlot,
     RuntimeVariant,
     VFolderMount,
 )
@@ -110,7 +111,7 @@ class CompactServiceInfo:
 
 @dataclass
 class RequesterCtx:
-    is_authorized: bool
+    is_authorized: Optional[bool]
     user_id: uuid.UUID
     user_role: UserRole
     domain_name: str
@@ -138,12 +139,9 @@ class RoutingData:
     traffic_ratio: float
     created_at: datetime
     error_data: dict[str, Any]
-    live_stat: dict[str, Any]
 
     @classmethod
-    def from_row(cls, row: Optional[RoutingRow]) -> Optional[Self]:
-        if row is None:
-            return None
+    def from_row(cls, row: RoutingRow) -> Self:
         return cls(
             id=row.id,
             endpoint=row.endpoint,
@@ -152,7 +150,6 @@ class RoutingData:
             traffic_ratio=row.traffic_ratio,
             created_at=row.created_at,
             error_data=row.error_data,
-            live_stat=row.live_stat,
         )
 
 
@@ -169,17 +166,17 @@ class EndpointData:
     domain: str
     project: uuid.UUID
     resource_group: str
-    resource_slots: Mapping[str, Any]
+    resource_slots: ResourceSlot
     url: str
 
     model: uuid.UUID
     model_definition_path: str | None
     model_mount_destination: Optional[str]
 
-    created_user: uuid.UUID
+    created_user_id: uuid.UUID
     created_user_email: Optional[str]
 
-    session_owner: uuid.UUID
+    session_owner_id: uuid.UUID
     session_owner_email: str
 
     tag: Optional[str]
@@ -193,7 +190,6 @@ class EndpointData:
 
     resource_opts: Optional[Mapping[str, Any]]
     replicas: int
-    desired_session_count: int
 
     cluster_mode: ClusterMode
     cluster_size: int
@@ -202,7 +198,7 @@ class EndpointData:
     destroyed_at: datetime
     retries: int
 
-    routings: Optional[RoutingData]
+    routings: Optional[list[RoutingData]]
     lifecycle_stage: str
     runtime_variant: RuntimeVariant
 
@@ -221,10 +217,12 @@ class EndpointData:
             model=row.model,
             model_definition_path=row.model_definition_path,
             model_mount_destination=row.model_mount_destination,
-            created_user=row.created_user,
-            created_user_email=row.created_user_email,
-            session_owner=row.session_owner,
-            session_owner_email=row.session_owner_email,
+            created_user_id=row.created_user,
+            created_user_email=row.created_user_row.email
+            if row.created_user_row is not None
+            else None,
+            session_owner_id=row.session_owner,
+            session_owner_email=row.session_owner_row.email,
             tag=row.tag,
             startup_command=row.startup_command,
             bootstrap_script=row.bootstrap_script,
@@ -233,15 +231,16 @@ class EndpointData:
             name=row.name,
             resource_opts=row.resource_opts,
             replicas=row.replicas,
-            desired_session_count=row.desired_session_count,
             cluster_mode=ClusterMode(row.cluster_mode),
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
             created_at=row.created_at,
             destroyed_at=row.destroyed_at,
             retries=row.retries,
-            routings=RoutingData.from_row(row.routings),
-            lifecycle_stage=row.lifecycle_stage,
+            routings=[RoutingData.from_row(routing) for routing in row.routings]
+            if row.routings
+            else None,
+            lifecycle_stage=row.lifecycle_stage.name,
             runtime_variant=row.runtime_variant,
         )
 
