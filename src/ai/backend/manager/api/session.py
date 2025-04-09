@@ -36,7 +36,7 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import web
 from dateutil.tz import tzutc
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
@@ -826,8 +826,10 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
 
 
 class TransitSessionStatusRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     ids: list[uuid.UUID] = Field(
-        validation_alias=AliasChoices("ids", "session_ids", "sessionIds", "SessionIds"),
+        validation_alias=AliasChoices("session_ids", "sessionIds", "SessionIds"),
         description="ID array of sessions to check and transit status.",
     )
 
@@ -1542,13 +1544,13 @@ async def list_files(request: web.Request) -> web.Response:
 
 class ContainerLogRequestModel(BaseModel):
     owner_access_key: str | None = Field(
-        validation_alias=AliasChoices("owner_access_key", "ownerAccessKey"),
         default=None,
+        alias="ownerAccessKey",
     )
     kernel_id: uuid.UUID | None = Field(
-        validation_alias=AliasChoices("kernel_id", "kernelId"),
         description="Target kernel to get container logs.",
         default=None,
+        alias="kernelId",
     )
 
 

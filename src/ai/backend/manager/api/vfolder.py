@@ -37,6 +37,7 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     BaseModel,
+    ConfigDict,
     Field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -369,22 +370,18 @@ def vfolder_check_exists(
 
 
 class CreateRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: tv.VFolderName = Field(
         description="Name of the vfolder",
     )
-    folder_host: str | None = Field(
-        validation_alias=AliasChoices("host", "folder_host"),
-        default=None,
-    )
+    folder_host: str | None = Field(default=None, alias="host")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
-    unmanaged_path: str | None = Field(
-        validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
+    unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
+    group_id: str | uuid.UUID | None = Field(
         default=None,
-    )
-    group: str | uuid.UUID | None = Field(
-        validation_alias=AliasChoices("group", "groupId", "group_id"),
-        default=None,
+        validation_alias=AliasChoices("group", "groupId"),
     )
     cloneable: bool = Field(
         default=False,
@@ -401,7 +398,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params.group
+    group_id_or_name = params.group_id
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -1675,8 +1672,10 @@ async def _delete(
 
 
 class DeleteRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("vfolderId", "id"),
         description="Target vfolder id to soft-delete, to go to trash bin",
     )
 
@@ -1746,8 +1745,10 @@ async def delete_by_name(request: web.Request) -> web.Response:
 
 
 class IDRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str = Field(
-        validation_alias=AliasChoices("vfolder_name", "vfolderName", "name"),
+        validation_alias=AliasChoices("vfolder_name", "vfolderName"),
         description="Target vfolder name",
     )
 
@@ -1782,8 +1783,10 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
 
 
 class DeleteFromTrashRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to hard-delete, permanently remove from storage",
     )
 
@@ -1837,8 +1840,10 @@ async def force_delete(request: web.Request) -> web.Response:
 
 
 class PurgeRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to purge, permanently remove from DB",
     )
 
@@ -1877,8 +1882,10 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
 
 
 class RestoreRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to restore",
     )
 

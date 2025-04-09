@@ -288,16 +288,16 @@ class ServiceConfigModel(BaseModel):
         default=None,
     )
     model_version: int = Field(
-        validation_alias=AliasChoices("model_version", "modelVersion"),
         description="Unused; Reserved for future works",
         default=1,
+        alias="modelVersion",
     )
     model_mount_destination: str = Field(
-        validation_alias=AliasChoices("model_mount_destination", "modelMountDestination"),
         default="/models",
         description=(
             "Mount destination for the model VFolder will be mounted inside the inference session. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
         ),
+        alias="modelMountDestination",
     )
 
     extra_mounts: Annotated[
@@ -316,9 +316,9 @@ class ServiceConfigModel(BaseModel):
         default=None,
     )
     scaling_group: str = Field(
-        validation_alias=AliasChoices("scaling_group", "scalingGroup"),
         description="Name of the resource group to spawn inference sessions",
         examples=["nvidia-H100"],
+        alias="scalingGroup",
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
@@ -327,18 +327,20 @@ class ServiceConfigModel(BaseModel):
 
 
 class NewServiceRequestModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     service_name: tv.SessionName = Field(
-        validation_alias=AliasChoices("name", "service_name", "clientSessionToken"),
         description="Name of the service",
+        validation_alias=AliasChoices("name", "clientSessionToken"),
     )
     replicas: int = Field(
-        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount", "replicas"),
         description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
+        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
     )
     image: str = Field(
-        validation_alias=AliasChoices("image", "lang"),
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
+        alias="lang",
     )
     runtime_variant: Annotated[
         RuntimeVariant,
@@ -348,39 +350,40 @@ class NewServiceRequestModel(BaseModel):
         ),
     ]
     architecture: str = Field(
-        validation_alias=AliasChoices("arch", "architecture"),
         description="Image architecture",
         default=DEFAULT_IMAGE_ARCH,
+        alias="arch",
     )
-    group: str = Field(
-        validation_alias=AliasChoices("group", "groupName", "group_name"),
+    group_name: str = Field(
         description="Name of project to spawn session",
         default="default",
+        validation_alias=AliasChoices("group", "groupName"),
     )
-    domain: str = Field(
-        validation_alias=AliasChoices("domain", "domainName", "domain_name"),
+    domain_name: str = Field(
         description="Name of domain to spawn session",
         default="default",
+        validation_alias=AliasChoices("domain", "domainName"),
     )
     cluster_size: int = Field(
-        validation_alias=AliasChoices("cluster_size", "clusterSize"), default=1
+        default=1,
+        alias="clusterSize",
     )
     cluster_mode: ClusterMode = Field(
-        validation_alias=AliasChoices("cluster_mode", "clusterMode"),
         default=ClusterMode.SINGLE_NODE,
+        alias="clusterMode",
     )
     tag: str | None = Field(default=None)
     startup_command: str | None = Field(
-        validation_alias=AliasChoices("startup_command", "startupCommand"),
         default=None,
+        alias="startupCommand",
     )
     bootstrap_script: str | None = Field(
-        validation_alias=AliasChoices("bootstrap_script", "bootstrapScript"),
         default=None,
+        alias="bootstrapScript",
     )
     callback_url: AnyUrl | None = Field(
-        validation_alias=AliasChoices("callback_url", "callbackUrl", "CallbackURL"),
         default=None,
+        validation_alias=AliasChoices("callbackUrl", "CallbackURL"),
     )
     owner_access_key: str | None = Field(
         description=(
@@ -429,8 +432,8 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             conn,
             params.config.scaling_group,
             owner_access_key,
-            params.domain,
-            params.group,
+            params.domain_name,
+            params.group_name,
         )
 
         params.config.scaling_group = checked_scaling_group
@@ -449,7 +452,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
                 conn,
                 owner_uuid,
                 user_role=owner_role,
-                domain_name=params.domain,
+                domain_name=params.domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_vf_conds,
             )
@@ -465,7 +468,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
                         conn,
                         owner_uuid,
                         user_role=owner_role,
-                        domain_name=params.domain,
+                        domain_name=params.domain_name,
                         allowed_vfolder_types=allowed_vfolder_types,
                         extra_vf_conds=extra_vf_conds,
                     )
@@ -489,7 +492,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             params.config.model_mount_destination,
             params.config.extra_mounts,
             UserScope(
-                domain_name=params.domain,
+                domain_name=params.domain_name,
                 group_id=group_id,
                 user_uuid=owner_uuid,
                 user_role=owner_role,
@@ -568,7 +571,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         "",
         image_row.image_ref,
         UserScope(
-            domain_name=params.domain,
+            domain_name=params.domain_name,
             group_id=validation_result.group_id,
             user_uuid=validation_result.owner_uuid,
             user_role=validation_result.owner_role,
@@ -598,7 +601,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             raise InvalidAPIParameters("Cannot create multiple services with same name")
 
         project_id = await resolve_group_name_or_id(
-            await db_sess.connection(), params.domain, params.group
+            await db_sess.connection(), params.domain_name, params.group_name
         )
         if project_id is None:
             raise InvalidAPIParameters(f"Invalid group name {project_id}")
@@ -610,7 +613,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             params.replicas,
             image_row,
             validation_result.model_id,
-            params.domain,
+            params.domain_name,
             project_id,
             validation_result.scaling_group,
             params.config.resources,
@@ -685,7 +688,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             f"model-eval-{secrets.token_urlsafe(16)}",
             image_row.image_ref,
             UserScope(
-                domain_name=params.domain,
+                domain_name=params.domain_name,
                 group_id=validation_result.group_id,
                 user_uuid=created_user.uuid,
                 user_role=created_user.role,
