@@ -24,6 +24,17 @@ __all__ = ("AuditLogRow",)
 class AuditLogEntityType(enum.StrEnum):
     IMAGE = "image"
     CONTAINER_REGISTRY = "container_registry"
+    DOMAIN = "domain"
+    GROUP = "group"
+    AGENT = "agent"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    PROJECT_RESOURCE_POLICY = "project_resource_policy"
+    USER_RESOURCE_POLICY = "user_resource_policy"
+    RESOURCE_PRESET = "resource_preset"
+    SESSION = "session"
+    USER = "user"
+    VFOLDER = "vfolder"
+    VFOLDER_INVITATION = "vfolder_invitation"
 
 
 class OperationStatus(enum.StrEnum):
