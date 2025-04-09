@@ -147,6 +147,13 @@ from .gql_models.image import (
     UnloadImage,
     UntagImageFromRegistry,
 )
+from .gql_models.kernel import (
+    ComputeContainer,
+    ComputeContainerList,
+    LegacyComputeSession,
+    LegacyComputeSessionList,
+)
+from .gql_models.keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .gql_models.scaling_group import (
     AssociateScalingGroupsWithDomain,
     AssociateScalingGroupsWithKeyPair,
@@ -169,7 +176,9 @@ from .gql_models.scaling_group import (
 )
 from .gql_models.session import (
     CheckAndTransitStatus,
+    ComputeSession,
     ComputeSessionConnection,
+    ComputeSessionList,
     ComputeSessionNode,
     ModifyComputeSession,
     SessionPermissionValueField,
@@ -200,13 +209,6 @@ from .image import (
     ImageStatus,
     PublicImageLoadFilter,
 )
-from .kernel import (
-    ComputeContainer,
-    ComputeContainerList,
-    LegacyComputeSession,
-    LegacyComputeSessionList,
-)
-from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import (
@@ -244,8 +246,6 @@ from .scaling_group import (
     query_allowed_sgroups,
 )
 from .session import (
-    ComputeSession,
-    ComputeSessionList,
     SessionQueryConditions,
     SessionStatus,
 )

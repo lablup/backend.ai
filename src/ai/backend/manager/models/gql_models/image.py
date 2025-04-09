@@ -71,6 +71,7 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
 )
 from ai.backend.manager.services.image.types import ImageRefData
+from ai.backend.manager.types import OptionalState, TriState
 
 from ...api.exceptions import ImageNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
@@ -99,8 +100,6 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     extract_object_uuid,
-    to_optional_state,
-    to_tri_state,
 )
 
 if TYPE_CHECKING:
@@ -1103,21 +1102,23 @@ class ModifyImageInput(graphene.InputObjectType):
         )
 
         return ModifyImageInputData(
-            name=to_optional_state("name", self.name),
-            registry=to_optional_state("registry", self.registry),
-            image=to_optional_state("image", self.image),
-            tag=to_optional_state("tag", self.tag),
-            architecture=to_optional_state("architecture", self.architecture),
-            is_local=to_optional_state("is_local", self.is_local),
-            size_bytes=to_optional_state("size_bytes", self.size_bytes),
-            type=to_optional_state("type", self.type),
-            config_digest=to_optional_state("config_digest", self.digest),
-            labels=to_optional_state("labels", {label.key: label.value for label in self.labels}),
-            accelerators=to_tri_state(
+            name=OptionalState.from_graphql("name", self.name),
+            registry=OptionalState.from_graphql("registry", self.registry),
+            image=OptionalState.from_graphql("image", self.image),
+            tag=OptionalState.from_graphql("tag", self.tag),
+            architecture=OptionalState.from_graphql("architecture", self.architecture),
+            is_local=OptionalState.from_graphql("is_local", self.is_local),
+            size_bytes=OptionalState.from_graphql("size_bytes", self.size_bytes),
+            type=OptionalState.from_graphql("type", self.type),
+            config_digest=OptionalState.from_graphql("config_digest", self.digest),
+            labels=OptionalState.from_graphql(
+                "labels", {label.key: label.value for label in self.labels}
+            ),
+            accelerators=TriState.from_graphql(
                 "accelerators",
                 accelerators,
             ),
-            resources=to_optional_state(
+            resources=OptionalState.from_graphql(
                 "resources",
                 resources_data,
             ),

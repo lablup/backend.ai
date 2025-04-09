@@ -18,7 +18,7 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
-from ai.backend.manager.models.gql_models.base import to_optional_state, to_tri_state
+from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
@@ -483,37 +483,39 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
         )
 
         return ModifyKeyPairResourcePolicyInputData(
-            default_for_unspecified=to_optional_state(
+            default_for_unspecified=OptionalState.from_graphql(
                 "default_for_unspecified", default_for_unspecified
             ),
-            total_resource_slots=to_optional_state(
+            total_resource_slots=OptionalState.from_graphql(
                 "total_resource_slots", self.total_resource_slots
             ),
-            max_session_lifetime=to_optional_state(
+            max_session_lifetime=OptionalState.from_graphql(
                 "max_session_lifetime", self.max_session_lifetime
             ),
-            max_concurrent_sessions=to_optional_state(
+            max_concurrent_sessions=OptionalState.from_graphql(
                 "max_concurrent_sessions", self.max_concurrent_sessions
             ),
-            max_concurrent_sftp_sessions=to_optional_state(
+            max_concurrent_sftp_sessions=OptionalState.from_graphql(
                 "max_concurrent_sftp_sessions", self.max_concurrent_sftp_sessions
             ),
-            max_containers_per_session=to_optional_state(
+            max_containers_per_session=OptionalState.from_graphql(
                 "max_containers_per_session", self.max_containers_per_session
             ),
-            idle_timeout=to_optional_state("idle_timeout", self.idle_timeout),
-            allowed_vfolder_hosts=to_optional_state(
+            idle_timeout=OptionalState.from_graphql("idle_timeout", self.idle_timeout),
+            allowed_vfolder_hosts=OptionalState.from_graphql(
                 "allowed_vfolder_hosts", self.allowed_vfolder_hosts
             ),
-            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
-            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
-            max_quota_scope_size=to_optional_state(
+            max_vfolder_count=OptionalState.from_graphql(
+                "max_vfolder_count", self.max_vfolder_count
+            ),
+            max_vfolder_size=OptionalState.from_graphql("max_vfolder_size", self.max_vfolder_size),
+            max_quota_scope_size=OptionalState.from_graphql(
                 "max_quota_scope_size", self.max_quota_scope_size
             ),
-            max_pending_session_count=to_optional_state(
+            max_pending_session_count=OptionalState.from_graphql(
                 "max_pending_session_count", self.max_pending_session_count
             ),
-            max_pending_session_resource_slots=to_tri_state(
+            max_pending_session_resource_slots=TriState.from_graphql(
                 "max_pending_session_resource_slots", self.max_pending_session_resource_slots
             ),
         )
@@ -759,14 +761,16 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
         )
 
         return ModifyUserResourcePolicyInputData(
-            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
-            max_quota_scope_size=to_optional_state(
+            max_vfolder_count=OptionalState.from_graphql(
+                "max_vfolder_count", self.max_vfolder_count
+            ),
+            max_quota_scope_size=OptionalState.from_graphql(
                 "max_quota_scope_size", self.max_quota_scope_size
             ),
-            max_session_count_per_model_session=to_optional_state(
+            max_session_count_per_model_session=OptionalState.from_graphql(
                 "max_session_count_per_model_session", self.max_session_count_per_model_session
             ),
-            max_customized_image_count=to_optional_state(
+            max_customized_image_count=OptionalState.from_graphql(
                 "max_customized_image_count", self.max_customized_image_count
             ),
         )
@@ -1013,12 +1017,16 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
         )
 
         return ModifyProjectResourcePolicyInputData(
-            max_vfolder_count=to_optional_state("max_vfolder_count", self.max_vfolder_count),
-            max_quota_scope_size=to_optional_state(
+            max_vfolder_count=OptionalState.from_graphql(
+                "max_vfolder_count", self.max_vfolder_count
+            ),
+            max_quota_scope_size=OptionalState.from_graphql(
                 "max_quota_scope_size", self.max_quota_scope_size
             ),
-            max_vfolder_size=to_optional_state("max_vfolder_size", self.max_vfolder_size),
-            max_network_count=to_optional_state("max_network_count", self.max_network_count),
+            max_vfolder_size=OptionalState.from_graphql("max_vfolder_size", self.max_vfolder_size),
+            max_network_count=OptionalState.from_graphql(
+                "max_network_count", self.max_network_count
+            ),
         )
 
 

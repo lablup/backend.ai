@@ -42,9 +42,10 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.gql_models.keypair import CreateKeyPair
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
-from ai.backend.manager.models.keypair import CreateKeyPair, KeyPairRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     SessionRow,

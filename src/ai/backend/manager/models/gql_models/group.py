@@ -68,6 +68,20 @@ if TYPE_CHECKING:
     from .scaling_group import ScalingGroup
 
 
+__all__ = (
+    "GroupNode",
+    "GroupConnection",
+    "Group",
+    "GroupInput",
+    "ModifyGroupInput",
+    "CreateGroup",
+    "ModifyGroup",
+    "DeleteGroup",
+    "PurgeGroup",
+    "GroupPermissionField",
+)
+
+
 class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)

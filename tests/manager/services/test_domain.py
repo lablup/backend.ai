@@ -98,7 +98,7 @@ async def create_domain(
                 input=DomainCreator(
                     name="test-create-domain-node",
                     description="Test domain",
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot.from_user_input({}, None),
                     allowed_vfolder_hosts={},
                     allowed_docker_registries=[],
                     integration_id=None,

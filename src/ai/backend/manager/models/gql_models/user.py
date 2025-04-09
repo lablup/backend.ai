@@ -69,6 +69,22 @@ if TYPE_CHECKING:
     from .group import GroupNode
 
 
+__all__ = (
+    "UserNode",
+    "UserConnection",
+    "User",
+    "UserGroup",
+    "UserList",
+    "UserInput",
+    "ModifyUserInput",
+    "PurgeUserInput",
+    "CreateUser",
+    "ModifyUser",
+    "DeleteUser",
+    "PurgeUser",
+)
+
+
 class UserNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)

@@ -49,6 +49,29 @@ from ..scaling_group import (
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
+__all__ = (
+    "ScalingGroup",
+    "ScalingGroupNode",
+    "ScalinGroupConnection",
+    "CreateScalingGroup",
+    "ModifyScalingGroup",
+    "DeleteScalingGroup",
+    "AssociateScalingGroupWithDomain",
+    "AssociateScalingGroupsWithDomain",
+    "DisassociateScalingGroupWithDomain",
+    "DisassociateScalingGroupsWithDomain",
+    "DisassociateAllScalingGroupsWithDomain",
+    "AssociateScalingGroupWithUserGroup",
+    "AssociateScalingGroupsWithUserGroup",
+    "DisassociateScalingGroupWithUserGroup",
+    "DisassociateScalingGroupsWithUserGroup",
+    "DisassociateAllScalingGroupsWithGroup",
+    "AssociateScalingGroupWithKeyPair",
+    "AssociateScalingGroupsWithKeyPair",
+    "DisassociateScalingGroupWithKeyPair",
+    "DisassociateScalingGroupsWithKeyPair",
+)
+
 
 class ScalingGroupNode(graphene.ObjectType):
     class Meta:
