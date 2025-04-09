@@ -95,8 +95,8 @@ from ai.backend.manager.services.keypair_resource_policy.service import KeypairR
 from ai.backend.manager.services.metric.container_metric import (
     MetricService as ContainerMetricService,
 )
-from ai.backend.manager.services.metric.types import (
-    ServiceInitParameter as MetricServiceInitParameter,
+from ai.backend.manager.services.metric.processors.container import (
+    MetricProcessors as ContainerMetricProcessors,
 )
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project_resource_policy.processors import (
@@ -561,9 +561,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     resource_preset_processors = ResourcePresetProcessors(resource_preset_service)
     metric_config = root_ctx.shared_config.data["metric"]
-    container_metric_service = ContainerMetricService(
-        MetricServiceInitParameter(metric_config["address"])
-    )
+    container_metric_service = ContainerMetricService(metric_config["address"])
+    container_metric_processors = ContainerMetricProcessors(container_metric_service)
 
     root_ctx.processors = Processors(
         agent=agent_processor,
@@ -580,7 +579,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         user_resource_policy=user_resource_policy_processors,
         project_resource_policy=project_resource_policy_processors,
         resource_preset=resource_preset_processors,
-        container_metric_service=container_metric_service,
+        container_metric=container_metric_processors,
     )
     yield
 

@@ -4,8 +4,6 @@ from typing import (
 )
 from uuid import UUID
 
-from ai.backend.common.types import HostPortPair
-
 
 @dataclass
 class MetricQueryParameter:
@@ -14,11 +12,6 @@ class MetricQueryParameter:
     start: str
     end: str
     step: str
-
-
-@dataclass
-class ServiceInitParameter:
-    metric_query_addr: HostPortPair
 
 
 @dataclass

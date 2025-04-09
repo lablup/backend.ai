@@ -7,6 +7,7 @@ import aiohttp
 import yarl
 
 from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
+from ai.backend.common.types import HostPortPair
 
 from .actions.container import (
     ContainerMetricAction,
@@ -19,7 +20,6 @@ from .types import (
     ContainerMetricResponseInfo,
     ContainerMetricResult,
     MetricResultValue,
-    ServiceInitParameter,
 )
 
 
@@ -66,8 +66,8 @@ class MetricResponse(TypedDict):
 class MetricService:
     _metric_query_endpoint: yarl.URL
 
-    def __init__(self, param: ServiceInitParameter) -> None:
-        self._metric_query_endpoint = yarl.URL(f"http://{param.metric_query_addr}/api/v1")
+    def __init__(self, metric_query_addr: HostPortPair) -> None:
+        self._metric_query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:
         endpoint = self._metric_query_endpoint / "label" / label_name / "values"
