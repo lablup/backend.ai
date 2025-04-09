@@ -30,6 +30,7 @@ class OperationStatus(enum.StrEnum):
     SUCCESS = "success"
     ERROR = "error"
     UNKNOWN = "unknown"
+    RUNNING = "running"
 
 
 class AuditLogRow(Base):
@@ -67,7 +68,7 @@ class AuditLogRow(Base):
 
     def __init__(
         self,
-        entity_type: AuditLogEntityType,
+        entity_type: str,
         operation: str,
         entity_id: str | uuid.UUID,
         request_id: uuid.UUID,
@@ -76,7 +77,7 @@ class AuditLogRow(Base):
         created_at: datetime,
         status: OperationStatus,
     ):
-        self.entity_type = entity_type.value
+        self.entity_type = entity_type
         self.operation = operation
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
         self.request_id = request_id
