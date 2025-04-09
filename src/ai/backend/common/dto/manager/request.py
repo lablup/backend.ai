@@ -11,7 +11,7 @@ from .field import VFolderPermissionField
 
 
 class VFolderCreateReq(BaseRequestModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     name: VFolderName = Field(
         description="Name of the vfolder",

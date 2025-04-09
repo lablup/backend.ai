@@ -826,7 +826,7 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
 
 
 class TransitSessionStatusRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     ids: list[uuid.UUID] = Field(
         validation_alias=AliasChoices("session_ids", "sessionIds", "SessionIds"),

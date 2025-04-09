@@ -370,7 +370,7 @@ def vfolder_check_exists(
 
 
 class CreateRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     name: tv.VFolderName = Field(
         description="Name of the vfolder",
@@ -1672,7 +1672,7 @@ async def _delete(
 
 
 class DeleteRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("vfolderId", "id"),
@@ -1745,7 +1745,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
 
 
 class IDRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     name: str = Field(
         validation_alias=AliasChoices("vfolder_name", "vfolderName"),
@@ -1783,7 +1783,7 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
 
 
 class DeleteFromTrashRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("id", "vfolderId"),
@@ -1840,7 +1840,7 @@ async def force_delete(request: web.Request) -> web.Response:
 
 
 class PurgeRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("id", "vfolderId"),
@@ -1882,7 +1882,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
 
 
 class RestoreRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("id", "vfolderId"),

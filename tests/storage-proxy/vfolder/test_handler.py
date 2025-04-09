@@ -208,12 +208,12 @@ async def test_clone_vfolder(mock_vfolder_service):
         "volume_id": str(UUID),
         "scope_type": "user",
         "scope_uuid": str(UUID),
-        "folder_uuid": str(UUID),
+        "folder_uuid": str(UUID1),
     }
     mock_request.json.return_value = {
         "dst_vfolder_id": VFolderID(
             quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
-            folder_id=UUID,
+            folder_id=UUID2,
         )
     }
 

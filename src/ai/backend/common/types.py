@@ -522,7 +522,7 @@ class MountPoint(BaseModel):
     target: Path | None = Field(default=None)
     permission: MountPermission | None = Field(alias="perm", default=None)
 
-    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
+    model_config = ConfigDict(validate_by_name=True, protected_namespaces=())
 
 
 class MountExpression:

@@ -327,7 +327,7 @@ class ServiceConfigModel(BaseModel):
 
 
 class NewServiceRequestModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(validate_by_name=True)
 
     service_name: tv.SessionName = Field(
         description="Name of the service",
