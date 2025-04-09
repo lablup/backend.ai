@@ -1102,23 +1102,23 @@ class ModifyImageInput(graphene.InputObjectType):
         )
 
         return ModifyImageInputData(
-            name=OptionalState.from_graphql("name", self.name),
-            registry=OptionalState.from_graphql("registry", self.registry),
-            image=OptionalState.from_graphql("image", self.image),
-            tag=OptionalState.from_graphql("tag", self.tag),
-            architecture=OptionalState.from_graphql("architecture", self.architecture),
-            is_local=OptionalState.from_graphql("is_local", self.is_local),
-            size_bytes=OptionalState.from_graphql("size_bytes", self.size_bytes),
-            type=OptionalState.from_graphql("type", self.type),
-            config_digest=OptionalState.from_graphql("config_digest", self.digest),
-            labels=OptionalState.from_graphql(
+            name=OptionalState[str].from_graphql("name", self.name),
+            registry=OptionalState[str].from_graphql("registry", self.registry),
+            image=OptionalState[str].from_graphql("image", self.image),
+            tag=OptionalState[str].from_graphql("tag", self.tag),
+            architecture=OptionalState[str].from_graphql("architecture", self.architecture),
+            is_local=OptionalState[bool].from_graphql("is_local", self.is_local),
+            size_bytes=OptionalState[int].from_graphql("size_bytes", self.size_bytes),
+            type=OptionalState[ImageType].from_graphql("type", self.type),
+            config_digest=OptionalState[str].from_graphql("config_digest", self.digest),
+            labels=OptionalState[dict[str, Any]].from_graphql(
                 "labels", {label.key: label.value for label in self.labels}
             ),
-            accelerators=TriState.from_graphql(
+            accelerators=TriState[str].from_graphql(
                 "accelerators",
                 accelerators,
             ),
-            resources=OptionalState.from_graphql(
+            resources=OptionalState[dict[str, Any]].from_graphql(
                 "resources",
                 resources_data,
             ),
