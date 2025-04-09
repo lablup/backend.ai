@@ -11,45 +11,21 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 @dataclass
 class KeyPairResourcePolicyModifier(PartialModifier):
-    allowed_vfolder_hosts: OptionalState[dict[str, Any]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
-    )
-    default_for_unspecified: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("default_for_unspecified")
-    )
-    idle_timeout: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("idle_timeout")
-    )
-    max_concurrent_sessions: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_concurrent_sessions")
-    )
-    max_containers_per_session: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_containers_per_session")
-    )
-    max_pending_session_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_pending_session_count")
-    )
+    allowed_vfolder_hosts: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
+    default_for_unspecified: OptionalState[str] = field(default_factory=OptionalState.nop)
+    idle_timeout: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_concurrent_sessions: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_containers_per_session: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_pending_session_count: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_pending_session_resource_slots: TriState[dict[str, Any]] = field(
         default_factory=TriState.nop
     )
-    max_quota_scope_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_quota_scope_size")
-    )
-    max_vfolder_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_count")
-    )
-    max_vfolder_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_size")
-    )
-    max_concurrent_sftp_sessions: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_concurrent_sftp_sessions")
-    )
-    max_session_lifetime: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_session_lifetime")
-    )
-    total_resource_slots: OptionalState[dict[str, Any]] = field(
-        default_factory=lambda: OptionalState.nop("total_resource_slots")
-    )
+    max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_vfolder_size: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_concurrent_sftp_sessions: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_session_lifetime: OptionalState[int] = field(default_factory=OptionalState.nop)
+    total_resource_slots: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
 
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

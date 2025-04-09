@@ -1102,24 +1102,22 @@ class ModifyImageInput(graphene.InputObjectType):
         )
 
         return ImageModifier(
-            name=OptionalState[str].from_graphql("name", self.name),
-            registry=OptionalState[str].from_graphql("registry", self.registry),
-            image=OptionalState[str].from_graphql("image", self.image),
-            tag=OptionalState[str].from_graphql("tag", self.tag),
-            architecture=OptionalState[str].from_graphql("architecture", self.architecture),
-            is_local=OptionalState[bool].from_graphql("is_local", self.is_local),
-            size_bytes=OptionalState[int].from_graphql("size_bytes", self.size_bytes),
-            type=OptionalState[ImageType].from_graphql("type", self.type),
-            config_digest=OptionalState[str].from_graphql("config_digest", self.digest),
-            labels=OptionalState[dict[str, Any]].from_graphql(
-                "labels", {label.key: label.value for label in self.labels}
-            ),
+            name=OptionalState[str].from_graphql(self.name),
+            registry=OptionalState[str].from_graphql(self.registry),
+            image=OptionalState[str].from_graphql(self.image),
+            tag=OptionalState[str].from_graphql(self.tag),
+            architecture=OptionalState[str].from_graphql(self.architecture),
+            is_local=OptionalState[bool].from_graphql(self.is_local),
+            size_bytes=OptionalState[int].from_graphql(self.size_bytes),
+            type=OptionalState[ImageType].from_graphql(self.type),
+            config_digest=OptionalState[str].from_graphql(self.digest),
+            labels=OptionalState[dict[str, Any]].from_graphql({
+                label.key: label.value for label in self.labels
+            }),
             accelerators=TriState[str].from_graphql(
-                "accelerators",
                 accelerators,
             ),
             resources=OptionalState[dict[str, Any]].from_graphql(
-                "resources",
                 resources_data,
             ),
         )

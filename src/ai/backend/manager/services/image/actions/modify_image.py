@@ -11,26 +11,18 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 @dataclass
 class ImageModifier(PartialModifier):
-    name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("name"))
-    registry: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("registry"))
-    image: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("image"))
-    tag: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("tag"))
-    architecture: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("architecture")
-    )
-    is_local: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_local"))
-    size_bytes: OptionalState[int] = field(default_factory=lambda: OptionalState.nop("size_bytes"))
-    type: OptionalState[ImageType] = field(default_factory=lambda: OptionalState.nop("type"))
-    config_digest: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("config_digest")
-    )
-    labels: OptionalState[dict[str, Any]] = field(
-        default_factory=lambda: OptionalState.nop("labels")
-    )
+    name: OptionalState[str] = field(default_factory=OptionalState.nop)
+    registry: OptionalState[str] = field(default_factory=OptionalState.nop)
+    image: OptionalState[str] = field(default_factory=OptionalState.nop)
+    tag: OptionalState[str] = field(default_factory=OptionalState.nop)
+    architecture: OptionalState[str] = field(default_factory=OptionalState.nop)
+    is_local: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    size_bytes: OptionalState[int] = field(default_factory=OptionalState.nop)
+    type: OptionalState[ImageType] = field(default_factory=OptionalState.nop)
+    config_digest: OptionalState[str] = field(default_factory=OptionalState.nop)
+    labels: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
     accelerators: TriState[str] = field(default_factory=TriState.nop)
-    resources: OptionalState[dict[str, Any]] = field(
-        default_factory=lambda: OptionalState.nop("resources")
-    )
+    resources: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:

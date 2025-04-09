@@ -83,7 +83,6 @@ from ai.backend.manager.services.users.actions.user_month_stats import (
     UserMonthStatsActionResult,
 )
 from ai.backend.manager.services.users.type import UserData
-from ai.backend.manager.types import OptionalState, TriStateEnum
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -222,14 +221,14 @@ class UserService:
         )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
-        data = action.get_updated_fields()
         email = action.email
+        data = action.modifier.fields_to_update()
         if data.get("password") is None:
             data.pop("password", None)
 
-        group_ids: OptionalState = action.modifiable_fields.group_ids
+        group_ids = action.modifier.group_ids.optional_value()
 
-        if not data and (group_ids.state() == TriStateEnum.UPDATE and group_ids.value() is None):
+        if not data and group_ids is None:
             return ModifyUserActionResult(data=None, success=False)
         if data.get("status") is None and data.get("is_active") is not None:
             data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
@@ -348,10 +347,7 @@ class UserService:
                         )
 
             # If domain is changed and no group is associated, clear previous domain's group.
-            if prev_domain_name != updated_user.domain_name and (
-                group_ids.state() == TriStateEnum.NOP
-                or (group_ids.state() == TriStateEnum.UPDATE and group_ids.value() is None)
-            ):
+            if prev_domain_name != updated_user.domain_name and not group_ids:
                 await conn.execute(
                     sa.delete(association_groups_users).where(
                         association_groups_users.c.user_id == updated_user.uuid
@@ -359,9 +355,7 @@ class UserService:
                 )
 
             # Update user's group if group_ids parameter is provided.
-            if (
-                group_ids.state() == TriStateEnum.UPDATE and group_ids.value() is not None
-            ) and updated_user is not None:
+            if group_ids and updated_user is not None:
                 # Clear previous groups associated with the user.
                 await conn.execute(
                     sa.delete(association_groups_users).where(
@@ -373,7 +367,7 @@ class UserService:
                     sa.select([groups.c.id])
                     .select_from(groups)
                     .where(groups.c.domain_name == updated_user.domain_name)
-                    .where(groups.c.id.in_(group_ids.value())),
+                    .where(groups.c.id.in_(group_ids)),
                 )
                 grps = result.fetchall()
                 if grps:
@@ -454,20 +448,14 @@ class UserService:
                     "Terminate those kernels first.",
                 )
 
-            if (
-                action.purge_shared_vfolders.state() == TriStateEnum.UPDATE
-                and not action.purge_shared_vfolders.value()
-            ):
+            if action.purge_shared_vfolders.optional_value():
                 await self.migrate_shared_vfolders(
                     conn,
                     deleted_user_uuid=user_uuid,
                     target_user_uuid=action.user_info_ctx.uuid,
                     target_user_email=action.user_info_ctx.email,
                 )
-            if (
-                action.delegate_endpoint_ownership.state() == TriStateEnum.UPDATE
-                and action.delegate_endpoint_ownership.value()
-            ):
+            if action.delegate_endpoint_ownership.optional_value():
                 await EndpointRow.delegate_endpoint_ownership(
                     db_session,
                     user_uuid,

@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import Any, Optional, Self
 from uuid import UUID
 
 from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.models.user import UserRole, UserStatus
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
+from ai.backend.manager.models.user import UserStatus
+from ai.backend.manager.types import Creator
 
 
 @dataclass
@@ -116,52 +116,3 @@ class UserData:
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
         )
-
-
-@dataclass
-class UserModifier(PartialModifier):
-    username: OptionalState[str] = field(
-        default_factory=OptionalState.nop,
-    )
-    password: OptionalState[str] = field(default_factory=OptionalState.nop)
-    need_password_change: OptionalState[bool] = field(
-        default_factory=OptionalState.nop,
-    )
-    full_name: TriState[str] = field(default_factory=TriState.nop)
-    description: TriState[str] = field(default_factory=TriState.nop)
-    is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    status: OptionalState[UserStatus] = field(default_factory=OptionalState.nop)
-    domain_name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    role: OptionalState[UserRole] = field(default_factory=OptionalState.nop)
-    allowed_client_ip: TriState[list[str]] = field(default_factory=TriState.nop)
-    totp_activated: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    resource_policy: TriState[str] = field(default_factory=TriState.nop)
-    sudo_session_enabled: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    container_uid: TriState[int] = field(default_factory=TriState.nop)
-    container_main_gid: TriState[int] = field(default_factory=TriState.nop)
-    container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
-    main_access_key: TriState[str] = field(default_factory=TriState.nop)
-    group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
-
-    @override
-    def fields_to_update(self) -> dict[str, Any]:
-        modified: dict[str, Any] = {}
-        self.username.update_dict(modified, "username")
-        self.password.update_dict(modified, "password")
-        self.need_password_change.update_dict(modified, "need_password_change")
-        self.full_name.update_dict(modified, "full_name")
-        self.description.update_dict(modified, "description")
-        self.is_active.update_dict(modified, "is_active")
-        self.status.update_dict(modified, "status")
-        self.domain_name.update_dict(modified, "domain_name")
-        self.role.update_dict(modified, "role")
-        self.allowed_client_ip.update_dict(modified, "allowed_client_ip")
-        self.totp_activated.update_dict(modified, "totp_activated")
-        self.resource_policy.update_dict(modified, "resource_policy")
-        self.sudo_session_enabled.update_dict(modified, "sudo_session_enabled")
-        self.container_uid.update_dict(modified, "container_uid")
-        self.container_main_gid.update_dict(modified, "container_main_gid")
-        self.container_gids.update_dict(modified, "container_gids")
-        self.main_access_key.update_dict(modified, "main_access_key")
-        self.group_ids.update_dict(modified, "group_ids")
-        return modified

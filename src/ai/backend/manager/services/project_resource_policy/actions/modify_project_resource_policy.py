@@ -11,18 +11,10 @@ from ai.backend.manager.types import OptionalState, PartialModifier
 
 @dataclass
 class ProjectResourcePolicyModifier(PartialModifier):
-    max_vfolder_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_count")
-    )
-    max_quota_scope_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_quota_scope_size")
-    )
-    max_vfolder_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_size")
-    )
-    max_network_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_network_count")
-    )
+    max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_vfolder_size: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_network_count: OptionalState[int] = field(default_factory=OptionalState.nop)
 
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

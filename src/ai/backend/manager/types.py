@@ -148,13 +148,27 @@ class TriState(Generic[TVal]):
     def nop(cls) -> TriState[TVal]:
         return cls(state=TriStateEnum.NOP, value=None)
 
-    def value(self) -> Optional[TVal]:
+    def value(self) -> TVal:
+        """
+        Returns the value of the TriState object.
+        It should only be used when the state value is unambiguously UPDATE.
+        """
+        if self._state != TriStateEnum.UPDATE:
+            raise ValueError("Not allowed to get value when state is not UPDATE")
+        if self._value is None:
+            raise ValueError("TriState value is not set when state is UPDATE")
+        return self._value
+
+    def optional_value(self) -> Optional[TVal]:
+        """
+        Returns the value of the TriState object.
+        When state is not UPDATE, it returns None.
+        This is useful for cases where you want to check if the state is UPDATE
+        and get the value, or if it is NULLIFY or NOP and get None.
+        """
         if self._state == TriStateEnum.UPDATE:
             return self._value
-        raise ValueError("TriState value is not set")
-
-    def state(self) -> TriStateEnum:
-        return self._state
+        return None
 
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:
@@ -176,8 +190,7 @@ class OptionalState(TriState[TVal]):
     This class is similar to TriState, but it cannot be in the NULLIFY state.
     """
 
-    def __init__(self, attr_name: str, state: TriStateEnum, value: Optional[TVal]):
-        self._attr_name = attr_name
+    def __init__(self, state: TriStateEnum, value: Optional[TVal]):
         if state == TriStateEnum.NULLIFY:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state
@@ -189,10 +202,10 @@ class OptionalState(TriState[TVal]):
             raise ValueError("OptionalState cannot be NULLIFY")
         if value is Undefined:
             return OptionalState.nop()
-        return OptionalState.update(value)
+        return OptionalState.update(value)  # type: ignore
 
     @classmethod
-    def nullify(cls) -> TriState[TVal]:
+    def nullify(cls) -> OptionalState[TVal]:
         raise ValueError("OptionalState cannot be NULLIFY")
 
     @classmethod

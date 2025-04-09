@@ -19,7 +19,6 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.manager.models.utils import define_state
 from ai.backend.manager.services.users.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
@@ -31,7 +30,7 @@ from ai.backend.manager.services.users.actions.delete_user import (
 from ai.backend.manager.services.users.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
-    UserModifiableFields,
+    UserModifier,
 )
 from ai.backend.manager.services.users.actions.purge_user import (
     PurgeUserAction,
@@ -791,102 +790,66 @@ class ModifyUserInput(graphene.InputObjectType):
         def value_or_none(value: Any) -> Optional[Any]:
             return value if value is not Undefined else None
 
-        modfifialble_fields = UserModifiableFields(
-            username=OptionalState(
-                "username",
-                define_state(self.username),
-                value_or_none(self.username),
+        modfifialble_fields = UserModifier(
+            username=OptionalState[str].from_graphql(
+                self.username,
             ),
-            password=OptionalState(
-                "password",
-                define_state(self.password),
-                value_or_none(self.password),
+            password=OptionalState[str].from_graphql(
+                self.password,
             ),
-            need_password_change=OptionalState(
-                "need_password_change",
-                define_state(self.need_password_change),
-                value_or_none(self.need_password_change),
+            need_password_change=OptionalState[bool].from_graphql(
+                self.need_password_change,
             ),
-            full_name=OptionalState(
-                "full_name",
-                define_state(self.full_name),
-                value_or_none(self.full_name),
+            full_name=OptionalState[str].from_graphql(
+                self.full_name,
             ),
-            description=OptionalState(
-                "description",
-                define_state(self.description),
-                value_or_none(self.description),
+            description=OptionalState[str].from_graphql(
+                self.description,
             ),
-            is_active=OptionalState(
-                "is_active",
-                define_state(self.is_active),
-                value_or_none(self.is_active),
+            is_active=OptionalState[bool].from_graphql(
+                self.is_active,
             ),
-            status=OptionalState(
-                "status",
-                define_state(self.status),
+            status=OptionalState[UserStatus].from_graphql(
                 UserStatus(self.status) if self.status is not Undefined else None,
             ),
-            domain_name=OptionalState(
-                "domain_name",
-                define_state(self.domain_name),
-                value_or_none(self.domain_name),
+            domain_name=OptionalState[str].from_graphql(
+                self.domain_name,
             ),
-            role=OptionalState(
-                "role",
-                define_state(self.role),
+            role=OptionalState[UserRole].from_graphql(
                 UserRole(self.role) if self.role is not Undefined else None,
             ),
-            group_ids=OptionalState(
-                "group_ids",
-                define_state(self.group_ids),
-                value_or_none(self.group_ids),
+            group_ids=OptionalState[list[str]].from_graphql(
+                self.group_ids,
             ),
-            allowed_client_ip=OptionalState(
-                "allowed_client_ip",
-                define_state(self.allowed_client_ip),
-                value_or_none(self.allowed_client_ip),
+            allowed_client_ip=OptionalState[list[str]].from_graphql(
+                self.allowed_client_ip,
             ),
-            totp_activated=OptionalState(
-                "totp_activated",
-                define_state(self.totp_activated),
-                value_or_none(self.totp_activated),
+            totp_activated=OptionalState[bool].from_graphql(
+                self.totp_activated,
             ),
-            resource_policy=OptionalState(
-                "resource_policy",
-                define_state(self.resource_policy),
-                value_or_none(self.resource_policy),
+            resource_policy=OptionalState[str].from_graphql(
+                self.resource_policy,
             ),
-            sudo_session_enabled=OptionalState(
-                "sudo_session_enabled",
-                define_state(self.sudo_session_enabled),
-                value_or_none(self.sudo_session_enabled),
+            sudo_session_enabled=OptionalState[bool].from_graphql(
+                self.sudo_session_enabled,
             ),
-            main_access_key=OptionalState(
-                "main_access_key",
-                define_state(self.main_access_key),
-                value_or_none(self.main_access_key),
+            main_access_key=OptionalState[str].from_graphql(
+                self.main_access_key,
             ),
-            container_uid=OptionalState(
-                "container_uid",
-                define_state(self.container_uid),
-                value_or_none(self.container_uid),
+            container_uid=OptionalState[int].from_graphql(
+                self.container_uid,
             ),
-            container_main_gid=OptionalState(
-                "container_main_gid",
-                define_state(self.container_main_gid),
-                value_or_none(self.container_main_gid),
+            container_main_gid=OptionalState[int].from_graphql(
+                self.container_main_gid,
             ),
-            container_gids=OptionalState(
-                "container_gids",
-                define_state(self.container_gids),
-                value_or_none(self.container_gids),
+            container_gids=OptionalState[list[int]].from_graphql(
+                self.container_gids,
             ),
         )
 
         return ModifyUserAction(
             email=email,
-            modifiable_fields=modfifialble_fields,
+            modifier=modfifialble_fields,
         )
 
 
@@ -905,17 +868,11 @@ class PurgeUserInput(graphene.InputObjectType):
         return PurgeUserAction(
             user_info_ctx=user_info_ctx,
             email=email,
-            purge_shared_vfolders=OptionalState(
-                "purge_shared_vfolders",
-                define_state(self.purge_shared_vfolders),
-                self.purge_shared_vfolders if self.purge_shared_vfolders is not Undefined else None,
+            purge_shared_vfolders=OptionalState[bool].from_graphql(
+                self.purge_shared_vfolders,
             ),
-            delegate_endpoint_ownership=OptionalState(
-                "delegate_endpoint_ownership",
-                define_state(self.delegate_endpoint_ownership),
-                self.delegate_endpoint_ownership
-                if self.delegate_endpoint_ownership is not Undefined
-                else None,
+            delegate_endpoint_ownership=OptionalState[bool].from_graphql(
+                self.delegate_endpoint_ownership,
             ),
         )
 

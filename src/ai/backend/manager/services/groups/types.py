@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, List, Optional, Self, override
+from typing import Any, Optional, Self, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -104,7 +104,7 @@ class GroupModifier(PartialModifier):
     user_update_mode: OptionalState[str] = field(
         default_factory=OptionalState.nop,
     )
-    user_uuids: OptionalState[List[str]] = field(
+    user_uuids: OptionalState[list[str]] = field(
         default_factory=OptionalState.nop,
     )
 
@@ -126,6 +126,6 @@ class GroupModifier(PartialModifier):
         return to_update
 
     def update_mode(self) -> Optional[str]:
-        if self.user_uuids.state() == TriState.UPDATE:
-            return self.user_update_mode.state()
+        if self.user_uuids.optional_value():
+            return self.user_update_mode.optional_value()
         return None

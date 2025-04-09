@@ -1602,7 +1602,7 @@ class SessionService:
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
         props = action.modifier
-        session_name = action.modifier.name
+        session_name = action.modifier.name.optional_value()
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)

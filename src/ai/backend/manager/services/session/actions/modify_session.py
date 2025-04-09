@@ -10,8 +10,8 @@ from ai.backend.manager.types import OptionalState, PartialModifier
 
 @dataclass
 class SessionModifier(PartialModifier):
-    name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("name"))
-    priority: OptionalState[int] = field(default_factory=lambda: OptionalState.nop("priority"))
+    name: OptionalState[str] = field(default_factory=OptionalState.nop)
+    priority: OptionalState[int] = field(default_factory=OptionalState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:

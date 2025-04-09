@@ -9,18 +9,12 @@ from ai.backend.manager.types import OptionalState, PartialModifier
 
 @dataclass
 class UserResourcePolicyModifier(PartialModifier):
-    max_vfolder_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_count")
-    )
-    max_quota_scope_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_quota_scope_size")
-    )
+    max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_session_count_per_model_session: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_session_count_per_model_session")
+        default_factory=OptionalState.nop
     )
-    max_customized_image_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_customized_image_count")
-    )
+    max_customized_image_count: OptionalState[int] = field(default_factory=OptionalState.nop)
 
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

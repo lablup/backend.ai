@@ -311,9 +311,9 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
             resource_slots=TriState[ResourceSlot].from_graphql(resource_slots),
             name=TriState[str].from_graphql(self.name),
             shared_memory=TriState[BinarySize].from_graphql(
-                BinarySize.from_str(self.shared_memory)
-                if self.shared_memory is not Undefined
-                else Undefined
+                BinarySize.finite_from_str(self.shared_memory)
+                if self.shared_memory is not Undefined and self.shared_memory is not None
+                else self.shared_memory
             ),
             scaling_group_name=TriState[str].from_graphql(self.scaling_group_name),
         )

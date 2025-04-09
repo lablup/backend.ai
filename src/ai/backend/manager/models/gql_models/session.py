@@ -701,8 +701,8 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
             ModifySessionAction(
                 session_id=session_id,
                 modifier=SessionModifier(
-                    name=OptionalState[str].from_graphql("name", name),
-                    priority=OptionalState[int].from_graphql("priority", priority),
+                    name=OptionalState[str].from_graphql(name),
+                    priority=OptionalState[int].from_graphql(priority),
                 ),
             )
         )

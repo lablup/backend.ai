@@ -114,7 +114,7 @@ class DomainModifier(PartialModifier):
     total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState.nop)
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(default_factory=OptionalState.nop)
     allowed_docker_registries: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
-    integration_id: TriState[Optional[str]] = field(default_factory=TriState.nop)
+    integration_id: TriState[str] = field(default_factory=TriState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
@@ -131,7 +131,7 @@ class DomainModifier(PartialModifier):
 
 @dataclass
 class DomainNodeModifier(PartialModifier):
-    description: TriState[str] = field(default_factory=lambda: TriState[str].nop("description"))
+    description: TriState[str] = field(default_factory=TriState[str].nop)
     is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState[ResourceSlot].nop)
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(

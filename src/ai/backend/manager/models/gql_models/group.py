@@ -21,7 +21,6 @@ from sqlalchemy.engine.row import Row
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.utils import define_state
 from ai.backend.manager.services.groups.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.groups.actions.delete_group import (
     DeleteGroupAction,
@@ -31,7 +30,7 @@ from ai.backend.manager.services.groups.actions.purge_group import (
     PurgeGroupAction,
 )
 from ai.backend.manager.services.groups.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
     BigInt,
@@ -588,62 +587,40 @@ class ModifyGroupInput(graphene.InputObjectType):
         return ModifyGroupAction(
             group_id=group_id,
             modifier=GroupModifier(
-                name=OptionalState(
-                    "name",
-                    define_state(self.name),
-                    value_or_none(self.name),
+                name=OptionalState[str].from_graphql(
+                    self.name,
                 ),
-                domain_name=OptionalState(
-                    "domain_name",
-                    define_state(self.domain_name),
-                    value_or_none(self.domain_name),
+                domain_name=OptionalState[str].from_graphql(
+                    self.domain_name,
                 ),
-                description=OptionalState(
-                    "description",
-                    define_state(self.description),
-                    value_or_none(self.description),
+                description=TriState[str].from_graphql(
+                    self.description,
                 ),
-                is_active=OptionalState(
-                    "is_active",
-                    define_state(self.is_active),
-                    value_or_none(self.is_active),
+                is_active=OptionalState[bool].from_graphql(
+                    self.is_active,
                 ),
-                total_resource_slots=OptionalState(
-                    "total_resource_slots",
-                    define_state(self.total_resource_slots),
+                total_resource_slots=TriState[ResourceSlot].from_graphql(
                     None
                     if self.total_resource_slots is Undefined
                     else ResourceSlot.from_user_input(self.total_resource_slots, None),
                 ),
-                user_update_mode=OptionalState(
-                    "user_update_mode",
-                    define_state(self.user_update_mode),
-                    value_or_none(self.user_update_mode),
+                user_update_mode=OptionalState[str].from_graphql(
+                    self.user_update_mode,
                 ),
-                user_uuids=OptionalState(
-                    "user_uuids",
-                    define_state(self.user_uuids),
-                    value_or_none(self.user_uuids),
+                user_uuids=OptionalState[list[str]].from_graphql(
+                    self.user_uuids,
                 ),
-                allowed_vfolder_hosts=OptionalState(
-                    "allowed_vfolder_hosts",
-                    define_state(self.allowed_vfolder_hosts),
-                    value_or_none(self.allowed_vfolder_hosts),
+                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                    self.allowed_vfolder_hosts,
                 ),
-                integration_id=OptionalState(
-                    "integration_id",
-                    define_state(self.integration_id),
-                    value_or_none(self.integration_id),
+                integration_id=TriState[str].from_graphql(
+                    self.integration_id,
                 ),
-                resource_policy=OptionalState(
-                    "resource_policy",
-                    define_state(self.resource_policy),
-                    value_or_none(self.resource_policy),
+                resource_policy=OptionalState[str].from_graphql(
+                    self.resource_policy,
                 ),
-                container_registry=OptionalState(
-                    "container_registry",
-                    define_state(self.container_registry),
-                    value_or_none(self.container_registry),
+                container_registry=OptionalState[dict[str, str]].from_graphql(
+                    self.container_registry,
                 ),
             ),
         )
