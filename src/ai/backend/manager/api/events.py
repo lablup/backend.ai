@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -48,6 +47,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
@@ -166,7 +166,7 @@ async def push_session_events(
                         response_data["clusterRole"] = cluster_role
                     if cluster_idx := row.get("cluster_idx"):
                         response_data["clusterIdx"] = cluster_idx
-                    await resp.send(json.dumps(response_data), event=event_name)
+                    await resp.send(dump_json_str(response_data), event=event_name)
                 finally:
                     my_queue.task_done()
         finally:

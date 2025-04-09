@@ -40,6 +40,7 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
+from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 
@@ -328,7 +329,7 @@ def pydantic_params_api_handler(
                 ]
                 msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
                 # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
-                raise InvalidAPIParameters(msg, extra_data=json.loads(ex.json()))
+                raise InvalidAPIParameters(msg, extra_data=load_json(ex.json()))
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

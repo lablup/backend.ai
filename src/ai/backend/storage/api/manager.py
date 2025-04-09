@@ -5,7 +5,6 @@ Manager-facing API
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import weakref
@@ -43,6 +42,7 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
@@ -132,7 +132,7 @@ def handle_fs_errors(
         if e.filename2:
             _append_fpath(e.filename2)
         raise web.HTTPBadRequest(
-            body=json.dumps(
+            text=dump_json_str(
                 {
                     "msg": msg,
                     "errno": e.errno,
@@ -149,7 +149,7 @@ def handle_external_errors() -> Iterator[None]:
         yield
     except ExternalError as e:
         raise web.HTTPInternalServerError(
-            body=json.dumps({
+            text=dump_json_str({
                 "msg": str(e),
             }),
             content_type="application/json",
@@ -524,7 +524,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                 )
             except VFolderNotFoundError:
                 raise web.HTTPBadRequest(
-                    body=json.dumps(
+                    text=dump_json_str(
                         {
                             "msg": "VFolder not found",
                             "vfid": str(params["vfid"]),
@@ -534,7 +534,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                 )
             except InvalidSubpathError as e:
                 raise web.HTTPBadRequest(
-                    body=json.dumps(
+                    text=dump_json_str(
                         {
                             "msg": "Invalid vfolder subpath",
                             "vfid": str(params["vfid"]),

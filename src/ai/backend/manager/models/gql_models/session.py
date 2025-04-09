@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Sequence
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -18,13 +18,17 @@ import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, SessionId, SessionResult
-from ai.backend.manager.api.exceptions import SessionNotFound
+from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionResult
 from ai.backend.manager.idle import ReportInfo
+from ai.backend.manager.services.session.actions.check_and_transit_status import (
+    CheckAndTransitStatusAction,
+)
+from ai.backend.manager.services.session.actions.modify_session import (
+    ModifySessionAction,
+    ModifySessionInputData,
+)
 
 from ..base import (
     BigInt,
@@ -34,7 +38,6 @@ from ..base import (
     PaginatedConnectionField,
     batch_multiresult_in_session,
     generate_sql_info_for_gql_connection,
-    set_if_set,
 )
 from ..gql_relay import (
     AsyncNode,
@@ -43,7 +46,6 @@ from ..gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
-from ..kernel import KernelRow
 from ..minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -69,7 +71,6 @@ from ..session import (
     load_related_field,
 )
 from ..user import UserRole, UserRow
-from ..utils import execute_with_txn_retry
 from .group import GroupRow
 from .kernel import KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
@@ -662,64 +663,29 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         **input,
     ) -> ModifyComputeSession:
         graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
 
-        set_if_set(input, data, "priority")
-        set_if_set(input, data, "name")
-        if "priority" in data:
-            _validate_priority_input(data["priority"])
-        if "name" in data:
-            _validate_name_input(data["name"])
+        priority = input.get("priority")
+        if priority:
+            _validate_priority_input(priority)
 
-        async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
-            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session_row = await db_session.scalar(query_stmt)
-            if session_row is None:
-                raise ValueError(f"Session not found (id:{session_id})")
-            session_row = cast(SessionRow, session_row)
-            if "name" in data:
-                # Check the owner of the target session has any session with the same name
-                try:
-                    sess = await SessionRow.get_session(
-                        db_session,
-                        data["name"],
-                        AccessKey(session_row.access_key),
-                    )
-                except SessionNotFound:
-                    pass
-                else:
-                    raise ValueError(
-                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
-                    )
-            _update_stmt = (
-                sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
-                .values(data)
-                .returning(SessionRow)
-            )
-            _stmt = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .from_statement(_update_stmt)
-                .execution_options(populate_existing=True)
-            )
-            ret = await db_session.scalar(_stmt)
-            if "name" in data:
-                await db_session.execute(
-                    sa.update(KernelRow)
-                    .values(session_name=data["name"])
-                    .where(KernelRow.session_id == session_id)
-                )
-            return ret
+        name = input.get("name")
+        if name:
+            _validate_name_input(name)
 
-        async with graph_ctx.db.connect() as db_conn:
-            session_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
-        if session_row is None:
-            raise ValueError(f"Session not found (id:{session_id})")
+        result = await graph_ctx.processors.session.modify_session.wait_for_complete(
+            ModifySessionAction(
+                session_id=session_id,
+                props=ModifySessionInputData(
+                    name=name,
+                    priority=priority,
+                ),
+            )
+        )
+
         return ModifyComputeSession(
-            ComputeSessionNode.from_row(graph_ctx, session_row),
+            ComputeSessionNode.from_row(graph_ctx, result.session_row),
             input.get("client_mutation_id"),
         )
 
@@ -757,29 +723,18 @@ class CheckAndTransitStatus(graphene.Mutation):
 
         user_role = cast(UserRole, graph_ctx.user["role"])
         user_id = cast(uuid.UUID, graph_ctx.user["uuid"])
-        accessible_session_ids: list[SessionId] = []
-        now = datetime.now(timezone.utc)
 
-        async with graph_ctx.db.connect() as db_conn:
-            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                for sid in session_ids:
-                    session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
-                    if session_row.user_uuid == user_id or user_role in (
-                        UserRole.ADMIN,
-                        UserRole.SUPERADMIN,
-                    ):
-                        accessible_session_ids.append(sid)
-
-            if accessible_session_ids:
-                session_rows = (
-                    await graph_ctx.registry.session_lifecycle_mgr.transit_session_status(
-                        accessible_session_ids, now, db_conn=db_conn
+        session_nodes = []
+        for session_id in session_ids:
+            action_result = (
+                await graph_ctx.processors.session.check_and_transit_status.wait_for_complete(
+                    CheckAndTransitStatusAction(
+                        user_id=user_id,
+                        user_role=user_role,
+                        session_id=session_id,
                     )
                 )
-                await graph_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
-                    row.id for row, is_transited in session_rows if is_transited
-                ])
-                result = [ComputeSessionNode.from_row(graph_ctx, row) for row, _ in session_rows]
-            else:
-                result = []
-        return CheckAndTransitStatus(result, input.get("client_mutation_id"))
+            )
+            session_nodes.append(ComputeSessionNode.from_row(graph_ctx, action_result.session_row))
+
+        return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))

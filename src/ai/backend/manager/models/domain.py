@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
+    Callable,
     List,
     Optional,
     Self,
@@ -21,17 +21,18 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import ResourceSlot, Sentinel, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.utils import define_state
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
@@ -41,9 +42,6 @@ from .base import (
     VFolderHostPermissionColumn,
     batch_result,
     mapper_registry,
-    set_if_set,
-    simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 from .rbac import (
     AbstractPermissionContext,
@@ -62,6 +60,24 @@ from .scaling_group import ScalingGroup
 from .user import UserRole
 
 if TYPE_CHECKING:
+    from ai.backend.manager.services.domain.actions.create_domain import (
+        CreateDomainAction,
+        CreateDomainActionResult,
+    )
+    from ai.backend.manager.services.domain.actions.delete_domain import (
+        DeleteDomainAction,
+        DeleteDomainActionResult,
+    )
+    from ai.backend.manager.services.domain.actions.modify_domain import (
+        ModifyDomainAction,
+        ModifyDomainActionResult,
+    )
+    from ai.backend.manager.services.domain.actions.purge_domain import (
+        PurgeDomainAction,
+        PurgeDomainActionResult,
+    )
+    from ai.backend.manager.services.domain.types import DomainData
+
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -98,14 +114,14 @@ domains = sa.Table(
         onupdate=sa.func.current_timestamp(),
     ),
     # TODO: separate resource-related fields with new domain resource policy table when needed.
-    sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
+    sa.Column("total_resource_slots", ResourceSlotColumn(), default=dict),
     sa.Column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
-        default={},
+        default=dict,
     ),
-    sa.Column("allowed_docker_registries", pgsql.ARRAY(sa.String), nullable=False, default="{}"),
+    sa.Column("allowed_docker_registries", pgsql.ARRAY(sa.String), nullable=False, default=list),
     #: Field for synchronization with external services.
     sa.Column("integration_id", sa.String(length=512)),
     # dotfiles column, \x90 means empty list in msgpack
@@ -234,6 +250,22 @@ class Domain(graphene.ObjectType):
         )
 
     @classmethod
+    def from_dto(cls, dto: DomainData) -> Domain:
+        return cls(
+            name=dto.name,
+            description=dto.description,
+            is_active=dto.is_active,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            total_resource_slots=dto.total_resource_slots.to_json()
+            if dto.total_resource_slots
+            else {},
+            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
+            allowed_docker_registries=dto.allowed_docker_registries,
+            integration_id=dto.integration_id,
+        )
+
+    @classmethod
     async def load_all(
         cls,
         ctx: GraphQueryContext,
@@ -282,6 +314,44 @@ class DomainInput(graphene.InputObjectType):
     )
     integration_id = graphene.String(required=False, default_value=None)
 
+    def to_action(self, domain_name: str) -> CreateDomainAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        return CreateDomainAction(
+            name=domain_name,
+            description=TriState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active", define_state(self.is_active), value_or_none(self.is_active)
+            ),
+            total_resource_slots=TriState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                None
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            allowed_docker_registries=OptionalState(
+                "allowed_docker_registries",
+                define_state(self.allowed_docker_registries),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            integration_id=TriState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
+        )
+
 
 class ModifyDomainInput(graphene.InputObjectType):
     name = graphene.String(required=False)
@@ -291,6 +361,54 @@ class ModifyDomainInput(graphene.InputObjectType):
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
     integration_id = graphene.String(required=False)
+
+    def _convert_field(
+        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+    ) -> Any | Sentinel:
+        if field_value is Undefined:
+            return Sentinel.TOKEN
+        if converter is not None:
+            return converter(field_value)
+        return field_value
+
+    def to_action(self, domain_name: str) -> ModifyDomainAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        return ModifyDomainAction(
+            domain_name=domain_name,
+            name=OptionalState("name", define_state(self.name), value_or_none(self.name)),
+            description=TriState(
+                "description",
+                define_state(self.description),
+                value_or_none(self.description),
+            ),
+            is_active=OptionalState(
+                "is_active", define_state(self.is_active), value_or_none(self.is_active)
+            ),
+            total_resource_slots=TriState(
+                "total_resource_slots",
+                define_state(self.total_resource_slots),
+                None
+                if self.total_resource_slots is Undefined
+                else ResourceSlot.from_user_input(self.total_resource_slots, None),
+            ),
+            allowed_vfolder_hosts=OptionalState(
+                "allowed_vfolder_hosts",
+                define_state(self.allowed_vfolder_hosts),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            allowed_docker_registries=OptionalState(
+                "allowed_docker_registries",
+                define_state(self.allowed_docker_registries),
+                value_or_none(self.allowed_vfolder_hosts),
+            ),
+            integration_id=TriState(
+                "integration_id",
+                define_state(self.integration_id),
+                value_or_none(self.integration_id),
+            ),
+        )
 
 
 class CreateDomain(graphene.Mutation):
@@ -313,35 +431,18 @@ class CreateDomain(graphene.Mutation):
         props: DomainInput,
     ) -> CreateDomain:
         ctx: GraphQueryContext = info.context
-        data = {
-            "name": name,
-            "description": props.description,
-            "is_active": props.is_active,
-            "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
-            "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
-            "allowed_docker_registries": props.allowed_docker_registries,
-            "integration_id": props.integration_id,
-        }
-        insert_query = sa.insert(domains).values(data)
 
-        async def _post_func(conn: SAConnection, result: Result) -> Row:
-            from .group import groups
+        action: CreateDomainAction = props.to_action(name)
+        res: CreateDomainActionResult = await ctx.processors.domain.create_domain.wait_for_complete(
+            action
+        )
 
-            model_store_insert_query = sa.insert(groups).values({
-                "name": "model-store",
-                "description": "Model Store",
-                "is_active": True,
-                "domain_name": name,
-                "total_resource_slots": {},
-                "allowed_vfolder_hosts": {},
-                "integration_id": None,
-                "resource_policy": "default",
-                "type": ProjectType.MODEL_STORE,
-            })
-            await conn.execute(model_store_insert_query)
+        domain_data: Optional[DomainData] = res.domain_data
 
-        return await simple_db_mutate_returning_item(
-            cls, ctx, insert_query, item_cls=Domain, post_func=_post_func
+        return cls(
+            ok=res.success,
+            msg=res.description,
+            domain=Domain.from_dto(domain_data) if domain_data else None,
         )
 
 
@@ -365,21 +466,19 @@ class ModifyDomain(graphene.Mutation):
         props: ModifyDomainInput,
     ) -> ModifyDomain:
         ctx: GraphQueryContext = info.context
-        data: Dict[str, Any] = {}
-        set_if_set(props, data, "name")  # data['name'] is new domain name
-        set_if_set(props, data, "description")
-        set_if_set(props, data, "is_active")
-        set_if_set(
-            props,
-            data,
-            "total_resource_slots",
-            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+
+        action: ModifyDomainAction = props.to_action(name)
+        res: ModifyDomainActionResult = await ctx.processors.domain.modify_domain.wait_for_complete(
+            action
         )
-        set_if_set(props, data, "allowed_vfolder_hosts")
-        set_if_set(props, data, "allowed_docker_registries")
-        set_if_set(props, data, "integration_id")
-        update_query = sa.update(domains).values(data).where(domains.c.name == name)
-        return await simple_db_mutate_returning_item(cls, ctx, update_query, item_cls=Domain)
+
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return cls(
+            ok=res.success,
+            msg=res.description,
+            domain=Domain.from_dto(domain_data) if domain_data else None,
+        )
 
 
 class DeleteDomain(graphene.Mutation):
@@ -398,8 +497,13 @@ class DeleteDomain(graphene.Mutation):
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
         ctx: GraphQueryContext = info.context
-        update_query = sa.update(domains).values(is_active=False).where(domains.c.name == name)
-        return await simple_db_mutate(cls, ctx, update_query)
+
+        action = DeleteDomainAction(name)
+        res: DeleteDomainActionResult = await ctx.processors.domain.delete_domain.wait_for_complete(
+            action
+        )
+
+        return cls(ok=res.success, msg=res.description)
 
 
 class PurgeDomain(graphene.Mutation):
@@ -420,75 +524,14 @@ class PurgeDomain(graphene.Mutation):
 
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
-        from . import groups, users
-
         ctx: GraphQueryContext = info.context
 
-        async def _pre_func(conn: SAConnection) -> None:
-            if await cls.domain_has_active_kernels(conn, name):
-                raise RuntimeError("Domain has some active kernels. Terminate them first.")
-            query = sa.select([sa.func.count()]).where(users.c.domain_name == name)
-            user_count = await conn.scalar(query)
-            if user_count > 0:
-                raise RuntimeError("There are users bound to the domain. Remove users first.")
-            query = sa.select([sa.func.count()]).where(groups.c.domain_name == name)
-            group_count = await conn.scalar(query)
-            if group_count > 0:
-                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
-
-            await cls.delete_kernels(conn, name)
-
-        delete_query = sa.delete(domains).where(domains.c.name == name)
-        return await simple_db_mutate(cls, ctx, delete_query, pre_func=_pre_func)
-
-    @classmethod
-    async def delete_kernels(
-        cls,
-        conn: SAConnection,
-        domain_name: str,
-    ) -> int:
-        """
-        Delete all kernels run from the target domain.
-
-        :param conn: DB connection
-        :param domain_name: domain's name to delete kernels
-
-        :return: number of deleted rows
-        """
-        from . import kernels
-
-        delete_query = sa.delete(kernels).where(kernels.c.domain_name == domain_name)
-        result = await conn.execute(delete_query)
-        if result.rowcount > 0:
-            log.info('deleted {0} domain"s kernels ({1})', result.rowcount, domain_name)
-        return result.rowcount
-
-    @classmethod
-    async def domain_has_active_kernels(
-        cls,
-        conn: SAConnection,
-        domain_name: str,
-    ) -> bool:
-        """
-        Check if the domain does not have active kernels.
-
-        :param conn: DB connection
-        :param domain_name: domain's name
-
-        :return: True if the domain has some active kernels.
-        """
-        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
-
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(
-                (kernels.c.domain_name == domain_name)
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-            )
+        action = PurgeDomainAction(name)
+        res: PurgeDomainActionResult = await ctx.processors.domain.purge_domain.wait_for_complete(
+            action
         )
-        active_kernel_count = await conn.scalar(query)
-        return active_kernel_count > 0
+
+        return cls(ok=res.success, msg=res.description)
 
 
 class DomainDotfile(TypedDict):

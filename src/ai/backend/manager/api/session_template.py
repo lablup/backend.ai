@@ -11,6 +11,7 @@ import yaml
 from aiohttp import web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import TemplateType, groups, session_templates, users
@@ -55,7 +56,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         log.debug("Params: {0}", params)
         try:
-            body = json.loads(params["payload"])
+            body = load_json(params["payload"])
         except json.JSONDecodeError:
             try:
                 body = yaml.safe_load_all(params["payload"])
@@ -201,9 +202,9 @@ async def get(request: web.Request, params: Any) -> web.Response:
                 "domain_name": domain_name,
             })
         if isinstance(resp, str):
-            resp = json.loads(resp)
+            resp = load_json(resp)
         else:
-            resp = json.loads(json.dumps(resp))
+            resp = load_json(dump_json(resp))
         return web.json_response(resp)
 
 
@@ -244,7 +245,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
         if not result:
             raise TaskTemplateNotFound
         try:
-            body = json.loads(params["payload"])
+            body = load_json(params["payload"])
         except json.JSONDecodeError:
             body = yaml.safe_load(params["payload"])
         except (yaml.YAMLError, yaml.MarkedYAMLError):

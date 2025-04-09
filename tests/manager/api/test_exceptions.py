@@ -1,6 +1,7 @@
 import json
 import pickle
 
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.utils import odict
 from ai.backend.manager.api.exceptions import BackendAgentError, BackendError
 
@@ -8,9 +9,8 @@ from ai.backend.manager.api.exceptions import BackendAgentError, BackendError
 def test_backend_error_obj():
     eobj = BackendError()
     assert eobj.args == (eobj.status_code, eobj.reason, eobj.error_type)
-    assert (
-        eobj.body
-        == json.dumps(
+    assert json.loads(eobj.body) == json.loads(
+        json.dumps(
             odict(
                 ("type", eobj.error_type),
                 ("title", eobj.error_title),
@@ -41,7 +41,7 @@ def test_backend_agent_error_obj():
     assert eobj.args == (eobj.status_code, eobj.reason, eobj.error_type, eobj.agent_error_type)
     assert (
         eobj.body
-        == json.dumps(
+        == dump_json_str(
             odict(
                 ("type", eobj.error_type),
                 ("title", eobj.error_title),
