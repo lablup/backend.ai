@@ -9,6 +9,7 @@ import enum
 import logging
 import sys
 import time
+import uuid
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -40,6 +41,7 @@ from ai.backend.common.types import (
     MetricKey,
     MetricValue,
     MovingStatValue,
+    SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -348,6 +350,43 @@ class StatContext:
             return now, 0.0
         return now, now - last
 
+    def _get_ownership_info_from_kernel(
+        self,
+        kernel_id: KernelId,
+    ) -> tuple[Optional[SessionId], Optional[uuid.UUID], Optional[uuid.UUID]]:
+        kernel_obj = self.agent.kernel_registry.get(kernel_id)
+        if kernel_obj is not None:
+            ownership_data = kernel_obj.ownership_data
+            session_id = ownership_data.session_id
+            owner_user_id = ownership_data.owner_user_id
+            owner_project_id = ownership_data.owner_project_id
+        else:
+            session_id = None
+            owner_user_id = None
+            owner_project_id = None
+        return session_id, owner_user_id, owner_project_id
+
+    def observe_node_metric(
+        self,
+        device_id: DeviceId,
+        metric_key: MetricKey,
+        measure: Measurement,
+    ) -> None:
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        value_pairs = [
+            (CURRENT_METRIC_KEY, str(measure.value)),
+        ]
+        if measure.capacity is not None:
+            value_pairs.append((CAPACITY_METRIC_KEY, str(measure.capacity)))
+        self._utilization_metric_observer.observe_device_metric(
+            metric=FlattenedDeviceMetric(
+                agent_id=agent_id,
+                device_id=device_id,
+                key=metric_key,
+                value_pairs=value_pairs,
+            )
+        )
+
     async def collect_node_stat(self) -> None:
         """
         Collect the per-node, per-device, and per-container statistics.
@@ -384,6 +423,11 @@ class StatContext:
                         self.node_metrics[metric_key].update(node_measure.per_node)
                     # update per-device metric
                     for dev_id, measure in node_measure.per_device.items():
+                        self.observe_node_metric(
+                            device_id=dev_id,
+                            metric_key=metric_key,
+                            measure=measure,
+                        )
                         if metric_key not in self.device_metrics:
                             self.device_metrics[metric_key] = {}
                         if dev_id not in self.device_metrics[metric_key]:
@@ -423,9 +467,6 @@ class StatContext:
                     )
                 )
 
-        for metric in flattened_metrics:
-            self._utilization_metric_observer.observe_device_metric(metric=metric)
-
         # push to the Redis server
         redis_agent_updates = {
             "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
@@ -446,6 +487,31 @@ class StatContext:
             return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+
+    def observe_container_metric(
+        self,
+        kernel_id: KernelId,
+        metric_key: MetricKey,
+        measure: Measurement,
+    ) -> None:
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        value_pairs = [
+            (CURRENT_METRIC_KEY, str(measure.value)),
+        ]
+        if measure.capacity is not None:
+            value_pairs.append((CAPACITY_METRIC_KEY, str(measure.capacity)))
+        self._utilization_metric_observer.observe_container_metric(
+            metric=FlattenedKernelMetric(
+                agent_id=agent_id,
+                kernel_id=kernel_id,
+                session_id=session_id,
+                owner_user_id=owner_user_id,
+                project_id=project_id,
+                key=metric_key,
+                value_pairs=value_pairs,
+            )
+        )
 
     async def collect_container_stat(
         self,
@@ -501,6 +567,11 @@ class StatContext:
                             kernel_id = kernel_id_map[ContainerId(cid)]
                         except KeyError:
                             continue
+                        self.observe_container_metric(
+                            kernel_id,
+                            metric_key,
+                            measure,
+                        )
                         updated_kernel_ids.add(kernel_id)
                         if kernel_id not in self.kernel_metrics:
                             self.kernel_metrics[kernel_id] = {}
@@ -522,16 +593,7 @@ class StatContext:
         kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
         agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
         for kernel_id in updated_kernel_ids:
-            kernel_obj = kernel_obj_map.get(kernel_id)
-            if kernel_obj is not None:
-                ownership_data = kernel_obj.ownership_data
-                session_id = ownership_data.session_id
-                owner_user_id = ownership_data.owner_user_id
-                owner_project_id = ownership_data.owner_project_id
-            else:
-                session_id = None
-                owner_user_id = None
-                owner_project_id = None
+            session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
             metrics = self.kernel_metrics[kernel_id]
             serializable_metrics: dict[MetricKey, MetricValue] = {}
             for key, obj in metrics.items():
@@ -549,7 +611,7 @@ class StatContext:
                         kernel_id,
                         session_id,
                         owner_user_id,
-                        owner_project_id,
+                        project_id,
                         key,
                         value_pairs,
                     )
@@ -558,9 +620,6 @@ class StatContext:
                 log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
 
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
-
-        for metric in kernel_updates:
-            self._utilization_metric_observer.observe_container_metric(metric=metric)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
