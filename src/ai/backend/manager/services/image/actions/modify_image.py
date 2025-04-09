@@ -27,7 +27,7 @@ class ImageModifier(PartialModifier):
     labels: OptionalState[dict[str, Any]] = field(
         default_factory=lambda: OptionalState.nop("labels")
     )
-    accelerators: TriState[str] = field(default_factory=lambda: TriState.nop("accelerators"))
+    accelerators: TriState[str] = field(default_factory=TriState.nop)
     resources: OptionalState[dict[str, Any]] = field(
         default_factory=lambda: OptionalState.nop("resources")
     )

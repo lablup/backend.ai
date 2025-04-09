@@ -56,12 +56,14 @@ class UserResourcePolicyService:
         self, action: ModifyUserResourcePolicyAction
     ) -> ModifyUserResourcePolicyActionResult:
         name = action.name
-        props = action.props
+        modifier = action.modifier
 
         async with self._db.begin_session() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             db_row = (await db_sess.execute(query)).scalar_one_or_none()
-            props.set_attr(db_row)
+            to_update = modifier.fields_to_update()
+            for key, value in to_update.items():
+                setattr(db_row, key, value)
 
         return ModifyUserResourcePolicyActionResult(user_resource_policy=db_row.to_dataclass())
 

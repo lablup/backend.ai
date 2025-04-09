@@ -166,7 +166,7 @@ async def test_create_domain_node(
                     domain_name="default",
                 ),
                 modifier=DomainNodeModifier(
-                    description=TriState.update("description", "Domain Description Modified"),
+                    description=TriState.update("Domain Description Modified"),
                 ),
             ),
             ModifyDomainNodeActionResult(
@@ -196,7 +196,7 @@ async def test_create_domain_node(
                     domain_name="default",
                 ),
                 modifier=DomainNodeModifier(
-                    description=TriState.update("description", "Domain Description Modified"),
+                    description=TriState.update("Domain Description Modified"),
                 ),
             ),
             ValueError,
@@ -211,7 +211,7 @@ async def test_create_domain_node(
                     domain_name="default",
                 ),
                 modifier=DomainNodeModifier(
-                    description=TriState.update("description", "Domain Description Modified"),
+                    description=TriState.update("Domain Description Modified"),
                 ),
             ),
             ValueError,
@@ -307,7 +307,7 @@ async def test_create_model_store_after_domain_created(
             ModifyDomainAction(
                 domain_name="test-modify-domain",
                 modifier=DomainModifier(
-                    description=TriState.update("description", "Domain Description Modified"),
+                    description=TriState.update("Domain Description Modified"),
                 ),
             ),
             ModifyDomainActionResult(
@@ -332,7 +332,7 @@ async def test_create_model_store_after_domain_created(
             ModifyDomainAction(
                 domain_name="not-exist-domain",
                 modifier=DomainModifier(
-                    description=TriState.update("description", "Domain Description Modified"),
+                    description=TriState.update("Domain Description Modified"),
                 ),
             ),
             ModifyDomainActionResult(

@@ -8,7 +8,7 @@ from sqlalchemy.engine.result import Row
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState, TriStateEnum
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -108,23 +108,13 @@ class DomainNodeCreator(Creator):
 
 @dataclass
 class DomainModifier(PartialModifier):
-    name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("name"))
-    description: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("description")
-    )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
-        default_factory=lambda: TriState.nop("total_resource_slots")
-    )
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
-    )
-    allowed_docker_registries: OptionalState[list[str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
-    )
-    integration_id: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("integration_id")
-    )
+    name: OptionalState[str] = field(default_factory=OptionalState.nop)
+    description: TriState[str] = field(default_factory=TriState.nop)
+    is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState.nop)
+    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(default_factory=OptionalState.nop)
+    allowed_docker_registries: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
+    integration_id: TriState[Optional[str]] = field(default_factory=TriState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
@@ -141,39 +131,26 @@ class DomainModifier(PartialModifier):
 
 @dataclass
 class DomainNodeModifier(PartialModifier):
-    description: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("description")
-    )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
-        default_factory=lambda: TriState.nop("total_resource_slots")
-    )
+    description: TriState[str] = field(default_factory=lambda: TriState[str].nop("description"))
+    is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState[ResourceSlot].nop)
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+        default_factory=OptionalState[dict[str, str]].nop
     )
     allowed_docker_registries: OptionalState[list[str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
+        default_factory=OptionalState[list[str]].nop
     )
-    integration_id: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("integration_id")
-    )
-    dotfiles: OptionalState[bytes] = field(default_factory=lambda: OptionalState.nop("dotfiles"))
+    integration_id: TriState[str] = field(default_factory=TriState[str].nop)
+    dotfiles: OptionalState[bytes] = field(default_factory=OptionalState[bytes].nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
-        modified: dict[str, Any] = {}
-        if self.description.state() != TriStateEnum.NOP:
-            modified["description"] = self.description.value()
-        if self.is_active.state() != TriStateEnum.NOP:
-            modified["is_active"] = self.is_active.value()
-        if self.total_resource_slots.state() != TriStateEnum.NOP:
-            modified["total_resource_slots"] = self.total_resource_slots.value()
-        if self.allowed_vfolder_hosts.state() != TriStateEnum.NOP:
-            modified["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts.value()
-        if self.allowed_docker_registries.state() != TriStateEnum.NOP:
-            modified["allowed_docker_registries"] = self.allowed_docker_registries.value()
-        if self.integration_id.state() != TriStateEnum.NOP:
-            modified["integration_id"] = self.integration_id.value()
-        if self.dotfiles.state() != TriStateEnum.NOP:
-            modified["dotfiles"] = self.dotfiles.value()
-        return modified
+        to_update: dict[str, Any] = {}
+        self.description.update_dict(to_update, "description")
+        self.is_active.update_dict(to_update, "is_active")
+        self.total_resource_slots.update_dict(to_update, "total_resource_slots")
+        self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
+        self.allowed_docker_registries.update_dict(to_update, "allowed_docker_registries")
+        self.integration_id.update_dict(to_update, "integration_id")
+        self.dotfiles.update_dict(to_update, "dotfiles")
+        return to_update

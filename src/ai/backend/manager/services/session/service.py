@@ -1601,8 +1601,8 @@ class SessionService:
 
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
-        props = action.props
-        session_name = action.props.name
+        props = action.modifier
+        session_name = action.modifier.name
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
@@ -1633,7 +1633,9 @@ class SessionService:
             )
 
             session_row = await db_session.scalar(select_stmt)
-            props.set_attr(session_row)
+            to_update = props.fields_to_update()
+            for key, value in to_update.items():
+                setattr(session_row, key, value)
 
             if session_name:
                 await db_session.execute(

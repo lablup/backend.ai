@@ -4,19 +4,14 @@ from typing import Optional, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
 from ai.backend.manager.services.domain.types import DomainData, DomainNodeModifier, UserInfo
-from ai.backend.manager.types import OptionalState
 
 
 @dataclass
 class ModifyDomainNodeAction(DomainAction):
     name: str
     user_info: UserInfo
-    sgroups_to_add: OptionalState[set[str]] = field(
-        default_factory=lambda: OptionalState.nop("scaling_groups")
-    )
-    sgroups_to_remove: OptionalState[set[str]] = field(
-        default_factory=lambda: OptionalState.nop("scaling_groups")
-    )
+    sgroups_to_add: Optional[set[str]] = None
+    sgroups_to_remove: Optional[set[str]] = None
     modifier: DomainNodeModifier = field(default_factory=DomainNodeModifier)
 
     @override

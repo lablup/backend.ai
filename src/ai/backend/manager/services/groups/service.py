@@ -61,7 +61,7 @@ from ai.backend.manager.services.groups.actions.usage_per_period import (
     UsagePerPeriodActionResult,
 )
 from ai.backend.manager.services.groups.types import GroupData
-from ai.backend.manager.types import OptionalState, TriStateEnum
+from ai.backend.manager.types import TriStateEnum
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -128,9 +128,8 @@ class GroupService:
             )
         ):
             raise ValueError("invalid user_update_mode")
-        if action.modifier.user_uuids.state() == TriStateEnum.NOP:
-            action.modifier.user_update_mode = OptionalState.nop("user_update_mode")
-        if not data and action.modifier.user_update_mode.value() is None:
+        update_mode = action.modifier.update_mode()
+        if not data and update_mode is None:
             return ModifyGroupActionResult(data=None, success=False)
 
         async def _do_mutate() -> MutationResult:
@@ -140,12 +139,12 @@ class GroupService:
                 gid = action.group_id
                 if action.modifier.user_uuids.state() == TriStateEnum.UPDATE:
                     user_uuids = cast(list[str], action.modifier.user_uuids.value())
-                    if action.modifier.user_update_mode.value() == "add":
+                    if update_mode == "add":
                         values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]
                         await conn.execute(
                             sa.insert(association_groups_users).values(values),
                         )
-                    elif action.modifier.user_update_mode.value() == "remove":
+                    elif update_mode == "remove":
                         await conn.execute(
                             sa.delete(association_groups_users).where(
                                 (association_groups_users.c.user_id.in_(user_uuids))

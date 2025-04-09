@@ -2,34 +2,33 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import PartialModifier, TriState
 
 
 @dataclass
-class ModifyResourcePresetInputData:
-    resource_slots: TriState[ResourceSlot] = field(
-        default_factory=lambda: TriState.nop("resource_slots")
-    )
-    name: TriState[str] = field(default_factory=lambda: TriState.nop("name"))
-    shared_memory: TriState[str] = field(default_factory=lambda: TriState.nop("shared_memory"))
-    scaling_group_name: TriState[str] = field(
-        default_factory=lambda: TriState.nop("scaling_group_name")
-    )
+class ResourcePresetModifier(PartialModifier):
+    resource_slots: TriState[ResourceSlot] = field(default_factory=TriState[ResourceSlot].nop)
+    name: TriState[str] = field(default_factory=TriState[str].nop)
+    shared_memory: TriState[BinarySize] = field(default_factory=TriState[BinarySize].nop)
+    scaling_group_name: TriState[str] = field(default_factory=TriState[str].nop)
 
-    def set_attr(self, row: Any) -> None:
-        self.resource_slots.set_attr(row)
-        self.name.set_attr(row)
-        self.shared_memory.set_attr(row)
-        self.scaling_group_name.set_attr(row)
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.resource_slots.update_dict(to_update, "resource_slots")
+        self.name.update_dict(to_update, "name")
+        self.shared_memory.update_dict(to_update, "shared_memory")
+        self.scaling_group_name.update_dict(to_update, "scaling_group_name")
+        return to_update
 
 
 @dataclass
 class ModifyResourcePresetAction(ResourcePresetAction):
-    props: ModifyResourcePresetInputData
+    modifier: ResourcePresetModifier
     id: Optional[uuid.UUID]
     name: Optional[str]
 

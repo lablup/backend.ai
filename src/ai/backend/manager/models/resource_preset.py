@@ -7,20 +7,21 @@ from uuid import UUID
 
 import graphene
 import sqlalchemy as sa
+from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.gql_models.base import to_tri_state
+from ai.backend.manager.types import TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.resource_preset.actions.create_preset import (
         ResourcePresetCreator,
     )
     from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-        ModifyResourcePresetInputData,
+        ResourcePresetModifier,
     )
 
 from .base import (
@@ -301,20 +302,20 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
-    def to_dataclass(self) -> ModifyResourcePresetInputData:
-        from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-            ModifyResourcePresetInputData,
-        )
-
+    def to_modifier(self) -> ResourcePresetModifier:
         resource_slots = (
             ResourceSlot.from_json(self.resource_slots) if self.resource_slots else None
         )
 
-        return ModifyResourcePresetInputData(
-            resource_slots=to_tri_state("resource_slots", resource_slots),
-            name=to_tri_state("name", self.name),
-            shared_memory=to_tri_state("shared_memory", self.shared_memory),
-            scaling_group_name=to_tri_state("scaling_group_name", self.scaling_group_name),
+        return ResourcePresetModifier(
+            resource_slots=TriState[ResourceSlot].from_graphql(resource_slots),
+            name=TriState[str].from_graphql(self.name),
+            shared_memory=TriState[BinarySize].from_graphql(
+                BinarySize.from_str(self.shared_memory)
+                if self.shared_memory is not Undefined
+                else Undefined
+            ),
+            scaling_group_name=TriState[str].from_graphql(self.scaling_group_name),
         )
 
 
@@ -383,7 +384,7 @@ class ModifyResourcePreset(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.resource_preset.modify_preset.wait_for_complete(
-            ModifyResourcePresetAction(id=id, name=name, props=props.to_dataclass())
+            ModifyResourcePresetAction(id=id, name=name, modifier=props.to_modifier())
         )
 
         return cls(True, "success")

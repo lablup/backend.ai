@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, List, Optional, Self, override
+from typing import Any, Optional, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.user import UserRole, UserStatus
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState, TriStateEnum
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -120,84 +120,48 @@ class UserData:
 
 @dataclass
 class UserModifier(PartialModifier):
-    username: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("username"))
-    password: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("password"))
+    username: OptionalState[str] = field(
+        default_factory=OptionalState.nop,
+    )
+    password: OptionalState[str] = field(default_factory=OptionalState.nop)
     need_password_change: OptionalState[bool] = field(
-        default_factory=lambda: OptionalState.nop("need_password_change")
+        default_factory=OptionalState.nop,
     )
-    full_name: TriState[Optional[str]] = field(default_factory=lambda: TriState.nop("full_name"))
-    description: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("description")
-    )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    status: OptionalState[UserStatus] = field(default_factory=lambda: OptionalState.nop("status"))
-    domain_name: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("domain_name")
-    )
-    role: OptionalState[UserRole] = field(default_factory=lambda: OptionalState.nop("role"))
-    allowed_client_ip: TriState[Optional[List[str]]] = field(
-        default_factory=lambda: TriState.nop("allowed_client_ip")
-    )
-    totp_activated: OptionalState[bool] = field(
-        default_factory=lambda: OptionalState.nop("totp_activated")
-    )
-    resource_policy: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("resource_policy")
-    )
-    sudo_session_enabled: OptionalState[bool] = field(
-        default_factory=lambda: OptionalState.nop("sudo_session_enabled")
-    )
-    container_uid: TriState[Optional[int]] = field(
-        default_factory=lambda: TriState.nop("container_uid")
-    )
-    container_main_gid: TriState[Optional[int]] = field(
-        default_factory=lambda: TriState.nop("container_main_gid")
-    )
-    container_gids: TriState[Optional[List[int]]] = field(
-        default_factory=lambda: TriState.nop("container_gids")
-    )
-    main_access_key: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("main_access_key")
-    )
-    group_ids: OptionalState[List[str]] = field(
-        default_factory=lambda: OptionalState.nop("group_ids")
-    )
+    full_name: TriState[str] = field(default_factory=TriState.nop)
+    description: TriState[str] = field(default_factory=TriState.nop)
+    is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    status: OptionalState[UserStatus] = field(default_factory=OptionalState.nop)
+    domain_name: OptionalState[str] = field(default_factory=OptionalState.nop)
+    role: OptionalState[UserRole] = field(default_factory=OptionalState.nop)
+    allowed_client_ip: TriState[list[str]] = field(default_factory=TriState.nop)
+    totp_activated: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    resource_policy: TriState[str] = field(default_factory=TriState.nop)
+    sudo_session_enabled: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    container_uid: TriState[int] = field(default_factory=TriState.nop)
+    container_main_gid: TriState[int] = field(default_factory=TriState.nop)
+    container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
+    main_access_key: TriState[str] = field(default_factory=TriState.nop)
+    group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
         modified: dict[str, Any] = {}
-        if self.username.state() != TriStateEnum.NOP:
-            modified["username"] = self.username.value()
-        if self.password.state() != TriStateEnum.NOP:
-            modified["password"] = self.password.value()
-        if self.need_password_change.state() != TriStateEnum.NOP:
-            modified["need_password_change"] = self.need_password_change.value()
-        if self.full_name.state() != TriStateEnum.NOP:
-            modified["full_name"] = self.full_name.value()
-        if self.description.state() != TriStateEnum.NOP:
-            modified["description"] = self.description.value()
-        if self.is_active.state() != TriStateEnum.NOP:
-            modified["is_active"] = self.is_active.value()
-        if self.status.state() != TriStateEnum.NOP:
-            modified["status"] = self.status.value()
-        if self.domain_name.state() != TriStateEnum.NOP:
-            modified["domain_name"] = self.domain_name.value()
-        if self.role.state() != TriStateEnum.NOP:
-            modified["role"] = self.role.value()
-        if self.allowed_client_ip.state() != TriStateEnum.NOP:
-            modified["allowed_client_ip"] = self.allowed_client_ip.value()
-        if self.totp_activated.state() != TriStateEnum.NOP:
-            modified["totp_activated"] = self.totp_activated.value()
-        if self.resource_policy.state() != TriStateEnum.NOP:
-            modified["resource_policy"] = self.resource_policy.value()
-        if self.sudo_session_enabled.state() != TriStateEnum.NOP:
-            modified["sudo_session_enabled"] = self.sudo_session_enabled.value()
-        if self.container_uid.state() != TriStateEnum.NOP:
-            modified["container_uid"] = self.container_uid.value()
-        if self.container_main_gid.state() != TriStateEnum.NOP:
-            modified["container_main_gid"] = self.container_main_gid.value()
-        if self.container_gids.state() != TriStateEnum.NOP:
-            modified["container_gids"] = self.container_gids.value()
-        if self.main_access_key.state() != TriStateEnum.NOP:
-            modified["main_access_key"] = self.main_access_key.value()
+        self.username.update_dict(modified, "username")
+        self.password.update_dict(modified, "password")
+        self.need_password_change.update_dict(modified, "need_password_change")
+        self.full_name.update_dict(modified, "full_name")
+        self.description.update_dict(modified, "description")
+        self.is_active.update_dict(modified, "is_active")
+        self.status.update_dict(modified, "status")
+        self.domain_name.update_dict(modified, "domain_name")
+        self.role.update_dict(modified, "role")
+        self.allowed_client_ip.update_dict(modified, "allowed_client_ip")
+        self.totp_activated.update_dict(modified, "totp_activated")
+        self.resource_policy.update_dict(modified, "resource_policy")
+        self.sudo_session_enabled.update_dict(modified, "sudo_session_enabled")
+        self.container_uid.update_dict(modified, "container_uid")
+        self.container_main_gid.update_dict(modified, "container_main_gid")
+        self.container_gids.update_dict(modified, "container_gids")
+        self.main_access_key.update_dict(modified, "main_access_key")
+        self.group_ids.update_dict(modified, "group_ids")
         return modified

@@ -40,8 +40,9 @@ from ai.backend.manager.services.session.actions.check_and_transit_status import
 )
 from ai.backend.manager.services.session.actions.modify_session import (
     ModifySessionAction,
-    ModifySessionInputData,
+    SessionModifier,
 )
+from ai.backend.manager.types import OptionalState
 
 from ..base import (
     BigInt,
@@ -699,9 +700,9 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         result = await graph_ctx.processors.session.modify_session.wait_for_complete(
             ModifySessionAction(
                 session_id=session_id,
-                props=ModifySessionInputData(
-                    name=name,
-                    priority=priority,
+                modifier=SessionModifier(
+                    name=OptionalState[str].from_graphql("name", name),
+                    priority=OptionalState[int].from_graphql("priority", priority),
                 ),
             )
         )

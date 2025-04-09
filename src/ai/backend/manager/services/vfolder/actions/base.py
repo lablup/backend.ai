@@ -16,7 +16,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-from ai.backend.manager.types import DataclassInput, TriState
+from ai.backend.manager.types import PartialModifier, TriState
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -73,20 +73,25 @@ class CreateVFolderActionResult(BaseActionResult):
 
 
 @dataclass
-class UpdateVFolderAttributeInput(DataclassInput):
-    name: TriState[str] = field(default_factory=lambda: TriState.nop("name"))
-    cloneable: TriState[bool] = field(default_factory=lambda: TriState.nop("cloneable"))
-    mount_permission: TriState[VFolderPermission] = field(
-        default_factory=lambda: TriState.nop("mount_permission")
-    )
+class VFolderAttributeModifier(PartialModifier):
+    name: TriState[str] = field(default_factory=TriState.nop)
+    cloneable: TriState[bool] = field(default_factory=TriState.nop)
+    mount_permission: TriState[VFolderPermission] = field(default_factory=TriState.nop)
+
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        self.cloneable.update_dict(to_update, "cloneable")
+        self.mount_permission.update_dict(to_update, "mount_permission")
+        return to_update
 
 
 @dataclass
 class UpdateVFolderAttributeAction(VFolderAction):
     user_uuid: uuid.UUID
-
     vfolder_uuid: uuid.UUID
-    input: UpdateVFolderAttributeInput = field(default_factory=UpdateVFolderAttributeInput)
+    modifier: VFolderAttributeModifier = field(default_factory=VFolderAttributeModifier)
 
     @override
     def entity_id(self) -> Optional[str]:

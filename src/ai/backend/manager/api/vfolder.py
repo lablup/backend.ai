@@ -103,7 +103,7 @@ from ..services.vfolder.actions.base import (
     MoveToTrashVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
-    UpdateVFolderAttributeInput,
+    VFolderAttributeModifier,
 )
 from ..services.vfolder.actions.file import (
     CreateDownloadSessionAction,
@@ -969,9 +969,9 @@ class RenameRequestModel(BaseModel):
         description="Name of the vfolder",
     )
 
-    def to_input(self) -> UpdateVFolderAttributeInput:
-        return UpdateVFolderAttributeInput(
-            name=TriState.update("name", self.new_name),
+    def to_input(self) -> VFolderAttributeModifier:
+        return VFolderAttributeModifier(
+            name=TriState.update(self.new_name),
         )
 
 
@@ -1000,7 +1000,7 @@ async def rename_vfolder(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            input=params.to_input(),
+            modifier=params.to_input(),
         )
     )
     return web.Response(status=HTTPStatus.CREATED)
@@ -1031,9 +1031,9 @@ async def update_vfolder_options(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            input=UpdateVFolderAttributeInput(
-                cloneable=TriState.update("cloneable", params["cloneable"]),
-                mount_permission=TriState.update("mount_permission", params["permission"]),
+            modifier=VFolderAttributeModifier(
+                cloneable=TriState.update(params["cloneable"]),
+                mount_permission=TriState.update(params["permission"]),
             ),
         )
     )

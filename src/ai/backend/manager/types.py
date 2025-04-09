@@ -3,8 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABC, abstractmethod
-from collections import UserDict
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -118,51 +117,44 @@ class TriState(Generic[TVal]):
     - NOP: No operation should be performed on the attribute.
     """
 
-    _attr_name: str
     _state: TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, attr_name: str, state: TriStateEnum, value: Optional[TVal]):
-        self._attr_name = attr_name
+    def __init__(self, state: TriStateEnum, value: Optional[TVal]):
+        """
+        Initialize a TriState object with the given state and value.
+        Do not call this constructor directly. Use the class methods instead.
+        """
         self._state = state
         self._value = value
 
     @classmethod
-    def from_graphql(cls, attr_name: str, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
+    def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
         if value is None:
-            return cls.nullify(attr_name)
+            return cls.nullify()
         if value is Undefined:
-            return cls.nop(attr_name)
-        return cls.update(attr_name, value)  # type: ignore
+            return cls.nop()
+        return cls.update(value)  # type: ignore
 
     @classmethod
-    def update(cls, attr_name: str, value: TVal) -> TriState[TVal]:
-        return cls(attr_name, state=TriStateEnum.UPDATE, value=value)
+    def update(cls, value: TVal) -> TriState[TVal]:
+        return cls(state=TriStateEnum.UPDATE, value=value)
 
     @classmethod
-    def nullify(cls, attr_name: str) -> TriState[TVal]:
-        return cls(attr_name, state=TriStateEnum.NULLIFY, value=None)
+    def nullify(cls) -> TriState[TVal]:
+        return cls(state=TriStateEnum.NULLIFY, value=None)
 
     @classmethod
-    def nop(cls, attr_name: str) -> TriState[TVal]:
-        return cls(attr_name, state=TriStateEnum.NOP, value=None)
+    def nop(cls) -> TriState[TVal]:
+        return cls(state=TriStateEnum.NOP, value=None)
 
     def value(self) -> Optional[TVal]:
         if self._state == TriStateEnum.UPDATE:
             return self._value
-        raise ValueError(f"Value is not set for {self._attr_name}")
+        raise ValueError("TriState value is not set")
 
     def state(self) -> TriStateEnum:
         return self._state
-
-    def set_attr(self, obj: Any) -> None:
-        match self._state:
-            case TriStateEnum.UPDATE:
-                setattr(obj, self._attr_name, self._value)
-            case TriStateEnum.NULLIFY:
-                setattr(obj, self._attr_name, None)
-            case TriStateEnum.NOP:
-                pass
 
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:
@@ -192,68 +184,21 @@ class OptionalState(TriState[TVal]):
         self._value = value
 
     @classmethod
-    def from_graphql(
-        cls, attr_name: str, value: Optional[TVal] | UndefinedType
-    ) -> OptionalState[TVal]:
+    def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> OptionalState[TVal]:
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")
         if value is Undefined:
-            return OptionalState.nop(attr_name)
-        return OptionalState.update(attr_name, value)  # type: ignore
+            return OptionalState.nop()
+        return OptionalState.update(value)
 
     @classmethod
-    def nullify(cls, _: str) -> TriState[TVal]:
+    def nullify(cls) -> TriState[TVal]:
         raise ValueError("OptionalState cannot be NULLIFY")
 
     @classmethod
-    def update(cls, attr_name: str, value: TVal) -> OptionalState[TVal]:
-        return cls(attr_name, state=TriStateEnum.UPDATE, value=value)
+    def update(cls, value: TVal) -> OptionalState[TVal]:
+        return cls(state=TriStateEnum.UPDATE, value=value)
 
     @classmethod
-    def nop(cls, attr_name: str) -> OptionalState[TVal]:
-        return cls(attr_name, state=TriStateEnum.NOP, value=None)
-
-
-@dataclass
-class DataclassInput:
-    """
-    Base class for inputs that are dataclasses.
-
-    The classes that inherit from this class should be dataclasses and
-    should have fields that are TriStateField.
-    """
-
-    def _get_fields(self) -> list[tuple[str, TriState]]:
-        return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
-
-    def set_attr(self, obj: Any) -> None:
-        for field_name, value in self._get_fields():
-            if value.state() != TriStateEnum.NOP:
-                setattr(obj, field_name, value.value())
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            field_name: value.value()
-            for field_name, value in self._get_fields()
-            if value.state() != TriStateEnum.NOP
-        }
-
-
-class DictInput(UserDict[str, TriState]):
-    """
-    Base class for inputs that are UserDict.
-    """
-
-    def _get_fields(self) -> list[tuple[str, TriState]]:
-        return [(k, v) for k, v in self.data.items()]
-
-    def set_attr(self, obj: Any) -> None:
-        for field_name, field in self._get_fields():
-            field.set_attr(obj)
-
-    def to_dict(self) -> dict[str, Any]:
-        result = {}
-        for field_name, field in self._get_fields():
-            if field.state() != TriStateEnum.NOP:
-                result[field_name] = field.value()
-        return result
+    def nop(cls) -> OptionalState[TVal]:
+        return cls(state=TriStateEnum.NOP, value=None)

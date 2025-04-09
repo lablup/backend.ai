@@ -30,7 +30,7 @@ class KeyPairResourcePolicyModifier(PartialModifier):
         default_factory=lambda: OptionalState.nop("max_pending_session_count")
     )
     max_pending_session_resource_slots: TriState[dict[str, Any]] = field(
-        default_factory=lambda: TriState.nop("max_pending_session_resource_slots")
+        default_factory=TriState.nop
     )
     max_quota_scope_size: OptionalState[int] = field(
         default_factory=lambda: OptionalState.nop("max_quota_scope_size")

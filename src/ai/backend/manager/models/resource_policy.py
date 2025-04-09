@@ -37,7 +37,7 @@ if TYPE_CHECKING:
         CreateUserResourcePolicyInputData,
     )
     from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-        ModifyUserResourcePolicyInputData,
+        UserResourcePolicyModifier,
     )
 
 from .base import (
@@ -757,12 +757,12 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_dataclass(self) -> ModifyUserResourcePolicyInputData:
+    def to_dataclass(self) -> UserResourcePolicyModifier:
         from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-            ModifyUserResourcePolicyInputData,
+            UserResourcePolicyModifier,
         )
 
-        return ModifyUserResourcePolicyInputData(
+        return UserResourcePolicyModifier(
             max_vfolder_count=OptionalState[int].from_graphql(
                 "max_vfolder_count", self.max_vfolder_count
             ),

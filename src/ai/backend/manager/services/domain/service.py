@@ -51,7 +51,6 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainActionResult,
 )
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import TriStateEnum
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -261,17 +260,8 @@ class DomainService:
     ) -> ModifyDomainNodeActionResult:
         domain_name = action.name
 
-        if action.sgroups_to_add.state() == TriStateEnum.UPDATE:
-            sgroups_to_add = action.sgroups_to_add.value()
-        else:
-            sgroups_to_add = None
-        if action.sgroups_to_remove.state() == TriStateEnum.UPDATE:
-            sgroups_to_remove = action.sgroups_to_remove.value()
-        else:
-            sgroups_to_remove = None
-
-        if sgroups_to_add is not None and sgroups_to_remove is not None:
-            if union := sgroups_to_add | sgroups_to_remove:
+        if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
+            if union := action.sgroups_to_add | action.sgroups_to_remove:
                 raise ValueError(
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
                     f"(sg:{union})."
@@ -292,25 +282,25 @@ class DomainService:
             if not domain_models:
                 raise ValueError(f"Not allowed to update domain (id:{domain_name})")
 
-            if sgroups_to_add is not None:
+            if action.sgroups_to_add is not None:
                 await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_add, db_session=db_session
+                    user_info, action.sgroups_to_add, db_session=db_session
                 )
                 await db_session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
                         {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
+                        for sgroup_name in action.sgroups_to_add
                     ],
                 )
-            if sgroups_to_remove is not None:
+            if action.sgroups_to_remove is not None:
                 await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_remove, db_session=db_session
+                    user_info, action.sgroups_to_remove, db_session=db_session
                 )
                 await db_session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
                         (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
+                        & (ScalingGroupForDomainRow.scaling_group.in_(action.sgroups_to_remove))
                     ),
                 )
             _update_stmt = (

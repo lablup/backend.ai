@@ -98,7 +98,7 @@ class ResourcePresetService:
     ) -> ModifyResourcePresetActionResult:
         name = action.name
         preset_id = action.id
-        props = action.props
+        modifier = action.modifier
 
         if preset_id is None and name is None:
             raise ValueError("One of (`id` or `name`) parameter should be not null")
@@ -123,8 +123,9 @@ class ResourcePresetService:
 
             if preset_row is None:
                 raise ObjectNotFound("Resource preset not found")
-
-            props.set_attr(preset_row)
+            to_update = modifier.fields_to_update()
+            for key, value in to_update.items():
+                setattr(preset_row, key, value)
             await db_sess.flush()
 
         return ModifyResourcePresetActionResult(resource_preset=preset_row)

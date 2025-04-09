@@ -21,7 +21,6 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.types import ResourceSlot, Sentinel
-from ai.backend.manager.models.utils import define_state
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
@@ -458,52 +457,32 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
             name=name,
             user_info=user_info,
             modifier=DomainNodeModifier(
-                description=TriState(
-                    "description",
-                    define_state(self.description),
-                    value_or_none(self.description),
+                description=TriState[str].from_graphql(
+                    self.description,
                 ),
-                is_active=OptionalState(
-                    "is_active",
-                    define_state(self.is_active),
-                    value_or_none(self.is_active),
-                ),
-                total_resource_slots=TriState(
-                    "total_resource_slots",
-                    define_state(self.total_resource_slots),
-                    None
+                is_active=OptionalState[bool].from_graphql(self.is_active),
+                total_resource_slots=TriState[ResourceSlot].from_graphql(
+                    graphql.Undefined
                     if self.total_resource_slots is graphql.Undefined
                     else ResourceSlot.from_user_input(self.total_resource_slots, None),
                 ),
-                allowed_vfolder_hosts=OptionalState(
-                    "allowed_vfolder_hosts",
-                    define_state(self.allowed_vfolder_hosts),
-                    value_or_none(self.allowed_vfolder_hosts),
+                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                    self.allowed_vfolder_hosts,
                 ),
-                allowed_docker_registries=OptionalState(
-                    "allowed_docker_registries",
-                    define_state(self.allowed_docker_registries),
-                    value_or_none(self.allowed_vfolder_hosts),
+                allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                    self.allowed_vfolder_hosts,
                 ),
-                integration_id=TriState(
-                    "integration_id",
-                    define_state(self.integration_id),
-                    value_or_none(self.integration_id),
+                integration_id=TriState[str].from_graphql(
+                    self.integration_id,
                 ),
-                dotfiles=OptionalState(
-                    "dotfiles", define_state(self.dotfiles), value_or_none(self.dotfiles)
+                dotfiles=OptionalState[bytes].from_graphql(
+                    self.dotfiles,
                 ),
             ),
-            sgroups_to_add=OptionalState(
-                "sgroups_to_add",
-                define_state(self.sgroups_to_add),
-                convert_to_set(self.sgroups_to_add),
-            ),
-            sgroups_to_remove=OptionalState(
-                "sgroups_to_remove",
-                define_state(self.sgroups_to_remove),
-                convert_to_set(self.sgroups_to_remove),
-            ),
+            sgroups_to_add=self.sgroups_to_add if self.sgroups_to_add is not Undefined else None,
+            sgroups_to_remove=self.sgroups_to_remove
+            if self.sgroups_to_remove is not Undefined
+            else None,
         )
 
 
@@ -693,37 +672,25 @@ class ModifyDomainInput(graphene.InputObjectType):
         return ModifyDomainAction(
             domain_name=domain_name,
             modifier=DomainModifier(
-                name=OptionalState("name", define_state(self.name), value_or_none(self.name)),
-                description=TriState(
-                    "description",
-                    define_state(self.description),
-                    value_or_none(self.description),
+                name=OptionalState[str].from_graphql(self.name),
+                description=TriState[str].from_graphql(
+                    self.description,
                 ),
-                is_active=OptionalState(
-                    "is_active", define_state(self.is_active), value_or_none(self.is_active)
+                is_active=OptionalState[bool].from_graphql(
+                    self.is_active,
                 ),
-                total_resource_slots=TriState(
-                    "total_resource_slots",
-                    define_state(self.total_resource_slots),
-                    None
+                total_resource_slots=TriState[ResourceSlot].from_graphql(
+                    Undefined
                     if self.total_resource_slots is Undefined
                     else ResourceSlot.from_user_input(self.total_resource_slots, None),
                 ),
-                allowed_vfolder_hosts=OptionalState(
-                    "allowed_vfolder_hosts",
-                    define_state(self.allowed_vfolder_hosts),
-                    value_or_none(self.allowed_vfolder_hosts),
+                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                    self.allowed_vfolder_hosts,
                 ),
-                allowed_docker_registries=OptionalState(
-                    "allowed_docker_registries",
-                    define_state(self.allowed_docker_registries),
-                    value_or_none(self.allowed_vfolder_hosts),
+                allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                    self.allowed_docker_registries,
                 ),
-                integration_id=TriState(
-                    "integration_id",
-                    define_state(self.integration_id),
-                    value_or_none(self.integration_id),
-                ),
+                integration_id=TriState[str].from_graphql(self.integration_id),
             ),
         )
 

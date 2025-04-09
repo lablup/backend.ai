@@ -77,35 +77,35 @@ class GroupData:
 
 @dataclass
 class GroupModifier(PartialModifier):
-    name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("name"))
+    name: OptionalState[str] = field(default_factory=OptionalState.nop)
     domain_name: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("domain_name")
+        default_factory=OptionalState.nop,
     )
-    description: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("description")
+    description: TriState[str] = field(
+        default_factory=TriState.nop,
     )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
-        default_factory=lambda: TriState.nop("total_resource_slots")
+    is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    total_resource_slots: TriState[ResourceSlot] = field(
+        default_factory=TriState.nop,
     )
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
+        default_factory=OptionalState.nop,
     )
-    integration_id: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("integration_id")
+    integration_id: TriState[str] = field(
+        default_factory=TriState.nop,
     )
     resource_policy: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("resource_policy")
+        default_factory=OptionalState.nop,
     )
-    type: OptionalState[ProjectType] = field(default_factory=lambda: OptionalState.nop("type"))
+    type: OptionalState[ProjectType] = field(default_factory=OptionalState.nop)
     container_registry: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("container_registry")
+        default_factory=OptionalState.nop,
     )
     user_update_mode: OptionalState[str] = field(
-        default_factory=lambda: OptionalState.nop("user_update_mode")
+        default_factory=OptionalState.nop,
     )
     user_uuids: OptionalState[List[str]] = field(
-        default_factory=lambda: OptionalState.nop("user_uuids")
+        default_factory=OptionalState.nop,
     )
 
     @override
@@ -124,3 +124,8 @@ class GroupModifier(PartialModifier):
         self.user_update_mode.update_dict(to_update, "user_update_mode")
         self.user_uuids.update_dict(to_update, "user_uuids")
         return to_update
+
+    def update_mode(self) -> Optional[str]:
+        if self.user_uuids.state() == TriState.UPDATE:
+            return self.user_update_mode.state()
+        return None
