@@ -118,7 +118,6 @@ class KernelOwnershipData:
     agent_id: AgentId
     owner_user_id: Optional[uuid.UUID] = None
     owner_project_id: Optional[uuid.UUID] = None
-    scoped_project_id: Optional[uuid.UUID] = None
 
     def __post_init__(self):
         def to_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
@@ -126,7 +125,6 @@ class KernelOwnershipData:
 
         self.owner_user_id = to_uuid(self.owner_user_id)
         self.owner_project_id = to_uuid(self.owner_project_id)
-        self.scoped_project_id = to_uuid(self.scoped_project_id)
 
     @property
     def owner_user_id_to_str(self) -> Optional[str]:
@@ -135,10 +133,6 @@ class KernelOwnershipData:
     @property
     def owner_project_id_to_str(self) -> Optional[str]:
         return str(self.owner_project_id) if self.owner_project_id is not None else None
-
-    @property
-    def scoped_project_id_to_str(self) -> Optional[str]:
-        return str(self.scoped_project_id) if self.scoped_project_id is not None else None
 
 
 WebMiddleware = Callable[
