@@ -66,8 +66,8 @@ class UtilizationMetricObserver:
                 "agent_id",
                 "kernel_id",
                 "session_id",
-                "owner_user_id",
-                "owner_project_id",
+                "user_id",
+                "project_id",
                 "value_type",
             ],
         )
@@ -94,8 +94,8 @@ class UtilizationMetricObserver:
                 agent_id=metric.agent_id,
                 kernel_id=metric.kernel_id,
                 session_id=metric.session_id or UNDEFINED,
-                owner_user_id=metric.owner_user_id or UNDEFINED,
-                owner_project_id=metric.owner_project_id or UNDEFINED,
+                user_id=metric.owner_user_id or UNDEFINED,
+                project_id=metric.project_id or UNDEFINED,
                 value_type=metric_value_type,
             ).set(float(value))
 
