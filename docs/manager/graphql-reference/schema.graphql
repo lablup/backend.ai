@@ -1352,6 +1352,12 @@ type ScalingGroup {
   """Added in 25.5.0."""
   accelerator_quantum_size: Float
 
+  """Added in 25.6.0. Minimum available slots for each resource."""
+  min_available_slots_for_each_resource: JSONString
+
+  """Added in 25.6.0. Maximum available slots for each resource."""
+  max_available_slots_for_each_resource: JSONString
+
   """Added in 24.03.7."""
   agent_count_by_status(
     """
