@@ -1,10 +1,8 @@
 import uuid
 from typing import Optional
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import BaseModel, Field
 
 
 class ListGroupQuery(BaseModel):
-    group_id: Optional[uuid.UUID] = Field(
-        default=None, validation_alias=AliasChoices("group_id", "groupId")
-    )
+    group_id: Optional[uuid.UUID] = Field(default=None, alias="groupId")

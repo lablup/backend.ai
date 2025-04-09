@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, ConfigDict, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.types import VFolderUsageMode
@@ -11,21 +11,23 @@ from .field import VFolderPermissionField
 
 
 class VFolderCreateReq(BaseRequestModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: VFolderName = Field(
         description="Name of the vfolder",
     )
     folder_host: Optional[str] = Field(
-        validation_alias=AliasChoices("host", "folder_host"),
+        alias="host",
         default=None,
     )
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
     unmanaged_path: Optional[str] = Field(
-        validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
+        alias="unmanagedPath",
         default=None,
     )
     group_id: Optional[uuid.UUID] = Field(
-        validation_alias=AliasChoices("group", "groupId", "group_id"),
+        validation_alias=AliasChoices("group", "groupId"),
         default=None,
     )
     cloneable: bool = Field(
