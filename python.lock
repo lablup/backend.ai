@@ -23,6 +23,7 @@
 //     "aiohttp~=3.10.8",
 //     "aiomonitor~=0.7.0",
 //     "aioresponses>=0.7.3",
+//     "aiosmtplib~=4.0.0",
 //     "aiosqlite~=0.20.0",
 //     "aiotools~=1.8.2",
 //     "aiotusclient~=0.1.4",
@@ -500,6 +501,30 @@
           ],
           "requires_python": ">=3.9",
           "version": "1.3.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "33c72021cd9e9da495823952751e2dd927014a04a0eca711ee4af9812f2f04af",
+              "url": "https://files.pythonhosted.org/packages/ab/a3/90454e5882d95edd73b18424279a58f3a791aed20c303af4193aa63c36a9/aiosmtplib-4.0.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "9629a0d8786ab1e5f790ebbbf5cbe7886fedf949a3f52fd7b27a0360f6233422",
+              "url": "https://files.pythonhosted.org/packages/7c/b3/8ed1f568661c46c19a486ade7d21c2e704d72d868aca41627da19813b1ce/aiosmtplib-4.0.0.tar.gz"
+            }
+          ],
+          "project_name": "aiosmtplib",
+          "requires_dists": [
+            "furo>=2023.9.10; extra == \"docs\"",
+            "sphinx-autodoc-typehints>=1.24.0; extra == \"docs\"",
+            "sphinx-copybutton>=0.5.0; extra == \"docs\"",
+            "sphinx>=7.0.0; extra == \"docs\"",
+            "uvloop>=0.18; extra == \"uvloop\""
+          ],
+          "requires_python": ">=3.9",
+          "version": "4.0.0"
         },
         {
           "artifacts": [
@@ -5347,6 +5372,7 @@
     "aiohttp~=3.10.8",
     "aiomonitor~=0.7.0",
     "aioresponses>=0.7.3",
+    "aiosmtplib~=4.0.0",
     "aiosqlite~=0.20.0",
     "aiotools~=1.8.2",
     "aiotusclient~=0.1.4",
