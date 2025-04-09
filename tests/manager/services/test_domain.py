@@ -95,7 +95,7 @@ async def create_domain(
         TestScenario.success(
             "Create a domain node",
             CreateDomainNodeAction(
-                input=DomainCreator(
+                creator=DomainCreator(
                     name="test-create-domain-node",
                     description="Test domain",
                     total_resource_slots=ResourceSlot.from_user_input({}, None),
@@ -131,7 +131,7 @@ async def create_domain(
         TestScenario.failure(
             "Create domain node with duplicated name",
             CreateDomainNodeAction(
-                input=DomainCreator(
+                creator=DomainCreator(
                     name="default",
                     description="Test domain",
                 ),

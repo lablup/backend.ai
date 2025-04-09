@@ -57,8 +57,8 @@ from ai.backend.manager.services.image.actions.forget_image import (
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import (
+    ImageModifier,
     ModifyImageAction,
-    ModifyImageInputData,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
@@ -1083,7 +1083,7 @@ class ModifyImageInput(graphene.InputObjectType):
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
-    def to_dataclass(self) -> ModifyImageInputData:
+    def to_dataclass(self) -> ImageModifier:
         resources_data: dict[str, Any] | UndefinedType = Undefined
         if self.resource_limits is not Undefined:
             resources_data = {}
@@ -1101,7 +1101,7 @@ class ModifyImageInput(graphene.InputObjectType):
             else None
         )
 
-        return ModifyImageInputData(
+        return ImageModifier(
             name=OptionalState[str].from_graphql("name", self.name),
             registry=OptionalState[str].from_graphql("registry", self.registry),
             image=OptionalState[str].from_graphql("image", self.image),
@@ -1151,7 +1151,7 @@ class ModifyImage(graphene.Mutation):
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                props=props.to_dataclass(),
+                modifier=props.to_dataclass(),
             )
         )
 

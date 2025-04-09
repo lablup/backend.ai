@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Self, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState, TriStateEnum
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -21,7 +21,7 @@ class GroupCreator(Creator):
     resource_policy: Optional[str] = None
     container_registry: Optional[dict[str, str]] = None
 
-    def get_creation_data(self) -> dict[str, Any]:
+    def fields_to_store(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "domain_name": self.domain_name,
@@ -109,24 +109,18 @@ class GroupModifier(PartialModifier):
     )
 
     @override
-    def get_modified_fields(self) -> dict[str, Any]:
-        modified: dict[str, Any] = {}
-        if self.name.state() != TriStateEnum.NOP:
-            modified["name"] = self.name.value()
-        if self.description.state() != TriStateEnum.NOP:
-            modified["description"] = self.description.value()
-        if self.is_active.state() != TriStateEnum.NOP:
-            modified["is_active"] = self.is_active.value()
-        if self.total_resource_slots.state() != TriStateEnum.NOP:
-            modified["total_resource_slots"] = self.total_resource_slots.value()
-        if self.allowed_vfolder_hosts.state() != TriStateEnum.NOP:
-            modified["allowed_vfolder_hosts"] = self.allowed_vfolder_hosts.value()
-        if self.integration_id.state() != TriStateEnum.NOP:
-            modified["integration_id"] = self.integration_id.value()
-        if self.resource_policy.state() != TriStateEnum.NOP:
-            modified["resource_policy"] = self.resource_policy.value()
-        if self.type.state() != TriStateEnum.NOP:
-            modified["type"] = self.type.value()
-        if self.container_registry.state() != TriStateEnum.NOP:
-            modified["container_registry"] = self.container_registry.value()
-        return modified
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        self.domain_name.update_dict(to_update, "domain_name")
+        self.description.update_dict(to_update, "description")
+        self.is_active.update_dict(to_update, "is_active")
+        self.total_resource_slots.update_dict(to_update, "total_resource_slots")
+        self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
+        self.integration_id.update_dict(to_update, "integration_id")
+        self.resource_policy.update_dict(to_update, "resource_policy")
+        self.type.update_dict(to_update, "type")
+        self.container_registry.update_dict(to_update, "container_registry")
+        self.user_update_mode.update_dict(to_update, "user_update_mode")
+        self.user_uuids.update_dict(to_update, "user_uuids")
+        return to_update

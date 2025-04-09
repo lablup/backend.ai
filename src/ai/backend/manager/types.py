@@ -9,7 +9,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Dict,
     Generic,
     Optional,
     Protocol,
@@ -81,7 +80,7 @@ class Creator(ABC):
     """
 
     @abstractmethod
-    def get_creation_data(self) -> dict[str, Any]:
+    def fields_to_store(self) -> dict[str, Any]:
         """
         Returns a dictionary of data that should be stored in the database.
         This is different from to_dict() as it specifically maps fields to their storage keys.
@@ -91,9 +90,10 @@ class Creator(ABC):
 
 class PartialModifier(ABC):
     @abstractmethod
-    def get_modified_fields(self) -> Dict[str, Any]:
+    def fields_to_update(self) -> dict[str, Any]:
         """
-        Returns a dictionary of field name to value for modified fields.
+        Returns a dictionary of fields that should be updated.
+        This is different from to_dict() as it specifically maps fields to their storage keys.
         """
         pass
 
@@ -161,6 +161,15 @@ class TriState(Generic[TVal]):
                 setattr(obj, self._attr_name, self._value)
             case TriStateEnum.NULLIFY:
                 setattr(obj, self._attr_name, None)
+            case TriStateEnum.NOP:
+                pass
+
+    def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
+        match self._state:
+            case TriStateEnum.UPDATE:
+                dict[attr_name] = self._value
+            case TriStateEnum.NULLIFY:
+                dict[attr_name] = None
             case TriStateEnum.NOP:
                 pass
 

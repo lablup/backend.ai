@@ -31,7 +31,7 @@ class UserCreator(Creator):
     container_main_gid: Optional[int] = None
     container_gids: Optional[list[int]] = None
 
-    def get_creation_data(self) -> dict[str, Any]:
+    def fields_to_store(self) -> dict[str, Any]:
         return {
             "email": self.email,
             "username": self.username,
@@ -164,7 +164,7 @@ class UserModifier(PartialModifier):
     )
 
     @override
-    def get_modified_fields(self) -> dict[str, Any]:
+    def fields_to_update(self) -> dict[str, Any]:
         modified: dict[str, Any] = {}
         if self.username.state() != TriStateEnum.NOP:
             modified["username"] = self.username.value()

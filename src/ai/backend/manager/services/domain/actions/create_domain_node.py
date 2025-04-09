@@ -12,8 +12,8 @@ from ai.backend.manager.services.domain.types import (
 
 @dataclass
 class CreateDomainNodeAction(DomainAction):
-    input: DomainCreator
     user_info: UserInfo
+    creator: DomainCreator
     scaling_groups: Optional[list[str]] = None
 
     @override

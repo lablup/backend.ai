@@ -22,16 +22,16 @@ from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
-        CreateKeyPairResourcePolicyInputData,
+        KeyPairResourcePolicyCreator,
     )
     from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-        ModifyKeyPairResourcePolicyInputData,
+        KeyPairResourcePolicyModifier,
     )
     from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
-        CreateProjectResourcePolicyInputData,
+        ProjectResourcePolicyCreator,
     )
     from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-        ModifyProjectResourcePolicyInputData,
+        ProjectResourcePolicyModifier,
     )
     from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
         CreateUserResourcePolicyInputData,
@@ -421,9 +421,9 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_dataclass(self, name: str) -> CreateKeyPairResourcePolicyInputData:
+    def to_dataclass(self, name: str) -> KeyPairResourcePolicyCreator:
         from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
-            CreateKeyPairResourcePolicyInputData,
+            KeyPairResourcePolicyCreator,
         )
 
         default_for_unspecified = DefaultForUnspecified[self.default_for_unspecified]
@@ -438,7 +438,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return CreateKeyPairResourcePolicyInputData(
+        return KeyPairResourcePolicyCreator(
             name=name,
             default_for_unspecified=default_for_unspecified,
             total_resource_slots=total_resource_slots,
@@ -471,9 +471,9 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_dataclass(self) -> ModifyKeyPairResourcePolicyInputData:
+    def to_dataclass(self) -> KeyPairResourcePolicyModifier:
         from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-            ModifyKeyPairResourcePolicyInputData,
+            KeyPairResourcePolicyModifier,
         )
 
         default_for_unspecified = (
@@ -482,7 +482,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
             else None
         )
 
-        return ModifyKeyPairResourcePolicyInputData(
+        return KeyPairResourcePolicyModifier(
             default_for_unspecified=OptionalState[str].from_graphql(
                 "default_for_unspecified", default_for_unspecified
             ),
@@ -985,15 +985,12 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_dataclass(self) -> CreateProjectResourcePolicyInputData:
-        from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
-            CreateProjectResourcePolicyInputData,
-        )
-
+    def to_creator(self, name: str) -> ProjectResourcePolicyCreator:
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return CreateProjectResourcePolicyInputData(
+        return ProjectResourcePolicyCreator(
+            name=name,
             max_vfolder_count=value_or_none(self.max_vfolder_count),
             max_quota_scope_size=value_or_none(self.max_quota_scope_size),
             max_vfolder_size=value_or_none(self.max_vfolder_size),
@@ -1013,12 +1010,12 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_dataclass(self) -> ModifyProjectResourcePolicyInputData:
+    def to_dataclass(self) -> ProjectResourcePolicyModifier:
         from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-            ModifyProjectResourcePolicyInputData,
+            ProjectResourcePolicyModifier,
         )
 
-        return ModifyProjectResourcePolicyInputData(
+        return ProjectResourcePolicyModifier(
             max_vfolder_count=OptionalState[int].from_graphql(
                 "max_vfolder_count", self.max_vfolder_count
             ),
@@ -1059,7 +1056,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
-            CreateProjectResourcePolicyAction(name, props.to_dataclass())
+            CreateProjectResourcePolicyAction(props.to_creator(name))
         )
 
         return CreateProjectResourcePolicy(

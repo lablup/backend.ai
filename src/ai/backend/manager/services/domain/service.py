@@ -70,7 +70,7 @@ class DomainService:
         self._db = db
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        data = action.input.get_creation_data()
+        data = action.input.fields_to_store()
         base_query = sa.insert(domains).values(data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
@@ -225,16 +225,16 @@ class DomainService:
                 await self._ensure_sgroup_permission(
                     action.user_info, scaling_groups, db_session=db_session
                 )
-            data = action.input.get_creation_data()
-            _insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(**data).returning(DomainRow)
+            data = action.creator.fields_to_store()
+            insert_and_returning = sa.select(DomainRow).from_statement(
+                sa.insert(DomainRow).values(data).returning(DomainRow)
             )
-            domain_row = await db_session.scalar(_insert_and_returning)
+            domain_row = await db_session.scalar(insert_and_returning)
             if scaling_groups is not None:
                 await db_session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group": sgroup_name, "domain": action.input.name}
+                        {"scaling_group": sgroup_name, "domain": action.creator.name}
                         for sgroup_name in scaling_groups
                     ],
                 )
@@ -253,7 +253,7 @@ class DomainService:
         return CreateDomainNodeActionResult(
             domain_data=DomainData.from_row(domain_row),
             success=True,
-            description=f"domain {action.input.name} created",
+            description=f"domain {action.creator.name} created",
         )
 
     async def modify_domain_node(
@@ -316,7 +316,7 @@ class DomainService:
             _update_stmt = (
                 sa.update(DomainRow)
                 .where(DomainRow.name == domain_name)
-                .values(action.get_modified_fields())
+                .values(action.modifier.fields_to_update())
                 .returning(DomainRow)
             )
             await db_session.execute(_update_stmt)

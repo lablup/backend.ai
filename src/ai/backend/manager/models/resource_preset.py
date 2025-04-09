@@ -17,7 +17,7 @@ from ai.backend.manager.models.gql_models.base import to_tri_state
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.resource_preset.actions.create_preset import (
-        CreateResourcePresetInputData,
+        ResourcePresetCreator,
     )
     from ai.backend.manager.services.resource_preset.actions.modify_preset import (
         ModifyResourcePresetInputData,
@@ -99,23 +99,12 @@ class ResourcePresetRow(Base):
     @classmethod
     async def create(
         cls,
-        name: str,
-        resource_slots: ResourceSlot,
-        scaling_group_name: Optional[str] = None,
-        shared_memory: Optional[int] = None,
+        creator: ResourcePresetCreator,
         *,
         db_session: AsyncSession,
     ) -> Optional[Self]:
-        insert_stmt = (
-            sa.insert(ResourcePresetRow)
-            .values(
-                name=name,
-                resource_slots=resource_slots,
-                scaling_group_name=scaling_group_name,
-                shared_memory=shared_memory,
-            )
-            .returning(ResourcePresetRow)
-        )
+        to_store = creator.fields_to_store()
+        insert_stmt = sa.insert(ResourcePresetRow).values(to_store).returning(ResourcePresetRow)
         stmt = sa.select(ResourcePresetRow).from_statement(insert_stmt)
 
         try:
@@ -289,13 +278,10 @@ class CreateResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
-    def to_dataclass(self) -> CreateResourcePresetInputData:
-        from ai.backend.manager.services.resource_preset.actions.create_preset import (
-            CreateResourcePresetInputData,
-        )
-
-        return CreateResourcePresetInputData(
-            resource_slots=ResourceSlot.from_json(self.resource_slots),
+    def to_creator(self, name: str) -> ResourcePresetCreator:
+        return ResourcePresetCreator(
+            name=name,
+            resource_slots=ResourceSlot.from_user_input(self.resource_slots, None),
             shared_memory=self.shared_memory if self.shared_memory else None,
             scaling_group_name=self.scaling_group_name if self.scaling_group_name else None,
         )
@@ -358,7 +344,7 @@ class CreateResourcePreset(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         result = await graph_ctx.processors.resource_preset.create_preset.wait_for_complete(
-            CreateResourcePresetAction(name=name, props=props.to_dataclass())
+            CreateResourcePresetAction(creator=props.to_creator(name))
         )
 
         return cls(True, "success", ResourcePreset.from_row(graph_ctx, result.resource_preset))

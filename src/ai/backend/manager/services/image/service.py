@@ -156,7 +156,7 @@ class ImageService:
         )
 
     async def modify_image(self, action: ModifyImageAction) -> ModifyImageActionResult:
-        props = action.props
+        props = action.modifier
 
         try:
             async with self._db.begin_session() as db_sess:
@@ -170,7 +170,9 @@ class ImageService:
                     )
                 except UnknownImageReference:
                     raise ModifyImageActionUnknownImageReferenceError
-                props.set_attr(image_row)
+                to_update = props.fields_to_update()
+                for key, value in to_update.items():
+                    setattr(image_row, key, value)
         except (ValueError, sa.exc.DBAPIError):
             raise ModifyImageActionValueError
 

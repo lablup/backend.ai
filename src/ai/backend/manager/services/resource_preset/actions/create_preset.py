@@ -1,23 +1,34 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Any, Optional, override
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
+from ai.backend.manager.types import Creator
 
 
 @dataclass
-class CreateResourcePresetInputData:
+class ResourcePresetCreator(Creator):
+    name: str
     resource_slots: ResourceSlot
     shared_memory: Optional[str]
     scaling_group_name: Optional[str]
 
+    def fields_to_store(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "resource_slots": self.resource_slots,
+            "shared_memory": BinarySize.from_str(self.shared_memory)
+            if self.shared_memory
+            else None,
+            "scaling_group_name": self.scaling_group_name,
+        }
+
 
 @dataclass
 class CreateResourcePresetAction(ResourcePresetAction):
-    name: str
-    props: CreateResourcePresetInputData
+    creator: ResourcePresetCreator
 
     @override
     def entity_id(self) -> Optional[str]:

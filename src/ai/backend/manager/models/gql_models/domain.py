@@ -363,7 +363,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
-            input=DomainCreator(
+            creator=DomainCreator(
                 name=self.name,
                 description=value_or_none(self.description),
                 is_active=value_or_none(self.is_active),

@@ -20,17 +20,6 @@ class ModifyGroupAction(GroupAction):
     def operation_type(self) -> str:
         return "modify"
 
-    def get_modified_fields(self):
-        return self.modifier.get_modified_fields()
-
-    @property
-    def user_update_mode(self):
-        return self.modifier.user_update_mode
-
-    @property
-    def user_uuids(self):
-        return self.modifier.user_uuids
-
 
 @dataclass
 class ModifyGroupActionResult(BaseActionResult):

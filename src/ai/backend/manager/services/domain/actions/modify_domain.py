@@ -20,7 +20,7 @@ class ModifyDomainAction(DomainAction):
         return "modify"
 
     def get_modified_fields(self):
-        return self.modifier.get_modified_fields()
+        return self.modifier.fields_to_update()
 
 
 @dataclass

@@ -92,7 +92,7 @@ class GroupService:
         self._redis_stat = redis_stat
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        data = action.input.get_creation_data()
+        data = action.input.fields_to_store()
         base_query = sa.insert(groups).values(data)
 
         async def _do_mutate() -> MutationResult:
@@ -116,11 +116,11 @@ class GroupService:
         return CreateGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        data = action.get_modified_fields()
+        data = action.modifier.fields_to_update()
 
         if (
-            action.user_update_mode.state() != TriStateEnum.NOP
-            and action.user_update_mode.value()
+            action.modifier.user_update_mode.state() != TriStateEnum.NOP
+            and action.modifier.user_update_mode.value()
             not in (
                 None,
                 "add",
@@ -128,9 +128,9 @@ class GroupService:
             )
         ):
             raise ValueError("invalid user_update_mode")
-        if action.user_uuids.state() == TriStateEnum.NOP:
+        if action.modifier.user_uuids.state() == TriStateEnum.NOP:
             action.modifier.user_update_mode = OptionalState.nop("user_update_mode")
-        if not data and action.user_update_mode.value() is None:
+        if not data and action.modifier.user_update_mode.value() is None:
             return ModifyGroupActionResult(data=None, success=False)
 
         async def _do_mutate() -> MutationResult:
@@ -138,14 +138,14 @@ class GroupService:
                 # TODO: refactor user addition/removal in groups as separate mutations
                 #       (to apply since 21.09)
                 gid = action.group_id
-                if action.user_uuids.state() == TriStateEnum.UPDATE:
-                    user_uuids = cast(list[str], action.user_uuids.value())
-                    if action.user_update_mode.value() == "add":
+                if action.modifier.user_uuids.state() == TriStateEnum.UPDATE:
+                    user_uuids = cast(list[str], action.modifier.user_uuids.value())
+                    if action.modifier.user_update_mode.value() == "add":
                         values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]
                         await conn.execute(
                             sa.insert(association_groups_users).values(values),
                         )
-                    elif action.user_update_mode.value() == "remove":
+                    elif action.modifier.user_update_mode.value() == "remove":
                         await conn.execute(
                             sa.delete(association_groups_users).where(
                                 (association_groups_users.c.user_id.in_(user_uuids))

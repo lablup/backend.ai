@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
@@ -11,13 +11,13 @@ from ai.backend.manager.types import OptionalState
 class ModifyDomainNodeAction(DomainAction):
     name: str
     user_info: UserInfo
-    modifier: DomainNodeModifier = field(default_factory=DomainNodeModifier)
     sgroups_to_add: OptionalState[set[str]] = field(
         default_factory=lambda: OptionalState.nop("scaling_groups")
     )
     sgroups_to_remove: OptionalState[set[str]] = field(
         default_factory=lambda: OptionalState.nop("scaling_groups")
     )
+    modifier: DomainNodeModifier = field(default_factory=DomainNodeModifier)
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -26,9 +26,6 @@ class ModifyDomainNodeAction(DomainAction):
     @override
     def operation_type(self) -> str:
         return "modify"
-
-    def get_modified_fields(self) -> dict[str, Any]:
-        return self.modifier.get_modified_fields()
 
 
 @dataclass

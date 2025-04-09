@@ -4,13 +4,13 @@ from typing import Any, Optional, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.models.image import ImageRow, ImageType
+from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.services.image.actions.base import ImageAction
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
 @dataclass
-class ModifyImageInputData:
+class ImageModifier(PartialModifier):
     name: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("name"))
     registry: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("registry"))
     image: OptionalState[str] = field(default_factory=lambda: OptionalState.nop("image"))
@@ -32,26 +32,29 @@ class ModifyImageInputData:
         default_factory=lambda: OptionalState.nop("resources")
     )
 
-    def set_attr(self, image_row: ImageRow) -> None:
-        self.name.set_attr(image_row)
-        self.registry.set_attr(image_row)
-        self.image.set_attr(image_row)
-        self.tag.set_attr(image_row)
-        self.architecture.set_attr(image_row)
-        self.is_local.set_attr(image_row)
-        self.size_bytes.set_attr(image_row)
-        self.type.set_attr(image_row)
-        self.config_digest.set_attr(image_row)
-        self.labels.set_attr(image_row)
-        self.accelerators.set_attr(image_row)
-        self.resources.set_attr(image_row)
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        self.registry.update_dict(to_update, "registry")
+        self.image.update_dict(to_update, "image")
+        self.tag.update_dict(to_update, "tag")
+        self.architecture.update_dict(to_update, "architecture")
+        self.is_local.update_dict(to_update, "is_local")
+        self.size_bytes.update_dict(to_update, "size_bytes")
+        self.type.update_dict(to_update, "type")
+        self.config_digest.update_dict(to_update, "config_digest")
+        self.labels.update_dict(to_update, "labels")
+        self.accelerators.update_dict(to_update, "accelerators")
+        self.resources.update_dict(to_update, "resources")
+        return to_update
 
 
 @dataclass
 class ModifyImageAction(ImageAction):
     target: str
     architecture: str
-    props: ModifyImageInputData
+    modifier: ImageModifier
 
     @override
     def entity_id(self) -> Optional[str]:
