@@ -82,7 +82,6 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
-from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.agent import (
     Agent,
     AgentConnection,
@@ -113,8 +112,13 @@ from .gql_models.domain import (
 from .gql_models.endpoint import (
     CreateEndpointAutoScalingRuleNode,
     DeleteEndpointAutoScalingRuleNode,
+    Endpoint,
     EndpointAutoScalingRuleConnection,
     EndpointAutoScalingRuleNode,
+    EndpointList,
+    EndpointToken,
+    EndpointTokenList,
+    ModifyEndpoint,
     ModifyEndpointAutoScalingRuleNode,
 )
 from .gql_models.fields import AgentPermissionField, ScopeField
