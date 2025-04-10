@@ -40,7 +40,7 @@ class SMTPReporterArgs:
 
 
 class SMTPReporter(ActionMonitor):
-    _closed: bool
+    _stopped: bool
     _config: SMTPReporterArgs
     _task_queue: asyncio.Queue[tuple[str, str]]
     _send_email_workers: list[asyncio.Task]
@@ -48,7 +48,7 @@ class SMTPReporter(ActionMonitor):
     _smtp_lock: asyncio.Lock
 
     def __init__(self, args: SMTPReporterArgs) -> None:
-        self._closed = True
+        self._stopped = True
         self._config = args
         self._task_queue = asyncio.Queue()
         self._smtp = aiosmtplib.SMTP(
@@ -60,7 +60,7 @@ class SMTPReporter(ActionMonitor):
         return f"Backend.AI SMTP Log Alert ({action.get_type()})"
 
     async def _send_email_worker(self) -> None:
-        while not self._closed:
+        while not self._stopped:
             subject, email_body = await self._task_queue.get()
             email_body += "\nThis email is sent from Backend.AI SMTP Reporter"
 
@@ -97,7 +97,7 @@ class SMTPReporter(ActionMonitor):
                 await self._smtp.login(self._config.username, self._config.password)
 
     async def start(self) -> None:
-        self._closed = False
+        self._stopped = False
         await self._connect_smtp()
         self._send_email_workers = []
         for _ in range(self._config.concurrency_limit):
@@ -105,7 +105,7 @@ class SMTPReporter(ActionMonitor):
             self._send_email_workers.append(worker)
 
     async def stop(self) -> None:
-        self._closed = True
+        self._stopped = True
         await self._task_queue.join()
         for worker in self._send_email_workers:
             worker.cancel()
