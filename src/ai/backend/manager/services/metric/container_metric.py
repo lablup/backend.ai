@@ -72,7 +72,7 @@ async def parse_query_string_by_metric_spec(param: MetricSpecForQuery) -> str:
     def _parse_sum_by(sum_by: Optional[str]) -> str:
         if sum_by is None:
             return ""
-        return f"sum_by ({param.sum_by})"
+        return f"sum by ({param.sum_by})"
 
     def _parse_labels(labels: Optional[str]) -> str:
         if labels is None:

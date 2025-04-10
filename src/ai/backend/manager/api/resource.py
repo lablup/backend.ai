@@ -231,7 +231,7 @@ async def user_month_stats(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.stats, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)

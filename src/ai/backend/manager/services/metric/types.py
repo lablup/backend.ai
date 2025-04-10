@@ -5,7 +5,7 @@ from typing import (
 )
 from uuid import UUID
 
-DEFAULT_METRIC_QUERY_TIMEWINDOW: Final[str] = "1m"
+DEFAULT_RANGE_VECTOR_TIMEWINDOW: Final[str] = "1m"
 
 
 @dataclass
@@ -56,6 +56,6 @@ class ContainerMetricResult:
 @dataclass(kw_only=True)
 class MetricSpecForQuery:
     metric_name: str
-    timewindow: str = DEFAULT_METRIC_QUERY_TIMEWINDOW
+    timewindow: str = DEFAULT_RANGE_VECTOR_TIMEWINDOW
     sum_by: Optional[str] = None
     labels: Optional[str] = None
