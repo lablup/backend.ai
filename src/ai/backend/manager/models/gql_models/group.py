@@ -30,7 +30,7 @@ from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
 )
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
     BigInt,
@@ -616,7 +616,7 @@ class ModifyGroupInput(graphene.InputObjectType):
                 resource_policy=OptionalState[str].from_graphql(
                     self.resource_policy,
                 ),
-                container_registry=OptionalState[dict[str, str]].from_graphql(
+                container_registry=TriState[dict[str, str]].from_graphql(
                     self.container_registry,
                 ),
             ),

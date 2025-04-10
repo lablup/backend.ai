@@ -5,7 +5,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.user.actions.base import UserAction
 from ai.backend.manager.services.user.type import UserData
-from ai.backend.manager.types import OptionalState, PartialModifier
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -20,14 +20,14 @@ class UserModifier(PartialModifier):
     domain_name: OptionalState[str] = field(default_factory=OptionalState.nop)
     role: OptionalState[UserRole] = field(default_factory=OptionalState.nop)
     group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
-    allowed_client_ip: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
+    allowed_client_ip: TriState[list[str]] = field(default_factory=TriState.nop)
     totp_activated: OptionalState[bool] = field(default_factory=OptionalState.nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState.nop)
     sudo_session_enabled: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    main_access_key: OptionalState[str] = field(default_factory=OptionalState.nop)
-    container_uid: OptionalState[int] = field(default_factory=OptionalState.nop)
-    container_main_gid: OptionalState[int] = field(default_factory=OptionalState.nop)
-    container_gids: OptionalState[list[int]] = field(default_factory=OptionalState.nop)
+    main_access_key: TriState[str] = field(default_factory=TriState.nop)
+    container_uid: TriState[int] = field(default_factory=TriState.nop)
+    container_main_gid: TriState[int] = field(default_factory=TriState.nop)
+    container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
 
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}

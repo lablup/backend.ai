@@ -180,7 +180,7 @@ class TriState(Generic[TVal]):
                 pass
 
 
-class OptionalState(TriState[TVal]):
+class OptionalState(Generic[TVal]):
     """
     OptionalState is a class that represents partial updates to an attribute of an object.
     It is used to indicate whether an attribute should be updated or not modified at all.
@@ -189,6 +189,9 @@ class OptionalState(TriState[TVal]):
     - NOP: No operation should be performed on the attribute.
     This class is similar to TriState, but it cannot be in the NULLIFY state.
     """
+
+    _state: _TriStateEnum
+    _value: Optional[TVal]
 
     def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
         if state == _TriStateEnum.NULLIFY:
@@ -205,13 +208,38 @@ class OptionalState(TriState[TVal]):
         return OptionalState.update(value)
 
     @classmethod
-    def nullify(cls) -> OptionalState[TVal]:
-        raise ValueError("OptionalState cannot be NULLIFY")
-
-    @classmethod
     def update(cls, value: TVal) -> OptionalState[TVal]:
         return cls(state=_TriStateEnum.UPDATE, value=value)
 
     @classmethod
     def nop(cls) -> OptionalState[TVal]:
         return cls(state=_TriStateEnum.NOP, value=None)
+
+    def value(self) -> TVal:
+        """
+        Returns the value of the TriState object.
+        It should only be used when the state value is unambiguously UPDATE.
+        """
+        if self._state != _TriStateEnum.UPDATE:
+            raise ValueError("Not allowed to get value when state is not UPDATE")
+        if self._value is None:
+            raise ValueError("TriState value is not set when state is UPDATE")
+        return self._value
+
+    def optional_value(self) -> Optional[TVal]:
+        """
+        Returns the value of the TriState object.
+        When state is not UPDATE, it returns None.
+        This is useful for cases where you want to check if the state is UPDATE
+        and get the value, or if it is NULLIFY or NOP and get None.
+        """
+        if self._state == _TriStateEnum.UPDATE:
+            return self._value
+        return None
+
+    def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
+        match self._state:
+            case _TriStateEnum.UPDATE:
+                dict[attr_name] = self._value
+            case _TriStateEnum.NOP:
+                pass

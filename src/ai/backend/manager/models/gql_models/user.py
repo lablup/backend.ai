@@ -37,7 +37,7 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserActionResult,
 )
 from ai.backend.manager.services.user.type import UserCreator, UserData, UserInfoContext
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
     FilterExprArg,
@@ -787,69 +787,64 @@ class ModifyUserInput(graphene.InputObjectType):
     )
 
     def to_action(self, email: str) -> ModifyUserAction:
-        def value_or_none(value: Any) -> Optional[Any]:
-            return value if value is not Undefined else None
-
-        modfifialble_fields = UserModifier(
-            username=OptionalState[str].from_graphql(
-                self.username,
-            ),
-            password=OptionalState[str].from_graphql(
-                self.password,
-            ),
-            need_password_change=OptionalState[bool].from_graphql(
-                self.need_password_change,
-            ),
-            full_name=OptionalState[str].from_graphql(
-                self.full_name,
-            ),
-            description=OptionalState[str].from_graphql(
-                self.description,
-            ),
-            is_active=OptionalState[bool].from_graphql(
-                self.is_active,
-            ),
-            status=OptionalState[UserStatus].from_graphql(
-                UserStatus(self.status) if self.status is not Undefined else None,
-            ),
-            domain_name=OptionalState[str].from_graphql(
-                self.domain_name,
-            ),
-            role=OptionalState[UserRole].from_graphql(
-                UserRole(self.role) if self.role is not Undefined else None,
-            ),
-            group_ids=OptionalState[list[str]].from_graphql(
-                self.group_ids,
-            ),
-            allowed_client_ip=OptionalState[list[str]].from_graphql(
-                self.allowed_client_ip,
-            ),
-            totp_activated=OptionalState[bool].from_graphql(
-                self.totp_activated,
-            ),
-            resource_policy=OptionalState[str].from_graphql(
-                self.resource_policy,
-            ),
-            sudo_session_enabled=OptionalState[bool].from_graphql(
-                self.sudo_session_enabled,
-            ),
-            main_access_key=OptionalState[str].from_graphql(
-                self.main_access_key,
-            ),
-            container_uid=OptionalState[int].from_graphql(
-                self.container_uid,
-            ),
-            container_main_gid=OptionalState[int].from_graphql(
-                self.container_main_gid,
-            ),
-            container_gids=OptionalState[list[int]].from_graphql(
-                self.container_gids,
-            ),
-        )
-
         return ModifyUserAction(
             email=email,
-            modifier=modfifialble_fields,
+            modifier=UserModifier(
+                username=OptionalState[str].from_graphql(
+                    self.username,
+                ),
+                password=OptionalState[str].from_graphql(
+                    self.password,
+                ),
+                need_password_change=OptionalState[bool].from_graphql(
+                    self.need_password_change,
+                ),
+                full_name=OptionalState[str].from_graphql(
+                    self.full_name,
+                ),
+                description=OptionalState[str].from_graphql(
+                    self.description,
+                ),
+                is_active=OptionalState[bool].from_graphql(
+                    self.is_active,
+                ),
+                status=OptionalState[UserStatus].from_graphql(
+                    UserStatus(self.status) if self.status is not Undefined else None,
+                ),
+                domain_name=OptionalState[str].from_graphql(
+                    self.domain_name,
+                ),
+                role=OptionalState[UserRole].from_graphql(
+                    UserRole(self.role) if self.role is not Undefined else None,
+                ),
+                group_ids=OptionalState[list[str]].from_graphql(
+                    self.group_ids,
+                ),
+                allowed_client_ip=TriState[list[str]].from_graphql(
+                    self.allowed_client_ip,
+                ),
+                totp_activated=OptionalState[bool].from_graphql(
+                    self.totp_activated,
+                ),
+                resource_policy=OptionalState[str].from_graphql(
+                    self.resource_policy,
+                ),
+                sudo_session_enabled=OptionalState[bool].from_graphql(
+                    self.sudo_session_enabled,
+                ),
+                main_access_key=TriState[str].from_graphql(
+                    self.main_access_key,
+                ),
+                container_uid=TriState[int].from_graphql(
+                    self.container_uid,
+                ),
+                container_main_gid=TriState[int].from_graphql(
+                    self.container_main_gid,
+                ),
+                container_gids=TriState[list[int]].from_graphql(
+                    self.container_gids,
+                ),
+            ),
         )
 
 
