@@ -20,6 +20,9 @@ class BaseAction(ABC):
     def operation_type(self) -> str:
         raise NotImplementedError
 
+    def get_type(self) -> str:
+        return f"{self.entity_type()}:{self.operation_type()}"
+
 
 @dataclass
 class BaseActionTriggerMeta:
