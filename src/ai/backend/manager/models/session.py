@@ -2377,7 +2377,9 @@ class ComputeSessionPermissionContextBuilder(
         scope: ProjectScope,
     ) -> ComputeSessionPermissionContext:
         permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
-        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        _user_perm_ctx = await self._build_at_user_scope_in_project(
+            ctx, ctx.user_id, scope.project_id
+        )
         permission_ctx.merge(_user_perm_ctx)
         return permission_ctx
 
@@ -2412,6 +2414,27 @@ class ComputeSessionPermissionContextBuilder(
         _vfolder_stmt = (
             sa.select(SessionRow)
             .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
+            .options(load_only(SessionRow.id))
+        )
+        own_folder_map = {
+            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
+        }
+        result = ComputeSessionPermissionContext(
+            object_id_to_additional_permission_map=own_folder_map
+        )
+        return result
+
+    async def _build_at_user_scope_in_project(
+        self,
+        ctx: ClientContext,
+        user_id: UUID,
+        project_id: UUID,
+    ) -> ComputeSessionPermissionContext:
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
+
+        _vfolder_stmt = (
+            sa.select(SessionRow)
+            .where((SessionRow.user_uuid == user_id) & (SessionRow.group_id == project_id))
             .options(load_only(SessionRow.id))
         )
         own_folder_map = {

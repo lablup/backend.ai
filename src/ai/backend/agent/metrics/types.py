@@ -21,7 +21,7 @@ class FlattenedKernelMetric:
     kernel_id: KernelId
     session_id: Optional[SessionId]
     owner_user_id: Optional[uuid.UUID]
-    owner_project_id: Optional[uuid.UUID]  # TODO: Implement project-owned sessions
+    project_id: Optional[uuid.UUID]
     key: MetricKey
     value_pairs: list[MetricValueFieldPair]
 

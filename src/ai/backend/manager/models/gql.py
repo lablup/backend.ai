@@ -2424,11 +2424,19 @@ class Queries(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[ComputeSessionNode]:
-        if scope_id is None:
-            scope_id = SystemScope()
+        final_scope_id: ScopeType
+        if project_id is not None:
+            # for backward compatibility.
+            # TODO: remove this part after `project_id` argument is fully deprecated
+            final_scope_id = ProjectScope(project_id)
+        else:
+            if scope_id is None:
+                final_scope_id = SystemScope()
+            else:
+                final_scope_id = scope_id
         return await ComputeSessionNode.get_accessible_connection(
             info,
-            scope_id,
+            final_scope_id,
             permission,
             filter,
             order,
