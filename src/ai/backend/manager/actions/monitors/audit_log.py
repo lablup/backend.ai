@@ -11,6 +11,7 @@ from ai.backend.manager.actions.action import BaseAction, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.models.audit_log import AuditLogRow, OperationStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.types import Sentinel
 
 NULL_UUID: Final[uuid.UUID] = uuid.UUID("00000000-0000-0000-0000-000000000000")
 UNKNOWN_ENTITY_ID: Final[str] = "(unknown)"
@@ -39,19 +40,21 @@ class AuditLog:
 
 
 class AuditLogger:
-    _queue: asyncio.Queue[AuditLog]
-    _closed: bool
+    _queue: asyncio.Queue[AuditLog | Sentinel]
+    _stopped: bool
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
         self._queue = asyncio.Queue()
-        self._closed = False
+        self._stopped = True
         self._log_task: Optional[asyncio.Task] = None
 
     async def log_queue(self) -> None:
-        while not self._closed:
+        while not self._stopped:
             audit_log = await self._queue.get()
+            if audit_log == Sentinel.token:
+                return
 
             async with self._db.begin_session() as db_sess:
                 action = audit_log.action
@@ -77,7 +80,10 @@ class AuditLogger:
                 db_row.entity_id = entity_id
                 await db_sess.flush()
 
-    async def init(self, action: BaseAction, info: AuditLogInfo) -> AuditLogMeta:
+    async def init(self, action: BaseAction, info: AuditLogInfo) -> Optional[AuditLogMeta]:
+        if self._stopped:
+            return None
+
         async with self._db.begin_session() as db_sess:
             db_row = AuditLogRow(
                 entity_type=action.entity_type(),
@@ -99,14 +105,16 @@ class AuditLogger:
         await self._queue.put(audit_log)
 
     def start(self) -> None:
+        self._stopped = False
         if not self._log_task:
             self._log_task = asyncio.create_task(self.log_queue())
 
     async def stop(self) -> None:
-        self._closed = True
+        self._stopped = True
 
         if self._log_task:
             try:
+                await self._queue.put(Sentinel.token)
                 await self._log_task
             except asyncio.CancelledError:
                 pass
@@ -122,16 +130,16 @@ class AuditLogManager(ActionMonitor):
 
     async def prepare(self, action: BaseAction) -> None:
         # TODO: Inject live configs into AuditLogInfo
-        audit_log_meta = await self._audit_logger.init(action, AuditLogInfo())
-        self._log_context.set(audit_log_meta)
+        if audit_log_meta := await self._audit_logger.init(action, AuditLogInfo()):
+            self._log_context.set(audit_log_meta)
 
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
-        audit_log_meta = self._log_context.get()
-        audit_log = AuditLog(action=action, result=result, meta=audit_log_meta)
-        await self._audit_logger.log(audit_log)
+        if audit_log_meta := self._log_context.get(None):
+            audit_log = AuditLog(action=action, result=result, meta=audit_log_meta)
+            await self._audit_logger.log(audit_log)
 
-    def start_logger(self) -> None:
+    def start(self) -> None:
         self._audit_logger.start()
 
-    async def stop_logger(self) -> None:
+    async def stop(self) -> None:
         await self._audit_logger.stop()
