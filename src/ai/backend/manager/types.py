@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass, fields
 from typing import (
@@ -15,6 +16,7 @@ from typing import (
 )
 
 import attr
+from graphql import Undefined, UndefinedType
 from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -71,6 +73,31 @@ class MountOptionModel(BaseModel):
     ]
 
 
+class Creator(ABC):
+    """
+    Base class for all creation operations.
+    Implementations should directly map fields to storage keys instead of using reflection.
+    """
+
+    @abstractmethod
+    def fields_to_store(self) -> dict[str, Any]:
+        """
+        Returns a dictionary of data that should be stored in the database.
+        This is different from to_dict() as it specifically maps fields to their storage keys.
+        """
+        pass
+
+
+class PartialModifier(ABC):
+    @abstractmethod
+    def fields_to_update(self) -> dict[str, Any]:
+        """
+        Returns a dictionary of fields that should be updated.
+        This is different from to_dict() as it specifically maps fields to their storage keys.
+        """
+        pass
+
+
 class State(enum.Enum):
     UPDATE = "update"
     NULLIFY = "nullify"
@@ -120,6 +147,14 @@ class TriState(Generic[TVal]):
             case State.NOP:
                 pass
 
+    @classmethod
+    def from_graphql(cls, attr_name: str, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
+        if value is None:
+            return cls.nullify(attr_name)
+        if value is Undefined:
+            return cls.nop(attr_name)
+        return cls.update(attr_name, value)  # type: ignore
+
 
 class OptionalState(TriState[TVal]):
     def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
@@ -136,6 +171,16 @@ class OptionalState(TriState[TVal]):
     @classmethod
     def nop(cls, attr_name: str) -> OptionalState[TVal]:
         return cls(attr_name, state=State.NOP, value=None)
+
+    @classmethod
+    def from_graphql(
+        cls, attr_name: str, value: Optional[TVal] | UndefinedType
+    ) -> OptionalState[TVal]:
+        if value is None:
+            raise ValueError("OptionalState cannot be NULLIFY")
+        if value is UndefinedType:
+            return OptionalState.nop(attr_name)
+        return OptionalState.update(attr_name, value)  # type: ignore
 
 
 class TriStateField(Generic[TVal]):

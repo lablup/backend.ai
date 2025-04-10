@@ -58,13 +58,6 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.utils import define_state
-from ai.backend.manager.services.model_service.actions.modify_enpoint import (
-    ExtraMount,
-    ImageRef,
-    ModifyEndpointAction,
-)
-from ai.backend.manager.services.model_service.types import EndpointData, RequesterCtx
 from ai.backend.manager.types import MountOptionModel, OptionalState, UserScope
 
 from ..api.exceptions import (
@@ -103,6 +96,12 @@ from .vfolder import VFolderRow, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.manager.config import SharedConfig
+    from ai.backend.manager.services.model_service.actions.modify_enpoint import (
+        ExtraMount,
+        ImageRef,
+        ModifyEndpointAction,
+    )
+    from ai.backend.manager.services.model_service.types import EndpointData, RequesterCtx
 
     from .gql import GraphQueryContext
 
@@ -1417,22 +1416,15 @@ class ExtraMountInput(graphene.InputObjectType):
     )
 
     def to_action_field(self) -> ExtraMount:
-        def value_or_none(value: Any) -> Optional[Any]:
-            return value if value is not Undefined else None
+        from ai.backend.manager.services.model_service.actions.modify_enpoint import ExtraMount
 
         return ExtraMount(
-            vfolder_id=OptionalState(
-                "vfolder_id", define_state(self.vfolder_id), value_or_none(self.vfolder_id)
+            vfolder_id=OptionalState.from_graphql("vfolder_id", self.vfolder_id),
+            mount_destination=OptionalState.from_graphql(
+                "mount_destination", self.mount_destination
             ),
-            mount_destination=OptionalState(
-                "mount_destination",
-                define_state(self.mount_destination),
-                value_or_none(self.mount_destination),
-            ),
-            type=OptionalState("type", define_state(self.type), value_or_none(self.type)),
-            permission=OptionalState(
-                "permission", define_state(self.permission), value_or_none(self.permission)
-            ),
+            type=OptionalState.from_graphql("type", self.type),
+            permission=OptionalState.from_graphql("permission", self.permission),
         )
 
 
@@ -1462,8 +1454,10 @@ class ModifyEndpointInput(graphene.InputObjectType):
     def to_action(
         self, requester_ctx: RequesterCtx, endpoint_id: uuid.UUID
     ) -> ModifyEndpointAction:
-        def value_or_none(value: Any) -> Optional[Any]:
-            return value if value is not Undefined else None
+        from ai.backend.manager.services.model_service.actions.modify_enpoint import (
+            ImageRef,
+            ModifyEndpointAction,
+        )
 
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
             registry: OptionalState = OptionalState.nop("registry")
@@ -1487,77 +1481,43 @@ class ModifyEndpointInput(graphene.InputObjectType):
         return ModifyEndpointAction(
             requester_ctx=requester_ctx,
             endpoint_id=endpoint_id,
-            resource_slots=OptionalState(
-                "resource_slots",
-                define_state(self.resource_slots),
-                value_or_none(self.resource_slots),
-            ),
-            resource_opts=OptionalState(
-                "resource_opts",
-                define_state(self.resource_opts),
-                value_or_none(self.resource_opts),
-            ),
-            cluster_mode=OptionalState(
+            resource_slots=OptionalState.from_graphql("resource_slots", self.resource_slots),
+            resource_opts=OptionalState.from_graphql("resource_opts", self.resource_opts),
+            cluster_mode=OptionalState.from_graphql(
                 "cluster_mode",
-                define_state(self.cluster_mode),
                 ClusterMode(self.cluster_mode) if self.cluster_mode is not Undefined else None,
             ),
-            cluster_size=OptionalState(
-                "cluster_size",
-                define_state(self.cluster_size),
-                value_or_none(self.cluster_size),
+            cluster_size=OptionalState.from_graphql("cluster_size", self.cluster_size),
+            replicas=OptionalState.from_graphql("replicas", self.replicas),
+            desired_session_count=OptionalState.from_graphql(
+                "desired_session_count", self.desired_session_count
             ),
-            replicas=OptionalState(
-                "replicas",
-                define_state(self.replicas),
-                value_or_none(self.replicas),
-            ),
-            desired_session_count=OptionalState(
-                "desired_session_count",
-                define_state(self.desired_session_count),
-                value_or_none(self.desired_session_count),
-            ),
-            image=OptionalState(
+            image=OptionalState.from_graphql(
                 "image",
-                define_state(self.image),
                 create_image_ref_from_input(self.image) if self.image is not Undefined else None,
             ),
-            name=OptionalState(
-                "name",
-                define_state(self.name),
-                value_or_none(self.name),
+            name=OptionalState.from_graphql("name", self.name),
+            resource_group=OptionalState.from_graphql("resource_group", self.resource_group),
+            model_definition_path=OptionalState.from_graphql(
+                "model_definition_path", self.model_definition_path
             ),
-            resource_group=OptionalState(
-                "resource_group",
-                define_state(self.resource_group),
-                value_or_none(self.resource_group),
-            ),
-            model_definition_path=OptionalState(
-                "model_definition_path",
-                define_state(self.model_definition_path),
-                value_or_none(self.model_definition_path),
-            ),
-            open_to_public=OptionalState(
+            open_to_public=OptionalState.from_graphql(
                 "open_to_public",
-                define_state(self.open_to_public),
-                value_or_none(self.open_to_public),
+                self.open_to_public,
             ),
-            extra_mounts=OptionalState(
+            extra_mounts=OptionalState.from_graphql(
                 "extra_mounts",
-                define_state(self.extra_mounts),
                 [extra_mount.to_action_field() for extra_mount in self.extra_mounts]
                 if self.extra_mounts is not Undefined
                 else None,
             ),
-            environ=OptionalState(
+            environ=OptionalState.from_graphql(
                 "environ",
-                define_state(self.environ),
-                value_or_none(self.environ),
+                self.environ,
             ),
-            runtime_variant=OptionalState(
+            runtime_variant=OptionalState.from_graphql(
                 "runtime_variant",
-                define_state(self.runtime_variant),
-                value_or_none(self.runtime_variant),
+                self.runtime_variant,
             ),
         )
 
@@ -1581,6 +1541,8 @@ class ModifyEndpoint(graphene.Mutation):
         endpoint_id: UUID,
         props: ModifyEndpointInput,
     ) -> Self:
+        from ai.backend.manager.services.model_service.types import RequesterCtx
+
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(

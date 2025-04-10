@@ -16,7 +16,6 @@ from ai.backend.common.types import (
     EndpointId,
     RuleId,
 )
-from ai.backend.manager.models.utils import define_state
 from ai.backend.manager.services.model_service.actions.create_endpoint_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
 )
@@ -328,49 +327,41 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         return ModifyEndpointAutoScalingRuleAction(
             requester_ctx=requester_ctx,
             id=id,
-            metric_source=OptionalState(
+            metric_source=OptionalState.from_graphql(
                 "metric_source",
-                define_state(self.metric_source),
                 AutoScalingMetricSource(self.metric_source)
                 if self.metric_source is not Undefined
                 else None,
             ),
-            metric_name=OptionalState(
+            metric_name=OptionalState.from_graphql(
                 "metric_name",
-                define_state(self.metric_name),
-                value_or_none(self.metric_name),
+                self.metric_name,
             ),
-            threshold=OptionalState(
+            threshold=OptionalState.from_graphql(
                 "threshold",
-                define_state(self.threshold),
-                value_or_none(self.threshold),
+                self.threshold,
             ),
-            comparator=OptionalState(
+            comparator=OptionalState.from_graphql(
                 "comparator",
-                define_state(self.comparator),
                 AutoScalingMetricComparator(self.comparator)
                 if self.comparator is not Undefined
                 else None,
             ),
-            step_size=OptionalState(
+            step_size=OptionalState.from_graphql(
                 "step_size",
-                define_state(self.step_size),
-                value_or_none(self.step_size),
+                self.step_size,
             ),
-            cooldown_seconds=OptionalState(
+            cooldown_seconds=OptionalState.from_graphql(
                 "cooldown_seconds",
-                define_state(self.cooldown_seconds),
-                value_or_none(self.cooldown_seconds),
+                self.cooldown_seconds,
             ),
-            min_replicas=TriState(
+            min_replicas=TriState.from_graphql(
                 "min_replicas",
-                define_state(self.min_replicas),
-                value_or_none(self.min_replicas),
+                self.min_replicas,
             ),
-            max_replicas=TriState(
+            max_replicas=TriState.from_graphql(
                 "max_replicas",
-                define_state(self.max_replicas),
-                value_or_none(self.max_replicas),
+                self.max_replicas,
             ),
         )
 

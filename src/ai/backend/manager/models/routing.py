@@ -12,7 +12,6 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.model_service.types import RoutingData
 
 from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
@@ -225,7 +224,7 @@ class Routing(graphene.ObjectType):
     _endpoint_row: "EndpointRow"
 
     @classmethod
-    def from_dto(cls, dto: Optional[RoutingData]) -> Optional[Self]:
+    def from_dto(cls, dto) -> Optional[Self]:  # type: ignore
         if dto is None:
             return None
         return cls(
