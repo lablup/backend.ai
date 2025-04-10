@@ -770,6 +770,8 @@ class ImageRow(Base):
         return self.customized and self.labels["ai.backend.customized-image.owner"] == str(user_id)
 
     def to_dataclass(self) -> ImageData:
+        from ai.backend.manager.data.image.types import ImageData
+
         return ImageData(
             id=self.id,
             name=self.name,
