@@ -177,7 +177,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
             month=params["month"],
         )
     )
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -210,7 +210,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -231,7 +231,8 @@ async def user_month_stats(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    print(f"{result.stats = }")
+    return web.json_response(result.stats, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -248,7 +249,7 @@ async def admin_month_stats(request: web.Request) -> web.Response:
         AdminMonthStatsAction()
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.stats, status=HTTPStatus.OK)
 
 
 # TODO: get_watcher_info overlaps with service-side method.
