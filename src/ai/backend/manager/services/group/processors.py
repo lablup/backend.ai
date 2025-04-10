@@ -1,29 +1,29 @@
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.services.groups.actions.create_group import (
+from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.delete_group import (
+from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
     DeleteGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.modify_group import (
+from ai.backend.manager.services.group.actions.modify_group import (
     ModifyGroupAction,
     ModifyGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.purge_group import (
+from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.usage_per_month import (
+from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
 )
-from ai.backend.manager.services.groups.actions.usage_per_period import (
+from ai.backend.manager.services.group.actions.usage_per_period import (
     UsagePerPeriodAction,
     UsagePerPeriodActionResult,
 )
-from ai.backend.manager.services.groups.service import GroupService
+from ai.backend.manager.services.group.service import GroupService
 
 
 class GroupProcessors:

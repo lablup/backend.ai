@@ -1,29 +1,29 @@
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.services.users.actions.admin_month_stats import (
+from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
 )
-from ai.backend.manager.services.users.actions.create_user import (
+from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.users.actions.delete_user import (
+from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
-from ai.backend.manager.services.users.actions.modify_user import (
+from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
 )
-from ai.backend.manager.services.users.actions.purge_user import (
+from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
-from ai.backend.manager.services.users.actions.user_month_stats import (
+from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
-from ai.backend.manager.services.users.service import UserService
+from ai.backend.manager.services.user.service import UserService
 
 
 class UserProcessors:

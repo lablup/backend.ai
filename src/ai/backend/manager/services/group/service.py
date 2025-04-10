@@ -36,31 +36,31 @@ from ai.backend.manager.models.resource_usage import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
-from ai.backend.manager.services.groups.actions.create_group import (
+from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.delete_group import (
+from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
     DeleteGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.modify_group import (
+from ai.backend.manager.services.group.actions.modify_group import (
     ModifyGroupAction,
     ModifyGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.purge_group import (
+from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.usage_per_month import (
+from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
 )
-from ai.backend.manager.services.groups.actions.usage_per_period import (
+from ai.backend.manager.services.group.actions.usage_per_period import (
     UsagePerPeriodAction,
     UsagePerPeriodActionResult,
 )
-from ai.backend.manager.services.groups.types import GroupData
+from ai.backend.manager.services.group.types import GroupData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

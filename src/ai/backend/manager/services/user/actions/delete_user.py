@@ -2,13 +2,12 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.users.actions.base import UserAction
-from ai.backend.manager.services.users.type import UserCreator, UserData
+from ai.backend.manager.services.user.actions.base import UserAction
 
 
 @dataclass
-class CreateUserAction(UserAction):
-    input: UserCreator
+class DeleteUserAction(UserAction):
+    email: str
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -16,14 +15,13 @@ class CreateUserAction(UserAction):
 
     @override
     def operation_type(self) -> str:
-        return "create"
+        return "delete"
 
 
 @dataclass
-class CreateUserActionResult(BaseActionResult):
-    data: Optional[UserData]
+class DeleteUserActionResult(BaseActionResult):
     success: bool
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id) if self.data else None
+        return None

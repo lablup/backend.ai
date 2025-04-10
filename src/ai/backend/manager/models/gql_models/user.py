@@ -19,24 +19,24 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.manager.services.users.actions.create_user import (
+from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.users.actions.delete_user import (
+from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
-from ai.backend.manager.services.users.actions.modify_user import (
+from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
     UserModifier,
 )
-from ai.backend.manager.services.users.actions.purge_user import (
+from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
-from ai.backend.manager.services.users.type import UserCreator, UserData, UserInfoContext
+from ai.backend.manager.services.user.type import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.types import OptionalState
 
 from ..base import (

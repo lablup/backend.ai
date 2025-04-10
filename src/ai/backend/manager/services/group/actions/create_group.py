@@ -1,15 +1,14 @@
-import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.groups.actions.base import GroupAction
-from ai.backend.manager.services.groups.types import GroupData
+from ai.backend.manager.services.group.actions.base import GroupAction
+from ai.backend.manager.services.group.types import GroupCreator, GroupData
 
 
 @dataclass
-class PurgeGroupAction(GroupAction):
-    group_id: uuid.UUID
+class CreateGroupAction(GroupAction):
+    input: GroupCreator
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -17,14 +16,14 @@ class PurgeGroupAction(GroupAction):
 
     @override
     def operation_type(self) -> str:
-        return "purge"
+        return "create"
 
 
 @dataclass
-class PurgeGroupActionResult(BaseActionResult):
+class CreateGroupActionResult(BaseActionResult):
     data: Optional[GroupData]
     success: bool
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id) if self.data is not None else None
+        return self.data.name if self.data is not None else None

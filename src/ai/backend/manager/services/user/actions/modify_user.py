@@ -3,8 +3,8 @@ from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.user import UserRole, UserStatus
-from ai.backend.manager.services.users.actions.base import UserAction
-from ai.backend.manager.services.users.type import UserData
+from ai.backend.manager.services.user.actions.base import UserAction
+from ai.backend.manager.services.user.type import UserData
 from ai.backend.manager.types import OptionalState, PartialModifier
 
 

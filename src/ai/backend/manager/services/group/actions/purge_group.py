@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.groups.actions.base import GroupAction
-from ai.backend.manager.services.groups.types import GroupData
+from ai.backend.manager.services.group.actions.base import GroupAction
+from ai.backend.manager.services.group.types import GroupData
 
 
 @dataclass
-class DeleteGroupAction(GroupAction):
+class PurgeGroupAction(GroupAction):
     group_id: uuid.UUID
 
     @override
@@ -17,11 +17,11 @@ class DeleteGroupAction(GroupAction):
 
     @override
     def operation_type(self) -> str:
-        return "delete"
+        return "purge"
 
 
 @dataclass
-class DeleteGroupActionResult(BaseActionResult):
+class PurgeGroupActionResult(BaseActionResult):
     data: Optional[GroupData]
     success: bool
 

@@ -58,31 +58,31 @@ from ai.backend.manager.models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
 )
-from ai.backend.manager.services.users.actions.admin_month_stats import (
+from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
 )
-from ai.backend.manager.services.users.actions.create_user import (
+from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.users.actions.delete_user import (
+from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
-from ai.backend.manager.services.users.actions.modify_user import (
+from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
 )
-from ai.backend.manager.services.users.actions.purge_user import (
+from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
-from ai.backend.manager.services.users.actions.user_month_stats import (
+from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
-from ai.backend.manager.services.users.type import UserData
+from ai.backend.manager.services.user.type import UserData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

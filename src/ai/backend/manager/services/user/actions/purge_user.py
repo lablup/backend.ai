@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.users.actions.base import UserAction
-from ai.backend.manager.services.users.type import UserInfoContext
+from ai.backend.manager.services.user.actions.base import UserAction
+from ai.backend.manager.services.user.type import UserInfoContext
 from ai.backend.manager.types import OptionalState
 
 
