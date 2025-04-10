@@ -59,8 +59,6 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetI
 from ai.backend.manager.services.image.actions.modify_image import (
     ImageModifier,
     ModifyImageAction,
-    OptionalState,
-    TriState,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
