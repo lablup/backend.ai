@@ -42,7 +42,6 @@ from ..base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from ..gql_models.user import ModifyUserInput
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import UserRole
@@ -550,7 +549,7 @@ class ModifyKeyPair(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
-        props: ModifyUserInput,
+        props: ModifyKeyPairInput,
     ) -> ModifyKeyPair:
         ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}

@@ -16,7 +16,7 @@ class KeyPairResourcePolicyModifier(PartialModifier):
     idle_timeout: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_concurrent_sessions: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_containers_per_session: OptionalState[int] = field(default_factory=OptionalState.nop)
-    max_pending_session_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_pending_session_count: TriState[int] = field(default_factory=TriState.nop)
     max_pending_session_resource_slots: TriState[dict[str, Any]] = field(
         default_factory=TriState.nop
     )

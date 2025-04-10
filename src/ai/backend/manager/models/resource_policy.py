@@ -492,9 +492,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
             max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
             max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
             max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
-            max_pending_session_count=OptionalState[int].from_graphql(
-                self.max_pending_session_count
-            ),
+            max_pending_session_count=TriState[int].from_graphql(self.max_pending_session_count),
             max_pending_session_resource_slots=TriState[dict[str, Any]].from_graphql(
                 self.max_pending_session_resource_slots
             ),

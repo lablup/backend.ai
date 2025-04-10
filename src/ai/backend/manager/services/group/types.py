@@ -5,7 +5,7 @@ from typing import Any, Optional, Self, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.types import Creator, OptionalState, PartialModifier
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -95,8 +95,8 @@ class GroupModifier(PartialModifier):
     )
     integration_id: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    container_registry: OptionalState[dict[str, str]] = field(
-        default_factory=OptionalState[dict[str, str]].nop
+    container_registry: TriState[dict[str, str]] = field(
+        default_factory=TriState[dict[str, str]].nop
     )
 
     @override
