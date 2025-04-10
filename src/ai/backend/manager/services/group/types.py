@@ -107,8 +107,6 @@ class GroupModifier(PartialModifier):
         self.is_active.update_dict(to_update, "is_active")
         self.domain_name.update_dict(to_update, "domain_name")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
-        self.user_update_mode.update_dict(to_update, "user_update_mode")
-        self.user_uuids.update_dict(to_update, "user_uuids")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         self.integration_id.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
