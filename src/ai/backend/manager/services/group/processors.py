@@ -39,3 +39,5 @@ class GroupProcessors:
         self.modify_group = ActionProcessor(group_service.modify_group)
         self.delete_group = ActionProcessor(group_service.delete_group)
         self.purge_group = ActionProcessor(group_service.purge_group)
+        self.usage_per_month = ActionProcessor(group_service.usage_per_month)
+        self.usage_per_period = ActionProcessor(group_service.usage_per_period)

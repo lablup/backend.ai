@@ -231,7 +231,6 @@ async def user_month_stats(request: web.Request) -> web.Response:
         )
     )
 
-    print(f"{result.stats = }")
     return web.json_response(result.stats, status=HTTPStatus.OK)
 
 
@@ -385,7 +384,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.registries, status=HTTPStatus.OK)
 
 
 def create_app(
