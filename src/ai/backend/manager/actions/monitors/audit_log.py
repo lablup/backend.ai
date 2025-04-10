@@ -4,7 +4,7 @@ import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Final, Optional
+from typing import Final, Optional, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseAction, ProcessResult
@@ -128,11 +128,13 @@ class AuditLogManager(ActionMonitor):
     def __init__(self, audit_logger: AuditLogger) -> None:
         self._audit_logger = audit_logger
 
+    @override
     async def prepare(self, action: BaseAction) -> None:
         # TODO: Inject live configs into AuditLogInfo
         if audit_log_meta := await self._audit_logger.init(action, AuditLogInfo()):
             self._log_context.set(audit_log_meta)
 
+    @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
         if audit_log_meta := self._log_context.get(None):
             audit_log = AuditLog(action=action, result=result, meta=audit_log_meta)
