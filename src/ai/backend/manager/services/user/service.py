@@ -153,7 +153,7 @@ class UserService:
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
                 {
-                    "is_active": action.input.status == UserStatus.ACTIVE,
+                    "is_active": _status == UserStatus.ACTIVE,
                     "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
                     "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                     "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
