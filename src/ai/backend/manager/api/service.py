@@ -90,7 +90,8 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    BaseResponseModel,
+    LegacyBaseRequestModel,
+    LegacyBaseResponseModel,
     get_access_key_scopes,
     get_user_uuid_scopes,
     pydantic_params_api_handler,
@@ -120,11 +121,11 @@ async def is_user_allowed_to_access_resource(
         return request["user"]["uyud"] == resource_owner
 
 
-class ListServeRequestModel(BaseModel):
+class ListServeRequestModel(LegacyBaseRequestModel):
     name: str | None = Field(default=None)
 
 
-class SuccessResponseModel(BaseResponseModel):
+class SuccessResponseModel(LegacyBaseResponseModel):
     success: bool = Field(default=True)
 
 
@@ -204,7 +205,7 @@ class RouteInfoModel(BaseModel):
     traffic_ratio: NonNegativeFloat
 
 
-class ServeInfoModel(BaseResponseModel):
+class ServeInfoModel(LegacyBaseResponseModel):
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     model_id: Annotated[uuid.UUID, Field(description="ID of model VFolder.")]
     extra_mounts: Annotated[
@@ -281,7 +282,7 @@ async def get_info(request: web.Request) -> ServeInfoModel:
     )
 
 
-class ServiceConfigModel(BaseModel):
+class ServiceConfigModel(LegacyBaseRequestModel):
     model: str = Field(description="Name or ID of the model VFolder", examples=["ResNet50"])
     model_definition_path: str | None = Field(
         description="Path to the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default.",
@@ -326,9 +327,7 @@ class ServiceConfigModel(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
-class NewServiceRequestModel(BaseModel):
-    model_config = ConfigDict(validate_by_name=True)
-
+class NewServiceRequestModel(LegacyBaseRequestModel):
     service_name: tv.SessionName = Field(
         description="Name of the service",
         validation_alias=AliasChoices("name", "clientSessionToken"),
@@ -882,11 +881,11 @@ async def sync(request: web.Request) -> SuccessResponseModel:
     return SuccessResponseModel()
 
 
-class ScaleRequestModel(BaseModel):
+class ScaleRequestModel(LegacyBaseRequestModel):
     to: int = Field(description="Ideal number of inference sessions")
 
 
-class ScaleResponseModel(BaseResponseModel):
+class ScaleResponseModel(LegacyBaseResponseModel):
     current_route_count: int
     target_count: int
 
@@ -933,7 +932,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         )
 
 
-class UpdateRouteRequestModel(BaseModel):
+class UpdateRouteRequestModel(LegacyBaseRequestModel):
     traffic_ratio: NonNegativeFloat
 
 
@@ -1029,7 +1028,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         return SuccessResponseModel()
 
 
-class TokenRequestModel(BaseModel):
+class TokenRequestModel(LegacyBaseRequestModel):
     duration: tv.TimeDuration | None = Field(
         default=None, description="The lifetime duration of the token."
     )
@@ -1056,7 +1055,7 @@ class TokenRequestModel(BaseModel):
         return self
 
 
-class TokenResponseModel(BaseResponseModel):
+class TokenResponseModel(LegacyBaseResponseModel):
     token: str
 
 
@@ -1129,7 +1128,7 @@ class ErrorInfoModel(BaseModel):
     error: dict[str, Any]
 
 
-class ErrorListResponseModel(BaseResponseModel):
+class ErrorListResponseModel(LegacyBaseResponseModel):
     errors: list[ErrorInfoModel]
     retries: int
 

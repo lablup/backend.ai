@@ -40,6 +40,7 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
@@ -217,13 +218,16 @@ def check_api_params(
     return wrap
 
 
-class BaseResponseModel(BaseModel):
+LegacyBaseRequestModel: TypeAlias = BaseRequestModel
+
+
+class LegacyBaseResponseModel(BaseResponseModel):
     status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
-TParamModel = TypeVar("TParamModel", bound=BaseModel, contravariant=True)
-TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseModel, covariant=True)
+TParamModel = TypeVar("TParamModel", bound=LegacyBaseRequestModel, contravariant=True)
+TQueryModel = TypeVar("TQueryModel", bound=LegacyBaseRequestModel)
+TResponseModel = TypeVar("TResponseModel", bound=LegacyBaseResponseModel, covariant=True)
 
 TPydanticResponse: TypeAlias = TResponseModel | list[TResponseModel]
 
@@ -248,10 +252,10 @@ class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
 
 
 def ensure_stream_response_type(
-    response: BaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
+    response: LegacyBaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
-        case BaseResponseModel(status=status):
+        case LegacyBaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
         case BaseModel():
             return web.json_response(response.model_dump(mode="json"))

@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 from .auth import superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
-from .utils import pydantic_params_api_handler
+from .utils import LegacyBaseRequestModel, pydantic_params_api_handler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -130,7 +130,7 @@ async def _handle_push_artifact_event(
     await scanner.scan_single_ref(f"{project}/{img_name}:{tag}")
 
 
-class HarborWebhookRequestModel(BaseModel):
+class HarborWebhookRequestModel(LegacyBaseRequestModel):
     type: str = Field(
         description="Type of the webhook event triggered by Harbor. See Harbor documentation for details."
     )

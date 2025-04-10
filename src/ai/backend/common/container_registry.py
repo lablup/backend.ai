@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
+from .api_handlers import BaseRequestModel
+
 
 class ContainerRegistryType(enum.StrEnum):
     DOCKER = "docker"
@@ -21,7 +23,7 @@ class AllowedGroupsModel(BaseModel):
     remove: list[str] = []
 
 
-class ContainerRegistryRowModel(BaseModel):
+class ContainerRegistryRowModel(BaseRequestModel):
     id: Optional[uuid.UUID] = None
     url: Optional[str] = None
     registry_name: Optional[str] = None

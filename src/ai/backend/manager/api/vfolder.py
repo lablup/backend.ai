@@ -139,7 +139,8 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .utils import (
-    BaseResponseModel,
+    LegacyBaseRequestModel,
+    LegacyBaseResponseModel,
     check_api_params,
     get_user_scopes,
     pydantic_params_api_handler,
@@ -154,7 +155,7 @@ VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
 
 
-class SuccessResponseModel(BaseResponseModel):
+class SuccessResponseModel(LegacyBaseResponseModel):
     success: bool = Field(default=True)
 
 
@@ -369,7 +370,7 @@ def vfolder_check_exists(
     return _wrapped
 
 
-class CreateRequestModel(BaseModel):
+class CreateRequestModel(LegacyBaseRequestModel):
     model_config = ConfigDict(validate_by_name=True)
 
     name: tv.VFolderName = Field(
@@ -1671,9 +1672,7 @@ async def _delete(
     )
 
 
-class DeleteRequestModel(BaseModel):
-    model_config = ConfigDict(validate_by_name=True)
-
+class DeleteRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("vfolderId", "id"),
         description="Target vfolder id to soft-delete, to go to trash bin",
@@ -1744,16 +1743,14 @@ async def delete_by_name(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class IDRequestModel(BaseModel):
-    model_config = ConfigDict(validate_by_name=True)
-
+class IDRequestModel(LegacyBaseRequestModel):
     name: str = Field(
         validation_alias=AliasChoices("vfolder_name", "vfolderName"),
         description="Target vfolder name",
     )
 
 
-class CompactVFolderInfoModel(BaseResponseModel):
+class CompactVFolderInfoModel(LegacyBaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
     name: str = Field(description="Name of the vfolder.")
 
@@ -1782,9 +1779,7 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
     return CompactVFolderInfoModel(id=row["id"], name=folder_name)
 
 
-class DeleteFromTrashRequestModel(BaseModel):
-    model_config = ConfigDict(validate_by_name=True)
-
+class DeleteFromTrashRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to hard-delete, permanently remove from storage",
@@ -1839,9 +1834,7 @@ async def force_delete(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class PurgeRequestModel(BaseModel):
-    model_config = ConfigDict(validate_by_name=True)
-
+class PurgeRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to purge, permanently remove from DB",
@@ -1881,9 +1874,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class RestoreRequestModel(BaseModel):
-    model_config = ConfigDict(validate_by_name=True)
-
+class RestoreRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to restore",
@@ -2144,18 +2135,18 @@ class UserPermMapping(BaseModel):
     ]
 
 
-class UpdateSharedRequestModel(BaseModel):
+class UpdateSharedRequestModel(LegacyBaseRequestModel):
     vfolder_id: Annotated[
         uuid.UUID,
         Field(
-            validation_alias=AliasChoices("vfolder_id", "vfolderId", "vfolder"),
+            validation_alias=AliasChoices("vfolder", "vfolderId"),
             description="Target vfolder id to update sharing status.",
         ),
     ]
     user_perm_list: Annotated[
         list[UserPermMapping],
         Field(
-            validation_alias=AliasChoices("user_perm", "user_perm_list", "userPermList"),
+            validation_alias=AliasChoices("user_perm", "userPermList"),
             description="A list of user and permission mappings.",
         ),
     ]
