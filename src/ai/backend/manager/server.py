@@ -452,7 +452,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 error_monitor=root_ctx.error_monitor,
                 idle_checker_host=root_ctx.idle_checker_host,
             )
-        )
+        ),
+        [audit_log_manager],
     )
     yield
 
