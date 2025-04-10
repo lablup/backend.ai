@@ -5,7 +5,6 @@ from collections.abc import Container, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
-    TYPE_CHECKING,
     List,
     Optional,
     Self,
@@ -47,9 +46,6 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import DomainPermission
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

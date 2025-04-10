@@ -92,7 +92,6 @@ class DomainService:
                 result = await conn.execute(query)
                 row = result.first()
                 await _post_func(conn, result)
-                # TODO: Raise Error if rowcount is 0
                 if result.rowcount != 1:
                     raise RuntimeError(
                         f"No domain created. rowcount: {result.rowcount}, data: {data}"

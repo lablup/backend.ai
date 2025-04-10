@@ -55,7 +55,6 @@ class ProjectResourcePolicyService:
             if db_row is None:
                 raise ObjectNotFound(f"Project resource policy with name {name} not found.")
 
-            pass
             to_update = action.modifier.fields_to_update()
             for key, value in to_update.items():
                 setattr(db_row, key, value)

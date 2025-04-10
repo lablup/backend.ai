@@ -38,9 +38,9 @@ class KeyPairResourcePolicyCreator(Creator):
             "max_containers_per_session": self.max_containers_per_session,
             "max_pending_session_count": self.max_pending_session_count,
             "max_pending_session_resource_slots": self.max_pending_session_resource_slots,
-            "max_quota_scope_size": self.max_quota_scope_size,
-            "max_vfolder_count": self.max_vfolder_count,
-            "max_vfolder_size": self.max_vfolder_size,
+            # "max_quota_scope_size": self.max_quota_scope_size, # Deprecated
+            # "max_vfolder_count": self.max_vfolder_count, # Deprecated
+            # "max_vfolder_size": self.max_vfolder_size, # Deprecated
             "max_concurrent_sftp_sessions": self.max_concurrent_sftp_sessions,
             "max_session_lifetime": self.max_session_lifetime,
             "total_resource_slots": self.total_resource_slots,

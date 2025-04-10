@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 
 import sqlalchemy as sa
@@ -37,14 +36,10 @@ class KeypairResourcePolicyService:
     async def create_keypair_resource_policy(
         self, action: CreateKeyPairResourcePolicyAction
     ) -> CreateKeyPairResourcePolicyActionResult:
-        dict_props = dataclasses.asdict(action.creator)
-        # Ignore deprecated fields
-        del dict_props["max_vfolder_count"]
-        del dict_props["max_vfolder_size"]
-        del dict_props["max_quota_scope_size"]
+        to_store = action.creator.fields_to_store()
 
         async with self._db.begin_session() as db_sess:
-            db_row = KeyPairResourcePolicyRow(**dict_props)
+            db_row = KeyPairResourcePolicyRow(**to_store)
             db_sess.add(db_row)
             result = db_row.to_dataclass()
 

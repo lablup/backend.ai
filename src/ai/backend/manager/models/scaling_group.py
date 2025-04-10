@@ -5,7 +5,6 @@ from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Optional,
@@ -55,9 +54,6 @@ from .rbac.context import ClientContext
 from .rbac.permission_defs import ScalingGroupPermission
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine
-
-if TYPE_CHECKING:
-    pass
 
 __all__: Sequence[str] = (
     # table defs

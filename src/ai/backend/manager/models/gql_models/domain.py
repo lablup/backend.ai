@@ -366,7 +366,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):
                 name=self.name,
                 description=value_or_none(self.description),
                 is_active=value_or_none(self.is_active),
-                total_resource_slots=value_or_none(self.total_resource_slots)
+                total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None)
                 if self.total_resource_slots is not graphql.Undefined
                 else None,
                 allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
@@ -562,7 +562,7 @@ class Domain(graphene.ObjectType):
         )
 
     @classmethod
-    def from_dto(cls, dto: DomainData) -> Domain:
+    def from_data(cls, dto: DomainData) -> Domain:
         return cls(
             name=dto.name,
             description=dto.description,
@@ -717,7 +717,7 @@ class CreateDomain(graphene.Mutation):
         return cls(
             ok=res.success,
             msg=res.description,
-            domain=Domain.from_dto(domain_data) if domain_data else None,
+            domain=Domain.from_data(domain_data) if domain_data else None,
         )
 
 
@@ -750,7 +750,7 @@ class ModifyDomain(graphene.Mutation):
         return cls(
             ok=res.success,
             msg=res.description,
-            domain=Domain.from_dto(domain_data) if domain_data else None,
+            domain=Domain.from_data(domain_data) if domain_data else None,
         )
 
 

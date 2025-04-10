@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import secrets
-from typing import TYPE_CHECKING, Any, List, Sequence, Tuple, TypedDict
+from typing import Any, List, Sequence, Tuple, TypedDict
 
 import sqlalchemy as sa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
@@ -14,9 +14,6 @@ from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
-
-if TYPE_CHECKING:
-    pass
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
