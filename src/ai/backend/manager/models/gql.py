@@ -80,6 +80,7 @@ from ..api.exceptions import (
     ObjectNotFound,
     TooManyKernelsFound,
 )
+from ..data.image.types import ImageStatus
 from .acl import PredefinedAtomicPermission
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .gql_models.agent import (
@@ -158,6 +159,12 @@ from .gql_models.kernel import (
     LegacyComputeSessionList,
 )
 from .gql_models.keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .gql_models.resource_preset import (
+    CreateResourcePreset,
+    DeleteResourcePreset,
+    ModifyResourcePreset,
+    ResourcePreset,
+)
 from .gql_models.scaling_group import (
     AssociateScalingGroupsWithDomain,
     AssociateScalingGroupsWithKeyPair,
@@ -210,7 +217,6 @@ from .group import (
 )
 from .image import (
     ImageLoadFilter,
-    ImageStatus,
     PublicImageLoadFilter,
 )
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
@@ -236,12 +242,6 @@ from .resource_policy import (
     ModifyUserResourcePolicy,
     ProjectResourcePolicy,
     UserResourcePolicy,
-)
-from .resource_preset import (
-    CreateResourcePreset,
-    DeleteResourcePreset,
-    ModifyResourcePreset,
-    ResourcePreset,
 )
 from .routing import Routing, RoutingList
 from .scaling_group import (

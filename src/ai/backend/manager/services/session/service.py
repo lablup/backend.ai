@@ -60,7 +60,7 @@ from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow, groups
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, ImageRow, rescan_images
 from ai.backend.manager.models.kernel import (
     KernelRow,
 )
@@ -184,6 +184,8 @@ from ai.backend.manager.services.session.actions.upload_files import (
 )
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
+
+from ...data.image.types import ImageStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 

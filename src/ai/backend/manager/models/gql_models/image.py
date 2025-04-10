@@ -74,6 +74,7 @@ from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
 
 from ...api.exceptions import ImageNotFound
+from ...data.image.types import ImageStatus, ImageType
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
@@ -86,8 +87,6 @@ from ..image import (
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
-    ImageStatus,
-    ImageType,
     get_permission_ctx,
 )
 from ..rbac import ScopeType
