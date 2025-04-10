@@ -20,7 +20,6 @@ from ai.backend.manager.models.gql_models.audit_log import (
 )
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
-from ai.backend.manager.services.metric.types import MetricQueryParameter
 from ai.backend.manager.services.processors import Processors
 
 from .gql_models.container_registry import (
@@ -3086,9 +3085,7 @@ class Queries(graphene.ObjectType):
         return await UserUtilizationMetric.get_object(
             info,
             user_id,
-            MetricQueryParameter(
-                props.metric_name, props.value_type, props.start, props.end, props.step
-            ),
+            props.to_metric_query_parameter(),
         )
 
     @staticmethod

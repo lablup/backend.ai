@@ -44,6 +44,15 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):
         ),
     )
 
+    def to_metric_query_parameter(self) -> MetricQueryParameter:
+        return MetricQueryParameter(
+            metric_name=self.metric_name,
+            value_type=self.value_type,
+            start=self.start,
+            end=self.end,
+            step=self.step,
+        )
+
 
 class UserUtilizationMetric(graphene.ObjectType):
     class Meta:
