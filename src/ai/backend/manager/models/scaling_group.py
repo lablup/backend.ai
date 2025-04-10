@@ -517,7 +517,7 @@ class ScalingGroup(graphene.ObjectType):
         result: Optional[ResourceSlot] = None
         for agent_row in agent_list:
             result = _compare_each_resource_and_get_min(agent_row.available_slots, result)
-        return result.to_json() if result is not None else {}
+        return dict(result.to_json()) if result is not None else {}
 
     async def resolve_max_available_slots_for_each_resource(
         self,
@@ -542,7 +542,7 @@ class ScalingGroup(graphene.ObjectType):
         result: Optional[ResourceSlot] = None
         for agent_row in agent_list:
             result = _compare_each_resource_and_get_max(agent_row.available_slots, result)
-        return result.to_json() if result is not None else {}
+        return dict(result.to_json()) if result is not None else {}
 
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
