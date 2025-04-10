@@ -14,15 +14,13 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.services.resource_preset.actions.create_preset import (
+    ResourcePresetCreator,
+)
+from ai.backend.manager.services.resource_preset.actions.modify_preset import (
+    ResourcePresetModifier,
+)
 from ai.backend.manager.types import TriState
-
-if TYPE_CHECKING:
-    from ai.backend.manager.services.resource_preset.actions.create_preset import (
-        ResourcePresetCreator,
-    )
-    from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-        ResourcePresetModifier,
-    )
 
 from .base import (
     Base,

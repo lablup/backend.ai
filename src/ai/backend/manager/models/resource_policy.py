@@ -18,27 +18,25 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
+    KeyPairResourcePolicyCreator,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
+    KeyPairResourcePolicyModifier,
+)
+from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
+    ProjectResourcePolicyCreator,
+)
+from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
+    ProjectResourcePolicyModifier,
+)
+from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
+    UserResourcePolicyCreator,
+)
+from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+    UserResourcePolicyModifier,
+)
 from ai.backend.manager.types import OptionalState, TriState
-
-if TYPE_CHECKING:
-    from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
-        KeyPairResourcePolicyCreator,
-    )
-    from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-        KeyPairResourcePolicyModifier,
-    )
-    from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
-        ProjectResourcePolicyCreator,
-    )
-    from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-        ProjectResourcePolicyModifier,
-    )
-    from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
-        UserResourcePolicyCreator,
-    )
-    from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-        UserResourcePolicyModifier,
-    )
 
 from .base import (
     Base,
