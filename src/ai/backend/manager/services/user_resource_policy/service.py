@@ -56,6 +56,8 @@ class UserResourcePolicyService:
         async with self._db.begin_session() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             db_row = (await db_sess.execute(query)).scalar_one_or_none()
+            if db_row is None:
+                raise ObjectNotFound(f"User resource policy with name {name} not found.")
             to_update = modifier.fields_to_update()
             for key, value in to_update.items():
                 setattr(db_row, key, value)
