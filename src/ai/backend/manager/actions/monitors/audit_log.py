@@ -50,7 +50,10 @@ class AuditLogger:
         self._stopped = True
         self._log_task: Optional[asyncio.Task] = None
 
-    async def log_queue(self) -> None:
+    async def _log_update(self) -> None:
+        """
+        Updates the information of the logs generated in `generate_log` based on the completed `ActionResult`.
+        """
         while not self._stopped:
             audit_log = await self._queue.get()
             if audit_log == Sentinel.token:
@@ -80,7 +83,11 @@ class AuditLogger:
                 db_row.entity_id = entity_id
                 await db_sess.flush()
 
-    async def init(self, action: BaseAction, info: AuditLogInfo) -> Optional[AuditLogMeta]:
+    async def generate_log(self, action: BaseAction, info: AuditLogInfo) -> Optional[AuditLogMeta]:
+        """
+        Record log information in the AuditLog table when Action started.
+        The recorded AuditLog row is updated in `_update_log` after the Action is completed.
+        """
         if self._stopped:
             return None
 
@@ -107,7 +114,7 @@ class AuditLogger:
     def start(self) -> None:
         self._stopped = False
         if not self._log_task:
-            self._log_task = asyncio.create_task(self.log_queue())
+            self._log_task = asyncio.create_task(self._log_update())
 
     async def stop(self) -> None:
         self._stopped = True
@@ -131,7 +138,7 @@ class AuditLogManager(ActionMonitor):
     @override
     async def prepare(self, action: BaseAction) -> None:
         # TODO: Inject live configs into AuditLogInfo
-        if audit_log_meta := await self._audit_logger.init(action, AuditLogInfo()):
+        if audit_log_meta := await self._audit_logger.generate_log(action, AuditLogInfo()):
             self._log_context.set(audit_log_meta)
 
     @override
