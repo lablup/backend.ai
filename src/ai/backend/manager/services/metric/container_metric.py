@@ -144,23 +144,16 @@ class MetricService:
         self,
         param: MetricSpecForQuery,
     ) -> str:
-        def _parse_sum_by(sum_by: list[str]) -> str:
-            if not sum_by:
-                return ""
-            return f"sum by ({','.join(param.sum_by)})"
-
-        def _parse_labels(labels: list[str]) -> str:
-            if not labels:
-                return ""
-            return f"{{{','.join(labels)}}}"
-
         match param.metric_type:
             case UtilizationMetricType.GAUGE:
-                return f"{_parse_sum_by(param.sum_by)}(backendai_container_utilization{_parse_labels(param.labels)})"
+                return f"{param.str_sum_by()}(backendai_container_utilization{param.str_labels()})"
             case UtilizationMetricType.RATE:
-                return f"{_parse_sum_by(param.sum_by)}(rate(backendai_container_utilization{_parse_labels(param.labels)}[{param.timewindow}])) / {UTILIZATION_METRIC_INTERVAL}"
+                return (
+                    f"{param.str_sum_by()}(rate(backendai_container_utilization{param.str_labels()}[{param.timewindow}])) "
+                    f"/ {UTILIZATION_METRIC_INTERVAL}"
+                )
             case UtilizationMetricType.DIFF:
-                return f"{_parse_sum_by(param.sum_by)}(rate(backendai_container_utilization{_parse_labels(param.labels)}[{param.timewindow}]))"
+                return f"{param.str_sum_by()}(rate(backendai_container_utilization{param.str_labels()}[{param.timewindow}]))"
 
     async def _get_query_string(
         self,

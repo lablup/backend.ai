@@ -83,3 +83,13 @@ class MetricSpecForQuery:
     timewindow: str = DEFAULT_RANGE_VECTOR_TIMEWINDOW
     sum_by: list[str] = field(default_factory=list)
     labels: list[str] = field(default_factory=list)
+
+    def str_sum_by(self) -> str:
+        if not self.sum_by:
+            return ""
+        return f"sum by ({','.join(self.sum_by)})"
+
+    def str_labels(self) -> str:
+        if not self.labels:
+            return ""
+        return f"{{{','.join(self.labels)}}}"
