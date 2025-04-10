@@ -40,7 +40,7 @@ class UserModifier(PartialModifier):
         self.status.update_dict(to_update, "status")
         self.domain_name.update_dict(to_update, "domain_name")
         self.role.update_dict(to_update, "role")
-        self.group_ids.update_dict(to_update, "group_ids")
+        # self.group_ids.update_dict(to_update, "group_ids")    # User schema does not have group_ids
         self.allowed_client_ip.update_dict(to_update, "allowed_client_ip")
         self.totp_activated.update_dict(to_update, "totp_activated")
         self.resource_policy.update_dict(to_update, "resource_policy")
