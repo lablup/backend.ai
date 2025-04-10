@@ -25,5 +25,6 @@ class AuditLogMonitor(ActionMonitor):
     async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
         pass
 
+    @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
         pass
