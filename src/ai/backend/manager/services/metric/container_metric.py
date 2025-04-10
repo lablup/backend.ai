@@ -25,6 +25,7 @@ from .types import (
     ContainerMetricResult,
     MetricResultValue,
     MetricSpecForQuery,
+    UtilizationMetricType,
 )
 
 
@@ -68,27 +69,6 @@ class MetricResponse(TypedDict):
     values: list[MetricResponseValue]
 
 
-async def parse_query_string_by_metric_spec(param: MetricSpecForQuery) -> str:
-    def _parse_sum_by(sum_by: Optional[str]) -> str:
-        if sum_by is None:
-            return ""
-        return f"sum by ({param.sum_by})"
-
-    def _parse_labels(labels: Optional[str]) -> str:
-        if labels is None:
-            return ""
-        return f"{{{labels}}}"
-
-    # TODO: Define device metadata for each metric and use it rather than hardcoding
-    match param.metric_name:
-        case "cpu_util":
-            return f"{_parse_sum_by(param.sum_by)}(rate(backendai_container_utilization{_parse_labels(param.labels)}[{param.timewindow}]))"
-        case "net_rx" | "net_tx":
-            return f"{_parse_sum_by(param.sum_by)}(rate(backendai_container_utilization{_parse_labels(param.labels)}[{param.timewindow}])) / {UTILIZATION_METRIC_INTERVAL}"
-        case _:
-            return f"{_parse_sum_by(param.sum_by)}(backendai_container_utilization{_parse_labels(param.labels)})"
-
-
 class MetricService:
     _metric_query_endpoint: yarl.URL
 
@@ -110,9 +90,8 @@ class MetricService:
         result = await self._query_label_values(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
         return ContainerMetricMetadataActionResult(result["data"])
 
-    @staticmethod
     def _get_label_values_for_query(
-        label: ContainerMetricOptionalLabel, metric_name: str
+        self, label: ContainerMetricOptionalLabel, metric_name: str
     ) -> list[str]:
         label_values: list[str] = [
             f'container_metric_name="{metric_name}"',
@@ -130,8 +109,7 @@ class MetricService:
         _append_if_not_none(label.project_id, "project_id")
         return label_values
 
-    @staticmethod
-    def _get_sum_by_for_query(label: ContainerMetricOptionalLabel) -> list[str]:
+    def _get_sum_by_for_query(self, label: ContainerMetricOptionalLabel) -> list[str]:
         sum_by_values = ["value_type"]
 
         def _append_if_not_none(value: Any, name: str) -> None:
@@ -145,17 +123,57 @@ class MetricService:
         _append_if_not_none(label.project_id, "project_id")
         return sum_by_values
 
+    def _get_metric_type(
+        self,
+        metric_name: str,
+        label: ContainerMetricOptionalLabel,
+    ) -> UtilizationMetricType:
+        # TODO: Define device metadata for each metric and use it rather than hardcoding
+        match metric_name:
+            case "cpu_util" if label.value_type == "current":
+                return UtilizationMetricType.DIFF
+            case "net_rx" | "net_tx":
+                return UtilizationMetricType.RATE
+            case _:
+                return UtilizationMetricType.GAUGE
+
+    def _parse_query_string_by_metric_spec(
+        self,
+        param: MetricSpecForQuery,
+    ) -> str:
+        def _parse_sum_by(sum_by: list[str]) -> str:
+            if not sum_by:
+                return ""
+            return f"sum by ({','.join(param.sum_by)})"
+
+        def _parse_labels(labels: list[str]) -> str:
+            if not labels:
+                return ""
+            return f"{{{','.join(labels)}}}"
+
+        match param.metric_type:
+            case UtilizationMetricType.GAUGE:
+                return f"{_parse_sum_by(param.sum_by)}(backendai_container_utilization{_parse_labels(param.labels)})"
+            case UtilizationMetricType.RATE:
+                return f"{_parse_sum_by(param.sum_by)}(rate(backendai_container_utilization{_parse_labels(param.labels)}[{param.timewindow}])) / {UTILIZATION_METRIC_INTERVAL}"
+            case UtilizationMetricType.DIFF:
+                return f"{_parse_sum_by(param.sum_by)}(rate(backendai_container_utilization{_parse_labels(param.labels)}[{param.timewindow}]))"
+
     async def _get_query_string(
         self,
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> str:
+        metric_type = self._get_metric_type(metric_name, label)
         label_values = self._get_label_values_for_query(label, metric_name)
         sum_by_values = self._get_sum_by_for_query(label)
-        labels = ",".join(label_values)
-        sum_by = ",".join(sum_by_values)
-        return await parse_query_string_by_metric_spec(
-            MetricSpecForQuery(metric_name=metric_name, sum_by=sum_by, labels=labels)
+        return self._parse_query_string_by_metric_spec(
+            MetricSpecForQuery(
+                metric_name=metric_name,
+                metric_type=metric_type,
+                sum_by=sum_by_values,
+                labels=label_values,
+            )
         )
 
     async def query_metric(

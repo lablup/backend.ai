@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import enum
+from dataclasses import dataclass, field
 from typing import (
     Final,
     Optional,
@@ -53,9 +54,31 @@ class ContainerMetricResult:
     values: list[MetricResultValue]
 
 
+class UtilizationMetricType(enum.Enum):
+    """
+    Specifies the type of a metric value.
+    """
+
+    GAUGE = 0
+    """
+    Represents an instantly measured occupancy value.
+    (e.g., used space as bytes, occupied amount as the number of items or a bandwidth)
+    """
+    RATE = 1
+    """
+    Represents a rate of changes calculated from underlying gauge/accumulation values
+    (e.g., I/O bps calculated from RX/TX accum.bytes)
+    """
+    DIFF = 2
+    """
+    Represents a difference of changes calculated from underlying gauge/accumulation values
+    """
+
+
 @dataclass(kw_only=True)
 class MetricSpecForQuery:
     metric_name: str
+    metric_type: UtilizationMetricType = UtilizationMetricType.GAUGE
     timewindow: str = DEFAULT_RANGE_VECTOR_TIMEWINDOW
-    sum_by: Optional[str] = None
-    labels: Optional[str] = None
+    sum_by: list[str] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
