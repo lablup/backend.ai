@@ -59,19 +59,20 @@ class UtilizationMetricType(enum.Enum):
     Specifies the type of a metric value.
     """
 
-    GAUGE = 0
+    GAUGE = enum.auto()
     """
     Represents an instantly measured occupancy value.
     (e.g., used space as bytes, occupied amount as the number of items or a bandwidth)
     """
-    RATE = 1
+    RATE = enum.auto()
     """
     Represents a rate of changes calculated from underlying gauge/accumulation values
     (e.g., I/O bps calculated from RX/TX accum.bytes)
     """
-    DIFF = 2
+    DIFF = enum.auto()
     """
     Represents a difference of changes calculated from underlying gauge/accumulation values
+    (e.g., Utilization msec from CPU usage)
     """
 
 
