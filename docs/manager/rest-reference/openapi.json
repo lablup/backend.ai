@@ -635,10 +635,10 @@
       },
       "UpdateSharedRequestModel": {
         "properties": {
-          "vfolder_id": {
+          "vfolder": {
             "description": "Target vfolder id to update sharing status.",
             "format": "uuid",
-            "title": "Vfolder Id",
+            "title": "Vfolder",
             "type": "string"
           },
           "user_perm": {
@@ -651,7 +651,7 @@
           }
         },
         "required": [
-          "vfolder_id",
+          "vfolder",
           "user_perm"
         ],
         "title": "UpdateSharedRequestModel",
