@@ -715,6 +715,7 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
     def __init__(self) -> None:
         self.cache = {}
         self.mod = sys.modules["ai.backend.manager.models"]
+        self._gql_mod = sys.modules["ai.backend.manager.models.gql_models"]
 
     @staticmethod
     def _get_key(otname: str, args, kwargs) -> int:
@@ -726,6 +727,13 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
             key += item
         return hash(key)
 
+    # TODO: Remove this method and logic to parse `batch_load_` method name
+    def load_attr(self, objtype_name: str) -> Any:
+        try:
+            return getattr(self.mod, objtype_name)
+        except Exception:
+            return getattr(self._gql_mod, objtype_name)
+
     def get_loader(
         self, context: GraphQueryContext, objtype_name: str, *args, **kwargs
     ) -> DataLoader:
@@ -733,7 +741,7 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
         loader = self.cache.get(k)
         if loader is None:
             objtype_name, has_variant, variant_name = objtype_name.partition(".")
-            objtype = getattr(self.mod, objtype_name)
+            objtype = self.load_attr(objtype_name)
             if has_variant:
                 batch_load_fn = getattr(objtype, "batch_load_" + variant_name)
             else:
