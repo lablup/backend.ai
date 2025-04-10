@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from typing import (
-    Any,
+    Final,
     Optional,
 )
 from uuid import UUID
+
+DEFAULT_METRIC_QUERY_TIMEWINDOW: Final[str] = "1m"
 
 
 @dataclass
@@ -44,39 +46,16 @@ class ContainerMetricOptionalLabel:
     user_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
 
-    def get_sum_by_for_query(self) -> list[str]:
-        sum_by_values = ["value_type"]
-
-        def _append_if_not_none(value: Any, name: str) -> None:
-            if value is not None:
-                sum_by_values.append(name)
-
-        _append_if_not_none(self.agent_id, "agent_id")
-        _append_if_not_none(self.kernel_id, "kernel_id")
-        _append_if_not_none(self.session_id, "session_id")
-        _append_if_not_none(self.user_id, "user_id")
-        _append_if_not_none(self.project_id, "project_id")
-        return sum_by_values
-
-    def get_label_values_for_query(self, metric_name: str) -> list[str]:
-        label_values: list[str] = [
-            f'container_metric_name="{metric_name}"',
-        ]
-
-        def _append_if_not_none(value: Any, name: str) -> None:
-            if value is not None:
-                label_values.append(f'{name}="{value}"')
-
-        _append_if_not_none(self.value_type, "value_type")
-        _append_if_not_none(self.agent_id, "agent_id")
-        _append_if_not_none(self.kernel_id, "kernel_id")
-        _append_if_not_none(self.session_id, "session_id")
-        _append_if_not_none(self.user_id, "user_id")
-        _append_if_not_none(self.project_id, "project_id")
-        return label_values
-
 
 @dataclass
 class ContainerMetricResult:
     metric: ContainerMetricResponseInfo
     values: list[MetricResultValue]
+
+
+@dataclass(kw_only=True)
+class MetricSpecForQuery:
+    metric_name: str
+    timewindow: str = DEFAULT_METRIC_QUERY_TIMEWINDOW
+    sum_by: Optional[str] = None
+    labels: Optional[str] = None
