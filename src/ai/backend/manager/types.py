@@ -15,7 +15,7 @@ from typing import (
 )
 
 import attr
-from graphql import Undefined, UndefinedType
+from graphql import UndefinedType
 from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -132,9 +132,9 @@ class TriState(Generic[TVal]):
     def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
         if value is None:
             return cls.nullify()
-        if value is Undefined:
+        if isinstance(value, UndefinedType):
             return cls.nop()
-        return cls.update(value)  # type: ignore
+        return cls.update(value)
 
     @classmethod
     def update(cls, value: TVal) -> TriState[TVal]:
@@ -198,11 +198,11 @@ class OptionalState(TriState[TVal]):
 
     @classmethod
     def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> OptionalState[TVal]:
+        if isinstance(value, UndefinedType):
+            return OptionalState.nop()
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")
-        if value is Undefined:
-            return OptionalState.nop()
-        return OptionalState.update(value)  # type: ignore
+        return OptionalState.update(value)
 
     @classmethod
     def nullify(cls) -> OptionalState[TVal]:

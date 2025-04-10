@@ -69,7 +69,7 @@ class DomainService:
         self._db = db
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        data = action.input.fields_to_store()
+        data = action.creator.fields_to_store()
         base_query = sa.insert(domains).values(data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
@@ -77,7 +77,7 @@ class DomainService:
                 "name": "model-store",
                 "description": "Model Store",
                 "is_active": True,
-                "domain_name": action.input.name,
+                "domain_name": action.creator.name,
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
                 "integration_id": None,

@@ -234,7 +234,7 @@ async def test_modify_domain_node(
         TestScenario.success(
             "Create a domain",
             CreateDomainAction(
-                input=DomainCreator(
+                creator=DomainCreator(
                     name="test-create-domain",
                     description="Test domain",
                 ),
@@ -259,7 +259,7 @@ async def test_modify_domain_node(
         TestScenario.success(
             "Create a domain with duplicated name, return none",
             CreateDomainAction(
-                input=DomainCreator(
+                creator=DomainCreator(
                     name="default",
                     description="Test domain",
                 ),
@@ -284,7 +284,7 @@ async def test_create_model_store_after_domain_created(
     processors: DomainProcessors, database_engine
 ) -> None:
     domain_name = "test-create-domain-post-func"
-    action = CreateDomainAction(input=DomainCreator(name=domain_name))
+    action = CreateDomainAction(creator=DomainCreator(name=domain_name))
 
     await processors.create_domain.wait_for_complete(action)
 

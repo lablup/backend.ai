@@ -8,7 +8,7 @@ from ai.backend.manager.services.domain.types import DomainCreator, DomainData
 
 @dataclass
 class CreateDomainAction(DomainAction):
-    input: DomainCreator
+    creator: DomainCreator
 
     @override
     def entity_id(self) -> Optional[str]:

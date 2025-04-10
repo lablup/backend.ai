@@ -631,7 +631,7 @@ class DomainInput(graphene.InputObjectType):
             return value if value is not Undefined else None
 
         return CreateDomainAction(
-            input=DomainCreator(
+            creator=DomainCreator(
                 name=domain_name,
                 description=value_or_none(self.description),
                 is_active=value_or_none(self.is_active),

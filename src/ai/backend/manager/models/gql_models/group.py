@@ -30,7 +30,7 @@ from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
 )
 from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.types import OptionalState
 
 from ..base import (
     BigInt,
@@ -590,13 +590,13 @@ class ModifyGroupInput(graphene.InputObjectType):
                 domain_name=OptionalState[str].from_graphql(
                     self.domain_name,
                 ),
-                description=TriState[str].from_graphql(
+                description=OptionalState[str].from_graphql(
                     self.description,
                 ),
                 is_active=OptionalState[bool].from_graphql(
                     self.is_active,
                 ),
-                total_resource_slots=TriState[ResourceSlot].from_graphql(
+                total_resource_slots=OptionalState[ResourceSlot].from_graphql(
                     None
                     if self.total_resource_slots is Undefined
                     else ResourceSlot.from_user_input(self.total_resource_slots, None),
@@ -610,7 +610,7 @@ class ModifyGroupInput(graphene.InputObjectType):
                 allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
                     self.allowed_vfolder_hosts,
                 ),
-                integration_id=TriState[str].from_graphql(
+                integration_id=OptionalState[str].from_graphql(
                     self.integration_id,
                 ),
                 resource_policy=OptionalState[str].from_graphql(
