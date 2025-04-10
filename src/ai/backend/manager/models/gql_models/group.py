@@ -590,7 +590,7 @@ class ModifyGroupInput(graphene.InputObjectType):
                 domain_name=OptionalState[str].from_graphql(
                     self.domain_name,
                 ),
-                description=OptionalState[str].from_graphql(
+                description=TriState[str].from_graphql(
                     self.description,
                 ),
                 is_active=OptionalState[bool].from_graphql(

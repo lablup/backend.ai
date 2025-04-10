@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.types import Creator, PartialModifier, TriState
+from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -25,8 +25,10 @@ class ResourcePresetCreator(Creator):
 
 @dataclass
 class ResourcePresetModifier(PartialModifier):
-    resource_slots: TriState[ResourceSlot] = field(default_factory=TriState[ResourceSlot].nop)
-    name: TriState[str] = field(default_factory=TriState[str].nop)
+    resource_slots: OptionalState[ResourceSlot] = field(
+        default_factory=OptionalState[ResourceSlot].nop
+    )
+    name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     shared_memory: TriState[BinarySize] = field(default_factory=TriState[BinarySize].nop)
     scaling_group_name: TriState[str] = field(default_factory=TriState[str].nop)
 

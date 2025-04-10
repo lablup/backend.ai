@@ -19,7 +19,7 @@ from ai.backend.manager.services.resource_preset.types import (
     ResourcePresetCreator,
     ResourcePresetModifier,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
     BigInt,
@@ -199,8 +199,8 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
         )
 
         return ResourcePresetModifier(
-            resource_slots=TriState[ResourceSlot].from_graphql(resource_slots),
-            name=TriState[str].from_graphql(self.name),
+            resource_slots=OptionalState[ResourceSlot].from_graphql(resource_slots),
+            name=OptionalState[str].from_graphql(self.name),
             shared_memory=TriState[BinarySize].from_graphql(
                 BinarySize.finite_from_str(self.shared_memory)
                 if self.shared_memory is not Undefined and self.shared_memory is not None

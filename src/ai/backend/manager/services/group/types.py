@@ -78,8 +78,8 @@ class GroupData:
 @dataclass
 class GroupModifier(PartialModifier):
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    description: OptionalState[str] = field(
-        default_factory=OptionalState.nop,
+    description: TriState[str] = field(
+        default_factory=TriState[str].nop,
     )
     is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     domain_name: OptionalState[str] = field(
