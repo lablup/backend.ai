@@ -57,8 +57,8 @@ from ai.backend.manager.services.image.actions.forget_image import (
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import (
+    ImageModifier,
     ModifyImageAction,
-    ModifyImageInputData,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
@@ -71,8 +71,10 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
 )
 from ai.backend.manager.services.image.types import ImageRefData
+from ai.backend.manager.types import OptionalState, TriState
 
 from ...api.exceptions import ImageNotFound
+from ...data.image.types import ImageStatus, ImageType
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
@@ -85,8 +87,6 @@ from ..image import (
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
-    ImageStatus,
-    ImageType,
     get_permission_ctx,
 )
 from ..rbac import ScopeType
@@ -99,8 +99,6 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     extract_object_uuid,
-    to_optional_state,
-    to_tri_state,
 )
 
 if TYPE_CHECKING:
@@ -1084,7 +1082,7 @@ class ModifyImageInput(graphene.InputObjectType):
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
-    def to_dataclass(self) -> ModifyImageInputData:
+    def to_modifier(self) -> ImageModifier:
         resources_data: dict[str, Any] | UndefinedType = Undefined
         if self.resource_limits is not Undefined:
             resources_data = {}
@@ -1102,23 +1100,23 @@ class ModifyImageInput(graphene.InputObjectType):
             else None
         )
 
-        return ModifyImageInputData(
-            name=to_optional_state("name", self.name),
-            registry=to_optional_state("registry", self.registry),
-            image=to_optional_state("image", self.image),
-            tag=to_optional_state("tag", self.tag),
-            architecture=to_optional_state("architecture", self.architecture),
-            is_local=to_optional_state("is_local", self.is_local),
-            size_bytes=to_optional_state("size_bytes", self.size_bytes),
-            type=to_optional_state("type", self.type),
-            config_digest=to_optional_state("config_digest", self.digest),
-            labels=to_optional_state("labels", {label.key: label.value for label in self.labels}),
-            accelerators=to_tri_state(
-                "accelerators",
+        return ImageModifier(
+            name=OptionalState[str].from_graphql(self.name),
+            registry=OptionalState[str].from_graphql(self.registry),
+            image=OptionalState[str].from_graphql(self.image),
+            tag=OptionalState[str].from_graphql(self.tag),
+            architecture=OptionalState[str].from_graphql(self.architecture),
+            is_local=OptionalState[bool].from_graphql(self.is_local),
+            size_bytes=OptionalState[int].from_graphql(self.size_bytes),
+            type=OptionalState[ImageType].from_graphql(self.type),
+            config_digest=OptionalState[str].from_graphql(self.digest),
+            labels=OptionalState[dict[str, Any]].from_graphql({
+                label.key: label.value for label in self.labels
+            }),
+            accelerators=TriState[str].from_graphql(
                 accelerators,
             ),
-            resources=to_optional_state(
-                "resources",
+            resources=OptionalState[dict[str, Any]].from_graphql(
                 resources_data,
             ),
         )
@@ -1150,7 +1148,7 @@ class ModifyImage(graphene.Mutation):
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                props=props.to_dataclass(),
+                modifier=props.to_modifier(),
             )
         )
 

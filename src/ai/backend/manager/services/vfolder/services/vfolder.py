@@ -400,7 +400,7 @@ class VFolderService:
     async def update_attribute(
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
-        update_input = action.input
+        modifier = action.modifier
         allowed_vfolder_types = await self._shared_config.get_vfolder_types()
 
         async def _update(db_session: AsyncSession) -> None:
@@ -422,7 +422,7 @@ class VFolderService:
             vfolder_row = await db_session.scalar(query_vfolder)
             vfolder_row = cast(VFolderRow, vfolder_row)
             try:
-                new_name = update_input.name.value()
+                new_name = modifier.name.value()
             except ValueError:
                 pass
             else:
@@ -431,8 +431,9 @@ class VFolderService:
                         raise InvalidParameter(
                             "One of your accessible vfolders already has the name you requested."
                         )
-
-            update_input.set_attr(vfolder_row)
+            to_update = modifier.fields_to_update()
+            for key, value in to_update.items():
+                setattr(vfolder_row, key, value)
 
         async with self._db.connect() as db_conn:
             await execute_with_txn_retry(_update, self._db.begin_session, db_conn)

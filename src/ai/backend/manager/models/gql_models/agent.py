@@ -49,9 +49,9 @@ from ..base import (
     set_if_set,
     simple_db_mutate,
 )
+from ..gql_models.kernel import ComputeContainer, KernelStatus
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import AssocGroupUserRow
-from ..kernel import ComputeContainer, KernelStatus
 from ..keypair import keypairs
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -74,6 +74,11 @@ __all__ = (
     "Agent",
     "AgentNode",
     "AgentConnection",
+    "AgentSummary",
+    "AgentList",
+    "AgentSummaryList",
+    "ModifyAgent",
+    "ModifyAgentInput",
 )
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {

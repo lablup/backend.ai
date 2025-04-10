@@ -22,10 +22,10 @@ from ..actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
-from ..services.base import VFolderService
+from ..services.vfolder import VFolderService
 
 
-class VFolderBaseProcessors:
+class VFolderProcessors:
     create_vfolder: ActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: ActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ActionProcessor[ListVFolderAction, ListVFolderActionResult]

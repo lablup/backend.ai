@@ -2,24 +2,23 @@ from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.users.actions.base import UserAction
+from ai.backend.manager.services.user.actions.base import UserAction
 
 
+# TODO: Batch action으로 만든 후 entity_id엔 모든 user_id를 넣어야 함.
 @dataclass
-class UserMonthStatsAction(UserAction):
-    user_id: str
-
+class AdminMonthStatsAction(UserAction):
     @override
     def entity_id(self) -> Optional[str]:
-        return self.user_id
+        return None
 
     @override
     def operation_type(self):
-        return "user_month_stats"
+        return "admin_month_stats"
 
 
 @dataclass
-class UserMonthStatsActionResult(BaseActionResult):
+class AdminMonthStatsActionResult(BaseActionResult):
     stats: list[Any]
 
     @override

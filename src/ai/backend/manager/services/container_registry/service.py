@@ -2,7 +2,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageRow, ImageStatus
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
@@ -24,6 +24,8 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesAction,
     RescanImagesActionResult,
 )
+
+from ...data.image.types import ImageStatus
 
 
 class ContainerRegistryService:

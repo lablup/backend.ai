@@ -12,6 +12,7 @@ from ai.backend.common.metrics.types import (
     UTILIZATION_METRIC_INTERVAL,
 )
 from ai.backend.common.types import HostPortPair
+from ai.backend.manager.config import SharedConfig
 
 from .actions.container import (
     ContainerMetricAction,
@@ -72,7 +73,9 @@ class MetricResponse(TypedDict):
 class MetricService:
     _metric_query_endpoint: yarl.URL
 
-    def __init__(self, metric_query_addr: HostPortPair) -> None:
+    def __init__(self, shared_config: SharedConfig) -> None:
+        metric_config = shared_config.data["metric"]
+        metric_query_addr: HostPortPair = metric_config["address"]
         self._metric_query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:

@@ -40,6 +40,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import (
+    ImageLabelsData,
+    ImageResourcesData,
+    ImageStatus,
+    ImageType,
+)
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
@@ -296,22 +302,11 @@ async def rescan_images(
     # TODO: delete images removed from registry?
 
 
-class ImageType(enum.Enum):
-    COMPUTE = "compute"
-    SYSTEM = "system"
-    SERVICE = "service"
-
-
 # Defined for avoiding circular import
 def _get_image_endpoint_join_condition():
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return ImageRow.id == foreign(EndpointRow.image)
-
-
-class ImageStatus(enum.StrEnum):
-    ALIVE = "ALIVE"
-    DELETED = "DELETED"
 
 
 class ImageRow(Base):
@@ -775,11 +770,7 @@ class ImageRow(Base):
         return self.customized and self.labels["ai.backend.customized-image.owner"] == str(user_id)
 
     def to_dataclass(self) -> ImageData:
-        from ai.backend.manager.data.image.types import (
-            ImageData,
-            ImageLabelsData,
-            ImageResourcesData,
-        )
+        from ai.backend.manager.data.image.types import ImageData
 
         return ImageData(
             id=self.id,
@@ -884,10 +875,6 @@ class ImageAliasRow(Base):
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
     def to_dataclass(self) -> ImageAliasData:
-        from ai.backend.manager.data.image.types import (
-            ImageAliasData,
-        )
-
         return ImageAliasData(id=self.id, alias=self.alias)
 
 
