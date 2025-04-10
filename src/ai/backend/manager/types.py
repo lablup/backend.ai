@@ -97,7 +97,7 @@ class PartialModifier(ABC):
         pass
 
 
-class TriStateEnum(enum.Enum):
+class _TriStateEnum(enum.Enum):
     UPDATE = "update"
     NULLIFY = "nullify"
     NOP = "nop"
@@ -117,10 +117,10 @@ class TriState(Generic[TVal]):
     - NOP: No operation should be performed on the attribute.
     """
 
-    _state: TriStateEnum
+    _state: _TriStateEnum
     _value: Optional[TVal]
 
-    def __init__(self, state: TriStateEnum, value: Optional[TVal]):
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
         """
         Initialize a TriState object with the given state and value.
         Do not call this constructor directly. Use the class methods instead.
@@ -138,22 +138,22 @@ class TriState(Generic[TVal]):
 
     @classmethod
     def update(cls, value: TVal) -> TriState[TVal]:
-        return cls(state=TriStateEnum.UPDATE, value=value)
+        return cls(state=_TriStateEnum.UPDATE, value=value)
 
     @classmethod
     def nullify(cls) -> TriState[TVal]:
-        return cls(state=TriStateEnum.NULLIFY, value=None)
+        return cls(state=_TriStateEnum.NULLIFY, value=None)
 
     @classmethod
     def nop(cls) -> TriState[TVal]:
-        return cls(state=TriStateEnum.NOP, value=None)
+        return cls(state=_TriStateEnum.NOP, value=None)
 
     def value(self) -> TVal:
         """
         Returns the value of the TriState object.
         It should only be used when the state value is unambiguously UPDATE.
         """
-        if self._state != TriStateEnum.UPDATE:
+        if self._state != _TriStateEnum.UPDATE:
             raise ValueError("Not allowed to get value when state is not UPDATE")
         if self._value is None:
             raise ValueError("TriState value is not set when state is UPDATE")
@@ -166,17 +166,17 @@ class TriState(Generic[TVal]):
         This is useful for cases where you want to check if the state is UPDATE
         and get the value, or if it is NULLIFY or NOP and get None.
         """
-        if self._state == TriStateEnum.UPDATE:
+        if self._state == _TriStateEnum.UPDATE:
             return self._value
         return None
 
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:
-            case TriStateEnum.UPDATE:
+            case _TriStateEnum.UPDATE:
                 dict[attr_name] = self._value
-            case TriStateEnum.NULLIFY:
+            case _TriStateEnum.NULLIFY:
                 dict[attr_name] = None
-            case TriStateEnum.NOP:
+            case _TriStateEnum.NOP:
                 pass
 
 
@@ -190,8 +190,8 @@ class OptionalState(TriState[TVal]):
     This class is similar to TriState, but it cannot be in the NULLIFY state.
     """
 
-    def __init__(self, state: TriStateEnum, value: Optional[TVal]):
-        if state == TriStateEnum.NULLIFY:
+    def __init__(self, state: _TriStateEnum, value: Optional[TVal]):
+        if state == _TriStateEnum.NULLIFY:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state
         self._value = value
@@ -210,8 +210,8 @@ class OptionalState(TriState[TVal]):
 
     @classmethod
     def update(cls, value: TVal) -> OptionalState[TVal]:
-        return cls(state=TriStateEnum.UPDATE, value=value)
+        return cls(state=_TriStateEnum.UPDATE, value=value)
 
     @classmethod
     def nop(cls) -> OptionalState[TVal]:
-        return cls(state=TriStateEnum.NOP, value=None)
+        return cls(state=_TriStateEnum.NOP, value=None)
