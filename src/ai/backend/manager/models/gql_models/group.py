@@ -581,9 +581,6 @@ class ModifyGroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
-        def value_or_none(value):
-            return value if value is not Undefined else None
-
         return ModifyGroupAction(
             group_id=group_id,
             modifier=GroupModifier(

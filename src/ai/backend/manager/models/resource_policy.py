@@ -34,7 +34,7 @@ if TYPE_CHECKING:
         ProjectResourcePolicyModifier,
     )
     from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
-        CreateUserResourcePolicyInputData,
+        UserResourcePolicyCreator,
     )
     from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
         UserResourcePolicyModifier,
@@ -421,11 +421,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_dataclass(self, name: str) -> KeyPairResourcePolicyCreator:
-        from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
-            KeyPairResourcePolicyCreator,
-        )
-
+    def to_creator(self, name: str) -> KeyPairResourcePolicyCreator:
         default_for_unspecified = DefaultForUnspecified[self.default_for_unspecified]
         total_resource_slots = ResourceSlot.from_user_input(self.total_resource_slots, None)
 
@@ -471,11 +467,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_dataclass(self) -> KeyPairResourcePolicyModifier:
-        from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-            KeyPairResourcePolicyModifier,
-        )
-
+    def to_modifier(self) -> KeyPairResourcePolicyModifier:
         default_for_unspecified = (
             DefaultForUnspecified[self.default_for_unspecified]
             if self.default_for_unspecified
@@ -536,7 +528,7 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         await graph_ctx.processors.keypair_resource_policy.create_keypair_resource_policy.wait_for_complete(
-            CreateKeyPairResourcePolicyAction(props.to_dataclass(name))
+            CreateKeyPairResourcePolicyAction(props.to_creator(name))
         )
 
         return CreateKeyPairResourcePolicy(
@@ -569,7 +561,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.wait_for_complete(
-            ModifyKeyPairResourcePolicyAction(name, props.to_dataclass())
+            ModifyKeyPairResourcePolicyAction(name, props.to_modifier())
         )
 
         return ModifyKeyPairResourcePolicy(
@@ -712,15 +704,12 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_dataclass(self) -> CreateUserResourcePolicyInputData:
-        from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
-            CreateUserResourcePolicyInputData,
-        )
-
+    def to_creator(self, name: str) -> UserResourcePolicyCreator:
         def value_or_none(value):
             return value if value is not Undefined else None
 
-        return CreateUserResourcePolicyInputData(
+        return UserResourcePolicyCreator(
+            name=name,
             max_vfolder_count=value_or_none(self.max_vfolder_count),
             max_quota_scope_size=value_or_none(self.max_quota_scope_size),
             max_session_count_per_model_session=value_or_none(
@@ -745,11 +734,7 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_dataclass(self) -> UserResourcePolicyModifier:
-        from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-            UserResourcePolicyModifier,
-        )
-
+    def to_modifier(self) -> UserResourcePolicyModifier:
         return UserResourcePolicyModifier(
             max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
             max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
@@ -788,7 +773,7 @@ class CreateUserResourcePolicy(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         await (
             graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
-                CreateUserResourcePolicyAction(name, props.to_dataclass())
+                CreateUserResourcePolicyAction(props.to_creator(name))
             )
         )
 
@@ -823,7 +808,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         await (
             graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
-                ModifyUserResourcePolicyAction(name, props.to_dataclass())
+                ModifyUserResourcePolicyAction(name, props.to_modifier())
             )
         )
 
@@ -994,11 +979,7 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_dataclass(self) -> ProjectResourcePolicyModifier:
-        from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-            ProjectResourcePolicyModifier,
-        )
-
+    def to_modifier(self) -> ProjectResourcePolicyModifier:
         return ProjectResourcePolicyModifier(
             max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
             max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
@@ -1065,7 +1046,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
 
         graph_ctx: GraphQueryContext = info.context
         await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
-            ModifyProjectResourcePolicyAction(name, props.to_dataclass())
+            ModifyProjectResourcePolicyAction(name, props.to_modifier())
         )
 
         return ModifyProjectResourcePolicy(

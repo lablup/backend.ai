@@ -969,7 +969,7 @@ class RenameRequestModel(BaseModel):
         description="Name of the vfolder",
     )
 
-    def to_input(self) -> VFolderAttributeModifier:
+    def to_modifier(self) -> VFolderAttributeModifier:
         return VFolderAttributeModifier(
             name=TriState.update(self.new_name),
         )
@@ -1000,7 +1000,7 @@ async def rename_vfolder(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            modifier=params.to_input(),
+            modifier=params.to_modifier(),
         )
     )
     return web.Response(status=HTTPStatus.CREATED)

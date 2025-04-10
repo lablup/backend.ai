@@ -40,6 +40,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageLabelsData, ImageResourcesData
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
@@ -775,12 +776,6 @@ class ImageRow(Base):
         return self.customized and self.labels["ai.backend.customized-image.owner"] == str(user_id)
 
     def to_dataclass(self) -> ImageData:
-        from ai.backend.manager.data.image.types import (
-            ImageData,
-            ImageLabelsData,
-            ImageResourcesData,
-        )
-
         return ImageData(
             id=self.id,
             name=self.name,
@@ -884,10 +879,6 @@ class ImageAliasRow(Base):
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
     def to_dataclass(self) -> ImageAliasData:
-        from ai.backend.manager.data.image.types import (
-            ImageAliasData,
-        )
-
         return ImageAliasData(id=self.id, alias=self.alias)
 
 

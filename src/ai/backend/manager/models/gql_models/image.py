@@ -1083,7 +1083,7 @@ class ModifyImageInput(graphene.InputObjectType):
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
-    def to_dataclass(self) -> ImageModifier:
+    def to_modifier(self) -> ImageModifier:
         resources_data: dict[str, Any] | UndefinedType = Undefined
         if self.resource_limits is not Undefined:
             resources_data = {}
@@ -1149,7 +1149,7 @@ class ModifyImage(graphene.Mutation):
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                modifier=props.to_dataclass(),
+                modifier=props.to_modifier(),
             )
         )
 

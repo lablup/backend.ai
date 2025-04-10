@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 
 import sqlalchemy as sa
@@ -37,15 +36,11 @@ class UserResourcePolicyService:
     async def create_user_resource_policy(
         self, action: CreateUserResourcePolicyAction
     ) -> CreateUserResourcePolicyActionResult:
-        name = action.name
-        props = action.props
-        dict_props = dataclasses.asdict(props)
-        dict_props["name"] = name
-        # Ignore deprecated fields
-        del dict_props["max_vfolder_size"]
+        creator = action.creator
+        to_create = creator.fields_to_store()
 
         async with self._db.begin_session() as db_sess:
-            db_row = UserResourcePolicyRow(**dict_props)
+            db_row = UserResourcePolicyRow(**to_create)
             db_sess.add(db_row)
             await db_sess.flush()
             result = db_row.to_dataclass()

@@ -447,12 +447,6 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
-        def value_or_none(value):
-            return value if value is not graphql.Undefined else None
-
-        def convert_to_set(value) -> Optional[set[str]]:
-            return set(value) if value is not graphql.Undefined else None
-
         return ModifyDomainNodeAction(
             name=name,
             user_info=user_info,
@@ -479,8 +473,10 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
                     self.dotfiles,
                 ),
             ),
-            sgroups_to_add=self.sgroups_to_add if self.sgroups_to_add is not Undefined else None,
-            sgroups_to_remove=self.sgroups_to_remove
+            sgroups_to_add=set(self.sgroups_to_add)
+            if self.sgroups_to_add is not Undefined
+            else None,
+            sgroups_to_remove=set(self.sgroups_to_remove)
             if self.sgroups_to_remove is not Undefined
             else None,
         )
@@ -666,9 +662,6 @@ class ModifyDomainInput(graphene.InputObjectType):
         return field_value
 
     def to_action(self, domain_name: str) -> ModifyDomainAction:
-        def value_or_none(value):
-            return value if value is not Undefined else None
-
         return ModifyDomainAction(
             domain_name=domain_name,
             modifier=DomainModifier(
