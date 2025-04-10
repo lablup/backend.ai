@@ -437,8 +437,8 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     audit_logger = AuditLogger(root_ctx.db)
-    audit_logger.start()
     audit_log_manager = AuditLogManager(audit_logger)
+    audit_log_manager.start()
 
     root_ctx.processors = Processors.create(
         ProcessorArgs(
