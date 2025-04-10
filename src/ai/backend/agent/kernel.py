@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import codecs
 import io
-import json
 import logging
 import math
 import os
@@ -45,6 +44,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
 )
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -740,7 +740,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             "type": evdata.type,
             "data": evdata.data,
         }
-        await sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
+        await sock.send_multipart([b"event", dump_json(data)])
 
     async def feed_interrupt(self):
         sock = await self._get_socket_pair()
@@ -764,12 +764,12 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         payload.update(opts)
         await sock.send_multipart([
             b"complete",
-            json.dumps(payload).encode("utf8"),
+            dump_json(payload),
         ])
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
-            return json.loads(result)
+            return load_json(result)
         except asyncio.CancelledError:
             return []
 
@@ -777,7 +777,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-model-service",
-            json.dumps(model_info).encode("utf8"),
+            dump_json(model_info),
         ])
         if health_check_info := model_info.get("service", {}).get("health_check"):
             timeout_seconds = (
@@ -789,7 +789,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             async with timeout(timeout_seconds):
                 result = await self.model_service_queue.get()
             self.model_service_queue.task_done()
-            return json.loads(result)
+            return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
@@ -799,13 +799,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
-            json.dumps(service_info).encode("utf8"),
+            dump_json(service_info),
         ])
         try:
             with timeout(10):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
-            return json.loads(result)
+            return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
@@ -815,7 +815,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"shutdown-service",
-            json.dumps(service_name).encode("utf8"),
+            dump_json(service_name),
         ])
 
     async def feed_service_apps(self):
@@ -828,7 +828,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
-            return json.loads(result)
+            return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
@@ -859,7 +859,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 elif rec.msg_type == "stderr":
                     stderr_items.append(rec.data or "")
                 elif rec.msg_type == "media" and rec.data is not None:
-                    o = json.loads(rec.data)
+                    o = load_json(rec.data)
                     media_items.append((o["type"], o["data"]))
                 elif rec.msg_type == "html":
                     html_items.append(rec.data)
@@ -889,7 +889,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 elif rec.msg_type == "stderr":
                     last_stderr.write(rec.data or "")
                 elif rec.msg_type == "media" and rec.data is not None:
-                    o = json.loads(rec.data)
+                    o = load_json(rec.data)
                     console_items.append(("media", (o["type"], o["data"])))
                 elif rec.msg_type in outgoing_msg_types:
                     # FIXME: currently mypy cannot handle dynamic specialization of literals.
@@ -921,16 +921,16 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         records.append(rec)
                     self.output_queue.task_done()
                     if rec.msg_type == "finished":
-                        data = json.loads(rec.data) if rec.data else {}
+                        data = load_json(rec.data) if rec.data else {}
                         raise RunFinished(data)
                     elif rec.msg_type == "clean-finished":
-                        data = json.loads(rec.data) if rec.data else {}
+                        data = load_json(rec.data) if rec.data else {}
                         raise CleanFinished(data)
                     elif rec.msg_type == "build-finished":
-                        data = json.loads(rec.data) if rec.data else {}
+                        data = load_json(rec.data) if rec.data else {}
                         raise BuildFinished(data)
                     elif rec.msg_type == "waiting-input":
-                        opts = json.loads(rec.data) if rec.data else {}
+                        opts = load_json(rec.data) if rec.data else {}
                         raise InputRequestPending(opts)
                     elif rec.msg_type == "exec-timeout":
                         raise ExecTimeout
@@ -1083,7 +1083,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         case b"model-service-result":
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
-                            response = json.loads(msg_data)
+                            response = load_json(msg_data)
                             event = ModelServiceStatusEvent(
                                 self.kernel_id,
                                 self.session_id,

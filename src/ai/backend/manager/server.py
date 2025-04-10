@@ -59,6 +59,7 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -76,6 +77,43 @@ from ai.backend.manager.service.container_registry.base import PerProjectRegistr
 from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
+)
+from ai.backend.manager.services.agent.processors import AgentProcessors
+from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.groups.processors import GroupProcessors
+from ai.backend.manager.services.groups.service import GroupService
+from ai.backend.manager.services.image.processors import ImageProcessors
+from ai.backend.manager.services.image.service import ImageService
+from ai.backend.manager.services.keypair_resource_policy.processors import (
+    KeypairResourcePolicyProcessors,
+)
+from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project_resource_policy.processors import (
+    ProjectResourcePolicyProcessors,
+)
+from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
+from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
+from ai.backend.manager.services.resource_preset.service import ResourcePresetService
+from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.service import SessionService
+from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
+from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
+from ai.backend.manager.services.users.processors import UserProcessors
+from ai.backend.manager.services.users.service import UserService
+from ai.backend.manager.services.vfolder.processors import (
+    VFolderBaseProcessors,
+    VFolderFileProcessors,
+    VFolderInviteProcessors,
+)
+from ai.backend.manager.services.vfolder.services import (
+    VFolderFileService,
+    VFolderInviteService,
+    VFolderService,
 )
 
 from . import __version__
@@ -433,15 +471,106 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # image_service = ImageService(
-    #     db=root_ctx.db,
-    #     agent_registry=root_ctx.registry,
-    # )
+    agent_service = AgentService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+        shared_config=root_ctx.shared_config,
+    )
+    agent_processor = AgentProcessors(agent_service)
 
-    # root_ctx.processors = Processors(
-    #     image_service=image_service,
-    # )
+    user_service = UserService(
+        db=root_ctx.db,
+        storage_manager=root_ctx.storage_manager,
+        redis_stat=root_ctx.redis_stat,
+    )
+    user_processor = UserProcessors(user_service)
+    domain_service = DomainService(root_ctx.db)
+    domain_processor = DomainProcessors(domain_service)
 
+    image_service = ImageService(root_ctx.db, root_ctx.registry)
+    image_processor = ImageProcessors(image_service)
+
+    container_registry_service = ContainerRegistryService(
+        db=root_ctx.db,
+    )
+    container_registry_processor = ContainerRegistryProcessors(container_registry_service)
+
+    vfolder_service = VFolderService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        storage_manager=root_ctx.storage_manager,
+        background_task_manager=root_ctx.background_task_manager,
+    )
+    vfolder_processor = VFolderBaseProcessors(vfolder_service)
+
+    vfolder_invite_service = VFolderInviteService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+    )
+    vfolder_invite_processor = VFolderInviteProcessors(vfolder_invite_service)
+
+    vfolder_file_service = VFolderFileService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        storage_manager=root_ctx.storage_manager,
+    )
+    vfolder_file_processor = VFolderFileProcessors(vfolder_file_service)
+
+    group_service = GroupService(
+        db=root_ctx.db,
+        storage_manager=root_ctx.storage_manager,
+        shared_config=root_ctx.shared_config,
+        redis_stat=root_ctx.redis_stat,
+    )
+    group_processor = GroupProcessors(group_service)
+
+    session_service = SessionService(
+        db=root_ctx.db,
+        agent_registry=root_ctx.registry,
+        redis_live=root_ctx.redis_live,
+        local_config=root_ctx.local_config,
+        stats_monitor=root_ctx.stats_monitor,
+        event_producer=root_ctx.event_producer,
+        background_task_manager=root_ctx.background_task_manager,
+        error_monitor=root_ctx.error_monitor,
+        idle_checker_host=root_ctx.idle_checker_host,
+    )
+    session_processor = SessionProcessors(session_service)
+
+    keypair_resource_policy_service = KeypairResourcePolicyService(db=root_ctx.db)
+    keypair_resource_policy_processor = KeypairResourcePolicyProcessors(
+        keypair_resource_policy_service
+    )
+    project_resource_policy_service = ProjectResourcePolicyService(db=root_ctx.db)
+    project_resource_policy_processors = ProjectResourcePolicyProcessors(
+        project_resource_policy_service
+    )
+    user_resource_policy_service = UserResourcePolicyService(db=root_ctx.db)
+    user_resource_policy_processors = UserResourcePolicyProcessors(user_resource_policy_service)
+
+    resource_preset_service = ResourcePresetService(
+        db=root_ctx.db,
+        shared_config=root_ctx.shared_config,
+        agent_registry=root_ctx.registry,
+    )
+    resource_preset_processors = ResourcePresetProcessors(resource_preset_service)
+
+    root_ctx.processors = Processors(
+        agent=agent_processor,
+        domain=domain_processor,
+        group=group_processor,
+        user=user_processor,
+        image=image_processor,
+        container_registry=container_registry_processor,
+        vfolder=vfolder_processor,
+        vfolder_invite=vfolder_invite_processor,
+        vfolder_file=vfolder_file_processor,
+        session=session_processor,
+        keypair_resource_policy=keypair_resource_policy_processor,
+        user_resource_policy=user_resource_policy_processors,
+        project_resource_policy=project_resource_policy_processors,
+        resource_preset=resource_preset_processors,
+    )
     yield
 
 
@@ -790,6 +919,7 @@ def build_root_app(
     root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
     app = web.Application(
         middlewares=[
+            request_id_middleware,
             exception_middleware,
             api_middleware,
             build_api_metric_middleware(root_ctx.metrics.api),
@@ -840,11 +970,11 @@ def build_root_app(
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
-            processors_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
+            processors_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:

@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Annotated, Protocol
+from collections import UserDict
+from dataclasses import dataclass, fields
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Generic,
+    Optional,
+    Protocol,
+    TypeVar,
+)
 
 import attr
 from pydantic import AliasChoices, BaseModel, Field
@@ -34,6 +44,9 @@ class Sentinel(enum.Enum):
     token = 0
 
 
+_SENTINEL = Sentinel.token
+
+
 @attr.define(slots=True)
 class UserScope:
     domain_name: str
@@ -56,3 +69,131 @@ class MountOptionModel(BaseModel):
         MountPermission | None,
         Field(validation_alias=AliasChoices("permission", "perm"), default=None),
     ]
+
+
+class State(enum.Enum):
+    UPDATE = "update"
+    NULLIFY = "nullify"
+    NOP = "nop"
+
+
+TVal = TypeVar("TVal")
+
+
+@dataclass
+class TriState(Generic[TVal]):
+    _attr_name: str
+    _state: State
+    _value: Optional[TVal]
+
+    def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
+        self._attr_name = attr_name
+        self._state = state
+        self._value = value
+
+    @classmethod
+    def update(cls, attr_name: str, value: TVal) -> TriState[TVal]:
+        return cls(attr_name, state=State.UPDATE, value=value)
+
+    @classmethod
+    def nullify(cls, attr_name: str) -> TriState[TVal]:
+        return cls(attr_name, state=State.NULLIFY, value=None)
+
+    @classmethod
+    def nop(cls, attr_name: str) -> TriState[TVal]:
+        return cls(attr_name, state=State.NOP, value=None)
+
+    def value(self) -> Optional[TVal]:
+        if self._state == State.UPDATE:
+            return self._value
+        raise ValueError(f"Value is not set for {self._attr_name}")
+
+    def state(self) -> State:
+        return self._state
+
+    def set_attr(self, obj: Any) -> None:
+        match self._state:
+            case State.UPDATE:
+                setattr(obj, self._attr_name, self._value)
+            case State.NULLIFY:
+                setattr(obj, self._attr_name, None)
+            case State.NOP:
+                pass
+
+
+class OptionalState(TriState[TVal]):
+    def __init__(self, attr_name: str, state: State, value: Optional[TVal]):
+        self._attr_name = attr_name
+        if state == State.NULLIFY:
+            raise ValueError("OptionalState cannot be NULLIFY")
+        self._state = state
+        self._value = value
+
+    @classmethod
+    def update(cls, attr_name: str, value: TVal) -> OptionalState[TVal]:
+        return cls(attr_name, state=State.UPDATE, value=value)
+
+    @classmethod
+    def nop(cls, attr_name: str) -> OptionalState[TVal]:
+        return cls(attr_name, state=State.NOP, value=None)
+
+
+class TriStateField(Generic[TVal]):
+    _value: TVal | Sentinel
+
+    def __init__(self, value: TVal | Sentinel = _SENTINEL) -> None:
+        self._value = value
+
+    def value(self) -> TVal:
+        if self._value is not _SENTINEL:
+            return self._value
+        raise ValueError(f"Value is not set for {self.__class__.__name__}")
+
+    def is_valid(self) -> bool:
+        return self._value is not _SENTINEL
+
+
+@dataclass
+class DataclassInput:
+    """
+    Base class for inputs that are dataclasses.
+
+    The classes that inherit from this class should be dataclasses and
+    should have fields that are TriStateField.
+    """
+
+    def _get_fields(self) -> list[tuple[str, TriStateField]]:
+        return [(field_meta.name, getattr(self, field_meta.name)) for field_meta in fields(self)]
+
+    def set_attr(self, obj: Any) -> None:
+        for field_name, value in self._get_fields():
+            if value.is_valid():
+                setattr(obj, field_name, value.value())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            field_name: value.value()
+            for field_name, value in self._get_fields()
+            if value.is_valid()
+        }
+
+
+class DictInput(UserDict[str, TriStateField]):
+    """
+    Base class for inputs that are UserDict.
+    """
+
+    def _get_fields(self) -> list[tuple[str, TriStateField]]:
+        return [(k, v) for k, v in self.data.items()]
+
+    def set_attr(self, obj: Any) -> None:
+        for field_name, value in self._get_fields():
+            if value.is_valid():
+                setattr(obj, field_name, value.value())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            field_name: value.value()
+            for field_name, value in self._get_fields()
+            if value.is_valid()
+        }

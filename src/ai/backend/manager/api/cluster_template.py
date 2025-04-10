@@ -10,6 +10,7 @@ import yaml
 from aiohttp import web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import (
@@ -143,7 +144,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         log.debug("Params: {0}", params)
         try:
-            body = json.loads(params["payload"])
+            body = load_json(params["payload"])
         except json.JSONDecodeError:
             try:
                 body = yaml.safe_load(params["payload"])
@@ -285,7 +286,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
         template = await conn.scalar(query)
         if not template:
             raise TaskTemplateNotFound
-    template = json.loads(template)
+    template = load_json(template)
     if params["format"] == "yaml":
         body = yaml.dump(template)
         return web.Response(text=body, content_type="text/yaml")
@@ -326,7 +327,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
         if not result:
             raise TaskTemplateNotFound
         try:
-            body = json.loads(params["payload"])
+            body = load_json(params["payload"])
         except json.JSONDecodeError:
             body = yaml.safe_load(params["payload"])
         except (yaml.YAMLError, yaml.MarkedYAMLError):

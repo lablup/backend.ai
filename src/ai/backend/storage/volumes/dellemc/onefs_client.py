@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import enum
-import json
 import os
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict, List, NotRequired, Optional, TypedDict, cast
 
 import aiohttp
+
+from ai.backend.common.json import dump_json_str
 
 
 class QuotaTypes(enum.StrEnum):
@@ -52,8 +53,8 @@ class OneFSClient:
         cluster_metadata = await self.get_cluster_metadata()
         node_metadata = await self.get_node_metadata()
         volume_cluster = {
-            "cluster": json.dumps(cluster_metadata),
-            "nodes": json.dumps(node_metadata),
+            "cluster": dump_json_str(cluster_metadata),
+            "nodes": dump_json_str(node_metadata),
         }
         return volume_cluster
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import pickle
@@ -99,6 +98,11 @@ from ai.backend.common.events import (
     VolumeUnmounted,
 )
 from ai.backend.common.exception import VolumeMountFailed
+from ai.backend.common.json import (
+    dump_json,
+    dump_json_str,
+    load_json,
+)
 from ai.backend.common.lock import FileLock
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -142,7 +146,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
     aobject,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop, mount, umount
+from ai.backend.common.utils import (
+    cancel_tasks,
+    current_loop,
+    mount,
+    umount,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
@@ -747,7 +756,7 @@ class AbstractAgent(
                 await pipe.hset(
                     "computer.metadata",
                     metadata["slot_name"],
-                    json.dumps(metadata),
+                    dump_json_str(metadata),
                 )
             return pipe
 
@@ -1598,7 +1607,7 @@ class AbstractAgent(
             async with FileLock(path=dest_path / "report.lock"):
                 for reported_kernel in dest_path.glob("report.*.json"):
                     raw_body = await self.loop.run_in_executor(None, _read, reported_kernel)
-                    body: dict[str, str] = json.loads(raw_body)
+                    body: dict[str, str] = load_json(raw_body)
                     kern_id = body["ID"]
                     if auto_terminate:
                         log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
@@ -1659,7 +1668,7 @@ class AbstractAgent(
                 "report_abusing_kernels",
                 abuse_report_script,
                 [hash_name],
-                [json.dumps(abuse_report)],
+                [dump_json_str(abuse_report)],
             )
 
     @abstractmethod
@@ -2203,7 +2212,7 @@ class AbstractAgent(
                     await self.restart_kernel__store_config(
                         kernel_id,
                         "cluster.json",
-                        json.dumps(cluster_info).encode("utf8"),
+                        dump_json(cluster_info),
                     )
 
                 if self.local_config["debug"]["log-kernel-config"]:
@@ -2655,7 +2664,7 @@ class AbstractAgent(
         existing_kernel_config = pickle.loads(
             await self.restart_kernel__load_config(kernel_id, "kconfig.dat"),
         )
-        existing_cluster_info = json.loads(
+        existing_cluster_info = load_json(
             await self.restart_kernel__load_config(kernel_id, "cluster.json"),
         )
         kernel_config = cast(
