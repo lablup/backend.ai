@@ -7,7 +7,6 @@ aiohttp_jinja2~=1.6
 aiohttp_sse>=2.2
 aiodns>=3.2
 aiomonitor~=0.7.0
-aiosmtplib~=4.0.0
 aioresponses>=0.7.3
 aiosqlite~=0.20.0
 aiotools~=1.8.2
