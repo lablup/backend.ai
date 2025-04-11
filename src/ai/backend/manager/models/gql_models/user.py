@@ -817,9 +817,6 @@ class ModifyUserInput(graphene.InputObjectType):
                 role=OptionalState[UserRole].from_graphql(
                     UserRole(self.role) if self.role is not Undefined else None,
                 ),
-                group_ids=OptionalState[list[str]].from_graphql(
-                    self.group_ids,
-                ),
                 allowed_client_ip=TriState[list[str]].from_graphql(
                     self.allowed_client_ip,
                 ),
@@ -844,6 +841,9 @@ class ModifyUserInput(graphene.InputObjectType):
                 container_gids=TriState[list[int]].from_graphql(
                     self.container_gids,
                 ),
+            ),
+            group_ids=OptionalState[list[str]].from_graphql(
+                self.group_ids,
             ),
         )
 
