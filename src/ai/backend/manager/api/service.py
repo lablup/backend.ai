@@ -7,7 +7,6 @@ from datetime import datetime
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Iterable,
     Self,
@@ -24,7 +23,6 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     AnyUrl,
-    BaseModel,
     ConfigDict,
     Field,
     HttpUrl,
@@ -38,6 +36,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.events import (
     EventHandler,
@@ -129,7 +128,7 @@ class SuccessResponseModel(LegacyBaseResponseModel):
     success: bool = Field(default=True)
 
 
-class CompactServeInfoModel(BaseModel):
+class CompactServeInfoModel(LegacyBaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     name: str = Field(description="Name of the model service.")
     replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
@@ -194,7 +193,7 @@ async def list_serve(
     ]
 
 
-class RouteInfoModel(BaseModel):
+class RouteInfoModel(BaseFieldModel):
     route_id: uuid.UUID = Field(
         description=(
             "Unique ID referencing endpoint route. Each endpoint route has a one-to-one"
@@ -207,11 +206,10 @@ class RouteInfoModel(BaseModel):
 
 class ServeInfoModel(LegacyBaseResponseModel):
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
-    model_id: Annotated[uuid.UUID, Field(description="ID of model VFolder.")]
-    extra_mounts: Annotated[
-        Sequence[uuid.UUID],
-        Field(description="List of extra VFolders which will be mounted to model service session."),
-    ]
+    model_id: uuid.UUID = Field(description="ID of model VFolder.")
+    extra_mounts: Sequence[uuid.UUID] = Field(
+        description="List of extra VFolders which will be mounted to model service session."
+    )
     name: str = Field(description="Name of the model service.")
     replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
     desired_session_count: NonNegativeInt = Field(description="Deprecated; use `replicas` instead.")
@@ -235,10 +233,9 @@ class ServeInfoModel(LegacyBaseResponseModel):
             " will be no authentication required to communicate with this API service."
         )
     )
-    runtime_variant: Annotated[
-        RuntimeVariant,
-        Field(description="Type of the inference runtime the image will try to load."),
-    ]
+    runtime_variant: RuntimeVariant = Field(
+        description="Type of the inference runtime the image will try to load."
+    )
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -301,16 +298,13 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         alias="modelMountDestination",
     )
 
-    extra_mounts: Annotated[
-        dict[uuid.UUID, MountOptionModel],
-        Field(
-            description=(
-                "Specifications about extra VFolders mounted to model service session. "
-                "MODEL type VFolders are not allowed to be attached to model service session with this option."
-            ),
-            default={},
+    extra_mounts: dict[uuid.UUID, MountOptionModel] = Field(
+        description=(
+            "Specifications about extra VFolders mounted to model service session. "
+            "MODEL type VFolders are not allowed to be attached to model service session with this option."
         ),
-    ]
+        default={},
+    )
 
     environ: dict[str, str] | None = Field(
         description="Environment variables to be set inside the inference session",
@@ -341,13 +335,10 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
         alias="lang",
     )
-    runtime_variant: Annotated[
-        RuntimeVariant,
-        Field(
-            description="Type of the inference runtime the image will try to load.",
-            default=RuntimeVariant.CUSTOM,
-        ),
-    ]
+    runtime_variant: RuntimeVariant = Field(
+        description="Type of the inference runtime the image will try to load.",
+        default=RuntimeVariant.CUSTOM,
+    )
     architecture: str = Field(
         description="Image architecture",
         default=DEFAULT_IMAGE_ARCH,
@@ -648,7 +639,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     )
 
 
-class TryStartResponseModel(BaseModel):
+class TryStartResponseModel(LegacyBaseResponseModel):
     task_id: str
 
 
@@ -1123,7 +1114,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
         return TokenResponseModel(token=token)
 
 
-class ErrorInfoModel(BaseModel):
+class ErrorInfoModel(BaseFieldModel):
     session_id: uuid.UUID | None
     error: dict[str, Any]
 
@@ -1206,14 +1197,12 @@ async def clear_error(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class RuntimeInfo(BaseModel):
-    name: Annotated[str, Field(description="Identifier to be passed later inside request body")]
-    human_readable_name: Annotated[
-        str, Field(description="Use this value as displayed label to user")
-    ]
+class RuntimeInfo(BaseFieldModel):
+    name: str = Field(description="Identifier to be passed later inside request body")
+    human_readable_name: str = Field(description="Use this value as displayed label to user")
 
 
-class RuntimeInfoModel(BaseModel):
+class RuntimeInfoModel(LegacyBaseResponseModel):
     runtimes: list[RuntimeInfo]
 
 

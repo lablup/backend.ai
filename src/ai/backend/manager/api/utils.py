@@ -38,7 +38,7 @@ import trafaret as t
 import yaml
 from aiohttp import web
 from aiohttp.typedefs import Handler
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.json import load_json
@@ -252,13 +252,11 @@ class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
 
 
 def ensure_stream_response_type(
-    response: LegacyBaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
+    response: LegacyBaseResponseModel | list[TResponseModel] | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
         case LegacyBaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
-        case BaseModel():
-            return web.json_response(response.model_dump(mode="json"))
         case list():
             return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
         case web.StreamResponse():

@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
-from pydantic import BaseModel, Field
+from pydantic import Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.container_registry import (
     ContainerRegistryType,
     PatchContainerRegistryRequestModel,
@@ -135,12 +136,12 @@ class HarborWebhookRequestModel(LegacyBaseRequestModel):
         description="Type of the webhook event triggered by Harbor. See Harbor documentation for details."
     )
 
-    class EventData(BaseModel):
-        class Resource(BaseModel):
+    class EventData(BaseFieldModel):
+        class Resource(BaseFieldModel):
             resource_url: str = Field(description="URL of the artifact")
             tag: str = Field(description="Tag of the artifact")
 
-        class Repository(BaseModel):
+        class Repository(BaseFieldModel):
             namespace: str = Field(description="Harbor project (namespace)")
             name: str = Field(description="Name of the repository")
 

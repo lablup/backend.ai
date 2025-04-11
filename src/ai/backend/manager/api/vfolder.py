@@ -12,7 +12,6 @@ from pathlib import Path
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Awaitable,
     Callable,
@@ -36,7 +35,6 @@ import trafaret as t
 from aiohttp import web
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
 )
@@ -45,6 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
+from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.types import (
     RedisConnectionInfo,
     VFolderHostPermission,
@@ -962,7 +961,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
     return web.json_response(usage, status=HTTPStatus.OK)
 
 
-class RenameRequestModel(BaseModel):
+class RenameRequestModel(LegacyBaseRequestModel):
     new_name: tv.VFolderName = Field(
         description="Name of the vfolder",
     )
@@ -2113,43 +2112,31 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     return web.json_response(resp, status=HTTPStatus.OK)
 
 
-class UserPermMapping(BaseModel):
-    user_id: Annotated[
-        uuid.UUID,
-        Field(
-            validation_alias=AliasChoices("user", "user_id", "userID"),
-            description="Target user id to update sharing status.",
+class UserPermMapping(BaseFieldModel):
+    user_id: uuid.UUID = Field(
+        description="Target user id to update sharing status.",
+        validation_alias=AliasChoices("user", "userID"),
+    )
+    perm: VFolderPermission | None = Field(
+        default=None,
+        description=textwrap.dedent(
+            "Permission to update. Delete the sharing between vfolder and user if this value is null. "
+            f"Should be one of {[p.value for p in VFolderPermission]}. "
+            "Default value is null."
         ),
-    ]
-    perm: Annotated[
-        VFolderPermission | None,
-        Field(
-            validation_alias=AliasChoices("perm", "permission"),
-            default=None,
-            description=textwrap.dedent(
-                "Permission to update. Delete the sharing between vfolder and user if this value is null. "
-                f"Should be one of {[p.value for p in VFolderPermission]}. "
-                "Default value is null."
-            ),
-        ),
-    ]
+        alias="permission",
+    )
 
 
 class UpdateSharedRequestModel(LegacyBaseRequestModel):
-    vfolder_id: Annotated[
-        uuid.UUID,
-        Field(
-            validation_alias=AliasChoices("vfolder", "vfolderId"),
-            description="Target vfolder id to update sharing status.",
-        ),
-    ]
-    user_perm_list: Annotated[
-        list[UserPermMapping],
-        Field(
-            validation_alias=AliasChoices("user_perm", "userPermList"),
-            description="A list of user and permission mappings.",
-        ),
-    ]
+    vfolder_id: uuid.UUID = Field(
+        description="Target vfolder id to update sharing status.",
+        alias="vfolder",
+    )
+    user_perm_list: list[UserPermMapping] = Field(
+        description="A list of user and permission mappings.",
+        validation_alias=AliasChoices("user_perm", "userPermList"),
+    )
 
 
 @auth_required
