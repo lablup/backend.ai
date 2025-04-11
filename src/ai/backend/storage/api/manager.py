@@ -1164,42 +1164,42 @@ def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
     app.router.add_route("GET", "/volumes/{volume_id}", handler.get_volume)
     app.router.add_route(
         "GET",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
         handler.get_quota_scope,
     )
     app.router.add_route(
         "POST",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
         handler.create_quota_scope,
     )
     app.router.add_route(
         "PUT",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
         handler.update_quota_scope,
     )
     app.router.add_route(
         "DELETE",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
         handler.delete_quota_scope,
     )
     app.router.add_route(
         "POST",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
         handler.create_vfolder,
     )
     app.router.add_route(
         "GET",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
         handler.get_vfolder_info,
     )
     app.router.add_route(
         "PUT",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}/clone",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}/clone",
         handler.clone_vfolder,
     )
     app.router.add_route(
         "DELETE",
-        "/volumes/{volume_id}/quotas/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
         handler.delete_vfolder,
     )
 
