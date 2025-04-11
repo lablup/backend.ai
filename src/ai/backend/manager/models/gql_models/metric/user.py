@@ -28,7 +28,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):
 
     value_type = graphene.String(
         default_value=None,
-        description="One of 'current', 'capacity', 'pct'. Default value is 'null'.",
+        description="One of 'current', 'capacity'. Default value is 'null'.",
     )
     metric_name = graphene.String(
         required=True,
@@ -44,7 +44,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):
         ),
     )
 
-    def to_metric_query_parameter(self) -> MetricQueryParameter:
+    def metric_query_param(self) -> MetricQueryParameter:
         return MetricQueryParameter(
             metric_name=self.metric_name,
             value_type=self.value_type,

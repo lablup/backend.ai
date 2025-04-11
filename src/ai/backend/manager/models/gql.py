@@ -3085,7 +3085,7 @@ class Queries(graphene.ObjectType):
         return await UserUtilizationMetric.get_object(
             info,
             user_id,
-            props.to_metric_query_parameter(),
+            props.metric_query_param(),
         )
 
     @staticmethod
