@@ -1,9 +1,8 @@
 import enum
 from typing import Optional
 
-from pydantic import BaseModel
-
-from ai.backend.common.types import VFolderUsageMode
+from ...api_handlers import BaseFieldModel
+from ...types import VFolderUsageMode
 
 
 class VFolderPermissionField(enum.StrEnum):
@@ -31,7 +30,7 @@ class VFolderOwnershipTypeField(enum.StrEnum):
     GROUP = "group"
 
 
-class VFolderItemField(BaseModel):
+class VFolderItemField(BaseFieldModel):
     id: str
     name: str
     quota_scope_id: str

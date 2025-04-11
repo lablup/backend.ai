@@ -169,6 +169,7 @@
           "extra": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -306,6 +307,7 @@
           "extra": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -448,7 +450,7 @@
             "$ref": "#/components/schemas/VFolderPermission",
             "default": "rw"
           },
-          "unmanaged_path": {
+          "unmanagedPath": {
             "anyOf": [
               {
                 "type": "string"
@@ -458,7 +460,7 @@
               }
             ],
             "default": null,
-            "title": "Unmanaged Path"
+            "title": "Unmanagedpath"
           },
           "group": {
             "anyOf": [
@@ -490,15 +492,15 @@
       },
       "DeleteRequestModel": {
         "properties": {
-          "vfolder_id": {
+          "vfolderId": {
             "description": "Target vfolder id to soft-delete, to go to trash bin",
             "format": "uuid",
-            "title": "Vfolder Id",
+            "title": "Vfolderid",
             "type": "string"
           }
         },
         "required": [
-          "vfolder_id"
+          "vfolderId"
         ],
         "title": "DeleteRequestModel",
         "type": "object"
@@ -561,45 +563,45 @@
       },
       "PurgeRequestModel": {
         "properties": {
-          "vfolder_id": {
+          "id": {
             "description": "Target vfolder id to purge, permanently remove from DB",
             "format": "uuid",
-            "title": "Vfolder Id",
+            "title": "Id",
             "type": "string"
           }
         },
         "required": [
-          "vfolder_id"
+          "id"
         ],
         "title": "PurgeRequestModel",
         "type": "object"
       },
       "RestoreRequestModel": {
         "properties": {
-          "vfolder_id": {
+          "id": {
             "description": "Target vfolder id to restore",
             "format": "uuid",
-            "title": "Vfolder Id",
+            "title": "Id",
             "type": "string"
           }
         },
         "required": [
-          "vfolder_id"
+          "id"
         ],
         "title": "RestoreRequestModel",
         "type": "object"
       },
       "DeleteFromTrashRequestModel": {
         "properties": {
-          "vfolder_id": {
+          "id": {
             "description": "Target vfolder id to hard-delete, permanently remove from storage",
             "format": "uuid",
-            "title": "Vfolder Id",
+            "title": "Id",
             "type": "string"
           }
         },
         "required": [
-          "vfolder_id"
+          "id"
         ],
         "title": "DeleteFromTrashRequestModel",
         "type": "object"
@@ -612,7 +614,7 @@
             "title": "User",
             "type": "string"
           },
-          "perm": {
+          "permission": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/VFolderPermission"
@@ -633,10 +635,10 @@
       },
       "UpdateSharedRequestModel": {
         "properties": {
-          "vfolder_id": {
+          "vfolder": {
             "description": "Target vfolder id to update sharing status.",
             "format": "uuid",
-            "title": "Vfolder Id",
+            "title": "Vfolder",
             "type": "string"
           },
           "user_perm": {
@@ -649,7 +651,7 @@
           }
         },
         "required": [
-          "vfolder_id",
+          "vfolder",
           "user_perm"
         ],
         "title": "UpdateSharedRequestModel",
@@ -675,6 +677,13 @@
       },
       "CompactServeInfoModel": {
         "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
           "id": {
             "description": "Unique ID referencing the model service.",
             "format": "uuid",
@@ -839,16 +848,16 @@
             "description": "Path to the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default.",
             "title": "Model Definition Path"
           },
-          "model_version": {
+          "modelVersion": {
             "default": 1,
             "description": "Unused; Reserved for future works",
-            "title": "Model Version",
+            "title": "Modelversion",
             "type": "integer"
           },
-          "model_mount_destination": {
+          "modelMountDestination": {
             "default": "/models",
             "description": "Mount destination for the model VFolder will be mounted inside the inference session. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`.",
-            "title": "Model Mount Destination",
+            "title": "Modelmountdestination",
             "type": "string"
           },
           "extra_mounts": {
@@ -857,6 +866,9 @@
             },
             "default": {},
             "description": "Specifications about extra VFolders mounted to model service session. MODEL type VFolders are not allowed to be attached to model service session with this option.",
+            "propertyNames": {
+              "format": "uuid"
+            },
             "title": "Extra Mounts",
             "type": "object"
           },
@@ -876,12 +888,12 @@
             "description": "Environment variables to be set inside the inference session",
             "title": "Environ"
           },
-          "scaling_group": {
+          "scalingGroup": {
             "description": "Name of the resource group to spawn inference sessions",
             "examples": [
               "nvidia-H100"
             ],
-            "title": "Scaling Group",
+            "title": "Scalinggroup",
             "type": "string"
           },
           "resources": {
@@ -928,7 +940,7 @@
         },
         "required": [
           "model",
-          "scaling_group",
+          "scalingGroup",
           "resources"
         ],
         "title": "ServiceConfigModel",
@@ -946,12 +958,12 @@
             "title": "Desired Session Count",
             "type": "integer"
           },
-          "image": {
+          "lang": {
             "description": "String reference of the image which will be used to create session",
             "examples": [
               "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
             ],
-            "title": "Image",
+            "title": "Lang",
             "type": "string"
           },
           "runtime_variant": {
@@ -977,12 +989,12 @@
             "title": "Domain",
             "type": "string"
           },
-          "cluster_size": {
+          "clusterSize": {
             "default": 1,
-            "title": "Cluster Size",
+            "title": "Clustersize",
             "type": "integer"
           },
-          "cluster_mode": {
+          "clusterMode": {
             "$ref": "#/components/schemas/ClusterMode",
             "default": "single-node"
           },
@@ -998,7 +1010,7 @@
             "default": null,
             "title": "Tag"
           },
-          "startup_command": {
+          "startupCommand": {
             "anyOf": [
               {
                 "type": "string"
@@ -1008,9 +1020,9 @@
               }
             ],
             "default": null,
-            "title": "Startup Command"
+            "title": "Startupcommand"
           },
-          "bootstrap_script": {
+          "bootstrapScript": {
             "anyOf": [
               {
                 "type": "string"
@@ -1020,9 +1032,9 @@
               }
             ],
             "default": null,
-            "title": "Bootstrap Script"
+            "title": "Bootstrapscript"
           },
-          "callback_url": {
+          "callbackUrl": {
             "anyOf": [
               {
                 "format": "uri",
@@ -1034,7 +1046,7 @@
               }
             ],
             "default": null,
-            "title": "Callback Url"
+            "title": "Callbackurl"
           },
           "owner_access_key": {
             "anyOf": [
@@ -1062,7 +1074,7 @@
         "required": [
           "name",
           "desired_session_count",
-          "image",
+          "lang",
           "config"
         ],
         "title": "NewServiceRequestModel",
@@ -1083,7 +1095,7 @@
             "type": "string"
           },
           "traffic_ratio": {
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Traffic Ratio",
             "type": "number"
           }
@@ -1206,6 +1218,13 @@
       },
       "TryStartResponseModel": {
         "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
           "task_id": {
             "title": "Task Id",
             "type": "string"
@@ -1239,6 +1258,13 @@
       },
       "RuntimeInfoModel": {
         "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
           "runtimes": {
             "items": {
               "$ref": "#/components/schemas/RuntimeInfo"
@@ -1286,6 +1312,7 @@
             "title": "Session Id"
           },
           "error": {
+            "additionalProperties": true,
             "title": "Error",
             "type": "object"
           }
@@ -1367,7 +1394,7 @@
       "UpdateRouteRequestModel": {
         "properties": {
           "traffic_ratio": {
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Traffic Ratio",
             "type": "number"
           }
@@ -1444,18 +1471,18 @@
       },
       "TransitSessionStatusRequestModel": {
         "properties": {
-          "ids": {
+          "session_ids": {
             "description": "ID array of sessions to check and transit status.",
             "items": {
               "format": "uuid",
               "type": "string"
             },
-            "title": "Ids",
+            "title": "Session Ids",
             "type": "array"
           }
         },
         "required": [
-          "ids"
+          "session_ids"
         ],
         "title": "TransitSessionStatusRequestModel",
         "type": "object"
@@ -1473,6 +1500,9 @@
             "additionalProperties": {
               "type": "string"
             },
+            "propertyNames": {
+              "format": "uuid"
+            },
             "title": "Session Status Map",
             "type": "object"
           }
@@ -1485,7 +1515,7 @@
       },
       "ContainerLogRequestModel": {
         "properties": {
-          "owner_access_key": {
+          "ownerAccessKey": {
             "anyOf": [
               {
                 "type": "string"
@@ -1495,9 +1525,9 @@
               }
             ],
             "default": null,
-            "title": "Owner Access Key"
+            "title": "Owneraccesskey"
           },
-          "kernel_id": {
+          "kernelId": {
             "anyOf": [
               {
                 "format": "uuid",
@@ -1509,7 +1539,7 @@
             ],
             "default": null,
             "description": "Target kernel to get container logs.",
-            "title": "Kernel Id"
+            "title": "Kernelid"
           }
         },
         "title": "ContainerLogRequestModel",

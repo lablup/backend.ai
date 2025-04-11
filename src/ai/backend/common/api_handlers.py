@@ -33,7 +33,26 @@ from .exception import (
     ParameterNotParsedError,
 )
 
-TModel = TypeVar("TModel", bound=BaseModel)
+
+class BaseRequestModel(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_by_name=True,
+    )
+
+
+class BaseFieldModel(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_by_name=True,
+    )
+
+
+class BaseResponseModel(BaseModel):
+    pass
+
+
+TRequestModel = TypeVar("TRequestModel", bound=BaseRequestModel)
 
 
 def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
@@ -47,16 +66,16 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
     return wrapped
 
 
-class BodyParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
+class BodyParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TModel]) -> None:
+    def __init__(self, model: Type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TModel] = None
+        self._parsed: Optional[TRequestModel] = None
 
     @property
-    def parsed(self) -> TModel:
+    def parsed(self) -> TRequestModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -69,16 +88,16 @@ class BodyParam(Generic[TModel]):
         return self
 
 
-class QueryParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
+class QueryParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TModel]) -> None:
+    def __init__(self, model: Type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TModel] = None
+        self._parsed: Optional[TRequestModel] = None
 
     @property
-    def parsed(self) -> TModel:
+    def parsed(self) -> TRequestModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -91,16 +110,16 @@ class QueryParam(Generic[TModel]):
         return self
 
 
-class HeaderParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
+class HeaderParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TModel]) -> None:
+    def __init__(self, model: Type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TModel] = None
+        self._parsed: Optional[TRequestModel] = None
 
     @property
-    def parsed(self) -> TModel:
+    def parsed(self) -> TRequestModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -113,16 +132,16 @@ class HeaderParam(Generic[TModel]):
         return self
 
 
-class PathParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
+class PathParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
 
-    def __init__(self, model: Type[TModel]) -> None:
+    def __init__(self, model: Type[TRequestModel]) -> None:
         self._model = model
-        self._parsed: Optional[TModel] = None
+        self._parsed: Optional[TRequestModel] = None
 
     @property
-    def parsed(self) -> TModel:
+    def parsed(self) -> TRequestModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -140,14 +159,6 @@ class MiddlewareParam(ABC, BaseModel):
     @abstractmethod
     def from_request(cls, request: web.Request) -> Self:
         pass
-
-
-class BaseRequestModel(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-
-class BaseResponseModel(BaseModel):
-    pass
 
 
 JSONDict: TypeAlias = dict[str, Any]

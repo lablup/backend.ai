@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import AliasChoices, Field
+from pydantic import Field
 
 from ...api_handlers import BaseRequestModel
 from ...types import QuotaConfig, VFolderID
@@ -22,5 +22,5 @@ class GetVFolderMetaReq(BaseRequestModel):
 class CloneVFolderReq(BaseRequestModel):
     dst_vfolder_id: VFolderID = Field(
         description="The destination virtual folder ID.",
-        validation_alias=AliasChoices("dst_vfid", "dst_vfolder_id"),
+        alias="dst_vfid",
     )

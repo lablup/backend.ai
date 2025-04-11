@@ -36,7 +36,7 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import web
 from dateutil.tz import tzutc
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, Field
 from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
@@ -133,7 +133,8 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    BaseResponseModel,
+    LegacyBaseRequestModel,
+    LegacyBaseResponseModel,
     Undefined,
     catch_unexpected,
     check_api_params,
@@ -825,14 +826,14 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
     return web.json_response({}, status=HTTPStatus.OK)
 
 
-class TransitSessionStatusRequestModel(BaseModel):
+class TransitSessionStatusRequestModel(LegacyBaseRequestModel):
     ids: list[uuid.UUID] = Field(
-        validation_alias=AliasChoices("ids", "session_ids", "sessionIds", "SessionIds"),
+        validation_alias=AliasChoices("session_ids", "sessionIds", "SessionIds"),
         description="ID array of sessions to check and transit status.",
     )
 
 
-class SessionStatusResponseModel(BaseResponseModel):
+class SessionStatusResponseModel(LegacyBaseResponseModel):
     session_status_map: dict[SessionId, str]
 
 
@@ -893,7 +894,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     return web.json_response(action_result.commit_result, status=HTTPStatus.CREATED)
 
 
-class ConvertSessionToImageRequesteModel(BaseModel):
+class ConvertSessionToImageRequesteModel(LegacyBaseRequestModel):
     image_name: str = Field(
         pattern=r"[a-zA-Z0-9\.\-_]+",
         description="Name of the image to be created.",
@@ -905,7 +906,7 @@ class ConvertSessionToImageRequesteModel(BaseModel):
     )
 
 
-class ConvertSessionToImageResponseModel(BaseResponseModel):
+class ConvertSessionToImageResponseModel(LegacyBaseResponseModel):
     task_id: str
 
 
@@ -1540,15 +1541,15 @@ async def list_files(request: web.Request) -> web.Response:
     return web.json_response(result.result, status=HTTPStatus.OK)
 
 
-class ContainerLogRequestModel(BaseModel):
+class ContainerLogRequestModel(LegacyBaseRequestModel):
     owner_access_key: str | None = Field(
-        validation_alias=AliasChoices("owner_access_key", "ownerAccessKey"),
         default=None,
+        alias="ownerAccessKey",
     )
     kernel_id: uuid.UUID | None = Field(
-        validation_alias=AliasChoices("kernel_id", "kernelId"),
         description="Target kernel to get container logs.",
         default=None,
+        alias="kernelId",
     )
 
 
