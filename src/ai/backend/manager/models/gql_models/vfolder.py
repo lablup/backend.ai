@@ -14,10 +14,11 @@ import graphene
 import graphql
 import sqlalchemy as sa
 import trafaret as t
-import yaml
 from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from sqlalchemy.orm import joinedload
 
 from ai.backend.common.config import model_definition_iv
@@ -642,8 +643,9 @@ class ModelCard(graphene.ObjectType):
                 )
             model_definition_yaml = chunks.decode("utf-8")
             try:
-                model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-            except yaml.error.YAMLError as e:
+                yaml = YAML()
+                model_definition_dict = yaml.load(model_definition_yaml)
+            except YAMLError as e:
                 raise ModelCardProcessError(
                     f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
                 )
