@@ -1095,9 +1095,7 @@ class ModifyImageInput(graphene.InputObjectType):
                 resources_data[limit_option.key] = limit_data
 
         accelerators = (
-            ",".join(self.supported_accelerators)
-            if self.supported_accelerators is not Undefined
-            else None
+            ",".join(self.supported_accelerators) if self.supported_accelerators else Undefined
         )
 
         return ImageModifier(
