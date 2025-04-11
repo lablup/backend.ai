@@ -614,7 +614,7 @@
             "title": "User",
             "type": "string"
           },
-          "perm": {
+          "permission": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/VFolderPermission"
@@ -677,6 +677,13 @@
       },
       "CompactServeInfoModel": {
         "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
           "id": {
             "description": "Unique ID referencing the model service.",
             "format": "uuid",
@@ -1211,6 +1218,13 @@
       },
       "TryStartResponseModel": {
         "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
           "task_id": {
             "title": "Task Id",
             "type": "string"
@@ -1244,6 +1258,13 @@
       },
       "RuntimeInfoModel": {
         "properties": {
+          "status": {
+            "default": 200,
+            "exclusiveMaximum": 600,
+            "minimum": 100,
+            "title": "Status",
+            "type": "integer"
+          },
           "runtimes": {
             "items": {
               "$ref": "#/components/schemas/RuntimeInfo"
