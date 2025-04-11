@@ -299,7 +299,7 @@ class ScalingGroup(graphene.ObjectType):
     ) -> dict[str, Any]:
         from ..agent import AgentRow
 
-        # TODO: Admin set which value to return here among "min", "max", "custom"
+        # TODO: Allow admins to set which value to return here among "min", "max", "custom"
         graph_ctx: GraphQueryContext = info.context
         agent_list = await AgentRow.get_schedulable_agents_by_sgroup(self.name, db=graph_ctx.db)
 
