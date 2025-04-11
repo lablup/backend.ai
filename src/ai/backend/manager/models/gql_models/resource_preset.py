@@ -195,7 +195,7 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
 
     def to_modifier(self) -> ResourcePresetModifier:
         resource_slots = (
-            ResourceSlot.from_json(self.resource_slots) if self.resource_slots else None
+            ResourceSlot.from_json(self.resource_slots) if self.resource_slots else Undefined
         )
 
         return ResourcePresetModifier(

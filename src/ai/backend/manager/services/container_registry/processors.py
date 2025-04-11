@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
@@ -35,9 +36,17 @@ class ContainerRegistryProcessors:
         GetContainerRegistriesAction, GetContainerRegistriesActionResult
     ]
 
-    def __init__(self, service: ContainerRegistryService) -> None:
-        self.rescan_images = ActionProcessor(service.rescan_images)
-        self.clear_images = ActionProcessor(service.clear_images)
-        self.load_container_registries = ActionProcessor(service.load_container_registries)
-        self.load_all_container_registries = ActionProcessor(service.load_all_container_registries)
-        self.get_container_registries = ActionProcessor(service.get_container_registries)
+    def __init__(
+        self, service: ContainerRegistryService, action_monitors: list[ActionMonitor]
+    ) -> None:
+        self.rescan_images = ActionProcessor(service.rescan_images, action_monitors)
+        self.clear_images = ActionProcessor(service.clear_images, action_monitors)
+        self.load_container_registries = ActionProcessor(
+            service.load_container_registries, action_monitors
+        )
+        self.load_all_container_registries = ActionProcessor(
+            service.load_all_container_registries, action_monitors
+        )
+        self.get_container_registries = ActionProcessor(
+            service.get_container_registries, action_monitors
+        )

@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 
 from ..actions.base import (
@@ -43,14 +44,14 @@ class VFolderProcessors:
     clone_vfolder: ActionProcessor[CloneVFolderAction, CloneVFolderActionResult]
     get_task_logs: ActionProcessor[GetTaskLogsAction, GetTaskLogsActionResult]
 
-    def __init__(self, service: VFolderService):
-        self.create_vfolder = ActionProcessor(service.create)
-        self.get_vfolder = ActionProcessor(service.get)
-        self.list_vfolder = ActionProcessor(service.list)
-        self.update_vfolder_attribute = ActionProcessor(service.update_attribute)
-        self.move_to_trash_vfolder = ActionProcessor(service.move_to_trash)
-        self.restore_vfolder_from_trash = ActionProcessor(service.restore)
-        self.delete_forever_vfolder = ActionProcessor(service.delete_forever)
-        self.force_delete_vfolder = ActionProcessor(service.force_delete)
-        self.clone_vfolder = ActionProcessor(service.clone)
-        self.get_task_logs = ActionProcessor(service.get_task_logs)
+    def __init__(self, service: VFolderService, action_monitors: list[ActionMonitor]):
+        self.create_vfolder = ActionProcessor(service.create, action_monitors)
+        self.get_vfolder = ActionProcessor(service.get, action_monitors)
+        self.list_vfolder = ActionProcessor(service.list, action_monitors)
+        self.update_vfolder_attribute = ActionProcessor(service.update_attribute, action_monitors)
+        self.move_to_trash_vfolder = ActionProcessor(service.move_to_trash, action_monitors)
+        self.restore_vfolder_from_trash = ActionProcessor(service.restore, action_monitors)
+        self.delete_forever_vfolder = ActionProcessor(service.delete_forever, action_monitors)
+        self.force_delete_vfolder = ActionProcessor(service.force_delete, action_monitors)
+        self.clone_vfolder = ActionProcessor(service.clone, action_monitors)
+        self.get_task_logs = ActionProcessor(service.get_task_logs, action_monitors)

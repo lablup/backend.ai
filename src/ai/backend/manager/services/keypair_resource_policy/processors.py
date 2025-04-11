@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -27,13 +28,15 @@ class KeypairResourcePolicyProcessors:
         DeleteKeyPairResourcePolicyAction, DeleteKeyPairResourcePolicyActionResult
     ]
 
-    def __init__(self, service: KeypairResourcePolicyService) -> None:
+    def __init__(
+        self, service: KeypairResourcePolicyService, action_monitors: list[ActionMonitor]
+    ) -> None:
         self.create_keypair_resource_policy = ActionProcessor(
-            service.create_keypair_resource_policy
+            service.create_keypair_resource_policy, action_monitors
         )
         self.modify_keypair_resource_policy = ActionProcessor(
-            service.modify_keypair_resource_policy
+            service.modify_keypair_resource_policy, action_monitors
         )
         self.delete_keypair_resource_policy = ActionProcessor(
-            service.delete_keypair_resource_policy
+            service.delete_keypair_resource_policy, action_monitors
         )

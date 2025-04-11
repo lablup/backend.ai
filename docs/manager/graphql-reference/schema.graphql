@@ -402,6 +402,9 @@ type AuditLogNode implements Node {
   """UUID of the audit log row"""
   row_id: UUID!
 
+  """Added in 25.6.0. UUID of the action"""
+  action_id: UUID!
+
   """Entity ID of the AuditLog"""
   entity_type: String!
 

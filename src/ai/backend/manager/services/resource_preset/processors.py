@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
@@ -29,9 +30,11 @@ class ResourcePresetProcessors:
     list_presets: ActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
     check_presets: ActionProcessor[CheckResourcePresetsAction, CheckResourcePresetsActionResult]
 
-    def __init__(self, service: ResourcePresetService) -> None:
-        self.create_preset = ActionProcessor(service.create_preset)
-        self.modify_preset = ActionProcessor(service.modify_preset)
-        self.delete_preset = ActionProcessor(service.delete_preset)
-        self.list_presets = ActionProcessor(service.list_presets)
-        self.check_presets = ActionProcessor(service.check_presets)
+    def __init__(
+        self, service: ResourcePresetService, action_monitors: list[ActionMonitor]
+    ) -> None:
+        self.create_preset = ActionProcessor(service.create_preset, action_monitors)
+        self.modify_preset = ActionProcessor(service.modify_preset, action_monitors)
+        self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)
+        self.list_presets = ActionProcessor(service.list_presets, action_monitors)
+        self.check_presets = ActionProcessor(service.check_presets, action_monitors)
