@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta
 from typing import Final, override
+
+import sqlalchemy as sa
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.audit_log import AuditLogRow, OperationStatus
@@ -32,13 +33,12 @@ class AuditLogReporter(AbstractReporter):
                 action_id=action_message.action_id,
                 entity_type=action_message.entity_type,
                 operation=action_message.operation_type,
+                created_at=action_message.created_at,
                 entity_id=action_message.entity_id or UNKNOWN_ENTITY_ID,
                 # TODO: Inject request_id.
                 request_id=NULL_UUID,
                 description="Task is running...",
-                duration=timedelta(0),
                 status=OperationStatus.RUNNING,
-                created_at=datetime.now(),
             )
 
             db_sess.add(db_row)
@@ -46,15 +46,17 @@ class AuditLogReporter(AbstractReporter):
 
     async def _update_log(self, action_message: FinishedActionMessage) -> None:
         async with self._db.begin_session() as db_sess:
-            db_row: AuditLogRow = await db_sess.get(AuditLogRow, action_message.action_id)
+            query = sa.select(AuditLogRow).where(AuditLogRow.action_id == action_message.action_id)
+            db_row: AuditLogRow = await db_sess.scalar(query)
             if not db_row:
-                log.error(f'AuditLog with id "{action_message.action_id}" not found in DB')
+                log.error(f'AuditLog with action_id "{action_message.action_id}" not found in DB')
                 return
 
             db_row.status = action_message.status
             db_row.description = action_message.description
             db_row.duration = action_message.duration
-            db_row.entity_id = action_message.entity_id
+            if action_message.entity_id:
+                db_row.entity_id = action_message.entity_id
             await db_sess.flush()
 
     @override
