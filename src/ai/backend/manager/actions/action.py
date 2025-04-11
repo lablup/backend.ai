@@ -21,7 +21,7 @@ class BaseAction(ABC):
 
 @dataclass
 class BaseActionTriggerMeta:
-    task_id: uuid.UUID
+    action_id: uuid.UUID
     started_at: datetime
 
 
@@ -53,7 +53,7 @@ class BaseBatchActionResult(ABC):
 
 @dataclass
 class BaseActionResultMeta:
-    task_id: uuid.UUID
+    action_id: uuid.UUID
     status: str
     description: str
     started_at: datetime

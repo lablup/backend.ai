@@ -90,7 +90,7 @@ async def test_processor_success():
         expected_done_action=MockAction(id="1", type="test", operation="create"),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
-                task_id=None,
+                action_id=None,
                 status="success",
                 description="Success",
                 started_at=None,
@@ -115,7 +115,7 @@ async def test_processor_exception():
         expected_done_action=MockAction(id="1", type="test", operation="create"),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
-                task_id=None,
+                action_id=None,
                 status="error",
                 description="Mock exception",
                 started_at=None,

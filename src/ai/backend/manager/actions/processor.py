@@ -31,8 +31,8 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         description: str = "unknown"
         result: Optional[TActionResult] = None
 
-        task_id = uuid.uuid4()
-        action_trigger_meta = BaseActionTriggerMeta(task_id=task_id, started_at=started_at)
+        action_id = uuid.uuid4()
+        action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
         for monitor in self._monitors:
             await monitor.prepare(action, action_trigger_meta)
         try:
@@ -47,7 +47,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             end_at = datetime.now()
             duration = (end_at - started_at).total_seconds()
             meta = BaseActionResultMeta(
-                task_id=task_id,
+                action_id=action_id,
                 status=status,
                 description=description,
                 started_at=started_at,
