@@ -121,7 +121,7 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
-from ..types import OptionalState, TriState
+from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -971,7 +971,7 @@ class RenameRequestModel(BaseModel):
 
     def to_modifier(self) -> VFolderAttributeModifier:
         return VFolderAttributeModifier(
-            name=TriState.update(self.new_name),
+            name=OptionalState.update(self.new_name),
         )
 
 

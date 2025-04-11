@@ -16,7 +16,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-from ai.backend.manager.types import OptionalState, PartialModifier, TriState
+from ai.backend.manager.types import OptionalState, PartialModifier
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -74,7 +74,7 @@ class CreateVFolderActionResult(BaseActionResult):
 
 @dataclass
 class VFolderAttributeModifier(PartialModifier):
-    name: TriState[str] = field(default_factory=TriState.nop)
+    name: OptionalState[str] = field(default_factory=OptionalState.nop)
     cloneable: OptionalState[bool] = field(default_factory=OptionalState.nop)
     mount_permission: OptionalState[VFolderPermission] = field(default_factory=OptionalState.nop)
 
