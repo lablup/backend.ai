@@ -9,6 +9,7 @@ Create Date: 2025-04-11 12:16:49.931839
 import logging
 import uuid
 from datetime import timedelta
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
@@ -29,7 +30,7 @@ NULL_UUID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
-Base = mapper_registry.generate_base()
+Base: Any = mapper_registry.generate_base()
 
 
 class AuditLogRowInUpgrade(Base):

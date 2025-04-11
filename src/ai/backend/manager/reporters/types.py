@@ -1,5 +1,5 @@
 import uuid
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -33,8 +33,10 @@ class FinishedActionMessage:
 
 
 class AbstractReporter(ABC):
+    @abstractmethod
     async def report_started(self, message: StartedActionMessage) -> None:
-        pass
+        raise NotImplementedError
 
+    @abstractmethod
     async def report_finished(self, message: FinishedActionMessage) -> None:
-        pass
+        raise NotImplementedError
