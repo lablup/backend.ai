@@ -950,7 +950,7 @@ class RescanImages(graphene.Mutation):
                 )
                 loaded_registries = registries.registries
 
-            rescaned_images = []
+            rescanned_images = []
             errors = []
             for registry_data in loaded_registries:
                 action_result = (
@@ -967,11 +967,11 @@ class RescanImages(graphene.Mutation):
                     log.error(error)
 
                 errors.extend(action_result.errors)
-                rescaned_images.extend(action_result.images)
+                rescanned_images.extend(action_result.images)
 
             if errors:
-                return DispatchResult.partial_success(rescaned_images, errors)
-            return DispatchResult.success(rescaned_images)
+                return DispatchResult.partial_success(rescanned_images, errors)
+            return DispatchResult.success(rescanned_images)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
