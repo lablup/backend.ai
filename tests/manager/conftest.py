@@ -91,6 +91,30 @@ here = Path(__file__).parent
 log = logging.getLogger("tests.manager.conftest")
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--rescan-cr-backend-ai",
+        action="store_true",
+        default=False,
+        help="Enable tests marked as rescan_cr_backend_ai",
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "rescan_cr_backend_ai: mark test to run only when --rescan-cr-backend-ai is set",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--rescan-cr-backend-ai"):
+        skip_flag = pytest.mark.skip(reason="--rescan-cr-backend-ai not set")
+        for item in items:
+            if "rescan_cr_backend_ai" in item.keywords:
+                item.add_marker(skip_flag)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def test_id():
     return secrets.token_hex(12)

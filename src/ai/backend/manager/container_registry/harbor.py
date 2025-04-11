@@ -357,9 +357,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
-        rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({"Accept": "application/vnd.oci.image.manifest.v1+json"})
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -384,6 +381,70 @@ class HarborRegistry_v2(BaseContainerRegistry):
             )
 
     @override
+    async def _process_oci_manifest(
+        self,
+        tg: aiotools.TaskGroup,
+        sess: aiohttp.ClientSession,
+        rqst_args: Mapping[str, Any],
+        image: str,
+        tag: str,
+        image_info: Mapping[str, Any],
+    ) -> None:
+        if (reporter := progress_reporter.get()) is not None:
+            reporter.total_progress += 1
+
+        async with concurrency_sema.get():
+            async with sess.get(
+                self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                manifest_data = await resp.json()
+
+            config_digest = manifest_data["config"]["digest"]
+            size_bytes = (
+                sum(layer["size"] for layer in manifest_data["layers"])
+                + manifest_data["config"]["size"]
+            )
+
+            async with sess.get(
+                self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                config_data = await read_json(resp)
+
+        labels = {}
+        if _config_labels := config_data.get("config", {}).get("Labels"):
+            labels = _config_labels
+        elif _container_config_labels := config_data.get("container_config", {}).get("Labels"):
+            labels = _container_config_labels
+
+        if not labels:
+            log.warning(
+                "The image {}:{} has no metadata labels -> treating as vanilla image",
+                image,
+                tag,
+            )
+            labels = {}
+
+        architecture = config_data.get("architecture")
+        if architecture:
+            architecture = arch_name_aliases.get(architecture, architecture)
+        else:
+            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+                architecture = "aarch64"
+            else:
+                architecture = "x86_64"
+
+        manifests = {
+            architecture: {
+                "size": size_bytes,
+                "labels": labels,
+                "digest": config_digest,
+            }
+        }
+        await self._read_manifest(image, tag, manifests)
+
+    @override
     async def _process_docker_v2_multiplatform_image(
         self,
         tg: aiotools.TaskGroup,
@@ -393,11 +454,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
-        rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-        })
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -431,11 +487,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
-        rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-        })
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
         tg.create_task(
@@ -450,7 +501,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_per_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: dict[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         *,
         digest: str,
@@ -507,7 +558,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_single_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: dict[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
     ) -> None:
@@ -518,7 +569,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
         """
         manifests = {}
         async with concurrency_sema.get():
-            rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
             # Harbor does not provide architecture information for a single-arch tag reference.
             # We heuristically detect the architecture using the tag name pattern.
             if tag.endswith("-arm64") or tag.endswith("-aarch64"):

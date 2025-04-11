@@ -663,10 +663,47 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.db, registry, reporter=reporter)
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            loaded_registries: list[ContainerRegistryData]
 
-        task_id = await ctx.background_task_manager.start(_rescan_task)
+            if registry is None:
+                all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
+                    LoadAllContainerRegistriesAction()
+                )
+                loaded_registries = all_registries.registries
+            else:
+                registries = await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                    LoadContainerRegistriesAction(
+                        registry=registry,
+                        project=project,
+                    )
+                )
+                loaded_registries = registries.registries
+
+            rescanned_images = []
+            errors = []
+            for registry_data in loaded_registries:
+                action_result = (
+                    await ctx.processors.container_registry.rescan_images.wait_for_complete(
+                        RescanImagesAction(
+                            registry=registry_data.registry_name,
+                            project=registry_data.project,
+                            progress_reporter=reporter,
+                        )
+                    )
+                )
+
+                for error in action_result.errors:
+                    log.error(error)
+
+                errors.extend(action_result.errors)
+                rescanned_images.extend(action_result.images)
+
+            if errors:
+                return DispatchResult.partial_success(rescanned_images, errors)
+            return DispatchResult.success(rescanned_images)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
@@ -844,10 +881,16 @@ class ModifyImage(graphene.Mutation):
                             ImageAlias(target),
                         ],
                     )
-                except UnknownImageReference:
-                    return ModifyImage(ok=False, msg="Image not found")
-                for k, v in data.items():
-                    setattr(image_row, k, v)
-        except ValueError as e:
-            return ModifyImage(ok=False, msg=str(e))
-        return ModifyImage(ok=True, msg="")
+
+                    if result.error is not None:
+                        log.error(result.error)
+                        total_result.errors.append(result.error)
+
+            if total_result.errors:
+                return DispatchResult.partial_success(
+                    total_result.purged_images, total_result.errors
+                )
+            return DispatchResult.success(total_result.purged_images)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
+        return PurgeImagesPayload(task_id=task_id)

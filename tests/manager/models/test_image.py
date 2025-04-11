@@ -270,3 +270,90 @@ async def test_image_rescan_on_docker_registry(
             populated_img_names = res.fetchall()
             print("populated_img_names!!", populated_img_names)
             assert set(populated_img_names) == test_case["expected_result"]["images"]
+
+
+@pytest.mark.rescan_cr_backend_ai
+@pytest.mark.timeout(60)
+async def test_image_rescan_on_cr_backend_ai(
+    client: Client,
+    etcd_fixture,
+    database_fixture,
+    create_app_and_client,
+):
+    app, _ = await create_app_and_client(
+        [
+            shared_config_ctx,
+            database_ctx,
+            monitoring_ctx,
+            hook_plugin_ctx,
+            redis_ctx,
+            event_dispatcher_ctx,
+            services_ctx,
+            network_plugin_ctx,
+            storage_manager_ctx,
+            agent_registry_ctx,
+            background_task_ctx,
+            distributed_lock_ctx,
+            idle_checker_ctx,
+            processors_ctx,
+        ],
+        [".events", ".auth"],
+    )
+    root_ctx: RootContext = app["_root.context"]
+    dispatcher: EventDispatcher = root_ctx.event_dispatcher
+    done_handler_ctx = {}
+    done_event = asyncio.Event()
+
+    async def done_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskDoneEvent,
+    ) -> None:
+        done_handler_ctx["event_name"] = event.name
+        update_body = attr.asdict(event)  # type: ignore
+        done_handler_ctx.update(**update_body)
+        done_event.set()
+
+    async def fail_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskFailedEvent,
+    ) -> None:
+        assert False, "Background task failed"
+
+    async def cancel_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskCancelledEvent,
+    ) -> None:
+        assert False, "Background task was cancelled"
+
+    dispatcher.subscribe(BgtaskDoneEvent, app, done_sub)
+    dispatcher.subscribe(BgtaskFailedEvent, app, fail_sub)
+    dispatcher.subscribe(BgtaskCancelledEvent, app, cancel_sub)
+
+    context = get_graphquery_context(
+        root_ctx.background_task_manager,
+        root_ctx.services_ctx,
+        root_ctx.processors,
+        root_ctx.db,
+    )
+    image_rescan_query = """
+        mutation ($registry: String, $project: String) {
+            rescan_images(registry: $registry, project: $project) {
+                ok
+                msg
+                task_id
+            }
+        }
+    """
+    variables = {
+        "registry": "cr.backend.ai",
+        "project": "stable",
+    }
+
+    res = await client.execute_async(image_rescan_query, context=context, variables=variables)
+    assert res["data"]["rescan_images"]["ok"]
+    await done_event.wait()
+    errors = done_handler_ctx.get("errors", None)
+    assert not errors, f"Rescan task failed with errors: {errors}"
