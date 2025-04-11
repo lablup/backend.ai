@@ -23,7 +23,8 @@ class QuotaScopeKey(LoggingInternalMeta):
     @classmethod
     def from_quota_scope_path(cls, path: QuotaScopeKeyPath) -> Self:
         return cls(
-            volume_id=path.volume_id, quota_scope_id=QuotaScopeID(path.scope_type, path.scope_uuid)
+            volume_id=path.volume_id,
+            quota_scope_id=QuotaScopeID(path.quota_scope_type, path.quota_scope_uuid),
         )
 
     def to_logging_str(self) -> str:
@@ -37,7 +38,7 @@ class VFolderKey(LoggingInternalMeta):
 
     @classmethod
     def from_vfolder_path(cls, path: VFolderKeyPath) -> Self:
-        quota_scope_id = QuotaScopeID(path.scope_type, path.scope_uuid)
+        quota_scope_id = QuotaScopeID(path.quota_scope_type, path.quota_scope_uuid)
         return cls(
             volume_id=path.volume_id,
             vfolder_id=VFolderID(quota_scope_id, path.folder_uuid),
