@@ -1027,13 +1027,23 @@ async def update_vfolder_options(
         row["id"],
         request.match_info["name"],
     )
+    cloneable = (
+        OptionalState[bool].update(params["cloneable"])
+        if params["cloneable"] is not None
+        else OptionalState[bool].nop()
+    )
+    mount_permission = (
+        OptionalState[VFolderPermission].update(params["permission"])
+        if params["permission"] is not None
+        else OptionalState[VFolderPermission].nop()
+    )
     await root_ctx.processors.vfolder.update_vfolder_attribute.wait_for_complete(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
             modifier=VFolderAttributeModifier(
-                cloneable=OptionalState[bool].update(params["cloneable"]),
-                mount_permission=TriState[VFolderPermission].update(params["permission"]),
+                cloneable=cloneable,
+                mount_permission=mount_permission,
             ),
         )
     )

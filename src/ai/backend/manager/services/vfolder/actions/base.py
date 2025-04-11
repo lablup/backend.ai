@@ -76,8 +76,8 @@ class CreateVFolderActionResult(BaseActionResult):
 class VFolderAttributeModifier(PartialModifier):
     name: TriState[str] = field(default_factory=TriState[str].nop)
     cloneable: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
-    mount_permission: TriState[VFolderPermission] = field(
-        default_factory=TriState[VFolderPermission].nop
+    mount_permission: OptionalState[VFolderPermission] = field(
+        default_factory=OptionalState[VFolderPermission].nop
     )
 
     @override
