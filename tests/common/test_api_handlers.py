@@ -3,10 +3,11 @@ from typing import Optional, Self
 
 import pytest
 from aiohttp import web
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import (
     APIResponse,
+    BaseRequestModel,
     BaseResponseModel,
     BodyParam,
     HeaderParam,
@@ -46,13 +47,13 @@ async def test_empty_parameter_handler_in_class(aiohttp_client):
     assert data["version"] == "1.0.0"
 
 
-class TestUserRequestModel(BaseModel):
+class TestUserRequestModel(BaseRequestModel):
     username: str
     email: str
     age: int
 
 
-class TestSearchParamsModel(BaseModel):
+class TestSearchParamsModel(BaseRequestModel):
     keyword: str
     category: Optional[str] = Field(default="all")
     limit: Optional[int] = Field(default=10)
@@ -142,7 +143,7 @@ async def test_empty_parameter(aiohttp_client):
     assert data["message"] == "test"
 
 
-class TestPostUserModel(BaseModel):
+class TestPostUserModel(BaseRequestModel):
     name: str
     age: int
 
@@ -178,7 +179,7 @@ async def test_body_parameter(aiohttp_client):
     assert data["age"] == 30
 
 
-class TestSearchQueryModel(BaseModel):
+class TestSearchQueryModel(BaseRequestModel):
     search: str
     page: Optional[int] = Field(default=1)
 
@@ -215,7 +216,7 @@ async def test_query_parameter(aiohttp_client):
     assert data["page"] == 2
 
 
-class TestAuthHeaderModel(BaseModel):
+class TestAuthHeaderModel(BaseRequestModel):
     authorization: str
 
 
@@ -248,7 +249,7 @@ async def test_header_parameter(aiohttp_client):
     assert data["authorization"] == "Bearer token123"
 
 
-class TestUserPathModel(BaseModel):
+class TestUserPathModel(BaseRequestModel):
     user_id: str
 
 
@@ -361,11 +362,11 @@ class TestMiddlewareModel(MiddlewareParam):
         return cls(is_authorized=request.get("is_authorized", False))
 
 
-class TestCreateUserModel(BaseModel):
+class TestCreateUserModel(BaseRequestModel):
     user_name: str
 
 
-class TestSearchParamModel(BaseModel):
+class TestSearchParamModel(BaseRequestModel):
     query: str
 
 
@@ -420,7 +421,7 @@ async def test_multiple_parameters(aiohttp_client):
     assert data["is_authorized"]
 
 
-class TestRegisterUserModel(BaseModel):
+class TestRegisterUserModel(BaseRequestModel):
     name: str
     age: int
 
@@ -452,7 +453,7 @@ async def test_invalid_body(aiohttp_client):
     assert error_response.status == HTTPStatus.BAD_REQUEST
 
 
-class TestProductSearchModel(BaseModel):
+class TestProductSearchModel(BaseRequestModel):
     search: str
     page: Optional[int] = Field(default=1)
 

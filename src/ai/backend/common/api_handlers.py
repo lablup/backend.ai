@@ -33,114 +33,6 @@ from .exception import (
     ParameterNotParsedError,
 )
 
-TModel = TypeVar("TModel", bound=BaseModel)
-
-
-def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
-    @functools.wraps(func)
-    def wrapped(*args, **kwargs) -> T:
-        try:
-            return func(*args, **kwargs)
-        except ValidationError as e:
-            raise InvalidAPIParameters(repr(e))
-
-    return wrapped
-
-
-class BodyParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
-
-    def __init__(self, model: Type[TModel]) -> None:
-        self._model = model
-        self._parsed: Optional[TModel] = None
-
-    @property
-    def parsed(self) -> TModel:
-        if not self._parsed:
-            raise ParameterNotParsedError(
-                f"Parameter of type {self._model.__name__} has not been parsed yet"
-            )
-        return self._parsed
-
-    @convert_validation_error
-    def from_body(self, json_body: str) -> Self:
-        self._parsed = self._model.model_validate(json_body)
-        return self
-
-
-class QueryParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
-
-    def __init__(self, model: Type[TModel]) -> None:
-        self._model = model
-        self._parsed: Optional[TModel] = None
-
-    @property
-    def parsed(self) -> TModel:
-        if not self._parsed:
-            raise ParameterNotParsedError(
-                f"Parameter of type {self._model.__name__} has not been parsed yet"
-            )
-        return self._parsed
-
-    @convert_validation_error
-    def from_query(self, query: MultiMapping[str]) -> Self:
-        self._parsed = self._model.model_validate(query)
-        return self
-
-
-class HeaderParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
-
-    def __init__(self, model: Type[TModel]) -> None:
-        self._model = model
-        self._parsed: Optional[TModel] = None
-
-    @property
-    def parsed(self) -> TModel:
-        if not self._parsed:
-            raise ParameterNotParsedError(
-                f"Parameter of type {self._model.__name__} has not been parsed yet"
-            )
-        return self._parsed
-
-    @convert_validation_error
-    def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
-        self._parsed = self._model.model_validate(headers)
-        return self
-
-
-class PathParam(Generic[TModel]):
-    _model: Type[TModel]
-    _parsed: Optional[TModel]
-
-    def __init__(self, model: Type[TModel]) -> None:
-        self._model = model
-        self._parsed: Optional[TModel] = None
-
-    @property
-    def parsed(self) -> TModel:
-        if not self._parsed:
-            raise ParameterNotParsedError(
-                f"Parameter of type {self._model.__name__} has not been parsed yet"
-            )
-        return self._parsed
-
-    @convert_validation_error
-    def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
-        self._parsed = self._model.model_validate(match_info)
-        return self
-
-
-class MiddlewareParam(ABC, BaseModel):
-    @classmethod
-    @abstractmethod
-    def from_request(cls, request: web.Request) -> Self:
-        pass
-
 
 class BaseRequestModel(BaseModel):
     model_config = ConfigDict(
@@ -158,6 +50,115 @@ class BaseFieldModel(BaseModel):
 
 class BaseResponseModel(BaseModel):
     pass
+
+
+TRequestModel = TypeVar("TRequestModel", bound=BaseRequestModel)
+
+
+def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs) -> T:
+        try:
+            return func(*args, **kwargs)
+        except ValidationError as e:
+            raise InvalidAPIParameters(repr(e))
+
+    return wrapped
+
+
+class BodyParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
+
+    def __init__(self, model: Type[TRequestModel]) -> None:
+        self._model = model
+        self._parsed: Optional[TRequestModel] = None
+
+    @property
+    def parsed(self) -> TRequestModel:
+        if not self._parsed:
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
+        return self._parsed
+
+    @convert_validation_error
+    def from_body(self, json_body: str) -> Self:
+        self._parsed = self._model.model_validate(json_body)
+        return self
+
+
+class QueryParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
+
+    def __init__(self, model: Type[TRequestModel]) -> None:
+        self._model = model
+        self._parsed: Optional[TRequestModel] = None
+
+    @property
+    def parsed(self) -> TRequestModel:
+        if not self._parsed:
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
+        return self._parsed
+
+    @convert_validation_error
+    def from_query(self, query: MultiMapping[str]) -> Self:
+        self._parsed = self._model.model_validate(query)
+        return self
+
+
+class HeaderParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
+
+    def __init__(self, model: Type[TRequestModel]) -> None:
+        self._model = model
+        self._parsed: Optional[TRequestModel] = None
+
+    @property
+    def parsed(self) -> TRequestModel:
+        if not self._parsed:
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
+        return self._parsed
+
+    @convert_validation_error
+    def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
+        self._parsed = self._model.model_validate(headers)
+        return self
+
+
+class PathParam(Generic[TRequestModel]):
+    _model: Type[TRequestModel]
+    _parsed: Optional[TRequestModel]
+
+    def __init__(self, model: Type[TRequestModel]) -> None:
+        self._model = model
+        self._parsed: Optional[TRequestModel] = None
+
+    @property
+    def parsed(self) -> TRequestModel:
+        if not self._parsed:
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
+        return self._parsed
+
+    @convert_validation_error
+    def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
+        self._parsed = self._model.model_validate(match_info)
+        return self
+
+
+class MiddlewareParam(ABC, BaseModel):
+    @classmethod
+    @abstractmethod
+    def from_request(cls, request: web.Request) -> Self:
+        pass
 
 
 JSONDict: TypeAlias = dict[str, Any]
