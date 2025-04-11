@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
@@ -34,10 +35,10 @@ class GroupProcessors:
     usage_per_month: ActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
     usage_per_period: ActionProcessor[UsagePerPeriodAction, UsagePerPeriodActionResult]
 
-    def __init__(self, group_service: GroupService) -> None:
-        self.create_group = ActionProcessor(group_service.create_group)
-        self.modify_group = ActionProcessor(group_service.modify_group)
-        self.delete_group = ActionProcessor(group_service.delete_group)
-        self.purge_group = ActionProcessor(group_service.purge_group)
-        self.usage_per_month = ActionProcessor(group_service.usage_per_month)
-        self.usage_per_period = ActionProcessor(group_service.usage_per_period)
+    def __init__(self, group_service: GroupService, action_monitors: list[ActionMonitor]) -> None:
+        self.create_group = ActionProcessor(group_service.create_group, action_monitors)
+        self.modify_group = ActionProcessor(group_service.modify_group, action_monitors)
+        self.delete_group = ActionProcessor(group_service.delete_group, action_monitors)
+        self.purge_group = ActionProcessor(group_service.purge_group, action_monitors)
+        self.usage_per_month = ActionProcessor(group_service.usage_per_month, action_monitors)
+        self.usage_per_period = ActionProcessor(group_service.usage_per_period, action_monitors)

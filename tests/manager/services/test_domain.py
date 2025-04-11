@@ -52,7 +52,7 @@ from .test_utils import TestScenario
 @pytest.fixture
 def processors(database_fixture, database_engine) -> DomainProcessors:
     domain_service = DomainService(database_engine)
-    return DomainProcessors(domain_service)
+    return DomainProcessors(domain_service, [])
 
 
 @pytest.fixture

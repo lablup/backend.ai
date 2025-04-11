@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
@@ -35,10 +36,10 @@ class DomainProcessors:
     delete_domain: ActionProcessor[DeleteDomainAction, DeleteDomainActionResult]
     purge_domain: ActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
 
-    def __init__(self, service: DomainService) -> None:
-        self.create_domain_node = ActionProcessor(service.create_domain_node)
-        self.modify_domain_node = ActionProcessor(service.modify_domain_node)
-        self.create_domain = ActionProcessor(service.create_domain)
-        self.modify_domain = ActionProcessor(service.modify_domain)
-        self.delete_domain = ActionProcessor(service.delete_domain)
-        self.purge_domain = ActionProcessor(service.purge_domain)
+    def __init__(self, service: DomainService, action_monitors: list[ActionMonitor]) -> None:
+        self.create_domain_node = ActionProcessor(service.create_domain_node, action_monitors)
+        self.modify_domain_node = ActionProcessor(service.modify_domain_node, action_monitors)
+        self.create_domain = ActionProcessor(service.create_domain, action_monitors)
+        self.modify_domain = ActionProcessor(service.modify_domain, action_monitors)
+        self.delete_domain = ActionProcessor(service.delete_domain, action_monitors)
+        self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)

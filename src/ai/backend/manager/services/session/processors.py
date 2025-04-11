@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
@@ -146,30 +147,36 @@ class SessionProcessors:
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
 
-    def __init__(self, service: SessionService) -> None:
-        self.commit_session = ActionProcessor(service.commit_session)
-        self.complete = ActionProcessor(service.complete)
-        self.convert_session_to_image = ActionProcessor(service.convert_session_to_image)
-        self.create_cluster = ActionProcessor(service.create_cluster)
-        self.create_from_params = ActionProcessor(service.create_from_params)
-        self.create_from_template = ActionProcessor(service.create_from_template)
-        self.destroy_session = ActionProcessor(service.destroy_session)
-        self.download_file = ActionProcessor(service.download_file)
-        self.download_files = ActionProcessor(service.download_files)
-        self.execute_session = ActionProcessor(service.execute_session)
-        self.get_abusing_report = ActionProcessor(service.get_abusing_report)
-        self.get_commit_status = ActionProcessor(service.get_commit_status)
-        self.get_container_logs = ActionProcessor(service.get_container_logs)
-        self.get_dependency_graph = ActionProcessor(service.get_dependency_graph)
-        self.get_direct_access_info = ActionProcessor(service.get_direct_access_info)
-        self.get_session_info = ActionProcessor(service.get_session_info)
-        self.interrupt = ActionProcessor(service.interrupt)
-        self.list_files = ActionProcessor(service.list_files)
-        self.match_sessions = ActionProcessor(service.match_sessions)
-        self.rename_session = ActionProcessor(service.rename_session)
-        self.restart_session = ActionProcessor(service.restart_session)
-        self.shutdown_service = ActionProcessor(service.shutdown_service)
-        self.start_service = ActionProcessor(service.start_service)
-        self.upload_files = ActionProcessor(service.upload_files)
-        self.modify_session = ActionProcessor(service.modify_session)
-        self.check_and_transit_status = ActionProcessor(service.check_and_transit_status)
+    def __init__(self, service: SessionService, action_monitors: list[ActionMonitor]) -> None:
+        self.commit_session = ActionProcessor(service.commit_session, action_monitors)
+        self.complete = ActionProcessor(service.complete, action_monitors)
+        self.convert_session_to_image = ActionProcessor(
+            service.convert_session_to_image, action_monitors
+        )
+        self.create_cluster = ActionProcessor(service.create_cluster, action_monitors)
+        self.create_from_params = ActionProcessor(service.create_from_params, action_monitors)
+        self.create_from_template = ActionProcessor(service.create_from_template, action_monitors)
+        self.destroy_session = ActionProcessor(service.destroy_session, action_monitors)
+        self.download_file = ActionProcessor(service.download_file, action_monitors)
+        self.download_files = ActionProcessor(service.download_files, action_monitors)
+        self.execute_session = ActionProcessor(service.execute_session, action_monitors)
+        self.get_abusing_report = ActionProcessor(service.get_abusing_report, action_monitors)
+        self.get_commit_status = ActionProcessor(service.get_commit_status, action_monitors)
+        self.get_container_logs = ActionProcessor(service.get_container_logs, action_monitors)
+        self.get_dependency_graph = ActionProcessor(service.get_dependency_graph, action_monitors)
+        self.get_direct_access_info = ActionProcessor(
+            service.get_direct_access_info, action_monitors
+        )
+        self.get_session_info = ActionProcessor(service.get_session_info, action_monitors)
+        self.interrupt = ActionProcessor(service.interrupt, action_monitors)
+        self.list_files = ActionProcessor(service.list_files, action_monitors)
+        self.match_sessions = ActionProcessor(service.match_sessions, action_monitors)
+        self.rename_session = ActionProcessor(service.rename_session, action_monitors)
+        self.restart_session = ActionProcessor(service.restart_session, action_monitors)
+        self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
+        self.start_service = ActionProcessor(service.start_service, action_monitors)
+        self.upload_files = ActionProcessor(service.upload_files, action_monitors)
+        self.modify_session = ActionProcessor(service.modify_session, action_monitors)
+        self.check_and_transit_status = ActionProcessor(
+            service.check_and_transit_status, action_monitors
+        )

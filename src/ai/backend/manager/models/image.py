@@ -45,6 +45,7 @@ from ai.backend.manager.data.image.types import (
     ImageResourcesData,
     ImageStatus,
     ImageType,
+    RescanImagesResult,
 )
 
 from ..api.exceptions import ImageNotFound

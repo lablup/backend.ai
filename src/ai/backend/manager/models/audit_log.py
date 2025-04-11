@@ -19,25 +19,30 @@ from .base import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-__all__ = ("AuditLogRow", "ImageAuditLogOperationType")
+__all__ = ("AuditLogRow",)
 
 
 class AuditLogEntityType(enum.StrEnum):
     IMAGE = "image"
-
-
-class ImageAuditLogOperationType(enum.StrEnum):
-    SESSION_CREATE = "session_create"
-    UPDATE = "update"  # Rescan and update image metadata
-    PULL = "pull"  # Pull image from the registry
+    CONTAINER_REGISTRY = "container_registry"
+    DOMAIN = "domain"
+    GROUP = "group"
+    AGENT = "agent"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    PROJECT_RESOURCE_POLICY = "project_resource_policy"
+    USER_RESOURCE_POLICY = "user_resource_policy"
+    RESOURCE_PRESET = "resource_preset"
+    SESSION = "session"
+    USER = "user"
+    VFOLDER = "vfolder"
+    VFOLDER_INVITATION = "vfolder_invitation"
 
 
 class OperationStatus(enum.StrEnum):
     SUCCESS = "success"
     ERROR = "error"
-
-
-AuditLogOperationType = ImageAuditLogOperationType
+    UNKNOWN = "unknown"
+    RUNNING = "running"
 
 
 class AuditLogRow(Base):
@@ -63,9 +68,10 @@ class AuditLogRow(Base):
         index=True,
     )
 
+    action_id = sa.Column("action_id", GUID, nullable=False)
     request_id = sa.Column("request_id", GUID, nullable=False)
     description = sa.Column("description", sa.String, nullable=False)
-    duration = sa.Column("duration", sa.Interval, nullable=False)
+    duration = sa.Column("duration", sa.Interval, nullable=True)
 
     status = sa.Column(
         "status",
@@ -75,17 +81,19 @@ class AuditLogRow(Base):
 
     def __init__(
         self,
-        entity_type: AuditLogEntityType,
-        operation: AuditLogOperationType,
+        entity_type: str,
+        operation: str,
         entity_id: str | uuid.UUID,
+        action_id: uuid.UUID,
         request_id: uuid.UUID,
         description: str,
-        duration: timedelta,
-        created_at: Optional[datetime] = None,
-        status: OperationStatus = OperationStatus.SUCCESS,
+        created_at: datetime,
+        status: OperationStatus,
+        duration: Optional[timedelta] = None,
     ):
-        self.entity_type = entity_type.value
-        self.operation = operation.value
+        self.entity_type = entity_type
+        self.operation = operation
+        self.action_id = action_id
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
         self.request_id = request_id
         self.description = description
@@ -100,6 +108,7 @@ class AuditLogRow(Base):
             f"operation: {self.operation}, "
             f"created_at: {self.created_at}, "
             f"entity_id: {self.entity_id}, "
+            f"action_id: {self.action_id}, "
             f"request_id: {self.request_id}, "
             f"description: {self.description}, "
             f"duration: {self.duration}, "
