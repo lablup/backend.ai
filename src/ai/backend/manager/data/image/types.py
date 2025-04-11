@@ -1,9 +1,19 @@
+import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from ai.backend.manager.models.image import ImageStatus, ImageType
+
+class ImageStatus(enum.StrEnum):
+    ALIVE = "ALIVE"
+    DELETED = "DELETED"
+
+
+class ImageType(enum.Enum):
+    COMPUTE = "compute"
+    SYSTEM = "system"
+    SERVICE = "service"
 
 
 @dataclass

@@ -42,9 +42,10 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.gql_models.keypair import CreateKeyPair
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
-from ai.backend.manager.models.keypair import CreateKeyPair, KeyPairRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     SessionRow,
@@ -57,32 +58,31 @@ from ai.backend.manager.models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
 )
-from ai.backend.manager.services.users.actions.admin_month_stats import (
+from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
 )
-from ai.backend.manager.services.users.actions.create_user import (
+from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
-from ai.backend.manager.services.users.actions.delete_user import (
+from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
 )
-from ai.backend.manager.services.users.actions.modify_user import (
+from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
 )
-from ai.backend.manager.services.users.actions.purge_user import (
+from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
-from ai.backend.manager.services.users.actions.user_month_stats import (
+from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
-from ai.backend.manager.services.users.type import UserData
-from ai.backend.manager.types import OptionalState, State
+from ai.backend.manager.services.user.type import UserData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -110,36 +110,36 @@ class UserService:
         self._redis_stat = redis_stat
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
-        username = action.username if action.username else action.email
+        username = action.input.username if action.input.username else action.input.email
         _status = UserStatus.ACTIVE  # TODO: Need to be set in action explicitly not in service (integrate is_active and status)
-        if action.status is None and action.is_active is not None:
-            _status = UserStatus.ACTIVE if action.is_active else UserStatus.INACTIVE
-        if action.status is not None:
-            _status = action.status
-        group_ids = [] if action.group_ids is None else action.group_ids
+        if action.input.status is None and action.input.is_active is not None:
+            _status = UserStatus.ACTIVE if action.input.is_active else UserStatus.INACTIVE
+        if action.input.status is not None:
+            _status = action.input.status
+        group_ids = [] if action.input.group_ids is None else action.input.group_ids
 
         user_data = {
             "username": username,
-            "email": action.email,
-            "password": action.password,
-            "need_password_change": action.need_password_change,
-            "full_name": action.full_name,
-            "description": action.description,
+            "email": action.input.email,
+            "password": action.input.password,
+            "need_password_change": action.input.need_password_change,
+            "full_name": action.input.full_name,
+            "description": action.input.description,
             "status": _status,
             "status_info": "admin-requested",  # user mutation is only for admin
-            "domain_name": action.domain_name,
-            "role": action.role,
-            "allowed_client_ip": action.allowed_client_ip,
-            "totp_activated": action.totp_activated,
-            "resource_policy": action.resource_policy,
-            "sudo_session_enabled": action.sudo_session_enabled,
+            "domain_name": action.input.domain_name,
+            "role": action.input.role,
+            "allowed_client_ip": action.input.allowed_client_ip,
+            "totp_activated": action.input.totp_activated,
+            "resource_policy": action.input.resource_policy,
+            "sudo_session_enabled": action.input.sudo_session_enabled,
         }
-        if action.container_uid is not None:
-            user_data["container_uid"] = action.container_uid
-        if action.container_main_gid is not None:
-            user_data["container_main_gid"] = action.container_main_gid
-        if action.container_gids is not None:
-            user_data["container_gids"] = action.container_gids
+        if action.input.container_uid is not None:
+            user_data["container_uid"] = action.input.container_uid
+        if action.input.container_main_gid is not None:
+            user_data["container_main_gid"] = action.input.container_main_gid
+        if action.input.container_gids is not None:
+            user_data["container_gids"] = action.input.container_gids
 
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -149,11 +149,11 @@ class UserService:
             created_user = result.first()
 
             # Create a default keypair for the user.
-            email = action.email
+            email = action.input.email
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
                 {
-                    "is_active": action.status == UserStatus.ACTIVE,
+                    "is_active": _status == UserStatus.ACTIVE,
                     "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
                     "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                     "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
@@ -190,7 +190,7 @@ class UserService:
                 query = (
                     sa.select([groups.c.id])
                     .select_from(groups)
-                    .where(groups.c.domain_name == action.domain_name)
+                    .where(groups.c.domain_name == action.input.domain_name)
                     .where(groups.c.id.in_(gids_to_join))
                 )
                 grps = (await conn.execute(query)).all()
@@ -221,14 +221,14 @@ class UserService:
         )
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
-        data = action.get_updated_fields()
         email = action.email
+        data = action.modifier.fields_to_update()
         if data.get("password") is None:
             data.pop("password", None)
 
-        group_ids: OptionalState = action.modifiable_fields.group_ids
+        group_ids = action.modifier.group_ids.optional_value()
 
-        if not data and (group_ids.state() == State.UPDATE and group_ids.value() is None):
+        if not data and group_ids is None:
             return ModifyUserActionResult(data=None, success=False)
         if data.get("status") is None and data.get("is_active") is not None:
             data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
@@ -347,10 +347,7 @@ class UserService:
                         )
 
             # If domain is changed and no group is associated, clear previous domain's group.
-            if prev_domain_name != updated_user.domain_name and (
-                group_ids.state() == State.NOP
-                or (group_ids.state() == State.UPDATE and group_ids.value() is None)
-            ):
+            if prev_domain_name != updated_user.domain_name and not group_ids:
                 await conn.execute(
                     sa.delete(association_groups_users).where(
                         association_groups_users.c.user_id == updated_user.uuid
@@ -358,9 +355,7 @@ class UserService:
                 )
 
             # Update user's group if group_ids parameter is provided.
-            if (
-                group_ids.state() == State.UPDATE and group_ids.value() is not None
-            ) and updated_user is not None:
+            if group_ids and updated_user is not None:
                 # Clear previous groups associated with the user.
                 await conn.execute(
                     sa.delete(association_groups_users).where(
@@ -372,7 +367,7 @@ class UserService:
                     sa.select([groups.c.id])
                     .select_from(groups)
                     .where(groups.c.domain_name == updated_user.domain_name)
-                    .where(groups.c.id.in_(group_ids.value())),
+                    .where(groups.c.id.in_(group_ids)),
                 )
                 grps = result.fetchall()
                 if grps:
@@ -453,20 +448,14 @@ class UserService:
                     "Terminate those kernels first.",
                 )
 
-            if (
-                action.purge_shared_vfolders.state() == State.UPDATE
-                and not action.purge_shared_vfolders.value()
-            ):
+            if action.purge_shared_vfolders.optional_value():
                 await self.migrate_shared_vfolders(
                     conn,
                     deleted_user_uuid=user_uuid,
                     target_user_uuid=action.user_info_ctx.uuid,
                     target_user_email=action.user_info_ctx.email,
                 )
-            if (
-                action.delegate_endpoint_ownership.state() == State.UPDATE
-                and action.delegate_endpoint_ownership.value()
-            ):
+            if action.delegate_endpoint_ownership.optional_value():
                 await EndpointRow.delegate_endpoint_ownership(
                     db_session,
                     user_uuid,

@@ -36,32 +36,31 @@ from ai.backend.manager.models.resource_usage import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
-from ai.backend.manager.services.groups.actions.create_group import (
+from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.delete_group import (
+from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
     DeleteGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.modify_group import (
+from ai.backend.manager.services.group.actions.modify_group import (
     ModifyGroupAction,
     ModifyGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.purge_group import (
+from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
-from ai.backend.manager.services.groups.actions.usage_per_month import (
+from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
 )
-from ai.backend.manager.services.groups.actions.usage_per_period import (
+from ai.backend.manager.services.group.actions.usage_per_period import (
     UsagePerPeriodAction,
     UsagePerPeriodActionResult,
 )
-from ai.backend.manager.services.groups.types import GroupData
-from ai.backend.manager.types import OptionalState, State
+from ai.backend.manager.services.group.types import GroupData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -92,7 +91,7 @@ class GroupService:
         self._redis_stat = redis_stat
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
-        data = action.get_insertion_data()
+        data = action.input.fields_to_store()
         base_query = sa.insert(groups).values(data)
 
         async def _do_mutate() -> MutationResult:
@@ -102,11 +101,13 @@ class GroupService:
                 row = result.first()
                 if result.rowcount > 0:
                     return MutationResult(
-                        success=True, message=f"Group {action.name} creation succeed", data=row
+                        success=True,
+                        message=f"Group {action.input.name} creation succeed",
+                        data=row,
                     )
                 else:
                     return MutationResult(
-                        success=False, message=f"no matching {action.name}", data=None
+                        success=False, message=f"no matching {action.input.name}", data=None
                     )
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
@@ -114,17 +115,16 @@ class GroupService:
         return CreateGroupActionResult(data=GroupData.from_row(res.data), success=res.success)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        data = action.get_modified_fields()
+        data = action.modifier.fields_to_update()
 
-        if action.user_update_mode.state() != State.NOP and action.user_update_mode.value() not in (
+        if action.modifier.user_update_mode.optional_value() not in (
             None,
             "add",
             "remove",
         ):
             raise ValueError("invalid user_update_mode")
-        if action.user_uuids.state() == State.NOP:
-            action.user_update_mode = OptionalState.update("user_update_mode", None)
-        if not data and action.user_update_mode.value() is None:
+        update_mode = action.modifier.update_mode()
+        if not data and update_mode is None:
             return ModifyGroupActionResult(data=None, success=False)
 
         async def _do_mutate() -> MutationResult:
@@ -132,14 +132,14 @@ class GroupService:
                 # TODO: refactor user addition/removal in groups as separate mutations
                 #       (to apply since 21.09)
                 gid = action.group_id
-                if action.user_uuids.state() == State.UPDATE:
-                    user_uuids = cast(list[str], action.user_uuids.value())
-                    if action.user_update_mode.value() == "add":
+                user_uuids = action.modifier.user_uuids.optional_value()
+                if user_uuids:
+                    if update_mode == "add":
                         values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]
                         await conn.execute(
                             sa.insert(association_groups_users).values(values),
                         )
-                    elif action.user_update_mode.value() == "remove":
+                    elif update_mode == "remove":
                         await conn.execute(
                             sa.delete(association_groups_users).where(
                                 (association_groups_users.c.user_id.in_(user_uuids))

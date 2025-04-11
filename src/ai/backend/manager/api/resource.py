@@ -34,16 +34,16 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import Watcher
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
-from ai.backend.manager.services.groups.actions.usage_per_month import UsagePerMonthAction
-from ai.backend.manager.services.groups.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.group.actions.usage_per_month import UsagePerMonthAction
+from ai.backend.manager.services.group.actions.usage_per_period import UsagePerPeriodAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
-from ai.backend.manager.services.users.actions.admin_month_stats import AdminMonthStatsAction
-from ai.backend.manager.services.users.actions.user_month_stats import UserMonthStatsAction
+from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
+from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 
 from .auth import auth_required, superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -177,7 +177,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
             month=params["month"],
         )
     )
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -210,7 +210,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -231,7 +231,7 @@ async def user_month_stats(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.stats, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
@@ -248,7 +248,7 @@ async def admin_month_stats(request: web.Request) -> web.Response:
         AdminMonthStatsAction()
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.stats, status=HTTPStatus.OK)
 
 
 # TODO: get_watcher_info overlaps with service-side method.
@@ -384,7 +384,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(result, status=HTTPStatus.OK)
+    return web.json_response(result.registries, status=HTTPStatus.OK)
 
 
 def create_app(
