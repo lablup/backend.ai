@@ -243,3 +243,8 @@ class OptionalState(Generic[TVal]):
                 dict[attr_name] = self._value
             case _TriStateEnum.NOP:
                 pass
+
+
+class SMTPTriggerPolicy(enum.StrEnum):
+    ALL = "ALL"
+    ON_ERROR = "ON_ERROR"
