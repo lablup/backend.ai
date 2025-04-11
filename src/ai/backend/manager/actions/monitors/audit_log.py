@@ -93,6 +93,8 @@ class AuditLogger:
 
         async with self._db.begin_session() as db_sess:
             db_row = AuditLogRow(
+                # TODO: Fix this.
+                action_id=NULL_UUID,
                 entity_type=action.entity_type(),
                 operation=action.operation_type(),
                 entity_id=action.entity_id() or UNKNOWN_ENTITY_ID,
@@ -100,7 +102,7 @@ class AuditLogger:
                 description="Task is running...",
                 duration=timedelta(0),
                 status=OperationStatus.RUNNING,
-                created_at=datetime.now(),
+                started_at=datetime.now(),
             )
 
             db_sess.add(db_row)

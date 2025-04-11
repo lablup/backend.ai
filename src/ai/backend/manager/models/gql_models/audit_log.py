@@ -55,6 +55,7 @@ class AuditLogNode(graphene.ObjectType):
         description = "Added in 25.6.0."
 
     row_id = graphene.UUID(required=True, description="UUID of the audit log row")
+    action_id = graphene.UUID(required=True, description="UUID of the action")
     entity_type = graphene.String(required=True, description="Entity ID of the AuditLog")
     operation = graphene.String(required=True, description="Entity type of the AuditLog")
     entity_id = graphene.String(required=True, description="Operation type of the AuditLog")
@@ -66,6 +67,7 @@ class AuditLogNode(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "entity_type": ("entity_type", None),
+        "action_id": ("action_id", None),
         "operation": ("operation", None),
         "entity_id": ("entity_id", None),
         "created_at": ("created_at", None),
@@ -77,6 +79,7 @@ class AuditLogNode(graphene.ObjectType):
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
         "entity_type": ("entity_type", None),
+        "action_id": ("action_id", None),
         "operation": ("operation", None),
         "entity_id": ("entity_id", None),
         "created_at": ("created_at", None),
@@ -94,7 +97,8 @@ class AuditLogNode(graphene.ObjectType):
             entity_type=row.entity_type,
             operation=row.operation,
             entity_id=row.entity_id,
-            created_at=row.created_at,
+            created_at=row.started_at,
+            action_id=row.action_id,
             request_id=row.request_id,
             description=row.description,
             duration=row.duration,

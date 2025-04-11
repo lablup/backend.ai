@@ -4,6 +4,7 @@ import enum
 import logging
 import uuid
 from datetime import datetime, timedelta
+from typing import Optional
 
 import sqlalchemy as sa
 
@@ -59,17 +60,18 @@ class AuditLogRow(Base):
         index=True,
     )
 
-    created_at = sa.Column(
-        "created_at",
+    started_at = sa.Column(
+        "started_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         nullable=False,
         index=True,
     )
 
+    action_id = sa.Column("action_id", GUID, nullable=False)
     request_id = sa.Column("request_id", GUID, nullable=False)
     description = sa.Column("description", sa.String, nullable=False)
-    duration = sa.Column("duration", sa.Interval, nullable=False)
+    duration = sa.Column("duration", sa.Interval, nullable=True)
 
     status = sa.Column(
         "status",
@@ -82,28 +84,31 @@ class AuditLogRow(Base):
         entity_type: str,
         operation: str,
         entity_id: str | uuid.UUID,
+        action_id: uuid.UUID,
         request_id: uuid.UUID,
         description: str,
-        duration: timedelta,
-        created_at: datetime,
+        started_at: datetime,
         status: OperationStatus,
+        duration: Optional[timedelta] = None,
     ):
         self.entity_type = entity_type
         self.operation = operation
+        self.action_id = action_id
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
         self.request_id = request_id
         self.description = description
         self.duration = duration
         self.status = status
-        self.created_at = created_at
+        self.started_at = started_at
 
     def __str__(self) -> str:
         return (
             f"AuditLogRow("
             f"entity_type: {self.entity_type}, "
             f"operation: {self.operation}, "
-            f"created_at: {self.created_at}, "
+            f"started_at: {self.started_at}, "
             f"entity_id: {self.entity_id}, "
+            f"action_id: {self.action_id}, "
             f"request_id: {self.request_id}, "
             f"description: {self.description}, "
             f"duration: {self.duration}, "
