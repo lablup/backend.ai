@@ -121,7 +121,7 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
-from ..types import TriState
+from ..types import OptionalState, TriState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -1032,8 +1032,8 @@ async def update_vfolder_options(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
             modifier=VFolderAttributeModifier(
-                cloneable=TriState.update(params["cloneable"]),
-                mount_permission=TriState.update(params["permission"]),
+                cloneable=OptionalState[bool].update(params["cloneable"]),
+                mount_permission=TriState[VFolderPermission].update(params["permission"]),
             ),
         )
     )
