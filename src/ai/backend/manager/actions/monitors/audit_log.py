@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Final, Optional, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action import BaseAction, ProcessResult
+from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.models.audit_log import AuditLogRow, OperationStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -136,7 +136,7 @@ class AuditLogManager(ActionMonitor):
         self._audit_logger = audit_logger
 
     @override
-    async def prepare(self, action: BaseAction) -> None:
+    async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
         # TODO: Inject live configs into AuditLogInfo
         if audit_log_meta := await self._audit_logger.generate_log(action, AuditLogInfo()):
             self._log_context.set(audit_log_meta)
