@@ -233,6 +233,9 @@ class ScalingGroup(graphene.ObjectType):
             description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
         ),
     )
+    resource_allocation_limit_for_sessions = graphene.JSONString(
+        description="Added in 25.6.0. The limit of computing resources that can be allocated to each compute session created within this resource group.",
+    )
 
     # TODO: Replace this field with a generic resource slot query API
     own_session_occupied_resource_slots = graphene.Field(
@@ -290,6 +293,31 @@ class ScalingGroup(graphene.ObjectType):
                 "occupied_slots": total_occupied_slots.to_json(),
                 "available_slots": total_available_slots.to_json(),
             }
+
+    async def resolve_resource_allocation_limit_for_sessions(
+        self, info: graphene.ResolveInfo
+    ) -> dict[str, Any]:
+        from ..agent import AgentRow
+
+        # TODO: Allow admins to set which value to return here among "min", "max", "custom"
+        graph_ctx: GraphQueryContext = info.context
+        agent_list = await AgentRow.get_schedulable_agents_by_sgroup(self.name, db=graph_ctx.db)
+
+        def _compare_each_resource_and_get_max(
+            val1: ResourceSlot, val2: Optional[ResourceSlot]
+        ) -> ResourceSlot:
+            if val2 is None:
+                return val1
+            return_val = ResourceSlot()
+            val1.sync_keys(val2)
+            for key in val1:
+                return_val[key] = max(val1[key], val2[key])
+            return return_val
+
+        result: Optional[ResourceSlot] = None
+        for agent_row in agent_list:
+            result = _compare_each_resource_and_get_max(agent_row.available_slots, result)
+        return dict(result.to_json()) if result is not None else {}
 
     # TODO: Replace this field with a generic resource slot query API
     async def resolve_own_session_occupied_resource_slots(

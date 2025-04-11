@@ -1372,6 +1372,11 @@ type ScalingGroup {
   ): JSONString
 
   """
+  Added in 25.6.0. The limit of computing resources that can be allocated to each compute session created within this resource group.
+  """
+  resource_allocation_limit_for_sessions: JSONString
+
+  """
   Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. Only includes sessions owned by the user.
   """
   own_session_occupied_resource_slots: JSONString
