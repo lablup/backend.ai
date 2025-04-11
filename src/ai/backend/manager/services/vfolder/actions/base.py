@@ -74,11 +74,9 @@ class CreateVFolderActionResult(BaseActionResult):
 
 @dataclass
 class VFolderAttributeModifier(PartialModifier):
-    name: TriState[str] = field(default_factory=TriState[str].nop)
-    cloneable: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
-    mount_permission: TriState[VFolderPermission] = field(
-        default_factory=TriState[VFolderPermission].nop
-    )
+    name: TriState[str] = field(default_factory=TriState.nop)
+    cloneable: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    mount_permission: TriState[VFolderPermission] = field(default_factory=TriState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
