@@ -71,7 +71,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.manager.actions.monitors.audit_log import AuditLogger, AuditLogManager
+from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
@@ -436,9 +436,7 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    audit_logger = AuditLogger(root_ctx.db)
-    audit_log_manager = AuditLogManager(audit_logger)
-    audit_log_manager.start()
+    audit_log_monitor = AuditLogMonitor()
 
     root_ctx.processors = Processors.create(
         ProcessorArgs(
@@ -453,7 +451,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
             )
         ),
-        [audit_log_manager],
+        [audit_log_monitor],
     )
     yield
 
