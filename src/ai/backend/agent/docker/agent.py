@@ -49,7 +49,7 @@ from async_timeout import timeout
 
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
@@ -92,7 +92,7 @@ from ai.backend.logging.formatter import pretty
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel, KernelFeatures
+from ..kernel import AbstractKernel
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types

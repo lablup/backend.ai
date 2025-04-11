@@ -94,14 +94,6 @@ ResultType = Union[
 ]
 
 
-class KernelFeatures(StringSetFlag):
-    UID_MATCH = "uid-match"
-    USER_INPUT = "user-input"
-    BATCH_MODE = "batch"
-    QUERY_MODE = "query"
-    TTY_MODE = "tty"
-
-
 class ClientFeatures(StringSetFlag):
     INPUT = "input"
     CONTINUATION = "continuation"
