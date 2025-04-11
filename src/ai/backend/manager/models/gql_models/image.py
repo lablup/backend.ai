@@ -26,7 +26,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     DispatchResult,
@@ -57,8 +57,8 @@ from ai.backend.manager.services.image.actions.forget_image import (
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import (
+    ImageModifier,
     ModifyImageAction,
-    ModifyImageInputData,
 )
 from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import (
@@ -71,8 +71,10 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
 )
 from ai.backend.manager.services.image.types import ImageRefData
+from ai.backend.manager.types import OptionalState, TriState
 
 from ...api.exceptions import ImageNotFound
+from ...data.image.types import ImageStatus, ImageType
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
@@ -85,8 +87,6 @@ from ..image import (
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
-    ImageStatus,
-    ImageType,
     get_permission_ctx,
 )
 from ..rbac import ScopeType
@@ -99,8 +99,6 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     extract_object_uuid,
-    to_optional_state,
-    to_tri_state,
 )
 
 if TYPE_CHECKING:
@@ -392,12 +390,12 @@ class Image(graphene.ObjectType):
         is_valid = ImageLoadFilter.GENERAL in load_filters
         for label in self.labels:
             match label.key:
-                case "ai.backend.features" if "operation" in label.value:
+                case LabelName.FEATURES.value if KernelFeatures.OPERATION.value in label.value:
                     if ImageLoadFilter.OPERATIONAL in load_filters:
                         is_valid = True
                     else:
                         return False
-                case "ai.backend.customized-image.owner":
+                case LabelName.CUSTOMIZED_OWNER.value:
                     if (
                         ImageLoadFilter.CUSTOMIZED not in load_filters
                         and ImageLoadFilter.CUSTOMIZED_GLOBAL not in load_filters
@@ -952,6 +950,8 @@ class RescanImages(graphene.Mutation):
                 )
                 loaded_registries = registries.registries
 
+            rescanned_images = []
+            errors = []
             for registry_data in loaded_registries:
                 action_result = (
                     await ctx.processors.container_registry.rescan_images.wait_for_complete(
@@ -966,7 +966,12 @@ class RescanImages(graphene.Mutation):
                 for error in action_result.errors:
                     log.error(error)
 
-            return DispatchResult.success(action_result)
+                errors.extend(action_result.errors)
+                rescanned_images.extend(action_result.images)
+
+            if errors:
+                return DispatchResult.partial_success(rescanned_images, errors)
+            return DispatchResult.success(rescanned_images)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
@@ -1084,7 +1089,7 @@ class ModifyImageInput(graphene.InputObjectType):
     supported_accelerators = graphene.List(graphene.String, required=False)
     resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
 
-    def to_dataclass(self) -> ModifyImageInputData:
+    def to_modifier(self) -> ImageModifier:
         resources_data: dict[str, Any] | UndefinedType = Undefined
         if self.resource_limits is not Undefined:
             resources_data = {}
@@ -1097,28 +1102,26 @@ class ModifyImageInput(graphene.InputObjectType):
                 resources_data[limit_option.key] = limit_data
 
         accelerators = (
-            ",".join(self.supported_accelerators)
-            if self.supported_accelerators is not Undefined
-            else None
+            ",".join(self.supported_accelerators) if self.supported_accelerators else Undefined
         )
 
-        return ModifyImageInputData(
-            name=to_optional_state("name", self.name),
-            registry=to_optional_state("registry", self.registry),
-            image=to_optional_state("image", self.image),
-            tag=to_optional_state("tag", self.tag),
-            architecture=to_optional_state("architecture", self.architecture),
-            is_local=to_optional_state("is_local", self.is_local),
-            size_bytes=to_optional_state("size_bytes", self.size_bytes),
-            type=to_optional_state("type", self.type),
-            config_digest=to_optional_state("config_digest", self.digest),
-            labels=to_optional_state("labels", {label.key: label.value for label in self.labels}),
-            accelerators=to_tri_state(
-                "accelerators",
+        return ImageModifier(
+            name=OptionalState[str].from_graphql(self.name),
+            registry=OptionalState[str].from_graphql(self.registry),
+            image=OptionalState[str].from_graphql(self.image),
+            tag=OptionalState[str].from_graphql(self.tag),
+            architecture=OptionalState[str].from_graphql(self.architecture),
+            is_local=OptionalState[bool].from_graphql(self.is_local),
+            size_bytes=OptionalState[int].from_graphql(self.size_bytes),
+            type=OptionalState[ImageType].from_graphql(self.type),
+            config_digest=OptionalState[str].from_graphql(self.digest),
+            labels=OptionalState[dict[str, Any]].from_graphql({
+                label.key: label.value for label in self.labels
+            }),
+            accelerators=TriState[str].from_graphql(
                 accelerators,
             ),
-            resources=to_optional_state(
-                "resources",
+            resources=OptionalState[dict[str, Any]].from_graphql(
                 resources_data,
             ),
         )
@@ -1150,7 +1153,7 @@ class ModifyImage(graphene.Mutation):
             ModifyImageAction(
                 target=target,
                 architecture=architecture,
-                props=props.to_dataclass(),
+                modifier=props.to_modifier(),
             )
         )
 
@@ -1252,7 +1255,11 @@ class PurgeImages(graphene.Mutation):
                         log.error(result.error)
                         total_result.errors.append(result.error)
 
-            return DispatchResult.success(total_result)
+            if total_result.errors:
+                return DispatchResult.partial_success(
+                    total_result.purged_images, total_result.errors
+                )
+            return DispatchResult.success(total_result.purged_images)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return PurgeImagesPayload(task_id=task_id)

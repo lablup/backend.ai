@@ -1,44 +1,37 @@
 import asyncio
 import base64
-import dataclasses
 import functools
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from dataclasses import asdict, dataclass
+from datetime import datetime
 from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Union, cast
 from urllib.parse import urlparse
 
 import aiohttp
 import aiotools
-import attrs
 import multidict
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
-from sqlalchemy.sql.expression import null, true
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
 from ai.backend.common.events import (
-    AgentTerminatedEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
-    EventProducer,
 )
 from ai.backend.common.exception import BackendError, InvalidAPIParameters, UnknownImageReference
 from ai.backend.common.json import load_json
-from ai.backend.common.plugin.monitor import GAUGE, ErrorPluginContext, StatsPluginContext
+from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
     ImageAlias,
     ImageRegistry,
-    RedisConnectionInfo,
     SessionId,
     SessionTypes,
 )
@@ -63,19 +56,14 @@ from ai.backend.manager.api.session import (
     find_dependent_sessions,
     overwritten_param_check,
 )
-from ai.backend.manager.api.utils import catch_unexpected, undefined
-from ai.backend.manager.config import LocalConfig
-from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow, groups
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow, ImageStatus, rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, ImageRow, rescan_images
 from ai.backend.manager.models.kernel import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
-    kernels,
 )
-from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
@@ -197,151 +185,41 @@ from ai.backend.manager.services.session.actions.upload_files import (
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
+from ...data.image.types import ImageStatus
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-@attrs.define(slots=True, auto_attribs=True, init=False)
-class PrivateContext:
-    agent_lost_checker: asyncio.Task[None]
-    stats_task: asyncio.Task[None]
-    database_ptask_group: aiotools.PersistentTaskGroup
-    rpc_ptask_group: aiotools.PersistentTaskGroup
-    webhook_ptask_group: aiotools.PersistentTaskGroup
-
-
-@catch_unexpected(log)
-async def check_agent_lost(
-    local_config: LocalConfig,
-    event_producer: EventProducer,
-    redis_live: RedisConnectionInfo,
-    interval: float,
-) -> None:
-    try:
-        now = datetime.now(tzutc())
-        timeout = timedelta(seconds=local_config["manager"]["heartbeat-timeout"])
-
-        async def _check_impl(r: Redis):
-            async for agent_id, prev in r.hscan_iter("agent.last_seen"):
-                prev = datetime.fromtimestamp(float(prev), tzutc())
-                if now - prev > timeout:
-                    await event_producer.produce_event(
-                        AgentTerminatedEvent("agent-lost"), source_override=agent_id.decode()
-                    )
-
-        await redis_helper.execute(redis_live, _check_impl)
-    except asyncio.CancelledError:
-        pass
-
-
-@catch_unexpected(log)
-async def report_stats(
-    db: ExtendedAsyncSAEngine,
-    stats_monitor: StatsPluginContext,
-    registry: AgentRegistry,
-    interval: float,
-) -> None:
-    try:
-        stats_monitor = stats_monitor
-        await stats_monitor.report_metric(
-            GAUGE, "ai.backend.manager.coroutines", len(asyncio.all_tasks())
-        )
-
-        all_inst_ids = [inst_id async for inst_id in registry.enumerate_instances()]
-        await stats_monitor.report_metric(
-            GAUGE, "ai.backend.manager.agent_instances", len(all_inst_ids)
-        )
-
-        async with db.begin_readonly() as conn:
-            query = (
-                sa.select([sa.func.count()])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.cluster_role == DEFAULT_ROLE)
-                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-                )
-            )
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(GAUGE, "ai.backend.manager.active_kernels", n)
-            subquery = (
-                sa.select([sa.func.count()])
-                .select_from(keypairs)
-                .where(keypairs.c.is_active == true())
-                .group_by(keypairs.c.user_id)
-            )
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_active_key", n)
-
-            subquery = subquery.where(keypairs.c.last_used != null())
-            query = sa.select([sa.func.count()]).select_from(subquery.alias())
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(GAUGE, "ai.backend.users.has_used_key", n)
-
-            """
-            query = sa.select([sa.func.count()]).select_from(usage)
-            n = await conn.scalar(query)
-            await stats_monitor.report_metric(
-                GAUGE, 'ai.backend.manager.accum_kernels', n)
-            """
-    except (sa.exc.InterfaceError, ConnectionRefusedError):
-        log.warning("report_stats(): error while connecting to PostgreSQL server")
+@dataclass
+class SessionServiceArgs:
+    db: ExtendedAsyncSAEngine
+    agent_registry: AgentRegistry
+    background_task_manager: BackgroundTaskManager
+    error_monitor: ErrorPluginContext
+    idle_checker_host: IdleCheckerHost
 
 
 class SessionService:
     _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
-    _redis_live: RedisConnectionInfo
-    _local_config: LocalConfig
-    _stats_monitor: StatsPluginContext
-    _app_ctx: PrivateContext
-    _event_producer: EventProducer
     _background_task_manager: BackgroundTaskManager
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
+    _database_ptask_group: aiotools.PersistentTaskGroup
+    _rpc_ptask_group: aiotools.PersistentTaskGroup
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
-        agent_registry: AgentRegistry,
-        redis_live: RedisConnectionInfo,
-        local_config: LocalConfig,
-        stats_monitor: StatsPluginContext,
-        event_producer: EventProducer,
-        background_task_manager: BackgroundTaskManager,
-        error_monitor: ErrorPluginContext,
-        idle_checker_host: IdleCheckerHost,
+        args: SessionServiceArgs,
     ) -> None:
-        self._db = db
-        self._agent_registry = agent_registry
-        self._redis_live = redis_live
-        self._local_config = local_config
-        self._stats_monitor = stats_monitor
-        self._event_producer = event_producer
-        self._background_task_manager = background_task_manager
-        self._error_monitor = error_monitor
-        self._idle_checker_host = idle_checker_host
-        self.init_app_ctx()
-
-    def init_app_ctx(self) -> None:
-        app_ctx: PrivateContext = PrivateContext()
-        app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
-        app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
-        app_ctx.webhook_ptask_group = aiotools.PersistentTaskGroup()
-
-        # Scan ALIVE agents
-        app_ctx.agent_lost_checker = aiotools.create_timer(
-            functools.partial(
-                check_agent_lost, self._local_config, self._event_producer, self._redis_live
-            ),
-            1.0,
-        )
-        app_ctx.agent_lost_checker.set_name("agent_lost_checker")
-        app_ctx.stats_task = aiotools.create_timer(
-            functools.partial(report_stats, self._db, self._stats_monitor, self._agent_registry),
-            5.0,
-        )
-        app_ctx.stats_task.set_name("stats_task")
-        self._app_ctx = app_ctx
+        self._db = args.db
+        self._agent_registry = args.agent_registry
+        self._background_task_manager = args.background_task_manager
+        self._error_monitor = args.error_monitor
+        self._idle_checker_host = args.idle_checker_host
+        self._database_ptask_group = aiotools.PersistentTaskGroup()
+        self._rpc_ptask_group = aiotools.PersistentTaskGroup()
+        self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
@@ -361,7 +239,7 @@ class SessionService:
                 )
 
             resp: Mapping[str, Any] = await asyncio.shield(
-                self._app_ctx.rpc_ptask_group.create_task(
+                self._rpc_ptask_group.create_task(
                     self._agent_registry.commit_session_to_file(session, filename),
                 ),
             )
@@ -529,11 +407,20 @@ class SessionService:
                     existing_row = await sess.scalar(query)
 
                     customized_image_id: str
+                    kern_features: list[str]
                     if existing_row:
-                        customized_image_id = existing_row.labels["ai.backend.customized-image.id"]
+                        kern_features = existing_row.labels.get(
+                            LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE
+                        ).split()
+                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID.value]
                         log.debug("reusing existing customized image ID {}", customized_image_id)
                     else:
+                        kern_features = [DEFAULT_KERNEL_FEATURE]
                         customized_image_id = str(uuid.uuid4())
+                    # Remove PRIVATE label for customized images
+                    kern_features = [
+                        feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
+                    ]
 
                 new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
                 new_image_ref = ImageRef.from_image_str(
@@ -545,13 +432,14 @@ class SessionService:
                 )
 
                 image_labels = {
-                    "ai.backend.customized-image.owner": f"{image_visibility.value}:{image_owner_id}",
-                    "ai.backend.customized-image.name": image_name,
-                    "ai.backend.customized-image.id": customized_image_id,
+                    LabelName.CUSTOMIZED_OWNER.value: f"{image_visibility.value}:{image_owner_id}",
+                    LabelName.CUSTOMIZED_NAME.value: image_name,
+                    LabelName.CUSTOMIZED_ID.value: customized_image_id,
+                    LabelName.FEATURES.value: " ".join(kern_features),
                 }
                 match image_visibility:
                     case CustomizedImageVisibilityScope.USER:
-                        image_labels["ai.backend.customized-image.user.email"] = action.user_email
+                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL.value] = action.user_email
 
                 # commit image with new tag set
                 resp = await self._agent_registry.commit_session(
@@ -868,7 +756,7 @@ class SessionService:
             config_from_template["agent_list"] = template["spec"]["agent_list"]
 
         override_config = drop_undefined(dict(action.params.config))
-        override_params = drop_undefined(dict(dataclasses.asdict(action.params)))
+        override_params = drop_undefined(dict(asdict(action.params)))
 
         log.debug("Default config: {0}", config_from_template)
         log.debug("Default params: {0}", param_from_template)
@@ -1569,7 +1457,7 @@ class SessionService:
         try:
             async with self._db.begin_readonly_session() as db_sess:
                 session = await asyncio.shield(
-                    self._app_ctx.database_ptask_group.create_task(
+                    self._database_ptask_group.create_task(
                         SessionRow.get_session(
                             db_sess,
                             session_name,
@@ -1633,7 +1521,7 @@ class SessionService:
             raise AppNotFound(f"{session_name}:{service}")
 
         await asyncio.shield(
-            self._app_ctx.database_ptask_group.create_task(
+            self._database_ptask_group.create_task(
                 self._agent_registry.increment_session_usage(session),
             )
         )
@@ -1645,7 +1533,7 @@ class SessionService:
             opts["envs"] = load_json(envs)
 
         result = await asyncio.shield(
-            self._app_ctx.rpc_ptask_group.create_task(
+            self._rpc_ptask_group.create_task(
                 self._agent_registry.start_service(session, service, opts),
             ),
         )
@@ -1725,8 +1613,8 @@ class SessionService:
 
     async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
         session_id = action.session_id
-        props = action.props
-        session_name = action.props.name
+        props = action.modifier
+        session_name = action.modifier.name.optional_value()
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
@@ -1757,7 +1645,9 @@ class SessionService:
             )
 
             session_row = await db_session.scalar(select_stmt)
-            props.set_attr(session_row)
+            to_update = props.fields_to_update()
+            for key, value in to_update.items():
+                setattr(session_row, key, value)
 
             if session_name:
                 await db_session.execute(

@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
@@ -36,10 +37,10 @@ class AgentProcessors:
     watcher_agent_stop: ActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
     recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
 
-    def __init__(self, service: AgentService) -> None:
-        self.sync_agent_registry = ActionProcessor(service.sync_agent_registry)
-        self.get_watcher_status = ActionProcessor(service.get_watcher_status)
-        self.watcher_agent_start = ActionProcessor(service.watcher_agent_start)
-        self.watcher_agent_restart = ActionProcessor(service.watcher_agent_restart)
-        self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop)
-        self.recalculate_usage = ActionProcessor(service.recalculate_usage)
+    def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
+        self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
+        self.get_watcher_status = ActionProcessor(service.get_watcher_status, action_monitors)
+        self.watcher_agent_start = ActionProcessor(service.watcher_agent_start, action_monitors)
+        self.watcher_agent_restart = ActionProcessor(service.watcher_agent_restart, action_monitors)
+        self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
+        self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)

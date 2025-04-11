@@ -1629,6 +1629,12 @@ class DispatchResult(Generic[ResultType]):
     def error(cls, error_message: str) -> DispatchResult[ResultType]:
         return cls(errors=[error_message])
 
+    @classmethod
+    def partial_success(
+        cls, result_type: ResultType, errors: list[str]
+    ) -> DispatchResult[ResultType]:
+        return cls(result=result_type, errors=errors)
+
 
 class PurgeImageResult(TypedDict):
     image: str

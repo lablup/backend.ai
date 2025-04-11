@@ -115,8 +115,8 @@ async def test_create_quota_scope(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
     }
     mock_request.json.return_value = {"options": None}
 
@@ -133,8 +133,8 @@ async def test_get_quota_scope(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
     }
 
     response: APIResponse = await handler.get_quota_scope(mock_request)
@@ -153,8 +153,8 @@ async def test_update_quota_scope(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
     }
     mock_request.json.return_value = {"options": None}
 
@@ -171,8 +171,8 @@ async def test_delete_quota_scope(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
     }
 
     response: APIResponse = await handler.delete_quota_scope(mock_request)
@@ -188,8 +188,8 @@ async def test_create_vfolder(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
         "folder_uuid": str(UUID),
     }
 
@@ -206,8 +206,8 @@ async def test_clone_vfolder(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
         "folder_uuid": str(UUID1),
     }
     mock_request.json.return_value = {
@@ -230,8 +230,8 @@ async def test_get_vfolder_info(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
         "folder_uuid": str(UUID),
     }
     mock_request.json.return_value = {"subpath": "/mnt/test_volume"}
@@ -255,8 +255,8 @@ async def test_delete_vfolder(mock_vfolder_service):
     mock_request = AsyncMock(web.Request)
     mock_request.match_info = {
         "volume_id": str(UUID),
-        "scope_type": "user",
-        "scope_uuid": str(UUID),
+        "quota_scope_type": "user",
+        "quota_scope_uuid": str(UUID),
         "folder_uuid": str(UUID),
     }
 

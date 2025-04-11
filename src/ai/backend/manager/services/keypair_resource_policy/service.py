@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 
 import sqlalchemy as sa
@@ -37,14 +36,10 @@ class KeypairResourcePolicyService:
     async def create_keypair_resource_policy(
         self, action: CreateKeyPairResourcePolicyAction
     ) -> CreateKeyPairResourcePolicyActionResult:
-        dict_props = dataclasses.asdict(action.props)
-        # Ignore deprecated fields
-        del dict_props["max_vfolder_count"]
-        del dict_props["max_vfolder_size"]
-        del dict_props["max_quota_scope_size"]
+        to_store = action.creator.fields_to_store()
 
         async with self._db.begin_session() as db_sess:
-            db_row = KeyPairResourcePolicyRow(**dict_props)
+            db_row = KeyPairResourcePolicyRow(**to_store)
             db_sess.add(db_row)
             result = db_row.to_dataclass()
 
@@ -54,7 +49,7 @@ class KeypairResourcePolicyService:
         self, action: ModifyKeyPairResourcePolicyAction
     ) -> ModifyKeyPairResourcePolicyActionResult:
         name = action.name
-        props = action.props
+        props = action.modifier
 
         async with self._db.begin_session() as db_sess:
             query = sa.select(KeyPairResourcePolicyRow).where(KeyPairResourcePolicyRow.name == name)
@@ -62,7 +57,9 @@ class KeypairResourcePolicyService:
             row: KeyPairResourcePolicyRow = result.scalar_one_or_none()
             if row is None:
                 raise ObjectNotFound(f"Keypair resource policy with name {name} not found.")
-            props.set_attr(row)
+            to_update = props.fields_to_update()
+            for key, value in to_update.items():
+                setattr(row, key, value)
             result = row.to_dataclass()
 
         return ModifyKeyPairResourcePolicyActionResult(keypair_resource_policy=result)

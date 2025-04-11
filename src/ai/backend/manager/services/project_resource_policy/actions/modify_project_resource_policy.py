@@ -6,35 +6,29 @@ from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.services.project_resource_policy.actions.base import (
     ProjectResourcePolicyAction,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, PartialModifier
 
 
 @dataclass
-class ModifyProjectResourcePolicyInputData:
-    max_vfolder_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_count")
-    )
-    max_quota_scope_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_quota_scope_size")
-    )
-    max_vfolder_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_size")
-    )
-    max_network_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_network_count")
-    )
+class ProjectResourcePolicyModifier(PartialModifier):
+    max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_vfolder_size: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_network_count: OptionalState[int] = field(default_factory=OptionalState.nop)
 
-    def set_attr(self, row: Any) -> None:
-        self.max_vfolder_count.set_attr(row)
-        self.max_quota_scope_size.set_attr(row)
-        self.max_vfolder_size.set_attr(row)
-        self.max_network_count.set_attr(row)
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.max_vfolder_count.update_dict(to_update, "max_vfolder_count")
+        self.max_quota_scope_size.update_dict(to_update, "max_quota_scope_size")
+        self.max_vfolder_size.update_dict(to_update, "max_vfolder_size")
+        self.max_network_count.update_dict(to_update, "max_network_count")
+        return to_update
 
 
 @dataclass
 class ModifyProjectResourcePolicyAction(ProjectResourcePolicyAction):
     name: str
-    props: ModifyProjectResourcePolicyInputData
+    modifier: ProjectResourcePolicyModifier
 
     @override
     def entity_id(self) -> Optional[str]:

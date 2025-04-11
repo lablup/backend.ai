@@ -1,9 +1,9 @@
-from .base import VFolderBaseProcessors
 from .file import VFolderFileProcessors
 from .invite import VFolderInviteProcessors
+from .vfolder import VFolderProcessors
 
 __all__ = (
-    "VFolderBaseProcessors",
+    "VFolderProcessors",
     "VFolderFileProcessors",
     "VFolderInviteProcessors",
 )

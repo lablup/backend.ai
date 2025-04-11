@@ -61,7 +61,6 @@ class RootContext(BaseContext):
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
     metrics: CommonMetricRegistry
-
     processors: Processors
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
