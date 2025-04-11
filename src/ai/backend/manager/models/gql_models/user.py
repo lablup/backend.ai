@@ -809,13 +809,17 @@ class ModifyUserInput(graphene.InputObjectType):
                     self.is_active,
                 ),
                 status=OptionalState[UserStatus].from_graphql(
-                    UserStatus(self.status) if self.status is not Undefined else None,
+                    self.status
+                    if (self.status is not Undefined or self.status is None)
+                    else UserStatus(self.status),
                 ),
                 domain_name=OptionalState[str].from_graphql(
                     self.domain_name,
                 ),
                 role=OptionalState[UserRole].from_graphql(
-                    UserRole(self.role) if self.role is not Undefined else None,
+                    self.role
+                    if (self.role is not Undefined or self.role is None)
+                    else UserRole(self.role),
                 ),
                 allowed_client_ip=TriState[list[str]].from_graphql(
                     self.allowed_client_ip,
