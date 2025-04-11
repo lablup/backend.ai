@@ -103,7 +103,7 @@ class SMTPReporter(AbstractReporter):
                 f"Description: Task is running...\n"
                 f"Started at: {datetime.now()}\n"
             )
-            await self._smtp_sender.send_email(subject, body)
+            asyncio.create_task(self._smtp_sender.send_email(subject, body))
 
     @abstractmethod
     async def report_finished(self, message: FinishedActionMessage) -> None:
@@ -120,7 +120,7 @@ class SMTPReporter(AbstractReporter):
                     f"Ended at: {message.ended_at}\n"
                     f"Duration: {message.duration} seconds\n"
                 )
-                await self._smtp_sender.send_email(subject, body)
+                asyncio.create_task(self._smtp_sender.send_email(subject, body))
 
         if SMTPTriggerPolicy.POST_ACTION in self._trigger_policy:
             subject = self._make_subject(message.action_type)
@@ -134,4 +134,4 @@ class SMTPReporter(AbstractReporter):
                 f"Ended at: {message.ended_at}\n"
                 f"Duration: {message.duration} seconds\n"
             )
-            await self._smtp_sender.send_email(subject, body)
+            asyncio.create_task(self._smtp_sender.send_email(subject, body))
