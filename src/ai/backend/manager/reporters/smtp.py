@@ -1,5 +1,4 @@
 import asyncio
-import enum
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -16,17 +15,12 @@ from ai.backend.manager.reporters.types import (
     FinishedActionMessage,
     StartedActionMessage,
 )
+from ai.backend.manager.types import SMTPTriggerPolicy
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 UNKNOWN_ENTITY_ID: Final[str] = "(unknown)"
-
-
-class SMTPTriggerPolicy(enum.Flag):
-    PRE_ACTION = enum.auto()
-    POST_ACTION = enum.auto()
-    ON_ERROR = enum.auto()
 
 
 @dataclass
@@ -94,20 +88,22 @@ class SMTPReporter(AbstractReporter):
 
     @abstractmethod
     async def report_started(self, message: StartedActionMessage) -> None:
-        if SMTPTriggerPolicy.PRE_ACTION in self._trigger_policy:
-            subject = self._make_subject(message.action_type)
-            body = (
-                "Action has been triggered.\n\n"
-                f"Action type: ({message.action_type})\n"
-                f"Status: {OperationStatus.RUNNING}\n"
-                f"Description: Task is running...\n"
-                f"Started at: {datetime.now()}\n"
-            )
-            asyncio.create_task(self._smtp_sender.send_email(subject, body))
+        if self._trigger_policy == SMTPTriggerPolicy.ON_ERROR:
+            return
+
+        subject = self._make_subject(message.action_type)
+        body = (
+            "Action has been triggered.\n\n"
+            f"Action type: ({message.action_type})\n"
+            f"Status: {OperationStatus.RUNNING}\n"
+            f"Description: Task is running...\n"
+            f"Started at: {datetime.now()}\n"
+        )
+        asyncio.create_task(self._smtp_sender.send_email(subject, body))
 
     @abstractmethod
     async def report_finished(self, message: FinishedActionMessage) -> None:
-        if SMTPTriggerPolicy.ON_ERROR in self._trigger_policy:
+        if self._trigger_policy == SMTPTriggerPolicy.ON_ERROR:
             if message.status == OperationStatus.ERROR:
                 subject = self._make_subject(message.action_type)
                 body = (
@@ -122,16 +118,15 @@ class SMTPReporter(AbstractReporter):
                 )
                 asyncio.create_task(self._smtp_sender.send_email(subject, body))
 
-        if SMTPTriggerPolicy.POST_ACTION in self._trigger_policy:
-            subject = self._make_subject(message.action_type)
-            body = (
-                "Action has been completed.\n\n"
-                f"Action type: ({message.action_type})\n"
-                f"Entity ID: {message.entity_id or UNKNOWN_ENTITY_ID}\n"
-                f"Status: {message.status}\n"
-                f"Description: {message.description}\n"
-                f"Started at: {message.created_at}\n"
-                f"Ended at: {message.ended_at}\n"
-                f"Duration: {message.duration} seconds\n"
-            )
-            asyncio.create_task(self._smtp_sender.send_email(subject, body))
+        subject = self._make_subject(message.action_type)
+        body = (
+            "Action has been completed.\n\n"
+            f"Action type: ({message.action_type})\n"
+            f"Entity ID: {message.entity_id or UNKNOWN_ENTITY_ID}\n"
+            f"Status: {message.status}\n"
+            f"Description: {message.description}\n"
+            f"Started at: {message.created_at}\n"
+            f"Ended at: {message.ended_at}\n"
+            f"Duration: {message.duration} seconds\n"
+        )
+        asyncio.create_task(self._smtp_sender.send_email(subject, body))
