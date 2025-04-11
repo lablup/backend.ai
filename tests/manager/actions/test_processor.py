@@ -33,6 +33,10 @@ class MockActionResult(BaseActionResult):
         return self.id
 
 
+class MockActionTriggerMeta:
+    pass
+
+
 class MockException(Exception):
     pass
 
@@ -52,7 +56,7 @@ class MockActionMonitor:
         self.expected_done_action = expected_done_action
         self.expected_done_result = expected_done_result
 
-    async def prepare(self, action: MockAction) -> None:
+    async def prepare(self, action: MockAction, _meta: MockActionTriggerMeta) -> None:
         assert action == self.expected_prepare_action
 
     async def done(self, action: MockAction, result: ProcessResult[MockActionResult]) -> None:
@@ -86,7 +90,12 @@ async def test_processor_success():
         expected_done_action=MockAction(id="1", type="test", operation="create"),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
-                status="success", description="Success", started_at=None, end_at=None, duration=0.0
+                task_id=None,
+                status="success",
+                description="Success",
+                started_at=None,
+                end_at=None,
+                duration=0.0,
             ),
             result=MockActionResult(id="1"),
         ),
@@ -106,6 +115,7 @@ async def test_processor_exception():
         expected_done_action=MockAction(id="1", type="test", operation="create"),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
+                task_id=None,
                 status="error",
                 description="Mock exception",
                 started_at=None,
