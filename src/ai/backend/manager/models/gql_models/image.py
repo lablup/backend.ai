@@ -1104,6 +1104,7 @@ class ModifyImageInput(graphene.InputObjectType):
         accelerators = (
             ",".join(self.supported_accelerators) if self.supported_accelerators else Undefined
         )
+        labels = {label.key: label.value for label in self.labels} if self.labels else Undefined
 
         return ImageModifier(
             name=OptionalState[str].from_graphql(self.name),
@@ -1115,9 +1116,7 @@ class ModifyImageInput(graphene.InputObjectType):
             size_bytes=OptionalState[int].from_graphql(self.size_bytes),
             type=OptionalState[ImageType].from_graphql(self.type),
             config_digest=OptionalState[str].from_graphql(self.digest),
-            labels=OptionalState[dict[str, Any]].from_graphql({
-                label.key: label.value for label in self.labels
-            }),
+            labels=OptionalState[dict[str, Any]].from_graphql(labels),
             accelerators=TriState[str].from_graphql(
                 accelerators,
             ),
