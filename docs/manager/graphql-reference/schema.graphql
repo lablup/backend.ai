@@ -2062,7 +2062,7 @@ type MetricResultValue {
 
 """Added in 25.6.0."""
 input UserUtilizationMetricQueryInput {
-  """One of 'current', 'capacity', 'pct'. Default value is 'null'."""
+  """One of 'current', 'capacity'. Default value is 'null'."""
   value_type: String = null
 
   """metric name of container utilization. For example, 'cpu_util', 'mem'."""
