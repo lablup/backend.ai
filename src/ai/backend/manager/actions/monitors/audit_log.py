@@ -10,10 +10,6 @@ NULL_UUID: Final[uuid.UUID] = uuid.UUID("00000000-0000-0000-0000-000000000000")
 UNKNOWN_ENTITY_ID: Final[str] = "(unknown)"
 
 
-NULL_UUID: Final[uuid.UUID] = uuid.UUID("00000000-0000-0000-0000-000000000000")
-UNKNOWN_ENTITY_ID: Final[str] = "(unknown)"
-
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
