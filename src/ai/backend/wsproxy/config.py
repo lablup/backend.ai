@@ -33,7 +33,7 @@ _file_perm = (Path(__file__).parent / "server.py").stat()
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(
-        populate_by_name=True,
+        validate_by_name=True,
         from_attributes=True,
         use_enum_values=True,
     )

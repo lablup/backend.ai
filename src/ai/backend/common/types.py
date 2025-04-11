@@ -517,12 +517,15 @@ class MountTypes(enum.StrEnum):
 
 
 class MountPoint(BaseModel):
+    model_config = ConfigDict(
+        validate_by_name=True,
+        protected_namespaces=(),
+    )
+
     type: MountTypes = Field(default=MountTypes.BIND)
     source: Path
     target: Path | None = Field(default=None)
     permission: MountPermission | None = Field(alias="perm", default=None)
-
-    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
 
 class MountExpression:
@@ -1625,6 +1628,12 @@ class DispatchResult(Generic[ResultType]):
     @classmethod
     def error(cls, error_message: str) -> DispatchResult[ResultType]:
         return cls(errors=[error_message])
+
+    @classmethod
+    def partial_success(
+        cls, result_type: ResultType, errors: list[str]
+    ) -> DispatchResult[ResultType]:
+        return cls(result=result_type, errors=errors)
 
 
 class PurgeImageResult(TypedDict):
