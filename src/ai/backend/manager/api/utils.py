@@ -252,17 +252,22 @@ class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
 
 
 def ensure_stream_response_type(
-    response: LegacyBaseResponseModel | list[TResponseModel] | web.StreamResponse,
+    response: LegacyBaseResponseModel
+    | BaseResponseModel
+    | list[TResponseModel]
+    | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
         case LegacyBaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
+        case BaseResponseModel():
+            return web.json_response(response.model_dump(mode="json"))
         case list():
             return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
         case web.StreamResponse():
             return response
         case _:
-            raise RuntimeError(f"Unsupported response type ({type(response)})")
+            raise RuntimeError(f"Unsupported response type ({type(response).__mro__})")
 
 
 def pydantic_response_api_handler(

@@ -2,9 +2,9 @@ import enum
 import uuid
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from .api_handlers import BaseRequestModel
+from .api_handlers import BaseFieldModel, BaseRequestModel, BaseResponseModel
 
 
 class ContainerRegistryType(enum.StrEnum):
@@ -18,12 +18,14 @@ class ContainerRegistryType(enum.StrEnum):
     LOCAL = "local"
 
 
-class AllowedGroupsModel(BaseModel):
+class AllowedGroupsModel(BaseFieldModel):
     add: list[str] = []
     remove: list[str] = []
 
 
-class ContainerRegistryRowModel(BaseRequestModel):
+class ContainerRegistryModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: Optional[uuid.UUID] = None
     url: Optional[str] = None
     registry_name: Optional[str] = None
@@ -35,13 +37,10 @@ class ContainerRegistryRowModel(BaseRequestModel):
     is_global: Optional[bool] = None
     extra: Optional[dict[str, Any]] = None
 
-    class Config:
-        from_attributes = True
 
-
-class PatchContainerRegistryRequestModel(ContainerRegistryRowModel):
+class PatchContainerRegistryRequestModel(ContainerRegistryModel, BaseRequestModel):
     allowed_groups: Optional[AllowedGroupsModel] = None
 
 
-class PatchContainerRegistryResponseModel(ContainerRegistryRowModel):
+class PatchContainerRegistryResponseModel(ContainerRegistryModel, BaseResponseModel):
     pass
