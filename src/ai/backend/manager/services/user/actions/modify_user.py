@@ -19,7 +19,6 @@ class UserModifier(PartialModifier):
     status: OptionalState[UserStatus] = field(default_factory=OptionalState.nop)
     domain_name: OptionalState[str] = field(default_factory=OptionalState.nop)
     role: OptionalState[UserRole] = field(default_factory=OptionalState.nop)
-    group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
     allowed_client_ip: TriState[list[str]] = field(default_factory=TriState.nop)
     totp_activated: OptionalState[bool] = field(default_factory=OptionalState.nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -54,6 +53,7 @@ class UserModifier(PartialModifier):
 class ModifyUserAction(UserAction):
     email: str
     modifier: UserModifier
+    group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
 
     @override
     def entity_id(self) -> Optional[str]:

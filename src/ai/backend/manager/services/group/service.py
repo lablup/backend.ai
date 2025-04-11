@@ -117,13 +117,13 @@ class GroupService:
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
         data = action.modifier.fields_to_update()
 
-        if action.modifier.user_update_mode.optional_value() not in (
+        if action.user_update_mode.optional_value() not in (
             None,
             "add",
             "remove",
         ):
             raise ValueError("invalid user_update_mode")
-        update_mode = action.modifier.update_mode()
+        update_mode = action.update_mode()
         if not data and update_mode is None:
             return ModifyGroupActionResult(data=None, success=False)
 
@@ -132,7 +132,7 @@ class GroupService:
                 # TODO: refactor user addition/removal in groups as separate mutations
                 #       (to apply since 21.09)
                 gid = action.group_id
-                user_uuids = action.modifier.user_uuids.optional_value()
+                user_uuids = action.user_uuids.optional_value()
                 if user_uuids:
                     if update_mode == "add":
                         values = [{"user_id": uuid, "group_id": gid} for uuid in user_uuids]

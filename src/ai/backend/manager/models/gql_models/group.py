@@ -601,12 +601,6 @@ class ModifyGroupInput(graphene.InputObjectType):
                     if self.total_resource_slots is Undefined
                     else ResourceSlot.from_user_input(self.total_resource_slots, None),
                 ),
-                user_update_mode=OptionalState[str].from_graphql(
-                    self.user_update_mode,
-                ),
-                user_uuids=OptionalState[list[str]].from_graphql(
-                    self.user_uuids,
-                ),
                 allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
                     self.allowed_vfolder_hosts,
                 ),
@@ -619,6 +613,12 @@ class ModifyGroupInput(graphene.InputObjectType):
                 container_registry=TriState[dict[str, str]].from_graphql(
                     self.container_registry,
                 ),
+            ),
+            user_update_mode=OptionalState[str].from_graphql(
+                self.user_update_mode,
+            ),
+            user_uuids=OptionalState[list[str]].from_graphql(
+                self.user_uuids,
             ),
         )
 
