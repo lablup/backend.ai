@@ -205,6 +205,8 @@ class RouteInfoModel(BaseFieldModel):
 
 
 class ServeInfoModel(LegacyBaseResponseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     model_id: uuid.UUID = Field(description="ID of model VFolder.")
     extra_mounts: Sequence[uuid.UUID] = Field(
@@ -236,8 +238,6 @@ class ServeInfoModel(LegacyBaseResponseModel):
     runtime_variant: RuntimeVariant = Field(
         description="Type of the inference runtime the image will try to load."
     )
-
-    model_config = ConfigDict(protected_namespaces=())
 
 
 @auth_required
@@ -280,6 +280,8 @@ async def get_info(request: web.Request) -> ServeInfoModel:
 
 
 class ServiceConfigModel(LegacyBaseRequestModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model: str = Field(description="Name or ID of the model VFolder", examples=["ResNet50"])
     model_definition_path: str | None = Field(
         description="Path to the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default.",
@@ -317,8 +319,6 @@ class ServiceConfigModel(LegacyBaseRequestModel):
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
-
-    model_config = ConfigDict(protected_namespaces=())
 
 
 class NewServiceRequestModel(LegacyBaseRequestModel):

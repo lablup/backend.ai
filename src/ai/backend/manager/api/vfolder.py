@@ -35,7 +35,6 @@ import trafaret as t
 from aiohttp import web
 from pydantic import (
     AliasChoices,
-    ConfigDict,
     Field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -370,11 +369,7 @@ def vfolder_check_exists(
 
 
 class CreateRequestModel(LegacyBaseRequestModel):
-    model_config = ConfigDict(validate_by_name=True)
-
-    name: tv.VFolderName = Field(
-        description="Name of the vfolder",
-    )
+    name: tv.VFolderName = Field(description="Name of the vfolder")
     folder_host: str | None = Field(default=None, alias="host")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
@@ -383,9 +378,7 @@ class CreateRequestModel(LegacyBaseRequestModel):
         default=None,
         validation_alias=AliasChoices("group", "groupId"),
     )
-    cloneable: bool = Field(
-        default=False,
-    )
+    cloneable: bool = Field(default=False)
 
 
 @auth_required
