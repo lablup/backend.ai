@@ -2,6 +2,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Optional
 
 from ai.backend.manager.models.audit_log import OperationStatus
 
@@ -11,7 +12,7 @@ class StartedActionMessage:
     """Message indicating that an action has started."""
 
     action_id: uuid.UUID
-    entity_id: str | uuid.UUID
+    entity_id: Optional[str | uuid.UUID]
     entity_type: str
     operation_type: str
     created_at: datetime
@@ -22,7 +23,7 @@ class FinishedActionMessage:
     """Message indicating that an action has finished."""
 
     action_id: uuid.UUID
-    entity_id: str | uuid.UUID
+    entity_id: Optional[str | uuid.UUID]  # TODO: Make this required?
     entity_type: str
     operation_type: str
     status: OperationStatus
