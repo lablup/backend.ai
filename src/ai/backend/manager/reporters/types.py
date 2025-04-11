@@ -12,6 +12,7 @@ class StartedActionMessage:
     """Message indicating that an action has started."""
 
     action_id: uuid.UUID
+    action_type: str
     entity_id: Optional[str | uuid.UUID]
     entity_type: str
     operation_type: str
@@ -23,6 +24,7 @@ class FinishedActionMessage:
     """Message indicating that an action has finished."""
 
     action_id: uuid.UUID
+    action_type: str
     entity_id: Optional[str | uuid.UUID]  # TODO: Make this required?
     entity_type: str
     operation_type: str

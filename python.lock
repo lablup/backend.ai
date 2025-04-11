@@ -2576,13 +2576,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "95920acccb578427a9aa38e37a186b1e43156c87260d7ba18ca63aa4c7cbd3a1",
-              "url": "https://files.pythonhosted.org/packages/cd/83/de0a49e7de540513f53ab5d2e105321dedeb08a8f5850f0208decf4390ec/Mako-1.3.9-py3-none-any.whl"
+              "hash": "baef24a52fc4fc514a0887ac600f9f1cff3d82c61d4d700a1fa84d597b88db59",
+              "url": "https://files.pythonhosted.org/packages/87/fb/99f81ac72ae23375f22b7afdb7642aba97c00a713c217124420147681a2f/mako-1.3.10-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b5d65ff3462870feec922dbccf38f6efb44e5714d7b593a656be86663d8600ac",
-              "url": "https://files.pythonhosted.org/packages/62/4f/ddb1965901bc388958db9f0c991255b2c469349a741ae8c9cd8a562d70a6/mako-1.3.9.tar.gz"
+              "hash": "99579a6f39583fa7e5630a28c3c1f440e4e97a414b80372649c0ce338da2ea28",
+              "url": "https://files.pythonhosted.org/packages/9e/38/bd5b78a920a64d708fe6bc8e0a2c075e1389d53bef8413725c63ba041535/mako-1.3.10.tar.gz"
             }
           ],
           "project_name": "mako",
@@ -2593,7 +2593,7 @@
             "pytest; extra == \"testing\""
           ],
           "requires_python": ">=3.8",
-          "version": "1.3.9"
+          "version": "1.3.10"
         },
         {
           "artifacts": [
@@ -3702,23 +3702,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "422286f356d5be69bb0754671cb43c233a3fca68ac7c65c05451986f11bac0e3",
-              "url": "https://files.pythonhosted.org/packages/68/3f/55a14b1e8de36145c79a6bc92588f7cde1f93ccb08ba727b48ec5675a13c/pyroscope_io-0.8.8-py2.py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "2de62c770ac9c122bcdfc63b021f4a8af84a992a2cd6ccbe5fc5f2503923a2a4",
+              "url": "https://files.pythonhosted.org/packages/50/df/4ac4dbabdfa94ece1426a274481da5ea471d2b3ff821233c28f8216a393a/pyroscope_io-0.8.9-py2.py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "18058e9c15d8229db4208b48ed16544d18a31220e87d60c954d9d637de69696b",
-              "url": "https://files.pythonhosted.org/packages/3b/b6/22558093784c774abf3851b45153019a72c0eead37d29844ea49cbb7bf85/pyroscope_io-0.8.8-py2.py3-none-macosx_11_0_x86_64.whl"
+              "hash": "9f7c95a37d1dfbe5491d8ac1e46db9bbef3c6d022eefc74c307b0d64c0f6b403",
+              "url": "https://files.pythonhosted.org/packages/af/2e/cf2bc36b45c4b878f32efc35f1201118fe45e46f8bbcac1e8514d933da21/pyroscope_io-0.8.9-py2.py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2312b55538deb240c1428591678ad9316a3f19af11bbcf15704d7d83c7adb7c7",
-              "url": "https://files.pythonhosted.org/packages/61/d3/28e5a1c74471dc00a59aae7ca2ecdd499d5fd2d282d6743ee109375a0711/pyroscope_io-0.8.8-py2.py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "36434d4804d93a6b74005b756d98e98575b1e550f5c26fb96e3a4ffd02606255",
+              "url": "https://files.pythonhosted.org/packages/da/00/d83145ac62869634d41d05788537f7f851a3b3983a975e5c4b0a2d4a5718/pyroscope_io-0.8.9-py2.py3-none-macosx_11_0_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d33df6c2742eef9868897d199e4e1efec3f5d18377cc73d273b74f7f5e60ac4b",
-              "url": "https://files.pythonhosted.org/packages/d5/cc/0d04cc9ec00e7939aa4c7513baf064b9aadd71c761ee4d2b3824e2718922/pyroscope_io-0.8.8-py2.py3-none-macosx_11_0_arm64.whl"
+              "hash": "3252793c56ba4140876cb86b9c93627490a2072ede19216558c09357e1d6f151",
+              "url": "https://files.pythonhosted.org/packages/e9/bf/0d48d5d8a4f63c7b21f68bb29b403803567046f25e9cca6f05c5088b9fcc/pyroscope_io-0.8.9-py2.py3-none-macosx_11_0_arm64.whl"
             }
           ],
           "project_name": "pyroscope-io",
@@ -3726,7 +3726,7 @@
             "cffi>=1.6.0"
           ],
           "requires_python": null,
-          "version": "0.8.8"
+          "version": "0.8.9"
         },
         {
           "artifacts": [
@@ -5042,19 +5042,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4b6cf02909eb5495cfbc3f6e8fd49217e6cc7944e145cdda8caa3734777f9e69",
-              "url": "https://files.pythonhosted.org/packages/df/c5/e7a0b0f5ed69f94c8ab7379c599e6036886bffcde609969a5325f47f1332/typing_extensions-4.13.1-py3-none-any.whl"
+              "hash": "a439e7c04b49fec3e5d3e2beaa21755cadbbdc391694e28ccdd36ca4a1408f8c",
+              "url": "https://files.pythonhosted.org/packages/8b/54/b1ae86c0973cc6f0210b53d508ca3641fb6d0c56823f288d108bc7ab3cc8/typing_extensions-4.13.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "98795af00fb9640edec5b8e31fc647597b4691f099ad75f469a2616be1a76dff",
-              "url": "https://files.pythonhosted.org/packages/76/ad/cd3e3465232ec2416ae9b983f27b9e94dc8171d56ac99b345319a9475967/typing_extensions-4.13.1.tar.gz"
+              "hash": "e6c81219bd689f51865d9e372991c540bda33a0379d5573cddb9a3a23f7caaef",
+              "url": "https://files.pythonhosted.org/packages/f6/37/23083fcd6e35492953e8d2aaaa68b860eb422b34627b13f2ce3eb6106061/typing_extensions-4.13.2.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "4.13.1"
+          "version": "4.13.2"
         },
         {
           "artifacts": [
@@ -5104,13 +5104,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1cee9ad369867bfdbbb48b7dd50374c0967a0bb7710050facf0dd6911440e3df",
-              "url": "https://files.pythonhosted.org/packages/c8/19/4ec628951a74043532ca2cf5d97b7b14863931476d117c471e8e2b1eb39f/urllib3-2.3.0-py3-none-any.whl"
+              "hash": "4e16665048960a0900c702d4a66415956a584919c03361cac9f1df5c5dd7e813",
+              "url": "https://files.pythonhosted.org/packages/6b/11/cc635220681e93a0183390e26485430ca2c7b5f9d33b15c74c2861cb8091/urllib3-2.4.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f8c5449b3cf0861679ce7e0503c7b44b5ec981bec0d1d3795a07f1ba96f0204d",
-              "url": "https://files.pythonhosted.org/packages/aa/63/e53da845320b757bf29ef6a9062f5c669fe997973f966045cb019c3f4b66/urllib3-2.3.0.tar.gz"
+              "hash": "414bc6535b787febd7567804cc015fee39daab8ad86268f1310a9250697de466",
+              "url": "https://files.pythonhosted.org/packages/8a/78/16493d9c386d8e60e442a35feac5e00f0913c0f4b7c217c11e8ec2ff53e0/urllib3-2.4.0.tar.gz"
             }
           ],
           "project_name": "urllib3",
@@ -5122,7 +5122,7 @@
             "zstandard>=0.18.0; extra == \"zstd\""
           ],
           "requires_python": ">=3.9",
-          "version": "2.3.0"
+          "version": "2.4.0"
         },
         {
           "artifacts": [
