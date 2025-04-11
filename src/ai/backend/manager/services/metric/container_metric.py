@@ -1,3 +1,4 @@
+import logging
 from typing import (
     Any,
     Optional,
@@ -12,6 +13,7 @@ from ai.backend.common.metrics.types import (
     UTILIZATION_METRIC_INTERVAL,
 )
 from ai.backend.common.types import HostPortPair
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config import SharedConfig
 
 from .actions.container import (
@@ -20,6 +22,7 @@ from .actions.container import (
     ContainerMetricMetadataAction,
     ContainerMetricMetadataActionResult,
 )
+from .exceptions import FailedToGetMetric
 from .types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
@@ -28,6 +31,8 @@ from .types import (
     MetricSpecForQuery,
     UtilizationMetricType,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class LabelValueResponse(TypedDict):
@@ -186,8 +191,17 @@ class MetricService:
         })
         async with aiohttp.ClientSession() as session:
             async with session.post(endpoint, data=form_data) as response:
-                response.raise_for_status()
-                result = await response.json()
+                match response.status:
+                    case 200:
+                        result = await response.json()
+                    case 400:
+                        result = await response.json()
+                        msg = result.get("error", "Unknown error")
+                        log.exception(f"Failed to get metric: {msg}")
+                        raise FailedToGetMetric(msg)
+                    case _:
+                        log.exception(f"Failed to get metric. code: {response.status}")
+                        raise FailedToGetMetric
 
         metrics: list[MetricResponse] = result["data"]["result"]
         return ContainerMetricActionResult(
