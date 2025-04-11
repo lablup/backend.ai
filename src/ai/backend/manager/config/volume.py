@@ -59,9 +59,8 @@ class VFolderProxyConfig(BaseModel):
     sftp_scaling_groups: Optional[list[str]] = Field(
         default=None,
         description="""
-        List of scaling groups that can access this volume via SFTP.
-        Controls which compute sessions can connect to this volume using SFTP.
-        If None, all scaling groups can access the volume.
+        List of SFTP scaling groups that the volume is mapped to.
+        Controls which scaling groups can create SFTP sessions for this volume.
         """,
         examples=[None, ["group-1", "group-2"]],
     )
