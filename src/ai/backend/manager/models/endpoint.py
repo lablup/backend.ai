@@ -21,10 +21,11 @@ from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 import trafaret as t
-import yaml
 import yarl
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -902,7 +903,8 @@ class ModelServicePredicateChecker:
                     break
                 chunks += chunk
         model_definition_yaml = chunks.decode("utf-8")
-        model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+        yaml = YAML()
+        model_definition_dict = yaml.load(model_definition_yaml)
         try:
             model_definition = model_definition_iv.check(model_definition_dict)
             assert model_definition is not None
@@ -911,7 +913,7 @@ class ModelServicePredicateChecker:
                 f"Failed to validate model definition from vFolder {folder_name} (ID"
                 f" {vfid.folder_id}): {e}",
             ) from e
-        except yaml.error.YAMLError as e:
+        except YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
 
         return yaml_name

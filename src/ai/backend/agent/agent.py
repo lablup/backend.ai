@@ -45,12 +45,13 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
-import yaml
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
 from redis.asyncio import Redis
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from tenacity import (
     AsyncRetrying,
     retry_if_exception_type,
@@ -2520,8 +2521,9 @@ class AbstractAgent(
                         f" vFolder {model_folder.name} (ID {model_folder.vfid})",
                     ) from e
                 try:
-                    raw_definition = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-                except yaml.error.YAMLError as e:
+                    yaml = YAML()
+                    raw_definition = yaml.load(model_definition_yaml)
+                except YAMLError as e:
                     raise AgentError(f"Invalid YAML syntax: {e}") from e
         try:
             model_definition = model_definition_iv.check(raw_definition)
