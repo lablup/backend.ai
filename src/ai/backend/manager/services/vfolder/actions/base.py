@@ -16,7 +16,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-from ai.backend.manager.types import DataclassInput, TriStateField
+from ai.backend.manager.types import PartialModifier, TriState
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -73,18 +73,25 @@ class CreateVFolderActionResult(BaseActionResult):
 
 
 @dataclass
-class UpdateVFolderAttributeInput(DataclassInput):
-    name: TriStateField[str] = field(default_factory=TriStateField)
-    cloneable: TriStateField[bool] = field(default_factory=TriStateField)
-    mount_permission: TriStateField[VFolderPermission] = field(default_factory=TriStateField)
+class VFolderAttributeModifier(PartialModifier):
+    name: TriState[str] = field(default_factory=TriState.nop)
+    cloneable: TriState[bool] = field(default_factory=TriState.nop)
+    mount_permission: TriState[VFolderPermission] = field(default_factory=TriState.nop)
+
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        self.cloneable.update_dict(to_update, "cloneable")
+        self.mount_permission.update_dict(to_update, "mount_permission")
+        return to_update
 
 
 @dataclass
 class UpdateVFolderAttributeAction(VFolderAction):
     user_uuid: uuid.UUID
-
     vfolder_uuid: uuid.UUID
-    input: UpdateVFolderAttributeInput = field(default_factory=UpdateVFolderAttributeInput)
+    modifier: VFolderAttributeModifier = field(default_factory=VFolderAttributeModifier)
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -260,10 +267,10 @@ class CloneVFolderAction(VFolderAction):
 
     source_vfolder_uuid: uuid.UUID
     target_name: str
-    target_host: Optional[str] = None
-    cloneable: bool = False
-    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
-    mount_permission: VFolderPermission = VFolderPermission.READ_WRITE
+    target_host: Optional[str]
+    cloneable: bool
+    usage_mode: VFolderUsageMode
+    mount_permission: VFolderPermission
 
     @override
     def entity_id(self) -> Optional[str]:

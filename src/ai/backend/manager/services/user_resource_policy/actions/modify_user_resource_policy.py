@@ -4,35 +4,33 @@ from typing import Any, Optional, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.services.user_resource_policy.actions.base import UserResourcePolicyAction
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, PartialModifier
 
 
 @dataclass
-class ModifyUserResourcePolicyInputData:
-    max_vfolder_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_vfolder_count")
-    )
-    max_quota_scope_size: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_quota_scope_size")
-    )
+class UserResourcePolicyModifier(PartialModifier):
+    max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_session_count_per_model_session: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_session_count_per_model_session")
+        default_factory=OptionalState.nop
     )
-    max_customized_image_count: OptionalState[int] = field(
-        default_factory=lambda: OptionalState.nop("max_customized_image_count")
-    )
+    max_customized_image_count: OptionalState[int] = field(default_factory=OptionalState.nop)
 
-    def set_attr(self, obj: Any) -> None:
-        self.max_vfolder_count.set_attr(obj)
-        self.max_quota_scope_size.set_attr(obj)
-        self.max_session_count_per_model_session.set_attr(obj)
-        self.max_customized_image_count.set_attr(obj)
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.max_vfolder_count.update_dict(to_update, "max_vfolder_count")
+        self.max_quota_scope_size.update_dict(to_update, "max_quota_scope_size")
+        self.max_session_count_per_model_session.update_dict(
+            to_update, "max_session_count_per_model_session"
+        )
+        self.max_customized_image_count.update_dict(to_update, "max_customized_image_count")
+        return to_update
 
 
 @dataclass
 class ModifyUserResourcePolicyAction(UserResourcePolicyAction):
     name: str
-    props: ModifyUserResourcePolicyInputData
+    modifier: UserResourcePolicyModifier
 
     @override
     def entity_id(self) -> Optional[str]:

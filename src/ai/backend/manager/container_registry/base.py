@@ -41,9 +41,10 @@ from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
 
+from ..data.image.types import ImageStatus, ImageType
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..exceptions import ScanImageError, ScanTagError
-from ..models.image import ImageIdentifier, ImageRow, ImageStatus, ImageType
+from ..models.image import ImageIdentifier, ImageRow
 from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
