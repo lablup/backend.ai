@@ -1,13 +1,10 @@
 import enum
 from dataclasses import dataclass, field
 from typing import (
-    Final,
     Literal,
     Optional,
 )
 from uuid import UUID
-
-DEFAULT_RANGE_VECTOR_TIMEWINDOW: Final[str] = "1m"
 
 
 @dataclass
@@ -80,8 +77,8 @@ class UtilizationMetricType(enum.Enum):
 @dataclass(kw_only=True)
 class MetricSpecForQuery:
     metric_name: str
-    metric_type: UtilizationMetricType = UtilizationMetricType.GAUGE
-    timewindow: str = DEFAULT_RANGE_VECTOR_TIMEWINDOW
+    metric_type: UtilizationMetricType
+    timewindow: str
     sum_by: list[str] = field(default_factory=list)
     labels: list[str] = field(default_factory=list)
 

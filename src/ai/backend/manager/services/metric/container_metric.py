@@ -3,6 +3,7 @@ from typing import (
     Any,
     Optional,
     TypedDict,
+    cast,
 )
 
 import aiohttp
@@ -77,11 +78,13 @@ class MetricResponse(TypedDict):
 
 class MetricService:
     _metric_query_endpoint: yarl.URL
+    _range_vector_timewindow: str  # 1m by default
 
     def __init__(self, shared_config: SharedConfig) -> None:
         metric_config = shared_config.data["metric"]
         metric_query_addr: HostPortPair = metric_config["address"]
         self._metric_query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
+        self._range_vector_timewindow = cast(str, metric_config["timewindow"])
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:
         endpoint = self._metric_query_endpoint / "label" / label_name / "values"
@@ -172,6 +175,7 @@ class MetricService:
             MetricSpecForQuery(
                 metric_name=metric_name,
                 metric_type=metric_type,
+                timewindow=self._range_vector_timewindow,
                 sum_by=sum_by_values,
                 labels=label_values,
             )

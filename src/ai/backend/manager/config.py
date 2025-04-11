@@ -210,7 +210,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from ..manager.defs import INTRINSIC_SLOTS
+from ..manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ServerMisconfiguredError
 from .models.session import SessionStatus
@@ -392,7 +392,8 @@ _config_defaults: Mapping[str, Any] = {
         "address": {
             "host": "127.0.0.1",
             "port": 9090,
-        }
+        },
+        "timewindow": DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW,
     },
 }
 
@@ -486,6 +487,11 @@ shared_config_iv = t.Dict({
         tx.AliasedKey(
             ["address", "addr"], default=_config_defaults["metric"]["address"]
         ): tx.HostPortPair,
+        tx.AliasedKey(
+            # time window for range vector queries
+            ["timewindow", "time-window", "time_window"],
+            default=_config_defaults["metric"]["timewindow"],
+        ): t.String,
     }).allow_extra("*"),
 }).allow_extra("*")
 
