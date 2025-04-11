@@ -27,8 +27,8 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):
         description = "Added in 25.6.0."
 
     value_type = graphene.String(
-        default_value=None,
-        description="One of 'current', 'capacity'. Default value is 'null'.",
+        default_value="current",
+        description="One of 'current', 'capacity'. Default value is 'current'.",
     )
     metric_name = graphene.String(
         required=True,

@@ -13,7 +13,7 @@ DEFAULT_RANGE_VECTOR_TIMEWINDOW: Final[str] = "1m"
 @dataclass
 class MetricQueryParameter:
     metric_name: str
-    value_type: Optional[Literal["current", "capacity"]]
+    value_type: Literal["current", "capacity"]
     start: str
     end: str
     step: str
@@ -40,31 +40,13 @@ class MetricResultValue:
 
 @dataclass
 class ContainerMetricOptionalLabel:
-    value_type: Optional[Literal["current", "capacity"]] = None
+    value_type: Literal["current", "capacity"]
 
     agent_id: Optional[str] = None
     kernel_id: Optional[UUID] = None
     session_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
-
-    def copy(
-        self,
-        value_type: Optional[Literal["current", "capacity"]] = None,
-        agent_id: Optional[str] = None,
-        kernel_id: Optional[UUID] = None,
-        session_id: Optional[UUID] = None,
-        user_id: Optional[UUID] = None,
-        project_id: Optional[UUID] = None,
-    ) -> "ContainerMetricOptionalLabel":
-        return ContainerMetricOptionalLabel(
-            value_type=value_type or self.value_type,
-            agent_id=agent_id or self.agent_id,
-            kernel_id=kernel_id or self.kernel_id,
-            session_id=session_id or self.session_id,
-            user_id=user_id or self.user_id,
-            project_id=project_id or self.project_id,
-        )
 
 
 @dataclass

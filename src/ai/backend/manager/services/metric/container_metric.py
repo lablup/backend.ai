@@ -165,39 +165,17 @@ class MetricService:
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> str:
-        match label.value_type:
-            case "current" | "capacity":
-                metric_type = self._get_metric_type(metric_name, label)
-                label_values = self._get_label_values_for_query(label, metric_name)
-                sum_by_values = self._get_sum_by_for_query(label)
-                return self._parse_query_string_by_metric_spec(
-                    MetricSpecForQuery(
-                        metric_name=metric_name,
-                        metric_type=metric_type,
-                        sum_by=sum_by_values,
-                        labels=label_values,
-                    )
-                )
-            case None:
-                query = ""
-                for value_type in ("current", "capacity"):
-                    new_label = label.copy(value_type=value_type)
-                    metric_type = self._get_metric_type(metric_name, new_label)
-                    label_values = self._get_label_values_for_query(label, metric_name)
-                    sum_by_values = self._get_sum_by_for_query(label)
-                    appended = self._parse_query_string_by_metric_spec(
-                        MetricSpecForQuery(
-                            metric_name=metric_name,
-                            metric_type=metric_type,
-                            sum_by=sum_by_values,
-                            labels=label_values,
-                        )
-                    )
-                    if query:
-                        query += f"or {appended}"
-                    else:
-                        query = appended
-                return query
+        metric_type = self._get_metric_type(metric_name, label)
+        label_values = self._get_label_values_for_query(label, metric_name)
+        sum_by_values = self._get_sum_by_for_query(label)
+        return self._parse_query_string_by_metric_spec(
+            MetricSpecForQuery(
+                metric_name=metric_name,
+                metric_type=metric_type,
+                sum_by=sum_by_values,
+                labels=label_values,
+            )
+        )
 
     async def query_metric(
         self,
