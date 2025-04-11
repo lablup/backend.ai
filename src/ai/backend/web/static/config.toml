@@ -41,7 +41,7 @@ proxyListenIP = "[Websocket proxy configuration IP.]"
 #disableCertCheck = false                # If true, It will disable certification check
 
 [menu]
-#blocklist = "" # Hide menus on the list which are separated by comma. please note that summary menu cannot be added to blocklist
+#blocklist = "" # Hide menus on the list which are separated by comma. please note that 'start' menu cannot be added to blocklist
 #inactivelist = "summary,import,statistics" # Disable menus on the list which are separated by comma.
 
 [resources]

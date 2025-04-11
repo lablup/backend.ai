@@ -16,6 +16,43 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.0rc3 (2025-04-11)
+
+### Breaking Changes
+* Add `force`, `noprune` options to `PurgeImages` GQL API, and allow `PurgeImages` to be performed on multiple agents (breaking change). ([#3987](https://github.com/lablup/backend.ai/issues/3987))
+
+### Features
+* Add `project_node` field of type GroupConnection to GQL `UserNode` type ([#3529](https://github.com/lablup/backend.ai/issues/3529))
+* Add `AuditLog` GQL interface. ([#4001](https://github.com/lablup/backend.ai/issues/4001))
+* Add vfolder services and processes ([#4002](https://github.com/lablup/backend.ai/issues/4002))
+* Add `domain` service & processors. ([#4012](https://github.com/lablup/backend.ai/issues/4012))
+* Add `group` service and processors ([#4026](https://github.com/lablup/backend.ai/issues/4026))
+* Add Action Test Code for `Domain` ([#4030](https://github.com/lablup/backend.ai/issues/4030))
+* Add `User` Service & Processors ([#4058](https://github.com/lablup/backend.ai/issues/4058))
+* Refactor Redis message queue to follow ABC pattern ([#4064](https://github.com/lablup/backend.ai/issues/4064))
+* Use `http.HTTPStatus` enum for HTTP status codes ([#4069](https://github.com/lablup/backend.ai/issues/4069))
+*  ([#4091](https://github.com/lablup/backend.ai/issues/4091))
+* Add new metrics reporters that report raw utilization values without hook modifications ([#4099](https://github.com/lablup/backend.ai/issues/4099))
+* Align action architecture code ([#4103](https://github.com/lablup/backend.ai/issues/4103))
+* Add RequestID context & middleware ([#4104](https://github.com/lablup/backend.ai/issues/4104))
+* Add `action_id` in ActionProcessor for tracking Action. ([#4131](https://github.com/lablup/backend.ai/issues/4131))
+
+### Fixes
+* Fix customized image visibility issue. ([#3939](https://github.com/lablup/backend.ai/issues/3939))
+* Add `Image` service & processors. ([#3997](https://github.com/lablup/backend.ai/issues/3997))
+* Add `Resource` service & processors. ([#4016](https://github.com/lablup/backend.ai/issues/4016))
+* Add missing newline at end of customized dotfiles. ([#4047](https://github.com/lablup/backend.ai/issues/4047))
+* Add `Session` service & processors. ([#4061](https://github.com/lablup/backend.ai/issues/4061))
+* Setup source at producer creation ([#4068](https://github.com/lablup/backend.ai/issues/4068))
+* Add missing `AuditLog` module import to ensure AuditLog table created at initial installation. ([#4079](https://github.com/lablup/backend.ai/issues/4079))
+* Change default value of `domain` table columns ([#4081](https://github.com/lablup/backend.ai/issues/4081))
+* Avoid kernel DB full scan when resolving GQL Agent queries ([#4086](https://github.com/lablup/backend.ai/issues/4086))
+* Filter Compute Session list query by project when project id scope is specified ([#4089](https://github.com/lablup/backend.ai/issues/4089))
+* Fix pydantic validation error from wrong type aliasing. ([#4094](https://github.com/lablup/backend.ai/issues/4094))
+* Replace aiodataloader-ng (a fork based on 0.2.1) with the managed upstream aiodataloader package (0.4.2) ([#4098](https://github.com/lablup/backend.ai/issues/4098))
+* Fix wrong name of quota scope type fields ([#4123](https://github.com/lablup/backend.ai/issues/4123))
+
+
 ## 25.5.2 (2025-03-31)
 
 ### Features
