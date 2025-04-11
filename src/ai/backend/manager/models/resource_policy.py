@@ -469,7 +469,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
         default_for_unspecified = (
             DefaultForUnspecified[self.default_for_unspecified]
             if self.default_for_unspecified
-            else None
+            else Undefined
         )
 
         return KeyPairResourcePolicyModifier(

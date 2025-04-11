@@ -121,7 +121,7 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
-from ..types import TriState
+from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -971,7 +971,7 @@ class RenameRequestModel(BaseModel):
 
     def to_modifier(self) -> VFolderAttributeModifier:
         return VFolderAttributeModifier(
-            name=TriState.update(self.new_name),
+            name=OptionalState[str].update(self.new_name),
         )
 
 
@@ -1027,13 +1027,23 @@ async def update_vfolder_options(
         row["id"],
         request.match_info["name"],
     )
+    cloneable = (
+        OptionalState[bool].update(params["cloneable"])
+        if params["cloneable"] is not None
+        else OptionalState[bool].nop()
+    )
+    mount_permission = (
+        OptionalState[VFolderPermission].update(params["permission"])
+        if params["permission"] is not None
+        else OptionalState[VFolderPermission].nop()
+    )
     await root_ctx.processors.vfolder.update_vfolder_attribute.wait_for_complete(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
             modifier=VFolderAttributeModifier(
-                cloneable=TriState.update(params["cloneable"]),
-                mount_permission=TriState.update(params["permission"]),
+                cloneable=cloneable,
+                mount_permission=mount_permission,
             ),
         )
     )

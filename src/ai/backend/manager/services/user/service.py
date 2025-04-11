@@ -226,7 +226,7 @@ class UserService:
         if data.get("password") is None:
             data.pop("password", None)
 
-        group_ids = action.modifier.group_ids.optional_value()
+        group_ids = action.group_ids.optional_value()
 
         if not data and group_ids is None:
             return ModifyUserActionResult(data=None, success=False)

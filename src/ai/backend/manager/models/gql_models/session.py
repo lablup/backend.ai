@@ -689,11 +689,11 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
 
-        priority = input.get("priority")
+        priority = input.get("priority", graphql.Undefined)
         if priority:
             _validate_priority_input(priority)
 
-        name = input.get("name")
+        name = input.get("name", graphql.Undefined)
         if name:
             _validate_name_input(name)
 

@@ -88,8 +88,6 @@ class GroupModifier(PartialModifier):
     total_resource_slots: OptionalState[ResourceSlot] = field(
         default_factory=OptionalState[ResourceSlot].nop
     )
-    user_update_mode: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    user_uuids: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
         default_factory=OptionalState[dict[str, str]].nop
     )
@@ -107,15 +105,8 @@ class GroupModifier(PartialModifier):
         self.is_active.update_dict(to_update, "is_active")
         self.domain_name.update_dict(to_update, "domain_name")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
-        self.user_update_mode.update_dict(to_update, "user_update_mode")
-        self.user_uuids.update_dict(to_update, "user_uuids")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         self.integration_id.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.container_registry.update_dict(to_update, "container_registry")
         return to_update
-
-    def update_mode(self) -> Optional[str]:
-        if self.user_uuids.optional_value():
-            return self.user_update_mode.optional_value()
-        return None
