@@ -8,7 +8,7 @@ from pprint import pformat
 from typing import Any, List, Literal, Optional, Self
 
 import click
-from pydantic import AliasChoices, BaseModel, DirectoryPath, Field, FilePath
+from pydantic import BaseModel, DirectoryPath, Field, FilePath
 
 from ai.backend.common import config
 from ai.backend.logging.types import LogLevel
@@ -415,11 +415,20 @@ class ManagerConfig(BaseModel):
         """,
         examples=[16 * (2**20), 32 * (2**20)],
     )
+    aiomonitor_port: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=65535,
+        description="""
+        Deprecated: Port for the aiomonitor terminal UI.
+        Use aiomonitor_termui_port instead.
+        """,
+        examples=[38100, 38200],
+    )
     aiomonitor_termui_port: int = Field(
         default=38100,
         ge=1,
         le=65535,
-        validation_alias=AliasChoices("aiomonitor-termui-port", "aiomonitor-port"),
         description="""
         Port for the aiomonitor terminal UI.
         Allows connecting to a debugging console for the manager.
@@ -478,6 +487,17 @@ class ManagerConfig(BaseModel):
         """,
         examples=[8080, 9090],
     )
+
+    @property
+    def aiomonitor_terminal_ui_port(self) -> int:
+        """
+        Returns the port for the aiomonitor terminal UI.
+        When deprecated aiomonitor_port is set, it will return that value.
+        Otherwise, it returns the aiomonitor_termui_port.
+        """
+        if self.aiomonitor_port is not None:
+            return self.aiomonitor_port
+        return self.aiomonitor_termui_port
 
 
 # Deprecated: v20.09
