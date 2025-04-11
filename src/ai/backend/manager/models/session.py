@@ -37,7 +37,6 @@ from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
-    DoStartSessionEvent,
     DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
@@ -171,7 +170,6 @@ class SessionStatus(enum.Enum):
         return {
             cls.PREPARING,
             cls.PULLING,
-            cls.CREATING,
             cls.TERMINATING,
         }
 
