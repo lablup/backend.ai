@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    Mapping,
     Optional,
     Self,
     cast,
@@ -18,17 +19,30 @@ import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionResult
+from ai.backend.common.types import (
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionResult,
+    VFolderMount,
+)
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
 from ai.backend.manager.services.session.actions.modify_session import (
     ModifySessionAction,
-    ModifySessionInputData,
+    SessionModifier,
 )
+from ai.backend.manager.types import OptionalState
 
 from ..base import (
     BigInt,
@@ -36,7 +50,9 @@ from ..base import (
     Item,
     OrderExprArg,
     PaginatedConnectionField,
+    PaginatedList,
     batch_multiresult_in_session,
+    batch_result_in_session,
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import (
@@ -53,11 +69,13 @@ from ..rbac import ScopeType
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import (
+    DEFAULT_SESSION_ORDERING,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
     QueryCondition,
     QueryOption,
     RelatedFields,
+    SessionDependencyRow,
     SessionQueryConditions,
     SessionRow,
     SessionStatus,
@@ -72,7 +90,7 @@ from ..session import (
 )
 from ..user import UserRole, UserRow
 from .group import GroupRow
-from .kernel import KernelConnection, KernelNode
+from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
 if TYPE_CHECKING:
@@ -82,6 +100,11 @@ __all__ = (
     "ComputeSessionNode",
     "ComputeSessionConnection",
     "ModifyComputeSession",
+    "ModifyComputeSession",
+    "ComputeSession",
+    "ComputeSessionList",
+    "InferenceSession",
+    "InferenceSessionList",
 )
 
 
@@ -677,9 +700,9 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         result = await graph_ctx.processors.session.modify_session.wait_for_complete(
             ModifySessionAction(
                 session_id=session_id,
-                props=ModifySessionInputData(
-                    name=name,
-                    priority=priority,
+                modifier=SessionModifier(
+                    name=OptionalState[str].from_graphql(name),
+                    priority=OptionalState[int].from_graphql(priority),
                 ),
             )
         )
@@ -738,3 +761,462 @@ class CheckAndTransitStatus(graphene.Mutation):
             session_nodes.append(ComputeSessionNode.from_row(graph_ctx, action_result.session_row))
 
         return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))
+
+
+class ComputeSession(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+    # identity
+    session_id = graphene.UUID()  # identical to `id`
+    main_kernel_id = graphene.UUID()
+    tag = graphene.String()
+    name = graphene.String()
+    type = graphene.String()
+    main_kernel_role = graphene.String()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
+
+    # image
+    image = graphene.String()  # image for the main container
+    architecture = graphene.String()  # image architecture for the main container
+    registry = graphene.String()  # image registry for the main container
+    cluster_template = graphene.String()
+    cluster_mode = graphene.String()
+    cluster_size = graphene.Int()
+
+    # ownership
+    domain_name = graphene.String()
+    group_name = graphene.String()
+    group_id = graphene.UUID()
+    user_email = graphene.String()
+    full_name = graphene.String()
+    user_id = graphene.UUID()
+    access_key = graphene.String()
+    created_user_email = graphene.String()
+    created_user_id = graphene.UUID()
+
+    # status
+    status = graphene.String()
+    status_changed = GQLDateTime()
+    status_info = graphene.String()
+    status_data = graphene.JSONString()
+    status_history = graphene.JSONString()
+    created_at = GQLDateTime()
+    terminated_at = GQLDateTime()
+    starts_at = GQLDateTime()
+    scheduled_at = GQLDateTime()
+    startup_command = graphene.String()
+    result = graphene.String()
+    commit_status = graphene.String()
+    abusing_reports = graphene.List(lambda: graphene.JSONString)
+    idle_checks = graphene.JSONString()
+
+    # resources
+    agent_ids = graphene.List(lambda: graphene.String)
+    agents = graphene.List(lambda: graphene.String)
+    resource_opts = graphene.JSONString()
+    scaling_group = graphene.String()
+    service_ports = graphene.JSONString()
+    mounts = graphene.List(lambda: graphene.String)
+    vfolder_mounts = graphene.List(lambda: graphene.String)
+    occupying_slots = graphene.JSONString()
+    occupied_slots = graphene.JSONString()  # legacy
+    requested_slots = graphene.JSONString(description="Added in 24.03.0.")
+
+    # statistics
+    num_queries = BigInt()
+
+    # owned containers (aka kernels)
+    containers = graphene.List(lambda: ComputeContainer)
+
+    # relations
+    dependencies = graphene.List(lambda: ComputeSession)
+
+    inference_metrics = graphene.JSONString()
+
+    @classmethod
+    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+        assert row is not None
+        email = getattr(row, "email")
+        full_name = getattr(row, "full_name")
+        group_name = getattr(row, "group_name")
+        row = row.SessionRow
+        status_history = row.status_history or {}
+        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        # TODO: Deprecate 'mounts' and replace it with a list of VirtualFolderNodes
+        mounts_set: set[str] = set()
+        mounts: list[str] = []
+        vfolder_mounts = cast(list[VFolderMount], row.vfolders_sorted_by_id)
+        for mount in vfolder_mounts:
+            if mount.name not in mounts_set:
+                mounts.append(mount.name)
+                mounts_set.add(mount.name)
+        return {
+            # identity
+            "id": row.id,
+            "session_id": row.id,
+            "main_kernel_id": row.main_kernel.id,
+            "tag": row.tag,
+            "name": row.name,
+            "type": row.session_type.name,
+            "main_kernel_role": row.session_type.name,  # legacy
+            "priority": row.priority,
+            # image
+            "image": row.images[0] if row.images is not None else "",
+            "architecture": row.main_kernel.architecture,
+            "registry": row.main_kernel.registry,
+            "cluster_template": None,  # TODO: implement
+            "cluster_mode": row.cluster_mode,
+            "cluster_size": row.cluster_size,
+            # ownership
+            "domain_name": row.domain_name,
+            "group_name": group_name[0],
+            "group_id": row.group_id,
+            "user_email": email,
+            "full_name": full_name,
+            "user_id": row.user_uuid,
+            "access_key": row.access_key,
+            "created_user_email": None,  # TODO: implement
+            "created_user_id": None,  # TODO: implement
+            # status
+            "status": row.status.name,
+            "status_changed": row.status_changed,
+            "status_info": row.status_info,
+            "status_data": row.status_data,
+            "status_history": status_history,
+            "created_at": row.created_at,
+            "terminated_at": row.terminated_at,
+            "starts_at": row.starts_at,
+            "scheduled_at": (
+                datetime.fromisoformat(raw_scheduled_at) if raw_scheduled_at is not None else None
+            ),
+            "startup_command": row.startup_command,
+            "result": row.result.name,
+            # resources
+            "agent_ids": row.agent_ids,
+            "agents": row.agent_ids,  # for backward compatibility
+            "scaling_group": row.scaling_group_name,
+            "service_ports": row.main_kernel.service_ports,
+            # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
+            "mounts": mounts,
+            "vfolder_mounts": [vf.vfid.folder_id for vf in vfolder_mounts],
+            "occupying_slots": row.occupying_slots.to_json(),
+            "occupied_slots": row.occupying_slots.to_json(),
+            "requested_slots": row.requested_slots.to_json(),
+            # statistics
+            "num_queries": row.num_queries,
+        }
+
+    @classmethod
+    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
+        if row is None:
+            return None
+        props = cls.parse_row(ctx, row)
+        return cls(**props)
+
+    async def resolve_inference_metrics(
+        self, info: graphene.ResolveInfo
+    ) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
+        )
+        return await loader.load(self.id)
+
+    async def resolve_containers(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> Iterable[ComputeContainer]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
+        return await loader.load(self.session_id)
+
+    async def resolve_dependencies(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> Iterable[ComputeSession]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
+        return await loader.load(self.id)
+
+    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "ComputeSession.commit_statuses"
+        )
+        return await loader.load(self.main_kernel_id)
+
+    async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
+        containers = self.containers
+        if containers is None:
+            containers = await self.resolve_containers(info)
+        if containers is None:
+            return {}
+        self.containers = containers
+        return {cntr.cluster_hostname: cntr.resource_opts for cntr in containers}
+
+    async def resolve_abusing_reports(
+        self, info: graphene.ResolveInfo
+    ) -> Iterable[Optional[Mapping[str, Any]]]:
+        containers = self.containers
+        if containers is None:
+            containers = await self.resolve_containers(info)
+        if containers is None:
+            return []
+        self.containers = containers
+        return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+
+    _queryfilter_fieldspec: FieldSpecType = {
+        "id": ("sessions_id", None),
+        "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
+        "name": ("sessions_name", None),
+        "priority": ("sessions_priority", None),
+        "image": (ArrayFieldItem("sessions_images"), None),
+        "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
+        "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
+        "agents": (ArrayFieldItem("sessions_agent_ids"), None),  # for backward compatibility
+        "domain_name": ("sessions_domain_name", None),
+        "group_name": ("group_name", None),
+        "user_email": ("users_email", None),
+        "user_id": ("sessions_user_uuid", None),
+        "full_name": ("users_full_name", None),
+        "access_key": ("sessions_access_key", None),
+        "scaling_group": ("sessions_scaling_group_name", None),
+        "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
+        "cluster_size": ("sessions_cluster_size", None),
+        "status": ("sessions_status", enum_field_getter(SessionStatus)),
+        "status_info": ("sessions_status_info", None),
+        "result": ("sessions_result", enum_field_getter(SessionResult)),
+        "created_at": ("sessions_created_at", dtparse),
+        "terminated_at": ("sessions_terminated_at", dtparse),
+        "starts_at": ("sessions_starts_at", dtparse),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            dtparse,
+        ),
+        "startup_command": ("sessions_startup_command", None),
+    }
+
+    _queryorder_colmap: ColumnMapType = {
+        "id": ("sessions_id", None),
+        "type": ("sessions_session_type", None),
+        "name": ("sessions_name", None),
+        "image": ("sessions_images", None),
+        "priority": ("sessions_priority", None),
+        "agent_ids": ("sessions_agent_ids", None),
+        "agent_id": ("sessions_agent_ids", None),
+        "agents": ("sessions_agent_ids", None),
+        "domain_name": ("sessions_domain_name", None),
+        "group_name": ("group_name", None),
+        "user_email": ("users_email", None),
+        "user_id": ("sessions_user_uuid", None),
+        "full_name": ("users_full_name", None),
+        "access_key": ("sessions_access_key", None),
+        "scaling_group": ("sessions_scaling_group_name", None),
+        "cluster_mode": ("sessions_cluster_mode", None),
+        # "cluster_template": "cluster_template",
+        "cluster_size": ("sessions_cluster_size", None),
+        "status": ("sessions_status", None),
+        "status_info": ("sessions_status_info", None),
+        "result": ("sessions_result", None),
+        "created_at": ("sessions_created_at", None),
+        "terminated_at": ("sessions_terminated_at", None),
+        "starts_at": ("sessions_starts_at", None),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            None,
+        ),
+    }
+
+    @classmethod
+    async def load_count(
+        cls,
+        ctx: GraphQueryContext,
+        *,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[str] = None,
+        status: Optional[str] = None,
+        filter: Optional[str] = None,
+    ) -> int:
+        if isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
+        elif isinstance(status, SessionStatus):
+            status_list = [status]
+        j = (
+            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
+            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+            .join(KernelRow, SessionRow.id == KernelRow.session_id)
+        )
+        query = sa.select([sa.func.count(sa.distinct(SessionRow.id))]).select_from(j)
+        if domain_name is not None:
+            query = query.where(SessionRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(SessionRow.group_id == group_id)
+        if access_key is not None:
+            query = query.where(SessionRow.access_key == access_key)
+        if status is not None:
+            query = query.where(SessionRow.status.in_(status_list))
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice(
+        cls,
+        ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[str] = None,
+        status: Optional[str] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+    ) -> Sequence[ComputeSession | None]:
+        if status is None:
+            status_list = None
+        elif isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
+        elif isinstance(status, SessionStatus):
+            status_list = [status]
+        j = (
+            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+                UserRow, SessionRow.user_uuid == UserRow.uuid
+            )
+        )
+        query = (
+            sa.select(
+                SessionRow,
+                agg_to_array(GroupRow.name).label("group_name"),
+                UserRow.email,
+                UserRow.full_name,
+            )
+            .select_from(j)
+            .options(selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)))
+            .group_by(SessionRow, UserRow.email, UserRow.full_name)
+            .limit(limit)
+            .offset(offset)
+        )
+        if domain_name is not None:
+            query = query.where(SessionRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(SessionRow.group_id == group_id)
+        if access_key is not None:
+            query = query.where(SessionRow.access_key == access_key)
+        if status is not None:
+            query = query.where(SessionRow.status.in_(status_list))
+        if filter is not None:
+            parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = parser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(*DEFAULT_SESSION_ORDERING)
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return [cls.from_row(ctx, r) async for r in (await db_sess.stream(query))]
+
+    @classmethod
+    async def batch_load_detail(
+        cls,
+        ctx: GraphQueryContext,
+        session_ids: Sequence[SessionId],
+        *,
+        domain_name: Optional[str] = None,
+        access_key: Optional[str] = None,
+    ) -> Sequence[ComputeSession | None]:
+        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+            UserRow, SessionRow.user_uuid == UserRow.uuid
+        )
+        query = (
+            sa.select(
+                SessionRow,
+                GroupRow.name.label("group_name"),
+                UserRow.email,
+                UserRow.full_name,
+            )
+            .select_from(j)
+            .where(SessionRow.id.in_(session_ids))
+            .options(selectinload(SessionRow.kernels))
+        )
+        if domain_name is not None:
+            query = query.where(SessionRow.domain_name == domain_name)
+        if access_key is not None:
+            query = query.where(SessionRow.access_key == access_key)
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return await batch_result_in_session(
+                ctx,
+                db_sess,
+                query,
+                cls,
+                session_ids,
+                lambda row: row.SessionRow.id,
+            )
+
+    @classmethod
+    async def batch_load_by_dependency(
+        cls,
+        ctx: GraphQueryContext,
+        session_ids: Sequence[SessionId],
+    ) -> Sequence[Sequence[ComputeSession]]:
+        j = sa.join(
+            SessionRow,
+            SessionDependencyRow,
+            SessionRow.id == SessionDependencyRow.depends_on,
+        )
+        query = (
+            sa.select(SessionRow)
+            .select_from(j)
+            .where(SessionDependencyRow.session_id.in_(session_ids))
+            .options(selectinload(SessionRow.kernels))
+        )
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return await batch_multiresult_in_session(
+                ctx,
+                db_sess,
+                query,
+                cls,
+                session_ids,
+                lambda row: row.SessionRow.id,
+            )
+
+    @classmethod
+    async def batch_load_commit_statuses(
+        cls,
+        ctx: GraphQueryContext,
+        kernel_ids: Sequence[KernelId],
+    ) -> Sequence[str]:
+        commit_statuses = await ctx.registry.get_commit_status(kernel_ids)
+        return [commit_statuses[kernel_id] for kernel_id in kernel_ids]
+
+
+class ComputeSessionList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(ComputeSession, required=True)
+
+
+class InferenceSession(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+
+class InferenceSessionList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(InferenceSession, required=True)

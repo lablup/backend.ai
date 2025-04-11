@@ -12,7 +12,8 @@ from ai.backend.common.docker import arch_name_aliases, get_docker_connector
 from ai.backend.common.json import pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageRow, ImageStatus
+from ..data.image.types import ImageStatus
+from ..models.image import ImageRow
 from .base import (
     BaseContainerRegistry,
     concurrency_sema,

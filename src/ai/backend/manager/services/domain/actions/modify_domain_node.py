@@ -1,62 +1,26 @@
-from dataclasses import dataclass, field, fields
-from typing import Any, Optional, cast, override
+from dataclasses import dataclass, field
+from typing import Optional, override
 
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.domain.actions.base import DomainAction
-from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import OptionalState, State, TriState
+from ai.backend.manager.services.domain.types import DomainData, DomainNodeModifier, UserInfo
 
 
 @dataclass
 class ModifyDomainNodeAction(DomainAction):
     name: str
     user_info: UserInfo
-    description: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("description")
-    )
-    is_active: OptionalState[bool] = field(default_factory=lambda: OptionalState.nop("is_active"))
-    total_resource_slots: TriState[Optional[ResourceSlot]] = field(
-        default_factory=lambda: TriState.nop("total_resource_slots")
-    )
-    allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_vfolder_hosts")
-    )
-    allowed_docker_registries: OptionalState[list[str]] = field(
-        default_factory=lambda: OptionalState.nop("allowed_docker_registries")
-    )
-    integration_id: TriState[Optional[str]] = field(
-        default_factory=lambda: TriState.nop("integration_id")
-    )
-    dotfiles: OptionalState[bytes] = field(default_factory=lambda: OptionalState.nop("dotfiles"))
-    sgroups_to_add: OptionalState[set[str]] = field(
-        default_factory=lambda: OptionalState.nop("scaling_groups")
-    )
-    sgroups_to_remove: OptionalState[set[str]] = field(
-        default_factory=lambda: OptionalState.nop("scaling_groups")
-    )
+    sgroups_to_add: Optional[set[str]] = None
+    sgroups_to_remove: Optional[set[str]] = None
+    modifier: DomainNodeModifier = field(default_factory=DomainNodeModifier)
 
+    @override
     def entity_id(self) -> Optional[str]:
         return None
 
+    @override
     def operation_type(self) -> str:
         return "modify"
-
-    def get_modified_fields(self) -> dict[str, Any]:
-        exclude_fields = [
-            "name",
-            "user_info",
-            "sgroups_to_add",
-            "sgroups_to_remove",
-        ]
-        result = {}
-        for f in fields(self):
-            if f.name in exclude_fields:
-                continue
-            field_value: OptionalState = getattr(self, f.name)
-            if field_value.state() != State.NOP:
-                result[f.name] = cast(Any, field_value.value())
-        return result
 
 
 @dataclass

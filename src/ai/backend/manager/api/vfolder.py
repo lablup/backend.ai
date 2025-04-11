@@ -103,7 +103,7 @@ from ..services.vfolder.actions.base import (
     MoveToTrashVFolderAction,
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
-    UpdateVFolderAttributeInput,
+    VFolderAttributeModifier,
 )
 from ..services.vfolder.actions.file import (
     CreateDownloadSessionAction,
@@ -121,7 +121,7 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
-from ..types import TriStateField
+from ..types import TriState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -969,9 +969,9 @@ class RenameRequestModel(BaseModel):
         description="Name of the vfolder",
     )
 
-    def to_input(self) -> UpdateVFolderAttributeInput:
-        return UpdateVFolderAttributeInput(
-            name=TriStateField(self.new_name),
+    def to_modifier(self) -> VFolderAttributeModifier:
+        return VFolderAttributeModifier(
+            name=TriState.update(self.new_name),
         )
 
 
@@ -1000,7 +1000,7 @@ async def rename_vfolder(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            input=params.to_input(),
+            modifier=params.to_modifier(),
         )
     )
     return web.Response(status=HTTPStatus.CREATED)
@@ -1031,9 +1031,9 @@ async def update_vfolder_options(
         UpdateVFolderAttributeAction(
             user_uuid=request["user"]["uuid"],
             vfolder_uuid=row["id"],
-            input=UpdateVFolderAttributeInput(
-                cloneable=TriStateField(params["cloneable"]),
-                mount_permission=TriStateField(params["permission"]),
+            modifier=VFolderAttributeModifier(
+                cloneable=TriState.update(params["cloneable"]),
+                mount_permission=TriState.update(params["permission"]),
             ),
         )
     )
@@ -1333,7 +1333,7 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
         request["keypair"]["access_key"],
         inv_id,
     )
-    await root_ctx.processors.vfolder_invitation.update_invitation.wait_for_complete(
+    await root_ctx.processors.vfolder_invite.update_invitation.wait_for_complete(
         UpdateInvitationAction(
             invitation_id=uuid.UUID(inv_id),
             requester_user_uuid=request["user"]["uuid"],
@@ -1373,7 +1373,7 @@ async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Resp
             sa.select(UserRow).where(UserRow.email.in_(invitee_emails))
         )
         user_uuids = [row.uuid for row in user_rows]
-    result = await root_ctx.processors.vfolder_invitation.invite_vfolder.wait_for_complete(
+    result = await root_ctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
         InviteVFolderAction(
             keypair_resource_policy=request["keypair"]["resource_policy"],
             user_uuid=user_uuid,
@@ -1395,7 +1395,7 @@ async def invitations(request: web.Request) -> web.Response:
         request["user"]["email"],
         request["keypair"]["access_key"],
     )
-    result = await root_ctx.processors.vfolder_invitation.list_invitation.wait_for_complete(
+    result = await root_ctx.processors.vfolder_invite.list_invitation.wait_for_complete(
         ListInvitationAction(
             requester_user_uuid=request["user"]["uuid"],
         )
@@ -1431,7 +1431,7 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
         request["keypair"]["access_key"],
         inv_id,
     )
-    await root_ctx.processors.vfolder_invitation.accept_invitation.wait_for_complete(
+    await root_ctx.processors.vfolder_invite.accept_invitation.wait_for_complete(
         AcceptInvitationAction(
             invitation_id=inv_id,
         )
@@ -1455,7 +1455,7 @@ async def delete_invitation(request: web.Request, params: Any) -> web.Response:
         request["keypair"]["access_key"],
         inv_id,
     )
-    await root_ctx.processors.vfolder_invitation.reject_invitation.wait_for_complete(
+    await root_ctx.processors.vfolder_invite.reject_invitation.wait_for_complete(
         RejectInvitationAction(
             invitation_id=inv_id,
             requester_user_uuid=request["user"]["uuid"],
@@ -1942,7 +1942,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     )
     if row["ownership_type"] == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
-    await root_ctx.processors.vfolder_invitation.leave_invited_vfolder.wait_for_complete(
+    await root_ctx.processors.vfolder_invite.leave_invited_vfolder.wait_for_complete(
         LeaveInvitedVFolderAction(
             vfolder_uuid=vfolder_id,
             requester_user_uuid=rqst_user_uuid,

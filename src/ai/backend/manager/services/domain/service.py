@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Iterable, Optional, cast
+from typing import Any, Awaitable, Callable, Iterable, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.engine.result import Result
@@ -51,7 +51,6 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainActionResult,
 )
 from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import State
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -70,7 +69,7 @@ class DomainService:
         self._db = db
 
     async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        data = action.get_insertion_data()
+        data = action.creator.fields_to_store()
         base_query = sa.insert(domains).values(data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
@@ -78,7 +77,7 @@ class DomainService:
                 "name": "model-store",
                 "description": "Model Store",
                 "is_active": True,
-                "domain_name": action.name,
+                "domain_name": action.creator.name,
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
                 "integration_id": None,
@@ -93,13 +92,11 @@ class DomainService:
                 result = await conn.execute(query)
                 row = result.first()
                 await _post_func(conn, result)
-                # TODO: Raise Error if rowcount is 0
-                if result.rowcount > 0:
-                    return MutationResult(success=True, message="domain creation succeed", data=row)
-                else:
-                    return MutationResult(
-                        success=False, message=f"no matching {action.name}", data=None
+                if result.rowcount != 1:
+                    raise RuntimeError(
+                        f"No domain created. rowcount: {result.rowcount}, data: {data}"
                     )
+                return MutationResult(success=True, message="domain creation succeed", data=row)
 
         res: MutationResult = await self._db_mutation_wrapper(_do_mutate)
 
@@ -124,7 +121,7 @@ class DomainService:
                     )
                 else:
                     return MutationResult(
-                        success=False, message=f"no matching {action.name}", data=None
+                        success=False, message=f"no matching {action.modifier.name}", data=None
                     )
 
         res = await self._db_mutation_wrapper(_do_mutate)
@@ -219,26 +216,23 @@ class DomainService:
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        if action.scaling_groups.state() == State.UPDATE:
-            scaling_groups = cast(list[str], action.scaling_groups.value())
-        else:
-            scaling_groups = None
+        scaling_groups = action.scaling_groups
 
         async def _insert(db_session: AsyncSession) -> DomainRow:
             if scaling_groups is not None:
                 await self._ensure_sgroup_permission(
                     action.user_info, scaling_groups, db_session=db_session
                 )
-            data = action.get_insertion_data()
-            _insert_and_returning = sa.select(DomainRow).from_statement(
+            data = action.creator.fields_to_store()
+            insert_and_returning = sa.select(DomainRow).from_statement(
                 sa.insert(DomainRow).values(data).returning(DomainRow)
             )
-            domain_row = await db_session.scalar(_insert_and_returning)
+            domain_row = await db_session.scalar(insert_and_returning)
             if scaling_groups is not None:
                 await db_session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group": sgroup_name, "domain": action.name}
+                        {"scaling_group": sgroup_name, "domain": action.creator.name}
                         for sgroup_name in scaling_groups
                     ],
                 )
@@ -257,7 +251,7 @@ class DomainService:
         return CreateDomainNodeActionResult(
             domain_data=DomainData.from_row(domain_row),
             success=True,
-            description=f"domain {action.name} created",
+            description=f"domain {action.creator.name} created",
         )
 
     async def modify_domain_node(
@@ -265,17 +259,8 @@ class DomainService:
     ) -> ModifyDomainNodeActionResult:
         domain_name = action.name
 
-        if action.sgroups_to_add.state() == State.UPDATE:
-            sgroups_to_add = action.sgroups_to_add.value()
-        else:
-            sgroups_to_add = None
-        if action.sgroups_to_remove.state() == State.UPDATE:
-            sgroups_to_remove = action.sgroups_to_remove.value()
-        else:
-            sgroups_to_remove = None
-
-        if sgroups_to_add is not None and sgroups_to_remove is not None:
-            if union := sgroups_to_add | sgroups_to_remove:
+        if action.sgroups_to_add is not None and action.sgroups_to_remove is not None:
+            if union := action.sgroups_to_add | action.sgroups_to_remove:
                 raise ValueError(
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
                     f"(sg:{union})."
@@ -296,31 +281,31 @@ class DomainService:
             if not domain_models:
                 raise ValueError(f"Not allowed to update domain (id:{domain_name})")
 
-            if sgroups_to_add is not None:
+            if action.sgroups_to_add is not None:
                 await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_add, db_session=db_session
+                    user_info, action.sgroups_to_add, db_session=db_session
                 )
                 await db_session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
                         {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
+                        for sgroup_name in action.sgroups_to_add
                     ],
                 )
-            if sgroups_to_remove is not None:
+            if action.sgroups_to_remove is not None:
                 await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_remove, db_session=db_session
+                    user_info, action.sgroups_to_remove, db_session=db_session
                 )
                 await db_session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
                         (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
+                        & (ScalingGroupForDomainRow.scaling_group.in_(action.sgroups_to_remove))
                     ),
                 )
             _update_stmt = (
                 sa.update(DomainRow)
                 .where(DomainRow.name == domain_name)
-                .values(action.get_modified_fields())
+                .values(action.modifier.fields_to_update())
                 .returning(DomainRow)
             )
             await db_session.execute(_update_stmt)

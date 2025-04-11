@@ -3,15 +3,14 @@ from typing import Any, Optional, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.groups.actions.base import GroupAction
+from ai.backend.manager.services.group.actions.base import GroupAction
 
 
 # TODO: Change to batch action
 @dataclass
-class UsagePerPeriodAction(GroupAction):
-    start_date: str
-    end_date: str
-    project_id: Optional[UUID] = None
+class UsagePerMonthAction(GroupAction):
+    month: str
+    group_ids: Optional[list[UUID]] = None
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -19,11 +18,11 @@ class UsagePerPeriodAction(GroupAction):
 
     @override
     def operation_type(self):
-        return "usage_per_period"
+        return "usage_per_month"
 
 
 @dataclass
-class UsagePerPeriodActionResult(BaseActionResult):
+class UsagePerMonthActionResult(BaseActionResult):
     # TODO: Define return type
     result: list[Any]
 

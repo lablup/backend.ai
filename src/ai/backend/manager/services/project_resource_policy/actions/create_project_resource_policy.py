@@ -6,20 +6,12 @@ from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.services.project_resource_policy.actions.base import (
     ProjectResourcePolicyAction,
 )
-
-
-@dataclass
-class CreateProjectResourcePolicyInputData:
-    max_vfolder_count: Optional[int]
-    max_quota_scope_size: Optional[int]
-    max_vfolder_size: Optional[int]
-    max_network_count: Optional[int]
+from ai.backend.manager.services.project_resource_policy.types import ProjectResourcePolicyCreator
 
 
 @dataclass
 class CreateProjectResourcePolicyAction(ProjectResourcePolicyAction):
-    name: str
-    props: CreateProjectResourcePolicyInputData
+    creator: ProjectResourcePolicyCreator
 
     @override
     def entity_id(self) -> Optional[str]:

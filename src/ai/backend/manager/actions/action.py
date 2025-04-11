@@ -1,3 +1,4 @@
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,6 +17,12 @@ class BaseAction(ABC):
     @abstractmethod
     def operation_type(self) -> str:
         raise NotImplementedError
+
+
+@dataclass
+class BaseActionTriggerMeta:
+    action_id: uuid.UUID
+    started_at: datetime
 
 
 class BaseBatchAction(ABC):
@@ -46,6 +53,7 @@ class BaseBatchActionResult(ABC):
 
 @dataclass
 class BaseActionResultMeta:
+    action_id: uuid.UUID
     status: str
     description: str
     started_at: datetime

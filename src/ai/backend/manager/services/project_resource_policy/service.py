@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 
 import sqlalchemy as sa
@@ -37,15 +36,8 @@ class ProjectResourcePolicyService:
     async def create_project_resource_policy(
         self, action: CreateProjectResourcePolicyAction
     ) -> CreateProjectResourcePolicyActionResult:
-        name = action.name
-        props = action.props
-        dict_props = dataclasses.asdict(props)
-        dict_props["name"] = name
-        # Ignore deprecated fields
-        del dict_props["max_vfolder_size"]
-
         async with self._db.begin_session() as db_sess:
-            new_row = ProjectResourcePolicyRow(**dict_props)
+            new_row = ProjectResourcePolicyRow(**action.creator.fields_to_store())
             db_sess.add(new_row)
             result = new_row.to_dataclass()
             await db_sess.flush()
@@ -56,7 +48,6 @@ class ProjectResourcePolicyService:
         self, action: ModifyProjectResourcePolicyAction
     ) -> ModifyProjectResourcePolicyActionResult:
         name = action.name
-        props = action.props
 
         async with self._db.begin_session() as db_sess:
             query = sa.select(ProjectResourcePolicyRow).where(ProjectResourcePolicyRow.name == name)
@@ -64,7 +55,9 @@ class ProjectResourcePolicyService:
             if db_row is None:
                 raise ObjectNotFound(f"Project resource policy with name {name} not found.")
 
-            props.set_attr(db_row)
+            to_update = action.modifier.fields_to_update()
+            for key, value in to_update.items():
+                setattr(db_row, key, value)
 
         return ModifyProjectResourcePolicyActionResult(
             project_resource_policy=db_row.to_dataclass()

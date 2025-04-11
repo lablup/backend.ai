@@ -1,9 +1,11 @@
 import asyncio
+import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
 from .action import (
     BaseActionResultMeta,
+    BaseActionTriggerMeta,
     ProcessResult,
     TAction,
     TActionResult,
@@ -28,8 +30,11 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         status: str = "unknown"
         description: str = "unknown"
         result: Optional[TActionResult] = None
+
+        action_id = uuid.uuid4()
+        action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
         for monitor in self._monitors:
-            await monitor.prepare(action)
+            await monitor.prepare(action, action_trigger_meta)
         try:
             result = await self._func(action)
             status = "success"
@@ -42,6 +47,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             end_at = datetime.now()
             duration = (end_at - started_at).total_seconds()
             meta = BaseActionResultMeta(
+                action_id=action_id,
                 status=status,
                 description=description,
                 started_at=started_at,
