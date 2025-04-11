@@ -472,11 +472,15 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
             else Undefined
         )
 
+        total_resource_slots = (
+            ResourceSlot.from_user_input(self.total_resource_slots, None)
+            if self.total_resource_slots
+            else Undefined
+        )
+
         return KeyPairResourcePolicyModifier(
             default_for_unspecified=OptionalState[str].from_graphql(default_for_unspecified),
-            total_resource_slots=OptionalState[dict[str, Any]].from_graphql(
-                self.total_resource_slots
-            ),
+            total_resource_slots=OptionalState[ResourceSlot].from_graphql(total_resource_slots),
             max_session_lifetime=OptionalState[int].from_graphql(self.max_session_lifetime),
             max_concurrent_sessions=OptionalState[int].from_graphql(self.max_concurrent_sessions),
             max_concurrent_sftp_sessions=OptionalState[int].from_graphql(
