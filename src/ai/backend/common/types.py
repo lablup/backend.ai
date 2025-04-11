@@ -517,12 +517,15 @@ class MountTypes(enum.StrEnum):
 
 
 class MountPoint(BaseModel):
+    model_config = ConfigDict(
+        validate_by_name=True,
+        protected_namespaces=(),
+    )
+
     type: MountTypes = Field(default=MountTypes.BIND)
     source: Path
     target: Path | None = Field(default=None)
     permission: MountPermission | None = Field(alias="perm", default=None)
-
-    model_config = ConfigDict(validate_by_name=True, protected_namespaces=())
 
 
 class MountExpression:

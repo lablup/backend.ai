@@ -1,9 +1,9 @@
 import uuid
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, Field
+
+from ai.backend.common.api_handlers import BaseRequestModel
 
 
-class VFolderIDPath(BaseModel):
-    model_config = ConfigDict(validate_by_name=True)
-
+class VFolderIDPath(BaseRequestModel):
     vfolder_id: uuid.UUID = Field(validation_alias=AliasChoices("id", "vfolderId"))

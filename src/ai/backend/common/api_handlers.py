@@ -149,6 +149,13 @@ class BaseRequestModel(BaseModel):
     )
 
 
+class BaseFieldModel(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_by_name=True,
+    )
+
+
 class BaseResponseModel(BaseModel):
     pass
 
