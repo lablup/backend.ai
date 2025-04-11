@@ -384,6 +384,7 @@ class ComputeSession(BaseFunction):
         tag: str | Undefined = undefined,
         scaling_group: str | Undefined = undefined,
         owner_access_key: str | Undefined = undefined,
+        attach_network: Optional[str] = None,  # TODO: Handle this argument properly
     ) -> ComputeSession:
         """
         Get-or-creates a compute session from template.

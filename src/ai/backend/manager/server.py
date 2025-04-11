@@ -59,6 +59,7 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -70,6 +71,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
@@ -77,27 +79,7 @@ from ai.backend.manager.service.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
-from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
-from ai.backend.manager.services.container_registry.service import ContainerRegistryService
-from ai.backend.manager.services.domain.processors import DomainProcessors
-from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.groups.processors import GroupProcessors
-from ai.backend.manager.services.groups.service import GroupService
-from ai.backend.manager.services.image.processors import ImageProcessors
-from ai.backend.manager.services.image.service import ImageService
-from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.services.users.processors import UserProcessors
-from ai.backend.manager.services.users.service import UserService
-from ai.backend.manager.services.vfolder.processors import (
-    VFolderBaseProcessors,
-    VFolderFileProcessors,
-    VFolderInviteProcessors,
-)
-from ai.backend.manager.services.vfolder.services import (
-    VFolderFileService,
-    VFolderInviteService,
-    VFolderService,
-)
+from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -454,57 +436,22 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    image_service = ImageService(
-        db=root_ctx.db,
-        agent_registry=root_ctx.registry,
-    )
+    audit_log_monitor = AuditLogMonitor()
 
-    user_service = UserService(
-        db=root_ctx.db,
-        storage_manager=root_ctx.storage_manager,
-        redis_stat=root_ctx.redis_stat,
-    )
-    user_processor = UserProcessors(user_service)
-    domain_service = DomainService(root_ctx.db)
-    domain_processor = DomainProcessors(domain_service)
-
-    image_service = ImageService(root_ctx.db, root_ctx.registry)
-    image_processor = ImageProcessors(image_service)
-
-    container_registry_service = ContainerRegistryService(
-        db=root_ctx.db,
-    )
-    container_registry_processor = ContainerRegistryProcessors(container_registry_service)
-    vfolder_service = VFolderService(
-        db=root_ctx.db,
-        shared_config=root_ctx.shared_config,
-        storage_manager=root_ctx.storage_manager,
-        background_task_manager=root_ctx.background_task_manager,
-    )
-    vfolder_processor = VFolderBaseProcessors(vfolder_service)
-    vfolder_invite_service = VFolderInviteService(
-        db=root_ctx.db,
-        shared_config=root_ctx.shared_config,
-    )
-    vfolder_invite_processor = VFolderInviteProcessors(vfolder_invite_service)
-    vfolder_file_service = VFolderFileService(
-        db=root_ctx.db,
-        shared_config=root_ctx.shared_config,
-        storage_manager=root_ctx.storage_manager,
-    )
-    vfolder_file_processor = VFolderFileProcessors(vfolder_file_service)
-
-    group_service = GroupService(db=root_ctx.db, storage_manager=root_ctx.storage_manager)
-    group_processor = GroupProcessors(group_service)
-    root_ctx.processors = Processors(
-        domain=domain_processor,
-        group=group_processor,
-        user=user_processor,
-        image=image_processor,
-        container_registry=container_registry_processor,
-        vfolder=vfolder_processor,
-        vfolder_invite=vfolder_invite_processor,
-        vfolder_file=vfolder_file_processor,
+    root_ctx.processors = Processors.create(
+        ProcessorArgs(
+            service_args=ServiceArgs(
+                db=root_ctx.db,
+                shared_config=root_ctx.shared_config,
+                storage_manager=root_ctx.storage_manager,
+                redis_stat=root_ctx.redis_stat,
+                background_task_manager=root_ctx.background_task_manager,
+                agent_registry=root_ctx.registry,
+                error_monitor=root_ctx.error_monitor,
+                idle_checker_host=root_ctx.idle_checker_host,
+            )
+        ),
+        [audit_log_monitor],
     )
     yield
 
@@ -854,6 +801,7 @@ def build_root_app(
     root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
     app = web.Application(
         middlewares=[
+            request_id_middleware,
             exception_middleware,
             api_middleware,
             build_api_metric_middleware(root_ctx.metrics.api),

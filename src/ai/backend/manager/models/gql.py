@@ -80,10 +80,9 @@ from ..api.exceptions import (
     ObjectNotFound,
     TooManyKernelsFound,
 )
+from ..data.image.types import ImageStatus
 from .acl import PredefinedAtomicPermission
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
-from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
-from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.agent import (
     Agent,
     AgentConnection,
@@ -100,21 +99,40 @@ from .gql_models.container_registry import (
     UpdateContainerRegistryQuota,
 )
 from .gql_models.domain import (
+    CreateDomain,
     CreateDomainNode,
+    DeleteDomain,
+    Domain,
     DomainConnection,
     DomainNode,
     DomainPermissionValueField,
+    ModifyDomain,
     ModifyDomainNode,
+    PurgeDomain,
 )
 from .gql_models.endpoint import (
     CreateEndpointAutoScalingRuleNode,
     DeleteEndpointAutoScalingRuleNode,
+    Endpoint,
     EndpointAutoScalingRuleConnection,
     EndpointAutoScalingRuleNode,
+    EndpointList,
+    EndpointToken,
+    EndpointTokenList,
+    ModifyEndpoint,
     ModifyEndpointAutoScalingRuleNode,
 )
 from .gql_models.fields import AgentPermissionField, ScopeField
-from .gql_models.group import GroupConnection, GroupNode, GroupPermissionField
+from .gql_models.group import (
+    CreateGroup,
+    DeleteGroup,
+    Group,
+    GroupConnection,
+    GroupNode,
+    GroupPermissionField,
+    ModifyGroup,
+    PurgeGroup,
+)
 from .gql_models.image import (
     AliasImage,
     ClearImages,
@@ -134,15 +152,59 @@ from .gql_models.image import (
     UnloadImage,
     UntagImageFromRegistry,
 )
+from .gql_models.kernel import (
+    ComputeContainer,
+    ComputeContainerList,
+    LegacyComputeSession,
+    LegacyComputeSessionList,
+)
+from .gql_models.keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .gql_models.resource_preset import (
+    CreateResourcePreset,
+    DeleteResourcePreset,
+    ModifyResourcePreset,
+    ResourcePreset,
+)
+from .gql_models.scaling_group import (
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
+    AssociateScalingGroupWithDomain,
+    AssociateScalingGroupWithKeyPair,
+    AssociateScalingGroupWithUserGroup,
+    CreateScalingGroup,
+    DeleteScalingGroup,
+    DisassociateAllScalingGroupsWithDomain,
+    DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
+    DisassociateScalingGroupWithDomain,
+    DisassociateScalingGroupWithKeyPair,
+    DisassociateScalingGroupWithUserGroup,
+    ModifyScalingGroup,
+    ScalingGroup,
+)
 from .gql_models.session import (
     CheckAndTransitStatus,
+    ComputeSession,
     ComputeSessionConnection,
+    ComputeSessionList,
     ComputeSessionNode,
     ModifyComputeSession,
     SessionPermissionValueField,
     TotalResourceSlot,
 )
-from .gql_models.user import UserConnection, UserNode
+from .gql_models.user import (
+    CreateUser,
+    DeleteUser,
+    ModifyUser,
+    PurgeUser,
+    User,
+    UserConnection,
+    UserList,
+    UserNode,
+)
 from .gql_models.vfolder import (
     ModelCard,
     ModelCardConnection,
@@ -151,25 +213,12 @@ from .gql_models.vfolder import (
     VirtualFolderNode,
 )
 from .group import (
-    CreateGroup,
-    DeleteGroup,
-    Group,
-    ModifyGroup,
     ProjectType,
-    PurgeGroup,
 )
 from .image import (
     ImageLoadFilter,
-    ImageStatus,
     PublicImageLoadFilter,
 )
-from .kernel import (
-    ComputeContainer,
-    ComputeContainerList,
-    LegacyComputeSession,
-    LegacyComputeSessionList,
-)
-from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import (
@@ -194,50 +243,18 @@ from .resource_policy import (
     ProjectResourcePolicy,
     UserResourcePolicy,
 )
-from .resource_preset import (
-    CreateResourcePreset,
-    DeleteResourcePreset,
-    ModifyResourcePreset,
-    ResourcePreset,
-)
 from .routing import Routing, RoutingList
 from .scaling_group import (
-    AssociateScalingGroupsWithDomain,
-    AssociateScalingGroupsWithKeyPair,
-    AssociateScalingGroupsWithUserGroup,
-    AssociateScalingGroupWithDomain,
-    AssociateScalingGroupWithKeyPair,
-    AssociateScalingGroupWithUserGroup,
-    CreateScalingGroup,
-    DeleteScalingGroup,
-    DisassociateAllScalingGroupsWithDomain,
-    DisassociateAllScalingGroupsWithGroup,
-    DisassociateScalingGroupsWithDomain,
-    DisassociateScalingGroupsWithKeyPair,
-    DisassociateScalingGroupsWithUserGroup,
-    DisassociateScalingGroupWithDomain,
-    DisassociateScalingGroupWithKeyPair,
-    DisassociateScalingGroupWithUserGroup,
-    ModifyScalingGroup,
-    ScalingGroup,
     ScalingGroupRow,
     and_names,
     query_allowed_sgroups,
 )
 from .session import (
-    ComputeSession,
-    ComputeSessionList,
     SessionQueryConditions,
     SessionStatus,
 )
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
-    CreateUser,
-    DeleteUser,
-    ModifyUser,
-    PurgeUser,
-    User,
-    UserList,
     UserRole,
     UserStatus,
 )
@@ -2424,11 +2441,19 @@ class Queries(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[ComputeSessionNode]:
-        if scope_id is None:
-            scope_id = SystemScope()
+        final_scope_id: ScopeType
+        if project_id is not None:
+            # for backward compatibility.
+            # TODO: remove this part after `project_id` argument is fully deprecated
+            final_scope_id = ProjectScope(project_id)
+        else:
+            if scope_id is None:
+                final_scope_id = SystemScope()
+            else:
+                final_scope_id = scope_id
         return await ComputeSessionNode.get_accessible_connection(
             info,
-            scope_id,
+            final_scope_id,
             permission,
             filter,
             order,

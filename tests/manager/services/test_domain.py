@@ -37,8 +37,14 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.domain.types import DomainData, UserInfo
-from ai.backend.manager.types import OptionalState, State, TriState
+from ai.backend.manager.services.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainModifier,
+    DomainNodeModifier,
+    UserInfo,
+)
+from ai.backend.manager.types import TriState
 
 from .test_utils import TestScenario
 
@@ -46,7 +52,7 @@ from .test_utils import TestScenario
 @pytest.fixture
 def processors(database_fixture, database_engine) -> DomainProcessors:
     domain_service = DomainService(database_engine)
-    return DomainProcessors(domain_service)
+    return DomainProcessors(domain_service, [])
 
 
 @pytest.fixture
@@ -89,19 +95,21 @@ async def create_domain(
         TestScenario.success(
             "Create a domain node",
             CreateDomainNodeAction(
-                name="test-create-domain-node",
-                description=OptionalState.update("description", "Test domain"),
+                creator=DomainCreator(
+                    name="test-create-domain-node",
+                    description="Test domain",
+                    total_resource_slots=ResourceSlot.from_user_input({}, None),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                    integration_id=None,
+                    dotfiles=b"\x90",
+                ),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
                     domain_name="default",
                 ),
-                total_resource_slots=OptionalState.update("total_resource_slots", {}),
-                allowed_vfolder_hosts=OptionalState.update("allowed_vfolder_hosts", {}),
-                allowed_docker_registries=OptionalState.update("allowed_docker_registries", []),
-                integration_id=OptionalState.update("integration_id", None),
-                dotfiles=OptionalState.update("dotfiles", b"\x90"),
-                scaling_groups=OptionalState.nop("scaling_groups"),
+                scaling_groups=None,
             ),
             CreateDomainNodeActionResult(
                 domain_data=DomainData(
@@ -123,8 +131,10 @@ async def create_domain(
         TestScenario.failure(
             "Create domain node with duplicated name",
             CreateDomainNodeAction(
-                name="default",
-                description=OptionalState.update("description", "Test domain"),
+                creator=DomainCreator(
+                    name="default",
+                    description="Test domain",
+                ),
                 user_info=UserInfo(
                     id=uuid.UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
                     role=UserRole.ADMIN,
@@ -155,7 +165,9 @@ async def test_create_domain_node(
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainNodeModifier(
+                    description=TriState.update("Domain Description Modified"),
+                ),
             ),
             ModifyDomainNodeActionResult(
                 domain_data=DomainData(
@@ -183,7 +195,9 @@ async def test_create_domain_node(
                     role=UserRole.SUPERADMIN,
                     domain_name="default",
                 ),
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainNodeModifier(
+                    description=TriState.update("Domain Description Modified"),
+                ),
             ),
             ValueError,
         ),
@@ -196,7 +210,9 @@ async def test_create_domain_node(
                     role=UserRole.USER,
                     domain_name="default",
                 ),
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainNodeModifier(
+                    description=TriState.update("Domain Description Modified"),
+                ),
             ),
             ValueError,
         ),
@@ -218,8 +234,10 @@ async def test_modify_domain_node(
         TestScenario.success(
             "Create a domain",
             CreateDomainAction(
-                name="test-create-domain",
-                description=TriState("description", State.UPDATE, "Test domain"),
+                creator=DomainCreator(
+                    name="test-create-domain",
+                    description="Test domain",
+                ),
             ),
             CreateDomainActionResult(
                 domain_data=DomainData(
@@ -241,8 +259,10 @@ async def test_modify_domain_node(
         TestScenario.success(
             "Create a domain with duplicated name, return none",
             CreateDomainAction(
-                name="default",
-                description=TriState("description", State.UPDATE, "Test domain"),
+                creator=DomainCreator(
+                    name="default",
+                    description="Test domain",
+                ),
             ),
             CreateDomainActionResult(
                 domain_data=None,
@@ -264,7 +284,7 @@ async def test_create_model_store_after_domain_created(
     processors: DomainProcessors, database_engine
 ) -> None:
     domain_name = "test-create-domain-post-func"
-    action = CreateDomainAction(name=domain_name)
+    action = CreateDomainAction(creator=DomainCreator(name=domain_name))
 
     await processors.create_domain.wait_for_complete(action)
 
@@ -286,7 +306,9 @@ async def test_create_model_store_after_domain_created(
             "Modify domain",
             ModifyDomainAction(
                 domain_name="test-modify-domain",
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainModifier(
+                    description=TriState.update("Domain Description Modified"),
+                ),
             ),
             ModifyDomainActionResult(
                 domain_data=DomainData(
@@ -309,7 +331,9 @@ async def test_create_model_store_after_domain_created(
             "Modify a domain not exists",
             ModifyDomainAction(
                 domain_name="not-exist-domain",
-                description=TriState("description", State.UPDATE, "Domain Description Modified"),
+                modifier=DomainModifier(
+                    description=TriState.update("Domain Description Modified"),
+                ),
             ),
             ModifyDomainActionResult(
                 domain_data=None,

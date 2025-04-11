@@ -1,9 +1,13 @@
 import asyncio
+import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
+from ai.backend.manager.models.audit_log import OperationStatus
+
 from .action import (
     BaseActionResultMeta,
+    BaseActionTriggerMeta,
     ProcessResult,
     TAction,
     TActionResult,
@@ -25,23 +29,27 @@ class ActionProcessor(Generic[TAction, TActionResult]):
 
     async def _run(self, action: TAction) -> TActionResult:
         started_at = datetime.now()
-        status: str = "unknown"
+        status = OperationStatus.UNKNOWN
         description: str = "unknown"
         result: Optional[TActionResult] = None
+
+        action_id = uuid.uuid4()
+        action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
         for monitor in self._monitors:
-            await monitor.prepare(action)
+            await monitor.prepare(action, action_trigger_meta)
         try:
             result = await self._func(action)
-            status = "success"
+            status = OperationStatus.SUCCESS
             description = "Success"
         except BaseException as e:
-            status = "error"
+            status = OperationStatus.ERROR
             description = str(e)
             raise
         finally:
             end_at = datetime.now()
             duration = (end_at - started_at).total_seconds()
             meta = BaseActionResultMeta(
+                action_id=action_id,
                 status=status,
                 description=description,
                 started_at=started_at,

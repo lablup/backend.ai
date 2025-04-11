@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 from ai.backend.common.types import (
+    AccessKey,
+    KernelId,
     QuotaScopeID,
     VFolderUsageMode,
 )
@@ -14,7 +16,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
 )
-from ai.backend.manager.types import DataclassInput, TriStateField
+from ai.backend.manager.types import OptionalState, PartialModifier
 
 from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
@@ -71,18 +73,25 @@ class CreateVFolderActionResult(BaseActionResult):
 
 
 @dataclass
-class UpdateVFolderAttributeInput(DataclassInput):
-    name: TriStateField[str] = field(default_factory=TriStateField)
-    cloneable: TriStateField[bool] = field(default_factory=TriStateField)
-    mount_permission: TriStateField[VFolderPermission] = field(default_factory=TriStateField)
+class VFolderAttributeModifier(PartialModifier):
+    name: OptionalState[str] = field(default_factory=OptionalState.nop)
+    cloneable: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    mount_permission: OptionalState[VFolderPermission] = field(default_factory=OptionalState.nop)
+
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        self.cloneable.update_dict(to_update, "cloneable")
+        self.mount_permission.update_dict(to_update, "mount_permission")
+        return to_update
 
 
 @dataclass
 class UpdateVFolderAttributeAction(VFolderAction):
     user_uuid: uuid.UUID
-
     vfolder_uuid: uuid.UUID
-    input: UpdateVFolderAttributeInput = field(default_factory=UpdateVFolderAttributeInput)
+    modifier: VFolderAttributeModifier = field(default_factory=VFolderAttributeModifier)
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -258,10 +267,10 @@ class CloneVFolderAction(VFolderAction):
 
     source_vfolder_uuid: uuid.UUID
     target_name: str
-    target_host: Optional[str] = None
-    cloneable: bool = False
-    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
-    mount_permission: VFolderPermission = VFolderPermission.READ_WRITE
+    target_host: Optional[str]
+    cloneable: bool
+    usage_mode: VFolderUsageMode
+    mount_permission: VFolderPermission
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -291,3 +300,35 @@ class CloneVFolderActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.vfolder_uuid)
+
+
+@dataclass
+class GetTaskLogsAction(VFolderAction):
+    user_id: uuid.UUID
+    domain_name: str
+    user_role: UserRole
+    kernel_id: KernelId
+    owner_access_key: AccessKey
+
+    # TODO: Remove this.
+    request: Any
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def operation_type(self):
+        return "get_task_logs"
+
+
+@dataclass
+class GetTaskLogsActionResult(BaseActionResult):
+    # TODO: Add proper type
+    response: Any
+    # TODO: Replace this with VFolderData
+    vfolder_data: Any
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_data["id"])

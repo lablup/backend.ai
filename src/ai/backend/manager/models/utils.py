@@ -24,7 +24,6 @@ from typing import (
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
-from graphql import Undefined
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
@@ -49,7 +48,7 @@ if TYPE_CHECKING:
     from ..config import LocalConfig
 
 from ..defs import LockID
-from ..types import Sentinel, State
+from ..types import Sentinel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
@@ -397,6 +396,7 @@ async def reenter_txn_session(
             yield sess
 
 
+# TODO: How to apply the missing execute_with_retry logic?
 async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
     max_attempts = 20
     result: TQueryResult | Sentinel = Sentinel.token
@@ -551,12 +551,3 @@ async def vacuum_db(
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             await conn.exec_driver_sql(vacuum_sql)
-
-
-def define_state(value: Any) -> State:
-    if value is None:
-        return State.NULLIFY
-    elif value is Undefined:
-        return State.NOP
-    else:
-        return State.UPDATE
