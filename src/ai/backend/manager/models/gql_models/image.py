@@ -1255,7 +1255,11 @@ class PurgeImages(graphene.Mutation):
                         log.error(result.error)
                         total_result.errors.append(result.error)
 
-            return DispatchResult.success(total_result)
+            if total_result.errors:
+                return DispatchResult.partial_success(
+                    total_result.purged_images, total_result.errors
+                )
+            return DispatchResult.success(total_result.purged_images)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return PurgeImagesPayload(task_id=task_id)
