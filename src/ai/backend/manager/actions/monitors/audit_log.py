@@ -102,7 +102,7 @@ class AuditLogger:
                 description="Task is running...",
                 duration=timedelta(0),
                 status=OperationStatus.RUNNING,
-                started_at=datetime.now(),
+                created_at=datetime.now(),
             )
 
             db_sess.add(db_row)

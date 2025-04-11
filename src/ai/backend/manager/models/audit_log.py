@@ -60,8 +60,8 @@ class AuditLogRow(Base):
         index=True,
     )
 
-    started_at = sa.Column(
-        "started_at",
+    created_at = sa.Column(
+        "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         nullable=False,
@@ -87,7 +87,7 @@ class AuditLogRow(Base):
         action_id: uuid.UUID,
         request_id: uuid.UUID,
         description: str,
-        started_at: datetime,
+        created_at: datetime,
         status: OperationStatus,
         duration: Optional[timedelta] = None,
     ):
@@ -99,14 +99,14 @@ class AuditLogRow(Base):
         self.description = description
         self.duration = duration
         self.status = status
-        self.started_at = started_at
+        self.created_at = created_at
 
     def __str__(self) -> str:
         return (
             f"AuditLogRow("
             f"entity_type: {self.entity_type}, "
             f"operation: {self.operation}, "
-            f"started_at: {self.started_at}, "
+            f"created_at: {self.created_at}, "
             f"entity_id: {self.entity_id}, "
             f"action_id: {self.action_id}, "
             f"request_id: {self.request_id}, "
