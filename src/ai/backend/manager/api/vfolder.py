@@ -971,7 +971,7 @@ class RenameRequestModel(BaseModel):
 
     def to_modifier(self) -> VFolderAttributeModifier:
         return VFolderAttributeModifier(
-            name=OptionalState.update(self.new_name),
+            name=OptionalState[str].update(self.new_name),
         )
 
 
