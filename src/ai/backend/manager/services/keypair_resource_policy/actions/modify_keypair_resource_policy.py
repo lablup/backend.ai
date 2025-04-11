@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.services.keypair_resource_policy.actions.base import (
@@ -25,7 +26,7 @@ class KeyPairResourcePolicyModifier(PartialModifier):
     max_vfolder_size: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_concurrent_sftp_sessions: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_session_lifetime: OptionalState[int] = field(default_factory=OptionalState.nop)
-    total_resource_slots: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
+    total_resource_slots: OptionalState[ResourceSlot] = field(default_factory=OptionalState.nop)
 
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
