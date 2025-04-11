@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
@@ -159,6 +159,8 @@ from .gql_models.kernel import (
     LegacyComputeSessionList,
 )
 from .gql_models.keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .gql_models.metric.base import ContainerUtilizationMetricMetadata
+from .gql_models.metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
 from .gql_models.resource_preset import (
     CreateResourcePreset,
     DeleteResourcePreset,
@@ -1148,6 +1150,17 @@ class Queries(graphene.ObjectType):
         EndpointAutoScalingRuleConnection,
         endpoint=graphene.String(required=True),
         description="Added in 25.1.0.",
+    )
+
+    user_utilization_metric = graphene.Field(
+        UserUtilizationMetric,
+        description="Added in 25.6.0.",
+        user_id=graphene.UUID(required=True),
+        props=UserUtilizationMetricQueryInput(required=True),
+    )
+    container_utilization_metric_metadata = graphene.Field(
+        ContainerUtilizationMetricMetadata,
+        description="Added in 25.6.0.",
     )
 
     @staticmethod
@@ -3055,6 +3068,32 @@ class Queries(graphene.ObjectType):
             before=before,
             last=last,
         )
+
+    @staticmethod
+    async def resolve_user_utilization_metric(
+        root: Any,
+        info: graphene.ResolveInfo,
+        user_id: uuid.UUID,
+        *,
+        props: UserUtilizationMetricQueryInput,
+    ) -> UserUtilizationMetric:
+        graph_ctx = cast(GraphQueryContext, info.context)
+        user = graph_ctx.user
+        if user["role"] not in (UserRole.SUPERADMIN, UserRole.MONITOR):
+            if user["uuid"] != user_id:
+                raise RuntimeError("Permission denied.")
+        return await UserUtilizationMetric.get_object(
+            info,
+            user_id,
+            props.metric_query_param(),
+        )
+
+    @staticmethod
+    async def resolve_container_utilization_metric_metadata(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> ContainerUtilizationMetricMetadata:
+        return await ContainerUtilizationMetricMetadata.get_object(info)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
