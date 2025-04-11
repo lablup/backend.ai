@@ -13,10 +13,10 @@ class VolumeIDPath(BaseRequestModel):
 
 
 class QuotaScopeKeyPath(VolumeIDPath):
-    scope_type: QuotaScopeType = Field(
+    quota_scope_type: QuotaScopeType = Field(
         description="The type of the quota scope.",
     )
-    scope_uuid: UUID = Field(
+    quota_scope_uuid: UUID = Field(
         description="A unique uuid for the quota scope.",
     )
 
