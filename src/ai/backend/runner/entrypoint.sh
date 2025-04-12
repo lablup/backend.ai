@@ -21,6 +21,21 @@ if [ ! -f "/usr/bin/scp" ]; then
   ln -s /opt/kernel/dropbearmulti /usr/bin/scp
 fi
 
+# set timezone configuration
+TARGET_TZ=${TZ:-"Etc/UTC"}
+ZONEINFO_DIR="/usr/share/zoneinfo"
+DEFAULT_ZONEINFO="${ZONEINFO_DIR}/Etc/UTC"
+TARGET_ZONEINFO="${ZONEINFO_DIR}/${TARGET_TZ}"
+if [ -f "$TARGET_ZONEINFO" ]; then
+    ln -sf "$TARGET_ZONEINFO" /etc/localtime
+    echo "$TARGET_TZ" > /etc/timezone
+    echo "Timezone set to: $TARGET_TZ"
+else
+    ln -sf "$DEFAULT_ZONEINFO" /etc/localtime
+    echo "$DEFAULT_TZ" > /etc/timezone
+    echo "Invalid TZ. Timezone set to default: Etc/UTC"
+fi
+
 if [ $USER_ID -eq 0 ]; then
 
   echo "WARNING: Running the user codes as root is not recommended."
