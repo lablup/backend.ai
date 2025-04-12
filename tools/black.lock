@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.12.8"
+//     "CPython==3.13.3"
 //   ],
 //   "generated_with_requirements": [
 //     "black~=24.8"
@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "elide_unused_requires_dist": false,
   "excluded": [],
   "locked_resolves": [
     {
@@ -37,18 +38,18 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "d37d422772111794b26757c5b55a3eade028aa3fde43121ab7b673d050949d65",
-              "url": "https://files.pythonhosted.org/packages/4c/ea/a77bab4cf1887f4b2e0bce5516ea0b3ff7d04ba96af21d65024629afedb6/black-24.10.0-cp312-cp312-macosx_11_0_arm64.whl"
+              "hash": "1f93102e0c5bb3907451063e08b9876dbeac810e7da5a8bfb7aeb5a9ef89066b",
+              "url": "https://files.pythonhosted.org/packages/37/d5/602d0ef5dfcace3fb4f79c436762f130abd9ee8d950fa2abdbf8bbc555e0/black-24.10.0-cp313-cp313-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "14b3502784f09ce2443830e3133dacf2c0110d45191ed470ecb04d0f5f6fcb0f",
-              "url": "https://files.pythonhosted.org/packages/4e/3e/443ef8bc1fbda78e61f79157f303893f3fddf19ca3c8989b163eb3469a12/black-24.10.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl"
+              "hash": "ddacb691cdcdf77b96f549cf9591701d8db36b2f19519373d60d31746068dbf2",
+              "url": "https://files.pythonhosted.org/packages/47/6d/a3a239e938960df1a662b93d6230d4f3e9b4a22982d060fc38c42f45a56b/black-24.10.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b5e39e0fae001df40f95bd8cc36b9165c5e2ea88900167bddf258bacef9bbdc3",
-              "url": "https://files.pythonhosted.org/packages/90/04/bf74c71f592bcd761610bbf67e23e6a3cff824780761f536512437f1e655/black-24.10.0-cp312-cp312-macosx_10_13_x86_64.whl"
+              "hash": "1cbacacb19e922a1d75ef2b6ccaefcd6e93a2c05ede32f06a21386a04cedb981",
+              "url": "https://files.pythonhosted.org/packages/d0/a0/a993f58d4ecfba035e61fca4e9f64a2ecae838fc9f33ab798c62173ed75c/black-24.10.0-cp313-cp313-macosx_10_13_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -153,13 +154,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "73e575e1408ab8103900836b97580d5307456908a03e92031bab39e4554cc3fb",
-              "url": "https://files.pythonhosted.org/packages/3c/a6/bc1012356d8ece4d66dd75c4b9fc6c1f6650ddd5991e421177d9f8f671be/platformdirs-4.3.6-py3-none-any.whl"
+              "hash": "a03875334331946f13c549dbd8f4bac7a13a50a895a0eb1e8c6a8ace80d40a94",
+              "url": "https://files.pythonhosted.org/packages/6d/45/59578566b3275b8fd9157885918fcd0c4d74162928a5310926887b856a51/platformdirs-4.3.7-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "357fb2acbc885b0419afd3ce3ed34564c13c9b95c89360cd9563f73aa5e2b907",
-              "url": "https://files.pythonhosted.org/packages/13/fc/128cc9cb8f03208bdbf93d3aa862e16d376844a14f9a0ce5cf4507372de4/platformdirs-4.3.6.tar.gz"
+              "hash": "eb437d586b6a0986388f0d6f74aa0cde27b48d0e3d66843640bfb6bdcdb6e351",
+              "url": "https://files.pythonhosted.org/packages/b6/2d/7d512a3913d60623e7eb945c6d1b4f0bddf1d0b7ada5225274c87e5b53d1/platformdirs-4.3.7.tar.gz"
             }
           ],
           "project_name": "platformdirs",
@@ -167,16 +168,16 @@
             "appdirs==1.4.4; extra == \"test\"",
             "covdefaults>=2.3; extra == \"test\"",
             "furo>=2024.8.6; extra == \"docs\"",
-            "mypy>=1.11.2; extra == \"type\"",
+            "mypy>=1.14.1; extra == \"type\"",
             "proselint>=0.14; extra == \"docs\"",
-            "pytest-cov>=5; extra == \"test\"",
+            "pytest-cov>=6; extra == \"test\"",
             "pytest-mock>=3.14; extra == \"test\"",
-            "pytest>=8.3.2; extra == \"test\"",
-            "sphinx-autodoc-typehints>=2.4; extra == \"docs\"",
-            "sphinx>=8.0.2; extra == \"docs\""
+            "pytest>=8.3.4; extra == \"test\"",
+            "sphinx-autodoc-typehints>=3; extra == \"docs\"",
+            "sphinx>=8.1.3; extra == \"docs\""
           ],
-          "requires_python": ">=3.8",
-          "version": "4.3.6"
+          "requires_python": ">=3.9",
+          "version": "4.3.7"
         }
       ],
       "platform_tag": null
@@ -186,14 +187,14 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.10.0",
-  "pip_version": "24.1.2",
+  "pex_version": "2.33.1",
+  "pip_version": "25.0.1",
   "prefer_older_binary": false,
   "requirements": [
     "black~=24.8"
   ],
   "requires_python": [
-    "==3.12.8"
+    "==3.13.3"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
@@ -202,5 +203,6 @@
     "mac"
   ],
   "transitive": true,
-  "use_pep517": null
+  "use_pep517": null,
+  "use_system_time": false
 }

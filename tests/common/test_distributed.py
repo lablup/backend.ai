@@ -21,12 +21,10 @@ from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
 from ai.backend.common.lock import (
     AbstractDistributedLock,
     EtcdLock,
-    EtcetraLock,
     FileLock,
     RedisLock,
 )
@@ -139,7 +137,7 @@ def etcd_timer_node_process(
     stop_event,
     etcd_ctx: EtcdLockContext,
     timer_ctx: TimerNodeContext,
-    etcd_client: Literal["etcetra"] | Literal["etcd-client-py"],
+    etcd_client: Literal["etcd-client-py"],
 ) -> None:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
@@ -188,17 +186,6 @@ def etcd_timer_node_process(
                     },
                 )
                 etcd_lock = EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True)
-            case "etcetra":
-                etcetra_etcd = EtcetraAsyncEtcd(
-                    addr=etcd_ctx.addr,
-                    namespace=etcd_ctx.namespace,
-                    scope_prefix_map={
-                        ConfigScopes.GLOBAL: "global",
-                        ConfigScopes.SGROUP: "sgroup/testing",
-                        ConfigScopes.NODE: "node/i-test",
-                    },
-                )
-                etcd_lock = EtcetraLock(etcd_ctx.lock_name, etcetra_etcd, timeout=None, debug=True)
 
         timer = GlobalTimer(
             etcd_lock,
@@ -386,7 +373,7 @@ async def test_gloal_timer_redlock(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("etcd_client", ["etcetra", "etcd-client-py"])
+@pytest.mark.parametrize("etcd_client", ["etcd-client-py"])
 async def test_global_timer_etcdlock(
     test_case_ns,
     etcd_container,

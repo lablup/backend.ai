@@ -199,7 +199,6 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.types import (
@@ -276,11 +275,7 @@ manager_local_config_iv = (
             t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
             t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
             t.Key("distributed-lock", default="pg_advisory"): t.Enum(
-                "filelock",
-                "pg_advisory",
-                "redlock",
-                "etcd",
-                "etcetra",
+                "filelock", "pg_advisory", "redlock", "etcd"
             ),
             t.Key(
                 "pg-advisory-config", default=PgAdvisoryLock.default_config
@@ -614,9 +609,6 @@ class SharedConfig(AbstractConfig):
             # TODO: provide a way to specify other scope prefixes
         }
         self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
-        self.etcetra_etcd = EtcetraAsyncEtcd(
-            etcd_addr, namespace, scope_prefix_map, credentials=credentials
-        )
 
     async def close(self) -> None:
         await self.etcd.close()
