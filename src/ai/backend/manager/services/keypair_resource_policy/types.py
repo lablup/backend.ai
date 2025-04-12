@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.types import Creator
 
 
@@ -9,12 +9,12 @@ from ai.backend.manager.types import Creator
 class KeyPairResourcePolicyCreator(Creator):
     name: Optional[str]
     allowed_vfolder_hosts: Optional[dict[str, Any]]
-    default_for_unspecified: Optional[str]
+    default_for_unspecified: Optional[DefaultForUnspecified]
     idle_timeout: Optional[int]
     max_concurrent_sessions: Optional[int]
     max_containers_per_session: Optional[int]
     max_pending_session_count: Optional[int]
-    max_pending_session_resource_slots: Optional[dict[str, Any]]
+    max_pending_session_resource_slots: Optional[ResourceSlot]
     max_quota_scope_size: Optional[int]
     max_vfolder_count: Optional[int]
     max_vfolder_size: Optional[int]
