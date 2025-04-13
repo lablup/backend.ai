@@ -36,6 +36,7 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     Field,
+    computed_field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -380,6 +381,20 @@ class CreateRequestModel(LegacyBaseRequestModel):
     )
     cloneable: bool = Field(default=False)
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def checked_group_id(self) -> str | uuid.UUID | None:
+        group_id_or_name: str | uuid.UUID | None
+        match self.group_id:
+            case str():
+                try:
+                    group_id_or_name = uuid.UUID(self.group_id)
+                except ValueError:
+                    group_id_or_name = self.group_id
+            case _:
+                group_id_or_name = self.group_id
+        return group_id_or_name
+
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
@@ -391,15 +406,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name: str | uuid.UUID | None
-    match params.group_id:
-        case str():
-            try:
-                group_id_or_name = uuid.UUID(params.group_id)
-            except ValueError:
-                group_id_or_name = params.group_id
-        case _:
-            group_id_or_name = params.group_id
+    group_id_or_name = params.checked_group_id
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
