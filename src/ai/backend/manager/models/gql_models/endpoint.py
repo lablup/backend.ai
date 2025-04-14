@@ -15,6 +15,7 @@ from graphql import Undefined, UndefinedType
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AutoScalingMetricComparator,
@@ -82,7 +83,6 @@ from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import UserRole, UserRow
-from src.ai.backend.common.exception import InvalidAPIParameters
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext

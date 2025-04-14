@@ -199,7 +199,7 @@ class ModelService:
             "",
             image_row.image_ref,
             UserScope(
-                domain_name=action.creator.domain,
+                domain_name=action.creator.domain_name,
                 group_id=service_prepare_ctx.group_id,
                 user_uuid=service_prepare_ctx.owner_uuid,
                 user_role=service_prepare_ctx.owner_role,
@@ -231,7 +231,7 @@ class ModelService:
                 raise InvalidAPIParameters("Cannot create multiple services with same name")
 
             project_id = await resolve_group_name_or_id(
-                await db_sess.connection(), action.creator.domain, action.creator.group
+                await db_sess.connection(), action.creator.domain_name, action.creator.group_name
             )
             if project_id is None:
                 raise InvalidAPIParameters(f"Invalid group name {project_id}")
@@ -243,7 +243,7 @@ class ModelService:
                 action.creator.replicas,
                 image_row,
                 service_prepare_ctx.model_id,
-                action.creator.domain,
+                action.creator.domain_name,
                 project_id,
                 service_prepare_ctx.scaling_group,
                 action.creator.config.resources,
@@ -372,7 +372,7 @@ class ModelService:
                 f"model-eval-{secrets.token_urlsafe(16)}",
                 image_row.image_ref,
                 UserScope(
-                    domain_name=action.domain,
+                    domain_name=action.domain_name,
                     group_id=service_prepare_ctx.group_id,
                     user_uuid=created_user.uuid,
                     user_role=created_user.role,

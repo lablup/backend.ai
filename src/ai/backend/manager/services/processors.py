@@ -194,7 +194,9 @@ class Processors:
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
-        resource_preset_processors = ResourcePresetProcessors(services.resource_preset)
+        resource_preset_processors = ResourcePresetProcessors(
+            services.resource_preset, action_monitors
+        )
         model_service_processors = ModelServiceProcessors(services.model_service)
         return cls(
             agent=agent_processors,

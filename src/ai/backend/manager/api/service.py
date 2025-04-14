@@ -31,18 +31,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.api_handlers import BaseFieldModel
-from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.events import (
-    EventHandler,
-    KernelLifecycleEventReason,
-    ModelServiceStatusEvent,
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionPreparingEvent,
-    SessionStartedEvent,
-    SessionTerminatedEvent,
-)
-from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -332,7 +320,6 @@ class ServiceConfigModel(LegacyBaseRequestModel):
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
 
-
     def to_action(self) -> ServiceConfig:
         extra_mounts_converted = {}
         for key, mount_option in self.extra_mounts.items():
@@ -369,7 +356,7 @@ class ValidationResult:
     extra_mounts: Sequence[VFolderMount]
 
 
-class NewServiceRequestModel(BaseModel):
+class NewServiceRequestModel(LegacyBaseRequestModel):
     service_name: tv.SessionName = Field(
         description="Name of the service",
         validation_alias=AliasChoices("name", "clientSessionToken"),
