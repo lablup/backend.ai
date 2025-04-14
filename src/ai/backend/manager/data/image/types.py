@@ -2,9 +2,10 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from ai.backend.manager.models.image import Resources
+if TYPE_CHECKING:
+    from ai.backend.manager.models.image import Resources
 
 
 class ImageStatus(enum.StrEnum):
@@ -25,7 +26,7 @@ class ImageLabelsData:
 
 @dataclass
 class ImageResourcesData:
-    resources_data: Resources
+    resources_data: "Resources"
 
 
 @dataclass
