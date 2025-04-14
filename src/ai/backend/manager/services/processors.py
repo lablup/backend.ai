@@ -24,6 +24,10 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.metric.processors.utilization_metric import (
+    UtilizationMetricProcessors,
+)
+from ai.backend.manager.services.metric.root_service import UtilizationMetricService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -74,6 +78,7 @@ class Services:
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
+    utilization_metric: UtilizationMetricService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -109,6 +114,7 @@ class Services:
         resource_preset_service = ResourcePresetService(
             args.db, args.agent_registry, args.shared_config
         )
+        utilization_metric_service = UtilizationMetricService(args.shared_config)
 
         return cls(
             agent=agent_service,
@@ -125,6 +131,7 @@ class Services:
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
+            utilization_metric=utilization_metric_service,
         )
 
 
@@ -149,6 +156,7 @@ class Processors:
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
+    utilization_metric: UtilizationMetricProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -179,6 +187,9 @@ class Processors:
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
+        utilization_metric_processors = UtilizationMetricProcessors(
+            services.utilization_metric, action_monitors
+        )
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -194,4 +205,5 @@ class Processors:
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
+            utilization_metric=utilization_metric_processors,
         )

@@ -26,6 +26,7 @@ from collections.abc import (
     MutableSequence,
     Sequence,
 )
+from dataclasses import dataclass
 from decimal import Decimal
 from io import SEEK_END, BytesIO
 from pathlib import Path
@@ -79,6 +80,7 @@ from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
     AgentHeartbeatEvent,
+    AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -115,6 +117,7 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedis
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -223,6 +226,18 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
     else:
         additional_gids = set(gids)
     environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
+
+
+@dataclass
+class ScannedImage:
+    canonical: str
+    digest: str
+
+
+@dataclass
+class ScanImagesResult:
+    scanned_images: Mapping[str, ScannedImage]
+    removed_images: Mapping[str, ScannedImage]
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -632,7 +647,7 @@ class AbstractAgent(
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
-    images: Mapping[str, str]
+    images: Mapping[str, ScannedImage]
     port_pool: set[int]
 
     redis: Redis
@@ -676,7 +691,7 @@ class AbstractAgent(
         self.agent_public_key = agent_public_key
         self.kernel_registry = {}
         self.computers = {}
-        self.images = {}  # repoTag -> digest
+        self.images = {}
         self.restarting_kernels = {}
         self.stat_ctx = StatContext(
             self,
@@ -772,14 +787,21 @@ class AbstractAgent(
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
-            self.images = await self.scan_images()
+            scan_images_result = await self.scan_images()
+            self.images = scan_images_result.scanned_images
             self.timer_tasks.append(aiotools.create_timer(self._scan_images_wrapper, 20.0))
             await self.scan_running_kernels()
 
         # Prepare stat collector tasks.
-        self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))
-        self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))
-        self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
+        self.timer_tasks.append(
+            aiotools.create_timer(self.collect_node_stat, UTILIZATION_METRIC_INTERVAL)
+        )
+        self.timer_tasks.append(
+            aiotools.create_timer(self.collect_container_stat, UTILIZATION_METRIC_INTERVAL)
+        )
+        self.timer_tasks.append(
+            aiotools.create_timer(self.collect_process_stat, UTILIZATION_METRIC_INTERVAL)
+        )
 
         # Prepare heartbeats.
         heartbeat_interval = self.local_config["debug"]["heartbeat-interval"]
@@ -1679,7 +1701,7 @@ class AbstractAgent(
             )
 
     @abstractmethod
-    async def scan_images(self) -> Mapping[str, str]:
+    async def scan_images(self) -> ScanImagesResult:
         """
         Scan the available kernel images/templates and update ``self.images``.
         This is called periodically to keep the image list up-to-date and allow
@@ -1687,7 +1709,12 @@ class AbstractAgent(
         """
 
     async def _scan_images_wrapper(self, interval: float) -> None:
-        self.images = await self.scan_images()
+        result = await self.scan_images()
+        self.images = result.scanned_images
+        if result.removed_images:
+            await self.produce_event(
+                AgentImagesRemoveEvent(image_canonicals=list(result.removed_images.keys()))
+            )
 
     @abstractmethod
     async def push_image(
