@@ -4,7 +4,6 @@ import enum
 import functools
 import logging
 import uuid
-from collections import UserDict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -305,8 +304,7 @@ async def rescan_images(
     # TODO: delete images removed from registry?
 
 
-class Resources(UserDict[SlotName, dict[str, Decimal]]):
-    pass
+type Resources = dict[SlotName, dict[str, Decimal]]
 
 
 # Defined for avoiding circular import
@@ -680,7 +678,7 @@ class ImageRow(Base):
             if label_key not in resources:
                 resources[label_key] = value
 
-        return Resources(ImageRow._resources.type._schema.check(resources))
+        return ImageRow._resources.type._schema.check(resources)
 
     def get_resources_from_labels(self) -> Resources:
         if self.labels is None:
@@ -697,7 +695,7 @@ class ImageRow(Base):
             res_key = k[len(RESOURCE_LABEL_PREFIX) :]
             resources[res_key] = {"min": v}
 
-        return Resources(ImageRow._resources.type._schema.check(resources))
+        return ImageRow._resources.type._schema.check(resources)
 
     async def get_slot_ranges(
         self,
