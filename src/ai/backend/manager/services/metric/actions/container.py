@@ -1,25 +1,37 @@
 from dataclasses import dataclass
+from typing import Optional, override
+
+from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 
 from ..types import ContainerMetricOptionalLabel, ContainerMetricResult
-from .base import MetricAction, MetricActionResult
 
 
 @dataclass
-class ContainerMetricMetadataAction(MetricAction):
-    def entity_type(self) -> str:
-        return "metric"
+class ContainerMetricMetadataAction(BaseAction):
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
 
+    @override
+    def entity_type(self) -> str:
+        return "metric_metadata"
+
+    @override
     def operation_type(self) -> str:
         return "query"
 
 
 @dataclass
-class ContainerMetricMetadataActionResult(MetricActionResult):
+class ContainerMetricMetadataActionResult(BaseActionResult):
     metric_names: list[str]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
 
 
 @dataclass
-class ContainerMetricAction(MetricAction):
+class ContainerMetricAction(BaseAction):
     metric_name: str
     labels: ContainerMetricOptionalLabel
 
@@ -27,13 +39,23 @@ class ContainerMetricAction(MetricAction):
     end: str
     step: str
 
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
     def entity_type(self) -> str:
         return "metric"
 
+    @override
     def operation_type(self) -> str:
         return "query"
 
 
 @dataclass
-class ContainerMetricActionResult(MetricActionResult):
+class ContainerMetricActionResult(BaseActionResult):
     result: list[ContainerMetricResult]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
