@@ -135,6 +135,7 @@ from .gql_models.group import (
 )
 from .gql_models.image import (
     AliasImage,
+    ClearImageCustomResourceLimit,
     ClearImages,
     DealiasImage,
     ForgetImage,
@@ -337,6 +338,9 @@ class Mutations(graphene.ObjectType):
     preload_image = PreloadImage.Field()
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
+    clear_image_custom_resource_limit = ClearImageCustomResourceLimit.Field(
+        description="Added in 25.6.0"
+    )
     forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
     forget_image = ForgetImage.Field(
         deprecation_reason="Deprecated since 25.4.0. Use `forget_image_by_id` instead."

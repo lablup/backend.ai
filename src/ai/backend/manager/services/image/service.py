@@ -27,6 +27,10 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageActionResult,
     AliasImageActionValueError,
 )
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
+    ClearImageCustomResourceLimitAction,
+    ClearImageCustomResourceLimitActionResult,
+)
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
     DealiasImageActionNoSuchAliasError,
@@ -311,3 +315,14 @@ class ImageService:
 
             result = await scan_single_image(db_session, registry_key, image_row, image_canonical)
             return ScanImageActionResult(image=result.images[0], errors=result.errors)
+
+    async def clear_image_custom_resource_limit(
+        self, action: ClearImageCustomResourceLimitAction
+    ) -> ClearImageCustomResourceLimitActionResult:
+        async with self._db.begin_session() as db_sess:
+            image_row = await ImageRow.resolve(
+                db_sess, [ImageIdentifier(action.image_canonical, action.architecture)]
+            )
+            image_row._resources = {}
+            await db_sess.flush()
+        return ClearImageCustomResourceLimitActionResult(image_data=image_row.to_dataclass())

@@ -38,7 +38,7 @@ class ImageModifier(PartialModifier):
         self.config_digest.update_dict(to_update, "config_digest")
         self.labels.update_dict(to_update, "labels")
         self.accelerators.update_dict(to_update, "accelerators")
-        self.resources.update_dict(to_update, "resources")
+        self.resources.update_dict(to_update, "_resources")
         return to_update
 
 

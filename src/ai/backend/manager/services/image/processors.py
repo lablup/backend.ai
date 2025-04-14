@@ -4,6 +4,10 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
 )
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
+    ClearImageCustomResourceLimitAction,
+    ClearImageCustomResourceLimitActionResult,
+)
 from ai.backend.manager.services.image.actions.dealias_image import (
     DealiasImageAction,
     DealiasImageActionResult,
@@ -65,6 +69,10 @@ class ImageProcessors:
     scan_image: ActionProcessor[ScanImageAction, ScanImageActionResult]
     purge_image: ActionProcessor[PurgeImageAction, PurgeImageActionResult]
     purge_images: ActionProcessor[PurgeImagesAction, PurgeImagesActionResult]
+    clear_image_custom_resource_limit: ActionProcessor[
+        ClearImageCustomResourceLimitAction,
+        ClearImageCustomResourceLimitActionResult,
+    ]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
         self.forget_image = ActionProcessor(service.forget_image, action_monitors)
@@ -81,3 +89,6 @@ class ImageProcessors:
         self.scan_image = ActionProcessor(service.scan_image, action_monitors)
         self.purge_image = ActionProcessor(service.purge_image, action_monitors)
         self.purge_images = ActionProcessor(service.purge_images, action_monitors)
+        self.clear_image_custom_resource_limit = ActionProcessor(
+            service.clear_image_custom_resource_limit, action_monitors
+        )

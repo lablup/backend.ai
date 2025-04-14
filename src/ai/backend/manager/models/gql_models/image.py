@@ -51,6 +51,9 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
 )
 from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
+    ClearImageCustomResourceLimitAction,
+)
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
@@ -1262,3 +1265,52 @@ class PurgeImages(graphene.Mutation):
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return PurgeImagesPayload(task_id=task_id)
+
+
+class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    image_canonical = graphene.String(required=True)
+    architecture = graphene.String(required=True, default_value=DEFAULT_IMAGE_ARCH)
+
+
+class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    image_node = graphene.Field(ImageNode)
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+
+class ClearImageCustomResourceLimit(graphene.Mutation):
+    """
+    Added in 25.6.0.
+    """
+
+    class Arguments:
+        key = ClearImageCustomResourceLimitKey(required=True)
+
+    Output = ClearImageCustomResourceLimitPayload
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        key: ClearImageCustomResourceLimitKey,
+    ) -> ClearImageCustomResourceLimitPayload:
+        log.info(
+            f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
+        )
+        ctx: GraphQueryContext = info.context
+        result = await ctx.processors.image.clear_image_custom_resource_limit.wait_for_complete(
+            ClearImageCustomResourceLimitAction(
+                image_canonical=key.image_canonical,
+                architecture=key.architecture,
+            )
+        )
+        return ClearImageCustomResourceLimitPayload(
+            image_node=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image_data))
+        )

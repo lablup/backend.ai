@@ -37,6 +37,7 @@ from ai.backend.common.types import (
     ImageConfig,
     ImageRegistry,
     ResourceSlot,
+    SlotName,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
@@ -47,6 +48,7 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     RescanImagesResult,
 )
+from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
@@ -89,7 +91,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "rescan_images",
-    "ImageType",
     "ImageAliasRow",
     "ImageLoadFilter",
     "ImageRow",
@@ -303,6 +304,9 @@ async def rescan_images(
     # TODO: delete images removed from registry?
 
 
+type Resources = dict[SlotName, dict[str, Decimal]]
+
+
 # Defined for avoiding circular import
 def _get_image_endpoint_join_condition():
     from ai.backend.manager.models.endpoint import EndpointRow
@@ -345,7 +349,7 @@ class ImageRow(Base):
     type = sa.Column("type", sa.Enum(ImageType), nullable=False)
     accelerators = sa.Column("accelerators", sa.String)
     labels = sa.Column("labels", sa.JSON, nullable=False, default=dict)
-    resources = sa.Column(
+    _resources = sa.Column(
         "resources",
         StructuredJSONColumn(
             t.Mapping(
@@ -357,7 +361,8 @@ class ImageRow(Base):
             ),
         ),
         nullable=False,
-    )
+    )  # Custom resource limits designated by the user
+
     status = sa.Column(
         "status",
         StrEnumType(ImageStatus),
@@ -411,7 +416,7 @@ class ImageRow(Base):
         self.type = type
         self.accelerators = accelerators
         self.labels = labels
-        self.resources = resources
+        self._resources = resources
         self.status = status
 
     @property
@@ -551,6 +556,7 @@ class ImageRow(Base):
             resources=image_data.resources.resources_data,
             status=image_data.status,
         )
+        image_row.id = image_data.id
         image_row.created_at = image_data.created_at
         return image_row
 
@@ -662,6 +668,35 @@ class ImageRow(Base):
     def __repr__(self) -> str:
         return self.__str__()
 
+    @property
+    def resources(self) -> Resources:
+        custom_resources = self._resources or {}
+        label_resources = self.get_resources_from_labels()  # Set this as default
+
+        resources = dict(custom_resources)
+        for label_key, value in label_resources.items():
+            if label_key not in resources:
+                resources[label_key] = value
+
+        return ImageRow._resources.type._schema.check(resources)
+
+    def get_resources_from_labels(self) -> Resources:
+        if self.labels is None:
+            raise RuntimeError(f'Labels not loaded in the ImageRow "({self.image_ref.canonical})"')
+
+        RESOURCE_LABEL_PREFIX = "ai.backend.resource.min."
+
+        resources = {  # default fallback if not defined
+            "cpu": {"min": INTRINSIC_SLOTS_MIN[SlotName("cpu")], "max": None},
+            "mem": {"min": INTRINSIC_SLOTS_MIN[SlotName("mem")], "max": None},
+        }
+
+        for k, v in filter(lambda pair: pair[0].startswith(RESOURCE_LABEL_PREFIX), self.labels):
+            res_key = k[len(RESOURCE_LABEL_PREFIX) :]
+            resources[res_key] = {"min": v}
+
+        return ImageRow._resources.type._schema.check(resources)
+
     async def get_slot_ranges(
         self,
         shared_config: SharedConfig,
@@ -669,10 +704,6 @@ class ImageRow(Base):
         slot_units = await shared_config.get_resource_slots()
         min_slot = ResourceSlot()
         max_slot = ResourceSlot()
-        # When the original image does not have any metadata label, self.resources is already filled
-        # with the intrinsic resource slots with their defualt minimums (defs.INTRINSIC_SLOTS_MIN)
-        # during rescanning the registry.
-        assert self.resources is not None
 
         for slot_key, resource in self.resources.items():
             slot_unit = slot_units.get(slot_key)
@@ -709,7 +740,6 @@ class ImageRow(Base):
 
     def _parse_row(self):
         res_limits = []
-        assert self.resources is not None
         for slot_key, slot_range in self.resources.items():
             min_value = slot_range.get("min")
             if min_value is None:
@@ -757,7 +787,7 @@ class ImageRow(Base):
         slot_type: str,
         value_range: Tuple[Optional[Decimal], Optional[Decimal]],
     ):
-        resources = self.resources
+        resources = self._resources
         if resources.get(slot_type) is None:
             resources[slot_type] = {}
         if value_range[0] is not None:
@@ -765,7 +795,7 @@ class ImageRow(Base):
         if value_range[1] is not None:
             resources[slot_type]["max"] = str(value_range[1])
 
-        self.resources = resources
+        self._resources = resources
 
     def is_owned_by(self, user_id: UUID) -> bool:
         return self.customized and self.labels["ai.backend.customized-image.owner"] == str(user_id)

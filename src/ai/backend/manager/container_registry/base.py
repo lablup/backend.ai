@@ -36,13 +36,12 @@ from ai.backend.common.exception import (
     ProjectMismatchWithCanonical,
 )
 from ai.backend.common.json import read_json
-from ai.backend.common.types import SlotName, SSLContextType
+from ai.backend.common.types import SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
 
 from ..data.image.types import ImageStatus, ImageType
-from ..defs import INTRINSIC_SLOTS_MIN
 from ..exceptions import ScanImageError, ScanTagError
 from ..models.image import ImageIdentifier, ImageRow
 from ..models.utils import ExtendedAsyncSAEngine
@@ -171,7 +170,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.size_bytes = update["size_bytes"]
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
-                        image_row.resources = update["resources"]
                         image_row.is_local = is_local
                         scanned_images.append(image_row.to_dataclass())
 
@@ -214,7 +212,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         type=ImageType.COMPUTE,
                         accelerators=update.get("accels"),
                         labels=update["labels"],
-                        resources=update["resources"],
                         status=ImageStatus.ALIVE,
                     )
                     session.add(image_row)
@@ -608,7 +605,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 await reporter.update(1, message=progress_msg)
             return
 
-        assert ImageRow.resources is not None
         for architecture, manifest in manifests.items():
             try:
                 try:
@@ -644,17 +640,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     # allow every accelerators for non-backend.ai image
                     updates["accels"] = "*"
 
-                resources = {  # default fallback if not defined
-                    "cpu": {"min": INTRINSIC_SLOTS_MIN[SlotName("cpu")], "max": None},
-                    "mem": {"min": INTRINSIC_SLOTS_MIN[SlotName("mem")], "max": None},
-                }
-                res_prefix = "ai.backend.resource.min."
-                for k, v in filter(
-                    lambda pair: pair[0].startswith(res_prefix), manifest["labels"].items()
-                ):
-                    res_key = k[len(res_prefix) :]
-                    resources[res_key] = {"min": v}
-                updates["resources"] = ImageRow.resources.type._schema.check(resources)
                 all_updates.get().update({
                     update_key: updates,
                 })
