@@ -4040,7 +4040,7 @@
           }
         },
         "parameters": [],
-        "description": "Accept invitation by invitee.\n\n    * `inv_ak` parameter is removed from 19.06 since virtual folder's ownership is\n    moved from keypair to a user or a group.\n\n    :param inv_id: ID of vfolder_invitations row.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "Accept invitation by invitee.\n\n* `inv_ak` parameter is removed from 19.06 since virtual folder's ownership is\nmoved from keypair to a user or a group.\n\n:param inv_id: ID of vfolder_invitations row.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/invitations/delete": {
