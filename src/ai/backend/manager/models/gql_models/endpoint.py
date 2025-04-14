@@ -357,7 +357,9 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     def to_action(
         self, requester_ctx: RequesterCtx, id: uuid.UUID
     ) -> ModifyEndpointAutoScalingRuleAction:
-        def convert_to_decimal(value: Optional[str] | UndefinedType) -> decimal.Decimal:
+        def convert_to_decimal(
+            value: Optional[str] | UndefinedType,
+        ) -> decimal.Decimal | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
             elif value is None:
@@ -1011,7 +1013,9 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
             return ImageRef(graphene_image_input.name, registry, architecture)
 
-        def convert_runtime_variant(value: Optional[str] | UndefinedType) -> RuntimeVariant:
+        def convert_runtime_variant(
+            value: Optional[str] | UndefinedType,
+        ) -> RuntimeVariant | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
             elif value is None:
