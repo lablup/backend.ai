@@ -282,7 +282,8 @@ class HarborRegistry_v2(BaseContainerRegistry):
             urllib.parse.urlencode({"": x})[1:] for x in [project, repository, tag]
         ]
         api_url = self.registry_url / "api" / "v2.0"
-        rqst_args["headers"] = {}
+        if "Accept" in rqst_args["headers"]:
+            del rqst_args["headers"]["Accept"]
         async with sess.get(
             api_url / "projects" / project / "repositories" / repository / "artifacts" / tag,
             **rqst_args,
