@@ -31,10 +31,8 @@ class ContainerUtilizationMetricMetadata(graphene.ObjectType):
         info: graphene.ResolveInfo,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
-        action_result = (
-            await graph_ctx.processors.container_metric.query_metadata.wait_for_complete(
-                ContainerMetricMetadataAction()
-            )
+        action_result = await graph_ctx.processors.utilization_metric.query_container_metadata.wait_for_complete(
+            ContainerMetricMetadataAction()
         )
         return cls(
             metric_names=action_result.metric_names,

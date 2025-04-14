@@ -79,7 +79,7 @@ class MetricResponse(BaseModel):
     values: list[MetricResponseValue]
 
 
-class MetricService:
+class ContainerUtilizationMetricService:
     _metric_query_endpoint: yarl.URL
     _range_vector_timewindow: str  # 1m by default
 
