@@ -1,16 +1,25 @@
 import enum
 from dataclasses import dataclass, field
 from typing import (
-    Literal,
     Optional,
 )
 from uuid import UUID
 
+from pydantic import BaseModel
 
-@dataclass
-class MetricQueryParameter:
+
+class ValueType(enum.StrEnum):
+    """
+    Specifies the type of a metric value.
+    """
+
+    CURRENT = "current"
+    CAPACITY = "capacity"
+
+
+class MetricQueryParameter(BaseModel):
     metric_name: str
-    value_type: Literal["current", "capacity"]
+    value_type: ValueType
     start: str
     end: str
     step: str
@@ -37,7 +46,7 @@ class MetricResultValue:
 
 @dataclass
 class ContainerMetricOptionalLabel:
-    value_type: Literal["current", "capacity"]
+    value_type: ValueType
 
     agent_id: Optional[str] = None
     kernel_id: Optional[UUID] = None
