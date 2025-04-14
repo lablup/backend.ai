@@ -36,6 +36,7 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     Field,
+    computed_field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -374,11 +375,25 @@ class CreateRequestModel(LegacyBaseRequestModel):
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
     unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
-    group_id: str | uuid.UUID | None = Field(
+    group_id_or_name: str | None = Field(
         default=None,
         validation_alias=AliasChoices("group", "groupId"),
     )
     cloneable: bool = Field(default=False)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def parsed_group_id_or_name(self) -> str | uuid.UUID | None:
+        group_id_or_name: str | uuid.UUID | None
+        match self.group_id_or_name:
+            case str():
+                try:
+                    group_id_or_name = uuid.UUID(self.group_id_or_name)
+                except ValueError:
+                    group_id_or_name = self.group_id_or_name
+            case _:
+                group_id_or_name = self.group_id_or_name
+        return group_id_or_name
 
 
 @auth_required
@@ -391,7 +406,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params.group_id
+    group_id_or_name = params.parsed_group_id_or_name
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
