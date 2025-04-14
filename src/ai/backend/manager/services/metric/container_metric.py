@@ -2,12 +2,12 @@ import logging
 from typing import (
     Any,
     Optional,
-    TypedDict,
     cast,
 )
 
 import aiohttp
 import yarl
+from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
@@ -36,42 +36,45 @@ from .types import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class LabelValueResponse(TypedDict):
+class LabelValueResponse(BaseModel):
     status: str
     data: list[str]
 
 
-class MetricResponseInfo(TypedDict):
+class MetricResponseInfo(BaseModel):
+    model_config = ConfigDict(validate_by_name=True, validate_by_alias=True)
+
     value_type: str
-    __name__: Optional[str]  # "backendai_container_utilization"
-    agent_id: Optional[str]
-    container_metric_name: Optional[str]
-    instance: Optional[str]
-    job: Optional[str]
-    kernel_id: Optional[str]
-    owner_project_id: Optional[str]
-    owner_user_id: Optional[str]
-    session_id: Optional[str]
+    name: Optional[str] = Field(
+        default=None, validation_alias="__name__"
+    )  # "backendai_container_utilization"
+    agent_id: Optional[str] = Field(default=None)
+    container_metric_name: Optional[str] = Field(default=None)
+    instance: Optional[str] = Field(default=None)
+    job: Optional[str] = Field(default=None)
+    kernel_id: Optional[str] = Field(default=None)
+    owner_project_id: Optional[str] = Field(default=None)
+    owner_user_id: Optional[str] = Field(default=None)
+    session_id: Optional[str] = Field(default=None)
 
-
-def to_response_info(val: MetricResponseInfo) -> ContainerMetricResponseInfo:
-    return ContainerMetricResponseInfo(
-        value_type=val["value_type"],
-        agent_id=val.get("agent_id"),
-        container_metric_name=val.get("container_metric_name"),
-        instance=val.get("instance"),
-        job=val.get("job"),
-        kernel_id=val.get("kernel_id"),
-        owner_project_id=val.get("owner_project_id"),
-        owner_user_id=val.get("owner_user_id"),
-        session_id=val.get("session_id"),
-    )
+    def to_response_info(self) -> ContainerMetricResponseInfo:
+        return ContainerMetricResponseInfo(
+            value_type=self.value_type,
+            agent_id=self.agent_id,
+            container_metric_name=self.container_metric_name,
+            instance=self.instance,
+            job=self.job,
+            kernel_id=self.kernel_id,
+            owner_project_id=self.owner_project_id,
+            owner_user_id=self.owner_user_id,
+            session_id=self.session_id,
+        )
 
 
 type MetricResponseValue = tuple[float, str]  # (timestamp, value)
 
 
-class MetricResponse(TypedDict):
+class MetricResponse(BaseModel):
     metric: MetricResponseInfo
     values: list[MetricResponseValue]
 
@@ -92,14 +95,15 @@ class MetricService:
         async with aiohttp.ClientSession() as session:
             async with session.get(endpoint, data=form_data) as response:
                 response.raise_for_status()
-                return await response.json()
+                data = await response.json()
+        return LabelValueResponse(**data)
 
     async def query_metadata(
         self,
         action: ContainerMetricMetadataAction,
     ) -> ContainerMetricMetadataActionResult:
         result = await self._query_label_values(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
-        return ContainerMetricMetadataActionResult(result["data"])
+        return ContainerMetricMetadataActionResult(result.data)
 
     def _get_label_values_for_query(
         self, label: ContainerMetricOptionalLabel, metric_name: str
@@ -195,10 +199,10 @@ class MetricService:
         })
         async with aiohttp.ClientSession() as session:
             async with session.post(endpoint, data=form_data) as response:
-                match response.status:
-                    case 200:
+                match response.status // 100:
+                    case 2:
                         result = await response.json()
-                    case 400:
+                    case 4:
                         result = await response.json()
                         msg = result.get("error", "Unknown error")
                         log.exception(f"Failed to get metric: {msg}")
@@ -207,12 +211,14 @@ class MetricService:
                         log.exception(f"Failed to get metric. code: {response.status}")
                         raise FailedToGetMetric
 
-        metrics: list[MetricResponse] = result["data"]["result"]
+        metrics: list[MetricResponse] = [
+            MetricResponse(**data) for data in result["data"]["result"]
+        ]
         return ContainerMetricActionResult(
             result=[
                 ContainerMetricResult(
-                    metric=to_response_info(m["metric"]),
-                    values=[MetricResultValue(*value) for value in m["values"]],
+                    metric=m.metric.to_response_info(),
+                    values=[MetricResultValue(*value) for value in m.values],
                 )
                 for m in metrics
             ]

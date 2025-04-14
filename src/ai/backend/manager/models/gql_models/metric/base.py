@@ -56,14 +56,6 @@ class ContainerUtilizationMetric(graphene.ObjectType):
         description="The average value of the metric in given time range. null if no data."
     )
 
-    @classmethod
-    def empty(cls, metric_name: str, value_type: Optional[str]) -> Self:
-        return cls(
-            metric_name=metric_name,
-            value_type=value_type,
-            values=[],
-        )
-
     async def resolve_max_value(self, info: graphene.ResolveInfo) -> Optional[str]:
         if not self.values:
             return None

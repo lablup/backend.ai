@@ -14,7 +14,7 @@ class ContainerMetricMetadataAction(BaseAction):
 
     @override
     def entity_type(self) -> str:
-        return "metric_metadata"
+        return "container_metric_metadata"
 
     @override
     def operation_type(self) -> str:
@@ -45,7 +45,7 @@ class ContainerMetricAction(BaseAction):
 
     @override
     def entity_type(self) -> str:
-        return "metric"
+        return "container_metric"
 
     @override
     def operation_type(self) -> str:
