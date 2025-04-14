@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.audit_log import AuditLogRow, OperationStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.reporters.types import (
+from ai.backend.manager.reporters.base import (
     AbstractReporter,
     FinishedActionMessage,
     StartedActionMessage,

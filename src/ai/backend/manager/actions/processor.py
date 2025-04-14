@@ -46,14 +46,14 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             description = str(e)
             raise
         finally:
-            end_at = datetime.now()
-            duration = (end_at - started_at).total_seconds()
+            ended_at = datetime.now()
+            duration = ended_at - started_at
             meta = BaseActionResultMeta(
                 action_id=action_id,
                 status=status,
                 description=description,
                 started_at=started_at,
-                end_at=end_at,
+                ended_at=ended_at,
                 duration=duration,
             )
             process_result = ProcessResult(meta=meta, result=result)

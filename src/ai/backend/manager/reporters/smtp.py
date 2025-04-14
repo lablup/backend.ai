@@ -10,7 +10,7 @@ import aiosmtplib
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.audit_log import OperationStatus
-from ai.backend.manager.reporters.types import (
+from ai.backend.manager.reporters.base import (
     AbstractReporter,
     FinishedActionMessage,
     StartedActionMessage,

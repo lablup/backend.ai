@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Generic, Optional, TypeVar
 
 from ai.backend.manager.models.audit_log import OperationStatus
@@ -62,8 +62,8 @@ class BaseActionResultMeta:
     status: OperationStatus
     description: str
     started_at: datetime
-    end_at: datetime
-    duration: float
+    ended_at: datetime
+    duration: timedelta
 
 
 TAction = TypeVar("TAction", bound=BaseAction)
