@@ -3,7 +3,7 @@ import decimal
 import logging
 import secrets
 import uuid
-from typing import Awaitable, Callable, cast
+from typing import Awaitable, Callable
 
 import aiohttp
 import sqlalchemy as sa
@@ -137,7 +137,7 @@ from ai.backend.manager.services.model_service.types import (
     RequesterCtx,
     RouteInfo,
 )
-from ai.backend.manager.types import MountOptionModel, UserScope, _TriStateEnum
+from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user_uuid
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -774,25 +774,6 @@ class ModelService:
                 ):
                     raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
-                # TODO: Validate if desired_session_count and replicas both set before service layer
-                # TODO: init runtime_variant field with RuntimeVariant Type need to be done in handler layer
-                if action.modifier.runtime_variant._state == _TriStateEnum.UPDATE:
-                    try:
-                        endpoint_row.runtime_variant = RuntimeVariant(
-                            cast(str, action.modifier.runtime_variant.value())
-                        )
-                    except KeyError:
-                        raise InvalidAPIParameters(
-                            f"Unsupported runtime {action.modifier.runtime_variant.value()}"
-                        )
-                if (
-                    action.modifier.desired_session_count._state == _TriStateEnum.UPDATE
-                    and action.modifier.replicas._state == _TriStateEnum.UPDATE
-                ):
-                    raise InvalidAPIParameters(
-                        "Cannot set both desired_session_count and replicas. Use replicas for future use."
-                    )
-
                 fields_to_update = action.modifier.fields_to_update()
                 for key, value in fields_to_update.items():
                     setattr(endpoint_row, key, value)
@@ -1033,14 +1014,6 @@ class ModelService:
                         raise GenericForbidden
 
             async def _do_mutate() -> MutationResult:
-                # TODO: Move data validation to the handler layer
-                if action.modifier.threshold.optional_value() is not None:
-                    _newval = action.modifier.threshold.optional_value()
-                    try:
-                        row.threshold = decimal.Decimal(cast(str, _newval))
-                    except decimal.InvalidOperation:
-                        raise InvalidAPIParameters(f"Cannot convert {_newval} to Decimal")
-
                 fields_to_update = action.modifier.fields_to_update()
                 for key, value in fields_to_update.items():
                     setattr(row, key, value)

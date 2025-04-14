@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import decimal
 import uuid
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence, cast
 from uuid import UUID
@@ -10,7 +11,7 @@ import jwt
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from graphql import Undefined
+from graphql import Undefined, UndefinedType
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -81,6 +82,7 @@ from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import UserRole, UserRow
+from src.ai.backend.common.exception import InvalidAPIParameters
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -355,6 +357,17 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     def to_action(
         self, requester_ctx: RequesterCtx, id: uuid.UUID
     ) -> ModifyEndpointAutoScalingRuleAction:
+        def convert_to_decimal(value: Optional[str] | UndefinedType) -> decimal.Decimal:
+            if isinstance(value, UndefinedType):
+                return value
+            elif value is None:
+                raise InvalidAPIParameters("Threshold cannot be None")
+
+            try:
+                return decimal.Decimal(value)
+            except decimal.InvalidOperation:
+                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal")
+
         return ModifyEndpointAutoScalingRuleAction(
             requester_ctx=requester_ctx,
             id=id,
@@ -368,7 +381,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
                     self.metric_name,
                 ),
                 threshold=OptionalState.from_graphql(
-                    self.threshold,
+                    convert_to_decimal(self.threshold),
                 ),
                 comparator=OptionalState.from_graphql(
                     AutoScalingMetricComparator(self.comparator)
@@ -998,6 +1011,22 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
             return ImageRef(graphene_image_input.name, registry, architecture)
 
+        def convert_runtime_variant(value: Optional[str] | UndefinedType) -> RuntimeVariant:
+            if isinstance(value, UndefinedType):
+                return value
+            elif value is None:
+                raise InvalidAPIParameters("Runtime variant cannot be None")
+
+            try:
+                return RuntimeVariant(value)
+            except KeyError:
+                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}")
+
+        if self.desired_session_count is not Undefined and self.replicas is not Undefined:
+            raise InvalidAPIParameters(
+                "Cannot set both desired_session_count and replicas. Use replicas for future use."
+            )
+
         return ModifyEndpointAction(
             requester_ctx=requester_ctx,
             endpoint_id=endpoint_id,
@@ -1030,7 +1059,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
                     self.environ,
                 ),
                 runtime_variant=OptionalState.from_graphql(
-                    self.runtime_variant,
+                    convert_runtime_variant(self.runtime_variant),
                 ),
             ),
         )

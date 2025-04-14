@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Mapping, Optional, Self, Sequence, override
 
 import yarl
@@ -397,7 +398,7 @@ class EndpointAutoScalingRuleCreator(Creator):
 class EndpointAutoScalingRuleModifier(PartialModifier):
     metric_source: OptionalState[AutoScalingMetricSource] = field(default_factory=OptionalState.nop)
     metric_name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    threshold: OptionalState[str] = field(default_factory=OptionalState.nop)
+    threshold: OptionalState[Decimal] = field(default_factory=OptionalState.nop)
     comparator: OptionalState[AutoScalingMetricComparator] = field(
         default_factory=OptionalState.nop
     )
@@ -411,6 +412,7 @@ class EndpointAutoScalingRuleModifier(PartialModifier):
         return {
             "metric_source": self.metric_source,
             "metric_name": self.metric_name,
+            "threshold": self.threshold,
             "comparator": self.comparator,
             "step_size": self.step_size,
             "cooldown_seconds": self.cooldown_seconds,
