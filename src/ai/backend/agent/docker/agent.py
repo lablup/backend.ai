@@ -89,7 +89,13 @@ from ai.backend.common.utils import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
-from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
+from ..agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ComputerContext,
+    ScanImagesResult,
+)
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel
@@ -1265,7 +1271,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
-    scan_images_timer: asyncio.Task
     metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
@@ -1527,10 +1532,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
             return distro
 
-    async def scan_images(self) -> Mapping[str, str]:
+    async def scan_images(self) -> ScanImagesResult:
         async with closing_async(Docker()) as docker:
             all_images = await docker.images.list()
-            updated_images = {}
+            scanned_images, removed_images = {}, {}
             for image in all_images:
                 if image["RepoTags"] is None:
                     continue
@@ -1555,12 +1560,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         continue
                     kernelspec = int(labels.get("ai.backend.kernelspec", "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
-                        updated_images[repo_tag] = img_detail["Id"]
-            for added_image in updated_images.keys() - self.images.keys():
+                        scanned_images[repo_tag] = img_detail["Id"]
+            for added_image in scanned_images.keys() - self.images.keys():
                 log.debug("found kernel image: {0}", added_image)
-            for removed_image in self.images.keys() - updated_images.keys():
+
+            for removed_image in self.images.keys() - scanned_images.keys():
                 log.debug("removed kernel image: {0}", removed_image)
-            return updated_images
+                removed_images[removed_image] = self.images[removed_image]
+
+            return ScanImagesResult(
+                scanned_images=scanned_images,
+                removed_images=removed_images,
+            )
 
     async def handle_agent_socket(self):
         """

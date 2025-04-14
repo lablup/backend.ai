@@ -61,6 +61,7 @@ from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
+    AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -372,6 +373,7 @@ class AgentRegistry:
         evd.consume(AgentStartedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
+        evd.consume(AgentImagesRemoveEvent, self, handle_agent_images_remove)
         evd.consume(RouteCreatedEvent, self, handle_route_creation)
 
         evd.consume(VFolderDeletionSuccessEvent, self, handle_vfolder_deletion_success)
@@ -3159,16 +3161,13 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
+            images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
+            image_canonicals = set(img_info[0] for img_info in images)
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
-                for image, _ in loaded_images:
-                    try:
-                        await pipe.sadd(ImageRef.parse_image_str(image, "*").canonical, agent_id)
-                    except ValueError:
-                        # Skip opaque (non-Backend.AI) image.
-                        continue
+                for image_canonical in image_canonicals:
+                    await pipe.sadd(image_canonical, agent_id)
                 return pipe
 
             await redis_helper.execute(self.redis_image, _pipe_builder)
@@ -3177,6 +3176,17 @@ class AgentRegistry:
             "POST_AGENT_HEARTBEAT",
             (agent_id, sgroup, available_slots),
         )
+
+    async def handle_agent_images_remove(
+        self, agent_id: AgentId, image_canonicals: list[str]
+    ) -> None:
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for image_canonical in image_canonicals:
+                await pipe.srem(image_canonical, agent_id)
+            return pipe
+
+        await redis_helper.execute(self.redis_image, _pipe_builder)
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
         await redis_helper.execute(self.redis_live, lambda r: r.hdel("agent.last_seen", agent_id))
@@ -4214,6 +4224,14 @@ async def handle_agent_heartbeat(
     event: AgentHeartbeatEvent,
 ) -> None:
     await context.handle_heartbeat(source, event.agent_info)
+
+
+async def handle_agent_images_remove(
+    context: AgentRegistry,
+    source: AgentId,
+    event: AgentImagesRemoveEvent,
+) -> None:
+    await context.handle_agent_images_remove(source, event.image_canonicals)
 
 
 async def handle_route_creation(
