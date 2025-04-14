@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.events import EventDispatcher
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -24,6 +25,8 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.model_service.processors import ModelServiceProcessors
+from ai.backend.manager.services.model_service.service import ModelService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -56,6 +59,7 @@ class ServiceArgs:
     agent_registry: AgentRegistry
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
+    event_dispatcher: EventDispatcher
 
 
 @dataclass
@@ -74,6 +78,7 @@ class Services:
     user_resource_policy: UserResourcePolicyService
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
+    model_service: ModelService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -109,6 +114,14 @@ class Services:
         resource_preset_service = ResourcePresetService(
             args.db, args.agent_registry, args.shared_config
         )
+        model_service = ModelService(
+            db=args.db,
+            agent_registry=args.agent_registry,
+            background_task_manager=args.background_task_manager,
+            event_dispatcher=args.event_dispatcher,
+            storage_manager=args.storage_manager,
+            shared_config=args.shared_config,
+        )
 
         return cls(
             agent=agent_service,
@@ -125,6 +138,7 @@ class Services:
             user_resource_policy=user_resource_policy_service,
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
+            model_service=model_service,
         )
 
 
@@ -149,6 +163,7 @@ class Processors:
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
+    model_service: ModelServiceProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -179,6 +194,10 @@ class Processors:
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
+        resource_preset_processors = ResourcePresetProcessors(
+            services.resource_preset, action_monitors
+        )
+        model_service_processors = ModelServiceProcessors(services.model_service)
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -194,4 +213,5 @@ class Processors:
             user_resource_policy=user_resource_policy_processors,
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
+            model_service=model_service_processors,
         )
