@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
+from ai.backend.manager.models.audit_log import OperationStatus
+
 from .action import (
     BaseActionResultMeta,
     BaseActionTriggerMeta,
@@ -27,7 +29,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
 
     async def _run(self, action: TAction) -> TActionResult:
         started_at = datetime.now()
-        status: str = "unknown"
+        status = OperationStatus.UNKNOWN
         description: str = "unknown"
         result: Optional[TActionResult] = None
 
@@ -37,10 +39,10 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             await monitor.prepare(action, action_trigger_meta)
         try:
             result = await self._func(action)
-            status = "success"
+            status = OperationStatus.SUCCESS
             description = "Success"
         except BaseException as e:
-            status = "error"
+            status = OperationStatus.ERROR
             description = str(e)
             raise
         finally:

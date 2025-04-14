@@ -12,7 +12,6 @@ from pathlib import Path
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Awaitable,
     Callable,
@@ -36,7 +35,6 @@ import trafaret as t
 from aiohttp import web
 from pydantic import (
     AliasChoices,
-    BaseModel,
     Field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -44,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
+from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.types import (
     RedisConnectionInfo,
     VFolderHostPermission,
@@ -138,7 +137,8 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .utils import (
-    BaseResponseModel,
+    LegacyBaseRequestModel,
+    LegacyBaseResponseModel,
     check_api_params,
     get_user_scopes,
     pydantic_params_api_handler,
@@ -153,7 +153,7 @@ VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
 
 
-class SuccessResponseModel(BaseResponseModel):
+class SuccessResponseModel(LegacyBaseResponseModel):
     success: bool = Field(default=True)
 
 
@@ -368,27 +368,17 @@ def vfolder_check_exists(
     return _wrapped
 
 
-class CreateRequestModel(BaseModel):
-    name: tv.VFolderName = Field(
-        description="Name of the vfolder",
-    )
-    folder_host: str | None = Field(
-        validation_alias=AliasChoices("host", "folder_host"),
-        default=None,
-    )
+class CreateRequestModel(LegacyBaseRequestModel):
+    name: tv.VFolderName = Field(description="Name of the vfolder")
+    folder_host: str | None = Field(default=None, alias="host")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
-    unmanaged_path: str | None = Field(
-        validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
+    unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
+    group_id: str | uuid.UUID | None = Field(
         default=None,
+        validation_alias=AliasChoices("group", "groupId"),
     )
-    group: str | uuid.UUID | None = Field(
-        validation_alias=AliasChoices("group", "groupId", "group_id"),
-        default=None,
-    )
-    cloneable: bool = Field(
-        default=False,
-    )
+    cloneable: bool = Field(default=False)
 
 
 @auth_required
@@ -401,7 +391,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params.group
+    group_id_or_name = params.group_id
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -964,7 +954,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
     return web.json_response(usage, status=HTTPStatus.OK)
 
 
-class RenameRequestModel(BaseModel):
+class RenameRequestModel(LegacyBaseRequestModel):
     new_name: tv.VFolderName = Field(
         description="Name of the vfolder",
     )
@@ -1684,9 +1674,9 @@ async def _delete(
     )
 
 
-class DeleteRequestModel(BaseModel):
+class DeleteRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("vfolderId", "id"),
         description="Target vfolder id to soft-delete, to go to trash bin",
     )
 
@@ -1755,14 +1745,14 @@ async def delete_by_name(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class IDRequestModel(BaseModel):
+class IDRequestModel(LegacyBaseRequestModel):
     name: str = Field(
-        validation_alias=AliasChoices("vfolder_name", "vfolderName", "name"),
+        validation_alias=AliasChoices("vfolder_name", "vfolderName"),
         description="Target vfolder name",
     )
 
 
-class CompactVFolderInfoModel(BaseResponseModel):
+class CompactVFolderInfoModel(LegacyBaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the vfolder.")
     name: str = Field(description="Name of the vfolder.")
 
@@ -1791,9 +1781,9 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
     return CompactVFolderInfoModel(id=row["id"], name=folder_name)
 
 
-class DeleteFromTrashRequestModel(BaseModel):
+class DeleteFromTrashRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to hard-delete, permanently remove from storage",
     )
 
@@ -1846,9 +1836,9 @@ async def force_delete(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class PurgeRequestModel(BaseModel):
+class PurgeRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to purge, permanently remove from DB",
     )
 
@@ -1886,9 +1876,9 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class RestoreRequestModel(BaseModel):
+class RestoreRequestModel(LegacyBaseRequestModel):
     vfolder_id: uuid.UUID = Field(
-        validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
+        validation_alias=AliasChoices("id", "vfolderId"),
         description="Target vfolder id to restore",
     )
 
@@ -2125,43 +2115,31 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     return web.json_response(resp, status=HTTPStatus.OK)
 
 
-class UserPermMapping(BaseModel):
-    user_id: Annotated[
-        uuid.UUID,
-        Field(
-            validation_alias=AliasChoices("user", "user_id", "userID"),
-            description="Target user id to update sharing status.",
+class UserPermMapping(BaseFieldModel):
+    user_id: uuid.UUID = Field(
+        description="Target user id to update sharing status.",
+        validation_alias=AliasChoices("user", "userID"),
+    )
+    perm: VFolderPermission | None = Field(
+        default=None,
+        description=textwrap.dedent(
+            "Permission to update. Delete the sharing between vfolder and user if this value is null. "
+            f"Should be one of {[p.value for p in VFolderPermission]}. "
+            "Default value is null."
         ),
-    ]
-    perm: Annotated[
-        VFolderPermission | None,
-        Field(
-            validation_alias=AliasChoices("perm", "permission"),
-            default=None,
-            description=textwrap.dedent(
-                "Permission to update. Delete the sharing between vfolder and user if this value is null. "
-                f"Should be one of {[p.value for p in VFolderPermission]}. "
-                "Default value is null."
-            ),
-        ),
-    ]
+        alias="permission",
+    )
 
 
-class UpdateSharedRequestModel(BaseModel):
-    vfolder_id: Annotated[
-        uuid.UUID,
-        Field(
-            validation_alias=AliasChoices("vfolder_id", "vfolderId", "vfolder"),
-            description="Target vfolder id to update sharing status.",
-        ),
-    ]
-    user_perm_list: Annotated[
-        list[UserPermMapping],
-        Field(
-            validation_alias=AliasChoices("user_perm", "user_perm_list", "userPermList"),
-            description="A list of user and permission mappings.",
-        ),
-    ]
+class UpdateSharedRequestModel(LegacyBaseRequestModel):
+    vfolder_id: uuid.UUID = Field(
+        description="Target vfolder id to update sharing status.",
+        alias="vfolder",
+    )
+    user_perm_list: list[UserPermMapping] = Field(
+        description="A list of user and permission mappings.",
+        validation_alias=AliasChoices("user_perm", "userPermList"),
+    )
 
 
 @auth_required

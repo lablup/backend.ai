@@ -1,2 +1,2 @@
 mypy==1.15.0
-pydantic~=2.9.2
+pydantic~=2.11.3

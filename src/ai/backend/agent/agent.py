@@ -45,12 +45,13 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
-import yaml
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
 from redis.asyncio import Redis
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from tenacity import (
     AsyncRetrying,
     retry_if_exception_type,
@@ -64,7 +65,14 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STATISTICS_DB, REDIS_STREAM_DB, RedisRole
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.docker import (
+    DEFAULT_KERNEL_FEATURE,
+    MAX_KERNELSPEC,
+    MIN_KERNELSPEC,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events import (
@@ -159,7 +167,7 @@ from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
-from .kernel import AbstractKernel, KernelFeatures, match_distro_data
+from .kernel import AbstractKernel, match_distro_data
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -250,7 +258,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
         self.kernel_features = frozenset(
-            self.image_labels.get("ai.backend.features", "uid-match").split()
+            self.image_labels.get(LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE).split()
         )
         self.ownership_data = ownership_data
         self.session_id = ownership_data.session_id
@@ -2527,8 +2535,9 @@ class AbstractAgent(
                         f" vFolder {model_folder.name} (ID {model_folder.vfid})",
                     ) from e
                 try:
-                    raw_definition = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-                except yaml.error.YAMLError as e:
+                    yaml = YAML()
+                    raw_definition = yaml.load(model_definition_yaml)
+                except YAMLError as e:
                     raise AgentError(f"Invalid YAML syntax: {e}") from e
         try:
             model_definition = model_definition_iv.check(raw_definition)

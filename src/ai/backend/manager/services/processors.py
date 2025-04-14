@@ -4,6 +4,7 @@ from typing import Self
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -160,29 +161,37 @@ class Processors:
     container_metric: ContainerMetricProcessors
 
     @classmethod
-    def create(cls, args: ProcessorArgs) -> Self:
+    def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
         services = Services.create(args.service_args)
-        agent_processors = AgentProcessors(services.agent)
-        domain_processors = DomainProcessors(services.domain)
-        group_processors = GroupProcessors(services.group)
-        user_processors = UserProcessors(services.user)
-        image_processors = ImageProcessors(services.image)
-        container_registry_processors = ContainerRegistryProcessors(services.container_registry)
-        vfolder_processors = VFolderProcessors(services.vfolder)
-        vfolder_file_processors = VFolderFileProcessors(services.vfolder_file)
-        vfolder_invite_processors = VFolderInviteProcessors(services.vfolder_invite)
-        session_processors = SessionProcessors(services.session)
+        agent_processors = AgentProcessors(services.agent, action_monitors)
+        domain_processors = DomainProcessors(services.domain, action_monitors)
+        group_processors = GroupProcessors(services.group, action_monitors)
+        user_processors = UserProcessors(services.user, action_monitors)
+        image_processors = ImageProcessors(services.image, action_monitors)
+        container_registry_processors = ContainerRegistryProcessors(
+            services.container_registry, action_monitors
+        )
+        vfolder_processors = VFolderProcessors(services.vfolder, action_monitors)
+        vfolder_file_processors = VFolderFileProcessors(services.vfolder_file, action_monitors)
+        vfolder_invite_processors = VFolderInviteProcessors(
+            services.vfolder_invite, action_monitors
+        )
+        session_processors = SessionProcessors(services.session, action_monitors)
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
-            services.keypair_resource_policy
+            services.keypair_resource_policy, action_monitors
         )
         user_resource_policy_processors = UserResourcePolicyProcessors(
-            services.user_resource_policy
+            services.user_resource_policy, action_monitors
         )
         project_resource_policy_processors = ProjectResourcePolicyProcessors(
-            services.project_resource_policy
+            services.project_resource_policy, action_monitors
         )
-        resource_preset_processors = ResourcePresetProcessors(services.resource_preset)
-        container_metric_processors = ContainerMetricProcessors(services.container_metric)
+        resource_preset_processors = ResourcePresetProcessors(
+            services.resource_preset, action_monitors
+        )
+        container_metric_processors = ContainerMetricProcessors(
+            services.container_metric, action_monitors
+        )
         return cls(
             agent=agent_processors,
             domain=domain_processors,

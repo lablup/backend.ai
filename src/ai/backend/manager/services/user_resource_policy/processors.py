@@ -1,3 +1,4 @@
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
@@ -25,7 +26,15 @@ class UserResourcePolicyProcessors:
         DeleteUserResourcePolicyAction, DeleteUserResourcePolicyActionResult
     ]
 
-    def __init__(self, service: UserResourcePolicyService) -> None:
-        self.create_user_resource_policy = ActionProcessor(service.create_user_resource_policy)
-        self.modify_user_resource_policy = ActionProcessor(service.modify_user_resource_policy)
-        self.delete_user_resource_policy = ActionProcessor(service.delete_user_resource_policy)
+    def __init__(
+        self, service: UserResourcePolicyService, action_monitors: list[ActionMonitor]
+    ) -> None:
+        self.create_user_resource_policy = ActionProcessor(
+            service.create_user_resource_policy, action_monitors
+        )
+        self.modify_user_resource_policy = ActionProcessor(
+            service.modify_user_resource_policy, action_monitors
+        )
+        self.delete_user_resource_policy = ActionProcessor(
+            service.delete_user_resource_policy, action_monitors
+        )

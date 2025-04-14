@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, Optional, TypeVar
 
+from ai.backend.manager.models.audit_log import OperationStatus
+
 
 class BaseAction(ABC):
     @abstractmethod
@@ -17,6 +19,9 @@ class BaseAction(ABC):
     @abstractmethod
     def operation_type(self) -> str:
         raise NotImplementedError
+
+    def type(self) -> str:
+        return f"{self.entity_type()}:{self.operation_type()}"
 
 
 @dataclass
@@ -54,7 +59,7 @@ class BaseBatchActionResult(ABC):
 @dataclass
 class BaseActionResultMeta:
     action_id: uuid.UUID
-    status: str
+    status: OperationStatus
     description: str
     started_at: datetime
     end_at: datetime

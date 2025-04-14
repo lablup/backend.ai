@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 
 from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
 from ai.backend.common.events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -407,11 +407,20 @@ class SessionService:
                     existing_row = await sess.scalar(query)
 
                     customized_image_id: str
+                    kern_features: list[str]
                     if existing_row:
-                        customized_image_id = existing_row.labels["ai.backend.customized-image.id"]
+                        kern_features = existing_row.labels.get(
+                            LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE
+                        ).split()
+                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID.value]
                         log.debug("reusing existing customized image ID {}", customized_image_id)
                     else:
+                        kern_features = [DEFAULT_KERNEL_FEATURE]
                         customized_image_id = str(uuid.uuid4())
+                    # Remove PRIVATE label for customized images
+                    kern_features = [
+                        feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
+                    ]
 
                 new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
                 new_image_ref = ImageRef.from_image_str(
@@ -423,13 +432,14 @@ class SessionService:
                 )
 
                 image_labels = {
-                    "ai.backend.customized-image.owner": f"{image_visibility.value}:{image_owner_id}",
-                    "ai.backend.customized-image.name": image_name,
-                    "ai.backend.customized-image.id": customized_image_id,
+                    LabelName.CUSTOMIZED_OWNER.value: f"{image_visibility.value}:{image_owner_id}",
+                    LabelName.CUSTOMIZED_NAME.value: image_name,
+                    LabelName.CUSTOMIZED_ID.value: customized_image_id,
+                    LabelName.FEATURES.value: " ".join(kern_features),
                 }
                 match image_visibility:
                     case CustomizedImageVisibilityScope.USER:
-                        image_labels["ai.backend.customized-image.user.email"] = action.user_email
+                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL.value] = action.user_email
 
                 # commit image with new tag set
                 resp = await self._agent_registry.commit_session(

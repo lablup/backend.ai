@@ -17,6 +17,7 @@ python_requirements(
         "more-itertools": ["more_itertools"],
         "zipstream-new": ["zipstream"],
         "etcd-client-py": ["etcd_client"],
+        "ruamel.yaml": ["ruamel.yaml"],
     },
     type_stubs_module_mapping={
         "types-aiofiles": ["aiofiles"],

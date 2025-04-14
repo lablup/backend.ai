@@ -7,7 +7,6 @@ from datetime import datetime
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Iterable,
     Self,
@@ -24,7 +23,6 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     AnyUrl,
-    BaseModel,
     ConfigDict,
     Field,
     HttpUrl,
@@ -38,6 +36,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.events import (
     EventHandler,
@@ -90,7 +89,8 @@ from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import (
-    BaseResponseModel,
+    LegacyBaseRequestModel,
+    LegacyBaseResponseModel,
     get_access_key_scopes,
     get_user_uuid_scopes,
     pydantic_params_api_handler,
@@ -120,15 +120,15 @@ async def is_user_allowed_to_access_resource(
         return request["user"]["uyud"] == resource_owner
 
 
-class ListServeRequestModel(BaseModel):
+class ListServeRequestModel(LegacyBaseRequestModel):
     name: str | None = Field(default=None)
 
 
-class SuccessResponseModel(BaseResponseModel):
+class SuccessResponseModel(LegacyBaseResponseModel):
     success: bool = Field(default=True)
 
 
-class CompactServeInfoModel(BaseModel):
+class CompactServeInfoModel(LegacyBaseResponseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     name: str = Field(description="Name of the model service.")
     replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
@@ -193,7 +193,7 @@ async def list_serve(
     ]
 
 
-class RouteInfoModel(BaseModel):
+class RouteInfoModel(BaseFieldModel):
     route_id: uuid.UUID = Field(
         description=(
             "Unique ID referencing endpoint route. Each endpoint route has a one-to-one"
@@ -204,13 +204,14 @@ class RouteInfoModel(BaseModel):
     traffic_ratio: NonNegativeFloat
 
 
-class ServeInfoModel(BaseResponseModel):
+class ServeInfoModel(LegacyBaseResponseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     endpoint_id: uuid.UUID = Field(description="Unique ID referencing the model service.")
-    model_id: Annotated[uuid.UUID, Field(description="ID of model VFolder.")]
-    extra_mounts: Annotated[
-        Sequence[uuid.UUID],
-        Field(description="List of extra VFolders which will be mounted to model service session."),
-    ]
+    model_id: uuid.UUID = Field(description="ID of model VFolder.")
+    extra_mounts: Sequence[uuid.UUID] = Field(
+        description="List of extra VFolders which will be mounted to model service session."
+    )
     name: str = Field(description="Name of the model service.")
     replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
     desired_session_count: NonNegativeInt = Field(description="Deprecated; use `replicas` instead.")
@@ -234,12 +235,9 @@ class ServeInfoModel(BaseResponseModel):
             " will be no authentication required to communicate with this API service."
         )
     )
-    runtime_variant: Annotated[
-        RuntimeVariant,
-        Field(description="Type of the inference runtime the image will try to load."),
-    ]
-
-    model_config = ConfigDict(protected_namespaces=())
+    runtime_variant: RuntimeVariant = Field(
+        description="Type of the inference runtime the image will try to load."
+    )
 
 
 @auth_required
@@ -281,106 +279,101 @@ async def get_info(request: web.Request) -> ServeInfoModel:
     )
 
 
-class ServiceConfigModel(BaseModel):
+class ServiceConfigModel(LegacyBaseRequestModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model: str = Field(description="Name or ID of the model VFolder", examples=["ResNet50"])
     model_definition_path: str | None = Field(
         description="Path to the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default.",
         default=None,
     )
     model_version: int = Field(
-        validation_alias=AliasChoices("model_version", "modelVersion"),
         description="Unused; Reserved for future works",
         default=1,
+        alias="modelVersion",
     )
     model_mount_destination: str = Field(
-        validation_alias=AliasChoices("model_mount_destination", "modelMountDestination"),
         default="/models",
         description=(
             "Mount destination for the model VFolder will be mounted inside the inference session. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`."
         ),
+        alias="modelMountDestination",
     )
 
-    extra_mounts: Annotated[
-        dict[uuid.UUID, MountOptionModel],
-        Field(
-            description=(
-                "Specifications about extra VFolders mounted to model service session. "
-                "MODEL type VFolders are not allowed to be attached to model service session with this option."
-            ),
-            default={},
+    extra_mounts: dict[uuid.UUID, MountOptionModel] = Field(
+        description=(
+            "Specifications about extra VFolders mounted to model service session. "
+            "MODEL type VFolders are not allowed to be attached to model service session with this option."
         ),
-    ]
+        default={},
+    )
 
     environ: dict[str, str] | None = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
     )
     scaling_group: str = Field(
-        validation_alias=AliasChoices("scaling_group", "scalingGroup"),
         description="Name of the resource group to spawn inference sessions",
         examples=["nvidia-H100"],
+        alias="scalingGroup",
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
 
-    model_config = ConfigDict(protected_namespaces=())
 
-
-class NewServiceRequestModel(BaseModel):
+class NewServiceRequestModel(LegacyBaseRequestModel):
     service_name: tv.SessionName = Field(
-        validation_alias=AliasChoices("name", "service_name", "clientSessionToken"),
         description="Name of the service",
+        validation_alias=AliasChoices("name", "clientSessionToken"),
     )
     replicas: int = Field(
-        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount", "replicas"),
         description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
+        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
     )
     image: str = Field(
-        validation_alias=AliasChoices("image", "lang"),
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
+        alias="lang",
     )
-    runtime_variant: Annotated[
-        RuntimeVariant,
-        Field(
-            description="Type of the inference runtime the image will try to load.",
-            default=RuntimeVariant.CUSTOM,
-        ),
-    ]
+    runtime_variant: RuntimeVariant = Field(
+        description="Type of the inference runtime the image will try to load.",
+        default=RuntimeVariant.CUSTOM,
+    )
     architecture: str = Field(
-        validation_alias=AliasChoices("arch", "architecture"),
         description="Image architecture",
         default=DEFAULT_IMAGE_ARCH,
+        alias="arch",
     )
-    group: str = Field(
-        validation_alias=AliasChoices("group", "groupName", "group_name"),
+    group_name: str = Field(
         description="Name of project to spawn session",
         default="default",
+        validation_alias=AliasChoices("group", "groupName"),
     )
-    domain: str = Field(
-        validation_alias=AliasChoices("domain", "domainName", "domain_name"),
+    domain_name: str = Field(
         description="Name of domain to spawn session",
         default="default",
+        validation_alias=AliasChoices("domain", "domainName"),
     )
     cluster_size: int = Field(
-        validation_alias=AliasChoices("cluster_size", "clusterSize"), default=1
+        default=1,
+        alias="clusterSize",
     )
     cluster_mode: ClusterMode = Field(
-        validation_alias=AliasChoices("cluster_mode", "clusterMode"),
         default=ClusterMode.SINGLE_NODE,
+        alias="clusterMode",
     )
     tag: str | None = Field(default=None)
     startup_command: str | None = Field(
-        validation_alias=AliasChoices("startup_command", "startupCommand"),
         default=None,
+        alias="startupCommand",
     )
     bootstrap_script: str | None = Field(
-        validation_alias=AliasChoices("bootstrap_script", "bootstrapScript"),
         default=None,
+        alias="bootstrapScript",
     )
     callback_url: AnyUrl | None = Field(
-        validation_alias=AliasChoices("callback_url", "callbackUrl", "CallbackURL"),
         default=None,
+        validation_alias=AliasChoices("callbackUrl", "CallbackURL"),
     )
     owner_access_key: str | None = Field(
         description=(
@@ -429,8 +422,8 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             conn,
             params.config.scaling_group,
             owner_access_key,
-            params.domain,
-            params.group,
+            params.domain_name,
+            params.group_name,
         )
 
         params.config.scaling_group = checked_scaling_group
@@ -449,7 +442,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
                 conn,
                 owner_uuid,
                 user_role=owner_role,
-                domain_name=params.domain,
+                domain_name=params.domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_vf_conds,
             )
@@ -465,7 +458,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
                         conn,
                         owner_uuid,
                         user_role=owner_role,
-                        domain_name=params.domain,
+                        domain_name=params.domain_name,
                         allowed_vfolder_types=allowed_vfolder_types,
                         extra_vf_conds=extra_vf_conds,
                     )
@@ -489,7 +482,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
             params.config.model_mount_destination,
             params.config.extra_mounts,
             UserScope(
-                domain_name=params.domain,
+                domain_name=params.domain_name,
                 group_id=group_id,
                 user_uuid=owner_uuid,
                 user_role=owner_role,
@@ -568,7 +561,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         "",
         image_row.image_ref,
         UserScope(
-            domain_name=params.domain,
+            domain_name=params.domain_name,
             group_id=validation_result.group_id,
             user_uuid=validation_result.owner_uuid,
             user_role=validation_result.owner_role,
@@ -598,7 +591,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             raise InvalidAPIParameters("Cannot create multiple services with same name")
 
         project_id = await resolve_group_name_or_id(
-            await db_sess.connection(), params.domain, params.group
+            await db_sess.connection(), params.domain_name, params.group_name
         )
         if project_id is None:
             raise InvalidAPIParameters(f"Invalid group name {project_id}")
@@ -610,7 +603,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             params.replicas,
             image_row,
             validation_result.model_id,
-            params.domain,
+            params.domain_name,
             project_id,
             validation_result.scaling_group,
             params.config.resources,
@@ -646,7 +639,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     )
 
 
-class TryStartResponseModel(BaseModel):
+class TryStartResponseModel(LegacyBaseResponseModel):
     task_id: str
 
 
@@ -685,7 +678,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             f"model-eval-{secrets.token_urlsafe(16)}",
             image_row.image_ref,
             UserScope(
-                domain_name=params.domain,
+                domain_name=params.domain_name,
                 group_id=validation_result.group_id,
                 user_uuid=created_user.uuid,
                 user_role=created_user.role,
@@ -879,11 +872,11 @@ async def sync(request: web.Request) -> SuccessResponseModel:
     return SuccessResponseModel()
 
 
-class ScaleRequestModel(BaseModel):
+class ScaleRequestModel(LegacyBaseRequestModel):
     to: int = Field(description="Ideal number of inference sessions")
 
 
-class ScaleResponseModel(BaseResponseModel):
+class ScaleResponseModel(LegacyBaseResponseModel):
     current_route_count: int
     target_count: int
 
@@ -930,7 +923,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         )
 
 
-class UpdateRouteRequestModel(BaseModel):
+class UpdateRouteRequestModel(LegacyBaseRequestModel):
     traffic_ratio: NonNegativeFloat
 
 
@@ -1026,7 +1019,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         return SuccessResponseModel()
 
 
-class TokenRequestModel(BaseModel):
+class TokenRequestModel(LegacyBaseRequestModel):
     duration: tv.TimeDuration | None = Field(
         default=None, description="The lifetime duration of the token."
     )
@@ -1053,7 +1046,7 @@ class TokenRequestModel(BaseModel):
         return self
 
 
-class TokenResponseModel(BaseResponseModel):
+class TokenResponseModel(LegacyBaseResponseModel):
     token: str
 
 
@@ -1121,12 +1114,12 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
         return TokenResponseModel(token=token)
 
 
-class ErrorInfoModel(BaseModel):
+class ErrorInfoModel(BaseFieldModel):
     session_id: uuid.UUID | None
     error: dict[str, Any]
 
 
-class ErrorListResponseModel(BaseResponseModel):
+class ErrorListResponseModel(LegacyBaseResponseModel):
     errors: list[ErrorInfoModel]
     retries: int
 
@@ -1204,14 +1197,12 @@ async def clear_error(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
-class RuntimeInfo(BaseModel):
-    name: Annotated[str, Field(description="Identifier to be passed later inside request body")]
-    human_readable_name: Annotated[
-        str, Field(description="Use this value as displayed label to user")
-    ]
+class RuntimeInfo(BaseFieldModel):
+    name: str = Field(description="Identifier to be passed later inside request body")
+    human_readable_name: str = Field(description="Use this value as displayed label to user")
 
 
-class RuntimeInfoModel(BaseModel):
+class RuntimeInfoModel(LegacyBaseResponseModel):
     runtimes: list[RuntimeInfo]
 
 
