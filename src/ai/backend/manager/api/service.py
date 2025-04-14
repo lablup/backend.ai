@@ -348,11 +348,13 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         description="Name of project to spawn session",
         default="default",
         validation_alias=AliasChoices("group", "groupName"),
+        serialization_alias="group",
     )
     domain_name: str = Field(
         description="Name of domain to spawn session",
         default="default",
         validation_alias=AliasChoices("domain", "domainName"),
+        serialization_alias="domain",
     )
     cluster_size: int = Field(
         default=1,
@@ -429,7 +431,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         params.config.scaling_group = checked_scaling_group
 
         owner_uuid, group_id, resource_policy = await query_userinfo(
-            request, params.model_dump(), conn
+            request, params.model_dump(by_alias=True), conn
         )
         query = sa.select([UserRow.role]).where(UserRow.uuid == owner_uuid)
         owner_role = (await conn.execute(query)).scalar()
