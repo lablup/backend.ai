@@ -2752,7 +2752,7 @@ type ClearImageCustomResourceLimitPayload {
 """Added in 25.6.0."""
 input ClearImageCustomResourceLimitKey {
   image_canonical: String!
-  architecture: String!
+  architecture: String! = "x86_64"
 }
 
 """Added in 24.03.0."""

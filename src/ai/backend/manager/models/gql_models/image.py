@@ -1273,7 +1273,7 @@ class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
     """
 
     image_canonical = graphene.String(required=True)
-    architecture = graphene.String(required=True)
+    architecture = graphene.String(required=True, default_value=DEFAULT_IMAGE_ARCH)
 
 
 class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
