@@ -7,6 +7,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Iterable,
+    Optional,
     Self,
     Sequence,
     Tuple,
@@ -320,7 +321,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
 
-    def to_action(self) -> ServiceConfig:
+    def to_dataclass(self) -> ServiceConfig:
         extra_mounts_converted = {}
         for key, mount_option in self.extra_mounts.items():
             extra_mounts_converted[key] = MountOption(
@@ -345,7 +346,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
 @dataclass
 class ValidationResult:
     model_id: uuid.UUID
-    model_definition_path: str | None
+    model_definition_path: Optional[str]
     requester_access_key: AccessKey
     owner_access_key: AccessKey
     owner_uuid: uuid.UUID
@@ -447,7 +448,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
                 callback_url=self.callback_url,
                 owner_access_key=self.owner_access_key,
                 open_to_public=self.open_to_public,
-                config=self.config.to_action(),
+                config=self.config.to_dataclass(),
                 sudo_session_enabled=sudo_session_enabled,
                 model_service_prepare_ctx=ModelServicePrepareCtx(
                     model_id=validation_result.model_id,
@@ -486,7 +487,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
             callback_url=self.callback_url,
             owner_access_key=self.owner_access_key,
             open_to_public=self.open_to_public,
-            config=self.config.to_action(),
+            config=self.config.to_dataclass(),
             request_user_id=request_user_id,
             sudo_session_enabled=sudo_session_enabled,
             model_service_prepare_ctx=ModelServicePrepareCtx(
