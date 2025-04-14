@@ -93,6 +93,7 @@ from .gql_models.agent import (
     ModifyAgent,
     RescanGPUAllocMaps,
 )
+from .gql_models.config.abusing_report import AbusingReportConfig, ModifyAbusingReportConfig
 from .gql_models.container_registry import (
     CreateContainerRegistryQuota,
     DeleteContainerRegistryQuota,
@@ -462,6 +463,8 @@ class Mutations(graphene.ObjectType):
     create_network = CreateNetwork.Field()
     modify_network = ModifyNetwork.Field()
     delete_network = DeleteNetwork.Field()
+
+    modify_abusing_report_config = ModifyAbusingReportConfig.Field(description="Added in 25.5.0.")
 
 
 class Queries(graphene.ObjectType):
@@ -1148,6 +1151,12 @@ class Queries(graphene.ObjectType):
         EndpointAutoScalingRuleConnection,
         endpoint=graphene.String(required=True),
         description="Added in 25.1.0.",
+    )
+
+    abusing_report_config = graphene.Field(
+        AbusingReportConfig,
+        description="Added in 25.5.0.",
+        agent_id=graphene.String(required=True),
     )
 
     @staticmethod
@@ -3055,6 +3064,14 @@ class Queries(graphene.ObjectType):
             before=before,
             last=last,
         )
+
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_abusing_report_config(
+        root: Any,
+        info: graphene.ResolveInfo,
+        agent_id: AgentId,
+    ) -> Optional[AbusingReportConfig]:
+        return await AbusingReportConfig.get_node(info, agent_id)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
