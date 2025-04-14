@@ -2051,7 +2051,7 @@ type UserUtilizationMetric {
 type ContainerUtilizationMetric {
   metric_name: String
 
-  """One of 'current', 'capacity', 'pct'."""
+  """One of 'current', 'capacity'."""
   value_type: String
   values: [MetricResultValue]
 
