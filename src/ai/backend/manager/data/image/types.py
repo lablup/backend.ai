@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+from ai.backend.manager.models.image import Resources
+
 
 class ImageStatus(enum.StrEnum):
     ALIVE = "ALIVE"
@@ -23,7 +25,7 @@ class ImageLabelsData:
 
 @dataclass
 class ImageResourcesData:
-    resources_data: dict[str, dict[str, Optional[str]]]
+    resources_data: Resources
 
 
 @dataclass

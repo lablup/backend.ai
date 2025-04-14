@@ -1262,3 +1262,50 @@ class PurgeImages(graphene.Mutation):
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return PurgeImagesPayload(task_id=task_id)
+
+
+class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    image_canonical = graphene.String(required=True)
+    architecture = graphene.String(required=True)
+
+
+class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
+    """
+    Added in 25.6.0.
+    """
+
+    image_node = graphene.Field(ImageNode)
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+
+class ClearImageCustomResourceLimit(graphene.Mutation):
+    """
+    Added in 25.6.0.
+    """
+
+    class Arguments:
+        key = ClearImageCustomResourceLimitKey(required=True)
+
+    Output = ClearImageCustomResourceLimitPayload
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        key: ClearImageCustomResourceLimitKey,
+    ) -> ClearImageCustomResourceLimitPayload:
+        log.info(
+            f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
+        )
+        ctx: GraphQueryContext = info.context
+        async with ctx.db.begin_session() as db_sess:
+            image_row = await ImageRow.resolve(
+                db_sess, [ImageIdentifier(key.image_canonical, key.architecture)]
+            )
+            image_row._resources = {}
+            await db_sess.flush()
+        return ClearImageCustomResourceLimitPayload(image_node=ImageNode.from_row(ctx, image_row))
