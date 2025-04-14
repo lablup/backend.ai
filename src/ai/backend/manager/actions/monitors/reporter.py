@@ -6,7 +6,7 @@ from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActi
 from ai.backend.manager.reporters.hub import ReporterHub
 
 
-class AuditLogMonitor(ActionMonitor):
+class ReporterMonitor(ActionMonitor):
     _reporter_hub: ReporterHub
 
     def __init__(self, reporter_hub: ReporterHub) -> None:

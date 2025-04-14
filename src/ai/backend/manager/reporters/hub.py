@@ -10,7 +10,6 @@ from ai.backend.manager.reporters.base import (
 
 @dataclass
 class ReporterHubArgs:
-    action_monitors: dict[str, list[str]]
     reporters: dict[str, list[AbstractReporter]]  # Key: action type, Value: reporter instance
     concurrency_limit: int = 5
 
@@ -18,7 +17,7 @@ class ReporterHubArgs:
 class ReporterHub:
     _start_queue: asyncio.Queue[StartedActionMessage]
     _finish_queue: asyncio.Queue[FinishedActionMessage]
-    _reporters: dict[str, list[AbstractReporter]]
+    _reporters: dict[str, list[AbstractReporter]]  # Key: action type, Value: reporters list
     _closed: bool
     _start_task: asyncio.Task
     _finish_task: asyncio.Task

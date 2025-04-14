@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import uuid
 from typing import Final, override
@@ -61,8 +60,8 @@ class AuditLogReporter(AbstractReporter):
 
     @override
     async def report_started(self, message: StartedActionMessage) -> None:
-        asyncio.create_task(self._generate_log(message))
+        await self._generate_log(message)
 
     @override
     async def report_finished(self, message: FinishedActionMessage) -> None:
-        asyncio.create_task(self._update_log(message))
+        await self._update_log(message)

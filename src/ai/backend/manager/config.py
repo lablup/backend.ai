@@ -240,6 +240,12 @@ _default_global_lock_lifetime: dict[str, float | int] = {
     "start": 30,
 }
 
+_default_reporter: dict[str, Any] = {
+    "smtp": [],
+    "audit-log": [],
+    "action-monitors": [],
+}
+
 manager_local_config_iv = (
     t.Dict({
         t.Key("db"): t.Dict({
@@ -327,6 +333,32 @@ manager_local_config_iv = (
             | t.String,
             t.Key("sample-rate", default=_default_pyroscope_config["sample-rate"]): t.Null
             | t.ToInt[1:],
+        }).allow_extra("*"),
+        t.Key("reporter", default=_default_reporter): t.Dict({
+            t.Key("smtp", default=[]): t.List(
+                t.Dict({
+                    t.Key("name"): t.String,
+                    t.Key("host"): t.String,
+                    t.Key("port"): t.Int[1:65535],
+                    t.Key("username"): t.String,
+                    t.Key("password"): t.String,
+                    t.Key("sender"): t.String,
+                    t.Key("recipients"): t.List(t.String),
+                    t.Key("use-tls"): t.ToBool,
+                    t.Key("trigger-policy"): t.Enum("ALL", "ON_ERROR"),
+                })
+            ),
+            t.Key("audit-log", default=[]): t.List(
+                t.Dict({
+                    t.Key("name"): t.String,
+                }).allow_extra("*")
+            ),
+            t.Key("action-monitors", default=[]): t.List(
+                t.Dict({
+                    t.Key("action-types"): t.List(t.String),
+                    t.Key("reporter"): t.String,
+                }).allow_extra("*")
+            ),
         }).allow_extra("*"),
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,

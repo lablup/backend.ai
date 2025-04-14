@@ -265,6 +265,11 @@ def local_config(
             "periodic-sync-stats": False,
         },
         "logging": logging_config,
+        "reporter": {
+            "smtp": [],
+            "audit-log": [],
+            "action-monitors": [],
+        },
     })
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
