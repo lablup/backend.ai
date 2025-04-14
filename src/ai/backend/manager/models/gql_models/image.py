@@ -51,6 +51,9 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
 )
 from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
+    ClearImageCustomResourceLimitAction,
+)
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
@@ -1302,10 +1305,12 @@ class ClearImageCustomResourceLimit(graphene.Mutation):
             f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
         )
         ctx: GraphQueryContext = info.context
-        async with ctx.db.begin_session() as db_sess:
-            image_row = await ImageRow.resolve(
-                db_sess, [ImageIdentifier(key.image_canonical, key.architecture)]
+        result = await ctx.processors.image.clear_image_custom_resource_limit.wait_for_complete(
+            ClearImageCustomResourceLimitAction(
+                image_canonical=key.image_canonical,
+                architecture=key.architecture,
             )
-            image_row._resources = {}
-            await db_sess.flush()
-        return ClearImageCustomResourceLimitPayload(image_node=ImageNode.from_row(ctx, image_row))
+        )
+        return ClearImageCustomResourceLimitPayload(
+            image_node=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image_data))
+        )
