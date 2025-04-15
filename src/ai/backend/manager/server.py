@@ -486,12 +486,12 @@ def _make_action_reporters(
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
-    hub = ReporterHub(
+    reporter_hub = ReporterHub(
         ReporterHubArgs(
             reporters=action_reporters,
         )
     )
-    monitor = ReporterMonitor(hub)
+    reporter_monitor = ReporterMonitor(reporter_hub)
 
     root_ctx.processors = Processors.create(
         ProcessorArgs(
@@ -506,7 +506,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
             )
         ),
-        [monitor],
+        [reporter_monitor],
     )
     yield
 
