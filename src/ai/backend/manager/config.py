@@ -345,6 +345,7 @@ manager_local_config_iv = (
                     t.Key("sender"): t.String,
                     t.Key("recipients"): t.List(t.String),
                     t.Key("use-tls"): t.ToBool,
+                    t.Key("max-workers"): t.Int,
                     t.Key("trigger-policy"): t.Enum("ALL", "ON_ERROR"),
                 })
             ),

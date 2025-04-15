@@ -30,12 +30,13 @@ class SMTPSenderArgs:
     sender: str
     recipients: list[str]
     use_tls: bool
+    max_workers: int = 5
 
 
 class SMTPSender:
-    def __init__(self, args: SMTPSenderArgs, max_workers: int = 5) -> None:
+    def __init__(self, args: SMTPSenderArgs) -> None:
         self._config = args
-        self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
 
     def send_email(self, subject: str, email_body: str) -> None:
         self._executor.submit(self._send_email, subject, email_body)
