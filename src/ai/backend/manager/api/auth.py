@@ -30,6 +30,7 @@ from ..models import keypair_resource_policies, keypairs, user_resource_policies
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
 from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
+from ..models.keypair import validate_ssh_keypair
 from ..models.user import (
     INACTIVE_USER_STATUSES,
     UserRole,
@@ -1129,6 +1130,10 @@ async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     log_args = (domain_name, access_key)
     log.info(log_fmt, *log_args)
     root_ctx: RootContext = request.app["_root.context"]
+
+    is_valid, err_msg = validate_ssh_keypair(privkey, pubkey)
+    if not is_valid:
+        raise InvalidAPIParameters(err_msg)
     async with root_ctx.db.begin() as conn:
         data = {
             "ssh_public_key": pubkey,

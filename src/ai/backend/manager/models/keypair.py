@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import base64
+import os
 import secrets
-from typing import Any, List, Sequence, Tuple, TypedDict
+from typing import Any, List, Optional, Sequence, Tuple, TypedDict
 
 import sqlalchemy as sa
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
+from cryptography.hazmat.primitives.hashes import SHA256
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
@@ -146,6 +150,48 @@ def generate_ssh_keypair() -> Tuple[str, str]:
     public_key = f"{public_key.rstrip()}\n"
     private_key = f"{private_key.rstrip()}\n"
     return (public_key, private_key)
+
+
+def validate_ssh_keypair(
+    private_key_value: str, public_key_value: str
+) -> tuple[bool, Optional[str]]:
+    """
+    Validate RSA keypair for SSH/SFTP connection.
+
+    Args:
+        private_key_value: PEM-encoded private key string (OpenSSL format)
+        public_key_value: OpenSSH-encoded public key string
+
+    Returns:
+        tuple[bool, Optional[str]]:
+            Tuple containing a boolean indicating if the keypair is valid,
+            and an optional error message if invalid.
+    """
+
+    private_key = crypto_serialization.load_pem_private_key(
+        private_key_value.encode(),
+        password=None,  # No encryption as specified
+    )
+    public_key = crypto_serialization.load_ssh_public_key(public_key_value.encode())
+
+    # Check that both are RSA keys
+    if not isinstance(private_key, rsa.RSAPrivateKey) or not isinstance(
+        public_key, rsa.RSAPublicKey
+    ):
+        return False, "Keypair is not RSA"
+
+    # Check if the keys match by signing and verifying a test message
+    test_message = os.urandom(32)
+
+    # Sign with private key
+    signature = private_key.sign(test_message, PKCS1v15(), SHA256())
+
+    # Verify with public key
+    try:
+        public_key.verify(signature, test_message, PKCS1v15(), SHA256())
+    except InvalidSignature as e:
+        return False, f"Keypair does not match: {e}"
+    return True, None
 
 
 async def query_owned_dotfiles(
