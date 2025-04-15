@@ -30,7 +30,7 @@ class SMTPSenderArgs:
     sender: str
     recipients: list[str]
     use_tls: bool
-    max_workers: int = 5
+    max_workers: int
 
 
 class SMTPSender:
