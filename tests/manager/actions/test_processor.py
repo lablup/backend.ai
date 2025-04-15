@@ -66,9 +66,9 @@ class MockActionMonitor:
         assert result.meta.description == self.expected_done_result.meta.description
         current_time = datetime.now()
         assert result.meta.started_at < current_time
-        assert result.meta.started_at <= result.meta.end_at
-        assert result.meta.end_at < current_time
-        assert result.meta.duration >= 0
+        assert result.meta.started_at <= result.meta.ended_at
+        assert result.meta.ended_at < current_time
+        assert result.meta.duration.total_seconds() >= 0
         if self.expected_done_result.result:
             assert result.result is not None
             assert result.result.entity_id() == self.expected_done_result.result.entity_id()
@@ -94,7 +94,7 @@ async def test_processor_success():
                 status="success",
                 description="Success",
                 started_at=None,
-                end_at=None,
+                ended_at=None,
                 duration=0.0,
             ),
             result=MockActionResult(id="1"),
@@ -119,7 +119,7 @@ async def test_processor_exception():
                 status="error",
                 description="Mock exception",
                 started_at=None,
-                end_at=None,
+                ended_at=None,
                 duration=0.0,
             ),
             result=None,

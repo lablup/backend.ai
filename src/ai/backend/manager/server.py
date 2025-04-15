@@ -71,8 +71,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
+from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.reporters.audit_log import AuditLogReporter
+from ai.backend.manager.reporters.base import AbstractReporter
+from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
+from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
 from ai.backend.manager.service.container_registry.harbor import (
@@ -103,7 +107,7 @@ from .config import load as load_config
 from .exceptions import InvalidArgument
 from .sweeper.kernel import stale_kernel_sweeper_ctx
 from .sweeper.session import stale_session_sweeper_ctx
-from .types import DistributedLockFactory
+from .types import DistributedLockFactory, SMTPTriggerPolicy
 
 VALID_VERSIONS: Final = frozenset([
     # 'v1.20160915',  # deprecated
@@ -434,10 +438,60 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         yield
 
 
+def _make_registered_reporters(
+    root_ctx: RootContext,
+) -> dict[str, AbstractReporter]:
+    reporters: dict[str, AbstractReporter] = {}
+    smtp_configs = root_ctx.local_config["reporter"]["smtp"]
+    for smtp_conf in smtp_configs:
+        smtp_args = SMTPSenderArgs(
+            host=smtp_conf["host"],
+            port=smtp_conf["port"],
+            username=smtp_conf["username"],
+            password=smtp_conf["password"],
+            sender=smtp_conf["sender"],
+            recipients=smtp_conf["recipients"],
+            use_tls=smtp_conf["use-tls"],
+        )
+        trigger_policy = SMTPTriggerPolicy[smtp_conf["trigger-policy"]]
+        reporters[smtp_conf["name"]] = SMTPReporter(smtp_args, trigger_policy)
+
+    audit_log_configs = root_ctx.local_config["reporter"]["audit-log"]
+    for audit_log_conf in audit_log_configs:
+        reporters[audit_log_conf["name"]] = AuditLogReporter(
+            root_ctx.db,
+        )
+    return reporters
+
+
+def _make_action_reporters(
+    root_ctx: RootContext,
+    reporters: dict[str, AbstractReporter],
+) -> dict[str, list[AbstractReporter]]:
+    action_monitors: dict[str, list[AbstractReporter]] = {}
+    action_monitor_configs = root_ctx.local_config["reporter"]["action-monitors"]
+    for action_monitor_conf in action_monitor_configs:
+        reporter_name: str = action_monitor_conf["reporter"]
+        reporter = reporters[reporter_name]
+        action_types: list[str] = action_monitor_conf["subscribed-actions"]
+        for action_type in action_types:
+            monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
+            monitors.append(reporter)
+            action_monitors[action_type] = monitors
+
+    return action_monitors
+
+
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    audit_log_monitor = AuditLogMonitor()
-
+    registered_reporters = _make_registered_reporters(root_ctx)
+    action_reporters = _make_action_reporters(root_ctx, registered_reporters)
+    reporter_hub = ReporterHub(
+        ReporterHubArgs(
+            reporters=action_reporters,
+        )
+    )
+    reporter_monitor = ReporterMonitor(reporter_hub)
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -451,7 +505,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
             )
         ),
-        [audit_log_monitor],
+        [reporter_monitor],
     )
     yield
 

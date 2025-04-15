@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import uuid
 from typing import Final, override
@@ -8,7 +7,7 @@ import sqlalchemy as sa
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.audit_log import AuditLogRow, OperationStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.reporters.types import (
+from ai.backend.manager.reporters.base import (
     AbstractReporter,
     FinishedActionMessage,
     StartedActionMessage,
@@ -61,8 +60,8 @@ class AuditLogReporter(AbstractReporter):
 
     @override
     async def report_started(self, message: StartedActionMessage) -> None:
-        asyncio.create_task(self._generate_log(message))
+        await self._generate_log(message)
 
     @override
     async def report_finished(self, message: FinishedActionMessage) -> None:
-        asyncio.create_task(self._update_log(message))
+        await self._update_log(message)

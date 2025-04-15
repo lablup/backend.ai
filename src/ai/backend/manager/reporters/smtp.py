@@ -1,16 +1,15 @@
 import asyncio
 import logging
-from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from email.mime.text import MIMEText
-from typing import Final
+from typing import Final, override
 
 import aiosmtplib
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.audit_log import OperationStatus
-from ai.backend.manager.reporters.types import (
+from ai.backend.manager.reporters.base import (
     AbstractReporter,
     FinishedActionMessage,
     StartedActionMessage,
@@ -32,7 +31,6 @@ class SMTPSenderArgs:
     sender: str
     recipients: list[str]
     use_tls: bool
-    concurrency_limit: int = 5
 
 
 class SMTPSender:
@@ -86,7 +84,7 @@ class SMTPReporter(AbstractReporter):
     def _make_subject(self, action_type: str) -> str:
         return f"Backend.AI SMTP Log Alert ({action_type})"
 
-    @abstractmethod
+    @override
     async def report_started(self, message: StartedActionMessage) -> None:
         if self._trigger_policy == SMTPTriggerPolicy.ON_ERROR:
             return
@@ -101,7 +99,7 @@ class SMTPReporter(AbstractReporter):
         )
         asyncio.create_task(self._smtp_sender.send_email(subject, body))
 
-    @abstractmethod
+    @override
     async def report_finished(self, message: FinishedActionMessage) -> None:
         if self._trigger_policy == SMTPTriggerPolicy.ON_ERROR:
             if message.status == OperationStatus.ERROR:
@@ -116,7 +114,8 @@ class SMTPReporter(AbstractReporter):
                     f"Ended at: {message.ended_at}\n"
                     f"Duration: {message.duration} seconds\n"
                 )
-                asyncio.create_task(self._smtp_sender.send_email(subject, body))
+                await self._smtp_sender.send_email(subject, body)
+                return
 
         subject = self._make_subject(message.action_type)
         body = (
@@ -129,4 +128,4 @@ class SMTPReporter(AbstractReporter):
             f"Ended at: {message.ended_at}\n"
             f"Duration: {message.duration} seconds\n"
         )
-        asyncio.create_task(self._smtp_sender.send_email(subject, body))
+        await self._smtp_sender.send_email(subject, body)
