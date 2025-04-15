@@ -473,7 +473,7 @@ def _make_action_reporters(
     for action_monitor_conf in action_monitor_configs:
         reporter_name: str = action_monitor_conf["reporter"]
         reporter = reporters[reporter_name]
-        action_types: list[str] = action_monitor_conf["action_types"]
+        action_types: list[str] = action_monitor_conf["action-types"]
         for action_type in action_types:
             monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
             monitors.append(reporter)

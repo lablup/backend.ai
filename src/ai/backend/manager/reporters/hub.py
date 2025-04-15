@@ -1,20 +1,23 @@
 import asyncio
+import logging
 from dataclasses import dataclass
 
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.reporters.base import (
     AbstractReporter,
     FinishedActionMessage,
     StartedActionMessage,
 )
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 
 @dataclass
 class ReporterHubArgs:
     reporters: dict[str, list[AbstractReporter]]  # Key: action type, Value: reporter instance
-    concurrency_limit: int = 5
 
 
-class ReporterHub:
+class ReporterHub(AbstractReporter):
     _start_queue: asyncio.Queue[StartedActionMessage]
     _finish_queue: asyncio.Queue[FinishedActionMessage]
     _reporters: dict[str, list[AbstractReporter]]  # Key: action type, Value: reporters list
@@ -47,7 +50,7 @@ class ReporterHub:
                 try:
                     await reporter.report_started(message)
                 except Exception as e:
-                    print(f"reporter.report_started failed: {e}")
+                    log.error(f"reporter.report_started failed: {e}")
 
     async def _report_finished(self) -> None:
         while not self._closed:
@@ -57,7 +60,7 @@ class ReporterHub:
                 try:
                     await reporter.report_finished(message)
                 except Exception as e:
-                    print(f"reporter.report_finished failed: {e}")
+                    log.error(f"reporter.report_finished failed: {e}")
 
     async def close(self) -> None:
         if self._closed:
