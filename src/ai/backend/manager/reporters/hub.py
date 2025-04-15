@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.reporters.base import (
@@ -33,9 +34,11 @@ class ReporterHub(AbstractReporter):
         self._start_task = asyncio.create_task(self._report_started())
         self._finish_task = asyncio.create_task(self._report_finished())
 
+    @override
     async def report_started(self, message: StartedActionMessage) -> None:
         await self._start_queue.put(message)
 
+    @override
     async def report_finished(self, message: FinishedActionMessage) -> None:
         await self._finish_queue.put(message)
 
