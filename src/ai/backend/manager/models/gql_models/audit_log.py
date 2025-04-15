@@ -54,15 +54,17 @@ class AuditLogNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
         description = "Added in 25.6.0."
 
-    row_id = graphene.UUID(required=True, description="UUID of the audit log row")
+    row_id = graphene.UUID(required=True, description="UUID of the AuditLog row")
     action_id = graphene.UUID(required=True, description="Added in 25.6.0. UUID of the action")
-    entity_type = graphene.String(required=True, description="Entity ID of the AuditLog")
-    operation = graphene.String(required=True, description="Entity type of the AuditLog")
-    entity_id = graphene.String(required=True, description="Operation type of the AuditLog")
+    entity_type = graphene.String(required=True, description="Entity type of the AuditLog")
+    operation = graphene.String(required=True, description="Operation type of the AuditLog")
+    entity_id = graphene.String(required=False, description="Entity ID of the AuditLog")
     created_at = graphene.DateTime(required=True, description="The time the AuditLog was reported")
-    request_id = graphene.String(required=True, description="Request ID of the AuditLog")
+    request_id = graphene.String(required=False, description="Request ID of the AuditLog")
     description = graphene.String(required=True, description="Description of the AuditLog")
-    duration = graphene.String(required=True, description="Duration taken to perform the operation")
+    duration = graphene.String(
+        required=False, description="Duration taken to perform the operation"
+    )
     status = graphene.String(required=True, description="Status of the AuditLog")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {

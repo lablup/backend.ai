@@ -6,7 +6,7 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActionMessage
 from ai.backend.manager.reporters.hub import ReporterHub
 
-BLANK_ID: Final[str] = "(unknown)"
+_BLANK_ID: Final[str] = "(unknown)"
 
 
 class ReporterMonitor(ActionMonitor):
@@ -32,13 +32,13 @@ class ReporterMonitor(ActionMonitor):
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
         entity_id = action.entity_id()
         if not entity_id:
-            entity_id = result.result.entity_id() if result.result else BLANK_ID
+            entity_id = result.result.entity_id() if result.result else _BLANK_ID
 
         message = FinishedActionMessage(
             action_id=result.meta.action_id,
             action_type=action.type(),
             entity_id=entity_id,
-            request_id=current_request_id() or BLANK_ID,
+            request_id=current_request_id() or _BLANK_ID,
             entity_type=action.entity_type(),
             operation_type=action.operation_type(),
             status=result.meta.status,
