@@ -168,11 +168,17 @@ def validate_ssh_keypair(
             and an optional error message if invalid.
     """
 
-    private_key = crypto_serialization.load_pem_private_key(
-        private_key_value.encode(),
-        password=None,  # No encryption as specified
-    )
-    public_key = crypto_serialization.load_ssh_public_key(public_key_value.encode())
+    try:
+        private_key = crypto_serialization.load_pem_private_key(
+            private_key_value.encode(),
+            password=None,  # No encryption as specified
+        )
+    except ValueError:
+        return False, "Invalid private key format"
+    try:
+        public_key = crypto_serialization.load_ssh_public_key(public_key_value.encode())
+    except ValueError:
+        return False, "Invalid public key format"
 
     # Check that both are RSA keys
     if not isinstance(private_key, rsa.RSAPrivateKey) or not isinstance(
