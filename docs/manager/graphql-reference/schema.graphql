@@ -423,8 +423,8 @@ type AuditLogNode implements Node {
   """The time the AuditLog was reported"""
   created_at: DateTime!
 
-  """RequestID of the AuditLog"""
-  request_id: UUID!
+  """Request ID of the AuditLog"""
+  request_id: String!
 
   """Description of the AuditLog"""
   description: String!
