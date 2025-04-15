@@ -231,6 +231,47 @@ class BgTaskMetricObserver:
         self._bgtask_done_count.labels(task_name=task_name, status=status).inc()
 
 
+class ActionMetricObserver:
+    _instance: Optional[Self] = None
+
+    _action_count: Counter
+    _action_duration_sec: Histogram
+
+    def __init__(self) -> None:
+        self._action_count = Counter(
+            name="backendai_action_count",
+            documentation="Total number of actions",
+            labelnames=["entity_type", "operation_type", "status"],
+        )
+        self._action_duration_sec = Histogram(
+            name="backendai_action_duration_sec",
+            documentation="Duration of actions in seconds",
+            labelnames=["entity_type", "operation_type", "status"],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_action(
+        self,
+        *,
+        entity_type: str,
+        operation_type: str,
+        status: str,
+        duration: float,
+    ) -> None:
+        self._action_count.labels(
+            entity_type=entity_type, operation_type=operation_type, status=status
+        ).inc()
+        self._action_duration_sec.labels(
+            entity_type=entity_type, operation_type=operation_type, status=status
+        ).observe(duration)
+
+
 class SystemMetricObserver:
     _instance: Optional[Self] = None
 

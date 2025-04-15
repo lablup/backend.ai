@@ -71,6 +71,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
@@ -492,6 +493,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         )
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
+    prometheus_monitor = PrometheusMonitor()
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -505,7 +507,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
             )
         ),
-        [reporter_monitor],
+        [reporter_monitor, prometheus_monitor],
     )
     yield
 
