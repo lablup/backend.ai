@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.hashes import SHA256
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -152,6 +152,33 @@ def generate_ssh_keypair() -> Tuple[str, str]:
     return (public_key, private_key)
 
 
+def _generate_random_bytes_to_verify_keypairs() -> bytes:
+    # Check if the keys match by signing and verifying a test message
+    return os.urandom(32)
+
+
+def _check_rsa_keypair(private_key: rsa.RSAPrivateKey, public_key: rsa.RSAPublicKey) -> None:
+    test_message = _generate_random_bytes_to_verify_keypairs()
+    signature = private_key.sign(test_message, PKCS1v15(), SHA256())
+    public_key.verify(signature, test_message, PKCS1v15(), SHA256())
+
+
+def _check_ecdsa_keypair(
+    private_key: ec.EllipticCurvePrivateKey, public_key: ec.EllipticCurvePublicKey
+) -> None:
+    test_message = _generate_random_bytes_to_verify_keypairs()
+    signature = private_key.sign(test_message, ec.ECDSA(SHA256()))
+    public_key.verify(signature, test_message, ec.ECDSA(SHA256()))
+
+
+def _check_ed25519_keypair(
+    private_key: ed25519.Ed25519PrivateKey, public_key: ed25519.Ed25519PublicKey
+) -> None:
+    test_message = _generate_random_bytes_to_verify_keypairs()
+    signature = private_key.sign(test_message)
+    public_key.verify(signature, test_message)
+
+
 def validate_ssh_keypair(
     private_key_value: str, public_key_value: str
 ) -> tuple[bool, Optional[str]]:
@@ -169,34 +196,36 @@ def validate_ssh_keypair(
     """
 
     try:
+        # Load the private key (PEM format)
         private_key = crypto_serialization.load_pem_private_key(
             private_key_value.encode(),
             password=None,  # No encryption as specified
         )
     except ValueError:
         return False, "Invalid private key format"
+
     try:
+        # Load the public key (OpenSSH format)
         public_key = crypto_serialization.load_ssh_public_key(public_key_value.encode())
     except ValueError:
         return False, "Invalid public key format"
 
-    # Check that both are RSA keys
-    if not isinstance(private_key, rsa.RSAPrivateKey) or not isinstance(
-        public_key, rsa.RSAPublicKey
-    ):
-        return False, "Keypair is not RSA"
-
-    # Check if the keys match by signing and verifying a test message
-    test_message = os.urandom(32)
-
-    # Sign with private key
-    signature = private_key.sign(test_message, PKCS1v15(), SHA256())
-
-    # Verify with public key
     try:
-        public_key.verify(signature, test_message, PKCS1v15(), SHA256())
+        match private_key, public_key:
+            case rsa.RSAPrivateKey(), rsa.RSAPublicKey():
+                _check_rsa_keypair(private_key, public_key)
+            case ec.EllipticCurvePrivateKey(), ec.EllipticCurvePublicKey():
+                _check_ecdsa_keypair(private_key, public_key)
+            case ed25519.Ed25519PrivateKey(), ed25519.Ed25519PublicKey():
+                _check_ed25519_keypair(private_key, public_key)
+            case _:
+                return (
+                    False,
+                    f"Unsupported pair of keys: private={type(private_key)}, public={type(public_key)}",
+                )
     except InvalidSignature as e:
         return False, f"Keypair does not match: {e}"
+
     return True, None
 
 
