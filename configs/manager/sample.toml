@@ -259,6 +259,7 @@ sender = "user@example.com"
 recipients = ["user@example.com", "user2@example.com"]
 use-tls = true
 trigger-policy = "ERROR"
+max-workers = 5
 
 
 # The list of actions to be monitored by the audit log reporter.
