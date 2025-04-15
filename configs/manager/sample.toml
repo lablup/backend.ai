@@ -241,6 +241,56 @@ certfile = ""
 "sqlalchemy" = "WARNING"
 
 
+[reporter]
+
+# Config for the audit log reporter.
+[[reporter.audit-log]]
+name = "audit_log"
+
+# Config for the SMTP reporter.
+# This reporter sends an email to the recipients when the trigger policy is met.
+[[reporter.smtp]]
+name = "smtp"
+host = "smtp.example.com"
+port = 587
+username = "user@example.com"
+password = "some_password"
+sender = "user@example.com"
+recipients = ["user@example.com", "user2@example.com"]
+use-tls = true
+trigger-policy = "ERROR"
+
+
+# The list of actions to be monitored by the audit log reporter.
+[[reporter.action-monitors]]
+subscribed-actions = [
+    "session:create_from_params",
+    "session:create_from_template",
+    "session:create_cluster",
+    "session:commit",
+    "session:convert_to_image",
+    "session:destroy",
+    "session:destroy_multi",
+    "container_registry:rescan"
+]
+reporter = "audit_log"
+
+
+# The list of actions to be monitored by the SMTP reporter.
+[[reporter.action-monitors]]
+subscribed-actions = [
+    "session:create_from_params",
+    "session:create_from_template",
+    "session:create_cluster",
+    "session:commit",
+    "session:convert_to_image",
+    "session:destroy",
+    "session:destroy_multi",
+    "container_registry:rescan"
+]
+reporter = "smtp"
+
+
 [debug]
 enabled = false
 

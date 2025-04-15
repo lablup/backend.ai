@@ -14,6 +14,7 @@ class StartedActionMessage:
     action_id: uuid.UUID
     action_type: str
     entity_id: Optional[str | uuid.UUID]
+    request_id: Optional[str]
     entity_type: str
     operation_type: str
     created_at: datetime
@@ -26,6 +27,7 @@ class FinishedActionMessage:
     action_id: uuid.UUID
     action_type: str
     entity_id: Optional[str | uuid.UUID]  # TODO: Make this required?
+    request_id: Optional[str]
     entity_type: str
     operation_type: str
     status: OperationStatus

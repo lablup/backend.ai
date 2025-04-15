@@ -405,32 +405,32 @@ type AuditLogNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """UUID of the audit log row"""
+  """UUID of the AuditLog row"""
   row_id: UUID!
 
   """Added in 25.6.0. UUID of the action"""
   action_id: UUID!
 
-  """Entity ID of the AuditLog"""
+  """Entity type of the AuditLog"""
   entity_type: String!
 
-  """Entity type of the AuditLog"""
+  """Operation type of the AuditLog"""
   operation: String!
 
-  """Operation type of the AuditLog"""
-  entity_id: String!
+  """Entity ID of the AuditLog"""
+  entity_id: String
 
   """The time the AuditLog was reported"""
   created_at: DateTime!
 
-  """RequestID of the AuditLog"""
-  request_id: UUID!
+  """Request ID of the AuditLog"""
+  request_id: String
 
   """Description of the AuditLog"""
   description: String!
 
   """Duration taken to perform the operation"""
-  duration: String!
+  duration: String
 
   """Status of the AuditLog"""
   status: String!
