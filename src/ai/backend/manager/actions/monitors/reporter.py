@@ -29,7 +29,7 @@ class ReporterMonitor(ActionMonitor):
         message = FinishedActionMessage(
             action_id=result.meta.action_id,
             action_type=action.type(),
-            entity_id=action.entity_id(),
+            entity_id=action.entity_id() or result.result.entity_id(),
             entity_type=action.entity_type(),
             operation_type=action.operation_type(),
             status=result.meta.status,

@@ -71,7 +71,7 @@ class SMTPSender:
                 message, sender=self._config.sender, recipients=self._config.recipients
             )
         except Exception as e:
-            print(f"Failed to send email: {e}")
+            log.error(f"Failed to send email: {e}")
 
 
 class SMTPReporter(AbstractReporter):
