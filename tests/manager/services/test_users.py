@@ -9,7 +9,9 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey, RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.models.group import AssocGroupUserRow
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -121,12 +123,11 @@ def create_user(
     return _create_user
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "test_scenario",
     [
         TestScenario.success(
-            "Create user with valid data",
+            "With valid data, create user action will be successful",
             CreateUserAction(
                 input=UserCreator(
                     username="testuser",
@@ -179,7 +180,7 @@ def create_user(
             ),
         ),
         TestScenario.success(
-            "Try to create user with non exsiting domain",
+            "With non-existing domain name, create user action will return result with None data",
             CreateUserAction(
                 input=UserCreator(
                     username="test_user_not_existing_domain",
@@ -216,78 +217,161 @@ async def test_create_user(
     await test_scenario.test(processors.create_user.wait_for_complete)
 
 
-@pytest.mark.asyncio
+async def test_create_default_keypair_after_create_user(
+    processors: UserProcessors,
+    database_engine: ExtendedAsyncSAEngine,
+    create_user,
+) -> None:
+    user_email = "test-keypair-create-user@email.com"
+    async with create_user(email=user_email, name="test-user", domain_name="default") as user_id:
+        async with database_engine.begin_session() as session:
+            keypair = await session.scalar(
+                sa.select(KeyPairRow).where((KeyPairRow.user == user_id))
+            )
+
+            assert keypair is not None
+            assert keypair.is_active is True
+            assert keypair.resource_policy == DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+            assert keypair.rate_limit == DEFAULT_KEYPAIR_RATE_LIMIT
+
+            user_main_access_key = await session.scalar(
+                sa.select(UserRow.main_access_key).where(UserRow.uuid == user_id)
+            )
+
+            assert user_main_access_key == keypair.access_key
+
+
+async def test_create_user_join_model_store_project(
+    processors: UserProcessors,
+    database_engine: ExtendedAsyncSAEngine,
+    create_user,
+) -> None:
+    user_email = "test-join-model-store@email.com"
+    async with create_user(email=user_email, name="test-user", domain_name="default") as user_id:
+        async with database_engine.begin_session() as session:
+            user_group_assoc = await session.scalar(
+                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_id)
+            )
+
+            assert user_group_assoc is not None
+            assert user_group_assoc.group_id == uuid.UUID(
+                "8e32dd28-d319-4e3b-8851-ea37837699a5"
+            )  # fixture injected in root conftest
+
+
 async def test_modify_user(
     processors: UserProcessors,
     database_engine: ExtendedAsyncSAEngine,
+    create_user,
 ) -> None:
-    create_user_action = CreateUserAction(
-        input=UserCreator(
-            username="modify-user",
-            password="password123",
-            email="modify-user@test.com",
-            need_password_change=False,
-            full_name="Modify User",
-            domain_name="default",
-            role=UserRole.USER,
-            resource_policy="default",
-            status=UserStatus.ACTIVE,
-            description="Test user description",
-            is_active=True,
-            allowed_client_ip=None,
-            totp_activated=False,
-            sudo_session_enabled=False,
-            group_ids=None,
-            container_uid=None,
-            container_main_gid=None,
-            container_gids=None,
-        ),
-    )
-    create_result = await processors.create_user.wait_for_complete(create_user_action)
-    user_data = create_result.data
-    assert user_data is not None
-    user_id = user_data.id
-
-    async with database_engine.begin() as conn:
-        keypair_result = await conn.scalar(
-            sa.select([
-                keypairs.c.user,
-                keypairs.c.is_active,
-                keypairs.c.is_admin,
-                keypairs.c.access_key,
-            ])
-            .select_from(keypairs)
-            .where(keypairs.c.user == user_id)
-            .order_by(sa.desc(keypairs.c.is_admin))
-            .order_by(sa.desc(keypairs.c.is_active)),
+    user_email = "modify-user@test.com"
+    async with create_user(
+        email=user_email,
+        name="test",
+        domain_name="default",
+        role=UserRole.USER,
+        full_name="Modify User",
+        password="password123",
+    ) as _:
+        action = ModifyUserAction(
+            email=user_email,
+            modifier=UserModifier(
+                username=OptionalState.update("modify_user"),
+                full_name=OptionalState.update("Modified User"),
+                totp_activated=OptionalState.update(True),
+                status=OptionalState.update(UserStatus.INACTIVE),
+            ),
         )
-        assert keypair_result is not None
 
-    action = ModifyUserAction(
-        email="modify-user@test.com",
-        modifier=UserModifier(
-            username=OptionalState.update("modify_user"),
-            domain_name=OptionalState.update("default"),
-            full_name=OptionalState.update("Modified User"),
-            totp_activated=OptionalState.update(True),
-            role=OptionalState.update(UserRole.ADMIN),
-        ),
-    )
+        result = await processors.modify_user.wait_for_complete(action)
 
-    result = await processors.modify_user.wait_for_complete(action)
+        assert result.success is True
+        assert result.data is not None
 
-    assert result.success is True
-    assert result.data is not None
+        # Check if the user data is modified correctly
+        assert result.data.full_name == "Modified User"
+        assert result.data.totp_activated is True
+        assert result.data.status == UserStatus.INACTIVE
 
-    # Check if the user data is modified correctly
-    assert result.data.full_name == "Modified User"
-    assert result.data.totp_activated is True
-    assert result.data.role == UserRole.ADMIN
+        # Check if data not modified
+        assert result.data.role == UserRole.USER
+        assert result.data.status_info == "admin-requested"
+        assert result.data.modified_at is not None
+        assert result.data.resource_policy == "default"
 
-    # Check if data not modified
-    assert result.data.status_info == "admin-requested"
-    assert result.data.modified_at is not None
-    assert result.data.resource_policy == "default"
+
+async def test_modify_user_role_to_admin(
+    processors: UserProcessors,
+    database_engine: ExtendedAsyncSAEngine,
+    create_user,
+) -> None:
+    user_email = "modify-user-role@test.com"
+    async with create_user(
+        email=user_email,
+        name="test",
+        domain_name="default",
+        role=UserRole.USER,
+    ) as user_id:
+        action = ModifyUserAction(
+            email=user_email,
+            modifier=UserModifier(
+                role=OptionalState.update(UserRole.ADMIN),
+            ),
+        )
+        result = await processors.modify_user.wait_for_complete(action)
+
+        assert result.success is True
+        assert result.data is not None
+
+        # Check if the user data is modified correctly
+        assert result.data.role == UserRole.ADMIN
+
+        # Check if keypair updated as active admin
+        async with database_engine.begin_session() as session:
+            keypair = await session.scalar(
+                sa.select(KeyPairRow).where((KeyPairRow.user == user_id))
+            )
+
+            assert keypair is not None
+            assert keypair.is_active is True
+            assert keypair.is_admin is True
+
+
+async def test_modify_admin_user_to_normal_user(
+    processors: UserProcessors,
+    database_engine: ExtendedAsyncSAEngine,
+    create_user,
+) -> None:
+    user_email = "modify-user-role@test.com"
+    async with create_user(
+        email=user_email,
+        name="test",
+        domain_name="default",
+        role=UserRole.SUPERADMIN,
+    ) as user_id:
+        action = ModifyUserAction(
+            email=user_email,
+            modifier=UserModifier(
+                role=OptionalState.update(UserRole.USER),
+            ),
+        )
+        result = await processors.modify_user.wait_for_complete(action)
+
+        assert result.success is True
+        assert result.data is not None
+
+        # Check if the user data is modified correctly
+        assert result.data.role == UserRole.USER
+
+        # Check if keypair updated as active but not admin
+        async with database_engine.begin_session() as session:
+            keypair = await session.scalar(
+                sa.select(KeyPairRow).where((KeyPairRow.user == user_id))
+            )
+
+            assert keypair is not None
+            assert keypair.is_active is True
+            assert keypair.is_admin is False
 
 
 @pytest.mark.asyncio
@@ -302,21 +386,21 @@ async def test_delete_user_success(
         result = await processors.delete_user.wait_for_complete(delete_action)
         assert result.success is True
 
-        # Check if the user is deleted
-        async with database_engine.begin() as conn:
-            result = await conn.scalar(
-                sa.select(keypairs.c.is_active).where(keypairs.c.user_id == delete_user_email)
+        # Check if the user and user keypair both deleted
+        async with database_engine.begin_session() as session:
+            result = await session.scalar(
+                sa.select(KeyPairRow.is_active).where(KeyPairRow.user_id == delete_user_email)
             )
-            assert result == False  # noqa
+            assert result is False
 
-            result = await conn.scalar(
+            result = await session.scalar(
                 sa.select(UserRow).where(
                     (UserRow.uuid == user_id) & (UserRow.status == UserStatus.ACTIVE)
                 )
             )
             assert result is None
 
-            result = await conn.scalar(
+            result = await session.scalar(
                 sa.select(UserRow).where(
                     (UserRow.uuid == user_id) & (UserRow.status == UserStatus.DELETED)
                 )
@@ -368,7 +452,7 @@ async def test_purge_user(
     "test_scenario",
     [
         TestScenario.failure(
-            "test purge user with non-existing email",
+            "With non-existing email, purge user action will raise error",
             PurgeUserAction(
                 email="non-exisiting-user@email.com",
                 user_info_ctx=UserInfoContext(
