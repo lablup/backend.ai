@@ -1,5 +1,6 @@
 from typing import override
 
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActionMessage
@@ -19,6 +20,7 @@ class ReporterMonitor(ActionMonitor):
             action_type=action.type(),
             entity_id=action.entity_id(),
             entity_type=action.entity_type(),
+            request_id=current_request_id(),
             operation_type=action.operation_type(),
             created_at=meta.started_at,
         )
@@ -26,10 +28,15 @@ class ReporterMonitor(ActionMonitor):
 
     @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
+        entity_id = action.entity_id()
+        if not entity_id:
+            entity_id = result.result.entity_id() if result.result else None
+
         message = FinishedActionMessage(
             action_id=result.meta.action_id,
             action_type=action.type(),
-            entity_id=action.entity_id() or result.result.entity_id(),
+            entity_id=entity_id,
+            request_id=current_request_id(),
             entity_type=action.entity_type(),
             operation_type=action.operation_type(),
             status=result.meta.status,
