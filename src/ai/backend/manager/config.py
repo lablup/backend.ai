@@ -355,7 +355,7 @@ manager_local_config_iv = (
             ),
             t.Key("action-monitors", default=[]): t.List(
                 t.Dict({
-                    t.Key("action-types"): t.List(t.String),
+                    t.Key("subscribed-actions"): t.List(t.String),
                     t.Key("reporter"): t.String,
                 }).allow_extra("*")
             ),

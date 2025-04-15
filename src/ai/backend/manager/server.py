@@ -473,7 +473,7 @@ def _make_action_reporters(
     for action_monitor_conf in action_monitor_configs:
         reporter_name: str = action_monitor_conf["reporter"]
         reporter = reporters[reporter_name]
-        action_types: list[str] = action_monitor_conf["action-types"]
+        action_types: list[str] = action_monitor_conf["subscribed-actions"]
         for action_type in action_types:
             monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
             monitors.append(reporter)
@@ -492,7 +492,6 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         )
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
-
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
