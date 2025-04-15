@@ -60,7 +60,7 @@ class AuditLogNode(graphene.ObjectType):
     operation = graphene.String(required=True, description="Entity type of the AuditLog")
     entity_id = graphene.String(required=True, description="Operation type of the AuditLog")
     created_at = graphene.DateTime(required=True, description="The time the AuditLog was reported")
-    request_id = graphene.UUID(required=True, description="RequestID of the AuditLog")
+    request_id = graphene.String(required=True, description="Request ID of the AuditLog")
     description = graphene.String(required=True, description="Description of the AuditLog")
     duration = graphene.String(required=True, description="Duration taken to perform the operation")
     status = graphene.String(required=True, description="Status of the AuditLog")

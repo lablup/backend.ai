@@ -1,6 +1,5 @@
 import logging
-import uuid
-from typing import Final, override
+from typing import override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.audit_log import AuditLogRow
@@ -10,10 +9,6 @@ from ai.backend.manager.reporters.base import (
     FinishedActionMessage,
     StartedActionMessage,
 )
-
-NULL_UUID: Final[uuid.UUID] = uuid.UUID("00000000-0000-0000-0000-000000000000")
-UNKNOWN_ENTITY_ID: Final[str] = "(unknown)"
-
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -31,8 +26,8 @@ class AuditLogReporter(AbstractReporter):
                 entity_type=action_message.entity_type,
                 operation=action_message.operation_type,
                 created_at=action_message.created_at,
-                entity_id=action_message.entity_id or UNKNOWN_ENTITY_ID,
-                request_id=action_message.request_id or NULL_UUID,
+                entity_id=action_message.entity_id,
+                request_id=action_message.request_id,
                 description=action_message.description,
                 status=action_message.status,
                 duration=action_message.duration,
