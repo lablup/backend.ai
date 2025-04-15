@@ -34,7 +34,7 @@ class AuditLogReporter(AbstractReporter):
                 operation=action_message.operation_type,
                 created_at=action_message.created_at,
                 entity_id=action_message.entity_id or UNKNOWN_ENTITY_ID,
-                request_id=action_message.request_id,
+                request_id=action_message.request_id or NULL_UUID,
                 description="Task is running...",
                 status=OperationStatus.RUNNING,
             )
