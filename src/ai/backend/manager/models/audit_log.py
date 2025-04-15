@@ -83,12 +83,12 @@ class AuditLogRow(Base):
         self,
         entity_type: str,
         operation: str,
-        entity_id: str | uuid.UUID,
         action_id: uuid.UUID,
-        request_id: str,
         description: str,
         created_at: datetime,
         status: OperationStatus,
+        entity_id: Optional[str | uuid.UUID] = None,
+        request_id: Optional[str] = None,
         duration: Optional[timedelta] = None,
     ):
         self.entity_type = entity_type
