@@ -106,7 +106,7 @@ class ImageService:
                 ],
             )
             if action.client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(action.user_id):
+                if not image_row.is_owned_by(action.user_id):
                     raise ForgetImageActionGenericForbiddenError()
             await image_row.mark_as_deleted(session)
         return ForgetImageActionResult(image=image_row.to_dataclass())
@@ -119,7 +119,7 @@ class ImageService:
             if not image_row:
                 raise ForgetImageActionByIdObjectNotFoundError()
             if action.client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(action.user_id):
+                if not image_row.is_owned_by(action.user_id):
                     raise ForgetImageActionByIdGenericForbiddenError()
             await image_row.mark_as_deleted(session)
         return ForgetImageByIdActionResult(image=image_row.to_dataclass())
@@ -194,7 +194,7 @@ class ImageService:
             if not image_row:
                 raise PurgeImageActionByIdObjectNotFoundError()
             if action.client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(action.user_id):
+                if not image_row.is_owned_by(action.user_id):
                     raise PurgeImageActionByIdGenericForbiddenError()
             try:
                 await db_session.delete(image_row)
@@ -210,7 +210,7 @@ class ImageService:
             if not image_row:
                 raise ImageNotFound
             if action.client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(action.user_id):
+                if not image_row.is_owned_by(action.user_id):
                     raise UntagImageFromRegistryActionGenericForbiddenError()
 
             query = sa.select(ContainerRegistryRow).where(
