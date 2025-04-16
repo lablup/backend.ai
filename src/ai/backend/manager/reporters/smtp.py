@@ -1,11 +1,10 @@
-import asyncio
 import logging
+import smtplib
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from email.mime.text import MIMEText
 from typing import Final, override
-
-import aiosmtplib
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.audit_log import OperationStatus
@@ -31,33 +30,18 @@ class SMTPSenderArgs:
     sender: str
     recipients: list[str]
     use_tls: bool
+    max_workers: int
 
 
 class SMTPSender:
-    _smtp: aiosmtplib.SMTP
-    _smtp_lock: asyncio.Lock
-    _config: SMTPSenderArgs
-
     def __init__(self, args: SMTPSenderArgs) -> None:
         self._config = args
-        self._smtp = aiosmtplib.SMTP(hostname=args.host, port=args.port, use_tls=args.use_tls)
-        self._smtp_lock = asyncio.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
 
-    async def _connect_smtp(self) -> None:
-        async with self._smtp_lock:
-            try:
-                if not self._smtp.is_connected:
-                    await self._smtp.connect()
-                    await self._smtp.login(self._config.username, self._config.password)
-            except Exception as e:
-                log.warning(f"Failed to connect to SMTP server: {e}. Retrying...")
-                self._smtp = aiosmtplib.SMTP(
-                    hostname=self._config.host, port=self._config.port, use_tls=self._config.use_tls
-                )
-                await self._smtp.connect()
-                await self._smtp.login(self._config.username, self._config.password)
+    def send_email(self, subject: str, email_body: str) -> None:
+        self._executor.submit(self._send_email, subject, email_body)
 
-    async def send_email(self, subject: str, email_body: str) -> None:
+    def _send_email(self, subject: str, email_body: str) -> None:
         email_body += "\nThis email is sent from Backend.AI SMTP Reporter"
 
         message = MIMEText(email_body, "plain", "utf-8")
@@ -66,10 +50,15 @@ class SMTPSender:
         message["To"] = ",".join(self._config.recipients)
 
         try:
-            await self._connect_smtp()
-            await self._smtp.send_message(
-                message, sender=self._config.sender, recipients=self._config.recipients
-            )
+            with smtplib.SMTP(self._config.host, self._config.port) as server:
+                if self._config.use_tls:
+                    server.starttls()
+                server.login(self._config.username, self._config.password)
+                server.send_message(
+                    message,
+                    from_addr=self._config.sender,
+                    to_addrs=self._config.recipients,
+                )
         except Exception as e:
             log.error(f"Failed to send email: {e}")
 
@@ -97,7 +86,7 @@ class SMTPReporter(AbstractReporter):
             f"Description: Task is running...\n"
             f"Started at: {datetime.now()}\n"
         )
-        asyncio.create_task(self._smtp_sender.send_email(subject, body))
+        self._smtp_sender.send_email(subject, body)
 
     @override
     async def report_finished(self, message: FinishedActionMessage) -> None:
@@ -114,7 +103,7 @@ class SMTPReporter(AbstractReporter):
                     f"Ended at: {message.ended_at}\n"
                     f"Duration: {message.duration} seconds\n"
                 )
-                await self._smtp_sender.send_email(subject, body)
+                self._smtp_sender.send_email(subject, body)
                 return
 
         subject = self._make_subject(message.action_type)
@@ -128,4 +117,4 @@ class SMTPReporter(AbstractReporter):
             f"Ended at: {message.ended_at}\n"
             f"Duration: {message.duration} seconds\n"
         )
-        await self._smtp_sender.send_email(subject, body)
+        self._smtp_sender.send_email(subject, body)
