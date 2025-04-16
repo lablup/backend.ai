@@ -305,7 +305,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         tag: str,
     ) -> None:
         async with concurrency_sema.get():
-            rqst_args = {**copy.deepcopy(rqst_args)}
+            rqst_args = copy.deepcopy(rqst_args)
             rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST_LIST
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
@@ -360,7 +360,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         sess: aiohttp.ClientSession,
         manifest_list: Sequence[Any],
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
     ) -> None:
@@ -402,7 +402,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         sess: aiohttp.ClientSession,
         manifest: Mapping[str, Any],
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
     ) -> dict[str, Any]:
         """
@@ -437,7 +437,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
@@ -447,7 +447,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             for item in image_info["manifests"]
             if "annotations" not in item  # skip attestation manifests
         ]
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
 
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
@@ -456,12 +456,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers", {})
         rqst_args["headers"].update({
             "Accept": self.MEDIA_TYPE_OCI_MANIFEST,
@@ -519,13 +519,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         manifest_list = image_info["manifests"]
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
         await self._read_manifest_list(
@@ -540,13 +540,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         config_digest = image_info["config"]["digest"]
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
         async with sess.get(
@@ -568,7 +568,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
@@ -587,7 +587,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             }
         ]
 
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
 

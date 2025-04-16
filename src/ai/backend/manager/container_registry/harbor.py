@@ -369,12 +369,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_INDEX})
 
@@ -406,12 +406,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_MANIFEST})
 
@@ -474,12 +474,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_DOCKER_MANIFEST_LIST})
 
@@ -511,12 +511,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**copy.deepcopy(rqst_args)}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_DOCKER_MANIFEST})
 
@@ -534,7 +534,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_per_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         *,
         digest: str,
@@ -591,12 +591,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_single_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
     ) -> None:
         """
-        Scan 'image:tag' which has been pusehd as a single architecture tag.
+        Scan 'image:tag' which has been pushed as a single architecture tag.
         In this case, Harbor does not provide explicit methods to determine the architecture.
         We infer the architecture from the tag naming patterns ("-arm64" for instance).
         """
