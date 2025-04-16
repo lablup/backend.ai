@@ -105,7 +105,7 @@ async def create_group(
     "test_scenario",
     [
         TestScenario.success(
-            "Create a group",
+            "When trigger create group action with valid data, group creation should be successful",
             CreateGroupAction(
                 input=GroupCreator(
                     name="test_create_group",
@@ -140,7 +140,7 @@ async def create_group(
         # TODO: If business logic is implemented to raise exception instead of returning None
         # we need to update TestScenario.failure
         TestScenario.success(
-            "Create a group with duplicated name",
+            "With duplicated name, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
                     name="default",
@@ -157,7 +157,7 @@ async def create_group(
             ),
         ),
         TestScenario.success(
-            "Create a group without resource policy",
+            "When trigger create group action with invalid resource policy, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
                     name="test_create_group_without_resource_policy",
@@ -204,7 +204,7 @@ async def test_modify_group(
         assert group_data is not None
         assert group_data.name == "modified_name"
         assert group_data.description == "modified description"
-        assert group_data.is_active == False  # noqa: E712
+        assert group_data.is_active is False
 
 
 async def test_modify_group_with_invalid_group_id(
@@ -220,7 +220,7 @@ async def test_modify_group_with_invalid_group_id(
     )
     result: ModifyGroupActionResult = await processors.modify_group.wait_for_complete(action)
     assert result.data is None
-    assert result.success == False  # noqa
+    assert result.success is False
 
 
 @pytest.mark.asyncio
@@ -234,11 +234,11 @@ async def test_delete_group(
         action = DeleteGroupAction(group_id=group_id)
         result: DeleteGroupActionResult = await processors.delete_group.wait_for_complete(action)
         assert result.data is None
-        assert result.success == True  # noqa: E712
+        assert result.success is True
 
 
 @pytest.mark.asyncio
-async def test_delete_group_in_db(
+async def test_delete_group_action_db_affect(
     processors: GroupProcessors,
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
@@ -251,7 +251,7 @@ async def test_delete_group_in_db(
             group = await session.scalar(sa.select(GroupRow).where(GroupRow.id == group_id))
 
             assert group is not None
-            assert group.is_active == False  # noqa: E712
+            assert group.is_active is False
             assert group.integration_id is None
 
 
@@ -273,7 +273,7 @@ async def test_purge_group(
 
 
 @pytest.mark.asyncio
-async def test_purge_group_in_db(
+async def test_purge_group_action_result_in_db(
     processors: GroupProcessors,
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
