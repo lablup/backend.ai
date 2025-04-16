@@ -2300,7 +2300,6 @@ LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
     VFolderPermission.READ_WRITE: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,
         VFolderRBACPermission.UPDATE_ATTRIBUTE,
-        VFolderRBACPermission.DELETE_VFOLDER,
         VFolderRBACPermission.READ_CONTENT,
         VFolderRBACPermission.WRITE_CONTENT,
         VFolderRBACPermission.DELETE_CONTENT,
@@ -2310,7 +2309,6 @@ LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
     VFolderPermission.RW_DELETE: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,
         VFolderRBACPermission.UPDATE_ATTRIBUTE,
-        VFolderRBACPermission.DELETE_VFOLDER,
         VFolderRBACPermission.READ_CONTENT,
         VFolderRBACPermission.WRITE_CONTENT,
         VFolderRBACPermission.DELETE_CONTENT,
