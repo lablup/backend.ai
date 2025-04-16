@@ -121,6 +121,14 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
+from ..services.vfolder.exceptions import (
+    InvalidParameter,
+    VFolderAlreadyExists,
+    VFolderServiceException,
+)
+from ..services.vfolder.exceptions import (
+    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
+)
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -419,22 +427,27 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     folder_host = params.folder_host
     unmanaged_path = params.unmanaged_path
 
-    result = await root_ctx.processors.vfolder.create_vfolder.wait_for_complete(
-        CreateVFolderAction(
-            name=params.name,
-            keypair_resource_policy=keypair_resource_policy,
-            domain_name=domain_name,
-            group_id_or_name=group_id_or_name,
-            folder_host=folder_host,
-            unmanaged_path=unmanaged_path,
-            mount_permission=params.permission,
-            usage_mode=params.usage_mode,
-            cloneable=params.cloneable,
-            user_uuid=user_uuid,
-            user_role=user_role,
-            creator_email=request["user"]["email"],
+    try:
+        result = await root_ctx.processors.vfolder.create_vfolder.wait_for_complete(
+            CreateVFolderAction(
+                name=params.name,
+                keypair_resource_policy=keypair_resource_policy,
+                domain_name=domain_name,
+                group_id_or_name=group_id_or_name,
+                folder_host=folder_host,
+                unmanaged_path=unmanaged_path,
+                mount_permission=params.permission,
+                usage_mode=params.usage_mode,
+                cloneable=params.cloneable,
+                user_uuid=user_uuid,
+                user_role=user_role,
+                creator_email=request["user"]["email"],
+            )
         )
-    )
+    except (InvalidParameter, VFolderAlreadyExists) as e:
+        raise InvalidAPIParameters(str(e))
+    except VFolderServiceException as e:
+        raise InternalServerError(str(e))
     resp = {
         "id": result.id.hex,
         "name": result.name,
@@ -1712,13 +1725,18 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         request["keypair"]["access_key"],
         folder_id,
     )
-    await root_ctx.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
-        MoveToTrashVFolderAction(
-            user_uuid=user_uuid,
-            keypair_resource_policy=resource_policy,
-            vfolder_uuid=folder_id,
+    try:
+        await root_ctx.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
+            MoveToTrashVFolderAction(
+                user_uuid=user_uuid,
+                keypair_resource_policy=resource_policy,
+                vfolder_uuid=folder_id,
+            )
         )
-    )
+    except InvalidParameter as e:
+        raise InvalidAPIParameters(str(e))
+    except VFolderMountedOnModelService:
+        raise ModelServiceDependencyNotCleared()
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -1821,12 +1839,17 @@ async def delete_from_trash_bin(
         request["keypair"]["access_key"],
         folder_id,
     )
-    await root_ctx.processors.vfolder.delete_forever_vfolder.wait_for_complete(
-        DeleteForeverVFolderAction(
-            user_uuid=user_uuid,
-            vfolder_uuid=folder_id,
+    try:
+        await root_ctx.processors.vfolder.delete_forever_vfolder.wait_for_complete(
+            DeleteForeverVFolderAction(
+                user_uuid=user_uuid,
+                vfolder_uuid=folder_id,
+            )
         )
-    )
+    except InvalidParameter as e:
+        raise InvalidAPIParameters(str(e))
+    except TooManyVFoldersFound:
+        raise InternalServerError("Too many vfolders found")
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 

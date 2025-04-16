@@ -6,11 +6,11 @@ class VFolderNotFound(VFolderServiceException):
     pass
 
 
-class VFolderAlreadyExists(VFolderServiceException):
+class VFolderCreationFailure(VFolderServiceException):
     pass
 
 
-class VFolderCreationFailure(VFolderServiceException):
+class VFolderAlreadyExists(VFolderServiceException):
     pass
 
 
@@ -18,7 +18,11 @@ class InvalidParameter(VFolderServiceException):
     pass
 
 
-class Forbidden(VFolderServiceException):
+class InsufficientPrivilege(VFolderServiceException):
+    pass
+
+
+class Forbidden(InvalidParameter):
     pass
 
 
@@ -31,10 +35,6 @@ class ProjectNotFound(VFolderServiceException):
 
 
 class InternalServerError(VFolderServiceException):
-    pass
-
-
-class InsufficientPrivilege(VFolderServiceException):
     pass
 
 
