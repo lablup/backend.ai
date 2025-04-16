@@ -238,7 +238,7 @@ async def test_delete_group(
 
 
 @pytest.mark.asyncio
-async def test_delete_group_action_db_affect(
+async def test_delete_group_action_effect_in_db(
     processors: GroupProcessors,
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
@@ -269,11 +269,11 @@ async def test_purge_group(
             PurgeGroupAction(group_id)
         )
         assert result.data is None
-        assert result.success == True  # noqa: E712
+        assert result.success is True
 
 
 @pytest.mark.asyncio
-async def test_purge_group_action_result_in_db(
+async def test_purge_group_action_effect_in_db(
     processors: GroupProcessors,
     database_engine: ExtendedAsyncSAEngine,
 ) -> None:
