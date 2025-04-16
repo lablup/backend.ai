@@ -798,7 +798,8 @@ class ImageRow(Base):
         self._resources = resources
 
     def is_owned_by(self, user_id: UUID) -> bool:
-        return self.customized and self.labels["ai.backend.customized-image.owner"] == str(user_id)
+        owner_label = self.labels["ai.backend.customized-image.owner"]
+        return self.customized and owner_label.split(":")[1] == str(user_id)
 
     def to_dataclass(self) -> ImageData:
         from ai.backend.manager.data.image.types import ImageData
