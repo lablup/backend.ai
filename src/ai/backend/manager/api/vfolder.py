@@ -126,6 +126,9 @@ from ..services.vfolder.exceptions import (
     VFolderAlreadyExists,
     VFolderServiceException,
 )
+from ..services.vfolder.exceptions import (
+    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
+)
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -1722,13 +1725,18 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         request["keypair"]["access_key"],
         folder_id,
     )
-    await root_ctx.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
-        MoveToTrashVFolderAction(
-            user_uuid=user_uuid,
-            keypair_resource_policy=resource_policy,
-            vfolder_uuid=folder_id,
+    try:
+        await root_ctx.processors.vfolder.move_to_trash_vfolder.wait_for_complete(
+            MoveToTrashVFolderAction(
+                user_uuid=user_uuid,
+                keypair_resource_policy=resource_policy,
+                vfolder_uuid=folder_id,
+            )
         )
-    )
+    except InvalidParameter as e:
+        raise InvalidAPIParameters(str(e))
+    except VFolderMountedOnModelService:
+        raise ModelServiceDependencyNotCleared()
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -1831,12 +1839,17 @@ async def delete_from_trash_bin(
         request["keypair"]["access_key"],
         folder_id,
     )
-    await root_ctx.processors.vfolder.delete_forever_vfolder.wait_for_complete(
-        DeleteForeverVFolderAction(
-            user_uuid=user_uuid,
-            vfolder_uuid=folder_id,
+    try:
+        await root_ctx.processors.vfolder.delete_forever_vfolder.wait_for_complete(
+            DeleteForeverVFolderAction(
+                user_uuid=user_uuid,
+                vfolder_uuid=folder_id,
+            )
         )
-    )
+    except InvalidParameter as e:
+        raise InvalidAPIParameters(str(e))
+    except TooManyVFoldersFound:
+        raise InternalServerError("Too many vfolders found")
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
