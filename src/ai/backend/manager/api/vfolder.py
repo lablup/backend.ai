@@ -121,7 +121,11 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
-from ..services.vfolder.exceptions import InvalidParameter, VFolderServiceException
+from ..services.vfolder.exceptions import (
+    InvalidParameter,
+    VFolderAlreadyExists,
+    VFolderServiceException,
+)
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -437,7 +441,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 creator_email=request["user"]["email"],
             )
         )
-    except InvalidParameter as e:
+    except (InvalidParameter, VFolderAlreadyExists) as e:
         raise InvalidAPIParameters(str(e))
     except VFolderServiceException as e:
         raise InternalServerError(str(e))

@@ -10,11 +10,11 @@ class VFolderCreationFailure(VFolderServiceException):
     pass
 
 
-class InvalidParameter(VFolderServiceException):
+class VFolderAlreadyExists(VFolderServiceException):
     pass
 
 
-class VFolderAlreadyExists(InvalidParameter):
+class InvalidParameter(VFolderServiceException):
     pass
 
 
