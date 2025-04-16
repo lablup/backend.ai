@@ -121,6 +121,7 @@ from ..services.vfolder.actions.invite import (
     RejectInvitationAction,
     UpdateInvitationAction,
 )
+from ..services.vfolder.exceptions import InvalidParameter, VFolderServiceException
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
@@ -419,22 +420,27 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     folder_host = params.folder_host
     unmanaged_path = params.unmanaged_path
 
-    result = await root_ctx.processors.vfolder.create_vfolder.wait_for_complete(
-        CreateVFolderAction(
-            name=params.name,
-            keypair_resource_policy=keypair_resource_policy,
-            domain_name=domain_name,
-            group_id_or_name=group_id_or_name,
-            folder_host=folder_host,
-            unmanaged_path=unmanaged_path,
-            mount_permission=params.permission,
-            usage_mode=params.usage_mode,
-            cloneable=params.cloneable,
-            user_uuid=user_uuid,
-            user_role=user_role,
-            creator_email=request["user"]["email"],
+    try:
+        result = await root_ctx.processors.vfolder.create_vfolder.wait_for_complete(
+            CreateVFolderAction(
+                name=params.name,
+                keypair_resource_policy=keypair_resource_policy,
+                domain_name=domain_name,
+                group_id_or_name=group_id_or_name,
+                folder_host=folder_host,
+                unmanaged_path=unmanaged_path,
+                mount_permission=params.permission,
+                usage_mode=params.usage_mode,
+                cloneable=params.cloneable,
+                user_uuid=user_uuid,
+                user_role=user_role,
+                creator_email=request["user"]["email"],
+            )
         )
-    )
+    except InvalidParameter as e:
+        raise InvalidAPIParameters(str(e))
+    except VFolderServiceException as e:
+        raise InternalServerError(str(e))
     resp = {
         "id": result.id.hex,
         "name": result.name,

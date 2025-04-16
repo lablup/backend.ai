@@ -315,7 +315,9 @@ class VFolderService:
                 extra_vf_conds=(sa.and_(*extra_vf_conds)),
             )
             if len(entries) > 0:
-                raise VFolderAlreadyExists(action.name)
+                raise VFolderAlreadyExists(
+                    f"VFolder with the given name already exists. ({action.name})"
+                )
             try:
                 folder_id = uuid.uuid4()
                 vfid = VFolderID(quota_scope_id, folder_id)
