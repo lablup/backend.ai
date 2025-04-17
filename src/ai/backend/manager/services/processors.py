@@ -25,8 +25,14 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
-from ai.backend.manager.services.model_service.processors import ModelServiceProcessors
-from ai.backend.manager.services.model_service.service import ModelService
+from ai.backend.manager.services.model_service.processors.auto_scaling import (
+    ModelServiceAutoScalingProcessors,
+)
+from ai.backend.manager.services.model_service.processors.model_service import (
+    ModelServiceProcessors,
+)
+from ai.backend.manager.services.model_service.services.auto_scaling import AutoScalingService
+from ai.backend.manager.services.model_service.services.model_service import ModelService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -79,6 +85,7 @@ class Services:
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
     model_service: ModelService
+    model_service_auto_scaling: AutoScalingService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -122,6 +129,7 @@ class Services:
             storage_manager=args.storage_manager,
             shared_config=args.shared_config,
         )
+        model_service_auto_scaling = AutoScalingService(args.db)
 
         return cls(
             agent=agent_service,
@@ -139,6 +147,7 @@ class Services:
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
             model_service=model_service,
+            model_service_auto_scaling=model_service_auto_scaling,
         )
 
 
@@ -164,6 +173,7 @@ class Processors:
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
     model_service: ModelServiceProcessors
+    model_service_auto_scaling: ModelServiceAutoScalingProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -198,6 +208,9 @@ class Processors:
             services.resource_preset, action_monitors
         )
         model_service_processors = ModelServiceProcessors(services.model_service)
+        model_service_auto_scaling_processors = ModelServiceAutoScalingProcessors(
+            services.model_service_auto_scaling, action_monitors
+        )
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -214,4 +227,5 @@ class Processors:
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
             model_service=model_service_processors,
+            model_service_auto_scaling=model_service_auto_scaling_processors,
         )

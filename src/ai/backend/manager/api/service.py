@@ -767,7 +767,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         to=params.to,
     )
 
-    result = await root_ctx.processors.model_service.scale_service_replicas.wait_for_complete(
+    result = await root_ctx.processors.model_service_auto_scaling.scale_service_replicas.wait_for_complete(
         action
     )
 

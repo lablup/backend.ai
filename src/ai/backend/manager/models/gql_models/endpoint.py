@@ -35,18 +35,12 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.routing import RouteStatus, Routing
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.services.model_service.actions.create_endpoint_auto_scaling_rule import (
+from ai.backend.manager.services.model_service.actions.auto_scale import (
     CreateEndpointAutoScalingRuleAction,
-)
-from ai.backend.manager.services.model_service.actions.delete_enpoint_auto_scaling_rule import (
     DeleteEndpointAutoScalingRuleAction,
-)
-from ai.backend.manager.services.model_service.actions.modify_endpoint_auto_scaling_rule import (
     ModifyEndpointAutoScalingRuleAction,
 )
-from ai.backend.manager.services.model_service.actions.modify_enpoint import (
-    ModifyEndpointAction,
-)
+from ai.backend.manager.services.model_service.actions.base import ModifyEndpointAction
 from ai.backend.manager.services.model_service.types import (
     EndpointAutoScalingRuleCreator,
     EndpointAutoScalingRuleData,
@@ -441,7 +435,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             endpoint_id=uuid.UUID(raw_endpoint_id),
         )
 
-        result = await graph_ctx.processors.model_service.create_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_service_auto_scaling.create_endpoint_auto_scaling_rule.wait_for_complete(
             action
         )
 
@@ -489,7 +483,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
             id=UUID(rule_id),
         )
 
-        result = await graph_ctx.processors.model_service.modify_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_service_auto_scaling.modify_endpoint_auto_scaling_rule.wait_for_complete(
             action
         )
 
@@ -534,7 +528,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
             id=UUID(rule_id),
         )
 
-        result = await graph_ctx.processors.model_service.delete_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_service_auto_scaling.delete_endpoint_auto_scaling_rule.wait_for_complete(
             action
         )
 

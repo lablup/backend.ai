@@ -1,5 +1,4 @@
 import asyncio
-import decimal
 import logging
 import secrets
 import uuid
@@ -27,18 +26,15 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
-    EndpointId,
     ImageAlias,
     MountPermission,
     MountTypes,
-    RuleId,
     RuntimeVariant,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
@@ -55,90 +51,48 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.services.model_service.actions.clear_error import (
+from ai.backend.manager.services.model_service.actions.base import (
     ClearErrorAction,
     ClearErrorActionResult,
-)
-from ai.backend.manager.services.model_service.actions.create_endpoint_auto_scaling_rule import (
-    CreateEndpointAutoScalingRuleAction,
-    CreateEndpointAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.model_service.actions.create_service import (
     CreateModelServiceAction,
     CreateModelServiceActionResult,
-    ServiceInfo,
-)
-from ai.backend.manager.services.model_service.actions.delete_enpoint_auto_scaling_rule import (
-    DeleteEndpointAutoScalingRuleAction,
-    DeleteEndpointAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.model_service.actions.delete_route import (
-    DeleteRouteAction,
-    DeleteRouteActionResult,
-)
-from ai.backend.manager.services.model_service.actions.delete_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
-)
-from ai.backend.manager.services.model_service.actions.force_sync import (
+    DeleteRouteAction,
+    DeleteRouteActionResult,
     ForceSyncAction,
     ForceSyncActionResult,
-)
-from ai.backend.manager.services.model_service.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
-)
-from ai.backend.manager.services.model_service.actions.get_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
-)
-from ai.backend.manager.services.model_service.actions.list_errors import (
     ListErrorsAction,
     ListErrorsActionResult,
-)
-from ai.backend.manager.services.model_service.actions.list_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
-)
-from ai.backend.manager.services.model_service.actions.modify_endpoint_auto_scaling_rule import (
-    ModifyEndpointAutoScalingRuleAction,
-    ModifyEndpointAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.model_service.actions.modify_enpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
-)
-from ai.backend.manager.services.model_service.actions.scale import (
-    ScaleServiceReplicasAction,
-    ScaleServiceReplicasActionResult,
-)
-from ai.backend.manager.services.model_service.actions.start_service import (
     StartModelServiceAction,
     StartModelServiceActionResult,
-)
-from ai.backend.manager.services.model_service.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
 )
 from ai.backend.manager.services.model_service.exceptions import (
-    EndpointAutoScalingRuleNotFound,
     EndpointNotFound,
-    GenericForbidden,
     InvalidAPIParameters,
     ModelServiceNotFound,
     RouteNotFound,
 )
+from ai.backend.manager.services.model_service.services.utils import verify_user_access_scopes
 from ai.backend.manager.services.model_service.types import (
     CompactServiceInfo,
-    EndpointAutoScalingRuleData,
     EndpointData,
     ErrorInfo,
     MutationResult,
-    RequesterCtx,
     RouteInfo,
+    ServiceInfo,
 )
 from ai.backend.manager.types import MountOptionModel, UserScope
-from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user_uuid
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -322,7 +276,7 @@ class ModelService:
                 endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
             except NoResultFound:
                 raise ModelServiceNotFound
-        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
+        await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
         async with self._db.begin_session() as db_sess:
             if len(endpoint.routings) == 0:
@@ -506,7 +460,7 @@ class ModelService:
             except NoResultFound:
                 raise ModelServiceNotFound
 
-        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
+        await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
         return GetModelServiceInfoActionResult(
             ServiceInfo(
@@ -538,7 +492,7 @@ class ModelService:
             except NoResultFound:
                 raise ModelServiceNotFound
 
-        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
+        await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
         error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
 
@@ -558,7 +512,7 @@ class ModelService:
                 endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
             except NoResultFound:
                 raise ModelServiceNotFound
-        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
+        await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
         async with self._db.begin_session() as db_sess:
             query = sa.delete(RoutingRow).where(
@@ -573,51 +527,6 @@ class ModelService:
 
         return ClearErrorActionResult(success=True)
 
-    async def scale_service_replicas(
-        self, action: ScaleServiceReplicasAction
-    ) -> ScaleServiceReplicasActionResult:
-        async with self._db.begin_readonly_session() as db_sess:
-            try:
-                endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
-            except NoResultFound:
-                raise ModelServiceNotFound
-        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
-
-        if action.to < 0:
-            raise InvalidAPIParameters(
-                "Amount of desired session count cannot be a negative number"
-            )
-        elif action.to > action.max_session_count_per_model_session:
-            raise InvalidAPIParameters(
-                f"Cannot spawn more than {action.max_session_count_per_model_session} sessions for a single service"
-            )
-
-        async with self._db.begin_session() as db_sess:
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == action.service_id)
-                .values({"replicas": action.to})
-            )
-            await db_sess.execute(query)
-            return ScaleServiceReplicasActionResult(
-                current_route_count=len(endpoint.routings), target_count=action.to
-            )
-
-    async def force_sync_with_app_proxy(self, action: ForceSyncAction) -> ForceSyncActionResult:
-        async with self._db.begin_readonly_session() as db_sess:
-            try:
-                endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
-            except NoResultFound:
-                raise ModelServiceNotFound
-        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
-
-        async with self._db.begin_session() as db_sess:
-            await self._registry.update_appproxy_endpoint_routes(
-                db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-            )
-
-        return ForceSyncActionResult(success=True)
-
     async def update_route(self, action: UpdateRouteAction) -> UpdateRouteActionResult:
         async with self._db.begin_session() as db_sess:
             try:
@@ -626,8 +535,8 @@ class ModelService:
                 raise RouteNotFound
             if route.endpoint != action.service_id:
                 raise RouteNotFound
-            await self._verify_user_access_scopes(
-                action.requester_ctx, route.endpoint_row.session_owner
+            await verify_user_access_scopes(
+                self._db, action.requester_ctx, route.endpoint_row.session_owner
             )
 
             query = (
@@ -656,8 +565,8 @@ class ModelService:
                 raise RouteNotFound
             if route.endpoint != action.service_id:
                 raise RouteNotFound
-        await self._verify_user_access_scopes(
-            action.requester_ctx, route.endpoint_row.session_owner
+        await verify_user_access_scopes(
+            self._db, action.requester_ctx, route.endpoint_row.session_owner
         )
         if route.status == RouteStatus.PROVISIONING:
             raise InvalidAPIParameters("Cannot remove route in PROVISIONING status")
@@ -695,7 +604,7 @@ class ModelService:
             wsproxy_addr = sgroup["wsproxy_addr"]
             wsproxy_api_token = sgroup["wsproxy_api_token"]
 
-        await self._verify_user_access_scopes(action.requester_ctx, endpoint.session_owner)
+        await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
 
         body = {"user_uuid": str(endpoint.session_owner), "exp": action.expires_at}
         async with aiohttp.ClientSession() as session:
@@ -723,26 +632,20 @@ class ModelService:
 
         return GenerateTokenActionResult(token)
 
-    async def _verify_user_access_scopes(
-        self, requester_ctx: RequesterCtx, owner_uuid: uuid.UUID
-    ) -> None:
-        if requester_ctx.is_authorized is False:
-            raise GenericForbidden("Only authorized requests may have access key scopes.")
-        if owner_uuid is None or owner_uuid == requester_ctx.user_id:
-            return
-        async with self._db.begin_readonly() as conn:
+    async def force_sync_with_app_proxy(self, action: ForceSyncAction) -> ForceSyncActionResult:
+        async with self._db.begin_readonly_session() as db_sess:
             try:
-                await check_if_requester_is_eligible_to_act_as_target_user_uuid(
-                    conn,
-                    requester_ctx.user_role,
-                    requester_ctx.domain_name,
-                    owner_uuid,
-                )
-                return
-            except ValueError as e:
-                raise InvalidAPIParameters(str(e))
-            except RuntimeError as e:
-                raise GenericForbidden(str(e))
+                endpoint = await EndpointRow.get(db_sess, action.service_id, load_routes=True)
+            except NoResultFound:
+                raise ModelServiceNotFound
+        await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
+
+        async with self._db.begin_session() as db_sess:
+            await self._registry.update_appproxy_endpoint_routes(
+                db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+            )
+
+        return ForceSyncActionResult(success=True)
 
     async def modify_endpoint(self, action: ModifyEndpointAction) -> ModifyEndpointActionResult:
         async def _do_mutate() -> MutationResult:
@@ -929,145 +832,6 @@ class ModelService:
         return ModifyEndpointActionResult(
             success=result.success, data=EndpointData.from_row(result.data)
         )
-
-    async def create_endpoint_auto_scaling_rule(
-        self, action: CreateEndpointAutoScalingRuleAction
-    ) -> CreateEndpointAutoScalingRuleActionResult:
-        if not action.creator.metric_source:
-            raise InvalidAPIParameters("metric_source is a required field")
-        if not action.creator.comparator:
-            raise InvalidAPIParameters("comparator is a required field")
-
-        try:
-            _endpoint_id = EndpointId(action.endpoint_id)
-        except ValueError:
-            raise EndpointNotFound
-
-        async with self._db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointRow.get(db_session, _endpoint_id)
-            except NoResultFound:
-                raise EndpointNotFound
-
-            match action.requester_ctx.user_role:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.domain != action.requester_ctx.domain_name:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.created_user != action.requester_ctx.user_id:
-                        raise GenericForbidden
-
-            try:
-                _threshold = decimal.Decimal(action.creator.threshold)
-            except decimal.InvalidOperation:
-                raise InvalidAPIParameters(f"Cannot convert {action.creator.threshold} to Decimal")
-
-            async def _do_mutate() -> MutationResult:
-                created_rule = await row.create_auto_scaling_rule(
-                    db_session,
-                    action.creator.metric_source,
-                    action.creator.metric_name,
-                    _threshold,
-                    action.creator.comparator,
-                    action.creator.step_size,
-                    cooldown_seconds=action.creator.cooldown_seconds,
-                    min_replicas=action.creator.min_replicas,
-                    max_replicas=action.creator.max_replicas,
-                )
-                return MutationResult(
-                    success=True,
-                    message="Auto scaling rule created",
-                    data=created_rule,
-                )
-
-            res = await self._db_mutation_wrapper(_do_mutate)
-
-            return CreateEndpointAutoScalingRuleActionResult(
-                success=res.success,
-                data=EndpointAutoScalingRuleData.from_row(res.data),
-            )
-
-    async def modify_endpoint_auto_scaling_rule(
-        self, action: ModifyEndpointAutoScalingRuleAction
-    ) -> ModifyEndpointAutoScalingRuleActionResult:
-        try:
-            _rule_id = RuleId(action.id)
-        except ValueError:
-            raise EndpointAutoScalingRuleNotFound
-
-        async with self._db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
-            except NoResultFound:
-                raise EndpointAutoScalingRuleNotFound
-
-            match action.requester_ctx.user_role:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.endpoint_row.domain != action.requester_ctx.domain_name:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.endpoint_row.created_user != action.requester_ctx.user_id:
-                        raise GenericForbidden
-
-            async def _do_mutate() -> MutationResult:
-                fields_to_update = action.modifier.fields_to_update()
-                for key, value in fields_to_update.items():
-                    setattr(row, key, value)
-
-                return MutationResult(
-                    success=True,
-                    message="Auto scaling rule updated",
-                    data=row,
-                )
-
-            res = await self._db_mutation_wrapper(_do_mutate)
-
-            return ModifyEndpointAutoScalingRuleActionResult(
-                success=res.success,
-                data=EndpointAutoScalingRuleData.from_row(res.data),
-            )
-
-    async def delete_endpoint_auto_scaling_rule(
-        self, action: DeleteEndpointAutoScalingRuleAction
-    ) -> DeleteEndpointAutoScalingRuleActionResult:
-        try:
-            _rule_id = RuleId(action.id)
-        except ValueError:
-            raise EndpointAutoScalingRuleNotFound
-
-        async with self._db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
-            except NoResultFound:
-                raise EndpointAutoScalingRuleNotFound
-
-            match action.requester_ctx.user_role:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.endpoint_row.domain != action.requester_ctx.domain_name:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.endpoint_row.created_user != action.requester_ctx.user_id:
-                        raise GenericForbidden
-
-            async def _do_mutate() -> MutationResult:
-                await db_session.delete(row)
-                return MutationResult(
-                    success=True,
-                    message="Auto scaling rule removed",
-                    data=None,
-                )
-
-            res = await self._db_mutation_wrapper(_do_mutate)
-
-            return DeleteEndpointAutoScalingRuleActionResult(
-                success=res.success,
-            )
 
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[MutationResult]]
