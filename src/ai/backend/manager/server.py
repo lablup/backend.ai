@@ -454,6 +454,7 @@ def _make_registered_reporters(
             recipients=smtp_conf["recipients"],
             use_tls=smtp_conf["use-tls"],
             max_workers=smtp_conf["max-workers"],
+            template=smtp_conf["template"],
         )
         trigger_policy = SMTPTriggerPolicy[smtp_conf["trigger-policy"]]
         reporters[smtp_conf["name"]] = SMTPReporter(smtp_args, trigger_policy)
