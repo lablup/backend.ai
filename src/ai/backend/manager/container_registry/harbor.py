@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import copy
 import logging
 import urllib.parse
 from typing import Any, AsyncIterator, Mapping, Optional, cast
@@ -229,18 +229,139 @@ class HarborRegistry_v2(BaseContainerRegistry):
                             next_page_url.query
                         )
 
+        try:
+            async with aiotools.TaskGroup() as tg:
+                artifact_url: Optional[yarl.URL] = (
+                    api_url / "projects" / project / "repositories" / repository / "artifacts"
+                ).with_query(
+                    {"page_size": "30"},
+                )
+                while artifact_url is not None:
+                    async with sess.get(artifact_url, allow_redirects=False, **rqst_args) as resp:
+                        resp.raise_for_status()
+                        body = await resp.json()
+                        for image_info in body:
+                            skip_reason: Optional[str] = None
+                            tag = image_info["digest"]
+                            try:
+                                if not image_info["tags"] or len(image_info["tags"]) == 0:
+                                    skip_reason = "no tag"
+                                    continue
+                                tags = [item["name"] for item in image_info["tags"]]
+
+                                for tag in tags:
+                                    match image_info["manifest_media_type"]:
+                                        case self.MEDIA_TYPE_OCI_INDEX:
+                                            await self._process_oci_index(
+                                                tg, sess, rqst_args, image, tag, image_info
+                                            )
+                                        case self.MEDIA_TYPE_OCI_MANIFEST:
+                                            await self._process_oci_manifest(
+                                                tg,
+                                                sess,
+                                                rqst_args,
+                                                image,
+                                                tag,
+                                                image_info,
+                                            )
+                                        case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                                            await self._process_docker_v2_multiplatform_image(
+                                                tg, sess, rqst_args, image, tag, image_info
+                                            )
+                                        case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                                            await self._process_docker_v2_image(
+                                                tg, sess, rqst_args, image, tag, image_info
+                                            )
+                                        case _ as media_type:
+                                            raise RuntimeError(
+                                                f"Unsupported artifact media-type: {media_type}"
+                                            )
+                            finally:
+                                if skip_reason:
+                                    log.warning(
+                                        "Skipped image - {}:{} ({})", image, tag, skip_reason
+                                    )
+                        artifact_url = None
+                        next_page_link = resp.links.get("next")
+                        if next_page_link:
+                            next_page_url = cast(yarl.URL, next_page_link["url"])
+                            artifact_url = self.registry_url.with_path(
+                                next_page_url.path
+                            ).with_query(next_page_url.query)
+        except aiotools.TaskGroupError as e:
+            raise ScanImageError(
+                f"Image scan failed, Details: {cast(ExceptionGroup, e).exceptions}"
+            ) from e
+
+    @override
+    async def _scan_tag(
+        self,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+    ) -> None:
+        project, _, repository = image.partition("/")
+        project, repository, tag = [
+            urllib.parse.urlencode({"": x})[1:] for x in [project, repository, tag]
+        ]
+        api_url = self.registry_url / "api" / "v2.0"
+        async with sess.get(
+            api_url / "projects" / project / "repositories" / repository / "artifacts" / tag,
+            **rqst_args,
+        ) as resp:
+            if resp.status == 404:
+                # ignore missing tags
+                # (may occur after deleting an image from the docker hub)
+                return
+            resp.raise_for_status()
+            resp_json = await resp.json()
+
+            try:
+                async with aiotools.TaskGroup() as tg:
+                    match resp_json["manifest_media_type"]:
+                        case self.MEDIA_TYPE_OCI_INDEX:
+                            await self._process_oci_index(
+                                tg, sess, rqst_args, image, tag, resp_json
+                            )
+                        case self.MEDIA_TYPE_OCI_MANIFEST:
+                            await self._process_oci_manifest(
+                                tg,
+                                sess,
+                                rqst_args,
+                                image,
+                                tag,
+                                resp_json,
+                            )
+                        case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                            await self._process_docker_v2_multiplatform_image(
+                                tg, sess, rqst_args, image, tag, resp_json
+                            )
+                        case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                            await self._process_docker_v2_image(
+                                tg, sess, rqst_args, image, tag, resp_json
+                            )
+                        case _ as media_type:
+                            raise RuntimeError(f"Unsupported artifact media-type: {media_type}")
+            except aiotools.TaskGroupError as e:
+                raise ScanTagError(
+                    f"Tag scan failed, Details: {cast(ExceptionGroup, e).exceptions}"
+                ) from e
+
+    @override
     async def _process_oci_index(
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_INDEX})
+
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -264,18 +385,88 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     )
                 )
 
-    async def _process_docker_v2_multiplatform_image(
+    @override
+    async def _process_oci_manifest(
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_MANIFEST})
+
+        if (reporter := progress_reporter.get()) is not None:
+            reporter.total_progress += 1
+
+        async with concurrency_sema.get():
+            async with sess.get(
+                self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                manifest_data = await resp.json()
+
+            config_digest = manifest_data["config"]["digest"]
+            size_bytes = (
+                sum(layer["size"] for layer in manifest_data["layers"])
+                + manifest_data["config"]["size"]
+            )
+
+            async with sess.get(
+                self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+            ) as resp:
+                resp.raise_for_status()
+                config_data = await read_json(resp)
+
+        labels = {}
+        if _config_labels := config_data.get("config", {}).get("Labels"):
+            labels = _config_labels
+        elif _container_config_labels := config_data.get("container_config", {}).get("Labels"):
+            labels = _container_config_labels
+
+        if not labels:
+            log.warning(
+                "The image {}:{} has no metadata labels -> treating as vanilla image",
+                image,
+                tag,
+            )
+            labels = {}
+
+        architecture = config_data.get("architecture")
+        if architecture:
+            architecture = arch_name_aliases.get(architecture, architecture)
+        else:
+            if tag.endswith("-arm64") or tag.endswith("-aarch64"):
+                architecture = "aarch64"
+            else:
+                architecture = "x86_64"
+
+        manifests = {
+            architecture: {
+                "size": size_bytes,
+                "labels": labels,
+                "digest": config_digest,
+            }
+        }
+        await self._read_manifest(image, tag, manifests)
+
+    @override
+    async def _process_docker_v2_multiplatform_image(
+        self,
+        tg: aiotools.TaskGroup,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+        image_info: Mapping[str, Any],
+    ) -> None:
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_DOCKER_MANIFEST_LIST})
+
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -303,14 +494,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_DOCKER_MANIFEST})
+
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
         async with aiotools.TaskGroup() as tg:
@@ -396,7 +588,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         tag: str,
     ) -> None:
         """
-        Scan 'image:tag' which has been pusehd as a single architecture tag.
+        Scan 'image:tag' which has been pushed as a single architecture tag.
         In this case, Harbor does not provide explicit methods to determine the architecture.
         We infer the architecture from the tag naming patterns ("-arm64" for instance).
         """
