@@ -446,7 +446,6 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
                 startup_command=self.startup_command,
                 bootstrap_script=self.bootstrap_script,
                 callback_url=self.callback_url,
-                owner_access_key=self.owner_access_key,
                 open_to_public=self.open_to_public,
                 config=self.config.to_dataclass(),
                 sudo_session_enabled=sudo_session_enabled,

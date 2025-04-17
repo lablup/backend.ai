@@ -297,7 +297,6 @@ class ModelServiceCreator(Creator):
     startup_command: Optional[str]
     bootstrap_script: Optional[str]
     callback_url: Optional[AnyUrl]
-    owner_access_key: Optional[str]
     open_to_public: bool
     config: ServiceConfig
 
