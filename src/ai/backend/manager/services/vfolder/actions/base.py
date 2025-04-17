@@ -83,7 +83,7 @@ class VFolderAttributeModifier(PartialModifier):
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
         self.cloneable.update_dict(to_update, "cloneable")
-        self.mount_permission.update_dict(to_update, "mount_permission")
+        self.mount_permission.update_dict(to_update, "permission")
         return to_update
 
 

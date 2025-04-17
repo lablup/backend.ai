@@ -2420,15 +2420,6 @@ class VFolderPermissionContext(
             permissions |= self.project_id_to_permission_map.get(vfolder_row.group, set())
             permissions |= self.domain_name_to_permission_map.get(vfolder_row.domain_name, set())
 
-        # Filter out mount permissions based on vfolders.permission
-        match vfolder_row.permission:
-            case VFolderPermission.READ_ONLY:
-                permissions -= {VFolderRBACPermission.MOUNT_RW, VFolderRBACPermission.MOUNT_WD}
-            case VFolderPermission.READ_WRITE:
-                permissions -= {VFolderRBACPermission.MOUNT_WD}
-            case VFolderPermission.RW_DELETE | VFolderPermission.OWNER_PERM:
-                pass
-
         if self.host_permission_ctx is not None:
             host_permission_map = self.host_permission_ctx.host_to_permissions_map
             host_perms = host_permission_map.get(vfolder_row.host)
