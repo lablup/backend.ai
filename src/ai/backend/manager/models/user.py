@@ -316,12 +316,12 @@ def by_username(
     Return a condition that filters by username.
     """
 
-    def _by_userusername(
+    def _by_username(
         condition: Optional[sa.sql.expression.BinaryExpression],
     ) -> sa.sql.expression.BinaryExpression:
         return _append_condition(condition, UserRow.username == username, operator)
 
-    return _by_userusername
+    return _by_username
 
 
 def by_user_email(
