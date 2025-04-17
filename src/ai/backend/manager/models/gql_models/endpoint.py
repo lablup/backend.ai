@@ -581,6 +581,14 @@ class Endpoint(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "name": ("endpoints_name", None),
+        "endpoint_id": ("endpoints_id", None),
+        "project": ("endpoints_project", None),
+        "resource_group": ("endpoints_resource_group", None),
+        "created_at": ("endpoints_created_at", None),
+        "retries": ("endpoints_retries", None),
+        "status": ("endpoints_status", None),
+        "replicas": ("endpoints_replicas", None),
+        "destroyed_at": ("endpoints_destroyed_at", None),
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
@@ -591,7 +599,14 @@ class Endpoint(graphene.ObjectType):
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
         "name": ("endpoints_name", None),
+        "endpoint_id": ("endpoints_id", None),
+        "project": ("endpoints_project", None),
+        "resource_group": ("endpoints_resource_group", None),
+        "retries": ("endpoints_retries", None),
+        "status": ("endpoints_status", None),
+        "replicas": ("endpoints_replicas", None),
         "created_at": ("endpoints_created_at", None),
+        "destroyed_at": ("endpoints_destroyed_at", None),
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
