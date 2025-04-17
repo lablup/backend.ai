@@ -61,10 +61,9 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
 from .types import (
-    ConditionMerger,
     QueryArgument,
     QueryCondition,
-    append_condition,
+    QuerySingleCondition,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
@@ -237,9 +236,7 @@ class GroupRow(Base):
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
         query_stmt = sa.select(GroupRow)
-        condition: Optional[sa.sql.expression.BinaryExpression] = None
-        for cond_callable in args.conditions:
-            condition = cond_callable(condition)
+        condition = args.condition
         if condition is not None:
             query_stmt = query_stmt.where(condition)
 
@@ -265,7 +262,7 @@ class GroupRow(Base):
     ) -> Self:
         rows = await cls.query_by_condition(
             QueryArgument(
-                [by_id(project_id, ConditionMerger.AND)],
+                QueryCondition.single(by_id(project_id)),
                 [load_related_field(cls.load_resource_policy)],
             ),
             db=db,
@@ -275,17 +272,8 @@ class GroupRow(Base):
         return rows[0]
 
 
-def by_id(project_id: uuid.UUID, operator: ConditionMerger) -> QueryCondition:
-    def _by_id(
-        cond: Optional[sa.sql.expression.BinaryExpression],
-    ) -> sa.sql.expression.BinaryExpression:
-        return append_condition(
-            cond,
-            GroupRow.id == project_id,
-            operator,
-        )
-
-    return _by_id
+def by_id(project_id: uuid.UUID) -> QuerySingleCondition:
+    return GroupRow.id == project_id
 
 
 @dataclass

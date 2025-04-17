@@ -32,10 +32,9 @@ from .base import (
 )
 from .exceptions import ObjectNotFound
 from .types import (
-    ConditionMerger,
     QueryArgument,
     QueryCondition,
-    append_condition,
+    QuerySingleCondition,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
@@ -221,9 +220,7 @@ class UserRow(Base):
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
         query_stmt = sa.select(UserRow)
-        condition: Optional[sa.sql.expression.BinaryExpression] = None
-        for cond_callable in args.conditions:
-            condition = cond_callable(condition)
+        condition = args.condition
         if condition is not None:
             query_stmt = query_stmt.where(condition)
 
@@ -249,9 +246,7 @@ class UserRow(Base):
     ) -> Self:
         rows = await cls.query_by_condition(
             QueryArgument(
-                [
-                    by_user_uuid(user_uuid, ConditionMerger.AND),
-                ],
+                QueryCondition.single(by_user_uuid(user_uuid)),
                 [
                     load_related_field(cls.load_keypairs),
                     load_related_field(cls.load_main_keypair),
@@ -286,50 +281,20 @@ class UserRow(Base):
 
 def by_user_uuid(
     user_uuid: UUID,
-    operator: ConditionMerger,
-) -> QueryCondition:
-    """
-    Return a condition that filters by user UUID.
-    """
-
-    def _by_user_uuid(
-        condition: Optional[sa.sql.expression.BinaryExpression],
-    ) -> sa.sql.expression.BinaryExpression:
-        return append_condition(condition, UserRow.uuid == user_uuid, operator)
-
-    return _by_user_uuid
+) -> QuerySingleCondition:
+    return UserRow.uuid == user_uuid
 
 
 def by_username(
     username: str,
-    operator: ConditionMerger,
-) -> QueryCondition:
-    """
-    Return a condition that filters by username.
-    """
-
-    def _by_username(
-        condition: Optional[sa.sql.expression.BinaryExpression],
-    ) -> sa.sql.expression.BinaryExpression:
-        return append_condition(condition, UserRow.username == username, operator)
-
-    return _by_username
+) -> QuerySingleCondition:
+    return UserRow.username == username
 
 
 def by_user_email(
     email: str,
-    operator: ConditionMerger,
-) -> QueryCondition:
-    """
-    Return a condition that filters by user email.
-    """
-
-    def _by_user_email(
-        condition: Optional[sa.sql.expression.BinaryExpression],
-    ) -> sa.sql.expression.BinaryExpression:
-        return append_condition(condition, UserRow.email == email, operator)
-
-    return _by_user_email
+) -> QuerySingleCondition:
+    return UserRow.email == email
 
 
 def _hash_password(password: str) -> str:

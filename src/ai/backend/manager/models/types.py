@@ -1,22 +1,13 @@
 import enum
 from dataclasses import dataclass, field
-from typing import Callable, Optional, Protocol
+from typing import Callable, Optional, Protocol, Self
 
 import sqlalchemy as sa
 
-type QueryConditionCallable = Callable[
-    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
-]
-type QueryCondition = Callable[..., QueryConditionCallable]
+type QuerySingleCondition = sa.sql.expression.BinaryExpression
 
 type QueryOptionCallable = Callable[[sa.sql.Select], sa.sql.Select]
 type QueryOption = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
-
-
-@dataclass
-class QueryArgument:
-    conditions: list[QueryCondition]
-    options: list[QueryOption] = field(default_factory=list)
 
 
 class ConditionMerger(enum.Enum):
@@ -32,14 +23,32 @@ class ConditionMerger(enum.Enum):
                 return sa.or_
 
 
-def append_condition(
-    condition: Optional[sa.sql.expression.BinaryExpression],
-    new_condition: sa.sql.expression.BinaryExpression,
-    operator: ConditionMerger,
-) -> sa.sql.expression.BinaryExpression:
-    return (
-        operator.sql_operator(condition, new_condition) if condition is not None else new_condition
-    )
+@dataclass
+class QueryCondition:
+    condition: Optional[QuerySingleCondition] = None
+
+    @classmethod
+    def multiple(cls, operator: ConditionMerger, conditions: list[Self]) -> Self:
+        sql_conditions = [cond.condition for cond in conditions if cond.condition is not None]
+        if not sql_conditions:
+            return cls()
+        if len(sql_conditions) == 1:
+            return cls(sql_conditions[0])
+        return cls(operator.sql_operator(*sql_conditions))
+
+    @classmethod
+    def single(cls, condition: QuerySingleCondition) -> Self:
+        return cls(condition)
+
+
+@dataclass
+class QueryArgument:
+    _condition: QueryCondition
+    options: list[QueryOption] = field(default_factory=list)
+
+    @property
+    def condition(self) -> Optional[QuerySingleCondition]:
+        return self._condition.condition if self._condition.condition is not None else None
 
 
 class _LoadableField(Protocol):
