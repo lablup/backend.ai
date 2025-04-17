@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,6 +30,14 @@ from .base import (
     IDColumn,
     IPColumn,
     mapper_registry,
+)
+from .exceptions import ObjectNotFound
+from .types import (
+    ConditionMerger,
+    QueryCondition,
+    QueryOption,
+    append_condition,
+    load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
@@ -191,7 +199,7 @@ class UserRow(Base):
         return user_row
 
     @classmethod
-    async def query_user_by_condition(
+    async def query_by_condition(
         cls,
         conditions: Iterable[QueryCondition],
         options: Iterable[QueryOption] = tuple(),
@@ -219,13 +227,13 @@ class UserRow(Base):
             )
 
     @classmethod
-    async def get_user_by_id_with_policies(
+    async def get_by_id_with_policies(
         cls,
         user_uuid: UUID,
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> Optional[Self]:
-        rows = await cls.query_user_by_condition(
+    ) -> Self:
+        rows = await cls.query_by_condition(
             [
                 by_user_uuid(user_uuid, ConditionMerger.AND),
             ],
@@ -237,7 +245,7 @@ class UserRow(Base):
             db=db,
         )
         if not rows:
-            return None
+            raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
     def get_main_keypair_row(self) -> Optional[KeyPairRow]:
@@ -260,38 +268,6 @@ class UserRow(Base):
         return keypair_candidate
 
 
-type QueryConditionCallable = Callable[
-    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
-]
-type QueryCondition = Callable[..., QueryConditionCallable]
-
-type QueryOptionCallable = Callable[[sa.sql.Select], sa.sql.Select]
-type QueryOption = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
-
-
-class ConditionMerger(enum.Enum):
-    AND = "AND"
-    OR = "OR"
-
-
-_COND_SQL_OPERATOR_MAP: Mapping[ConditionMerger, Callable] = {
-    ConditionMerger.AND: sa.and_,
-    ConditionMerger.OR: sa.or_,
-}
-
-
-def _append_condition(
-    condition: Optional[sa.sql.expression.BinaryExpression],
-    new_condition: sa.sql.expression.BinaryExpression,
-    operator: ConditionMerger,
-) -> sa.sql.expression.BinaryExpression:
-    return (
-        _COND_SQL_OPERATOR_MAP[operator](condition, new_condition)
-        if condition is not None
-        else new_condition
-    )
-
-
 def by_user_uuid(
     user_uuid: UUID,
     operator: ConditionMerger,
@@ -303,7 +279,7 @@ def by_user_uuid(
     def _by_user_uuid(
         condition: Optional[sa.sql.expression.BinaryExpression],
     ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, UserRow.uuid == user_uuid, operator)
+        return append_condition(condition, UserRow.uuid == user_uuid, operator)
 
     return _by_user_uuid
 
@@ -319,7 +295,7 @@ def by_username(
     def _by_username(
         condition: Optional[sa.sql.expression.BinaryExpression],
     ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, UserRow.username == username, operator)
+        return append_condition(condition, UserRow.username == username, operator)
 
     return _by_username
 
@@ -335,7 +311,7 @@ def by_user_email(
     def _by_user_email(
         condition: Optional[sa.sql.expression.BinaryExpression],
     ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, UserRow.email == email, operator)
+        return append_condition(condition, UserRow.email == email, operator)
 
     return _by_user_email
 
@@ -345,7 +321,7 @@ class RelatedFields(enum.StrEnum):
     MAIN_KEYPAIR = enum.auto()
     RESOURCE_POLICY = enum.auto()
 
-    def loading_option(self) -> Callable:
+    def loading_option(self, already_joined: bool = False) -> Callable:
         from .keypair import KeyPairRow
 
         match self:
@@ -359,10 +335,6 @@ class RelatedFields(enum.StrEnum):
                 )
             case RelatedFields.RESOURCE_POLICY:
                 return joinedload(UserRow.resource_policy_row)
-
-
-def load_related_field(field: RelatedFields) -> QueryOptionCallable:
-    return lambda stmt: stmt.options(field.loading_option())
 
 
 def _hash_password(password: str) -> str:

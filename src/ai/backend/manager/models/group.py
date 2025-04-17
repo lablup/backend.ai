@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Iterable,
     Optional,
     Self,
@@ -24,7 +25,7 @@ import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
@@ -45,6 +46,7 @@ from .base import (
     VFolderHostPermissionColumn,
     mapper_registry,
 )
+from .exceptions import ObjectNotFound
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -58,6 +60,14 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
+from .types import (
+    ConditionMerger,
+    QueryCondition,
+    QueryOption,
+    append_condition,
+    load_related_field,
+)
+from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .rbac import ContainerRegistryScope
@@ -214,6 +224,72 @@ class GroupRow(Base):
             raise NoResultFound
 
         return row
+
+    @classmethod
+    async def query_by_condition(
+        cls,
+        conditions: Iterable[QueryCondition],
+        options: Iterable[QueryOption] = tuple(),
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> list[Self]:
+        query_stmt = sa.select(GroupRow)
+        condition: Optional[sa.sql.expression.BinaryExpression] = None
+        for cond_callable in conditions:
+            condition = cond_callable(condition)
+        if condition is not None:
+            query_stmt = query_stmt.where(condition)
+
+        for option in options:
+            query_stmt = option(query_stmt)
+
+        async def fetch(db_session: AsyncSession) -> list[Self]:
+            return (await db_session.scalars(query_stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(
+                fetch,
+                db.begin_readonly_session,
+                db_conn,
+            )
+
+    @classmethod
+    async def get_by_id_with_policies(
+        cls,
+        project_id: uuid.UUID,
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> Self:
+        rows = await cls.query_by_condition(
+            [by_id(project_id, ConditionMerger.AND)],
+            [load_related_field(RelatedFields.RESOURCE_POLICY)],
+            db=db,
+        )
+        if not rows:
+            raise ObjectNotFound(f"Project with id {project_id} not found")
+        return rows[0]
+
+
+class RelatedFields(enum.StrEnum):
+    RESOURCE_POLICY = enum.auto()
+
+    def loading_option(self, already_joined: bool = False) -> Callable:
+        match self:
+            case RelatedFields.RESOURCE_POLICY:
+                return joinedload(GroupRow.resource_policy_row)
+
+
+def by_id(project_id: uuid.UUID, operator: ConditionMerger) -> QueryCondition:
+    def _by_id(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return append_condition(
+            cond,
+            GroupRow.id == project_id,
+            operator,
+        )
+
+    return _by_id
 
 
 @dataclass
