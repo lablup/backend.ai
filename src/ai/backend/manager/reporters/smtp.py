@@ -17,7 +17,6 @@ from ai.backend.manager.types import SMTPTriggerPolicy
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-_BLANK_ID: Final[str] = "(unknown)"
 _UNDEFINED_VALUE: Final[str] = "(undefined)"
 
 
