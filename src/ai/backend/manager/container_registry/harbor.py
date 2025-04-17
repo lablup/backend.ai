@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 import urllib.parse
 from typing import Any, AsyncIterator, Mapping, Optional, cast, override
@@ -321,8 +322,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
             urllib.parse.urlencode({"": x})[1:] for x in [project, repository, tag]
         ]
         api_url = self.registry_url / "api" / "v2.0"
-        if "Accept" in rqst_args["headers"]:
-            del rqst_args["headers"]["Accept"]
         async with sess.get(
             api_url / "projects" / project / "repositories" / repository / "artifacts" / tag,
             **rqst_args,
@@ -370,11 +369,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_INDEX})
+
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -403,11 +406,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_MANIFEST})
+
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
 
@@ -467,11 +474,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_DOCKER_MANIFEST_LIST})
+
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
             if (
@@ -500,11 +511,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
+        rqst_args = copy.deepcopy(rqst_args)
+        rqst_args["headers"] = rqst_args.get("headers") or {}
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_DOCKER_MANIFEST})
+
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
         tg.create_task(
@@ -519,7 +534,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_per_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         *,
         digest: str,
@@ -576,12 +591,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def _harbor_scan_tag_single_arch(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
     ) -> None:
         """
-        Scan 'image:tag' which has been pusehd as a single architecture tag.
+        Scan 'image:tag' which has been pushed as a single architecture tag.
         In this case, Harbor does not provide explicit methods to determine the architecture.
         We infer the architecture from the tag naming patterns ("-arm64" for instance).
         """
