@@ -40,16 +40,10 @@ class _LoadableField(Protocol):
     def __call__(self, *args, **kwargs) -> Callable:
         pass
 
-    # def loading_option(self, already_joined: bool = False) -> Callable:
-    #     pass
-
 
 class _JoinableField(Protocol):
     def __call__(self, *args, **kwargs) -> sa.orm.attributes.InstrumentedAttribute:
         pass
-
-    # def joined_field(self) -> sa.orm.attributes.InstrumentedAttribute:
-    #     pass
 
 
 def load_related_field(field: _LoadableField) -> QueryOptionCallable:
