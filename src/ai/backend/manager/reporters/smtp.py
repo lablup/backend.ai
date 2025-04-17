@@ -2,7 +2,6 @@ import logging
 import smtplib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime
 from email.mime.text import MIMEText
 from typing import Final, override
 
@@ -30,6 +29,7 @@ class SMTPSenderArgs:
     sender: str
     recipients: list[str]
     use_tls: bool
+    template: str
     max_workers: int
 
 
@@ -42,8 +42,6 @@ class SMTPSender:
         self._executor.submit(self._send_email, subject, email_body)
 
     def _send_email(self, subject: str, email_body: str) -> None:
-        email_body += "\nThis email is sent from Backend.AI SMTP Reporter"
-
         message = MIMEText(email_body, "plain", "utf-8")
         message["Subject"] = subject
         message["From"] = self._config.sender
@@ -64,11 +62,37 @@ class SMTPSender:
 
 
 class SMTPReporter(AbstractReporter):
+    _mail_template: str
     _smtp_sender: SMTPSender
 
     def __init__(self, args: SMTPSenderArgs, trigger_policy: SMTPTriggerPolicy) -> None:
         self._smtp_sender = SMTPSender(args)
         self._trigger_policy = trigger_policy
+        self._mail_template = args.template
+
+    def _create_body_from_template(
+        self, message: StartedActionMessage | FinishedActionMessage
+    ) -> str:
+        template = self._mail_template
+
+        template = template.replace("{{ action_id }}", str(message.action_id))
+        template = template.replace("{{ action_type }}", message.action_type)
+        template = template.replace("{{ entity_id }}", str(message.entity_id) or UNKNOWN_ENTITY_ID)
+        template = template.replace("{{ request_id }}", message.request_id or UNKNOWN_ENTITY_ID)
+        template = template.replace("{{ entity_type }}", message.entity_type)
+        template = template.replace("{{ operation_type }}", message.operation_type)
+        template = template.replace("{{ created_at }}", str(message.created_at))
+
+        match message:
+            case StartedActionMessage():
+                pass
+            case FinishedActionMessage():
+                template = template.replace("{{ ended_at }}", str(message.ended_at))
+                template = template.replace("{{ duration }}", str(message.duration))
+                template = template.replace("{{ status }}", message.status.value)
+                template = template.replace("{{ description }}", message.description)
+
+        return template
 
     def _make_subject(self, action_type: str) -> str:
         return f"Backend.AI SMTP Log Alert ({action_type})"
@@ -79,13 +103,7 @@ class SMTPReporter(AbstractReporter):
             return
 
         subject = self._make_subject(message.action_type)
-        body = (
-            "Action has been triggered.\n\n"
-            f"Action type: ({message.action_type})\n"
-            f"Status: {OperationStatus.RUNNING}\n"
-            f"Description: Task is running...\n"
-            f"Started at: {datetime.now()}\n"
-        )
+        body = f"Action has been triggered.\n\n{self._create_body_from_template(message)}"
         self._smtp_sender.send_email(subject, body)
 
     @override
@@ -95,26 +113,11 @@ class SMTPReporter(AbstractReporter):
                 subject = self._make_subject(message.action_type)
                 body = (
                     "Action has resulted in an error.\n\n"
-                    f"Action type: ({message.action_type})\n"
-                    f"Entity ID: {message.entity_id or UNKNOWN_ENTITY_ID}\n"
-                    f"Status: {message.status}\n"
-                    f"Description: {message.description}\n"
-                    f"Started at: {message.created_at}\n"
-                    f"Ended at: {message.ended_at}\n"
-                    f"Duration: {message.duration} seconds\n"
+                    f"{self._create_body_from_template(message)}"
                 )
                 self._smtp_sender.send_email(subject, body)
                 return
 
         subject = self._make_subject(message.action_type)
-        body = (
-            "Action has been completed.\n\n"
-            f"Action type: ({message.action_type})\n"
-            f"Entity ID: {message.entity_id or UNKNOWN_ENTITY_ID}\n"
-            f"Status: {message.status}\n"
-            f"Description: {message.description}\n"
-            f"Started at: {message.created_at}\n"
-            f"Ended at: {message.ended_at}\n"
-            f"Duration: {message.duration} seconds\n"
-        )
+        body = f"Action has finished.\n\n{self._create_body_from_template(message)}"
         self._smtp_sender.send_email(subject, body)

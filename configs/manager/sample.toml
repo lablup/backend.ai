@@ -32,7 +32,7 @@ password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 # lock-conn-timeout = 30
 
 # This setting causes the pool to recycle connections after the given number of seconds has passed.
-# Default is -1, which means infinite. 
+# Default is -1, which means infinite.
 # https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
 # https://docs.sqlalchemy.org/en/14/core/pooling.html#setting-pool-recycle
 # pool-recycle = -1
@@ -258,8 +258,20 @@ password = "some_password"
 sender = "user@example.com"
 recipients = ["user@example.com", "user2@example.com"]
 use-tls = true
-trigger-policy = "ERROR"
+trigger-policy = "ON_ERROR"
 max-workers = 5
+
+template = """
+Action type: {{ action_type }}
+Entity ID: {{ entity_id }}
+Status: {{ status }}
+Description: {{ description }}
+Started at: {{ created_at }}
+Finished at: {{ ended_at }}
+Duration: {{ duration }} seconds
+
+This email is sent from Backend.AI SMTP Reporter.
+"""
 
 
 # The list of actions to be monitored by the audit log reporter.

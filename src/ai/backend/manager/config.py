@@ -246,6 +246,16 @@ _default_reporter: dict[str, Any] = {
     "action-monitors": [],
 }
 
+_default_smtp_template = """
+Action type: {{ action_type }}
+Entity ID: {{ entity_id }}
+Status: {{ status }}
+Description: {{ description }}
+Started at: {{ created_at }}
+Finished at: {{ ended_at }}
+Duration: {{ duration }} seconds
+"""
+
 manager_local_config_iv = (
     t.Dict({
         t.Key("db"): t.Dict({
@@ -346,6 +356,7 @@ manager_local_config_iv = (
                     t.Key("recipients"): t.List(t.String),
                     t.Key("use-tls"): t.ToBool,
                     t.Key("max-workers", default=5): t.Int,
+                    t.Key("template", default=_default_smtp_template): t.String,
                     t.Key("trigger-policy"): t.Enum("ALL", "ON_ERROR"),
                 })
             ),
