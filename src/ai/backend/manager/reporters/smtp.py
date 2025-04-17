@@ -17,7 +17,8 @@ from ai.backend.manager.types import SMTPTriggerPolicy
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-UNKNOWN_ENTITY_ID: Final[str] = "(unknown)"
+_BLANK_ID: Final[str] = "(unknown)"
+_UNDEFINED_VALUE: Final[str] = "(undefined)"
 
 
 @dataclass
@@ -77,15 +78,18 @@ class SMTPReporter(AbstractReporter):
 
         template = template.replace("{{ action_id }}", str(message.action_id))
         template = template.replace("{{ action_type }}", message.action_type)
-        template = template.replace("{{ entity_id }}", str(message.entity_id) or UNKNOWN_ENTITY_ID)
-        template = template.replace("{{ request_id }}", message.request_id or UNKNOWN_ENTITY_ID)
+        template = template.replace("{{ entity_id }}", str(message.entity_id) or _BLANK_ID)
+        template = template.replace("{{ request_id }}", message.request_id or _BLANK_ID)
         template = template.replace("{{ entity_type }}", message.entity_type)
         template = template.replace("{{ operation_type }}", message.operation_type)
         template = template.replace("{{ created_at }}", str(message.created_at))
 
         match message:
             case StartedActionMessage():
-                pass
+                template = template.replace("{{ ended_at }}", _UNDEFINED_VALUE)
+                template = template.replace("{{ duration }}", _UNDEFINED_VALUE)
+                template = template.replace("{{ status }}", _UNDEFINED_VALUE)
+                template = template.replace("{{ description }}", _UNDEFINED_VALUE)
             case FinishedActionMessage():
                 template = template.replace("{{ ended_at }}", str(message.ended_at))
                 template = template.replace("{{ duration }}", str(message.duration))
