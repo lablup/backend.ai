@@ -972,9 +972,10 @@ class RescanImages(graphene.Mutation):
                 errors.extend(action_result.errors)
                 rescanned_images.extend(action_result.images)
 
+            rescanned_image_ids = [image.id for image in rescanned_images]
             if errors:
-                return DispatchResult.partial_success(rescanned_images, errors)
-            return DispatchResult.success(rescanned_images)
+                return DispatchResult.partial_success(rescanned_image_ids, errors)
+            return DispatchResult.success(rescanned_image_ids)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
