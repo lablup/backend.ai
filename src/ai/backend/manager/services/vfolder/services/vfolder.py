@@ -711,12 +711,12 @@ class VFolderService:
         allowed_vfolder_types = await self._shared_config.get_vfolder_types()
         if "user" not in allowed_vfolder_types:
             raise InvalidParameter("user vfolder cannot be created in this host")
+        requester_user_row = await UserRow.get_user_by_id_with_policies(
+            action.requester_user_uuid, db=self._db
+        )
+        if requester_user_row is None:
+            raise InvalidParameter("No such user.")
         async with self._db.begin_session() as db_session:
-            requester_user_row = await db_session.scalar(
-                sa.select(UserRow)
-                .where(UserRow.uuid == action.requester_user_uuid)
-                .options(selectinload(UserRow.resource_policy_row).options())
-            )
             entries = await query_accessible_vfolders(
                 db_session.bind,
                 action.requester_user_uuid,
@@ -780,7 +780,9 @@ class VFolderService:
                 max_vfolder_count = group_row.resource_policy_row.max_vfolder_count
 
             else:
-                vfolder_hosts = requester_user_row.resource_policy_row.allowed_vfolder_hosts
+                vfolder_hosts = (
+                    requester_user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
+                )
                 max_vfolder_count = requester_user_row.resource_policy_row.max_vfolder_count
 
             allowed_hosts = await filter_host_allowed_permission(
