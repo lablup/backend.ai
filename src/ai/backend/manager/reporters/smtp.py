@@ -18,6 +18,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 _BLANK_ID: Final[str] = "(unknown)"
+_UNDEFINED_VALUE: Final[str] = "(undefined)"
 
 
 @dataclass
@@ -75,8 +76,10 @@ class SMTPReporter(AbstractReporter):
 
         template = template.replace("{{ action_id }}", str(message.action_id))
         template = template.replace("{{ action_type }}", message.action_type)
-        template = template.replace("{{ entity_id }}", str(message.entity_id) or _BLANK_ID)
-        template = template.replace("{{ request_id }}", message.request_id or _BLANK_ID)
+        template = template.replace(
+            "{{ entity_id }}", str(message.entity_id) if message.entity_id else _UNDEFINED_VALUE
+        )
+        template = template.replace("{{ request_id }}", message.request_id or _UNDEFINED_VALUE)
         template = template.replace("{{ entity_type }}", message.entity_type)
         template = template.replace("{{ operation_type }}", message.operation_type)
         template = template.replace("{{ created_at }}", str(message.created_at))
