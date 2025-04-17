@@ -173,7 +173,7 @@ class MoveToTrashVFolderAction(VFolderAction):
 
     @override
     def operation_type(self):
-        return "move-to-trash"
+        return "move_to_trash"
 
 
 @dataclass
@@ -221,7 +221,7 @@ class DeleteForeverVFolderAction(VFolderAction):
 
     @override
     def operation_type(self):
-        return "delete-forever"
+        return "delete_forever"
 
 
 @dataclass
@@ -249,7 +249,7 @@ class ForceDeleteVFolderAction(VFolderAction):
 
     @override
     def operation_type(self):
-        return "force-delete"
+        return "force_delete"
 
 
 @dataclass

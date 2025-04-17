@@ -89,7 +89,7 @@ class ListFilesAction(VFolderAction):
 
     @override
     def operation_type(self) -> str:
-        return "list-files"
+        return "list_files"
 
 
 @dataclass
@@ -144,7 +144,7 @@ class DeleteFilesAction(VFolderAction):
 
     @override
     def operation_type(self) -> str:
-        return "delete-files"
+        return "delete_files"
 
 
 @dataclass
