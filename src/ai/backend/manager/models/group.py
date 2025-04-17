@@ -226,6 +226,10 @@ class GroupRow(Base):
         return row
 
     @classmethod
+    def load_resource_policy(cls) -> Callable:
+        return joinedload(GroupRow.resource_policy_row)
+
+    @classmethod
     async def query_by_condition(
         cls,
         conditions: Iterable[QueryCondition],
@@ -262,21 +266,12 @@ class GroupRow(Base):
     ) -> Self:
         rows = await cls.query_by_condition(
             [by_id(project_id, ConditionMerger.AND)],
-            [load_related_field(RelatedFields.RESOURCE_POLICY)],
+            [load_related_field(cls.load_resource_policy)],
             db=db,
         )
         if not rows:
             raise ObjectNotFound(f"Project with id {project_id} not found")
         return rows[0]
-
-
-class RelatedFields(enum.StrEnum):
-    RESOURCE_POLICY = enum.auto()
-
-    def loading_option(self, already_joined: bool = False) -> Callable:
-        match self:
-            case RelatedFields.RESOURCE_POLICY:
-                return joinedload(GroupRow.resource_policy_row)
 
 
 def by_id(project_id: uuid.UUID, operator: ConditionMerger) -> QueryCondition:

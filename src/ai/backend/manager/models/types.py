@@ -37,18 +37,24 @@ def append_condition(
 
 
 class _LoadableField(Protocol):
-    def loading_option(self, already_joined: bool = False) -> Callable:
+    def __call__(self, *args, **kwargs) -> Callable:
         pass
+
+    # def loading_option(self, already_joined: bool = False) -> Callable:
+    #     pass
 
 
 class _JoinableField(Protocol):
-    def joined_field(self) -> sa.orm.attributes.InstrumentedAttribute:
+    def __call__(self, *args, **kwargs) -> sa.orm.attributes.InstrumentedAttribute:
         pass
+
+    # def joined_field(self) -> sa.orm.attributes.InstrumentedAttribute:
+    #     pass
 
 
 def load_related_field(field: _LoadableField) -> QueryOptionCallable:
-    return lambda stmt: stmt.options(field.loading_option())
+    return lambda stmt: stmt.options(field())
 
 
 def join_by_related_field(field: _JoinableField) -> QueryOptionCallable:
-    return lambda stmt: stmt.join(field.joined_field())
+    return lambda stmt: stmt.join(field())

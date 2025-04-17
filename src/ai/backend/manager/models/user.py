@@ -182,6 +182,22 @@ class UserRow(Base):
     )
 
     @classmethod
+    def load_keypairs(cls) -> Callable:
+        from .keypair import KeyPairRow
+
+        return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
+
+    @classmethod
+    def load_main_keypair(cls) -> Callable:
+        from .keypair import KeyPairRow
+
+        return joinedload(UserRow.main_keypair).options(joinedload(KeyPairRow.resource_policy_row))
+
+    @classmethod
+    def load_resource_policy(cls) -> Callable:
+        return joinedload(UserRow.resource_policy_row)
+
+    @classmethod
     async def query_user_by_uuid(
         cls,
         user_uuid: UUID,
@@ -238,9 +254,9 @@ class UserRow(Base):
                 by_user_uuid(user_uuid, ConditionMerger.AND),
             ],
             options=[
-                load_related_field(RelatedFields.KEYPAIRS),
-                load_related_field(RelatedFields.MAIN_KEYPAIR),
-                load_related_field(RelatedFields.RESOURCE_POLICY),
+                load_related_field(cls.load_keypairs),
+                load_related_field(cls.load_main_keypair),
+                load_related_field(cls.load_resource_policy),
             ],
             db=db,
         )
@@ -314,27 +330,6 @@ def by_user_email(
         return append_condition(condition, UserRow.email == email, operator)
 
     return _by_user_email
-
-
-class RelatedFields(enum.StrEnum):
-    KEYPAIRS = enum.auto()
-    MAIN_KEYPAIR = enum.auto()
-    RESOURCE_POLICY = enum.auto()
-
-    def loading_option(self, already_joined: bool = False) -> Callable:
-        from .keypair import KeyPairRow
-
-        match self:
-            case RelatedFields.KEYPAIRS:
-                return selectinload(UserRow.keypairs).options(
-                    joinedload(KeyPairRow.resource_policy_row)
-                )
-            case RelatedFields.MAIN_KEYPAIR:
-                return joinedload(UserRow.main_keypair).options(
-                    joinedload(KeyPairRow.resource_policy_row)
-                )
-            case RelatedFields.RESOURCE_POLICY:
-                return joinedload(UserRow.resource_policy_row)
 
 
 def _hash_password(password: str) -> str:
