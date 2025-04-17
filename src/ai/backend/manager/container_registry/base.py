@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 from abc import ABCMeta, abstractmethod
@@ -84,7 +85,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self.registry_url = yarl.URL(registry_info.url)
         self.max_concurrency_per_registry = max_concurrency_per_registry
         self.base_hdrs = {
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json",
+            "Accept": self.MEDIA_TYPE_DOCKER_MANIFEST,
         }
         self.credentials = {}
         self.ssl_verify = ssl_verify
@@ -216,7 +217,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     self.credentials,
                     f"repository:{project_and_image_name}:pull",
                 )
-                rqst_args["headers"].update(**self.base_hdrs)
                 await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
             await self.commit_rescan_result()
         finally:
@@ -277,6 +277,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         tag: str,
     ) -> None:
         async with concurrency_sema.get():
+            rqst_args = copy.deepcopy(rqst_args)
             rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST_LIST
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
@@ -327,7 +328,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         sess: aiohttp.ClientSession,
         manifest_list: Sequence[Any],
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
     ) -> None:
@@ -369,7 +370,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         sess: aiohttp.ClientSession,
         manifest: Mapping[str, Any],
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
     ) -> dict[str, Any]:
         """
@@ -404,7 +405,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
@@ -414,6 +415,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             for item in image_info["manifests"]
             if "annotations" not in item  # skip attestation manifests
         ]
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
 
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
@@ -422,12 +424,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         manifest_list = image_info["manifests"]
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
         await self._read_manifest_list(
@@ -442,12 +445,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         config_digest = image_info["config"]["digest"]
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
         async with sess.get(
@@ -469,7 +473,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
@@ -488,6 +492,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             }
         ]
 
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
 
