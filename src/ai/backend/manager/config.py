@@ -254,6 +254,8 @@ Description: {{ description }}
 Started at: {{ created_at }}
 Finished at: {{ ended_at }}
 Duration: {{ duration }} seconds
+
+This email is sent from Backend.AI SMTP Reporter.
 """
 
 manager_local_config_iv = (
