@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import enum
 import logging
-from collections.abc import Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -34,8 +33,8 @@ from .base import (
 from .exceptions import ObjectNotFound
 from .types import (
     ConditionMerger,
+    QueryArgument,
     QueryCondition,
-    QueryOption,
     append_condition,
     load_related_field,
 )
@@ -217,19 +216,18 @@ class UserRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        conditions: Iterable[QueryCondition],
-        options: Iterable[QueryOption] = tuple(),
+        args: QueryArgument,
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
         query_stmt = sa.select(UserRow)
         condition: Optional[sa.sql.expression.BinaryExpression] = None
-        for cond_callable in conditions:
+        for cond_callable in args.conditions:
             condition = cond_callable(condition)
         if condition is not None:
             query_stmt = query_stmt.where(condition)
 
-        for option in options:
+        for option in args.options:
             query_stmt = option(query_stmt)
 
         async def fetch(db_session: SASession) -> list[Self]:
@@ -250,14 +248,16 @@ class UserRow(Base):
         db: ExtendedAsyncSAEngine,
     ) -> Self:
         rows = await cls.query_by_condition(
-            [
-                by_user_uuid(user_uuid, ConditionMerger.AND),
-            ],
-            options=[
-                load_related_field(cls.load_keypairs),
-                load_related_field(cls.load_main_keypair),
-                load_related_field(cls.load_resource_policy),
-            ],
+            QueryArgument(
+                [
+                    by_user_uuid(user_uuid, ConditionMerger.AND),
+                ],
+                [
+                    load_related_field(cls.load_keypairs),
+                    load_related_field(cls.load_main_keypair),
+                    load_related_field(cls.load_resource_policy),
+                ],
+            ),
             db=db,
         )
         if not rows:

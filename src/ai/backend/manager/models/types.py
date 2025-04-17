@@ -1,5 +1,5 @@
 import enum
-from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Callable, Optional, Protocol
 
 import sqlalchemy as sa
@@ -13,15 +13,23 @@ type QueryOptionCallable = Callable[[sa.sql.Select], sa.sql.Select]
 type QueryOption = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
 
 
+@dataclass
+class QueryArgument:
+    conditions: list[QueryCondition]
+    options: list[QueryOption] = field(default_factory=list)
+
+
 class ConditionMerger(enum.Enum):
     AND = "AND"
     OR = "OR"
 
-
-_COND_SQL_OPERATOR_MAP: Mapping[ConditionMerger, Callable] = {
-    ConditionMerger.AND: sa.and_,
-    ConditionMerger.OR: sa.or_,
-}
+    @property
+    def sql_operator(self) -> Callable:
+        match self:
+            case ConditionMerger.AND:
+                return sa.and_
+            case ConditionMerger.OR:
+                return sa.or_
 
 
 def append_condition(
@@ -30,9 +38,7 @@ def append_condition(
     operator: ConditionMerger,
 ) -> sa.sql.expression.BinaryExpression:
     return (
-        _COND_SQL_OPERATOR_MAP[operator](condition, new_condition)
-        if condition is not None
-        else new_condition
+        operator.sql_operator(condition, new_condition) if condition is not None else new_condition
     )
 
 

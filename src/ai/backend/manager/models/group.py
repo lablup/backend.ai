@@ -62,8 +62,8 @@ from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
 from .types import (
     ConditionMerger,
+    QueryArgument,
     QueryCondition,
-    QueryOption,
     append_condition,
     load_related_field,
 )
@@ -232,19 +232,18 @@ class GroupRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        conditions: Iterable[QueryCondition],
-        options: Iterable[QueryOption] = tuple(),
+        args: QueryArgument,
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
         query_stmt = sa.select(GroupRow)
         condition: Optional[sa.sql.expression.BinaryExpression] = None
-        for cond_callable in conditions:
+        for cond_callable in args.conditions:
             condition = cond_callable(condition)
         if condition is not None:
             query_stmt = query_stmt.where(condition)
 
-        for option in options:
+        for option in args.options:
             query_stmt = option(query_stmt)
 
         async def fetch(db_session: AsyncSession) -> list[Self]:
@@ -265,8 +264,10 @@ class GroupRow(Base):
         db: ExtendedAsyncSAEngine,
     ) -> Self:
         rows = await cls.query_by_condition(
-            [by_id(project_id, ConditionMerger.AND)],
-            [load_related_field(cls.load_resource_policy)],
+            QueryArgument(
+                [by_id(project_id, ConditionMerger.AND)],
+                [load_related_field(cls.load_resource_policy)],
+            ),
             db=db,
         )
         if not rows:
