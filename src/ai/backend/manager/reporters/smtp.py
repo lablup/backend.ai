@@ -18,7 +18,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 _BLANK_ID: Final[str] = "(unknown)"
-_UNDEFINED_VALUE: Final[str] = "(undefined)"
 
 
 @dataclass
@@ -71,9 +70,7 @@ class SMTPReporter(AbstractReporter):
         self._trigger_policy = trigger_policy
         self._mail_template = args.template
 
-    def _create_body_from_template(
-        self, message: StartedActionMessage | FinishedActionMessage
-    ) -> str:
+    def _create_body_from_template(self, message: FinishedActionMessage) -> str:
         template = self._mail_template
 
         template = template.replace("{{ action_id }}", str(message.action_id))
@@ -83,18 +80,10 @@ class SMTPReporter(AbstractReporter):
         template = template.replace("{{ entity_type }}", message.entity_type)
         template = template.replace("{{ operation_type }}", message.operation_type)
         template = template.replace("{{ created_at }}", str(message.created_at))
-
-        match message:
-            case StartedActionMessage():
-                template = template.replace("{{ ended_at }}", _UNDEFINED_VALUE)
-                template = template.replace("{{ duration }}", _UNDEFINED_VALUE)
-                template = template.replace("{{ status }}", _UNDEFINED_VALUE)
-                template = template.replace("{{ description }}", _UNDEFINED_VALUE)
-            case FinishedActionMessage():
-                template = template.replace("{{ ended_at }}", str(message.ended_at))
-                template = template.replace("{{ duration }}", str(message.duration))
-                template = template.replace("{{ status }}", message.status.value)
-                template = template.replace("{{ description }}", message.description)
+        template = template.replace("{{ ended_at }}", str(message.ended_at))
+        template = template.replace("{{ duration }}", str(message.duration))
+        template = template.replace("{{ status }}", message.status.value)
+        template = template.replace("{{ description }}", message.description)
 
         return template
 
@@ -103,12 +92,7 @@ class SMTPReporter(AbstractReporter):
 
     @override
     async def report_started(self, message: StartedActionMessage) -> None:
-        if self._trigger_policy == SMTPTriggerPolicy.ON_ERROR:
-            return
-
-        subject = self._make_subject(message.action_type)
-        body = f"Action has been triggered.\n\n{self._create_body_from_template(message)}"
-        self._smtp_sender.send_email(subject, body)
+        pass
 
     @override
     async def report_finished(self, message: FinishedActionMessage) -> None:
