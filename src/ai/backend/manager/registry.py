@@ -2700,14 +2700,17 @@ class AgentRegistry:
 
         if session.network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE:
-                try:
-                    async with self.agent_cache.rpc_context(
-                        session.main_kernel.agent,
-                        order_key=str(session.main_kernel.session_id),
-                    ) as rpc:
-                        await rpc.call.destroy_local_network(network_ref_name)
-                except Exception:
-                    log.exception(f"Failed to destroy the agent-local network {network_ref_name}")
+                if network_ref_name is not None:
+                    try:
+                        async with self.agent_cache.rpc_context(
+                            session.main_kernel.agent,
+                            order_key=str(session.main_kernel.session_id),
+                        ) as rpc:
+                            await rpc.call.destroy_local_network(network_ref_name)
+                    except Exception:
+                        log.exception(
+                            f"Failed to destroy the agent-local network {network_ref_name}"
+                        )
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
                 assert network_ref_name, "network_id should not be None!"
                 network_plugin = self.network_plugin_ctx.plugins[
