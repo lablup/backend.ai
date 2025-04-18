@@ -903,13 +903,17 @@ async def prepare_vfolder_mounts(
     }
 
     requested_vfolder_names: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_ids: set[uuid.UUID] = set()
     requested_vfolder_subpaths: dict[str | uuid.UUID, str] = {}
     requested_vfolder_dstpaths: dict[str | uuid.UUID, str] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
     _already_resolved: set[str] = set()
 
     # Split the vfolder name and subpaths
-    for key in requested_mounts:
+    for key in requested_mount_references:
+        if isinstance(key, uuid.UUID):
+            requested_vfolder_ids.add(key)
+            continue
         name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
@@ -947,6 +951,11 @@ async def prepare_vfolder_mounts(
             extra_vf_conds,
             VFolderRow.id.in_(requested_mount_map.keys()),
         )
+    if requested_vfolder_ids:
+        extra_vf_conds = sa.or_(
+            extra_vf_conds,
+            VFolderRow.id.in_(requested_vfolder_ids),
+        )
     extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
     accessible_vfolders = await query_accessible_vfolders(
         conn,
@@ -968,6 +977,9 @@ async def prepare_vfolder_mounts(
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
+        if vfid in requested_vfolder_ids:
+            requested_vfolder_names[vfid] = name
+            requested_vfolder_subpaths[vfid] = "."
         if name in _already_resolved:
             continue
         if name not in requested_names:
@@ -1022,6 +1034,7 @@ async def prepare_vfolder_mounts(
                 )
             )
             continue
+        print(f"{vfolder['group'] = }, {user_scope.group_id = }")
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
             # if they do not belong to the execution kernel.
