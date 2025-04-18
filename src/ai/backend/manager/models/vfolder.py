@@ -1034,7 +1034,6 @@ async def prepare_vfolder_mounts(
                 )
             )
             continue
-        print(f"{vfolder['group'] = }, {user_scope.group_id = }")
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
             # if they do not belong to the execution kernel.
