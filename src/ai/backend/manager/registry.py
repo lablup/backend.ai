@@ -2705,7 +2705,8 @@ class AgentRegistry:
                         session.main_kernel.agent,
                         order_key=str(session.main_kernel.session_id),
                     ) as rpc:
-                        await rpc.call.destroy_local_network(network_ref_name)
+                        if network_ref_name:
+                            await rpc.call.destroy_local_network(network_ref_name)
                 except Exception:
                     log.exception(f"Failed to destroy the agent-local network {network_ref_name}")
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
