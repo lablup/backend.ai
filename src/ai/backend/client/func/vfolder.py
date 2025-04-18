@@ -570,8 +570,9 @@ class VFolderByName(BaseFunction):
             "exist_ok": exist_ok,
         })
         async with rqst.fetch() as resp:
-            reply = await resp.json()
-            return reply["results"]
+            # reply: {'success': [{'msg': None, 'item': 'task-1'}], 'failed': []}
+            reply = await resp.json()  # {'results': {'success': [], 'failed': [{'msg': "FileExistsError(17, 'File exists')", 'item': 'task-0'}]}}
+            return reply
 
     @api_function
     async def mkdir(
