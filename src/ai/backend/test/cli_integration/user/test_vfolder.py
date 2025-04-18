@@ -1,8 +1,8 @@
-import json
 import os
 from contextlib import closing
 from io import TextIOWrapper
 
+import orjson as json
 import pytest
 
 from ...utils.cli import EOF, ClientRunnerFunc
@@ -159,6 +159,9 @@ def test_mkdir_vfolder(run_user: ClientRunnerFunc):
     # Create directory in the vfolder
     with closing(run_user(["vfolder", "mkdir", vfolder_name, dir_paths[0]])) as p:
         p.expect(EOF)
+        response = json.loads(p.before.decode())
+        assert response.get("success") is not None
+        assert response.get("results") is None
         assert "Successfully created" in p.before.decode(), "Directory creation failed."
 
     # Create already existing directory with exist-ok option
