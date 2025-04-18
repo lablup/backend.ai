@@ -32,8 +32,8 @@ from .base import (
 )
 from .exceptions import ObjectNotFound
 from .types import (
-    QueryArgument,
     QueryCondition,
+    QueryOption,
     QuerySingleCondition,
     load_related_field,
 )
@@ -215,16 +215,25 @@ class UserRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        args: QueryArgument,
+        condition: QueryCondition,
+        options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
-        query_stmt = sa.select(UserRow)
-        condition = args.condition
-        if condition is not None:
-            query_stmt = query_stmt.where(condition)
+        """
+        Query user rows by condition.
+        Args:
+            condition: QueryCondition.
+            options: A sequence of query options.
+            db: Database engine.
+        Returns:
+            A list of UserRow instances that match the condition.
+        Raises:
+            EmptySQLCondition: If condition is empty.
+        """
+        query_stmt = sa.select(UserRow).where(condition.final_sql_condition)
 
-        for option in args.options:
+        for option in options:
             query_stmt = option(query_stmt)
 
         async def fetch(db_session: SASession) -> list[Self]:
@@ -244,15 +253,23 @@ class UserRow(Base):
         *,
         db: ExtendedAsyncSAEngine,
     ) -> Self:
+        """
+        Query user row by UUID with related policies.
+        Args:
+            user_uuid: User UUID.
+            db: Database engine.
+        Returns:
+            The UserRow instance that matches the UUID.
+        Raises:
+            ObjectNotFound: If user not found.
+        """
         rows = await cls.query_by_condition(
-            QueryArgument(
-                QueryCondition.single(by_user_uuid(user_uuid)),
-                [
-                    load_related_field(cls.load_keypairs),
-                    load_related_field(cls.load_main_keypair),
-                    load_related_field(cls.load_resource_policy),
-                ],
-            ),
+            QueryCondition.single(by_user_uuid(user_uuid)),
+            [
+                load_related_field(cls.load_keypairs),
+                load_related_field(cls.load_main_keypair),
+                load_related_field(cls.load_resource_policy),
+            ],
             db=db,
         )
         if not rows:

@@ -1,8 +1,9 @@
-import enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Optional, Protocol, Self
 
 import sqlalchemy as sa
+
+from .exceptions import EmptySQLCondition
 
 type QuerySingleCondition = sa.sql.expression.BinaryExpression
 
@@ -10,45 +11,45 @@ type QueryOptionCallable = Callable[[sa.sql.Select], sa.sql.Select]
 type QueryOption = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
 
 
-class ConditionMerger(enum.Enum):
-    AND = "AND"
-    OR = "OR"
-
-    @property
-    def sql_operator(self) -> Callable:
-        match self:
-            case ConditionMerger.AND:
-                return sa.and_
-            case ConditionMerger.OR:
-                return sa.or_
-
-
 @dataclass
 class QueryCondition:
-    condition: Optional[QuerySingleCondition] = None
+    """
+    A class representing a SQL condition for querying.
+    Raises an EmptySQLCondition exception if the condition is empty.
+    """
+
+    _sql_condition: Optional[QuerySingleCondition]
 
     @classmethod
-    def multiple(cls, operator: ConditionMerger, conditions: list[Self]) -> Self:
-        sql_conditions = [cond.condition for cond in conditions if cond.condition is not None]
+    def multiple(cls, operator: Callable, conditions: list[Self]) -> Self:
+        """
+        Args:
+            operator: The SQL operator to use for combining conditions, one of `sqlalchemy.or_`, `sqlalchemy.and_`.
+            conditions: A list of QueryCondition instances to combine.
+        Returns:
+            A new QueryCondition instance with the combined conditions.
+        """
+        sql_conditions = []
+        for cond in conditions:
+            try:
+                sql_conditions.append(cond.final_sql_condition)
+            except EmptySQLCondition:
+                continue
         if not sql_conditions:
-            return cls()
+            return cls(None)
         if len(sql_conditions) == 1:
             return cls(sql_conditions[0])
-        return cls(operator.sql_operator(*sql_conditions))
+        return cls(operator(*sql_conditions))
 
     @classmethod
     def single(cls, condition: QuerySingleCondition) -> Self:
         return cls(condition)
 
-
-@dataclass
-class QueryArgument:
-    _condition: QueryCondition
-    options: list[QueryOption] = field(default_factory=list)
-
     @property
-    def condition(self) -> Optional[QuerySingleCondition]:
-        return self._condition.condition if self._condition.condition is not None else None
+    def final_sql_condition(self) -> QuerySingleCondition:
+        if self._sql_condition is None:
+            raise EmptySQLCondition
+        return self._sql_condition
 
 
 class _LoadableField(Protocol):

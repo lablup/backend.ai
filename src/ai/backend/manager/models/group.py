@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from collections.abc import Container
+from collections.abc import Container, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
@@ -12,7 +12,6 @@ from typing import (
     Iterable,
     Optional,
     Self,
-    Sequence,
     TypeAlias,
     TypedDict,
     Union,
@@ -61,8 +60,8 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
 from .types import (
-    QueryArgument,
     QueryCondition,
+    QueryOption,
     QuerySingleCondition,
     load_related_field,
 )
@@ -231,16 +230,24 @@ class GroupRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        args: QueryArgument,
+        condition: QueryCondition,
+        options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
-        query_stmt = sa.select(GroupRow)
-        condition = args.condition
-        if condition is not None:
-            query_stmt = query_stmt.where(condition)
+        """
+        Args:
+            condition: QueryCondition.
+            options: A sequence of query options.
+            db: Database engine.
+        Returns:
+            A list of GroupRow instances that match the condition.
+        Raises:
+            EmptySQLCondition: If the condition is empty.
+        """
+        query_stmt = sa.select(GroupRow).where(condition.final_sql_condition)
 
-        for option in args.options:
+        for option in options:
             query_stmt = option(query_stmt)
 
         async def fetch(db_session: AsyncSession) -> list[Self]:
@@ -260,11 +267,19 @@ class GroupRow(Base):
         *,
         db: ExtendedAsyncSAEngine,
     ) -> Self:
+        """
+        Query a project by its ID with related resource policies.
+        Args:
+            project_id: The ID of the project.
+            db: Database engine.
+        Returns:
+            The GroupRow instance that matches the project ID.
+        Raises:
+            ObjectNotFound: If the project not found.
+        """
         rows = await cls.query_by_condition(
-            QueryArgument(
-                QueryCondition.single(by_id(project_id)),
-                [load_related_field(cls.load_resource_policy)],
-            ),
+            QueryCondition.single(by_id(project_id)),
+            [load_related_field(cls.load_resource_policy)],
             db=db,
         )
         if not rows:
