@@ -479,7 +479,9 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
         )
 
         return KeyPairResourcePolicyModifier(
-            default_for_unspecified=OptionalState[str].from_graphql(default_for_unspecified),
+            default_for_unspecified=OptionalState[DefaultForUnspecified].from_graphql(
+                default_for_unspecified
+            ),
             total_resource_slots=OptionalState[ResourceSlot].from_graphql(total_resource_slots),
             max_session_lifetime=OptionalState[int].from_graphql(self.max_session_lifetime),
             max_concurrent_sessions=OptionalState[int].from_graphql(self.max_concurrent_sessions),

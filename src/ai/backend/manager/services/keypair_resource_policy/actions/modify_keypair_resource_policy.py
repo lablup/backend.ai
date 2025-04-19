@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.services.keypair_resource_policy.actions.base import (
@@ -13,7 +13,9 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class KeyPairResourcePolicyModifier(PartialModifier):
     allowed_vfolder_hosts: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
-    default_for_unspecified: OptionalState[str] = field(default_factory=OptionalState.nop)
+    default_for_unspecified: OptionalState[DefaultForUnspecified] = field(
+        default_factory=OptionalState.nop
+    )
     idle_timeout: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_concurrent_sessions: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_containers_per_session: OptionalState[int] = field(default_factory=OptionalState.nop)
