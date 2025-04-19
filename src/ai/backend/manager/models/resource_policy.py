@@ -504,7 +504,10 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -538,7 +541,10 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
 
 
 class ModifyKeyPairResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -571,7 +577,10 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
 
 
 class DeleteKeyPairResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -748,7 +757,10 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):
 
 
 class CreateUserResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -784,7 +796,10 @@ class CreateUserResourcePolicy(graphene.Mutation):
 
 
 class ModifyUserResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -819,7 +834,10 @@ class ModifyUserResourcePolicy(graphene.Mutation):
 
 
 class DeleteUserResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -989,7 +1007,10 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
 
 
 class CreateProjectResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -1023,7 +1044,10 @@ class CreateProjectResourcePolicy(graphene.Mutation):
 
 
 class ModifyProjectResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
@@ -1056,7 +1080,10 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
 
 
 class DeleteProjectResourcePolicy(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
 
     class Arguments:
         name = graphene.String(required=True)
