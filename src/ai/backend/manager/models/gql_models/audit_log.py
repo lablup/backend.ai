@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Mapping, Optional, Self, cast
 
 import graphene
+from dateutil.parser import parse as dtparse
 
 from ai.backend.manager.models.audit_log import (
     AuditLogEntityType,
@@ -72,7 +73,7 @@ class AuditLogNode(graphene.ObjectType):
         "action_id": ("action_id", None),
         "operation": ("operation", None),
         "entity_id": ("entity_id", None),
-        "created_at": ("created_at", None),
+        "created_at": ("created_at", dtparse),
         "request_id": ("request_id", None),
         "description": ("description", None),
         "duration": ("duration", None),
