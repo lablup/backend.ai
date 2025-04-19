@@ -1093,7 +1093,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     result = await root_ctx.processors.vfolder_file.mkdir.wait_for_complete(
         MkdirAction(row["id"], params["path"], params["parents"], params["exist_ok"])
     )
-    return web.json_response(result.results, status=result.storage_resp_status)
+    return web.json_response({"results": result.results}, status=result.storage_resp_status)
 
 
 @auth_required
