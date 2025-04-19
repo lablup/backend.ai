@@ -711,12 +711,12 @@ class VFolderService:
         allowed_vfolder_types = await self._shared_config.get_vfolder_types()
         if "user" not in allowed_vfolder_types:
             raise InvalidParameter("user vfolder cannot be created in this host")
-        async with self._db.begin_session() as db_session:
-            requester_user_row = await db_session.scalar(
-                sa.select(UserRow)
-                .where(UserRow.uuid == action.requester_user_uuid)
-                .options(selectinload(UserRow.resource_policy_row).options())
-            )
+        requester_user_row = await UserRow.get_by_id_with_policies(
+            action.requester_user_uuid, db=self._db
+        )
+        if requester_user_row is None:
+            raise InvalidParameter("No such user.")
+        async with self._db.begin_readonly_session() as db_session:
             entries = await query_accessible_vfolders(
                 db_session.bind,
                 action.requester_user_uuid,
@@ -731,6 +731,10 @@ class VFolderService:
                     break
             else:
                 raise InvalidParameter("No such vfolder.")
+        project_row: Optional[GroupRow] = None
+        if (project_id := row["group"]) is not None:
+            project_row = await GroupRow.get_by_id_with_policies(project_id, db=self._db)
+        async with self._db.begin_session() as db_session:
             domain_name = requester_user_row.domain_name
             source_folder_host = row["host"]
             source_folder_id = VFolderID(row["quota_scope_id"], row["id"])
@@ -768,19 +772,13 @@ class VFolderService:
             if source_proxy_name != target_proxy_name:
                 raise InvalidParameter("proxy name of source and target vfolders must be equal.")
 
-            if row["group"]:
-                query = (
-                    sa.select(GroupRow)
-                    .where((GroupRow.domain_name == domain_name) & (GroupRow.id == row["group"]))
-                    .options(selectinload(GroupRow.resource_policy_row))
-                )
-                result = await db_session.execute(query)
-                group_row = result.scalar()
-                vfolder_hosts = group_row.resource_policy_row.allowed_vfolder_hosts
-                max_vfolder_count = group_row.resource_policy_row.max_vfolder_count
-
+            if project_row is not None:
+                vfolder_hosts = project_row.allowed_vfolder_hosts
+                max_vfolder_count = project_row.resource_policy_row.max_vfolder_count
             else:
-                vfolder_hosts = requester_user_row.resource_policy_row.allowed_vfolder_hosts
+                vfolder_hosts = (
+                    requester_user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
+                )
                 max_vfolder_count = requester_user_row.resource_policy_row.max_vfolder_count
 
             allowed_hosts = await filter_host_allowed_permission(

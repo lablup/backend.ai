@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Self, Sequence, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Optional,
+    Self,
+    Sequence,
+    cast,
+)
 from uuid import UUID
 
 import bcrypt
@@ -22,6 +30,14 @@ from .base import (
     IPColumn,
     mapper_registry,
 )
+from .exceptions import ObjectNotFound
+from .types import (
+    QueryCondition,
+    QueryOption,
+    QuerySingleCondition,
+    load_related_field,
+)
+from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .keypair import KeyPairRow
@@ -164,6 +180,22 @@ class UserRow(Base):
     )
 
     @classmethod
+    def load_keypairs(cls) -> Callable:
+        from .keypair import KeyPairRow
+
+        return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
+
+    @classmethod
+    def load_main_keypair(cls) -> Callable:
+        from .keypair import KeyPairRow
+
+        return joinedload(UserRow.main_keypair).options(joinedload(KeyPairRow.resource_policy_row))
+
+    @classmethod
+    def load_resource_policy(cls) -> Callable:
+        return joinedload(UserRow.resource_policy_row)
+
+    @classmethod
     async def query_user_by_uuid(
         cls,
         user_uuid: UUID,
@@ -179,6 +211,70 @@ class UserRow(Base):
         )
         user_row = await db_session.scalar(user_query)
         return user_row
+
+    @classmethod
+    async def query_by_condition(
+        cls,
+        condition: QueryCondition,
+        options: Sequence[QueryOption] = tuple(),
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> list[Self]:
+        """
+        Query user rows by condition.
+        Args:
+            condition: QueryCondition.
+            options: A sequence of query options.
+            db: Database engine.
+        Returns:
+            A list of UserRow instances that match the condition.
+        Raises:
+            EmptySQLCondition: If condition is empty.
+        """
+        query_stmt = sa.select(UserRow).where(condition.final_sql_condition)
+
+        for option in options:
+            query_stmt = option(query_stmt)
+
+        async def fetch(db_session: SASession) -> list[Self]:
+            return (await db_session.scalars(query_stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(
+                fetch,
+                db.begin_readonly_session,
+                db_conn,
+            )
+
+    @classmethod
+    async def get_by_id_with_policies(
+        cls,
+        user_uuid: UUID,
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> Self:
+        """
+        Query user row by UUID with related policies.
+        Args:
+            user_uuid: User UUID.
+            db: Database engine.
+        Returns:
+            The UserRow instance that matches the UUID.
+        Raises:
+            ObjectNotFound: If user not found.
+        """
+        rows = await cls.query_by_condition(
+            QueryCondition.single(by_user_uuid(user_uuid)),
+            [
+                load_related_field(cls.load_keypairs),
+                load_related_field(cls.load_main_keypair),
+                load_related_field(cls.load_resource_policy),
+            ],
+            db=db,
+        )
+        if not rows:
+            raise ObjectNotFound(f"User with id {user_uuid} not found")
+        return rows[0]
 
     def get_main_keypair_row(self) -> Optional[KeyPairRow]:
         # `cast()` requires import of KeyPairRow
@@ -198,6 +294,24 @@ class UserRow(Base):
         else:
             keypair_candidate = main_keypair_row
         return keypair_candidate
+
+
+def by_user_uuid(
+    user_uuid: UUID,
+) -> QuerySingleCondition:
+    return UserRow.uuid == user_uuid
+
+
+def by_username(
+    username: str,
+) -> QuerySingleCondition:
+    return UserRow.username == username
+
+
+def by_user_email(
+    email: str,
+) -> QuerySingleCondition:
+    return UserRow.email == email
 
 
 def _hash_password(password: str) -> str:
