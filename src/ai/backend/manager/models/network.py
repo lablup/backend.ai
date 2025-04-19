@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Final, Mapping, overload
 
 import graphene
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,8 +165,8 @@ class NetworkNode(graphene.ObjectType):
         "driver": ("driver", None),
         "project": ("project", uuid.UUID),
         "domain_name": ("domain_name", None),
-        "created_at": ("created_at", None),
-        "updated_at": ("updated_at", None),
+        "created_at": ("created_at", dtparse),
+        "updated_at": ("updated_at", dtparse),
         "options": ("options", None),
     }
 
