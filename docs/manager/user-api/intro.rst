@@ -41,7 +41,7 @@ Note that the API server may raise a timeout error and cancel the run if the wai
 In the query mode, usually the runtime context (e.g., global variables) is preserved for next subsequent runs, but this is not guaranteed by the API itself---it's up to the kernel runtime implementation.
 
 .. _run-state-diagram:
-.. figure:: run-state-diagram.svg
+.. figure:: run-state-diagram.png
 
    The state diagram of a “run” with the **execute** API.
 
