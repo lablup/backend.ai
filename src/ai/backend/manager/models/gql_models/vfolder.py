@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
@@ -13,6 +14,7 @@ from typing import (
 import graphene
 import graphql
 import sqlalchemy as sa
+import tomli
 import trafaret as t
 from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
@@ -117,6 +119,8 @@ class VirtualFolderNode(graphene.ObjectType):
         VFolderPermissionValueField,
         description=f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}.",
     )
+
+    service_config = graphene.JSONString(description="Added in 25.7.0.")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", uuid.UUID),
@@ -255,6 +259,7 @@ class VirtualFolderNode(graphene.ObjectType):
                 graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
             )
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
+            print("permission_ctx!", permission_ctx)
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
@@ -392,6 +397,38 @@ class VirtualFolderNode(graphene.ObjectType):
             for vf in vfolder_rows
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def resolve_service_config(self, info: graphene.ResolveInfo) -> str:
+        graph_ctx: GraphQueryContext = info.context
+        chunks = bytes()
+        config_name = "service-config.toml"
+
+        vfolder_row_id = self.row_id
+        quota_scope_id = self.quota_scope_id
+        host = self.host
+        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
+            host, is_unmanaged(self.unmanaged_path)
+        )
+
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/fetch",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfolder_id),
+                "relpath": f"./{config_name}",
+            },
+        ) as (client_api_url, storage_resp):
+            while True:
+                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+        service_config_toml = chunks.decode("utf-8")
+        raw_cfg = tomli.loads(service_config_toml)
+        return json.dumps(raw_cfg, ensure_ascii=False, indent=2)
 
 
 class VirtualFolderConnection(Connection):
