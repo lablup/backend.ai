@@ -28,7 +28,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-cli",
+        name="backend_ai-cli",
         description="Backend.AI Command Line Interface Helper",
         license="MIT",
     ),

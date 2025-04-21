@@ -56,7 +56,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-agent",
+        name="backend_ai-agent",
         description="Backend.AI Agent",
         license="LGPLv3",
     ),

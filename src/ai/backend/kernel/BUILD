@@ -25,7 +25,7 @@ python_distribution(
         ":src",
     ],
     provides=python_artifact(
-        name="backend.ai-kernel",
+        name="backend_ai-kernel",
         description="Backend.AI Kernel Runner",
         license="LGPLv3",
     ),
