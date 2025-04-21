@@ -9,7 +9,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderItemField,
 )
 from ai.backend.common.dto.manager.request import VFolderCreateReq
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.types import RuntimeVariant, VFolderUsageMode
 from ai.backend.manager.models import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -124,6 +124,6 @@ class ServiceEnvironmentConfig(BaseModel):
 
 
 class ServiceConfig(BaseModel):
-    runtime_variant: str
+    runtime_variant: RuntimeVariant
     environment: ServiceEnvironmentConfig
     resource_limits: dict[str, Any] = Field(default_factory=dict)
