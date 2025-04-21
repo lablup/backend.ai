@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Self
 
+from pydantic import BaseModel, Field
+
 from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
 from ai.backend.common.dto.manager.field import (
     VFolderItemField,
@@ -116,28 +118,7 @@ class VFolderItem:
         )
 
 
-@dataclass
-class ServiceConfig:
+class ServiceConfig(BaseModel):
     runtime_variant: str
     environment: dict[str, Any]
-    resource_limits: dict[str, Any]
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        if "runtime_variant" not in data:
-            raise ValueError("Missing 'runtime_variant' in service config data")
-        if "environment" not in data:
-            raise ValueError("Missing 'environment' in service config data")
-
-        return cls(
-            runtime_variant=data["runtime_variant"],
-            environment=data["environment"],
-            resource_limits=data.get("resource_limit", {}),
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "runtime_variant": self.runtime_variant,
-            "environment": self.environment,
-            "resource_limits": self.resource_limits,
-        }
+    resource_limits: dict[str, Any] = Field(default_factory=dict)

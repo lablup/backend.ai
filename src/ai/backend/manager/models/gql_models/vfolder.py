@@ -400,15 +400,17 @@ class VirtualFolderNode(graphene.ObjectType):
     async def resolve_service_config(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
 
-        result = await graph_ctx.processors.vfolder_file.fetch_service_config.wait_for_complete(
-            FetchServiceConfigAction(
-                vfolder_uuid=self.row_id,
-                quota_scope_id=self.quota_scope_id,
-                host=self.host,
-                unmanaged_path=self.unmanaged_path,
+        action_result = (
+            await graph_ctx.processors.vfolder_file.fetch_service_config.wait_for_complete(
+                FetchServiceConfigAction(
+                    vfolder_uuid=self.row_id,
+                    quota_scope_id=self.quota_scope_id,
+                    host=self.host,
+                    unmanaged_path=self.unmanaged_path,
+                )
             )
         )
-        return json.dumps(result.result.to_dict())
+        return json.dumps(action_result.result.model_dump())
 
 
 class VirtualFolderConnection(Connection):
