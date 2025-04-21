@@ -300,7 +300,7 @@ async def rescan_images(
     # TODO: delete images removed from registry?
 
 
-type Resources = dict[SlotName, dict[str, Decimal]]
+type Resources = dict[SlotName, dict[str, Any]]
 
 
 # Defined for avoiding circular import
@@ -912,6 +912,8 @@ class ImageAliasRow(Base):
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
     def to_dataclass(self) -> ImageAliasData:
+        from ai.backend.manager.data.image.types import ImageAliasData
+
         return ImageAliasData(id=self.id, alias=self.alias)
 
 

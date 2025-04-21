@@ -41,6 +41,12 @@ class AliasImageActionResult(BaseActionResult):
     def entity_id(self) -> Optional[str]:
         return str(self.image_id)
 
+    # TODO: Find a way to compare image alias row ID
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AliasImageActionResult):
+            return False
+        return self.image_alias.alias == other.image_alias.alias
+
 
 class AliasImageActionValueError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
