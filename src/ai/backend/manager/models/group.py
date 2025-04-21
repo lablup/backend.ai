@@ -3,15 +3,15 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from collections.abc import Container
+from collections.abc import Container, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Iterable,
     Optional,
     Self,
-    Sequence,
     TypeAlias,
     TypedDict,
     Union,
@@ -24,7 +24,7 @@ import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
@@ -45,6 +45,7 @@ from .base import (
     VFolderHostPermissionColumn,
     mapper_registry,
 )
+from .exceptions import ObjectNotFound
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -58,6 +59,13 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
+from .types import (
+    QueryCondition,
+    QueryOption,
+    QuerySingleCondition,
+    load_related_field,
+)
+from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from .rbac import ContainerRegistryScope
@@ -214,6 +222,73 @@ class GroupRow(Base):
             raise NoResultFound
 
         return row
+
+    @classmethod
+    def load_resource_policy(cls) -> Callable:
+        return joinedload(GroupRow.resource_policy_row)
+
+    @classmethod
+    async def query_by_condition(
+        cls,
+        condition: QueryCondition,
+        options: Sequence[QueryOption] = tuple(),
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> list[Self]:
+        """
+        Args:
+            condition: QueryCondition.
+            options: A sequence of query options.
+            db: Database engine.
+        Returns:
+            A list of GroupRow instances that match the condition.
+        Raises:
+            EmptySQLCondition: If the condition is empty.
+        """
+        query_stmt = sa.select(GroupRow).where(condition.final_sql_condition)
+
+        for option in options:
+            query_stmt = option(query_stmt)
+
+        async def fetch(db_session: AsyncSession) -> list[Self]:
+            return (await db_session.scalars(query_stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(
+                fetch,
+                db.begin_readonly_session,
+                db_conn,
+            )
+
+    @classmethod
+    async def get_by_id_with_policies(
+        cls,
+        project_id: uuid.UUID,
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> Self:
+        """
+        Query a project by its ID with related resource policies.
+        Args:
+            project_id: The ID of the project.
+            db: Database engine.
+        Returns:
+            The GroupRow instance that matches the project ID.
+        Raises:
+            ObjectNotFound: If the project not found.
+        """
+        rows = await cls.query_by_condition(
+            QueryCondition.single(by_id(project_id)),
+            [load_related_field(cls.load_resource_policy)],
+            db=db,
+        )
+        if not rows:
+            raise ObjectNotFound(f"Project with id {project_id} not found")
+        return rows[0]
+
+
+def by_id(project_id: uuid.UUID) -> QuerySingleCondition:
+    return GroupRow.id == project_id
 
 
 @dataclass
