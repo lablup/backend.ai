@@ -188,3 +188,30 @@ class MkdirActionResult(BaseActionResult):
     @override
     def entity_id(self) -> Optional[str]:
         return str(self.vfolder_uuid)
+
+
+@dataclass
+class FetchServiceConfigAction(VFolderAction):
+    vfolder_uuid: uuid.UUID
+    quota_scope_id: str
+    host: str
+    unmanaged_path: str
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)
+
+    @override
+    def operation_type(self) -> str:
+        return "fetch_service_config"
+
+
+@dataclass
+class FetchServiceConfigActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
+    # TODO: add type
+    result: dict[str, Any]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_uuid)

@@ -14,7 +14,6 @@ from typing import (
 import graphene
 import graphql
 import sqlalchemy as sa
-import tomli
 import trafaret as t
 from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
@@ -28,6 +27,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.services.vfolder.actions.file import FetchServiceConfigAction
 
 from ...defs import (
     DEFAULT_CHUNK_SIZE,
@@ -400,35 +400,16 @@ class VirtualFolderNode(graphene.ObjectType):
 
     async def resolve_service_config(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
-        chunks = bytes()
-        config_name = "service-config.toml"
 
-        vfolder_row_id = self.row_id
-        quota_scope_id = self.quota_scope_id
-        host = self.host
-        vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
-        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
-            host, is_unmanaged(self.unmanaged_path)
+        result = await graph_ctx.processors.vfolder_file.fetch_service_config.wait_for_complete(
+            FetchServiceConfigAction(
+                vfolder_uuid=self.row_id,
+                quota_scope_id=self.quota_scope_id,
+                host=self.host,
+                unmanaged_path=self.unmanaged_path,
+            )
         )
-
-        async with graph_ctx.storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/file/fetch",
-            json={
-                "volume": volume_name,
-                "vfid": str(vfolder_id),
-                "relpath": f"./{config_name}",
-            },
-        ) as (client_api_url, storage_resp):
-            while True:
-                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
-                if not chunk:
-                    break
-                chunks += chunk
-        service_config_toml = chunks.decode("utf-8")
-        raw_cfg = tomli.loads(service_config_toml)
-        return json.dumps(raw_cfg, ensure_ascii=False, indent=2)
+        return json.dumps(result.result)
 
 
 class VirtualFolderConnection(Connection):
