@@ -2,7 +2,6 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import (
-    TYPE_CHECKING,
     Any,
     Optional,
     override,
@@ -11,10 +10,7 @@ from typing import (
 from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
 
-if TYPE_CHECKING:
-    from ai.backend.manager.data.vfolder.dto import ServiceConfig
-
-from ..types import FileInfo
+from ..types import FileInfo, ServiceConfigInfo
 from .base import VFolderAction
 
 
@@ -213,7 +209,7 @@ class FetchServiceConfigAction(VFolderAction):
 @dataclass
 class FetchServiceConfigActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
-    result: "ServiceConfig"
+    result: ServiceConfigInfo
 
     @override
     def entity_id(self) -> Optional[str]:
