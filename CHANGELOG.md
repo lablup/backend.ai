@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.1 (2025-04-21)
+
+### Features
+* Add more filterspec to `EndPoint` GQL. ([#4210](https://github.com/lablup/backend.ai/issues/4210))
+
+### Fixes
+* Fix wrong types in `ResourcePolicy` GQL modifier. ([#4154](https://github.com/lablup/backend.ai/issues/4154))
+* Fix VFolder clone by correcting access to user info ([#4214](https://github.com/lablup/backend.ai/issues/4214))
+* Skip destroying session's network if session does not have any network ([#4215](https://github.com/lablup/backend.ai/issues/4215))
+* Calculate RBAC admin role in project correctly ([#4218](https://github.com/lablup/backend.ai/issues/4218))
+* Fix extra mounts of model services ([#4224](https://github.com/lablup/backend.ai/issues/4224))
+* Add missing `dtparse` for `created_at` in queryfilter ([#4225](https://github.com/lablup/backend.ai/issues/4225))
+* Revert response schema of vfolder mkdir API ([#4227](https://github.com/lablup/backend.ai/issues/4227))
+
+
 ## 25.6.0 (2025-04-17)
 
 ### Breaking Changes
