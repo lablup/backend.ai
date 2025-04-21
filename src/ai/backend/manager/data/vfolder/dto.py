@@ -118,7 +118,12 @@ class VFolderItem:
         )
 
 
+class ServiceEnvironmentConfig(BaseModel):
+    image: str
+    architecture: str
+
+
 class ServiceConfig(BaseModel):
     runtime_variant: str
-    environment: dict[str, Any]
+    environment: ServiceEnvironmentConfig
     resource_limits: dict[str, Any] = Field(default_factory=dict)
