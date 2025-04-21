@@ -1200,6 +1200,9 @@ type VirtualFolder implements Item {
   cur_size: BigInt
   cloneable: Boolean
   status: String
+
+  """Added in 25.7.0."""
+  service_config: JSONString
 }
 
 type ComputeSession implements Item {
