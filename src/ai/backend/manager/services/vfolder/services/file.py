@@ -10,6 +10,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.data.vfolder.dto import ServiceConfig
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
@@ -299,9 +300,11 @@ class VFolderFileService:
         vfolder_row_id = action.vfolder_uuid
         quota_scope_id = action.quota_scope_id
         host = action.host
+        unmanaged_path = action.unmanaged_path
+
         vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
-            host, is_unmanaged(action.unmanaged_path)
+            host, is_unmanaged(unmanaged_path)
         )
 
         async with self._storage_manager.request(
@@ -320,6 +323,8 @@ class VFolderFileService:
                     break
                 resp_chunks += chunk
         service_config_toml = resp_chunks.decode("utf-8")
+
         return FetchServiceConfigActionResult(
-            result=tomli.loads(service_config_toml), vfolder_uuid=action.vfolder_uuid
+            result=ServiceConfig.from_dict(tomli.loads(service_config_toml)),
+            vfolder_uuid=action.vfolder_uuid,
         )

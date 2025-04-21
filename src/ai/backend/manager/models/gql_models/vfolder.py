@@ -259,7 +259,6 @@ class VirtualFolderNode(graphene.ObjectType):
                 graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
             )
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
-            print("permission_ctx!", permission_ctx)
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
@@ -409,7 +408,7 @@ class VirtualFolderNode(graphene.ObjectType):
                 unmanaged_path=self.unmanaged_path,
             )
         )
-        return json.dumps(result.result)
+        return json.dumps(result.result.to_dict())
 
 
 class VirtualFolderConnection(Connection):

@@ -114,3 +114,30 @@ class VFolderItem:
             max_files=self.max_files,
             cur_size=self.cur_size,
         )
+
+
+@dataclass
+class ServiceConfig:
+    runtime_variant: str
+    environment: dict[str, Any]
+    resource_limits: dict[str, Any]
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        if "runtime_variant" not in data:
+            raise ValueError("Missing 'runtime_variant' in service config data")
+        if "environment" not in data:
+            raise ValueError("Missing 'environment' in service config data")
+
+        return cls(
+            runtime_variant=data["runtime_variant"],
+            environment=data["environment"],
+            resource_limits=data.get("resource_limit", {}),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "runtime_variant": self.runtime_variant,
+            "environment": self.environment,
+            "resource_limits": self.resource_limits,
+        }
