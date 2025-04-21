@@ -2,14 +2,12 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Self
 
-from pydantic import BaseModel, Field
-
 from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
 from ai.backend.common.dto.manager.field import (
     VFolderItemField,
 )
 from ai.backend.common.dto.manager.request import VFolderCreateReq
-from ai.backend.common.types import RuntimeVariant, VFolderUsageMode
+from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.models import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -116,14 +114,3 @@ class VFolderItem:
             max_files=self.max_files,
             cur_size=self.cur_size,
         )
-
-
-class ServiceEnvironmentConfig(BaseModel):
-    image: str
-    architecture: str
-
-
-class ServiceConfig(BaseModel):
-    runtime_variant: RuntimeVariant
-    environment: ServiceEnvironmentConfig
-    resource_limits: dict[str, Any] = Field(default_factory=dict)

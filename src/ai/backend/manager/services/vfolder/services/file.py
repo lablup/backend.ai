@@ -10,7 +10,6 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.manager.config import SharedConfig
-from ai.backend.manager.data.vfolder.dto import ServiceConfig
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
@@ -39,7 +38,7 @@ from ..actions.file import (
     RenameFileActionResult,
 )
 from ..exceptions import InvalidParameter
-from ..types import FileInfo
+from ..types import FileInfo, ServiceConfigInfo
 
 
 class VFolderFileService:
@@ -315,6 +314,6 @@ class VFolderFileService:
         service_config_toml = resp_chunks.decode("utf-8")
 
         return FetchServiceConfigActionResult(
-            result=ServiceConfig.model_validate(tomli.loads(service_config_toml)),
+            result=ServiceConfigInfo.model_validate(tomli.loads(service_config_toml)),
             vfolder_uuid=action.vfolder_uuid,
         )
