@@ -47,7 +47,7 @@ from ..agent import (
     ScanImagesResult,
 )
 from ..exception import UnsupportedResource
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelInitArgs
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..types import Container, ContainerStatus, KernelOwnershipData, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
@@ -175,15 +175,18 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
         return DummyKernel(
-            self.ownership_data,
-            self.kernel_config["network_id"],
-            self.image_ref,
-            self.kspec_version,
-            agent_config=self.local_config,
-            service_ports=service_ports,
-            resource_spec=resource_spec,
-            environ=environ,
-            data={},
+            KernelInitArgs(
+                ownership_data=self.ownership_data,
+                network_id=self.kernel_config["network_id"],
+                image=self.image_ref,
+                version=self.kspec_version,
+                agent_config=self.local_config,
+                resource_spec=resource_spec,
+                service_ports=service_ports,
+                environ=environ,
+                data={},
+                event_producer=self.event_producer,
+            ),
             dummy_config=self.dummy_config,
         )
 

@@ -5,7 +5,7 @@ import os
 import shutil
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple, override
+from typing import Any, FrozenSet, Mapping, Optional, Sequence, Tuple, override
 
 import pkg_resources
 import zmq
@@ -16,15 +16,13 @@ from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
 from ai.backend.agent.utils import get_arch_name
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..kernel import AbstractCodeRunner, AbstractKernel
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
+from ..kernel import AbstractCodeRunner, AbstractKernel, KernelInitArgs
+from ..types import AgentEventData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -32,35 +30,20 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class KubernetesKernel(AbstractKernel):
     deployment_name: str
 
-    def __init__(
-        self,
-        ownership_data: KernelOwnershipData,
-        network_id: str,
-        image: ImageRef,
-        version: int,
-        *,
-        agent_config: Mapping[str, Any],
-        resource_spec: KernelResourceSpec,
-        service_ports: Any,  # TODO: type-annotation
-        data: Dict[str, Any],
-        environ: Mapping[str, Any],
-    ) -> None:
-        super().__init__(
-            ownership_data,
-            network_id,
-            image,
-            version,
-            agent_config=agent_config,
-            resource_spec=resource_spec,
-            service_ports=service_ports,
-            data=data,
-            environ=environ,
-        )
+    def __init__(self, args: KernelInitArgs) -> None:
+        super().__init__(args)
 
-        self.deployment_name = f"kernel-{ownership_data.kernel_id}"
+        self.deployment_name = f"kernel-{self.ownership_data.kernel_id}"
 
     async def close(self) -> None:
+        await super().close()
         await self.scale(0)
+
+    async def _check_own_container_status_task(
+        self, interval: float, timeout: Optional[float] = None
+    ) -> None:
+        # TODO: Implement container status check
+        pass
 
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int

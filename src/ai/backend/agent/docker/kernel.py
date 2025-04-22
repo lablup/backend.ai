@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple, cast, override
+from typing import Any, Final, FrozenSet, Mapping, Optional, Sequence, Tuple, cast, override
 
 import janus
 import pkg_resources
@@ -21,18 +21,22 @@ from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
-from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events import DanglingKernelDetected, EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..kernel import AbstractCodeRunner, AbstractKernel
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
+from ..kernel import AbstractCodeRunner, AbstractKernel, KernelInitArgs
+from ..types import (
+    AgentEventData,
+    Container,
+    ContainerStatus,
+    KernelLifecycleStatus,
+)
 from ..utils import closing_async, get_arch_name
+from .utils import container_from_docker_container
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -45,34 +49,12 @@ class DockerKernel(AbstractKernel):
 
     def __init__(
         self,
-        ownership_data: KernelOwnershipData,
-        network_id: str,
-        image: ImageRef,
-        version: int,
+        args: KernelInitArgs,
         network_driver: str,
-        *,
-        agent_config: Mapping[str, Any],
-        resource_spec: KernelResourceSpec,
-        service_ports: Any,  # TODO: type-annotation
-        environ: Mapping[str, Any],
-        data: Dict[str, Any],
     ) -> None:
-        super().__init__(
-            ownership_data,
-            network_id,
-            image,
-            version,
-            agent_config=agent_config,
-            resource_spec=resource_spec,
-            service_ports=service_ports,
-            data=data,
-            environ=environ,
-        )
+        super().__init__(args)
 
         self.network_driver = network_driver
-
-    async def close(self) -> None:
-        pass
 
     def __getstate__(self):
         props = super().__getstate__()
@@ -82,6 +64,65 @@ class DockerKernel(AbstractKernel):
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)
+
+    async def _get_container_info(self) -> Optional[Container]:
+        if self.container_id is None:
+            return None
+        async with closing_async(Docker()) as docker:
+            container = await docker.containers.get(self.container_id)
+        return container_from_docker_container(container)
+
+    def _compare_with_container(self, container: Container) -> None:
+        match self.state:
+            case KernelLifecycleStatus.PREPARING:
+                raise
+            case KernelLifecycleStatus.RUNNING:
+                if container.status != ContainerStatus.RUNNING:
+                    raise
+            case KernelLifecycleStatus.TERMINATING:
+                # There might be a delay in the container status change
+                # after the kernel is being terminated.
+                pass
+
+    async def _check_own_container_status(self) -> None:
+        try:
+            container = await self._get_container_info()
+        except DockerError as e:
+            if e.status == 404:
+                raise
+            raise
+        if container is None:
+            if self.state == KernelLifecycleStatus.RUNNING:
+                await self._event_producer.produce_event(
+                    DanglingKernelDetected(kernel_id=self.kernel_id), self.agent_id
+                )
+            return
+        self._compare_with_container(container)
+
+    async def _check_own_container_status_task(
+        self, interval: float, timeout: Optional[float] = None
+    ) -> None:
+        while True:
+            try:
+                async with asyncio.timeout(5):
+                    await self._check_own_container_status()
+                await asyncio.sleep(interval)
+            except asyncio.TimeoutError:
+                continue
+            except asyncio.CancelledError:
+                if self.state == KernelLifecycleStatus.TERMINATING:
+                    # The kernel is being terminated.
+                    # No need to check the container status anymore.
+                    break
+                await asyncio.sleep(interval)
+            except Exception as e:
+                if self.state == KernelLifecycleStatus.TERMINATING:
+                    break
+                # Any other exception should be logged and ignored.
+                log.exception(
+                    f"Unexpected exception occurred while checking container status. (e: {e})"
+                )
+                await asyncio.sleep(interval)
 
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int

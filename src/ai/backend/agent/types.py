@@ -65,6 +65,22 @@ class Container:
     ports: Sequence[Port]
     backend_obj: Any  # used to keep the backend-specific data
 
+    @property
+    def kernel_id(self) -> Optional[KernelId]:
+        raw_kernel_id = self.labels.get("ai.backend.kernel-id")
+        try:
+            return KernelId(uuid.UUID(raw_kernel_id))
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def session_id(self) -> Optional[SessionId]:
+        _session_id = self.labels.get("ai.backend.session-id")
+        try:
+            return SessionId(uuid.UUID(_session_id))
+        except (TypeError, ValueError):
+            return None
+
 
 class KernelLifecycleStatus(enum.StrEnum):
     """

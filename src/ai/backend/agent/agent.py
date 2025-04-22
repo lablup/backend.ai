@@ -83,6 +83,8 @@ from ai.backend.common.events import (
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DanglingContainerDetected,
+    DanglingKernelDetected,
     DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoVolumeMountEvent,
@@ -1410,6 +1412,41 @@ class AbstractAgent(
                             kernel_id,
                         )
 
+    async def _scan_containers(self, interval: float) -> None:
+        """
+        Scan the kernel containers and check if they are in the kernel registry.
+        Produce `DanglingContainerDetected` events if there are any.
+        """
+
+        try:
+            async with asyncio.timeout(20):
+                containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
+        except asyncio.TimeoutError:
+            log.warning("scan_mismatch_kernels() timeout, continuing")
+            return
+
+        for existing_kernel, container in containers:
+            if existing_kernel not in self.kernel_registry:
+                log.warning(
+                    "scan_mismatch_kernels() detected dangling container (k:{},c:{})",
+                    existing_kernel,
+                    container.id,
+                )
+                await self.produce_event(
+                    DanglingContainerDetected(container.id),
+                )
+
+        existing_kernel_ids = set([k for k, _ in containers])
+        for registered_kernel_id in self.kernel_registry:
+            if registered_kernel_id not in existing_kernel_ids:
+                log.warning(
+                    "scan_mismatch_kernels() detected dangling kernel (k:{})",
+                    registered_kernel_id,
+                )
+                await self.produce_event(
+                    DanglingKernelDetected(registered_kernel_id),
+                )
+
     async def sync_container_lifecycles(self, interval: float) -> None:
         """
         Periodically synchronize the alive/known container sets,
@@ -1777,6 +1814,7 @@ class AbstractAgent(
             pass
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
+            kernel_obj._event_producer = self.event_producer
             if kernel_obj.runner is not None:
                 kernel_obj.runner.event_producer = self.event_producer
                 await kernel_obj.runner.__ainit__()
