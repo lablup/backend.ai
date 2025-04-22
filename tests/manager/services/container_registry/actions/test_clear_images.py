@@ -15,7 +15,6 @@ from ...fixtures import (
 from ...test_utils import TestScenario
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "test_scenario",
     [
