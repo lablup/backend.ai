@@ -35,7 +35,16 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.data.image.types import (
+    ImageAliasData,
+    ImageData,
+    ImageLabelsData,
+    ImageResourcesData,
+    ImageStatus,
+    ImageType,
+    RescanImagesResult,
+)
+from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
@@ -608,7 +617,35 @@ class ImageRow(Base):
         if value_range[1] is not None:
             resources[slot_type]["max"] = str(value_range[1])
 
-        self.resources = resources
+        self._resources = resources
+
+    def is_owned_by(self, user_id: UUID) -> bool:
+        if not self.customized:
+            return False
+        return self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(user_id)
+
+    def to_dataclass(self) -> ImageData:
+        from ai.backend.manager.data.image.types import ImageData
+
+        return ImageData(
+            id=self.id,
+            name=self.name,
+            project=self.project,
+            image=self.image,
+            created_at=self.created_at,
+            tag=self.tag,
+            registry=self.registry,
+            registry_id=self.registry_id,
+            architecture=self.architecture,
+            config_digest=self.config_digest,
+            size_bytes=self.size_bytes,
+            is_local=self.is_local,
+            type=self.type,
+            accelerators=self.accelerators,
+            labels=ImageLabelsData(label_data=self.labels),
+            resources=ImageResourcesData(resources_data=self.resources),
+            status=self.status,
+        )
 
 
 async def bulk_get_image_configs(
