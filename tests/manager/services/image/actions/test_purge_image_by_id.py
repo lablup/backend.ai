@@ -1,8 +1,11 @@
 import uuid
 
 import pytest
+import sqlalchemy as sa
 
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.image.actions.purge_image_by_id import (
     PurgeImageActionByIdGenericForbiddenError,
     PurgeImageActionByIdObjectNotFoundError,
@@ -66,3 +69,33 @@ async def test_purge_image_by_id(
     test_scenario: TestScenario[PurgeImageByIdAction, PurgeImageByIdActionResult],
 ):
     await test_scenario.test(processors.purge_image_by_id.wait_for_complete)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    [
+        {
+            "images": [
+                IMAGE_FIXTURE_DICT,
+            ]
+        }
+    ],
+)
+async def test_purge_image_by_id_side_effect(
+    processors: ImageProcessors,
+    database_engine: ExtendedAsyncSAEngine,
+):
+    await processors.purge_image_by_id.wait_for_complete(
+        PurgeImageByIdAction(
+            user_id=uuid.uuid4(),
+            client_role=UserRole.SUPERADMIN,
+            image_id=IMAGE_ROW_FIXTURE.id,
+        )
+    )
+
+    async with database_engine.begin_session() as db_sess:
+        db_row = await db_sess.scalar(
+            sa.select(ImageRow).where(ImageRow.id == IMAGE_ROW_FIXTURE.id)
+        )
+        assert db_row is None, "Image should be deleted from the database"
