@@ -1842,6 +1842,29 @@ class AgentRegistry:
                             )
                         ).image_ref
 
+                        _pytorch_distributed_environ = {
+                            "WORLD_SIZE": str(binding.kernel.cluster_size),
+                            "WORLD_RANK": str(scheduled_session.kernels.index(binding.kernel)),
+                            "LOCAL_RANK": str(binding.kernel.local_rank),
+                            "MASTER_ADDR": str(scheduled_session.main_kernel.cluster_hostname),
+                            "MASTER_PORT": "12345",
+                        }
+
+                        _tf_distributed_environ = {
+                            "TF_CONFIG": dump_json_str({
+                                "cluster": {
+                                    "worker": [
+                                        f"{kernel.cluster_hostname}:12345"
+                                        for kernel in scheduled_session.kernels
+                                    ]
+                                },
+                                "task": {
+                                    "type": "worker",
+                                    "index": str(scheduled_session.kernels.index(binding.kernel)),
+                                },
+                            }),
+                        }
+
                         raw_configs.append({
                             "image": {
                                 # TODO: refactor registry and is_local to be specified per kernel.
@@ -1873,6 +1896,8 @@ class AgentRegistry:
                             "idle_timeout": int(idle_timeout),
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
+                                **_pytorch_distributed_environ,
+                                **_tf_distributed_environ,
                                 # inherit per-session environment variables
                                 **scheduled_session.environ,
                                 # set per-kernel environment variables
@@ -1889,27 +1914,6 @@ class AgentRegistry:
                                         "ai.backend.service-ports"
                                     )
                                 ),
-                                # PyTorch
-                                "WORLD_SIZE": str(binding.kernel.cluster_size),
-                                "WORLD_RANK": str(scheduled_session.kernels.index(binding.kernel)),
-                                "LOCAL_RANK": str(binding.kernel.local_rank),
-                                "MASTER_ADDR": str(scheduled_session.main_kernel.cluster_hostname),
-                                "MASTER_PORT": "12345",
-                                # TensorFlow
-                                "TF_CONFIG": dump_json_str({
-                                    "cluster": {
-                                        "worker": [
-                                            f"{kernel.cluster_hostname}:12345"
-                                            for kernel in scheduled_session.kernels
-                                        ]
-                                    },
-                                    "task": {
-                                        "type": "worker",
-                                        "index": str(
-                                            scheduled_session.kernels.index(binding.kernel)
-                                        ),
-                                    },
-                                }),
                             },
                             "resource_slots": binding.kernel.requested_slots.to_json(),
                             "resource_opts": binding.kernel.resource_opts,
