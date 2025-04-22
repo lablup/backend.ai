@@ -70,7 +70,7 @@ EXPECTED_IMAGE_RESCAN_RESULT = [
                 "Success Case",
                 RescanImagesAction(
                     registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name,
-                    project=None,
+                    project=CONTAINER_REGISTRY_ROW_FIXTURE.project,
                     progress_reporter=None,
                 ),
                 RescanImagesActionResult(
