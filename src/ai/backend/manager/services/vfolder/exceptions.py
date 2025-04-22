@@ -12,108 +12,85 @@ from ai.backend.common.exception import (
 )
 
 
-class VFolderServiceException(BackendAIError):
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.SERVICE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class VFolderNotFound(VFolderServiceException, web.HTTPNotFound):
+class VFolderNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-not-found"
     error_title = "Virtual folder not found."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
 
 
-class VFolderCreationFailure(VFolderServiceException, web.HTTPBadRequest):
+class VFolderCreationFailure(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-creation-failed"
     error_title = "Virtual folder creation failed."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
-class VFolderAlreadyExists(VFolderServiceException, web.HTTPConflict):
+class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "Virtual folder already exists."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
         )
 
 
-class InvalidParameter(VFolderServiceException, web.HTTPBadRequest):
+class VFolderInvalidParameter(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameter"
     error_title = "Invalid parameter."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
-class InsufficientPrivilege(VFolderServiceException, web.HTTPForbidden):
+class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/insufficient-privilege"
     error_title = "Insufficient privilege."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
-class Forbidden(InvalidParameter, web.HTTPForbidden):
+class Forbidden(VFolderInvalidParameter, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/forbidden"
     error_title = "Forbidden operation."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
 
-class ObjectNotFound(VFolderServiceException, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/object-not-found"
-    error_title = "Object not found."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class ProjectNotFound(VFolderServiceException, web.HTTPNotFound):
+class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/project-not-found"
     error_title = "Project not found."
 
@@ -125,39 +102,39 @@ class ProjectNotFound(VFolderServiceException, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
 
 
-class InternalServerError(VFolderServiceException, web.HTTPInternalServerError):
+class InternalServerError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Internal server error."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.SERVICE,
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
-class ModelServiceDependencyNotCleared(VFolderServiceException, web.HTTPBadRequest):
+class ModelServiceDependencyNotCleared(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/model-service-dependency-not-cleared"
     error_title = "Cannot delete model VFolders bound to alive model services."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.DELETE,
-            error_detail=ErrorDetail.FORBIDDEN,
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
-class TooManyVFoldersFound(VFolderServiceException, web.HTTPBadRequest):
+class TooManyVFoldersFound(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/too-many-vfolders"
     error_title = "Too many virtual folders found."
 
@@ -169,33 +146,33 @@ class TooManyVFoldersFound(VFolderServiceException, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
-class VFolderFilterStatusNotAvailable(VFolderServiceException, web.HTTPBadRequest):
+class VFolderFilterStatusNotAvailable(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-not-available"
     error_title = "Virtual folder filter status not available."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
-class VFolderFilterStatusFailed(VFolderServiceException, web.HTTPBadRequest):
+class VFolderFilterStatusFailed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-failed"
     error_title = "Virtual folder filter status failed."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

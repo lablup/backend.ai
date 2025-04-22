@@ -47,7 +47,7 @@ class PurgeImageActionByIdGenericForbiddenError(BackendAIError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.DELETE,
+            operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -60,7 +60,7 @@ class PurgeImageActionByIdObjectNotFoundError(BackendAIError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.DELETE,
+            operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
         )
 
@@ -77,6 +77,6 @@ class PurgeImageActionByIdObjectDBError(BackendAIError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.DELETE,
+            operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )

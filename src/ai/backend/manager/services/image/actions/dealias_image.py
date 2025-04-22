@@ -46,7 +46,7 @@ class DealiasImageActionNoSuchAliasError(BackendAIError, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.DELETE,
+            domain=ErrorDomain.IMAGE_ALIAS,
+            operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.NOT_FOUND,
         )

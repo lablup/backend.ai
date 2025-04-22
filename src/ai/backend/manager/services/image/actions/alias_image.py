@@ -41,19 +41,6 @@ class AliasImageActionResult(BaseActionResult):
         return str(self.image_id)
 
 
-class AliasImageActionNoSuchAliasError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/image-alias-not-found"
-    error_title = "Image alias not found."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class AliasImageActionValueError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
     error_title = "Invalid parameters for image alias."
@@ -61,7 +48,7 @@ class AliasImageActionValueError(BackendAIError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.IMAGE,
+            domain=ErrorDomain.IMAGE_ALIAS,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
@@ -78,7 +65,7 @@ class AliasImageActionDBError(BackendAIError, web.HTTPInternalServerError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.SERVICE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            domain=ErrorDomain.IMAGE_ALIAS,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
         )

@@ -34,15 +34,15 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.vfolder import VFolderRow
 
 
-class URLNotFound(BackendError, web.HTTPNotFound):
+class URLNotFound(BackendError, web.HTTPNotFound):  # TODO: Misused now.
     error_type = "https://api.backend.ai/probs/url-not-found"
     error_title = "Unknown URL path."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
 
@@ -81,7 +81,7 @@ class GenericBadRequest(BackendError, web.HTTPBadRequest):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
 
@@ -93,8 +93,8 @@ class RejectedByHook(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.HOOK,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -129,7 +129,7 @@ class GenericForbidden(BackendError, web.HTTPForbidden):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -142,7 +142,7 @@ class InsufficientPrivilege(BackendError, web.HTTPForbidden):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
-            operation=ErrorOperation.API,
+            operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -154,8 +154,8 @@ class MethodNotAllowed(BackendError, web.HTTPMethodNotAllowed):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -168,7 +168,7 @@ class InternalServerError(BackendError, web.HTTPInternalServerError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
+            operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -181,7 +181,7 @@ class ServerMisconfiguredError(BackendError, web.HTTPInternalServerError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
+            operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -194,8 +194,8 @@ class ServiceUnavailable(BackendError, web.HTTPServiceUnavailable):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
@@ -206,9 +206,9 @@ class NotImplementedAPI(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
         )
 
 
@@ -219,9 +219,9 @@ class DeprecatedAPI(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.DEPRECATED,
         )
 
 
@@ -260,7 +260,7 @@ class PasswordExpired(BackendError, web.HTTPUnauthorized):
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
-            error_detail=ErrorDetail.UNAUTHORIZED,
+            error_detail=ErrorDetail.DATA_EXPIRED,
         )
 
 
@@ -271,8 +271,8 @@ class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
@@ -284,9 +284,9 @@ class GraphQLError(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
@@ -297,8 +297,8 @@ class ContainerRegistryWebhookAuthorizationFailed(BackendError, web.HTTPUnauthor
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.AUTH,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.HOOK,
             error_detail=ErrorDetail.UNAUTHORIZED,
         )
 
@@ -310,7 +310,7 @@ class HarborWebhookContainerRegistryRowNotFound(InternalServerError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
@@ -346,7 +346,7 @@ class DomainNotFound(ObjectNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
+            domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
@@ -382,7 +382,7 @@ class ScalingGroupNotFound(ObjectNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.INSTANCE,
+            domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
@@ -466,7 +466,7 @@ class ContainerRegistryNotFound(ObjectNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
@@ -478,7 +478,7 @@ class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
@@ -493,7 +493,7 @@ class TooManySessionsMatched(BackendError, web.HTTPNotFound):
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
     def __init__(
@@ -525,7 +525,7 @@ class TooManyKernelsFound(BackendError, web.HTTPNotFound):
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
@@ -535,7 +535,7 @@ class TaskTemplateNotFound(ObjectNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
+            domain=ErrorDomain.TEMPLATE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
@@ -566,19 +566,6 @@ class SessionAlreadyExists(BackendError, web.HTTPBadRequest):
         )
 
 
-class VFolderCreationFailed(BackendError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/vfolder-creation-failed"
-    error_title = "Virtual folder creation has failed."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
 class TooManyVFoldersFound(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-vfolders"
     error_title = "Multiple vfolders found for the operation for a single vfolder."
@@ -586,9 +573,9 @@ class TooManyVFoldersFound(BackendError, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
     def __init__(self, matched_rows: Sequence[VFolderRow]) -> None:
@@ -612,7 +599,7 @@ class VFolderNotFound(ObjectNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
@@ -625,7 +612,7 @@ class VFolderAlreadyExists(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
         )
@@ -637,9 +624,9 @@ class ModelServiceDependencyNotCleared(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.DELETE,
-            error_detail=ErrorDetail.FORBIDDEN,
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
@@ -650,9 +637,9 @@ class VFolderOperationFailed(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
@@ -663,7 +650,7 @@ class VFolderFilterStatusFailed(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
@@ -676,9 +663,9 @@ class VFolderFilterStatusNotAvailable(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
+            domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
@@ -689,8 +676,8 @@ class VFolderPermissionError(BackendError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VIRTUAL_FOLDER,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
@@ -704,7 +691,7 @@ class DotfileCreationFailed(BackendError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.DOTFILE,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
@@ -742,7 +729,7 @@ class DotfileVFolderPathConflict(BackendError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.DOTFILE,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
@@ -753,9 +740,9 @@ class QuotaExceeded(BackendError, web.HTTPPreconditionFailed):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
+            domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.FORBIDDEN,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
@@ -766,9 +753,9 @@ class RateLimitExceeded(BackendError, web.HTTPTooManyRequests):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.API,
-            error_detail=ErrorDetail.FORBIDDEN,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
@@ -780,8 +767,8 @@ class InstanceNotAvailable(BackendError, web.HTTPServiceUnavailable):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.INSTANCE,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
@@ -792,9 +779,9 @@ class ServerFrozen(BackendError, web.HTTPServiceUnavailable):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
@@ -805,8 +792,8 @@ class StorageProxyError(BackendError, web.HTTPError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -838,8 +825,8 @@ class BackendAgentError(BackendError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -928,7 +915,7 @@ class KernelDestructionFailed(BackendAgentError, web.HTTPInternalServerError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.DELETE,
+            operation=ErrorOperation.SOFT_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -941,7 +928,7 @@ class KernelRestartFailed(BackendAgentError, web.HTTPInternalServerError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.UPDATE,
+            operation=ErrorOperation.START,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -954,7 +941,7 @@ class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.SERVICE,
+            operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -967,5 +954,5 @@ class UnknownImageReferenceError(ObjectNotFound):
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
             operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

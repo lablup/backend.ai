@@ -129,16 +129,29 @@ class ErrorDomain(enum.StrEnum):
     """
 
     BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
+    API = "api"
+    PLUGIN = "plugin"
+    BGTASK = "bgtask"
     KERNEL = "kernel"
     USER = "user"
     SESSION = "session"
     GROUP = "group"
+    DOMAIN = "domain"
     IMAGE = "image"
+    IMAGE_ALIAS = "image-alias"
+    TEMPLATE = "template"
+    CONTAINER_REGISTRY = "container-registry"
+    SCALING_GROUP = "scaling-group"
     INSTANCE = "instance"
     ENDPOINT = "endpoint"
     ROUTING = "routing"
     DOTFILE = "dotfile"
-    VIRTUAL_FOLDER = "vfolder"
+    VFOLDER = "vfolder"
+    MODEL_SERVICE = "model-service"
+    STORAGE = "storage"
+    AGENT = "agent"
+    PERMISSION = "permission"
+    METRIC = "metric"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -150,13 +163,19 @@ class ErrorOperation(enum.StrEnum):
 
     GENERIC = "generic"  # Whenever possible, use specific operation names instead of this one.
     CREATE = "create"
+    ACCESS = "access"
     READ = "read"
     UPDATE = "update"
-    DELETE = "delete"
-    LIST = "list"
+    START = "start"
+    SOFT_DELETE = "soft-delete"
+    HARD_DELETE = "purge"
+    LIST = "list-query"
     AUTH = "auth"
-    API = "api"
-    SERVICE = "service"
+    HOOK = "hook"
+    REQUEST = "request"
+    PARSING = "parsing"
+    EXECUTE = "execute"
+    SETUP = "setup"
 
 
 class ErrorDetail(enum.StrEnum):
@@ -166,16 +185,41 @@ class ErrorDetail(enum.StrEnum):
     during the operation.
     """
 
+    # Client Error
+    BAD_REQUEST = "bad-request"
+    NOT_FOUND = "not-found"
+    # Conflict means the request conflicts with the current state of the server.
+    CONFLICT = "conflict"
+    # Already Exists means the resource already exists.
+    ALREADY_EXISTS = "already-exists"
+    # Invalid parameters means the received parameters are invalid.
+    # This is different from BAD_REQUEST, which means the request is malformed.
+    INVALID_PARAMETERS = "invalid-parameters"
+    # Forbidden means the user is not allowed to access the resource.
+    # This is different from UNAUTHORIZED, which means the user is not authenticated.
+    FORBIDDEN = "forbidden"
+    # Unauthorized means the user is not authenticated.
+    # This means the user is not logged in or the token is invalid.
+    UNAUTHORIZED = "unauthorized"
+
+    # Server Error
     INTERNAL_ERROR = (
         "internal-error"  # Whenever possible, use specific error names instead of this one.
     )
-    NOT_FOUND = "not-found"
-    ALREADY_EXISTS = "already-exists"
-    INVALID_PARAMETERS = "invalid-parameters"
-    TIMEOUT = "timeout"
-    FORBIDDEN = "forbidden"
-    UNAUTHORIZED = "unauthorized"
-    BAD_REQUEST = "bad-request"
+    # UNAVAILABLE means the resource is not available.
+    UNAVAILABLE = "unavailable"
+    # TIMEOUT means the request timed out.
+    TASK_TIMEOUT = "task-timeout"
+    # DATA_EXPIRED means the data is expired.
+    # This is different from NOT_FOUND, which means the resource does not exist.
+    DATA_EXPIRED = "data-expired"
+    CANCELED = "canceled"
+    # Unexpected Error
+    NOT_IMPLEMENTED = "not-implemented"
+    DEPRECATED = "deprecated"
+    # MISMATCH means the current state of the server does not match the expected state.
+    # MISMATCH is used when the server is in a state that is not expected.
+    MISMATCH = "mismatch"
 
 
 @dataclass
@@ -286,8 +330,8 @@ class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
 
@@ -299,8 +343,8 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.API,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
@@ -312,9 +356,9 @@ class MiddlewareParamParsingFailed(BackendAIError, web.HTTPInternalServerError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )
 
 
@@ -325,9 +369,9 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 
@@ -338,8 +382,8 @@ class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -351,7 +395,7 @@ class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SERVICE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.CANCELED,
         )

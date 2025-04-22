@@ -48,6 +48,6 @@ class ForgetImageActionGenericForbiddenError(BackendAIError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.DELETE,
+            operation=ErrorOperation.SOFT_DELETE,
             error_detail=ErrorDetail.FORBIDDEN,
         )

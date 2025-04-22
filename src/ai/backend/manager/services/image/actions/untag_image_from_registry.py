@@ -47,6 +47,6 @@ class UntagImageFromRegistryActionGenericForbiddenError(BackendAIError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
-            operation=ErrorOperation.DELETE,
+            operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.FORBIDDEN,
         )
