@@ -27,7 +27,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-client",
+        name="backend_ai-client",
         description="Backend.AI Client SDK",
         license="MIT",
     ),
