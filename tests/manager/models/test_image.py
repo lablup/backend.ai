@@ -1,9 +1,4 @@
 import asyncio
-import json
-from dataclasses import asdict
-from http import HTTPStatus
-from typing import Callable
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -44,7 +39,7 @@ from ai.backend.manager.server import (
     services_ctx,
     storage_manager_ctx,
 )
-from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
+from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads, setup_dockerhub_mocking
 
 
 @pytest.fixture(scope="module")
@@ -251,62 +246,9 @@ async def test_image_rescan_on_docker_registry(
 
     mock_dockerhub_responses = test_case["mock_dockerhub_responses"]
 
-    def setup_dockerhub_mocking(mocked):
-        registry_url = extra_fixtures["container_registries"][0]["url"]
-
-        # /v2/ endpoint
-        mocked.get(
-            f"{registry_url}/v2/",
-            status=HTTPStatus.OK,
-            payload=mock_dockerhub_responses["get_token"],
-            repeat=True,
-        )
-
-        # catalog
-        mocked.get(
-            f"{registry_url}/v2/_catalog?n=30",
-            status=HTTPStatus.OK,
-            payload=mock_dockerhub_responses["get_catalog"],
-            repeat=True,
-        )
-
-        repositories = mock_dockerhub_responses["get_catalog"]["repositories"]
-
-        for repo in repositories:
-            # tags
-            mock_value = mock_dockerhub_responses["get_tags"]
-            params = {
-                "status": HTTPStatus.OK,
-                "callback" if isinstance(mock_value, Callable) else "payload": mock_value,
-            }
-
-            mocked.get(f"{registry_url}/v2/{repo}/tags/list?n=10", **params)
-
-            # manifest
-            mocked.get(
-                f"{registry_url}/v2/{repo}/manifests/latest",
-                status=HTTPStatus.OK,
-                payload=mock_dockerhub_responses["get_manifest"],
-                headers={
-                    "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
-                },
-                repeat=True,
-            )
-
-            config_data = mock_dockerhub_responses["get_manifest"]["config"]
-            image_digest = config_data["digest"]
-
-            # config blob (JSON)
-            mocked.get(
-                f"{registry_url}/v2/{repo}/blobs/{image_digest}",
-                status=HTTPStatus.OK,
-                body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
-                payload=mock_dockerhub_responses["get_config"],
-                repeat=True,
-            )
-
     with aioresponses() as mocked:
-        setup_dockerhub_mocking(mocked)
+        registry_url = extra_fixtures["container_registries"][0]["url"]
+        setup_dockerhub_mocking(mocked, registry_url, mock_dockerhub_responses)
 
         context = get_graphquery_context(
             root_ctx.background_task_manager,
