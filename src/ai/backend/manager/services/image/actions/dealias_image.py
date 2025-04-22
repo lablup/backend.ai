@@ -2,8 +2,16 @@ from dataclasses import dataclass
 from typing import Optional, override
 from uuid import UUID
 
+from aiohttp import web
+
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.services.image.actions.base import ImageAction
 
@@ -31,5 +39,14 @@ class DealiasImageActionResult(BaseActionResult):
         return str(self.image_id)
 
 
-class DealiasImageActionNoSuchAliasError(BaseActionException):
-    pass
+class DealiasImageActionNoSuchAliasError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/image-alias-not-found"
+    error_title = "Image alias not found."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.DELETE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

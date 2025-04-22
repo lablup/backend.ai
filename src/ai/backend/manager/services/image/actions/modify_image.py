@@ -1,8 +1,14 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -66,9 +72,27 @@ class ModifyImageActionResult(BaseActionResult):
         return str(self.image.id)
 
 
-class ModifyImageActionUnknownImageReferenceError(BaseActionException):
-    pass
+class ModifyImageActionUnknownImageReferenceError(BackendAIError):
+    error_type = "https://api.backend.ai/probs/image-not-found"
+    error_title = "Unknown image reference."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
 
 
-class ModifyImageActionValueError(BaseActionException):
-    pass
+class ModifyImageActionValueError(BackendAIError):
+    error_type = "https://api.backend.ai/probs/invalid-parameters"
+    error_title = "Invalid parameters for image modification."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

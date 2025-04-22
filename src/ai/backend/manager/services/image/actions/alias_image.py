@@ -2,8 +2,16 @@ from dataclasses import dataclass
 from typing import Optional, override
 from uuid import UUID
 
+from aiohttp import web
+
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.exceptions import BaseActionException
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.services.image.actions.base import ImageAction
 
@@ -33,18 +41,44 @@ class AliasImageActionResult(BaseActionResult):
         return str(self.image_id)
 
 
-class AliasImageActionNoSuchAliasError(BaseActionException):
-    pass
+class AliasImageActionNoSuchAliasError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/image-alias-not-found"
+    error_title = "Image alias not found."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
 
 
-# TODO: Is this required?
-class AliasImageActionValueError(BaseActionException):
-    pass
+class AliasImageActionValueError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-parameters"
+    error_title = "Invalid parameters for image alias."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
 
 
-class AliasImageActionDBError(BaseActionException):
+class AliasImageActionDBError(BackendAIError, web.HTTPInternalServerError):
     """
     This can occur when an image alias with the same value already exists.
     """
 
-    pass
+    error_type = "https://api.backend.ai/probs/image-db-error"
+    error_title = "Database error while managing image alias."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.SERVICE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
