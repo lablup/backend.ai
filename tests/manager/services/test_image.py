@@ -1,14 +1,12 @@
-import dataclasses
 import uuid
 from dataclasses import replace
 
 import pytest
-from dateutil.parser import isoparse
 
 from ai.backend.common.types import SlotName
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.data.image.types import ImageLabelsData, ImageResourcesData
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
+from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.server import (
     agent_registry_ctx,
@@ -48,45 +46,15 @@ from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.types import OptionalState, TriState
 
+from .fixtures import (
+    IMAGE_ALIAS_DATA,
+    IMAGE_ALIAS_DICT,
+    IMAGE_ALIAS_ROW_FIXTURE,
+    IMAGE_FIXTURE_DATA,
+    IMAGE_FIXTURE_DICT,
+    IMAGE_ROW_FIXTURE,
+)
 from .test_utils import TestScenario
-
-IMAGE_ROW_FIXTURE = ImageRow(
-    name="cr.backend.ai/stable/python:3.9-ubuntu20.04",
-    image="stable/python",
-    project="stable",
-    registry="cr.backend.ai",
-    registry_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
-    architecture="x86_64",
-    accelerators="cuda",
-    config_digest="sha256:abcdefgh0123456789abcdefgh0123456789abcdefgh0123456789abcd".ljust(
-        72, " "
-    ),  # config_digest column is sa.CHAR(length=72)
-    size_bytes=12345678,
-    is_local=False,
-    type=ImageType.COMPUTE,
-    labels={},
-    resources={},
-    status=ImageStatus.ALIVE,
-)
-IMAGE_ROW_FIXTURE.created_at = isoparse("2023-10-01T00:00:00+09:00")
-IMAGE_ROW_FIXTURE.id = uuid.uuid4()
-
-IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
-    id=uuid.uuid4(),
-    alias="python",
-    image_id=IMAGE_ROW_FIXTURE.id,
-)
-
-IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()
-IMAGE_ALIAS_DATA = IMAGE_ALIAS_ROW_FIXTURE.to_dataclass()
-
-
-IMAGE_FIXTURE_DICT = dataclasses.asdict(
-    dataclasses.replace(IMAGE_FIXTURE_DATA, type=ImageType.COMPUTE._name_, labels={}, resources={})  # type: ignore
-)
-
-IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
-IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
 
 
 @pytest.fixture
