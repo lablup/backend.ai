@@ -7,6 +7,8 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 
+RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
+
 IMAGE_ROW_FIXTURE = ImageRow(
     name="registry.example.com/test_project/python:3.9-ubuntu20.04",
     image="test_project/python",
@@ -22,7 +24,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
     is_local=False,
     type=ImageType.COMPUTE,
     labels={},
-    resources={},
+    resources=RESOURCE_LIMITS,
     status=ImageStatus.ALIVE,
 )
 IMAGE_ROW_FIXTURE.id = uuid.uuid4()
@@ -31,7 +33,12 @@ IMAGE_ROW_FIXTURE.created_at = isoparse("2023-10-01T00:00:00+09:00")
 IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()
 
 IMAGE_FIXTURE_DICT = dataclasses.asdict(
-    dataclasses.replace(IMAGE_FIXTURE_DATA, type=ImageType.COMPUTE._name_, labels={}, resources={})  # type: ignore
+    dataclasses.replace(
+        IMAGE_FIXTURE_DATA,
+        type=ImageType.COMPUTE._name_,  # type: ignore
+        labels={},  # type: ignore
+        resources=RESOURCE_LIMITS,  # type: ignore
+    )
 )
 
 IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(

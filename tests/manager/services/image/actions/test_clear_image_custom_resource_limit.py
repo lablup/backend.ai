@@ -1,0 +1,54 @@
+import copy
+
+import pytest
+
+from ai.backend.common.types import SlotName
+from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
+    ClearImageCustomResourceLimitAction,
+    ClearImageCustomResourceLimitActionResult,
+)
+from ai.backend.manager.services.image.processors import ImageProcessors
+
+from ...fixtures import (
+    IMAGE_FIXTURE_DATA,
+    IMAGE_FIXTURE_DICT,
+)
+from ...test_utils import TestScenario
+
+EXPECTED_IMAGE_DATA = copy.deepcopy(IMAGE_FIXTURE_DATA)
+# Intrinsic cpu, and mem resource limits exist.
+EXPECTED_IMAGE_DATA.resources.resources_data.pop(SlotName("cuda.device"))
+
+
+@pytest.mark.parametrize(
+    "test_scenario",
+    [
+        TestScenario.success(
+            "Success Case",
+            ClearImageCustomResourceLimitAction(
+                image_canonical=IMAGE_FIXTURE_DATA.name,
+                architecture=IMAGE_FIXTURE_DATA.architecture,
+            ),
+            ClearImageCustomResourceLimitActionResult(
+                image_data=EXPECTED_IMAGE_DATA,
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    [
+        {
+            "images": [
+                IMAGE_FIXTURE_DICT,
+            ],
+        }
+    ],
+)
+async def test_clear_image_custom_resource_limit(
+    processors: ImageProcessors,
+    test_scenario: TestScenario[
+        ClearImageCustomResourceLimitAction, ClearImageCustomResourceLimitActionResult
+    ],
+):
+    await test_scenario.test(processors.clear_image_custom_resource_limit.wait_for_complete)
