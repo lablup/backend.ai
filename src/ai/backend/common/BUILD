@@ -26,6 +26,7 @@ python_distribution(
     dependencies=[
         ":src",
         "src/ai/backend/common/auth:src",
+        "src/ai/backend/common/broadcaster:src",
         "src/ai/backend/common/contexts:src",
         "src/ai/backend/common/data/session:src",
         "src/ai/backend/common/data/vfolder:src",

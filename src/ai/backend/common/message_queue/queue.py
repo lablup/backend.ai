@@ -57,6 +57,7 @@ class AbstractMessageQueue(ABC):
         This is a normal queue, so the message will be delivered to one consumer.
         Messages are consumed only once by one consumer.
         """
+        raise NotImplementedError("Consume queue method not implemented")
 
     @abstractmethod
     async def subscribe_queue(
@@ -69,6 +70,7 @@ class AbstractMessageQueue(ABC):
         This is a broadcast queue, so the message will be delivered to all subscribers.
         The subscriber should call `done` method to acknowledge the message when it is processed.
         """
+        raise NotImplementedError("Subscribe queue method not implemented")
 
     @abstractmethod
     async def done(
@@ -82,6 +84,7 @@ class AbstractMessageQueue(ABC):
         If the consumer does not call `done`, the message will be re-delivered after the
         some timeout period.
         """
+        raise NotImplementedError("Done method not implemented")
 
     @abstractmethod
     async def close(self) -> None:
@@ -91,3 +94,4 @@ class AbstractMessageQueue(ABC):
         This method should be called when the message queue is no longer needed.
         It will close all connections and stop all background tasks.
         """
+        raise NotImplementedError("Close method not implemented")
