@@ -1723,7 +1723,6 @@ class AgentRegistry:
                 if scheduled_session.main_kernel.preopen_ports is not None
                 else ""
             ),
-            # TODO
         })
 
         # Aggregate by agents to minimize RPC calls
@@ -1894,7 +1893,7 @@ class AgentRegistry:
                                 "WORLD_SIZE": str(binding.kernel.cluster_size),
                                 "WORLD_RANK": str(scheduled_session.kernels.index(binding.kernel)),
                                 "LOCAL_RANK": str(binding.kernel.local_rank),
-                                "MASTER_ADDR": str(binding.kernel.cluster_hostname),
+                                "MASTER_ADDR": str(scheduled_session.main_kernel.cluster_hostname),
                                 "MASTER_PORT": "12345",
                                 # TensorFlow
                                 "TF_CONFIG": dump_json_str({
