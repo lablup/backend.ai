@@ -93,6 +93,7 @@ from ai.backend.common.events import (
     VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -1722,6 +1723,7 @@ class AgentRegistry:
                 if scheduled_session.main_kernel.preopen_ports is not None
                 else ""
             ),
+            # TODO
         })
 
         # Aggregate by agents to minimize RPC calls
@@ -1888,6 +1890,27 @@ class AgentRegistry:
                                         "ai.backend.service-ports"
                                     )
                                 ),
+                                # PyTorch
+                                "WORLD_SIZE": str(binding.kernel.cluster_size),
+                                "WORLD_RANK": str(scheduled_session.kernels.index(binding.kernel)),
+                                "LOCAL_RANK": str(binding.kernel.local_rank),
+                                "MASTER_ADDR": str(binding.kernel.cluster_hostname),
+                                "MASTER_PORT": "12345",
+                                # TensorFlow
+                                "TF_CONFIG": dump_json_str({
+                                    "cluster": {
+                                        "worker": [
+                                            f"{kernel.cluster_hostname}:12345"
+                                            for kernel in scheduled_session.kernels
+                                        ]
+                                    },
+                                    "task": {
+                                        "type": "worker",
+                                        "index": str(
+                                            scheduled_session.kernels.index(binding.kernel)
+                                        ),
+                                    },
+                                }),
                             },
                             "resource_slots": binding.kernel.requested_slots.to_json(),
                             "resource_opts": binding.kernel.resource_opts,
