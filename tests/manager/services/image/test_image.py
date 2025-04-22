@@ -46,7 +46,7 @@ from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.types import OptionalState, TriState
 
-from .fixtures import (
+from ..fixtures import (
     IMAGE_ALIAS_DATA,
     IMAGE_ALIAS_DICT,
     IMAGE_ALIAS_ROW_FIXTURE,
@@ -54,7 +54,7 @@ from .fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from .test_utils import TestScenario
+from ..test_utils import TestScenario
 
 
 @pytest.fixture

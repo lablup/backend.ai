@@ -31,11 +31,11 @@ class ImageResourcesData:
 
 @dataclass
 class ImageData:
-    id: uuid.UUID
+    id: uuid.UUID = field(compare=False)
     name: str
     project: Optional[str]
     image: str
-    created_at: Optional[datetime]
+    created_at: Optional[datetime] = field(compare=False)
     tag: Optional[str]
     registry: str
     registry_id: uuid.UUID
@@ -58,5 +58,5 @@ class RescanImagesResult:
 
 @dataclass
 class ImageAliasData:
-    id: uuid.UUID
+    id: uuid.UUID = field(compare=False)
     alias: str
