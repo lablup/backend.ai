@@ -909,7 +909,7 @@ async def prepare_vfolder_mounts(
     matched_vfolder_mounts: list[VFolderMount] = []
     _already_resolved: set[str] = set()
 
-    def is_added(folder_id: uuid.UUID) -> bool:
+    def is_mount_added(folder_id: uuid.UUID) -> bool:
         return folder_id in [mount.vfid.folder_id for mount in matched_vfolder_mounts]
 
     # Split the vfolder name and subpaths
@@ -1020,7 +1020,7 @@ async def prepare_vfolder_mounts(
             permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
-            if is_added(vfolder["id"]):
+            if is_mount_added(vfolder["id"]):
                 continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
@@ -1056,7 +1056,7 @@ async def prepare_vfolder_mounts(
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
             requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
         if vfolder["name"] == ".local" and vfolder["group"] is not None:
-            if is_added(vfolder["id"]):
+            if is_mount_added(vfolder["id"]):
                 continue
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(
@@ -1085,7 +1085,7 @@ async def prepare_vfolder_mounts(
             )
         else:
             # Normal vfolders
-            if is_added(vfolder["id"]):
+            if is_mount_added(vfolder["id"]):
                 continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
