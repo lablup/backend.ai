@@ -8,10 +8,10 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 
 IMAGE_ROW_FIXTURE = ImageRow(
-    name="cr.backend.ai/test_project/python:3.9-ubuntu20.04",
+    name="registry.example.com/test_project/python:3.9-ubuntu20.04",
     image="test_project/python",
     project="test_project",
-    registry="cr.backend.ai",
+    registry="registry.example.com",
     registry_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
     architecture="x86_64",
     accelerators="cuda",
@@ -45,9 +45,9 @@ IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
 IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
 
 CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
-    url="https://cr.backend.ai",
-    registry_name="cr.backend.ai",
-    type=ContainerRegistryType.HARBOR2,
+    url="https://registry.example.com",
+    registry_name="registry.example.com",
+    type=ContainerRegistryType.DOCKER,
     project="test_project",
     username=None,
     password=None,
@@ -59,5 +59,5 @@ CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
 CONTAINER_REGISTRY_ROW_FIXTURE.id = uuid.uuid4()
 CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
-    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.HARBOR2.value)  # type: ignore
+    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
 )
