@@ -44,6 +44,7 @@ class ContainerRegistryService:
             )
             if project:
                 stmt = stmt.where(ContainerRegistryRow.project == project)
+            # TODO: Raise exception if registry not found or two or more registries found
             registry_row: ContainerRegistryRow = await db_session.scalar(stmt)
 
             scanner_cls = get_container_registry_cls(registry_row)
