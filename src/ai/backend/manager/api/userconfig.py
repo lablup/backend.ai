@@ -9,6 +9,12 @@ from aiohttp import web
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors.exceptions import (
+    DotfileAlreadyExists,
+    DotfileCreationFailed,
+    DotfileNotFound,
+    InvalidAPIParameters,
+)
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
     keypairs,
@@ -19,12 +25,6 @@ from ..models import (
     vfolders,
 )
 from .auth import auth_required
-from .exceptions import (
-    DotfileAlreadyExists,
-    DotfileCreationFailed,
-    DotfileNotFound,
-    InvalidAPIParameters,
-)
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes

@@ -45,8 +45,8 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
 from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 
+from ..errors.exceptions import InvalidAPIParameters
 from .auth import auth_required, superadmin_required
-from .exceptions import InvalidAPIParameters
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params

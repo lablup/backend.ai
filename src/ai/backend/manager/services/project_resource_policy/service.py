@@ -3,7 +3,7 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ObjectNotFound
+from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
 )

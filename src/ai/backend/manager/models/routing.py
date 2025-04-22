@@ -13,7 +13,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import RoutingNotFound
+from ..errors.exceptions import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
 
 if TYPE_CHECKING:

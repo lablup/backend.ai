@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.api.exceptions import ScalingGroupNotFound
+from ai.backend.manager.errors.exceptions import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.registry import check_scaling_group
 

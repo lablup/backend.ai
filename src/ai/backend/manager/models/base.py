@@ -67,7 +67,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import GenericForbidden, InvalidAPIParameters
+from ..errors.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,

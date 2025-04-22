@@ -55,6 +55,19 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.models.storage import StorageSessionManager
 
+from ..errors.exceptions import (
+    BackendAgentError,
+    InsufficientPrivilege,
+    InternalServerError,
+    InvalidAPIParameters,
+    ModelServiceDependencyNotCleared,
+    ObjectNotFound,
+    TooManyVFoldersFound,
+    VFolderFilterStatusFailed,
+    VFolderFilterStatusNotAvailable,
+    VFolderNotFound,
+    VFolderOperationFailed,
+)
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
@@ -131,19 +144,6 @@ from ..services.vfolder.exceptions import (
 )
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
-from .exceptions import (
-    BackendAgentError,
-    InsufficientPrivilege,
-    InternalServerError,
-    InvalidAPIParameters,
-    ModelServiceDependencyNotCleared,
-    ObjectNotFound,
-    TooManyVFoldersFound,
-    VFolderFilterStatusFailed,
-    VFolderFilterStatusNotAvailable,
-    VFolderNotFound,
-    VFolderOperationFailed,
-)
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .utils import (
     LegacyBaseRequestModel,

@@ -9,9 +9,7 @@ from aiohttp import web
 from ai.backend.common import msgpack
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
-from .auth import admin_required, auth_required
-from .exceptions import (
+from ..errors.exceptions import (
     DomainNotFound,
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -19,6 +17,8 @@ from .exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
 )
+from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
+from .auth import admin_required, auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params

@@ -9,6 +9,13 @@ python_sources(
         "src/ai/backend/manager/network:src",
         "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
         "src/ai/backend/manager/scheduler:src",
+        "src/ai/backend/manager/services:src",
+        "src/ai/backend/manager/services/agent:src",
+        "src/ai/backend/manager/services/agent/actions:src",
+        "src/ai/backend/manager/services/model_serving:src",
+        "src/ai/backend/manager/services/model_serving/actions:src",
+        "src/ai/backend/manager/services/model_serving/processors:src",
+        "src/ai/backend/manager/services/model_serving/services:src",
         "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
         "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         ":resources",

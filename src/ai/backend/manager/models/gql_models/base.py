@@ -12,7 +12,7 @@ from graphql import GraphQLError
 from graphql.language.ast import FloatValueNode, IntValueNode, ObjectValueNode, ValueNode
 from graphql.language.printer import print_ast
 
-from ...api.exceptions import ObjectNotFound
+from ...errors.exceptions import ObjectNotFound
 from ..gql_relay import AsyncNode
 
 SAFE_MIN_INT = -9007199254740991

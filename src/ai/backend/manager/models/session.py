@@ -59,7 +59,8 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionData
 
-from ..api.exceptions import (
+from ..defs import DEFAULT_ROLE
+from ..errors.exceptions import (
     AgentError,
     BackendError,
     KernelCreationFailed,
@@ -72,7 +73,6 @@ from ..api.exceptions import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ..defs import DEFAULT_ROLE
 from .base import (
     GUID,
     Base,

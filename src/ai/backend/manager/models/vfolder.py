@@ -60,17 +60,17 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import (
+from ..defs import (
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+    VFOLDER_DSTPATHS_MAP,
+)
+from ..errors.exceptions import (
     InvalidAPIParameters,
     ObjectNotFound,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
-)
-from ..defs import (
-    RESERVED_VFOLDER_PATTERNS,
-    RESERVED_VFOLDERS,
-    VFOLDER_DSTPATHS_MAP,
 )
 from ..types import UserScope
 from .base import (

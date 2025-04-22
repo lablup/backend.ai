@@ -36,7 +36,16 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import (
+from ai.backend.manager.api.scaling_group import query_wsproxy_status
+from ai.backend.manager.api.session import (
+    CustomizedImageVisibilityScope,
+    drop_undefined,
+    find_dependency_sessions,
+    find_dependent_sessions,
+    overwritten_param_check,
+)
+from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.errors.exceptions import (
     AppNotFound,
     GenericForbidden,
     InternalServerError,
@@ -48,15 +57,6 @@ from ai.backend.manager.api.exceptions import (
     TooManySessionsMatched,
     UnknownImageReferenceError,
 )
-from ai.backend.manager.api.scaling_group import query_wsproxy_status
-from ai.backend.manager.api.session import (
-    CustomizedImageVisibilityScope,
-    drop_undefined,
-    find_dependency_sessions,
-    find_dependent_sessions,
-    overwritten_param_check,
-)
-from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow, groups

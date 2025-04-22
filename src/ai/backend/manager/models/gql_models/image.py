@@ -75,9 +75,9 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...api.exceptions import ImageNotFound
 from ...data.image.types import ImageStatus, ImageType
 from ...defs import DEFAULT_IMAGE_ARCH
+from ...errors.exceptions import ImageNotFound
 from ..base import (
     FilterExprArg,
     OrderExprArg,
