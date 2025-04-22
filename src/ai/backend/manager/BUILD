@@ -37,7 +37,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-manager",
+        name="backend_ai-manager",
         description="Backend.AI Manager",
         license="LGPLv3",
     ),

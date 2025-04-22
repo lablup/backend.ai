@@ -34,7 +34,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-test",
+        name="backend_ai-test",
         description="Backend.AI Integration Test Suite",
         license="MIT",
     ),
