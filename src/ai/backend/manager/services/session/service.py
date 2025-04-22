@@ -25,7 +25,13 @@ from ai.backend.common.events import (
     BgtaskDoneEvent,
     BgtaskFailedEvent,
 )
-from ai.backend.common.exception import BackendError, InvalidAPIParameters, UnknownImageReference
+from ai.backend.common.exception import (
+    BackendAIError,
+    BgtaskCancelledError,
+    BgtaskFailedError,
+    InvalidAPIParameters,
+    UnknownImageReference,
+)
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
@@ -243,7 +249,7 @@ class SessionService:
                     self._agent_registry.commit_session_to_file(session, filename),
                 ),
             )
-        except BackendError:
+        except BackendAIError:
             log.exception("COMMIT_SESSION: exception")
             raise
 
@@ -279,7 +285,7 @@ class SessionService:
             )
         except AssertionError:
             raise InvalidAPIParameters
-        except BackendError:
+        except BackendAIError:
             log.exception("COMPLETE: exception")
             raise
         return CompleteActionResult(
@@ -455,9 +461,9 @@ class SessionService:
                             await reporter.update(increment=1, message="Committed image")
                             break
                         case BgtaskFailedEvent():
-                            raise BackendError(extra_msg=event.message)
+                            raise BgtaskFailedError(extra_msg=event.message)
                         case BgtaskCancelledEvent():
-                            raise BackendError(extra_msg="Operation cancelled")
+                            raise BgtaskCancelledError(extra_msg="Operation cancelled")
 
                 if not new_image_ref.is_local:
                     # push image to registry from local agent
@@ -479,9 +485,9 @@ class SessionService:
                             case BgtaskDoneEvent():
                                 break
                             case BgtaskFailedEvent():
-                                raise BackendError(extra_msg=event.message)
+                                raise BgtaskFailedError(extra_msg=event.message)
                             case BgtaskCancelledEvent():
-                                raise BackendError(extra_msg="Operation cancelled")
+                                raise BgtaskCancelledError(extra_msg="Operation cancelled")
 
                 await reporter.update(increment=1, message="Pushed image to registry")
                 # rescan updated image only
@@ -492,7 +498,7 @@ class SessionService:
                     reporter=reporter,
                 )
                 await reporter.update(increment=1, message="Completed")
-            except BackendError:
+            except BackendAIError:
                 log.exception("CONVERT_SESSION_TO_IMAGE: exception")
                 raise
 
@@ -569,7 +575,7 @@ class SessionService:
             return CreateClusterActionResult(result=resp, session_id=resp["kernelId"])
         except TooManySessionsMatched:
             raise SessionAlreadyExists
-        except BackendError:
+        except BackendAIError:
             log.exception("GET_OR_CREATE: exception")
             raise
         except UnknownImageReference:
@@ -667,7 +673,7 @@ class SessionService:
             return CreateFromParamsActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
-        except BackendError:
+        except BackendAIError:
             log.exception("GET_OR_CREATE: exception")
             raise
         except Exception:
@@ -885,7 +891,7 @@ class SessionService:
             return CreateFromTemplateActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
-        except BackendError:
+        except BackendAIError:
             log.exception("GET_OR_CREATE: exception")
             raise
         except Exception:
@@ -979,7 +985,7 @@ class SessionService:
             result = await self._agent_registry.download_single(session, owner_access_key, file)
         except asyncio.CancelledError:
             raise
-        except BackendError:
+        except BackendAIError:
             log.exception("DOWNLOAD_SINGLE: exception")
             raise
         except (ValueError, FileNotFoundError):
@@ -1017,7 +1023,7 @@ class SessionService:
             log.debug("file(s) inside container retrieved")
         except asyncio.CancelledError:
             raise
-        except BackendError:
+        except BackendAIError:
             log.exception("DOWNLOAD_FILE: exception")
             raise
         except (ValueError, FileNotFoundError):
@@ -1132,7 +1138,7 @@ class SessionService:
         except AssertionError as e:
             log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
             raise InvalidAPIParameters(extra_msg=e.args[0])
-        except BackendError:
+        except BackendAIError:
             log.exception("EXECUTE: exception")
             raise
 
@@ -1153,7 +1159,7 @@ class SessionService:
                 )
             kernel = session.main_kernel
             report = await self._agent_registry.get_abusing_report(kernel.id)
-        except BackendError:
+        except BackendAIError:
             log.exception("GET_ABUSING_REPORT: exception")
             raise
         return GetAbusingReportActionResult(result=report, session_row=session)
@@ -1171,7 +1177,7 @@ class SessionService:
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
             statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
-        except BackendError:
+        except BackendAIError:
             log.exception("GET_COMMIT_STATUS: exception")
             raise
         resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
@@ -1360,7 +1366,7 @@ class SessionService:
             log.debug("container file list for {0} retrieved", path)
         except asyncio.CancelledError:
             raise
-        except BackendError:
+        except BackendAIError:
             log.exception("LIST_FILES: exception")
             raise
         except Exception:

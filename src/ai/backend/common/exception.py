@@ -1,4 +1,7 @@
+import enum
 import json
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
 from aiohttp import web
@@ -119,7 +122,89 @@ class VolumeUnmountFailed(RuntimeError):
     """
 
 
-class BackendError(web.HTTPError):
+class ErrorDomain(enum.StrEnum):
+    """
+    An enum to represent the domain of the error.
+    The domain is a string that represents the area where the error occurred.
+    """
+
+    BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
+    KERNEL = "kernel"
+    USER = "user"
+    SESSION = "session"
+    GROUP = "group"
+    IMAGE = "image"
+    INSTANCE = "instance"
+    ENDPOINT = "endpoint"
+    ROUTING = "routing"
+    DOTFILE = "dotfile"
+    VIRTUAL_FOLDER = "vfolder"
+
+
+class ErrorOperation(enum.StrEnum):
+    """
+    An enum to represent the operation where the error occurred.
+    The operation is a string that represents the action that was being performed
+    when the error occurred.
+    """
+
+    GENERIC = "generic"  # Whenever possible, use specific operation names instead of this one.
+    CREATE = "create"
+    READ = "read"
+    UPDATE = "update"
+    DELETE = "delete"
+    LIST = "list"
+    AUTH = "auth"
+    API = "api"
+    SERVICE = "service"
+
+
+class ErrorDetail(enum.StrEnum):
+    """
+    An enum to represent the specific error that occurred during the operation.
+    The error detail is a string that describes the specific error that occurred
+    during the operation.
+    """
+
+    INTERNAL_ERROR = (
+        "internal-error"  # Whenever possible, use specific error names instead of this one.
+    )
+    NOT_FOUND = "not-found"
+    ALREADY_EXISTS = "already-exists"
+    INVALID_PARAMETERS = "invalid-parameters"
+    TIMEOUT = "timeout"
+    FORBIDDEN = "forbidden"
+    UNAUTHORIZED = "unauthorized"
+    BAD_REQUEST = "bad-request"
+
+
+@dataclass
+class ErrorCode:
+    """
+    A dataclass to represent error codes for Backend.AI errors.
+
+    All fields are lowercase.
+
+    The top-level domain is set to backendai. Other domains represent the specific
+    area where the error occurred, such as kernel, user, session, etc.
+    Whenever possible, use detailed domain names instead of backendai of general purpose errors.
+
+    The operation field represents the operation where the error occurred,
+    such as create, delete, update, get, list, etc.
+
+    The error_detail field describes the specific error that occurred during the operation.
+    If it consists of two or more words, they should be connected with a hyphen (-).
+    """
+
+    domain: ErrorDomain
+    operation: ErrorOperation
+    error_detail: ErrorDetail
+
+    def __str__(self) -> str:
+        return f"{self.domain}_{self.operation}_{self.error_detail}"
+
+
+class BackendAIError(web.HTTPError, ABC):
     """
     An RFC-7807 error class as a drop-in replacement of the original
     aiohttp.web.HTTPError subclasses.
@@ -181,22 +266,92 @@ class BackendError(web.HTTPError):
             self.__dict__,
         )
 
+    @classmethod
+    @abstractmethod
+    def error_code(cls) -> ErrorCode:
+        """
+        Returns the error code for this error.
+        This is used in the API response to indicate the type of error.
 
-class MalformedRequestBody(BackendError, web.HTTPBadRequest):
+        The error code is in the form {domain}_{operation}_{error}.
+        For example, "kernel_create_invalid-image" or "kernel_create_timeout".
+        """
+        raise NotImplementedError("Subclasses must implement error_code() method.")
+
+
+class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Malformed request body."
 
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.API,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
 
-class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
+
+class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Invalid or Missing API Parameters."
 
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.API,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
 
-class MiddlewareParamParsingFailed(BackendError, web.HTTPInternalServerError):
+
+class MiddlewareParamParsingFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Middleware parameter parsing failed."
 
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SERVICE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
 
-class ParameterNotParsedError(BackendError, web.HTTPInternalServerError):
+
+class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Parameter Not Parsed Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SERVICE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/bgtask-failed"
+    error_title = "Background Task Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SERVICE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/bgtask-cancelled"
+    error_title = "Background Task Cancelled"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SERVICE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

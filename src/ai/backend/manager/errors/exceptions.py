@@ -11,14 +11,20 @@ future UX improvements.
 
 from __future__ import annotations
 
-import enum
-from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from aiohttp import web
 
+from ai.backend.common.exception import (
+    BackendAIError as BackendError,
+)
+from ai.backend.common.exception import (
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.common.json import dump_json
 from ai.backend.common.plugin.hook import HookResult
 
@@ -27,159 +33,77 @@ from ..exceptions import AgentError
 if TYPE_CHECKING:
     from ai.backend.manager.api.vfolder import VFolderRow
 
-
-class ErrorDomain(enum.StrEnum):
-    """
-    An enum to represent the domain of the error.
-    The domain is a string that represents the area where the error occurred.
-    """
-
-    BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
-    KERNEL = "kernel"
-    USER = "user"
-    SESSION = "session"
-    GROUP = "group"
-    IMAGE = "image"
-    INSTANCE = "instance"
-    ENDPOINT = "endpoint"
-    ROUTING = "routing"
-    DOTFILE = "dotfile"
-    VIRTUAL_FOLDER = "vfolder"
-
-
-class ErrorOperation(enum.StrEnum):
-    """
-    An enum to represent the operation where the error occurred.
-    The operation is a string that represents the action that was being performed
-    when the error occurred.
-    """
-
-    GENERIC = "generic"  # Whenever possible, use specific operation names instead of this one.
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
-    DELETE = "delete"
-    LIST = "list"
-    AUTH = "auth"
-    API = "api"
-    SERVICE = "service"
-
-
-class ErrorDetail(enum.StrEnum):
-    """
-    An enum to represent the specific error that occurred during the operation.
-    The error detail is a string that describes the specific error that occurred
-    during the operation.
-    """
-
-    INTERNAL_ERROR = (
-        "internal-error"  # Whenever possible, use specific error names instead of this one.
-    )
-    NOT_FOUND = "not-found"
-    ALREADY_EXISTS = "already-exists"
-    INVALID_PARAMETERS = "invalid-parameters"
-    TIMEOUT = "timeout"
-    FORBIDDEN = "forbidden"
-    UNAUTHORIZED = "unauthorized"
-    BAD_REQUEST = "bad-request"
-
-
-@dataclass
-class ErrorCode:
-    """
-    A dataclass to represent error codes for Backend.AI errors.
-
-    All fields are lowercase.
-
-    The top-level domain is set to backendai. Other domains represent the specific
-    area where the error occurred, such as kernel, user, session, etc.
-    Whenever possible, use detailed domain names instead of backendai of general purpose errors.
-
-    The operation field represents the operation where the error occurred,
-    such as create, delete, update, get, list, etc.
-
-    The error_detail field describes the specific error that occurred during the operation.
-    If it consists of two or more words, they should be connected with a hyphen (-).
-    """
-
-    domain: ErrorDomain
-    operation: ErrorOperation
-    error_detail: ErrorDetail
-
-    def __str__(self) -> str:
-        return f"{self.domain}_{self.operation}_{self.error_detail}"
-
-
-class BackendError(web.HTTPError, ABC):
-    """
-    An RFC-7807 error class as a drop-in replacement of the original
-    aiohttp.web.HTTPError subclasses.
-    """
-
-    error_type: str = "https://api.backend.ai/probs/general-error"
-    error_title: str = "General Backend API Error."
-
-    content_type: str
-    extra_msg: Optional[str]
-
-    def __init__(self, extra_msg: Optional[str] = None, extra_data: Optional[Any] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.args = (self.status_code, self.reason, self.error_type)
-        self.empty_body = False
-        self.content_type = "application/problem+json"
-        self.extra_msg = extra_msg
-        self.extra_data = extra_data
-        body = {
-            "type": self.error_type,
-            "title": self.error_title,
-        }
-        if extra_msg is not None:
-            body["msg"] = extra_msg
-        if extra_data is not None:
-            body["data"] = extra_data
-        self.body = dump_json(body)
-
-    def __str__(self):
-        lines = []
-        if self.extra_msg:
-            lines.append(f"{self.error_title} ({self.extra_msg})")
-        else:
-            lines.append(self.error_title)
-        if self.extra_data:
-            lines.append(" -> extra_data: " + repr(self.extra_data))
-        return "\n".join(lines)
-
-    def __repr__(self):
-        lines = []
-        if self.extra_msg:
-            lines.append(
-                f"<{type(self).__name__}({self.status}): {self.error_title} ({self.extra_msg})>"
-            )
-        else:
-            lines.append(f"<{type(self).__name__}({self.status}): {self.error_title}>")
-        if self.extra_data:
-            lines.append(" -> extra_data: " + repr(self.extra_data))
-        return "\n".join(lines)
-
-    def __reduce__(self):
-        return (
-            type(self),
-            (),  # empty the constructor args to make unpickler to use
-            # only the exact current state in __dict__
-            self.__dict__,
-        )
-
-    @classmethod
-    @abstractmethod
-    def error_code(cls) -> ErrorCode:
-        """
-        Returns the error code for this error.
-        This is used in the API response to indicate the type of error.
-
-        The error code is in the form {domain}_{operation}_{error}.
-        For example, "kernel_create_invalid-image" or "kernel_create_timeout".
-        """
-        raise NotImplementedError("Subclasses must implement error_code() method.")
+# Re-export enums and dataclass from common package
+__all__ = (
+    "ErrorDomain",
+    "ErrorOperation",
+    "ErrorDetail",
+    "ErrorCode",
+    "BackendError",
+    "URLNotFound",
+    "ObjectNotFound",
+    "GenericBadRequest",
+    "RejectedByHook",
+    "InvalidCredentials",
+    "GenericForbidden",
+    "InsufficientPrivilege",
+    "MethodNotAllowed",
+    "InternalServerError",
+    "ServerMisconfiguredError",
+    "ServiceUnavailable",
+    "NotImplementedAPI",
+    "DeprecatedAPI",
+    "InvalidAuthParameters",
+    "AuthorizationFailed",
+    "PasswordExpired",
+    "InvalidAPIParameters",
+    "GraphQLError",
+    "ContainerRegistryWebhookAuthorizationFailed",
+    "HarborWebhookContainerRegistryRowNotFound",
+    "InstanceNotFound",
+    "ImageNotFound",
+    "DomainNotFound",
+    "GroupNotFound",
+    "UserNotFound",
+    "ScalingGroupNotFound",
+    "SessionNotFound",
+    "MainKernelNotFound",
+    "KernelNotFound",
+    "EndpointNotFound",
+    "RoutingNotFound",
+    "EndpointTokenNotFound",
+    "ContainerRegistryNotFound",
+    "ContainerRegistryGroupsAssociationNotFound",
+    "TooManySessionsMatched",
+    "TooManyKernelsFound",
+    "TaskTemplateNotFound",
+    "AppNotFound",
+    "SessionAlreadyExists",
+    "VFolderCreationFailed",
+    "TooManyVFoldersFound",
+    "VFolderNotFound",
+    "VFolderAlreadyExists",
+    "ModelServiceDependencyNotCleared",
+    "VFolderOperationFailed",
+    "VFolderFilterStatusFailed",
+    "VFolderFilterStatusNotAvailable",
+    "VFolderPermissionError",
+    "DotfileCreationFailed",
+    "DotfileAlreadyExists",
+    "DotfileNotFound",
+    "DotfileVFolderPathConflict",
+    "QuotaExceeded",
+    "RateLimitExceeded",
+    "InstanceNotAvailable",
+    "ServerFrozen",
+    "StorageProxyError",
+    "BackendAgentError",
+    "KernelCreationFailed",
+    "KernelDestructionFailed",
+    "KernelRestartFailed",
+    "KernelExecutionFailed",
+    "UnknownImageReferenceError",
+)
 
 
 class URLNotFound(BackendError, web.HTTPNotFound):
