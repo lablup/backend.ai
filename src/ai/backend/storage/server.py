@@ -8,6 +8,7 @@ import pwd
 import ssl
 import sys
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
@@ -19,6 +20,15 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
+from ai.backend.common.broadcaster.broadcaster import (
+    AbstractBroadcaster,
+    AbstractBroadcastSubscriber,
+)
+from ai.backend.common.broadcaster.redis_broadcaster import (
+    BROADCAST_EVENT_CHANNEL,
+    RedisBroadcaster,
+    RedisBroadcasterSubscriber,
+)
 from ai.backend.common.config import (
     ConfigurationError,
     override_key,
@@ -127,12 +137,13 @@ async def server_main(
             log.exception("Unable to read config from etcd")
             raise e
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(redis_config)
-        mq = _make_message_queue(
+        event_processors = _make_event_processors(
             local_config,
             etcd_redis_config,
         )
         event_producer = EventProducer(
-            mq,
+            event_processors.mq,
+            event_processors.broadcaster,
             source=AGENTID_STORAGE,
             log_events=local_config["debug"]["log-events"],
         )
@@ -142,7 +153,8 @@ async def server_main(
             safe_print_redis_config(redis_config),
         )
         event_dispatcher = EventDispatcher(
-            mq,
+            event_processors.mq,
+            event_processors.subscriber,
             log_events=local_config["debug"]["log-events"],
             event_observer=metric_registry.event,
         )
@@ -262,34 +274,51 @@ async def server_main(
             m.close()
 
 
-def _make_message_queue(
+@dataclass
+class EventProcessors:
+    broadcaster: AbstractBroadcaster
+    subscriber: AbstractBroadcastSubscriber
+    mq: AbstractMessageQueue
+
+
+def _make_event_processors(
     local_config: dict[str, Any],
     etcd_redis_config: EtcdRedisConfig,
-) -> AbstractMessageQueue:
+) -> EventProcessors:
     stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
         stream_redis_config,
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
     )
+    broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+    subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
     node_id = local_config["storage-proxy"]["node-id"]
     if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
-        return HiRedisQueue(
-            stream_redis_config,
-            HiRedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-                db=REDIS_STREAM_DB,
+        return EventProcessors(
+            broadcaster=broadcaster,
+            subscriber=subscriber,
+            mq=HiRedisQueue(
+                stream_redis_config,
+                HiRedisMQArgs(
+                    stream_key="events",
+                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                    node_id=node_id,
+                    db=REDIS_STREAM_DB,
+                ),
             ),
         )
 
-    return RedisQueue(
-        stream_redis,
-        RedisMQArgs(
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
+    return EventProcessors(
+        broadcaster=broadcaster,
+        subscriber=subscriber,
+        mq=RedisQueue(
+            stream_redis,
+            RedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+            ),
         ),
     )
 

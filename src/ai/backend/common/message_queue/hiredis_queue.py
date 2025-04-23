@@ -46,7 +46,6 @@ class HiRedisQueue(AbstractMessageQueue):
     _conf: RedisConfig
     _db: int
     _consume_queue: asyncio.Queue[MQMessage]
-    _subscribe_queue: asyncio.Queue[MQMessage]
     _stream_key: str
     _group_name: str
     _consumer_id: str
@@ -54,13 +53,11 @@ class HiRedisQueue(AbstractMessageQueue):
     # loop tasks for consuming messages
     _auto_claim_loop_task: asyncio.Task
     _read_messages_task: asyncio.Task
-    _read_broadcast_messages_task: asyncio.Task
 
     def __init__(self, conf: RedisConfig, args: HiRedisMQArgs) -> None:
         self._conf = conf
         self._db = args.db
         self._consume_queue = asyncio.Queue()
-        self._subscribe_queue = asyncio.Queue()
         self._stream_key = args.stream_key
         self._group_name = args.group_name
         self._consumer_id = _generate_consumer_id(args.node_id)
@@ -70,9 +67,6 @@ class HiRedisQueue(AbstractMessageQueue):
             self._auto_claim_loop(start_id, args.autoclaim_idle_timeout)
         )
         self._read_messages_task = asyncio.create_task(self._read_messages_loop())
-        self._read_broadcast_messages_task = asyncio.create_task(
-            self._read_broadcast_messages_loop()
-        )
 
     async def send(self, payload: dict[bytes, bytes]) -> None:
         async with RedisConnection(self._conf, db=self._db) as client:
@@ -104,13 +98,6 @@ class HiRedisQueue(AbstractMessageQueue):
             except asyncio.CancelledError:
                 break
 
-    async def subscribe_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
-        while not self._closed:
-            try:
-                yield await self._subscribe_queue.get()
-            except asyncio.CancelledError:
-                break
-
     async def done(self, msg_id: MessageId) -> None:
         async with RedisConnection(self._conf, db=self._db) as client:
             await client.execute([
@@ -126,7 +113,6 @@ class HiRedisQueue(AbstractMessageQueue):
         self._closed = True
         self._auto_claim_loop_task.cancel()
         self._read_messages_task.cancel()
-        self._read_broadcast_messages_task.cancel()
 
     async def _auto_claim_loop(self, autoclaim_start_id: str, autoclaim_idle_timeout: int) -> None:
         log.debug("Starting auto claim loop for stream %s", self._stream_key)
@@ -240,39 +226,6 @@ class HiRedisQueue(AbstractMessageQueue):
                         payload[key] = value
                     msg = MQMessage(msg_id, payload)
                     await self._consume_queue.put(msg)
-
-    async def _read_broadcast_messages_loop(self) -> None:
-        log.debug("Reading broadcast messages from stream %s", self._stream_key)
-        last_msg_id = "$"
-        while not self._closed:
-            try:
-                last_msg_id = await self._read_broadcast_messages(last_msg_id)
-            except hiredis.HiredisError as e:
-                await self._failover_consumer(e)
-                last_msg_id = "$"
-            except Exception as e:
-                log.error("Error while reading broadcast messages: %s", e)
-
-    async def _read_broadcast_messages(self, last_msg_id: str) -> str:
-        async with RedisConnection(self._conf, db=self._db) as client:
-            reply = await client.execute(
-                ["XREAD", "BLOCK", "1000", "STREAMS", self._stream_key, last_msg_id],
-                command_timeout=5,
-            )
-            if reply is None:
-                log.debug("No messages to read")
-                return last_msg_id
-            for stream_msg in reply.values():
-                for msg_id, messages in stream_msg:
-                    payload = {}
-                    for i in range(0, len(messages), 2):
-                        key = messages[i]
-                        value = messages[i + 1]
-                        payload[key] = value
-                    msg = MQMessage(msg_id, payload)
-                    await self._subscribe_queue.put(msg)
-                    last_msg_id = str(msg_id)
-        return last_msg_id
 
     async def _failover_consumer(self, e: hiredis.HiredisError) -> None:
         # If the group does not exist, create it

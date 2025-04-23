@@ -60,19 +60,6 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError("Consume queue method not implemented")
 
     @abstractmethod
-    async def subscribe_queue(
-        self,
-    ) -> AsyncGenerator[MQMessage, None]:
-        """
-        Subscribe to messages from the queue.
-        This method will block until a message is available.
-
-        This is a broadcast queue, so the message will be delivered to all subscribers.
-        The subscriber should call `done` method to acknowledge the message when it is processed.
-        """
-        raise NotImplementedError("Subscribe queue method not implemented")
-
-    @abstractmethod
     async def done(
         self,
         msg_id: MessageId,

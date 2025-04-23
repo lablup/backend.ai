@@ -19,6 +19,11 @@ import tqdm
 import yarl
 
 from ai.backend.common import redis_helper
+from ai.backend.common.broadcaster.redis_broadcaster import (
+    BROADCAST_EVENT_CHANNEL,
+    RedisBroadcaster,
+    RedisBroadcasterSubscriber,
+)
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events import (
@@ -246,13 +251,17 @@ async def check_and_upgrade(
             node_id=node_id,
         ),
     )
+    broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+    subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
     event_producer = EventProducer(
         redis_mq,
+        broadcaster,
         source=AGENTID_STORAGE,
         log_events=local_config["debug"]["log-events"],
     )
     event_dispatcher = EventDispatcher(
         redis_mq,
+        subscriber,
         log_events=local_config["debug"]["log-events"],
     )
     ctx = RootContext(

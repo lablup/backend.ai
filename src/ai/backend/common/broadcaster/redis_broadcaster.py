@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, AsyncGenerator, override
+from typing import AsyncGenerator, Final, override
 
 from ai.backend.common import redis_helper
 from ai.backend.common.broadcaster.broadcaster import (
@@ -8,11 +8,12 @@ from ai.backend.common.broadcaster.broadcaster import (
     AbstractBroadcastSubscriber,
     BroadcastedMessage,
 )
-from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+BROADCAST_EVENT_CHANNEL: Final[str] = "broadcast_event_channel"
 
 
 class RedisBroadcaster(AbstractBroadcaster):
@@ -23,8 +24,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         self._conn = conn
         self._channel = channel
 
-    async def broadcast(self, payload: Any) -> None:
-        b = dump_json(payload)
+    async def broadcast(self, b: bytes) -> None:
         return await redis_helper.execute(
             self._conn,
             lambda r: r.publish(self._channel, b),
@@ -54,8 +54,7 @@ class RedisBroadcasterSubscriber(AbstractBroadcastSubscriber):
                 await pubsub.subscribe(*self._channels)
                 async for message in pubsub.listen():
                     if message["type"] == "message":
-                        msg = load_json(message["data"])
-                        await self._queue.put(BroadcastedMessage(msg))
+                        await self._queue.put(BroadcastedMessage(message["data"]))
             except asyncio.CancelledError:
                 raise
             except Exception as e:
