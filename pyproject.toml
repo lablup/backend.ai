@@ -1,5 +1,6 @@
 [project]
 requires-python = "~=3.13.3"
+name = "backend.ai"
 dynamic = ["version"]
 
 [tool.towncrier]
