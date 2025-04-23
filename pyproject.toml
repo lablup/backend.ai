@@ -1,5 +1,6 @@
 [project]
 requires-python = "~=3.13.3"
+dynamic = ["version"]
 
 [tool.towncrier]
 package = "ai.backend.manager"  # reference point for getting __version__
@@ -115,3 +116,6 @@ disable_error_code = ["typeddict-unknown-key"]
 init_forbid_extra = true
 init_typed = true
 warn_required_dynamic_aliases = true
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
