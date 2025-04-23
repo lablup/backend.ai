@@ -130,3 +130,26 @@ async def test_rescan_images(
         setup_dockerhub_mocking(mocked, registry_url, dockerhub_responses_mock)
 
         await test_scenario.test(processors.rescan_images.wait_for_complete)
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.rescan_cr_backend_ai
+async def test_rescan_images_on_cr_backend_ai(
+    processors: ContainerRegistryProcessors,
+):
+    """
+    Test rescan images on cr.backend.ai registry.
+    Use this test optionally to perform an actual rescan test in the actual registry.
+
+    To include this test in the pants test, add `--rescan-cr-backend-ai` to the pytest args.
+    """
+    result = await processors.rescan_images.wait_for_complete(
+        RescanImagesAction(
+            registry="cr.backend.ai",
+            project="stable",
+            progress_reporter=None,
+        )
+    )
+
+    assert len(result.images) > 0, "No images found in the registry"
+    assert len(result.errors) == 0, "Errors found during rescan"
