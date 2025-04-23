@@ -3,8 +3,9 @@ from dataclasses import replace
 
 import pytest
 
-from ai.backend.manager.models.image import ImageStatus
+from ai.backend.manager.models.image import ImageRow, ImageStatus
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageActionByIdGenericForbiddenError,
     ForgetImageActionByIdObjectNotFoundError,
@@ -70,3 +71,35 @@ async def test_forget_image_by_id(
     test_scenario: TestScenario[ForgetImageByIdAction, ForgetImageByIdActionResult],
 ):
     await test_scenario.test(processors.forget_image_by_id.wait_for_complete)
+
+
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    [
+        {
+            "images": [
+                IMAGE_FIXTURE_DICT,
+            ]
+        }
+    ],
+)
+async def test_forget_image_by_id_side_effect(
+    processors: ImageProcessors,
+    database_engine: ExtendedAsyncSAEngine,
+):
+    await processors.forget_image_by_id.wait_for_complete(
+        ForgetImageByIdAction(
+            user_id=uuid.uuid4(),
+            client_role=UserRole.SUPERADMIN,
+            image_id=IMAGE_ROW_FIXTURE.id,
+        )
+    )
+
+    async with database_engine.begin_session() as db_sess:
+        db_row = await ImageRow.get(
+            db_sess, IMAGE_ROW_FIXTURE.id, filter_by_statuses=[ImageStatus.DELETED]
+        )
+        assert db_row is not None, "Image should not be purged from the database"
+        assert db_row.status is ImageStatus.DELETED, (
+            "Image should be marked with deleted in the database"
+        )
