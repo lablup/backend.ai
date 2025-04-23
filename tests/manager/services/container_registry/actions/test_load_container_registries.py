@@ -1,3 +1,7 @@
+import copy
+import dataclasses
+import uuid
+
 import pytest
 
 from ai.backend.manager.services.container_registry.actions.load_container_registries import (
@@ -13,14 +17,33 @@ from ...fixtures import (
 )
 from ...test_utils import TestScenario
 
+CONTAINER_REGISTRY_FIXTURE_2_DATA = copy.deepcopy(CONTAINER_REGISTRY_FIXTURE_DATA)
+CONTAINER_REGISTRY_FIXTURE_2_DATA.id = uuid.uuid4()
+CONTAINER_REGISTRY_FIXTURE_2_DATA.project = "test_project2"
+
+CONTAINER_REGISTRY_FIXTURE_2_DICT = dataclasses.asdict(CONTAINER_REGISTRY_FIXTURE_2_DATA)
+
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
         TestScenario.success(
-            "Success Case",
+            "Load container registries with registry name",
             LoadContainerRegistriesAction(
                 registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name, project=None
+            ),
+            LoadContainerRegistriesActionResult(
+                registries=[
+                    CONTAINER_REGISTRY_FIXTURE_DATA,
+                    CONTAINER_REGISTRY_FIXTURE_2_DATA,
+                ]
+            ),
+        ),
+        TestScenario.success(
+            "Load container registries with registry name and project",
+            LoadContainerRegistriesAction(
+                registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name,
+                project=CONTAINER_REGISTRY_ROW_FIXTURE.project,
             ),
             LoadContainerRegistriesActionResult(
                 registries=[
@@ -36,6 +59,7 @@ from ...test_utils import TestScenario
         {
             "container_registries": [
                 CONTAINER_REGISTRY_FIXTURE_DICT,
+                CONTAINER_REGISTRY_FIXTURE_2_DICT,
             ],
         }
     ],
