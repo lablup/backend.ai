@@ -2381,7 +2381,7 @@ class AbstractAgent(
                         container_id=ContainerId(container_data["container_id"]),
                     )
                     raise AgentError(
-                        f"Container startup failed (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                        f"Container startup failed (k:{str(ctx.kernel_id)}, container:{container_data['container_id']}, e:{repr(e)})"
                     )
                 finally:
                     self._pending_creation_tasks[kernel_id].remove(current_task)
