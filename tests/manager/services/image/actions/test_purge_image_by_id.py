@@ -71,7 +71,6 @@ async def test_purge_image_by_id(
     await test_scenario.test(processors.purge_image_by_id.wait_for_complete)
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "extra_fixtures",
     [
