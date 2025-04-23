@@ -2371,7 +2371,9 @@ class AbstractAgent(
                     )
                 except BaseException as e:
                     log.exception(
-                        f"unexpected error while waiting container startup (k: {kernel_id}, e: {repr(e)})"
+                        "unexpected error while waiting container startup (k: {}, e: {})",
+                        kernel_id,
+                        repr(e),
                     )
                     await self.inject_container_lifecycle_event(
                         kernel_id,
