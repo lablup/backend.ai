@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import TYPE_CHECKING, Mapping, Optional, Self, cast
 
 import graphene
@@ -76,8 +77,8 @@ class AuditLogNode(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "request_id": ("request_id", None),
         "description": ("description", None),
-        "duration": ("duration", None),
-        "status": ("status", None),
+        "duration": ("duration", lambda duration: timedelta(seconds=float(duration))),
+        "status": ("status", lambda status: OperationStatus(status)),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
