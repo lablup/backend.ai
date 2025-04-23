@@ -6,6 +6,7 @@ from dateutil.parser import isoparse
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
+from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
@@ -68,3 +69,33 @@ CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
 )
+
+
+DOCKERHUB_RESPONSE_MOCK = {
+    "get_token": {"token": "fake-token"},
+    "get_catalog": {
+        "repositories": [
+            "test_project/python",
+            "other/dangling-image1",
+            "other/dangling-image2",
+            "other/python",
+        ],
+    },
+    "get_tags": mock_aioresponses_sequential_payloads([
+        {"tags": ["latest"]},
+        {"tags": []},
+        {"tags": None},
+        {"tags": ["latest"]},
+    ]),
+    "get_manifest": {
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "config": {
+            "mediaType": "application/vnd.docker.container.image.v1+json",
+            "size": 100,
+            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        },
+        "layers": [],
+    },
+    "get_config": {"architecture": "amd64", "os": "linux"},
+}

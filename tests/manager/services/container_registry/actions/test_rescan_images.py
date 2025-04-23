@@ -16,15 +16,17 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesActionResult,
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
-from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads, setup_dockerhub_mocking
+from ai.backend.testutils.mock import setup_dockerhub_mocking
 
 from ...fixtures import (
     CONTAINER_REGISTRY_FIXTURE_DATA,
     CONTAINER_REGISTRY_FIXTURE_DICT,
     CONTAINER_REGISTRY_ROW_FIXTURE,
+    DOCKERHUB_RESPONSE_MOCK,
 )
 from ...test_utils import TestScenario
 
+# Added some default values to IMAGE_FIXTURE_DATA
 EXPECTED_IMAGE_RESCAN_RESULT = [
     ImageData(
         id=uuid.uuid4(),
@@ -79,34 +81,7 @@ EXPECTED_IMAGE_RESCAN_RESULT = [
                     errors=[],
                 ),
             ),
-            {
-                "get_token": {"token": "fake-token"},
-                "get_catalog": {
-                    "repositories": [
-                        "test_project/python",
-                        "other/dangling-image1",
-                        "other/dangling-image2",
-                        "other/python",
-                    ],
-                },
-                "get_tags": mock_aioresponses_sequential_payloads([
-                    {"tags": ["latest"]},
-                    {"tags": []},
-                    {"tags": None},
-                    {"tags": ["latest"]},
-                ]),
-                "get_manifest": {
-                    "schemaVersion": 2,
-                    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-                    "config": {
-                        "mediaType": "application/vnd.docker.container.image.v1+json",
-                        "size": 100,
-                        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-                    },
-                    "layers": [],
-                },
-                "get_config": {"architecture": "amd64", "os": "linux"},
-            },
+            DOCKERHUB_RESPONSE_MOCK,
         ),
     ],
 )
