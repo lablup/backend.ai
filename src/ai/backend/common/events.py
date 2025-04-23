@@ -33,7 +33,13 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
+from ai.backend.common.broadcaster.broadcaster import (
+    AbstractBroadcaster,
+    AbstractBroadcastSubscriber,
+    BroadcastedMessage,
+)
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
@@ -1169,6 +1175,7 @@ class EventDispatcher:
     _consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
+    _broadcast_subscriber: AbstractBroadcastSubscriber
 
     _consumer_loop_task: asyncio.Task
     _subscriber_loop_task: asyncio.Task
@@ -1181,6 +1188,7 @@ class EventDispatcher:
     def __init__(
         self,
         message_queue: AbstractMessageQueue,
+        broadcast_subscriber: AbstractBroadcastSubscriber,
         log_events: bool = False,
         *,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
@@ -1192,6 +1200,7 @@ class EventDispatcher:
         self._consumers = defaultdict(set)
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
+        self._broadcast_subscriber = broadcast_subscriber
         self._metric_observer = event_observer
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
@@ -1392,19 +1401,24 @@ class EventDispatcher:
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
-        async for msg in self._msg_queue.subscribe_queue():  # type: ignore
+        async for msg in self._broadcast_subscriber.subscribe_queue():  # type: ignore
+            msg = cast(
+                BroadcastedMessage,
+                msg,
+            )
             if self._closed:
                 return
             event_type = "unknown"
             start = time.perf_counter()
             try:
-                decoded_event_name = msg.payload[b"name"].decode()
+                payload = load_json(msg.payload)
+                decoded_event_name = payload[b"name"].decode()
                 if decoded_event_name and isinstance(decoded_event_name, str):
                     event_type = decoded_event_name
                 await self.dispatch_subscribers(
                     decoded_event_name,
-                    AgentId(msg.payload[b"source"].decode()),
-                    msgpack.unpackb(msg.payload[b"args"]),
+                    AgentId(payload[b"source"].decode()),
+                    msgpack.unpackb(payload[b"args"]),
                 )
                 self._metric_observer.observe_event_success(
                     event_type=event_type,
@@ -1429,23 +1443,45 @@ class EventDispatcher:
 class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
+    _broadcaster: AbstractBroadcaster
     _log_events: bool
 
     def __init__(
         self,
         msg_queue: AbstractMessageQueue,
+        broadcaster: AbstractBroadcaster,
         *,
         source: AgentId,
         log_events: bool = False,
     ) -> None:
         self._closed = False
         self._msg_queue = msg_queue
+        self._broadcaster = broadcaster
         self._source_bytes = source.encode()
         self._log_events = log_events
 
     async def close(self) -> None:
         self._closed = True
         await self._msg_queue.close()
+
+    async def broadcast_event(
+        self,
+        event: AbstractEvent,
+        source_override: Optional[AgentId] = None,
+    ) -> None:
+        if self._closed:
+            return
+        source_bytes = self._source_bytes
+        if source_override is not None:
+            source_bytes = source_override.encode()
+
+        raw_event = {
+            b"name": event.name.encode(),
+            b"source": source_bytes,
+            b"args": msgpack.packb(event.serialize()),
+        }
+        b = dump_json(raw_event)
+        await self._broadcaster.broadcast(b)
 
     async def produce_event(
         self,

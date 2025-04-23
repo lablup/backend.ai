@@ -18,6 +18,11 @@ import pytest
 from redis.asyncio import Redis
 
 from ai.backend.common import config, redis_helper
+from ai.backend.common.broadcaster.redis_broadcaster import (
+    BROADCAST_EVENT_CHANNEL,
+    RedisBroadcaster,
+    RedisBroadcasterSubscriber,
+)
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -107,12 +112,15 @@ async def run_timer(
             node_id=node_id,
         ),
     )
-
+    broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+    subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
     event_dispatcher = EventDispatcher(
         redis_mq,
+        subscriber,
     )
     event_producer = EventProducer(
         redis_mq,
+        broadcaster,
         source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
@@ -163,12 +171,15 @@ def etcd_timer_node_process(
                 node_id=node_id,
             ),
         )
-
+        broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+        subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
         event_dispatcher = EventDispatcher(
             redis_mq,
+            subscriber,
         )
         event_producer = EventProducer(
             redis_mq,
+            broadcaster,
             source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
@@ -246,11 +257,15 @@ class TimerNode(threading.Thread):
                 node_id=node_id,
             ),
         )
+        broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+        subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
         event_dispatcher = EventDispatcher(
             redis_mq,
+            subscriber,
         )
         event_producer = EventProducer(
             redis_mq,
+            broadcaster,
             source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
@@ -451,6 +466,8 @@ async def test_global_timer_join_leave(
         db=REDIS_STREAM_DB,
     )
     node_id = f"test-{random.randint(0, 1000)}"
+    broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+    subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
     redis_mq = RedisQueue(
         stream_redis,
         RedisMQArgs(
@@ -461,9 +478,11 @@ async def test_global_timer_join_leave(
     )
     event_dispatcher = EventDispatcher(
         redis_mq,
+        subscriber,
     )
     event_producer = EventProducer(
         redis_mq,
+        broadcaster,
         source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)

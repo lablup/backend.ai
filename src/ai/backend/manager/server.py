@@ -18,6 +18,7 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -40,6 +41,15 @@ from setproctitle import setproctitle
 from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.broadcaster.broadcaster import (
+    AbstractBroadcaster,
+    AbstractBroadcastSubscriber,
+)
+from ai.backend.common.broadcaster.redis_broadcaster import (
+    BROADCAST_EVENT_CHANNEL,
+    RedisBroadcaster,
+    RedisBroadcasterSubscriber,
+)
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
@@ -522,14 +532,16 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    mq = _make_message_queue(root_ctx)
+    event_processors = _make_message_queue(root_ctx)
     root_ctx.event_producer = EventProducer(
-        mq,
+        event_processors.mq,
+        event_processors.broadcaster,
         source=AGENTID_MANAGER,
         log_events=root_ctx.local_config["debug"]["log-events"],
     )
     root_ctx.event_dispatcher = EventDispatcher(
-        mq,
+        event_processors.mq,
+        event_processors.subscriber,
         log_events=root_ctx.local_config["debug"]["log-events"],
         event_observer=root_ctx.metrics.event,
     )
@@ -539,9 +551,16 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.event_dispatcher.close()
 
 
+@dataclass
+class EventProcessors:
+    mq: AbstractMessageQueue
+    broadcaster: AbstractBroadcaster
+    subscriber: AbstractBroadcastSubscriber
+
+
 def _make_message_queue(
     root_ctx: RootContext,
-) -> AbstractMessageQueue:
+) -> EventProcessors:
     etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
         root_ctx.shared_config.data["redis"]
     )
@@ -551,24 +570,34 @@ def _make_message_queue(
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
     )
+    broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+    subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
     node_id = root_ctx.local_config["manager"]["id"]
     if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
-        return HiRedisQueue(
-            stream_redis_config,
-            HiRedisMQArgs(
+        return EventProcessors(
+            mq=HiRedisQueue(
+                stream_redis_config,
+                HiRedisMQArgs(
+                    stream_key="events",
+                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                    node_id=node_id,
+                    db=REDIS_STREAM_DB,
+                ),
+            ),
+            broadcaster=broadcaster,
+            subscriber=subscriber,
+        )
+    return EventProcessors(
+        mq=RedisQueue(
+            stream_redis,
+            RedisMQArgs(
                 stream_key="events",
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=node_id,
-                db=REDIS_STREAM_DB,
             ),
-        )
-    return RedisQueue(
-        stream_redis,
-        RedisMQArgs(
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
         ),
+        broadcaster=broadcaster,
+        subscriber=subscriber,
     )
 
 

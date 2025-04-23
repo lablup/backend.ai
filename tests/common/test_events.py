@@ -8,6 +8,11 @@ import attrs
 import pytest
 
 from ai.backend.common import config, redis_helper
+from ai.backend.common.broadcaster.redis_broadcaster import (
+    BROADCAST_EVENT_CHANNEL,
+    RedisBroadcaster,
+    RedisBroadcasterSubscriber,
+)
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import (
     AbstractEvent,
@@ -58,10 +63,13 @@ async def test_dispatch(redis_container) -> None:
             node_id=node_id,
         ),
     )
+    broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+    subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
     dispatcher = EventDispatcher(
         redis_mq,
+        subscriber,
     )
-    producer = EventProducer(redis_mq, source=AgentId(node_id))
+    producer = EventProducer(redis_mq, broadcaster, source=AgentId(node_id))
 
     records = set()
 
@@ -125,13 +133,15 @@ async def test_error_on_dispatch(redis_container) -> None:
             node_id=node_id,
         ),
     )
-
+    broadcaster = RedisBroadcaster(stream_redis, BROADCAST_EVENT_CHANNEL)
+    subscriber = RedisBroadcasterSubscriber(stream_redis, [BROADCAST_EVENT_CHANNEL])
     dispatcher = EventDispatcher(
         redis_mq,
+        subscriber,
         consumer_exception_handler=handle_exception,  # type: ignore
         subscriber_exception_handler=handle_exception,  # type: ignore
     )
-    producer = EventProducer(redis_mq, source=AgentId(node_id))
+    producer = EventProducer(redis_mq, broadcaster, source=AgentId(node_id))
 
     async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
