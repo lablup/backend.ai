@@ -769,7 +769,8 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
             owner_access_key=owner_access_key,
         )
     )
-    return web.json_response(result.result, status=HTTPStatus.OK)
+    resp = result.commit_info.asdict()
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
