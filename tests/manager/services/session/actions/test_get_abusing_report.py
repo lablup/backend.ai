@@ -29,7 +29,7 @@ def mock_agent_get_abusing_report_rpc(mocker, mock_agent_response_result):
     return mock
 
 
-AGENT_GET_ABUSING_REPORT_RPC_RESP = AbuseReport(kernel=KERNEL_FIXTURE_DATA.id, abuse_report="")
+AGENT_GET_ABUSING_REPORT_RPC_RESP = AbuseReport(kernel=str(KERNEL_FIXTURE_DATA.id), abuse_report="")
 
 
 @pytest.mark.parametrize(

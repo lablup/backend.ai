@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, KernelId
 from ai.backend.manager.services.session.actions.get_container_logs import (
     GetContainerLogsAction,
     GetContainerLogsActionResult,
@@ -42,7 +42,7 @@ AGENT_GET_CONTAINER_LOGS_RPC_RESP = {"result": {"logs": CONTAINER_LOGS_MOCK}}
                 GetContainerLogsAction(
                     session_name=cast(str, SESSION_FIXTURE_DATA.name),
                     owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
-                    kernel_id=cast(str, KERNEL_FIXTURE_DATA.id),
+                    kernel_id=KernelId(KERNEL_FIXTURE_DATA.id),
                 ),
                 GetContainerLogsActionResult(
                     result=AGENT_GET_CONTAINER_LOGS_RPC_RESP,
