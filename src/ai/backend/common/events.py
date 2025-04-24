@@ -1242,6 +1242,7 @@ class EventDispatcher:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
         on a single event, only one callable among those will be called.
+        Only one consumer will be called for each event.
 
         args_matcher:
           Optional. A callable which accepts event argument and supplies a bool as a return value.
@@ -1283,6 +1284,7 @@ class EventDispatcher:
     ) -> EventHandler[TContext, TEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
+        All consumers will be called when certain event pops up.
 
         args_matcher:
           Optional. A callable which accepts event argument and supplies a bool as a return value.
@@ -1469,6 +1471,11 @@ class EventProducer:
         event: AbstractEvent,
         source_override: Optional[AgentId] = None,
     ) -> None:
+        """
+        Broadcast an event to all subscribers.
+        This event is delivered to all subscribers.
+        Use this method for events that need to be delivered to all subscribers.
+        """
         if self._closed:
             return
         source_bytes = self._source_bytes
@@ -1488,6 +1495,12 @@ class EventProducer:
         event: AbstractEvent,
         source_override: Optional[AgentId] = None,
     ) -> None:
+        """
+        Add an event to the event queue, and have it processed by one random consumer.
+        Use this for events that must be consumed exactly once.
+        This is useful in situations where the event needs to be handled by a specific manager
+        due to user connections or state being tied to a particular manager, ensuring proper processing.
+        """
         if self._closed:
             return
         source_bytes = self._source_bytes
