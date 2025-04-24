@@ -1156,7 +1156,7 @@ async def get_info(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("GET_INFO: exception")
         raise
-    return web.json_response(result.result, status=HTTPStatus.OK)
+    return web.json_response(result.session_info.asdict(), status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
