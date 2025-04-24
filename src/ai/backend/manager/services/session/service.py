@@ -1146,18 +1146,20 @@ class SessionService:
         owner_access_key = action.owner_access_key
         try:
             async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
+                session_row = await SessionRow.get_session(
                     db_sess,
                     session_name,
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
-            kernel = session.main_kernel
+            kernel = session_row.main_kernel
             report = await self._agent_registry.get_abusing_report(kernel.id)
         except BackendError:
             log.exception("GET_ABUSING_REPORT: exception")
             raise
-        return GetAbusingReportActionResult(result=report, session_row=session)
+        return GetAbusingReportActionResult(
+            abuse_report=report, session_data=session_row.to_dataclass()
+        )
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
         session_name = action.session_name
