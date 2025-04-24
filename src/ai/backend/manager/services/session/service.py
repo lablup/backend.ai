@@ -194,6 +194,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
 )
+from ai.backend.manager.services.session.types import LegacySessionInfo
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -1235,43 +1236,40 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.increment_session_usage(sess)
-        resp["domainName"] = sess.domain_name
-        resp["groupId"] = str(sess.group_id)
-        resp["userId"] = str(sess.user_uuid)
-        resp["lang"] = sess.main_kernel.image  # legacy
-        resp["image"] = sess.main_kernel.image
-        resp["architecture"] = sess.main_kernel.architecture
-        resp["registry"] = sess.main_kernel.registry
-        resp["tag"] = sess.tag
 
-        # Resource occupation
-        resp["containerId"] = str(sess.main_kernel.container_id)
-        resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
-        resp["occupyingSlots"] = str(sess.occupying_slots)
-        resp["requestedSlots"] = str(sess.requested_slots)
-        resp["occupiedShares"] = str(
-            sess.main_kernel.occupied_shares
-        )  # legacy, only caculate main kernel's occupying resource
-        resp["environ"] = str(sess.environ)
-        resp["resourceOpts"] = str(sess.resource_opts)
-
-        # Lifecycle
-        resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
-        resp["statusInfo"] = str(sess.status_info)
-        resp["statusData"] = sess.status_data
         age = datetime.now(tzutc()) - sess.created_at
-        resp["age"] = int(age.total_seconds() * 1000)  # age in milliseconds
-        resp["creationTime"] = str(sess.created_at)
-        resp["terminationTime"] = str(sess.terminated_at) if sess.terminated_at else None
-
-        resp["numQueriesExecuted"] = sess.num_queries
-        resp["lastStat"] = sess.last_stat
-        resp["idleChecks"] = await self._idle_checker_host.get_idle_check_report(sess.id)
+        session_info = LegacySessionInfo(
+            domain_name=sess.domain_name,
+            group_id=sess.group_id,
+            user_id=sess.user_uuid,
+            lang=sess.main_kernel.image,  # legacy
+            image=sess.main_kernel.image,
+            architecture=sess.main_kernel.architecture,
+            registry=sess.main_kernel.registry,
+            tag=sess.tag,
+            container_id=sess.main_kernel.container_id,
+            occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
+            occupying_slots=str(sess.occupying_slots),
+            requested_slots=str(sess.requested_slots),
+            occupied_shares=str(sess.main_kernel.occupied_shares),  # legacy
+            environ=str(sess.environ),
+            resource_opts=str(sess.resource_opts),
+            status=sess.status.name,
+            status_info=str(sess.status_info) if sess.status_info else None,
+            status_data=sess.status_data,
+            age_ms=int(age.total_seconds() * 1000),
+            creation_time=sess.created_at,
+            termination_time=sess.terminated_at,
+            num_queries_executed=sess.num_queries,
+            last_stat=sess.last_stat,
+            idle_checks=await self._idle_checker_host.get_idle_check_report(sess.id),
+        )
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
-
-        return GetSessionInfoActionResult(result=resp, session_row=sess)
+        return GetSessionInfoActionResult(
+            session_info=session_info, session_data=sess.to_dataclass()
+        )
 
     async def get_status_history(
         self, action: GetStatusHistoryAction
