@@ -1329,7 +1329,7 @@ class SessionService:
             log.exception("LIST_FILES: unexpected error!", e)
             raise InternalServerError
 
-        return ListFilesActionResult(result=result, session_row=session)
+        return ListFilesActionResult(result=result, session_data=session.to_dataclass())
 
     async def match_sessions(self, action: MatchSessionsAction) -> MatchSessionsActionResult:
         id_or_name_prefix = action.id_or_name_prefix
