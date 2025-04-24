@@ -111,7 +111,7 @@ class RedisQueue(AbstractMessageQueue):
         self._read_broadcast_messages_task.cancel()
 
     async def _auto_claim_loop(self, autoclaim_start_id: str, autoclaim_idle_timeout: int) -> None:
-        log.debug("Starting auto claim loop for stream %s", self._stream_key)
+        log.debug("Starting auto claim loop for stream {}", self._stream_key)
         while not self._closed:
             try:
                 next_start_id, claimed = await self._auto_claim(
@@ -124,7 +124,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error("Error while auto claiming messages: %s", e)
+                log.error("Error while auto claiming messages: {}", e)
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int
@@ -162,14 +162,14 @@ class RedisQueue(AbstractMessageQueue):
         await pipe.execute()
 
     async def _read_messages_loop(self) -> None:
-        log.debug("Reading messages from stream %s", self._stream_key)
+        log.debug("Reading messages from stream {}", self._stream_key)
         while not self._closed:
             try:
                 await self._read_messages()
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error("Error while reading messages: %s", e)
+                log.error("Error while reading messages: {}", e)
 
     async def _read_messages(self) -> None:
         reply = await redis_helper.execute(
@@ -193,7 +193,7 @@ class RedisQueue(AbstractMessageQueue):
                 await self._consume_queue.put(msg)
 
     async def _read_broadcast_messages_loop(self) -> None:
-        log.debug("Reading broadcast messages from stream %s", self._stream_key)
+        log.debug("Reading broadcast messages from stream {}", self._stream_key)
         last_msg_id = "$"
         while not self._closed:
             try:
@@ -202,7 +202,7 @@ class RedisQueue(AbstractMessageQueue):
                 await self._failover_consumer(e)
                 last_msg_id = "$"
             except Exception as e:
-                log.error("Error while reading broadcast messages: %s", e)
+                log.error("Error while reading broadcast messages: {}", e)
 
     async def _read_broadcast_messages(self, last_msg_id: str) -> str:
         reply = await redis_helper.execute(
@@ -230,7 +230,7 @@ class RedisQueue(AbstractMessageQueue):
         # and start the auto claim loop again
         if "NOGROUP" in str(e):
             log.warning(
-                "Consumer group does not exist. Creating group %s for stream %s",
+                "Consumer group does not exist. Creating group {} for stream {}",
                 self._group_name,
                 self._stream_key,
             )
@@ -241,13 +241,13 @@ class RedisQueue(AbstractMessageQueue):
                 )
             except Exception as internal_exception:
                 log.warning(
-                    "Error while creating consumer group %s for stream %s: %s",
+                    "Error while creating consumer group {} for stream {}: {}",
                     self._group_name,
                     self._stream_key,
                     internal_exception,
                 )
         else:
-            log.error("Error while reading messages: %s", e)
+            log.error("Error while reading messages: {}", e)
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:
