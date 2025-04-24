@@ -51,6 +51,24 @@ class AgentStatus(enum.Enum):
     RESTARTING = 2
     TERMINATED = 3
 
+    @classmethod
+    def from_value(cls, v: int | str) -> AgentStatus:
+        if isinstance(v, int):
+            return cls(v)
+        if isinstance(v, str):
+            match v.upper():
+                case "ALIVE":
+                    return cls.ALIVE
+                case "LOST":
+                    return cls.LOST
+                case "RESTARTING":
+                    return cls.RESTARTING
+                case "TERMINATED":
+                    return cls.TERMINATED
+                case _:
+                    raise ValueError(f"Invalid value for AgentStatus: {v}")
+        raise ValueError(f"Invalid value for AgentStatus: {v}")
+
 
 agents = sa.Table(
     "agents",

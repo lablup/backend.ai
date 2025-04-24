@@ -43,7 +43,6 @@ from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrde
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
-    enum_field_getter,
 )
 
 from ...defs import DEFAULT_ROLE
@@ -355,7 +354,7 @@ class ComputeContainer(graphene.ObjectType):
         "local_rank": ("local_rank", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
-        "status": ("status", enum_field_getter(KernelStatus)),
+        "status": ("status", KernelStatus.from_str),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),

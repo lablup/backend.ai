@@ -43,7 +43,7 @@ from ..base import (
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import GroupRow, ProjectType
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..rbac import (
     ScopeType,
     SystemScope,
@@ -129,15 +129,15 @@ class VirtualFolderNode(graphene.ObjectType):
         "unmanaged_path": ("unmanaged_path", None),
         "usage_mode": (
             "usage_mode",
-            enum_field_getter(VFolderUsageMode),
+            VFolderUsageMode.from_str,
         ),
         "permission": (
             "permission",
-            enum_field_getter(VFolderPermission),
+            VFolderPermission.from_str,
         ),
         "ownership_type": (
             "ownership_type",
-            enum_field_getter(VFolderOwnershipType),
+            VFolderOwnershipType.from_str,
         ),
         "max_files": ("max_files", None),
         "max_size": ("max_size", None),
@@ -146,7 +146,7 @@ class VirtualFolderNode(graphene.ObjectType):
         "cloneable": ("cloneable", None),
         "status": (
             "status",
-            enum_field_getter(VFolderOperationStatus),
+            VFolderOperationStatus.from_str,
         ),
     }
 
@@ -449,15 +449,15 @@ class ModelCard(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            enum_field_getter(VFolderUsageMode),
+            VFolderUsageMode.from_str,
         ),
         "permission": (
             "vfolders_permission",
-            enum_field_getter(VFolderPermission),
+            VFolderPermission.from_str,
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            enum_field_getter(VFolderOwnershipType),
+            VFolderOwnershipType.from_str,
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -466,7 +466,7 @@ class ModelCard(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            enum_field_getter(VFolderOperationStatus),
+            VFolderOperationStatus.from_str,
         ),
     }
 

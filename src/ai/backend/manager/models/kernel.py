@@ -109,6 +109,10 @@ class KernelStatus(enum.StrEnum):
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
 
+    @classmethod
+    def from_str(cls, s: str) -> KernelStatus:
+        return cls(s.upper())
+
 
 # statuses to consider when calculating current resource usage
 AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(

@@ -1601,7 +1601,7 @@ class AgentRegistry:
                     network_config = {"mode": network.driver, **network.options}
             case NetworkType.VOLATILE:
                 if (
-                    scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE
+                    ClusterMode.from_str(scheduled_session.cluster_mode) == ClusterMode.SINGLE_NODE
                     and scheduled_session.cluster_size > 1
                 ):
                     network_name = f"bai-singlenode-{scheduled_session.id}"
@@ -1621,7 +1621,7 @@ class AgentRegistry:
                         "mode": "bridge",
                         "network_name": network_name,
                     }
-                elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
+                elif ClusterMode.from_str(scheduled_session.cluster_mode) == ClusterMode.MULTI_NODE:
                     # Create overlay network for multi-node sessions
                     driver = self.shared_config["network"]["inter-container"]["default-driver"]
                     network_plugin = self.network_plugin_ctx.plugins[driver]
@@ -2699,7 +2699,7 @@ class AgentRegistry:
         # Get the main container's agent info
 
         if session.network_type == NetworkType.VOLATILE:
-            if session.cluster_mode == ClusterMode.SINGLE_NODE:
+            if ClusterMode.from_str(session.cluster_mode) == ClusterMode.SINGLE_NODE:
                 if network_ref_name is not None:
                     try:
                         async with self.agent_cache.rpc_context(
@@ -2711,7 +2711,7 @@ class AgentRegistry:
                         log.exception(
                             f"Failed to destroy the agent-local network {network_ref_name}"
                         )
-            elif session.cluster_mode == ClusterMode.MULTI_NODE:
+            elif ClusterMode.from_str(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 assert network_ref_name, "network_id should not be None!"
                 network_plugin = self.network_plugin_ctx.plugins[
                     self.shared_config["network"]["inter-container"]["default-driver"]
@@ -4322,7 +4322,7 @@ async def handle_route_creation(
                     "preopen_ports": None,
                     "agent_list": None,
                 },
-                ClusterMode[endpoint.cluster_mode],
+                ClusterMode.from_str(endpoint.cluster_mode),
                 endpoint.cluster_size,
                 bootstrap_script=endpoint.bootstrap_script,
                 startup_command=endpoint.startup_command,

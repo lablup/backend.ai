@@ -53,7 +53,7 @@ from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import association_groups_users as agus
 from ..group import groups
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -171,12 +171,12 @@ class UserNode(graphene.ObjectType):
         "full_name": ("full_name", None),
         "description": ("description", None),
         "is_active": ("is_active", None),
-        "status": ("status", enum_field_getter(UserStatus)),
+        "status": ("status", UserStatus.from_str),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
-        "role": ("role", enum_field_getter(UserRole)),
+        "role": ("role", UserRole.from_str),
         "resource_policy": ("resource_policy", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
@@ -499,12 +499,12 @@ class User(graphene.ObjectType):
         "full_name": ("full_name", None),
         "description": ("description", None),
         "is_active": ("is_active", None),
-        "status": ("status", enum_field_getter(UserStatus)),
+        "status": ("status", UserStatus.from_str),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
-        "role": ("role", enum_field_getter(UserRole)),
+        "role": ("role", UserRole.from_str),
         "resource_policy": ("resource_policy", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),

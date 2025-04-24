@@ -18,6 +18,21 @@ class ImageType(enum.Enum):
     SYSTEM = "system"
     SERVICE = "service"
 
+    @classmethod
+    def from_str(cls, s: str) -> "ImageType":
+        s_upper = s.upper()
+        match s_upper:
+            case "COMPUTE":
+                return cls.COMPUTE
+            case "SYSTEM":
+                return cls.SYSTEM
+            case "SERVICE":
+                return cls.SERVICE
+            case _:
+                raise ValueError(
+                    f"Invalid image type: '{s}'. Expected one of {cls.__members__.keys()} (case-insensitive)."
+                )
+
 
 @dataclass
 class ImageLabelsData:

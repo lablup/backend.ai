@@ -163,6 +163,10 @@ class SessionStatus(enum.StrEnum):
             cls.TERMINATING,
         }
 
+    @classmethod
+    def from_str(cls, s: str) -> SessionStatus:
+        return cls(s.upper())
+
 
 FOLLOWING_SESSION_STATUSES = (
     # Session statuses that need to wait all kernels belonging to the session
@@ -1753,7 +1757,9 @@ async def check_all_dependencies(
     result = await db_session.execute(query)
     rows = result.scalars().all()
     pending_dependencies = [
-        sess_row for sess_row in rows if sess_row.result != SessionResult.SUCCESS
+        sess_row
+        for sess_row in rows
+        if SessionResult.from_str(sess_row.result) != SessionResult.SUCCESS
     ]
     return pending_dependencies
 

@@ -125,6 +125,15 @@ class ProjectType(enum.StrEnum):
     GENERAL = "general"
     MODEL_STORE = "model-store"
 
+    @classmethod
+    def from_str(cls, s: str) -> ProjectType:
+        match s.upper():
+            case "GENERAL":
+                return cls.GENERAL
+            case "MODEL_STORE" | "MODEL-STORE":
+                return cls.MODEL_STORE
+        raise ValueError(f"Invalid project type: {s}")
+
 
 groups = sa.Table(
     "groups",

@@ -88,7 +88,7 @@ from .base import (
 )
 from .group import GroupRow
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -166,6 +166,16 @@ class VFolderOwnershipType(enum.StrEnum):
     def to_field(self) -> VFolderOwnershipTypeField:
         return VFolderOwnershipTypeField(self)
 
+    @classmethod
+    def from_str(cls, s: str) -> VFolderOwnershipType:
+        match s.upper():
+            case "USER":
+                return cls.USER
+            case "GROUP":
+                return cls.GROUP
+            case _:
+                raise ValueError(f"Invalid VFolderOwnershipType: {s}")
+
 
 class VFolderPermission(enum.StrEnum):
     """
@@ -180,6 +190,20 @@ class VFolderPermission(enum.StrEnum):
 
     def to_field(self) -> VFolderPermissionField:
         return VFolderPermissionField(self)
+
+    @classmethod
+    def from_str(cls, s: str) -> VFolderPermission:
+        match s.upper():
+            case "RO" | "READ_ONLY":
+                return cls.READ_ONLY
+            case "RW" | "READ_WRITE":
+                return cls.READ_WRITE
+            case "RW_DELETE":
+                return cls.RW_DELETE
+            case "WD" | "OWNER_PERM":
+                return cls.OWNER_PERM
+            case _:
+                raise ValueError(f"Invalid VFolderPermission: {s}")
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -215,6 +239,30 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
     DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
+
+    @classmethod
+    def from_str(cls, s: str) -> VFolderOperationStatus:
+        match s.upper():
+            case "READY":
+                return cls.READY
+            case "PERFORMING":
+                return cls.PERFORMING
+            case "CLONING":
+                return cls.CLONING
+            case "MOUNTED":
+                return cls.MOUNTED
+            case "ERROR":
+                return cls.ERROR
+            case "DELETE_PENDING" | "DELETE-PENDING":
+                return cls.DELETE_PENDING
+            case "DELETE_ONGOING" | "DELETE-ONGOING":
+                return cls.DELETE_ONGOING
+            case "DELETE_COMPLETE" | "DELETE-COMPLETE":
+                return cls.DELETE_COMPLETE
+            case "DELETE_ERROR" | "DELETE-ERROR":
+                return cls.DELETE_ERROR
+            case _:
+                raise ValueError(f"Invalid VFolderOperationStatus: {s}")
 
     def is_deletable(self, force: bool = False) -> bool:
         if force:
@@ -1624,15 +1672,15 @@ class VirtualFolder(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            enum_field_getter(VFolderUsageMode),
+            VFolderUsageMode.from_str,
         ),
         "permission": (
             "vfolders_permission",
-            enum_field_getter(VFolderPermission),
+            VFolderPermission.from_str,
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            enum_field_getter(VFolderOwnershipType),
+            VFolderOwnershipType.from_str,
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -1641,7 +1689,7 @@ class VirtualFolder(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            lambda s: VFolderOperationStatus(s),
+            VFolderOperationStatus.from_str,
         ),
     }
 
@@ -2012,7 +2060,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "permission": ("vfolder_permissions_permission", enum_field_getter(VFolderPermission)),
+        "permission": ("vfolder_permissions_permission", VFolderPermission.from_str),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),
         "user": ("vfolder_permissions_user", None),

@@ -72,6 +72,22 @@ class UserRole(enum.StrEnum):
     USER = "user"
     MONITOR = "monitor"
 
+    @classmethod
+    def from_str(cls, s: str) -> UserRole:
+        match s.upper():
+            case "SUPERADMIN":
+                return cls.SUPERADMIN
+            case "ADMIN":
+                return cls.ADMIN
+            case "USER":
+                return cls.USER
+            case "MONITOR":
+                return cls.MONITOR
+            case _:
+                raise ValueError(
+                    f"Invalid user role: '{s}'. Expected one of {cls.__members__.keys()} (case-insensitive)."
+                )
+
 
 class UserStatus(enum.StrEnum):
     """
@@ -82,6 +98,22 @@ class UserStatus(enum.StrEnum):
     INACTIVE = "inactive"
     DELETED = "deleted"
     BEFORE_VERIFICATION = "before-verification"
+
+    @classmethod
+    def from_str(cls, s: str) -> UserStatus:
+        match s.upper():
+            case "ACTIVE":
+                return cls.ACTIVE
+            case "INACTIVE":
+                return cls.INACTIVE
+            case "DELETED":
+                return cls.DELETED
+            case "BEFORE-VERIFICATION" | "BEFORE_VERIFICATION":
+                return cls.BEFORE_VERIFICATION
+            case _:
+                raise ValueError(
+                    f"Invalid user status: '{s}'. Expected one of {cls.__members__.keys()} (case-insensitive)."
+                )
 
 
 ACTIVE_USER_STATUSES = (UserStatus.ACTIVE,)

@@ -322,7 +322,7 @@ overwritten_param_check = t.Dict({
     t.Key("owner_access_key", default=None): t.Null | t.String,
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
-    tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(ClusterMode),
+    tx.AliasedKey(["cluster_mode", "clusterMode"], default="SINGLE_NODE"): tx.Enum(ClusterMode),
     tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
     tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
 }).allow_extra("*")
@@ -396,7 +396,7 @@ async def query_userinfo(
             UndefChecker | t.Null | t.String
         ),
         tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
+        tx.AliasedKey(["cluster_mode", "clusterMode"], default="SINGLE_NODE"): tx.Enum(
             ClusterMode
         ),  # new in APIv6
         t.Key("config", default=dict): t.Mapping(t.String, t.Any),
@@ -519,7 +519,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
         tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
         tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
+        tx.AliasedKey(["cluster_mode", "clusterMode"], default="SINGLE_NODE"): tx.Enum(
             ClusterMode
         ),  # new in APIv6
         t.Key("config", default=dict): t.Mapping(t.String, t.Any),

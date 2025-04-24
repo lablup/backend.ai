@@ -54,7 +54,7 @@ from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import AssocGroupUserRow
 from ..keypair import keypairs
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..rbac import (
     ScopeType,
 )
@@ -83,7 +83,7 @@ __all__ = (
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
     "id": ("id", None),
-    "status": ("status", enum_field_getter(AgentStatus)),
+    "status": ("status", AgentStatus.from_value),
     "status_changed": ("status_changed", dtparse),
     "region": ("region", None),
     "scaling_group": ("scaling_group", None),
@@ -472,7 +472,7 @@ class Agent(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", enum_field_getter(AgentStatus)),
+        "status": ("status", AgentStatus.from_value),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
@@ -757,7 +757,7 @@ class AgentSummary(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", enum_field_getter(AgentStatus)),
+        "status": ("status", AgentStatus.from_value),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulable", None),
     }

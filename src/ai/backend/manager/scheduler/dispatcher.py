@@ -491,7 +491,8 @@ class SchedulerDispatcher(aobject):
                 async with self.db.begin_readonly_session() as db_sess:
                     if (
                         sgroup_opts.enforce_spreading_endpoint_replica
-                        and args.pending_session_type == SessionTypes.INFERENCE
+                        and SessionTypes.from_str(args.pending_session_type)
+                        == SessionTypes.INFERENCE
                     ):
                         endpoint_id = await db_sess.scalar(
                             sa.select(RoutingRow.endpoint).where(
@@ -752,7 +753,7 @@ class SchedulerDispatcher(aobject):
                 )
 
             try:
-                match schedulable_sess.cluster_mode:
+                match ClusterMode.from_str(schedulable_sess.cluster_mode):
                     case ClusterMode.SINGLE_NODE:
                         await self._schedule_single_node_session(
                             sched_ctx,
