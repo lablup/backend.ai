@@ -1218,7 +1218,9 @@ class SessionService:
                     # Get logs from database record
                     log.debug("returning log from database record")
                     resp["result"]["logs"] = kernel_log.decode("utf-8")
-                    return GetContainerLogsActionResult(result=resp, session_row=compute_session)
+                    return GetContainerLogsActionResult(
+                        result=resp, session_data=compute_session.to_dataclass()
+                    )
 
         registry = self._agent_registry
         await registry.increment_session_usage(compute_session)
@@ -1227,7 +1229,9 @@ class SessionService:
         )
         log.debug("returning log from agent")
 
-        return GetContainerLogsActionResult(result=resp, session_row=compute_session)
+        return GetContainerLogsActionResult(
+            result=resp, session_data=compute_session.to_dataclass()
+        )
 
     async def get_dependency_graph(
         self, action: GetDependencyGraphAction
