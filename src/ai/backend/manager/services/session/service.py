@@ -182,7 +182,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
 )
-from ai.backend.manager.services.session.types import LegacySessionInfo
+from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySessionInfo
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -1175,8 +1175,12 @@ class SessionService:
         except BackendError:
             log.exception("GET_COMMIT_STATUS: exception")
             raise
-        resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
-        return GetCommitStatusActionResult(result=resp, session_row=session)
+
+        result = CommitStatusInfo(
+            status=statuses[session.main_kernel.id],
+            kernel=str(session.main_kernel.id),
+        )
+        return GetCommitStatusActionResult(commit_info=result, session_data=session.to_dataclass())
 
     async def get_container_logs(
         self, action: GetContainerLogsAction
