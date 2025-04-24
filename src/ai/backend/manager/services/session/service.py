@@ -1164,7 +1164,9 @@ class SessionService:
         )
         log.debug("returning log from agent")
 
-        return GetContainerLogsActionResult(result=resp, session_row=compute_session)
+        return GetContainerLogsActionResult(
+            result=resp, session_data=compute_session.to_dataclass()
+        )
 
     async def get_dependency_graph(
         self, action: GetDependencyGraphAction
