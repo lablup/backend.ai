@@ -795,7 +795,7 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
             owner_access_key=owner_access_key,
         )
     )
-    return web.json_response(result.result or {}, status=HTTPStatus.OK)
+    return web.json_response(result.abuse_report or {}, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
