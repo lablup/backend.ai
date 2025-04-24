@@ -1842,41 +1842,50 @@ class AgentRegistry:
                             )
                         ).image_ref
 
-                        _pytorch_distributed_environ = {
-                            "WORLD_SIZE": str(binding.kernel.cluster_size),
-                            "WORLD_RANK": str(scheduled_session.kernels.index(binding.kernel)),
-                            "LOCAL_RANK": str(binding.kernel.local_rank),
-                            "MASTER_ADDR": str(scheduled_session.main_kernel.cluster_hostname),
-                            "MASTER_PORT": "12345",
-                        }
+                        image_conf = get_image_conf(binding.kernel)
+                        kernel_rank = scheduled_session.kernels.index(binding.kernel)
 
-                        _tf_distributed_environ = {
-                            "TF_CONFIG": dump_json_str({
-                                "cluster": {
-                                    "worker": [
-                                        f"{kernel.cluster_hostname}:12345"
-                                        for kernel in scheduled_session.kernels
-                                    ]
-                                },
-                                "task": {
-                                    "type": "worker",
-                                    "index": str(scheduled_session.kernels.index(binding.kernel)),
-                                },
-                            }),
-                        }
+                        match image_conf["canonical"].split(":"):
+                            case canonical, _ if canonical.endswith("pytorch"):
+                                distributed_training_environ = {
+                                    "WORLD_SIZE": str(binding.kernel.cluster_size),
+                                    "WORLD_RANK": str(kernel_rank),
+                                    "LOCAL_RANK": str(binding.kernel.local_rank),
+                                    "MASTER_ADDR": str(
+                                        scheduled_session.main_kernel.cluster_hostname
+                                    ),
+                                    "MASTER_PORT": "12345",
+                                }
+                            case canonical, _ if canonical.endswith("tensorflow"):
+                                distributed_training_environ = {
+                                    "TF_CONFIG": dump_json_str({
+                                        "cluster": {
+                                            "worker": [
+                                                f"{kernel.cluster_hostname}:12345"
+                                                for kernel in scheduled_session.kernels
+                                            ]
+                                        },
+                                        "task": {
+                                            "type": "worker",
+                                            "index": str(kernel_rank),
+                                        },
+                                    }),
+                                }
+                            case _:
+                                distributed_training_environ = {}
 
                         raw_configs.append({
                             "image": {
                                 # TODO: refactor registry and is_local to be specified per kernel.
-                                "registry": get_image_conf(binding.kernel)["registry"],
-                                "project": get_image_conf(binding.kernel)["project"],
-                                "digest": get_image_conf(binding.kernel)["digest"],
-                                "repo_digest": get_image_conf(binding.kernel)["repo_digest"],
-                                "canonical": get_image_conf(binding.kernel)["canonical"],
-                                "architecture": get_image_conf(binding.kernel)["architecture"],
-                                "labels": get_image_conf(binding.kernel)["labels"],
-                                "is_local": get_image_conf(binding.kernel)["is_local"],
-                                "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
+                                "registry": image_conf["registry"],
+                                "project": image_conf["project"],
+                                "digest": image_conf["digest"],
+                                "repo_digest": image_conf["repo_digest"],
+                                "canonical": image_conf["canonical"],
+                                "architecture": image_conf["architecture"],
+                                "labels": image_conf["labels"],
+                                "is_local": image_conf["is_local"],
+                                "auto_pull": image_conf["auto_pull"],
                             },
                             "network_id": str(scheduled_session.id),
                             "session_type": scheduled_session.session_type.value,
@@ -1896,23 +1905,18 @@ class AgentRegistry:
                             "idle_timeout": int(idle_timeout),
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
-                                **_pytorch_distributed_environ,
-                                **_tf_distributed_environ,
+                                **distributed_training_environ,
                                 # inherit per-session environment variables
                                 **scheduled_session.environ,
                                 # set per-kernel environment variables
                                 "BACKENDAI_KERNEL_ID": str(binding.kernel.id),
-                                "BACKENDAI_KERNEL_IMAGE": get_image_conf(binding.kernel)[
-                                    "canonical"
-                                ],
+                                "BACKENDAI_KERNEL_IMAGE": image_conf["canonical"],
                                 "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
                                 "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
                                 "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
                                 "BACKENDAI_SERVICE_PORTS": str(
-                                    get_image_conf(binding.kernel)["labels"].get(
-                                        "ai.backend.service-ports"
-                                    )
+                                    image_conf["labels"].get("ai.backend.service-ports")
                                 ),
                             },
                             "resource_slots": binding.kernel.requested_slots.to_json(),
@@ -1920,7 +1924,7 @@ class AgentRegistry:
                             "bootstrap_script": binding.kernel.bootstrap_script,
                             "startup_command": binding.kernel.startup_command,
                             "internal_data": scheduled_session.main_kernel.internal_data,
-                            "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
+                            "auto_pull": image_conf["auto_pull"],
                             "preopen_ports": scheduled_session.main_kernel.preopen_ports,
                             "allocated_host_ports": list(binding.allocated_host_ports),
                             "agent_addr": binding.agent_alloc_ctx.agent_addr,
