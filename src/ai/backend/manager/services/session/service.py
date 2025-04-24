@@ -952,7 +952,7 @@ class SessionService:
             log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
             raise InternalServerError
 
-        return DownloadFileActionResult(result=result, session_row=session)
+        return DownloadFileActionResult(bytes=result, session_data=session.to_dataclass())
 
     async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
         session_name = action.session_name
