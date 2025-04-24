@@ -37,10 +37,11 @@ from ai.backend.common.exception import (
     ProjectMismatchWithCanonical,
 )
 from ai.backend.common.json import read_json
-from ai.backend.common.types import SSLContextType
+from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
+from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 
 from ..data.image.types import ImageStatus, ImageType
 from ..exceptions import ScanImageError, ScanTagError
@@ -591,6 +592,26 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
 
+    def _read_supported_accelerators_from_labels(self, labels: Mapping[str, Any]) -> set[str]:
+        """Returns set of accelerators, represented by the slot name, supported by the image (excluding cpu and mem)."""
+
+        accels = set()
+        if _accels_str := labels.get("ai.backend.accelerators"):
+            accels |= set(_accels_str.split(","))
+        for key in labels.keys():
+            if key.startswith("ai.backend.resource.min") or key.startswith(
+                "ai.backend.resource.max"
+            ):
+                accel = key.split(
+                    "."
+                )[
+                    4
+                ]  # "ai" "backend" "resource" "min" "cuda/cpu/mem/..." "device/shares/...(if necessary)"
+                if SlotName(accel) not in INTRINSIC_SLOTS_MIN:
+                    accels.add(accel)
+
+        return accels
+
     async def _read_manifest(
         self,
         image: str,
@@ -638,9 +659,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     "labels": manifest["labels"],  # keep the original form
                 }
                 if "ai.backend.kernelspec" in manifest["labels"]:
-                    accels = manifest["labels"].get("ai.backend.accelerators")
+                    accels = self._read_supported_accelerators_from_labels(manifest["labels"])
                     if accels:
-                        updates["accels"] = accels
+                        updates["accels"] = ",".join(accels)
                 else:
                     # allow every accelerators for non-backend.ai image
                     updates["accels"] = "*"
