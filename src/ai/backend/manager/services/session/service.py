@@ -194,7 +194,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
 )
-from ai.backend.manager.services.session.types import LegacySessionInfo
+from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySessionInfo
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore

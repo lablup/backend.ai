@@ -1,3 +1,4 @@
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
@@ -70,3 +71,12 @@ class LegacySessionInfo:
             "lastStat": self.last_stat,
             "idleChecks": self.idle_checks,
         }
+
+
+@dataclass
+class CommitStatusInfo:
+    status: str
+    kernel: str
+
+    def asdict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
