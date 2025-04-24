@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 import uuid
 from datetime import datetime, timezone
@@ -45,7 +46,7 @@ SESSION_ROW_FIXTURE = SessionRow(
     created_at=datetime.now(timezone.utc),
     terminated_at=None,
     starts_at=None,
-    status=SessionStatus.PENDING,
+    status=SessionStatus.RUNNING,
     status_info=None,
     status_data=None,
     status_history=None,
@@ -64,7 +65,7 @@ KERNEL_ROW_FIXTURE = KernelRow(
     session_creation_id=SESSION_ROW_FIXTURE.creation_id,
     session_name=SESSION_ROW_FIXTURE.name,
     session_type=SessionTypes.INTERACTIVE,
-    cluster_mode=ClusterMode.SINGLE_NODE.name,
+    cluster_mode=ClusterMode.SINGLE_NODE,
     cluster_size=1,
     cluster_role="main",
     cluster_idx=1,
@@ -126,8 +127,8 @@ SESSION_FIXTURE_DATA = SESSION_ROW_FIXTURE.to_dataclass()
 SESSION_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(
         SESSION_FIXTURE_DATA,
-        result=SessionResult.UNDEFINED.name,  # type: ignore
-        status=SessionStatus.PENDING.value,  # type: ignore
+        result=SESSION_FIXTURE_DATA.result.name,  # type: ignore
+        status=SESSION_FIXTURE_DATA.status.value,  # type: ignore
     )
 )
 
@@ -137,9 +138,23 @@ KERNEL_FIXTURE_DATA = KERNEL_ROW_FIXTURE.to_dataclass()
 KERNEL_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(
         KERNEL_FIXTURE_DATA,
-        session_type=SessionTypes.INTERACTIVE.value,  # type: ignore
-        cluster_mode=ClusterMode.SINGLE_NODE.name,  # type: ignore
-        result=SessionResult.UNDEFINED.name,  # type: ignore
-        status=SessionStatus.PENDING.value,  # type: ignore
+        session_type=KERNEL_FIXTURE_DATA.session_type.value,  # type: ignore
+        cluster_mode=KERNEL_FIXTURE_DATA.cluster_mode.name,  # type: ignore
+        result=KERNEL_FIXTURE_DATA.result.name,  # type: ignore
+        status=KERNEL_FIXTURE_DATA.status.value,  # type: ignore
+    )
+)
+
+
+PENDING_SESSION_FIXTURE_DATA = copy.deepcopy(SESSION_FIXTURE_DATA)
+PENDING_SESSION_FIXTURE_DATA.id = SessionId(uuid.uuid4())
+PENDING_SESSION_FIXTURE_DATA.name = "pending_session"
+PENDING_SESSION_FIXTURE_DATA.status = SessionStatus.PENDING
+
+PENDING_SESSION_FIXTURE_DICT = dataclasses.asdict(
+    dataclasses.replace(
+        PENDING_SESSION_FIXTURE_DATA,
+        result=PENDING_SESSION_FIXTURE_DATA.result.name,  # type: ignore
+        status=PENDING_SESSION_FIXTURE_DATA.status.value,  # type: ignore
     )
 )
