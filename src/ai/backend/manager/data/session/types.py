@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
+    AccessKey,
     ClusterMode,
     SessionResult,
     SessionTypes,
@@ -32,9 +33,10 @@ class SessionData:
     created_at: datetime
     status: "SessionStatus"
     result: SessionResult
+    num_queries: int
     creation_id: Optional[str]
     name: Optional[str]
-    access_key: Optional[str]
+    access_key: Optional[AccessKey]
     agent_ids: Optional[list[str]]
     images: Optional[list[str]]
     tag: Optional[str]
@@ -52,7 +54,9 @@ class SessionData:
     status_history: Optional[dict[str, Any]]
     callback_url: Optional[str]
     startup_command: Optional[str]
-    num_queries: Optional[int]
     last_stat: Optional[dict[str, Any]]
     network_type: Optional[NetworkType]
     network_id: Optional[str]
+
+    # Loaded from relationship
+    service_ports: Optional[str]
