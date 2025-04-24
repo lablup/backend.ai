@@ -1555,7 +1555,7 @@ class SessionService:
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
 
-        return ModifySessionActionResult(result=None, session_row=session_row)
+        return ModifySessionActionResult(session_data=session_row.to_dataclass())
 
     async def check_and_transit_status(
         self, action: CheckAndTransitStatusAction

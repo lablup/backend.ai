@@ -37,6 +37,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.kernel.types import KernelData
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -582,6 +583,73 @@ class KernelRow(Base):
         back_populates="kernels",
         foreign_keys="KernelRow.user_uuid",
     )
+
+    @classmethod
+    def from_dataclass(cls, data: KernelData) -> KernelRow:
+        raise NotImplementedError("KernelRow.from_dataclass() is not implemented.")
+
+    def to_dataclass(self) -> KernelData:
+        return KernelData(
+            id=self.id,
+            session_id=self.session_id,
+            session_creation_id=self.session_creation_id,
+            session_name=self.session_name,
+            session_type=self.session_type,
+            cluster_mode=self.cluster_mode,
+            cluster_size=self.cluster_size,
+            cluster_role=self.cluster_role,
+            cluster_idx=self.cluster_idx,
+            local_rank=self.local_rank,
+            cluster_hostname=self.cluster_hostname,
+            uid=self.uid,
+            main_gid=self.main_gid,
+            gids=self.gids,
+            scaling_group=self.scaling_group,
+            agent=self.agent_row.to_dataclass() if getattr(self, "agent_row", None) else None,
+            agent_addr=self.agent_addr,
+            domain_name=self.domain_name,
+            group_id=self.group_id,
+            user_uuid=self.user_uuid,
+            access_key=self.access_key,
+            image=self.image,
+            architecture=self.architecture,
+            registry=self.registry,
+            tag=self.tag,
+            container_id=self.container_id,
+            occupied_slots=self.occupied_slots,
+            requested_slots=self.requested_slots,
+            occupied_shares=self.occupied_shares,
+            environ=self.environ,
+            mounts=self.mounts,
+            mount_map=self.mount_map,
+            vfolder_mounts=self.vfolder_mounts,
+            attached_devices=self.attached_devices,
+            resource_opts=self.resource_opts,
+            bootstrap_script=self.bootstrap_script,
+            kernel_host=self.kernel_host or self.agent_addr,
+            repl_in_port=self.repl_in_port,
+            repl_out_port=self.repl_out_port,
+            stdin_port=self.stdin_port,
+            stdout_port=self.stdout_port,
+            service_ports=self.service_ports,
+            preopen_ports=self.preopen_ports,
+            use_host_network=self.use_host_network,
+            created_at=self.created_at,
+            terminated_at=self.terminated_at,
+            starts_at=self.starts_at,
+            status=self.status,
+            status_changed=self.status_changed,
+            status_info=self.status_info,
+            status_data=self.status_data,
+            status_history=self.status_history,
+            callback_url=str(self.callback_url) if self.callback_url else None,
+            startup_command=self.startup_command,
+            result=self.result,
+            internal_data=self.internal_data,
+            container_log=self.container_log,
+            num_queries=self.num_queries,
+            last_stat=self.last_stat,
+        )
 
     @property
     def image_ref(self) -> ImageRef | None:
