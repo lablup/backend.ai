@@ -47,11 +47,12 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from redis.asyncio import Redis
 
 from .defs import RedisRole
 from .exception import InvalidIpAddressValue
+from .json import dump_json_str, load_json
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
@@ -145,6 +146,8 @@ __all__ = (
     "ItemResult",
     "ResultSet",
     "safe_print_redis_config",
+    "PyTorchDistributedEnviron",
+    "TensorFlowDistributedEnviron",
 )
 
 
@@ -1640,3 +1643,61 @@ class PurgeImageResult(TypedDict):
     image: str
     result: Optional[list[Any]]
     error: Optional[str]
+
+
+class PyTorchDistributedEnviron(BaseModel):
+    world_size: str = Field(serialization_alias="WORLD_SIZE")
+    world_rank: str = Field(serialization_alias="WORLD_RANK")
+    local_rank: str = Field(serialization_alias="LOCAL_RANK")
+    master_addr: str = Field(serialization_alias="MASTER_ADDR")
+    master_port: str = Field(serialization_alias="MASTER_PORT")
+
+    @override
+    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+        kwargs["by_alias"] = kwargs.get("by_alias", True)
+        return super().model_dump(*args, **kwargs)
+
+
+class _TensorFlowDistributedClusterConfig(BaseModel):
+    worker: list[str]  # "<hostname>:<port>"
+
+
+_TensorFlowDistributedClusterRole = Literal["chief", "worker", "ps", "evaluator"]
+
+
+class _TensorFlowDistributedTaskConfig(BaseModel):
+    type_: _TensorFlowDistributedClusterRole = Field(alias="type")
+    index: str
+
+    @override
+    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+        kwargs["by_alias"] = kwargs.get("by_alias", True)
+        return super().model_dump(*args, **kwargs)
+
+
+class _TensorFlowDistributedConfig(BaseModel):
+    cluster: _TensorFlowDistributedClusterConfig
+    task: _TensorFlowDistributedTaskConfig
+
+    @override
+    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+        kwargs["by_alias"] = kwargs.get("by_alias", True)
+        return super().model_dump(*args, **kwargs)
+
+
+class TensorFlowDistributedEnviron(BaseModel):
+    config: _TensorFlowDistributedConfig = Field(alias="TF_CONFIG")
+
+    @field_validator("config", mode="before")
+    @classmethod
+    def parse_config(cls, v: str | Mapping[str, Any]) -> _TensorFlowDistributedConfig:
+        if isinstance(v, str):
+            return _TensorFlowDistributedConfig(**load_json(v))
+        return _TensorFlowDistributedConfig(**v)
+
+    @override
+    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+        kwargs["by_alias"] = kwargs.get("by_alias", True)
+        result = super().model_dump(*args, **kwargs)
+        result["TF_CONFIG"] = dump_json_str(self.config.model_dump(*args, **kwargs))
+        return result

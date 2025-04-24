@@ -93,7 +93,6 @@ from ai.backend.common.events import (
     VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
-from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -116,6 +115,7 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
+    PyTorchDistributedEnviron,
     RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
@@ -123,6 +123,7 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     SlotTypes,
+    TensorFlowDistributedEnviron,
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
@@ -1846,31 +1847,31 @@ class AgentRegistry:
                         kernel_rank = scheduled_session.kernels.index(binding.kernel)
 
                         match image_conf["canonical"].split(":"):
-                            case canonical, _ if canonical.endswith("pytorch"):
-                                distributed_training_environ = {
-                                    "WORLD_SIZE": str(binding.kernel.cluster_size),
-                                    "WORLD_RANK": str(kernel_rank),
-                                    "LOCAL_RANK": str(binding.kernel.local_rank),
-                                    "MASTER_ADDR": str(
-                                        scheduled_session.main_kernel.cluster_hostname
-                                    ),
-                                    "MASTER_PORT": "12345",
-                                }
-                            case canonical, _ if canonical.endswith("tensorflow"):
-                                distributed_training_environ = {
-                                    "TF_CONFIG": dump_json_str({
-                                        "cluster": {
-                                            "worker": [
-                                                f"{kernel.cluster_hostname}:12345"
-                                                for kernel in scheduled_session.kernels
-                                            ]
+                            case canonical, *_ if canonical.endswith("pytorch"):
+                                distributed_training_environ = PyTorchDistributedEnviron(
+                                    world_size=binding.kernel.cluster_size,
+                                    world_rank=kernel_rank,
+                                    local_rank=binding.kernel.local_rank,
+                                    master_addr=scheduled_session.main_kernel.cluster_hostname,
+                                    master_port="12345",
+                                ).model_dump()
+                            case canonical, *_ if canonical.endswith("tensorflow"):
+                                distributed_training_environ = (
+                                    TensorFlowDistributedEnviron.model_validate({
+                                        "TF_CONFIG": {
+                                            "cluster": {
+                                                "worker": [
+                                                    f"{kernel.cluster_hostname}:12345"
+                                                    for kernel in scheduled_session.kernels
+                                                ],
+                                            },
+                                            "task": {
+                                                "type": "worker",
+                                                "index": str(kernel_rank),
+                                            },
                                         },
-                                        "task": {
-                                            "type": "worker",
-                                            "index": str(kernel_rank),
-                                        },
-                                    }),
-                                }
+                                    }).model_dump()
+                                )
                             case _:
                                 distributed_training_environ = {}
 
