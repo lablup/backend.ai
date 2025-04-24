@@ -1412,7 +1412,7 @@ class SessionService:
                 kernel.session_name = new_name
             await db_sess.commit()
 
-        return RenameSessionActionResult(result=None, session_row=compute_session)
+        return RenameSessionActionResult(session_data=compute_session.to_dataclass())
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name

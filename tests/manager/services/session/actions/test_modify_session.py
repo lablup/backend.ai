@@ -18,16 +18,18 @@ from ..fixtures import KERNEL_FIXTURE_DICT, SESSION_FIXTURE_DATA, SESSION_FIXTUR
     "test_scenario",
     [
         TestScenario.success(
-            "Success Case",
+            "Update name, priority",
             ModifySessionAction(
                 session_id=SESSION_FIXTURE_DATA.id,
                 modifier=SessionModifier(
-                    name=OptionalState.nop(),
+                    name=OptionalState.update("new_name"),
                     priority=OptionalState.update(100),
                 ),
             ),
-            ModifySessionActionResult(session_data=replace(SESSION_FIXTURE_DATA, priority=100)),
-        )
+            ModifySessionActionResult(
+                session_data=replace(SESSION_FIXTURE_DATA, name="new_name", priority=100)
+            ),
+        ),
     ],
 )
 @pytest.mark.parametrize(
