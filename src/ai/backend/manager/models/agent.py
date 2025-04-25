@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Optional, Self, TypeAlias, cast, override
+from typing import Any, Optional, Self, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -51,12 +51,15 @@ class AgentStatus(enum.Enum):
     RESTARTING = 2
     TERMINATED = 3
 
+    @override
     @classmethod
-    def from_value(cls, v: int | str) -> AgentStatus:
-        if isinstance(v, int):
-            return cls(v)
-        if isinstance(v, str):
-            match v.upper():
+    def _missing_(cls, value: Any) -> Optional[AgentStatus]:
+        if isinstance(value, int):
+            for member in cls:
+                if member.value == value:
+                    return member
+        if isinstance(value, str):
+            match value.upper():
                 case "ALIVE":
                     return cls.ALIVE
                 case "LOST":
@@ -65,9 +68,7 @@ class AgentStatus(enum.Enum):
                     return cls.RESTARTING
                 case "TERMINATED":
                     return cls.TERMINATED
-                case _:
-                    raise ValueError(f"Invalid value for AgentStatus: {v}")
-        raise ValueError(f"Invalid value for AgentStatus: {v}")
+        return None
 
 
 agents = sa.Table(

@@ -83,7 +83,7 @@ __all__ = (
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
     "id": ("id", None),
-    "status": ("status", AgentStatus.from_value),
+    "status": ("status", lambda v: AgentStatus(v)),
     "status_changed": ("status_changed", dtparse),
     "region": ("region", None),
     "scaling_group": ("scaling_group", None),
@@ -472,7 +472,7 @@ class Agent(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", AgentStatus.from_value),
+        "status": ("status", lambda v: AgentStatus(v)),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
@@ -757,7 +757,7 @@ class AgentSummary(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", AgentStatus.from_value),
+        "status": ("status", lambda v: AgentStatus(v)),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulable", None),
     }
