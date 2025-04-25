@@ -2,7 +2,9 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, override
+from typing import TYPE_CHECKING, Optional
+
+from ai.backend.common.types import CIStrEnum
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.image import Resources
@@ -13,20 +15,10 @@ class ImageStatus(enum.StrEnum):
     DELETED = "DELETED"
 
 
-class ImageType(enum.Enum):
+class ImageType(CIStrEnum):
     COMPUTE = "compute"
     SYSTEM = "system"
     SERVICE = "service"
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional["ImageType"]:
-        if isinstance(value, str):
-            value = value.lower()
-            for member in cls:
-                if member.value == value:
-                    return member
-        return None
 
 
 @dataclass
