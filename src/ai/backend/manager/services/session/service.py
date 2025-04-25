@@ -30,6 +30,7 @@ from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
+    DispatchResult,
     ImageAlias,
     ImageRegistry,
     SessionId,
@@ -40,7 +41,6 @@ from ai.backend.manager.api.exceptions import (
     AppNotFound,
     GenericForbidden,
     InternalServerError,
-    QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -352,7 +352,7 @@ class SessionService:
 
         base_image_ref = image_row.image_ref
 
-        async def _commit_and_upload(reporter: ProgressReporter) -> None:
+        async def _commit_and_upload(reporter: ProgressReporter) -> DispatchResult:
             reporter.total_progress = 3
             await reporter.update(message="Commit started")
             try:
@@ -385,12 +385,8 @@ class SessionService:
 
                     customized_image_count_limit = action.max_customized_image_count
                     if customized_image_count_limit <= existing_image_count:
-                        raise QuotaExceeded(
-                            extra_msg="You have reached your customized image count quota",
-                            extra_data={
-                                "limit": customized_image_count_limit,
-                                "current": existing_image_count,
-                            },
+                        return DispatchResult.error(
+                            f"You have reached your customized image count quota. limit: {customized_image_count_limit}, current: {existing_image_count}"
                         )
 
                     # check if image with same name exists and reuse ID it if is
@@ -455,9 +451,9 @@ class SessionService:
                             await reporter.update(increment=1, message="Committed image")
                             break
                         case BgtaskFailedEvent():
-                            raise BackendError(extra_msg=event.message)
+                            return DispatchResult.error(str(event.message))
                         case BgtaskCancelledEvent():
-                            raise BackendError(extra_msg="Operation cancelled")
+                            return DispatchResult.error("Operation cancelled")
 
                 if not new_image_ref.is_local:
                     # push image to registry from local agent
@@ -479,9 +475,9 @@ class SessionService:
                             case BgtaskDoneEvent():
                                 break
                             case BgtaskFailedEvent():
-                                raise BackendError(extra_msg=event.message)
+                                return DispatchResult.error(str(event.message))
                             case BgtaskCancelledEvent():
-                                raise BackendError(extra_msg="Operation cancelled")
+                                return DispatchResult.error("Operation cancelled")
 
                 await reporter.update(increment=1, message="Pushed image to registry")
                 # rescan updated image only
@@ -492,9 +488,10 @@ class SessionService:
                     reporter=reporter,
                 )
                 await reporter.update(increment=1, message="Completed")
-            except BackendError:
+                return DispatchResult.success(None)
+            except BackendError as e:
                 log.exception("CONVERT_SESSION_TO_IMAGE: exception")
-                raise
+                return DispatchResult.error(str(e))
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
         return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
