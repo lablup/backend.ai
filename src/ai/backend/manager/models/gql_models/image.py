@@ -133,7 +133,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "registry_id": ("registry_id", None),
     "architecture": ("architecture", None),
     "is_local": ("is_local", None),
-    "type": ("session_type", lambda s: ImageType(s)),
+    "type": ("session_type", ImageType),
     "accelerators": ("accelerators", None),
 }
 

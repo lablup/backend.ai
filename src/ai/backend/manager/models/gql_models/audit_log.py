@@ -78,7 +78,7 @@ class AuditLogNode(graphene.ObjectType):
         "request_id": ("request_id", None),
         "description": ("description", None),
         "duration": ("duration", lambda duration: timedelta(seconds=float(duration))),
-        "status": ("status", lambda status: OperationStatus(status)),
+        "status": ("status", OperationStatus),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {

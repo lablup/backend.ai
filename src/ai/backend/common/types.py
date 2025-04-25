@@ -387,6 +387,7 @@ class ClusterMode(enum.StrEnum):
     @classmethod
     def _missing_(cls, value: object) -> Optional[ClusterMode]:
         assert isinstance(value, str)
+        # This implementation ensures compatibility with both cases, as we are mixing the use of enum names and values in DB, GraphQL, REST, etc.
         match value.upper():
             case "SINGLE-NODE" | "SINGLE_NODE":
                 return cls.SINGLE_NODE

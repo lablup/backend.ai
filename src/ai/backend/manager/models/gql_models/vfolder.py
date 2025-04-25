@@ -129,15 +129,15 @@ class VirtualFolderNode(graphene.ObjectType):
         "unmanaged_path": ("unmanaged_path", None),
         "usage_mode": (
             "usage_mode",
-            lambda s: VFolderUsageMode(s),
+            VFolderUsageMode,
         ),
         "permission": (
             "permission",
-            lambda s: VFolderPermission(s),
+            VFolderPermission,
         ),
         "ownership_type": (
             "ownership_type",
-            lambda s: VFolderOwnershipType(s),
+            VFolderOwnershipType,
         ),
         "max_files": ("max_files", None),
         "max_size": ("max_size", None),
@@ -146,7 +146,7 @@ class VirtualFolderNode(graphene.ObjectType):
         "cloneable": ("cloneable", None),
         "status": (
             "status",
-            lambda s: VFolderOperationStatus(s),
+            VFolderOperationStatus,
         ),
     }
 
@@ -449,15 +449,15 @@ class ModelCard(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            lambda s: VFolderUsageMode(s),
+            VFolderUsageMode,
         ),
         "permission": (
             "vfolders_permission",
-            lambda s: VFolderPermission(s),
+            VFolderPermission,
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            lambda s: VFolderOwnershipType(s),
+            VFolderOwnershipType,
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -466,7 +466,7 @@ class ModelCard(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            lambda s: VFolderOperationStatus(s),
+            VFolderOperationStatus,
         ),
     }
 

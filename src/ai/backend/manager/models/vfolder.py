@@ -2053,7 +2053,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "permission": ("vfolder_permissions_permission", lambda s: VFolderPermission(s)),
+        "permission": ("vfolder_permissions_permission", VFolderPermission),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),
         "user": ("vfolder_permissions_user", None),

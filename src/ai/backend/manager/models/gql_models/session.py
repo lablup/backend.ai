@@ -974,7 +974,7 @@ class ComputeSession(graphene.ObjectType):
 
     _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
-        "type": ("sessions_session_type", lambda s: SessionTypes(s)),
+        "type": ("sessions_session_type", SessionTypes),
         "name": ("sessions_name", None),
         "priority": ("sessions_priority", None),
         "image": (ArrayFieldItem("sessions_images"), None),
@@ -988,11 +988,11 @@ class ComputeSession(graphene.ObjectType):
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
-        "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode(s)),
+        "cluster_mode": ("sessions_cluster_mode", ClusterMode),
         "cluster_size": ("sessions_cluster_size", None),
-        "status": ("sessions_status", lambda s: SessionStatus(s)),
+        "status": ("sessions_status", SessionStatus),
         "status_info": ("sessions_status_info", None),
-        "result": ("sessions_result", lambda s: SessionResult(s)),
+        "result": ("sessions_result", SessionResult),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
