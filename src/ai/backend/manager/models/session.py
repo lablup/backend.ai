@@ -46,6 +46,7 @@ from ai.backend.common.events import (
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AccessKey,
+    CIUpperStrEnum,
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
@@ -133,7 +134,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
 
 
-class SessionStatus(enum.StrEnum):
+class SessionStatus(CIUpperStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     # ---
@@ -162,10 +163,6 @@ class SessionStatus(enum.StrEnum):
             cls.CREATING,
             cls.TERMINATING,
         }
-
-    @classmethod
-    def from_str(cls, s: str) -> SessionStatus:
-        return cls(s.upper())
 
 
 FOLLOWING_SESSION_STATUSES = (
@@ -1757,9 +1754,7 @@ async def check_all_dependencies(
     result = await db_session.execute(query)
     rows = result.scalars().all()
     pending_dependencies = [
-        sess_row
-        for sess_row in rows
-        if SessionResult.from_str(sess_row.result) != SessionResult.SUCCESS
+        sess_row for sess_row in rows if SessionResult(sess_row.result) != SessionResult.SUCCESS
     ]
     return pending_dependencies
 

@@ -2,7 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional, override
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.image import Resources
@@ -18,20 +18,15 @@ class ImageType(enum.Enum):
     SYSTEM = "system"
     SERVICE = "service"
 
+    @override
     @classmethod
-    def from_str(cls, s: str) -> "ImageType":
-        s_upper = s.upper()
-        match s_upper:
-            case "COMPUTE":
-                return cls.COMPUTE
-            case "SYSTEM":
-                return cls.SYSTEM
-            case "SERVICE":
-                return cls.SERVICE
-            case _:
-                raise ValueError(
-                    f"Invalid image type: '{s}'. Expected one of {cls.__members__.keys()} (case-insensitive)."
-                )
+    def _missing_(cls, value: Any) -> Optional["ImageType"]:
+        if isinstance(value, str):
+            value = value.lower()
+            for member in cls:
+                if member.value == value:
+                    return member
+        return None
 
 
 @dataclass

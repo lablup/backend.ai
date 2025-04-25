@@ -10,6 +10,7 @@ from typing import (
     Self,
     Sequence,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -21,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
+from ai.backend.common.types import CIUpperStrEnum
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
@@ -62,7 +64,7 @@ class PasswordColumn(TypeDecorator):
         return _hash_password(value)
 
 
-class UserRole(enum.StrEnum):
+class UserRole(CIUpperStrEnum):
     """
     User's role.
     """
@@ -71,22 +73,6 @@ class UserRole(enum.StrEnum):
     ADMIN = "admin"
     USER = "user"
     MONITOR = "monitor"
-
-    @classmethod
-    def from_str(cls, s: str) -> UserRole:
-        match s.upper():
-            case "SUPERADMIN":
-                return cls.SUPERADMIN
-            case "ADMIN":
-                return cls.ADMIN
-            case "USER":
-                return cls.USER
-            case "MONITOR":
-                return cls.MONITOR
-            case _:
-                raise ValueError(
-                    f"Invalid user role: '{s}'. Expected one of {cls.__members__.keys()} (case-insensitive)."
-                )
 
 
 class UserStatus(enum.StrEnum):
@@ -99,9 +85,11 @@ class UserStatus(enum.StrEnum):
     DELETED = "deleted"
     BEFORE_VERIFICATION = "before-verification"
 
+    @override
     @classmethod
-    def from_str(cls, s: str) -> UserStatus:
-        match s.upper():
+    def _missing_(cls, value: Any) -> Optional[UserStatus]:
+        assert isinstance(value, str)
+        match value.upper():
             case "ACTIVE":
                 return cls.ACTIVE
             case "INACTIVE":
@@ -110,10 +98,7 @@ class UserStatus(enum.StrEnum):
                 return cls.DELETED
             case "BEFORE-VERIFICATION" | "BEFORE_VERIFICATION":
                 return cls.BEFORE_VERIFICATION
-            case _:
-                raise ValueError(
-                    f"Invalid user status: '{s}'. Expected one of {cls.__members__.keys()} (case-insensitive)."
-                )
+        return None
 
 
 ACTIVE_USER_STATUSES = (UserStatus.ACTIVE,)

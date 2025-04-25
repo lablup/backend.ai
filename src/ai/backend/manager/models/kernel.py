@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import enum
 import logging
 import uuid
 from collections.abc import Container, Mapping
@@ -29,6 +28,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
+    CIUpperStrEnum,
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
@@ -87,7 +87,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
-class KernelStatus(enum.StrEnum):
+class KernelStatus(CIUpperStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     # ---
@@ -108,10 +108,6 @@ class KernelStatus(enum.StrEnum):
     TERMINATED = "TERMINATED"
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
-
-    @classmethod
-    def from_str(cls, s: str) -> KernelStatus:
-        return cls(s.upper())
 
 
 # statuses to consider when calculating current resource usage

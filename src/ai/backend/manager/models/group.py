@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Iterable,
     Optional,
@@ -126,13 +127,14 @@ class ProjectType(enum.StrEnum):
     MODEL_STORE = "model-store"
 
     @classmethod
-    def from_str(cls, s: str) -> ProjectType:
-        match s.upper():
+    def _missing_(cls, value: Any) -> Optional[ProjectType]:
+        assert isinstance(value, str)
+        match value.upper():
             case "GENERAL":
                 return cls.GENERAL
             case "MODEL_STORE" | "MODEL-STORE":
                 return cls.MODEL_STORE
-        raise ValueError(f"Invalid project type: {s}")
+        return None
 
 
 groups = sa.Table(

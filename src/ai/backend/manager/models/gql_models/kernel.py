@@ -354,7 +354,7 @@ class ComputeContainer(graphene.ObjectType):
         "local_rank": ("local_rank", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
-        "status": ("status", KernelStatus.from_str),
+        "status": ("status", lambda s: KernelStatus(s)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),

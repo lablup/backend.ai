@@ -405,42 +405,17 @@ class ServicePortProtocols(enum.StrEnum):
     INTERNAL = "internal"
 
 
-class SessionTypes(enum.StrEnum):
+class SessionTypes(CIUpperStrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
 
-    @classmethod
-    def from_str(cls, s: str) -> SessionTypes:
-        match s.upper():
-            case "INTERACTIVE":
-                return cls.INTERACTIVE
-            case "BATCH":
-                return cls.BATCH
-            case "INFERENCE":
-                return cls.INFERENCE
-            case "SYSTEM":
-                return cls.SYSTEM
-            case _:
-                raise ValueError(f"Invalid session type: {s}")
 
-
-class SessionResult(enum.StrEnum):
+class SessionResult(CIUpperStrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
-
-    @classmethod
-    def from_str(cls, s: str) -> SessionResult:
-        match s.upper():
-            case "UNDEFINED":
-                return cls.UNDEFINED
-            case "SUCCESS":
-                return cls.SUCCESS
-            case "FAILURE":
-                return cls.FAILURE
-        raise ValueError(f"Invalid session result: {s}")
 
 
 class ResourceGroupType(enum.StrEnum):
@@ -452,14 +427,16 @@ class ClusterMode(enum.StrEnum):
     SINGLE_NODE = "single-node"
     MULTI_NODE = "multi-node"
 
+    @override
     @classmethod
-    def from_str(cls, s: str) -> ClusterMode:
-        match s.upper():
+    def _missing_(cls, value: object) -> Optional[ClusterMode]:
+        assert isinstance(value, str)
+        match value.upper():
             case "SINGLE-NODE" | "SINGLE_NODE":
                 return cls.SINGLE_NODE
             case "MULTI-NODE" | "MULTI_NODE":
                 return cls.MULTI_NODE
-        raise ValueError(f"Invalid cluster mode: {s}")
+        return None
 
 
 class CommitStatus(enum.StrEnum):
@@ -1096,7 +1073,7 @@ class VFolderID:
         return hash((qsid, self.folder_id))
 
 
-class VFolderUsageMode(enum.StrEnum):
+class VFolderUsageMode(CIUpperStrEnum):
     """
     Usage mode of virtual folder.
 
@@ -1108,18 +1085,6 @@ class VFolderUsageMode(enum.StrEnum):
     GENERAL = "general"
     MODEL = "model"
     DATA = "data"
-
-    @classmethod
-    def from_str(cls, s: str) -> VFolderUsageMode:
-        match s.upper():
-            case "GENERAL":
-                return cls.GENERAL
-            case "MODEL":
-                return cls.MODEL
-            case "DATA":
-                return cls.DATA
-            case _:
-                raise ValueError(f"Invalid usage mode: {s}")
 
 
 @attrs.define(slots=True)
