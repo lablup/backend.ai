@@ -481,14 +481,15 @@ class SessionService:
 
                 await reporter.update(increment=1, message="Pushed image to registry")
                 # rescan updated image only
-                await rescan_images(
+                rescan_result = await rescan_images(
                     self._db,
                     new_image_ref.canonical,
                     registry_project,
                     reporter=reporter,
                 )
                 await reporter.update(increment=1, message="Completed")
-                return DispatchResult.success(None)
+                rescanned_image_ids = [image.id for image in rescan_result.images]
+                return DispatchResult.success(rescanned_image_ids)
             except BackendError as e:
                 log.exception("CONVERT_SESSION_TO_IMAGE: exception")
                 return DispatchResult.error(str(e))
