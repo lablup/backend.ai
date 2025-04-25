@@ -374,7 +374,7 @@ class BackgroundTaskManager:
             error_code=None,
         )
 
-        msg = getattr(bgtask_result_event, "message", "")
+        msg = getattr(bgtask_result_event, "message", "") or ""
         task_status = cast(TaskStatus, bgtask_result_event.name)
         await self._update_bgtask_status(task_id, task_status, msg=msg)
 
