@@ -1004,6 +1004,14 @@ async def prepare_vfolder_mounts(
             requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
             requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
+    def is_subpath_duplicate(subpath: PurePosixPath, vfsubpaths: Iterable[PurePosixPath]) -> bool:
+        log.warning("subpath: {}", subpath)  # ".pipeline" / "tasks/task-0-IRx8"
+        # items = {m.vfsubpath for m in mounts}
+        log.warning(
+            "matched_vfolder_mounts.vfsubpath: {}", vfsubpaths
+        )  # {PurePosixPath(".pipeline")} / {PurePosixPath("tasks/task-0-IRx8"), PurePosixPath(".pipeline")}
+        return subpath in vfsubpaths
+
     # for vfolder in accessible_vfolders:
     accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
     for requested_key, vfolder_name in requested_vfolder_names.items():
@@ -1085,7 +1093,13 @@ async def prepare_vfolder_mounts(
             )
         else:
             # Normal vfolders
-            if is_mount_added(vfolder["id"]):
+            # subpath = requested_vfolder_subpaths.get(requested_key)
+            # if subpath is not None and is_subpath_duplicate(
+            #     PurePosixPath(subpath), {m.vfsubpath for m in matched_vfolder_mounts}
+            # ):
+            if is_subpath_duplicate(
+                PurePosixPath(subpath), {m.vfsubpath for m in matched_vfolder_mounts}
+            ):
                 continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
