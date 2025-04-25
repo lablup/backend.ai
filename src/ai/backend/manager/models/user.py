@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.common.types import CIUpperStrEnum
+from ai.backend.common.types import CIStrEnum
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
@@ -64,7 +64,7 @@ class PasswordColumn(TypeDecorator):
         return _hash_password(value)
 
 
-class UserRole(CIUpperStrEnum):
+class UserRole(CIStrEnum):
     """
     User's role.
     """

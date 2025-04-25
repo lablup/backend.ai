@@ -47,7 +47,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderPermissionField,
 )
 from ai.backend.common.types import (
-    CIUpperStrEnum,
+    CIStrEnum,
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
@@ -156,7 +156,7 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderOwnershipType(CIUpperStrEnum):
+class VFolderOwnershipType(CIStrEnum):
     """
     Ownership type of virtual folder.
     """

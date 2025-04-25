@@ -28,7 +28,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
-    CIUpperStrEnum,
+    CIStrEnum,
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
@@ -87,7 +87,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
-class KernelStatus(CIUpperStrEnum):
+class KernelStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     # ---

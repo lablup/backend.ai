@@ -46,7 +46,7 @@ from ai.backend.common.events import (
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AccessKey,
-    CIUpperStrEnum,
+    CIStrEnum,
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
@@ -134,7 +134,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
 
 
-class SessionStatus(CIUpperStrEnum):
+class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     # ---
