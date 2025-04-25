@@ -1,11 +1,13 @@
 import uuid
+from pathlib import PurePosixPath
 
 import pytest
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.common.types import VFolderMount
 from ai.backend.manager.models.gql import GraphQueryContext
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VirtualFolder
+from ai.backend.manager.models.vfolder import MountPermission, VirtualFolder, is_vfsubpath_duplicate
 from ai.backend.manager.server import (
     database_ctx,
 )
@@ -223,3 +225,64 @@ async def test_batch_load_by_id(
             assert res is None
         else:
             assert res.id == expected_id
+
+
+@pytest.mark.parametrize(
+    "vfsubpath",
+    [
+        PurePosixPath(".mytest"),
+        PurePosixPath(".pipeline/vfroot"),
+    ],
+)
+@pytest.mark.parametrize(
+    "vfmounts",
+    [
+        [
+            VFolderMount.from_json({
+                "name": "vfolder_1",
+                "vfid": uuid.uuid4().hex,
+                "vfsubpath": PurePosixPath(".mytest"),
+                "host_path": PurePosixPath("."),
+                "kernel_path": PurePosixPath("."),
+                "mount_perm": MountPermission.READ_WRITE,
+            }),
+            VFolderMount.from_json({
+                "name": "vfolder_1",
+                "vfid": uuid.uuid4().hex,
+                "vfsubpath": PurePosixPath(".pipeline"),
+                "host_path": PurePosixPath("."),
+                "kernel_path": PurePosixPath("."),
+                "mount_perm": MountPermission.READ_WRITE,
+            }),
+        ],
+    ],
+)
+def test_mounts_vfsubpath_duplicate(vfsubpath, vfmounts) -> None:
+    # TODO: a/b, a/b/c inclusion check
+    assert is_vfsubpath_duplicate(vfsubpath, vfmounts)
+
+
+@pytest.mark.parametrize(
+    "vfsubpath",
+    [
+        PurePosixPath(".mytest"),
+    ],
+)
+@pytest.mark.parametrize(
+    "vfmounts",
+    [
+        [
+            VFolderMount.from_json({
+                "name": "vfolder_1",
+                "vfid": uuid.uuid4().hex,
+                "vfsubpath": PurePosixPath(".pipeline"),
+                "host_path": PurePosixPath("."),
+                "kernel_path": PurePosixPath("."),
+                "mount_perm": MountPermission.READ_WRITE,
+            }),
+        ],
+    ],
+)
+def test_mounts_vfsubpath_not_duplicates(vfsubpath, vfmounts) -> None:
+    # TODO: a/b, a/b/c inclusion check
+    assert not is_vfsubpath_duplicate(vfsubpath, vfmounts)
