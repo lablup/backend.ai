@@ -22,7 +22,7 @@ class CIStrEnum(enum.StrEnum):
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
         for member in cls:
-            if member.value == value:
+            if member.value.lower() == value:
                 return member
         return None
 
@@ -55,17 +55,17 @@ class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
 class LogLevel(CIStrEnum):
     # The logging stdlib only accepts uppercased loglevel names,
     # so we subclass `CIStrEnum` here.
-    CRITICAL = enum.auto()
-    ERROR = enum.auto()
-    WARNING = enum.auto()
-    INFO = enum.auto()
-    DEBUG = enum.auto()
-    NOTSET = enum.auto()
+    CRITICAL = "CRITICAL"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
+    NOTSET = "NOTSET"
 
 
 class LogFormat(CIStrEnum):
-    SIMPLE = enum.auto()
-    VERBOSE = enum.auto()
+    SIMPLE = "simple"
+    VERBOSE = "verbose"
 
 
 class SimpleBinarySizeTrafaret(t.Trafaret):
