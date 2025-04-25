@@ -42,6 +42,8 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.image.types import (
+    ImageAliasData,
+    ImageData,
     ImageLabelsData,
     ImageResourcesData,
     ImageStatus,
@@ -78,11 +80,6 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
-    from ai.backend.manager.data.image.types import (
-        ImageAliasData,
-        ImageData,
-        RescanImagesResult,
-    )
 
     from ..config import SharedConfig
 
@@ -798,8 +795,9 @@ class ImageRow(Base):
         self._resources = resources
 
     def is_owned_by(self, user_id: UUID) -> bool:
-        owner_label = self.labels["ai.backend.customized-image.owner"]
-        return self.customized and owner_label.split(":")[1] == str(user_id)
+        if not self.customized:
+            return False
+        return self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(user_id)
 
     def to_dataclass(self) -> ImageData:
         from ai.backend.manager.data.image.types import ImageData

@@ -2407,13 +2407,20 @@ class AbstractAgent(
                     raise AgentError(
                         f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                     )
-                except Exception:
+                except BaseException as e:
                     log.exception(
-                        "unexpected error while waiting container startup (k:{})", kernel_id
+                        "unexpected error while waiting container startup (k: {}, e: {})",
+                        kernel_id,
+                        repr(e),
                     )
-                    raise RuntimeError(
-                        "cancelled waiting of container startup due to initialization failure",
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
                     )
+                    raise
                 finally:
                     self._pending_creation_tasks[kernel_id].remove(current_task)
                     if not self._pending_creation_tasks[kernel_id]:
