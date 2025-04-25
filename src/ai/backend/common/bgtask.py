@@ -239,22 +239,17 @@ class BackgroundTaskManager:
             # The task ID is invalid or represents a task completed more than 24 hours ago.
             raise ValueError("No such background task.")
 
-        if task_info["status"] == "failed":
-            # Already failed, so we can return the failure event.
-            yield (
-                BgtaskFailedEvent(task_id, message=task_info["msg"]),
-                {
-                    "status": task_info["status"],
-                    "current_progress": task_info["current"],
-                    "total_progress": task_info["total"],
-                },
-            )
-            return
-
-        if task_info["status"] != "started":
+        status = task_info["status"]
+        if status != "started":
             # It is an already finished task!
+            event_cls: type[BgtaskEvents]
+            if status == "failed":
+                event_cls = BgtaskFailedEvent
+            else:
+                event_cls = BgtaskDoneEvent
+
             yield (
-                BgtaskDoneEvent(task_id, message=task_info["msg"]),
+                event_cls(task_id, message=task_info["msg"]),
                 {
                     "status": task_info["status"],
                     "current_progress": task_info["current"],
@@ -355,12 +350,13 @@ class BackgroundTaskManager:
 
         message = bgtask_result.message()
 
-        if bgtask_result.has_error() and bgtask_result.result is None:
-            return BgtaskFailedEvent(task_id, message=message)
         if bgtask_result.has_error():
-            return BgtaskPartialSuccessEvent(
-                task_id=task_id, message=message, errors=bgtask_result.errors
-            )
+            if bgtask_result.result is None:
+                return BgtaskFailedEvent(task_id, message=message)
+            else:
+                return BgtaskPartialSuccessEvent(
+                    task_id=task_id, message=message, errors=bgtask_result.errors
+                )
         else:
             return BgtaskDoneEvent(task_id=task_id, message=message)
 
