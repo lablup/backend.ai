@@ -217,13 +217,50 @@ class BackgroundTaskManager:
         if not task_info.status.finished():
             return None
 
-        return BgtaskAlreadyDoneEvent(
-            task_id=task_id,
-            message=task_info.msg,
-            task_status=task_info.status,
-            current=task_info.current,
-            total=task_info.total,
-        )
+        if task_info["status"] == "failed":
+            # Already failed, so we can return the failure event.
+            yield (
+                BgtaskFailedEvent(task_id, message=task_info["msg"]),
+                {
+                    "status": task_info["status"],
+                    "current_progress": task_info["current"],
+                    "total_progress": task_info["total"],
+                },
+            )
+            return
+
+        if task_info["status"] != "started":
+            # It is an already finished task!
+            yield (
+                BgtaskDoneEvent(task_id, message=task_info["msg"]),
+                {
+                    "status": task_info["status"],
+                    "current_progress": task_info["current"],
+                    "total_progress": task_info["total"],
+                },
+            )
+            return
+
+        # It is an ongoing task.
+        my_queue: asyncio.Queue[BgtaskEvents | Sentinel] = asyncio.Queue()
+        async with self._dict_lock:
+            self._task_update_queues[task_id].add(my_queue)
+        try:
+            while True:
+                event = await my_queue.get()
+                try:
+                    if event is sentinel:
+                        break
+                    if task_id != event.task_id:
+                        continue
+                    yield event, {}
+                finally:
+                    my_queue.task_done()
+        finally:
+            self._task_update_queues[task_id].remove(my_queue)
+            async with self._dict_lock:
+                if len(self._task_update_queues[task_id]) == 0:
+                    del self._task_update_queues[task_id]
 
     async def start(
         self,
@@ -278,6 +315,9 @@ class BackgroundTaskManager:
             return BgtaskDoneEvent(task_id, bgtask_result)
 
         message = bgtask_result.message()
+
+        if bgtask_result.has_error() and bgtask_result.result is None:
+            return BgtaskFailedEvent(task_id, message=message)
         if bgtask_result.has_error():
             return BgtaskPartialSuccessEvent(
                 task_id=task_id, message=message, errors=bgtask_result.errors
@@ -338,8 +378,8 @@ class BackgroundTaskManager:
             error_code=None,
         )
 
-        msg = getattr(bgtask_result_event, "msg", "") or ""
-        task_status = bgtask_result_event.status()
+        msg = getattr(bgtask_result_event, "message", "")
+        task_status = cast(TaskStatus, bgtask_result_event.name)
         await self._update_bgtask_status(task_id, task_status, msg=msg)
 
         return bgtask_result_event
