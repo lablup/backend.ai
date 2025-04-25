@@ -258,7 +258,6 @@ async def test_batch_load_by_id(
     ],
 )
 def test_mounts_vfsubpath_duplicate(vfsubpath, vfmounts) -> None:
-    # TODO: a/b, a/b/c inclusion check
     assert is_vfsubpath_duplicate(vfsubpath, vfmounts)
 
 
@@ -284,5 +283,8 @@ def test_mounts_vfsubpath_duplicate(vfsubpath, vfmounts) -> None:
     ],
 )
 def test_mounts_vfsubpath_not_duplicates(vfsubpath, vfmounts) -> None:
-    # TODO: a/b, a/b/c inclusion check
     assert not is_vfsubpath_duplicate(vfsubpath, vfmounts)
+
+
+def test_mounts_vfsubpath_inclusion_duplicates() -> None:
+    pass
