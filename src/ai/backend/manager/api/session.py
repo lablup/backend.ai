@@ -1507,7 +1507,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
             file=file,
         )
     )
-    return web.Response(body=result, status=HTTPStatus.OK)
+    return web.Response(body=result.result, status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)
