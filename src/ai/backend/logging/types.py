@@ -22,7 +22,7 @@ class CIStrEnum(enum.StrEnum):
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
         for member in cls:
-            if member.value == value:
+            if member.value.lower() == value:
                 return member
         return None
 
@@ -31,32 +31,6 @@ class CIStrEnum(enum.StrEnum):
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
         return CIStrEnumTrafaret(cls)
-
-
-class CIUpperStrEnum(CIStrEnum):
-    """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    UPPERCASED.
-    """
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
-        value = value.upper()
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
-
-    @override
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return name.upper()
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return CIUpperStrEnumTrafaret(cls)
 
 
 T_enum = TypeVar("T_enum", bound=enum.Enum)
@@ -78,36 +52,20 @@ class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
             self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
 
-class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
-    """
-    A case-insensitive version of trafaret to parse StrEnum values.
-    """
-
-    def __init__(self, enum_cls: type[T_enum]) -> None:
-        self.enum_cls = enum_cls
-
-    def check_and_return(self, value: str) -> T_enum:
-        try:
-            # Assume that the enum values are lowercases.
-            return self.enum_cls(value.upper())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
-
-
-class LogLevel(CIUpperStrEnum):
+class LogLevel(CIStrEnum):
     # The logging stdlib only accepts uppercased loglevel names,
-    # so we subclass `CIUpperStrEnum` here.
-    CRITICAL = enum.auto()
-    ERROR = enum.auto()
-    WARNING = enum.auto()
-    INFO = enum.auto()
-    DEBUG = enum.auto()
-    NOTSET = enum.auto()
+    # so we subclass `CIStrEnum` here.
+    CRITICAL = "CRITICAL"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
+    NOTSET = "NOTSET"
 
 
 class LogFormat(CIStrEnum):
-    SIMPLE = enum.auto()
-    VERBOSE = enum.auto()
+    SIMPLE = "simple"
+    VERBOSE = "verbose"
 
 
 class SimpleBinarySizeTrafaret(t.Trafaret):

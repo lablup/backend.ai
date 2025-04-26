@@ -1598,7 +1598,7 @@ class Queries(graphene.ObjectType):
             info.context,
             domain_name=domain_name,
             is_active=is_active,
-            type=[ProjectType[t] for t in type],
+            type=[ProjectType(t) for t in type],
         )
 
     @staticmethod

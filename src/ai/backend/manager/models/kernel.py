@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import enum
 import logging
 import uuid
 from collections.abc import Container, Mapping
@@ -29,6 +28,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
+    CIStrEnum,
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
@@ -87,7 +87,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
-class KernelStatus(enum.StrEnum):
+class KernelStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     # ---

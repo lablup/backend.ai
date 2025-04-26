@@ -360,8 +360,8 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         default=1,
         alias="clusterSize",
     )
-    cluster_mode: ClusterMode = Field(
-        default=ClusterMode.SINGLE_NODE,
+    cluster_mode: str = Field(
+        default="SINGLE_NODE",
         alias="clusterMode",
     )
     tag: str | None = Field(default=None)
@@ -572,7 +572,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         validation_result.resource_policy,
         SessionTypes.INFERENCE,
         creation_config,
-        params.cluster_mode,
+        ClusterMode(params.cluster_mode),
         params.cluster_size,
         dry_run=True,  # Setting this to True will prevent actual session from being enqueued
         bootstrap_script=params.bootstrap_script,
@@ -609,7 +609,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             project_id,
             validation_result.scaling_group,
             params.config.resources,
-            params.cluster_mode,
+            ClusterMode(params.cluster_mode),
             params.cluster_size,
             validation_result.extra_mounts,
             model_mount_destination=params.config.model_mount_destination,
@@ -708,7 +708,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
                 "preopen_ports": None,
                 "agent_list": None,
             },
-            params.cluster_mode,
+            ClusterMode(params.cluster_mode),
             params.cluster_size,
             bootstrap_script=params.bootstrap_script,
             startup_command=params.startup_command,

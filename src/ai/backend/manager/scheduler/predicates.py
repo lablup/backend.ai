@@ -52,7 +52,7 @@ async def check_reserved_batch_session(
     """
     Check if a batch-type session should not be started for a certain amount of time.
     """
-    if sess_ctx.session_type == SessionTypes.BATCH:
+    if SessionTypes(sess_ctx.session_type) == SessionTypes.BATCH:
         query = sa.select(SessionRow.starts_at).where(SessionRow.id == sess_ctx.id)
         starts_at = await db_sess.scalar(query)
         if starts_at is not None and datetime.now(tzutc()) < starts_at:
@@ -132,7 +132,10 @@ async def check_dependencies(
     rows = result.fetchall()
     pending_dependencies = []
     for row in rows:
-        if row.result != SessionResult.SUCCESS or row.status != SessionStatus.TERMINATED:
+        if (
+            SessionResult(row.result) != SessionResult.SUCCESS
+            or SessionStatus(row.status) != SessionStatus.TERMINATED
+        ):
             pending_dependencies.append(row)
     all_success = not pending_dependencies
     if all_success:
