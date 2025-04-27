@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Mapping, Optional, Self, cast
 import graphene
 from dateutil.parser import parse as dtparse
 
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log import (
     AuditLogEntityType,
     AuditLogRow,
-    OperationStatus,
 )
 from ai.backend.manager.models.base import (
     FilterExprArg,

@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from typing import Final, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.audit_log import OperationStatus
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.reporters.base import (
     AbstractReporter,
     FinishedActionMessage,

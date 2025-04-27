@@ -9,6 +9,7 @@ from typing import Optional
 import sqlalchemy as sa
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.actions.types import OperationStatus
 
 from .base import (
     GUID,
@@ -36,13 +37,6 @@ class AuditLogEntityType(enum.StrEnum):
     USER = "user"
     VFOLDER = "vfolder"
     VFOLDER_INVITATION = "vfolder_invitation"
-
-
-class OperationStatus(enum.StrEnum):
-    SUCCESS = "success"
-    ERROR = "error"
-    UNKNOWN = "unknown"
-    RUNNING = "running"
 
 
 class AuditLogRow(Base):
