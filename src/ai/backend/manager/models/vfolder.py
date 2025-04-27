@@ -1085,7 +1085,9 @@ async def prepare_vfolder_mounts(
             )
         else:
             # Normal vfolders
-            if is_vfsubpath_duplicate(PurePosixPath(subpath), matched_vfolder_mounts):
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(requested_vfolder_subpaths[requested_key])
+            if is_vfsubpath_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
                 continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
@@ -1111,9 +1113,9 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    vfsubpath=PurePosixPath(requested_vfolder_subpaths[requested_key]),
-                    host_path=mount_base_path / requested_vfolder_subpaths[requested_key],
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
+                    host_path=mount_base_path / vfsubpath,
                     kernel_path=kernel_path,
                     mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
@@ -2778,8 +2780,10 @@ async def get_permission_ctx(
     return permission_ctx
 
 
-def is_vfsubpath_duplicate(vfsubpath: PurePosixPath, vfmounts: Iterable[VFolderMount]) -> bool:
-    for mount in vfmounts:
-        if vfsubpath.is_relative_to(mount.vfsubpath):
+def is_vfsubpath_duplicate(
+    folder_id: VFolderID, subpath: PurePosixPath, mounts: Iterable[VFolderMount]
+) -> bool:
+    for mount in mounts:
+        if mount.vfid == folder_id and subpath.is_relative_to(mount.vfsubpath):
             return True
     return False

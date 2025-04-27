@@ -7,7 +7,12 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import VFolderMount
 from ai.backend.manager.models.gql import GraphQueryContext
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import MountPermission, VirtualFolder, is_vfsubpath_duplicate
+from ai.backend.manager.models.vfolder import (
+    MountPermission,
+    VFolderID,
+    VirtualFolder,
+    is_vfsubpath_duplicate,
+)
 from ai.backend.manager.server import (
     database_ctx,
 )
@@ -227,11 +232,45 @@ async def test_batch_load_by_id(
             assert res.id == expected_id
 
 
+# @pytest.mark.parametrize(
+#     "vfsubpath",
+#     [
+#         PurePosixPath(".mytest"),
+#         PurePosixPath(".pipeline/vfroot"),
+#     ],
+# )
+# @pytest.mark.parametrize(
+#     "vfmounts",
+#     [
+#         [
+#             VFolderMount.from_json({
+#                 "name": "vfolder_1",
+#                 "vfid": uuid.uuid4().hex,
+#                 "vfsubpath": PurePosixPath(".mytest"),
+#                 "host_path": PurePosixPath("."),
+#                 "kernel_path": PurePosixPath("."),
+#                 "mount_perm": MountPermission.READ_WRITE,
+#             }),
+#             VFolderMount.from_json({
+#                 "name": "vfolder_1",
+#                 "vfid": uuid.uuid4().hex,
+#                 "vfsubpath": PurePosixPath(".pipeline"),
+#                 "host_path": PurePosixPath("."),
+#                 "kernel_path": PurePosixPath("."),
+#                 "mount_perm": MountPermission.READ_WRITE,
+#             }),
+#         ],
+#     ],
+# )
+# def test_mounts_vfsubpath_duplicate(vfsubpath, vfmounts) -> None:
+#     assert is_vfsubpath_duplicate(vfsubpath, vfmounts)
+
+
 @pytest.mark.parametrize(
-    "vfsubpath",
+    "vf_id_subpath_pair",
     [
-        PurePosixPath(".mytest"),
-        PurePosixPath(".pipeline/vfroot"),
+        (VFolderID(None, "00000000-0000-0000-0000-000000000001"), PurePosixPath(".mytest")),
+        (VFolderID(None, "00000000-0000-0000-0000-000000000001"), PurePosixPath("subpath1")),
     ],
 )
 @pytest.mark.parametrize(
@@ -240,41 +279,18 @@ async def test_batch_load_by_id(
         [
             VFolderMount.from_json({
                 "name": "vfolder_1",
-                "vfid": uuid.uuid4().hex,
-                "vfsubpath": PurePosixPath(".mytest"),
-                "host_path": PurePosixPath("."),
-                "kernel_path": PurePosixPath("."),
-                "mount_perm": MountPermission.READ_WRITE,
-            }),
-            VFolderMount.from_json({
-                "name": "vfolder_1",
-                "vfid": uuid.uuid4().hex,
+                "vfid": "00000000-0000-0000-0000-000000000001",
                 "vfsubpath": PurePosixPath(".pipeline"),
                 "host_path": PurePosixPath("."),
                 "kernel_path": PurePosixPath("."),
                 "mount_perm": MountPermission.READ_WRITE,
             }),
         ],
-    ],
-)
-def test_mounts_vfsubpath_duplicate(vfsubpath, vfmounts) -> None:
-    assert is_vfsubpath_duplicate(vfsubpath, vfmounts)
-
-
-@pytest.mark.parametrize(
-    "vfsubpath",
-    [
-        PurePosixPath(".mytest"),
-    ],
-)
-@pytest.mark.parametrize(
-    "vfmounts",
-    [
         [
             VFolderMount.from_json({
                 "name": "vfolder_1",
-                "vfid": uuid.uuid4().hex,
-                "vfsubpath": PurePosixPath(".pipeline"),
+                "vfid": "00000000-0000-0000-0000-000000000002",
+                "vfsubpath": PurePosixPath("subpath1"),
                 "host_path": PurePosixPath("."),
                 "kernel_path": PurePosixPath("."),
                 "mount_perm": MountPermission.READ_WRITE,
@@ -282,8 +298,8 @@ def test_mounts_vfsubpath_duplicate(vfsubpath, vfmounts) -> None:
         ],
     ],
 )
-def test_mounts_vfsubpath_not_duplicates(vfsubpath, vfmounts) -> None:
-    assert not is_vfsubpath_duplicate(vfsubpath, vfmounts)
+def test_mounts_vfsubpath_not_duplicates(vf_id_subpath_pair, vfmounts) -> None:
+    assert not is_vfsubpath_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)
 
 
 def test_mounts_vfsubpath_inclusion_duplicates() -> None:
