@@ -10,6 +10,7 @@ from typing import (
     Self,
     Sequence,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -21,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
+from ai.backend.common.types import CIStrEnum
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
@@ -62,7 +64,7 @@ class PasswordColumn(TypeDecorator):
         return _hash_password(value)
 
 
-class UserRole(enum.StrEnum):
+class UserRole(CIStrEnum):
     """
     User's role.
     """
@@ -82,6 +84,21 @@ class UserStatus(enum.StrEnum):
     INACTIVE = "inactive"
     DELETED = "deleted"
     BEFORE_VERIFICATION = "before-verification"
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[UserStatus]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "ACTIVE":
+                return cls.ACTIVE
+            case "INACTIVE":
+                return cls.INACTIVE
+            case "DELETED":
+                return cls.DELETED
+            case "BEFORE-VERIFICATION" | "BEFORE_VERIFICATION":
+                return cls.BEFORE_VERIFICATION
+        return None
 
 
 ACTIVE_USER_STATUSES = (UserStatus.ACTIVE,)

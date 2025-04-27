@@ -59,9 +59,7 @@ __all__ = (
     "Sentinel",
     "QueueSentinel",
     "CIStrEnum",
-    "CIUpperStrEnum",
     "CIStrEnumTrafaret",
-    "CIUpperStrEnumTrafaret",
     "JSONSerializableMixin",
     "check_typed_tuple",
     "check_typed_dict",
@@ -207,8 +205,8 @@ class QueueSentinel(enum.Enum):
 
 class CIStrEnum(enum.StrEnum):
     """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    lowercased.
+    A StrEnum variant that allows case-insensitive matching of its members.
+    All enum values are converted to lowercase for comparison, ensuring they are treated equally regardless of case.
     """
 
     @override
@@ -219,7 +217,7 @@ class CIStrEnum(enum.StrEnum):
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
         for member in cls:
-            if member.value == value:
+            if member.value.lower() == value:
                 return member
         return None
 
@@ -228,32 +226,6 @@ class CIStrEnum(enum.StrEnum):
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
         return CIStrEnumTrafaret(cls)
-
-
-class CIUpperStrEnum(CIStrEnum):
-    """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    UPPERCASED.
-    """
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
-        value = value.upper()
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
-
-    @override
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return name.upper()
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return CIUpperStrEnumTrafaret(cls)
 
 
 T_enum = TypeVar("T_enum", bound=enum.Enum)
@@ -271,22 +243,6 @@ class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
         try:
             # Assume that the enum values are lowercases.
             return self.enum_cls(value.lower())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
-
-
-class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
-    """
-    A case-insensitive version of trafaret to parse StrEnum values.
-    """
-
-    def __init__(self, enum_cls: type[T_enum]) -> None:
-        self.enum_cls = enum_cls
-
-    def check_and_return(self, value: str) -> T_enum:
-        try:
-            # Assume that the enum values are lowercases.
-            return self.enum_cls(value.upper())
         except (KeyError, ValueError):
             self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
@@ -405,14 +361,14 @@ class ServicePortProtocols(enum.StrEnum):
     INTERNAL = "internal"
 
 
-class SessionTypes(enum.StrEnum):
+class SessionTypes(CIStrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
 
 
-class SessionResult(enum.StrEnum):
+class SessionResult(CIStrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
@@ -426,6 +382,18 @@ class ResourceGroupType(enum.StrEnum):
 class ClusterMode(enum.StrEnum):
     SINGLE_NODE = "single-node"
     MULTI_NODE = "multi-node"
+
+    @override
+    @classmethod
+    def _missing_(cls, value: object) -> Optional[ClusterMode]:
+        assert isinstance(value, str)
+        # This implementation ensures compatibility with both cases, as we are mixing the use of enum names and values in DB, GraphQL, REST, etc.
+        match value.lower():
+            case "single-node" | "single_node":
+                return cls.SINGLE_NODE
+            case "multi-node" | "multi_node":
+                return cls.MULTI_NODE
+        return None
 
 
 class CommitStatus(enum.StrEnum):
@@ -1062,7 +1030,7 @@ class VFolderID:
         return hash((qsid, self.folder_id))
 
 
-class VFolderUsageMode(enum.StrEnum):
+class VFolderUsageMode(CIStrEnum):
     """
     Usage mode of virtual folder.
 
@@ -1587,12 +1555,12 @@ class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
         return result
 
 
-class AutoScalingMetricSource(CIUpperStrEnum):
+class AutoScalingMetricSource(CIStrEnum):
     KERNEL = enum.auto()
     INFERENCE_FRAMEWORK = enum.auto()
 
 
-class AutoScalingMetricComparator(CIUpperStrEnum):
+class AutoScalingMetricComparator(CIStrEnum):
     LESS_THAN = enum.auto()
     LESS_THAN_OR_EQUAL = enum.auto()
     GREATER_THAN = enum.auto()

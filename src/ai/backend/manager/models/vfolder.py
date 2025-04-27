@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderPermissionField,
 )
 from ai.backend.common.types import (
+    CIStrEnum,
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
@@ -88,7 +89,7 @@ from .base import (
 )
 from .group import GroupRow
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -155,7 +156,7 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderOwnershipType(enum.StrEnum):
+class VFolderOwnershipType(CIStrEnum):
     """
     Ownership type of virtual folder.
     """
@@ -180,6 +181,21 @@ class VFolderPermission(enum.StrEnum):
 
     def to_field(self) -> VFolderPermissionField:
         return VFolderPermissionField(self)
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[VFolderPermission]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "RO" | "READ_ONLY":
+                return cls.READ_ONLY
+            case "RW" | "READ_WRITE":
+                return cls.READ_WRITE
+            case "RW_DELETE":
+                return cls.RW_DELETE
+            case "WD" | "OWNER_PERM":
+                return cls.OWNER_PERM
+        return None
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -215,6 +231,31 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
     DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[VFolderOperationStatus]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "READY":
+                return cls.READY
+            case "PERFORMING":
+                return cls.PERFORMING
+            case "CLONING":
+                return cls.CLONING
+            case "MOUNTED":
+                return cls.MOUNTED
+            case "ERROR":
+                return cls.ERROR
+            case "DELETE_PENDING" | "DELETE-PENDING":
+                return cls.DELETE_PENDING
+            case "DELETE_ONGOING" | "DELETE-ONGOING":
+                return cls.DELETE_ONGOING
+            case "DELETE_COMPLETE" | "DELETE-COMPLETE":
+                return cls.DELETE_COMPLETE
+            case "DELETE_ERROR" | "DELETE-ERROR":
+                return cls.DELETE_ERROR
+        return None
 
     def is_deletable(self, force: bool = False) -> bool:
         if force:
@@ -1626,15 +1667,15 @@ class VirtualFolder(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            enum_field_getter(VFolderUsageMode),
+            lambda s: VFolderUsageMode(s),
         ),
         "permission": (
             "vfolders_permission",
-            enum_field_getter(VFolderPermission),
+            lambda s: VFolderPermission(s),
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            enum_field_getter(VFolderOwnershipType),
+            lambda s: VFolderOwnershipType(s),
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -2014,7 +2055,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "permission": ("vfolder_permissions_permission", enum_field_getter(VFolderPermission)),
+        "permission": ("vfolder_permissions_permission", VFolderPermission),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),
         "user": ("vfolder_permissions_user", None),

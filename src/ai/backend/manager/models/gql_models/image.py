@@ -38,7 +38,6 @@ from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrde
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
     QueryFilterParser,
-    enum_field_getter,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
@@ -134,7 +133,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "registry_id": ("registry_id", None),
     "architecture": ("architecture", None),
     "is_local": ("is_local", None),
-    "type": ("session_type", enum_field_getter(ImageType)),
+    "type": ("session_type", ImageType),
     "accelerators": ("accelerators", None),
 }
 

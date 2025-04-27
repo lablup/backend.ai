@@ -710,7 +710,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         """
         session_id = kernel["session_id"]
 
-        if kernel["session_type"] == SessionTypes.BATCH:
+        if SessionTypes(kernel["session_type"]) == SessionTypes.BATCH:
             return True
 
         active_streams = await redis_helper.execute(
