@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
-from ai.backend.manager.models.audit_log import OperationStatus
+from ai.backend.manager.actions.types import OperationStatus
 
 from .action import (
     BaseActionResultMeta,

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from ai.backend.manager.models.audit_log import OperationStatus
+from ai.backend.manager.actions.types import OperationStatus
 
 
 @dataclass
