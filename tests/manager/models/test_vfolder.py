@@ -1,5 +1,5 @@
-import uuid
 from pathlib import PurePosixPath
+from uuid import UUID
 
 import pytest
 
@@ -138,52 +138,52 @@ FIXTURES = [
     "test_case",
     [
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
             "user_id": None,
             "group_id": None,
             "domain_name": None,
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
             "vfolder_ids": [
-                uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                UUID("00000000-0000-0000-0000-000000000001"),
+                UUID("00000000-0000-0000-0000-000000000002"),
             ],
             "user_id": None,
             "group_id": None,
             "domain_name": None,
             "expected_result": [
-                uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                UUID("00000000-0000-0000-0000-000000000001"),
+                UUID("00000000-0000-0000-0000-000000000002"),
             ],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
+            "user_id": UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
             "domain_name": None,
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
+            "user_id": UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
             "domain_name": "default",
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
+            "user_id": UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
             "domain_name": "INVALID",
             "expected_result": [None],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000003")],
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000003")],
             "user_id": None,
-            "group_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "group_id": UUID("00000000-0000-0000-0000-000000000000"),
             "domain_name": None,
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000003")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000003")],
         },
     ],
     ids=[
@@ -269,8 +269,8 @@ async def test_batch_load_by_id(
 @pytest.mark.parametrize(
     "vf_id_subpath_pair",
     [
-        (VFolderID(None, "00000000-0000-0000-0000-000000000001"), PurePosixPath(".mytest")),
-        (VFolderID(None, "00000000-0000-0000-0000-000000000001"), PurePosixPath("subpath1")),
+        (VFolderID(None, UUID("00000000-0000-0000-0000-000000000001")), PurePosixPath(".mytest")),
+        (VFolderID(None, UUID("00000000-0000-0000-0000-000000000001")), PurePosixPath("subpath1")),
     ],
 )
 @pytest.mark.parametrize(
