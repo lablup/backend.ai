@@ -13,7 +13,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend_ai-accelerator-cuda-open",
+        name="backend.ai-accelerator-cuda-open",
         description="Backend.AI Accelerator Plugin for CUDA",
         license="LGPLv3",
     ),

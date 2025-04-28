@@ -19,7 +19,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend_ai-logging",
+        name="backend.ai-logging",
         description="Backend.AI Logging Subsystem",
         license="MIT",
     ),

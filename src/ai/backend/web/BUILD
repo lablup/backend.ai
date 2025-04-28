@@ -28,7 +28,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend_ai-webserver",
+        name="backend.ai-webserver",
         description="Backend.AI WebUI Host",
         license="LGPLv3",
     ),
