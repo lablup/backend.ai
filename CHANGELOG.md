@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.2 (2025-04-28)
+
+### Fixes
+* Fix `Images.supported_accelerators` GQL field not containing every accelerators that image supports ([#4230](https://github.com/lablup/backend.ai/issues/4230))
+* Resolve `ImageAliasData` type not found issue in `ImageAliasData.to_dataclass()`. ([#4232](https://github.com/lablup/backend.ai/issues/4232))
+* Filter out duplicate vFolder mounts when enqueueing sessions ([#4247](https://github.com/lablup/backend.ai/issues/4247))
+* Fix invalid logging format by replacing percent-style (`%s`) with brace-style (`{}`) for compatibility with `BraceStyleAdapter` ([#4256](https://github.com/lablup/backend.ai/issues/4256))
+* Added missing `version` field to the `project` section in pyproject.toml to resolve build failures when installing the package via pip from a Git repository ([#4259](https://github.com/lablup/backend.ai/issues/4259))
+* Add missing parser to `AuditLogNode`'s `status`, `duration` fields in queryfilter. ([#4260](https://github.com/lablup/backend.ai/issues/4260))
+* Fix kernel cleanup by ensuring kernels and their containers are properly destroyed during initialization failures ([#4264](https://github.com/lablup/backend.ai/issues/4264))
+* Fix wrong fieldspec in `User` ([#4268](https://github.com/lablup/backend.ai/issues/4268))
+* Make enable reading both Enum name and Enum value ([#4269](https://github.com/lablup/backend.ai/issues/4269))
+* Improve duplicate vfolder mount detection by checking both folder ID and subpath, allowing multiple mounts from the same folder with different subpaths ([#4274](https://github.com/lablup/backend.ai/issues/4274))
+* Fix wrong value of Session download-single file API result ([#4276](https://github.com/lablup/backend.ai/issues/4276))
+* Upgrade pyjwt version due to security vulnerability ([#4287](https://github.com/lablup/backend.ai/issues/4287))
+
+
 ## 25.6.1 (2025-04-21)
 
 ### Features
