@@ -950,9 +950,6 @@ async def prepare_vfolder_mounts(
     matched_vfolder_mounts: list[VFolderMount] = []
     _already_resolved: set[str] = set()
 
-    def is_mount_added(folder_id: uuid.UUID) -> bool:
-        return folder_id in [mount.vfid.folder_id for mount in matched_vfolder_mounts]
-
     # Split the vfolder name and subpaths
     for key in requested_mount_references:
         if isinstance(key, uuid.UUID):
@@ -1061,7 +1058,9 @@ async def prepare_vfolder_mounts(
             permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
-            if is_mount_added(vfolder["id"]):
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(".")
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
                 continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
@@ -1071,8 +1070,8 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    vfsubpath=PurePosixPath("."),
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
                     host_path=PurePosixPath(unmanaged_path),
                     kernel_path=kernel_path,
                     mount_perm=vfolder["permission"],
@@ -1097,7 +1096,9 @@ async def prepare_vfolder_mounts(
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
             requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
         if vfolder["name"] == ".local" and vfolder["group"] is not None:
-            if is_mount_added(vfolder["id"]):
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
                 continue
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(
@@ -1106,8 +1107,8 @@ async def prepare_vfolder_mounts(
                 "folder/file/mkdir",
                 params={
                     "volume": storage_manager.get_proxy_and_volume(vfolder["host"])[1],
-                    "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
-                    "relpaths": [str(user_scope.user_uuid.hex)],
+                    "vfid": str(vfid),
+                    "relpaths": [vfsubpath.as_posix()],
                     "exist_ok": True,
                 },
             ):
@@ -1126,7 +1127,9 @@ async def prepare_vfolder_mounts(
             )
         else:
             # Normal vfolders
-            if is_mount_added(vfolder["id"]):
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(requested_vfolder_subpaths[requested_key])
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
                 continue
             kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
@@ -1152,9 +1155,9 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    vfsubpath=PurePosixPath(requested_vfolder_subpaths[requested_key]),
-                    host_path=mount_base_path / requested_vfolder_subpaths[requested_key],
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
+                    host_path=mount_base_path / vfsubpath,
                     kernel_path=kernel_path,
                     mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
@@ -2817,3 +2820,14 @@ async def get_permission_ctx(
         # )
         # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
     return permission_ctx
+
+
+def is_mount_duplicate(
+    folder_id: VFolderID, subpath: PurePosixPath, mounts: Iterable[VFolderMount]
+) -> bool:
+    for mount in mounts:
+        if mount.vfid != folder_id:
+            continue
+        if subpath.is_relative_to(mount.vfsubpath) or mount.vfsubpath.is_relative_to(subpath):
+            return True
+    return False

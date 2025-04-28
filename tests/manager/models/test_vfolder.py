@@ -1,11 +1,18 @@
-import uuid
+from pathlib import PurePosixPath
+from uuid import UUID
 
 import pytest
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.common.types import VFolderMount
 from ai.backend.manager.models.gql import GraphQueryContext
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VirtualFolder
+from ai.backend.manager.models.vfolder import (
+    MountPermission,
+    VFolderID,
+    VirtualFolder,
+    is_mount_duplicate,
+)
 from ai.backend.manager.server import (
     database_ctx,
 )
@@ -131,52 +138,52 @@ FIXTURES = [
     "test_case",
     [
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
             "user_id": None,
             "group_id": None,
             "domain_name": None,
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
             "vfolder_ids": [
-                uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                UUID("00000000-0000-0000-0000-000000000001"),
+                UUID("00000000-0000-0000-0000-000000000002"),
             ],
             "user_id": None,
             "group_id": None,
             "domain_name": None,
             "expected_result": [
-                uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                UUID("00000000-0000-0000-0000-000000000001"),
+                UUID("00000000-0000-0000-0000-000000000002"),
             ],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
+            "user_id": UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
             "domain_name": None,
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
+            "user_id": UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
             "domain_name": "default",
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000001")],
+            "user_id": UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
             "domain_name": "INVALID",
             "expected_result": [None],
         },
         {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000003")],
+            "vfolder_ids": [UUID("00000000-0000-0000-0000-000000000003")],
             "user_id": None,
-            "group_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "group_id": UUID("00000000-0000-0000-0000-000000000000"),
             "domain_name": None,
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000003")],
+            "expected_result": [UUID("00000000-0000-0000-0000-000000000003")],
         },
     ],
     ids=[
@@ -223,3 +230,92 @@ async def test_batch_load_by_id(
             assert res is None
         else:
             assert res.id == expected_id
+
+
+@pytest.mark.parametrize(
+    "vf_id_subpath_pair",
+    [
+        (VFolderID(None, UUID("00000000-0000-0000-0000-000000000001")), PurePosixPath(".mytest")),
+    ],
+)
+@pytest.mark.parametrize(
+    "vfmounts",
+    [
+        [
+            VFolderMount.from_json({
+                "name": "vfolder_1",
+                "vfid": UUID("00000000-0000-0000-0000-000000000001"),
+                "vfsubpath": PurePosixPath(".mytest"),
+                "host_path": PurePosixPath("."),
+                "kernel_path": PurePosixPath("."),
+                "mount_perm": MountPermission.READ_WRITE,
+            }),
+        ],
+    ],
+)
+def test_mounts_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+    assert is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)
+
+
+@pytest.mark.parametrize(
+    "vf_id_subpath_pair",
+    [
+        (VFolderID(None, UUID("00000000-0000-0000-0000-000000000001")), PurePosixPath(".mytest")),
+        (VFolderID(None, UUID("00000000-0000-0000-0000-000000000001")), PurePosixPath("subpath1")),
+    ],
+)
+@pytest.mark.parametrize(
+    "vfmounts",
+    [
+        [
+            VFolderMount.from_json({
+                "name": "vfolder_1",
+                "vfid": UUID("00000000-0000-0000-0000-000000000001"),
+                "vfsubpath": PurePosixPath(".pipeline"),
+                "host_path": PurePosixPath("."),
+                "kernel_path": PurePosixPath("."),
+                "mount_perm": MountPermission.READ_WRITE,
+            }),
+        ],
+        [
+            VFolderMount.from_json({
+                "name": "vfolder_1",
+                "vfid": UUID("00000000-0000-0000-0000-000000000002"),
+                "vfsubpath": PurePosixPath("subpath1"),
+                "host_path": PurePosixPath("."),
+                "kernel_path": PurePosixPath("."),
+                "mount_perm": MountPermission.READ_WRITE,
+            }),
+        ],
+    ],
+)
+def test_mounts_not_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+    assert not is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)
+
+
+@pytest.mark.parametrize(
+    "vf_id_subpath_pair",
+    [
+        (
+            VFolderID(None, UUID("00000000-0000-0000-0000-000000000001")),
+            PurePosixPath(".pipeline/vfroot"),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "vfmounts",
+    [
+        [
+            VFolderMount.from_json({
+                "name": "vfolder_1",
+                "vfid": UUID("00000000-0000-0000-0000-000000000001"),
+                "vfsubpath": PurePosixPath(".pipeline"),
+                "host_path": PurePosixPath("."),
+                "kernel_path": PurePosixPath("."),
+                "mount_perm": MountPermission.READ_WRITE,
+            }),
+        ]
+    ],
+)
+def test_mounts_inclusion_duplicate(vf_id_subpath_pair, vfmounts) -> None:
+    assert is_mount_duplicate(vf_id_subpath_pair[0], vf_id_subpath_pair[1], vfmounts)

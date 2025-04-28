@@ -485,6 +485,8 @@ class VFolderID(t.Trafaret):
                     converted = (None, UUID().check(pieces[0]))
                 else:
                     converted = tuple_t.check((pieces[0], pieces[2]))
+            case uuid.UUID():
+                converted = (None, UUID().check(value))
             case tuple():
                 converted = tuple_t.check(value)
             case _:
