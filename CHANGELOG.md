@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.3 (2025-04-28)
+No significant changes.
+
+
 ## 25.6.2 (2025-04-28)
 
 ### Fixes
