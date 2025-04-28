@@ -49,4 +49,4 @@ class DryRunModelServiceActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.task_id)
+        return None

@@ -321,6 +321,7 @@ class ModelService:
         return DeleteModelServiceActionResult(success=True)
 
     async def dry_run(self, action: DryRunModelServiceAction) -> DryRunModelServiceActionResult:
+        # TODO: Seperate background task definition and trigger into different layer
         service_prepare_ctx = action.model_service_prepare_ctx
         async with self._db.begin_readonly_session() as session:
             image_row = await ImageRow.resolve(
