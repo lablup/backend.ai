@@ -442,7 +442,7 @@ class RoutingNotFound(ObjectNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.ROUTING,
+            domain=ErrorDomain.ROUTE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
