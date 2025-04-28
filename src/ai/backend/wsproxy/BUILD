@@ -29,7 +29,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend_ai-wsproxy",
+        name="backend.ai-wsproxy",
         description="Backend.AI WSProxy",
         license="LGPLv3",
     ),

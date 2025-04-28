@@ -28,7 +28,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend_ai-storage-proxy",
+        name="backend.ai-storage-proxy",
         description="Backend.AI Storage Proxy",
         license="LGPLv3",
     ),

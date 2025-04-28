@@ -45,12 +45,12 @@ async def setup_kwargs_plugin(
         ),
     )
     VERSION = _digest_contents[0].content.decode()
-    print(f"VERSION: {VERSION}")
+
     # Validate that required fields are set.
-    if not kwargs["name"].startswith("backend_ai-"):
+    if not kwargs["name"].startswith("backend.ai-"):
         raise ValueError(
             f"Invalid `name` kwarg in the `provides` field for {request.target.address}. The"
-            f" name must start with 'backend_ai-', but was {kwargs['name']}.",
+            f" name must start with 'backend.ai-', but was {kwargs['name']}.",
         )
     if "description" not in kwargs:
         raise ValueError(

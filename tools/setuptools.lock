@@ -9,7 +9,7 @@
 //     "CPython==3.13.3"
 //   ],
 //   "generated_with_requirements": [
-//     "setuptools~=75.1.0",
+//     "setuptools~=80.0.0",
 //     "wheel~=0.44.0"
 //   ],
 //   "manylinux": "manylinux2014",
@@ -34,13 +34,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2",
-              "url": "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
+              "hash": "a38f898dcd6e5380f4da4381a87ec90bd0a7eec23d204a5552e80ee3cab6bd27",
+              "url": "https://files.pythonhosted.org/packages/23/63/5517029d6696ddf2bd378d46f63f479be001c31b462303170a1da57650cb/setuptools-80.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538",
-              "url": "https://files.pythonhosted.org/packages/27/b8/f21073fde99492b33ca357876430822e4800cdf522011f18041351dfa74b/setuptools-75.1.0.tar.gz"
+              "hash": "c40a5b3729d58dd749c0f08f1a07d134fb8a0a3d7f87dc33e7c5e1f762138650",
+              "url": "https://files.pythonhosted.org/packages/44/80/97e25f0f1e4067677806084b7382a6ff9979f3d15119375c475c288db9d7/setuptools-80.0.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -48,28 +48,25 @@
             "build[virtualenv]>=1.0.3; extra == \"test\"",
             "filelock>=3.4.0; extra == \"test\"",
             "furo; extra == \"doc\"",
-            "importlib-metadata>=6; python_version < \"3.10\" and extra == \"core\"",
-            "importlib-metadata>=7.0.2; python_version < \"3.10\" and extra == \"type\"",
-            "importlib-resources>=5.10.2; python_version < \"3.9\" and extra == \"core\"",
+            "importlib_metadata>=6; python_version < \"3.10\" and extra == \"core\"",
+            "importlib_metadata>=7.0.2; python_version < \"3.10\" and extra == \"type\"",
             "ini2toml[lite]>=0.14; extra == \"test\"",
-            "jaraco.collections; extra == \"core\"",
             "jaraco.develop>=7.21; (python_version >= \"3.9\" and sys_platform != \"cygwin\") and extra == \"test\"",
             "jaraco.develop>=7.21; sys_platform != \"cygwin\" and extra == \"type\"",
             "jaraco.envs>=2.2; extra == \"test\"",
-            "jaraco.functools; extra == \"core\"",
+            "jaraco.functools>=4; extra == \"core\"",
             "jaraco.packaging>=9.3; extra == \"doc\"",
-            "jaraco.path>=3.2.0; extra == \"test\"",
-            "jaraco.test; extra == \"test\"",
+            "jaraco.path>=3.7.2; extra == \"test\"",
+            "jaraco.test>=5.5; extra == \"test\"",
             "jaraco.text>=3.7; extra == \"core\"",
             "jaraco.tidelift>=1.4; extra == \"doc\"",
-            "more-itertools; extra == \"core\"",
-            "more-itertools>=8.8; extra == \"core\"",
-            "mypy==1.11.*; extra == \"type\"",
-            "packaging; extra == \"core\"",
-            "packaging>=23.2; extra == \"test\"",
-            "packaging>=24; extra == \"core\"",
+            "more_itertools; extra == \"core\"",
+            "more_itertools>=8.8; extra == \"core\"",
+            "mypy==1.14.*; extra == \"type\"",
+            "packaging>=24.2; extra == \"core\"",
+            "packaging>=24.2; extra == \"test\"",
             "pip>=19.1; extra == \"test\"",
-            "platformdirs>=2.6.2; extra == \"core\"",
+            "platformdirs>=4.2.2; extra == \"core\"",
             "pygments-github-lexers==0.0.5; extra == \"doc\"",
             "pyproject-hooks!=1.1; extra == \"doc\"",
             "pyproject-hooks!=1.1; extra == \"test\"",
@@ -85,7 +82,7 @@
             "pytest-timeout; extra == \"test\"",
             "pytest-xdist>=3; extra == \"test\"",
             "rst.linker>=1.9; extra == \"doc\"",
-            "ruff>=0.5.2; sys_platform != \"cygwin\" and extra == \"check\"",
+            "ruff>=0.8.0; sys_platform != \"cygwin\" and extra == \"check\"",
             "sphinx-favicon; extra == \"doc\"",
             "sphinx-inline-tabs; extra == \"doc\"",
             "sphinx-lint; extra == \"doc\"",
@@ -100,8 +97,8 @@
             "wheel>=0.43.0; extra == \"core\"",
             "wheel>=0.44.0; extra == \"test\""
           ],
-          "requires_python": ">=3.8",
-          "version": "75.1.0"
+          "requires_python": ">=3.9",
+          "version": "80.0.0"
         },
         {
           "artifacts": [
@@ -136,7 +133,7 @@
   "pip_version": "25.0.1",
   "prefer_older_binary": false,
   "requirements": [
-    "setuptools~=75.1.0",
+    "setuptools~=80.0.0",
     "wheel~=0.44.0"
   ],
   "requires_python": [
