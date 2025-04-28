@@ -110,6 +110,11 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ..errors.exceptions import (
+    BackendError,
+    InsufficientPrivilege,
+    InvalidAPIParameters,
+)
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     SessionDependencyRow,
@@ -125,11 +130,6 @@ from ..models.session import (
 )
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
-from .exceptions import (
-    BackendError,
-    InsufficientPrivilege,
-    InvalidAPIParameters,
-)
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import (

@@ -14,8 +14,8 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ObjectNotFound
 from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users, groups

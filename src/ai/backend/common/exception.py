@@ -1,4 +1,7 @@
+import enum
 import json
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
 from aiohttp import web
@@ -119,7 +122,134 @@ class VolumeUnmountFailed(RuntimeError):
     """
 
 
-class BackendError(web.HTTPError):
+class ErrorDomain(enum.StrEnum):
+    """
+    An enum to represent the domain of the error.
+    The domain is a string that represents the area where the error occurred.
+    """
+
+    BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
+    API = "api"
+    PLUGIN = "plugin"
+    BGTASK = "bgtask"
+    KERNEL = "kernel"
+    USER = "user"
+    SESSION = "session"
+    GROUP = "group"
+    DOMAIN = "domain"
+    IMAGE = "image"
+    IMAGE_ALIAS = "image-alias"
+    TEMPLATE = "template"
+    CONTAINER_REGISTRY = "container-registry"
+    SCALING_GROUP = "scaling-group"
+    INSTANCE = "instance"
+    ENDPOINT = "endpoint"
+    ENDPOINT_AUTO_SCALING = "endpoint-auto-scaling"
+    ROUTE = "route"
+    DOTFILE = "dotfile"
+    VFOLDER = "vfolder"
+    MODEL_SERVICE = "model-service"
+    STORAGE = "storage"
+    AGENT = "agent"
+    PERMISSION = "permission"
+    METRIC = "metric"
+
+
+class ErrorOperation(enum.StrEnum):
+    """
+    An enum to represent the operation where the error occurred.
+    The operation is a string that represents the action that was being performed
+    when the error occurred.
+    """
+
+    GENERIC = "generic"  # Whenever possible, use specific operation names instead of this one.
+    CREATE = "create"
+    ACCESS = "access"
+    READ = "read"
+    UPDATE = "update"
+    START = "start"
+    SOFT_DELETE = "soft-delete"
+    HARD_DELETE = "purge"
+    LIST = "list-query"
+    AUTH = "auth"
+    HOOK = "hook"
+    REQUEST = "request"
+    PARSING = "parsing"
+    EXECUTE = "execute"
+    SETUP = "setup"
+
+
+class ErrorDetail(enum.StrEnum):
+    """
+    An enum to represent the specific error that occurred during the operation.
+    The error detail is a string that describes the specific error that occurred
+    during the operation.
+    """
+
+    # Client Error
+    BAD_REQUEST = "bad-request"
+    NOT_FOUND = "not-found"
+    # Conflict means the request conflicts with the current state of the server.
+    CONFLICT = "conflict"
+    # Already Exists means the resource already exists.
+    ALREADY_EXISTS = "already-exists"
+    # Invalid parameters means the received parameters are invalid.
+    # This is different from BAD_REQUEST, which means the request is malformed.
+    INVALID_PARAMETERS = "invalid-parameters"
+    # Forbidden means the user is not allowed to access the resource.
+    # This is different from UNAUTHORIZED, which means the user is not authenticated.
+    FORBIDDEN = "forbidden"
+    # Unauthorized means the user is not authenticated.
+    # This means the user is not logged in or the token is invalid.
+    UNAUTHORIZED = "unauthorized"
+
+    # Server Error
+    INTERNAL_ERROR = (
+        "internal-error"  # Whenever possible, use specific error names instead of this one.
+    )
+    # UNAVAILABLE means the resource is not available.
+    UNAVAILABLE = "unavailable"
+    # TIMEOUT means the request timed out.
+    TASK_TIMEOUT = "task-timeout"
+    # DATA_EXPIRED means the data is expired.
+    # This is different from NOT_FOUND, which means the resource does not exist.
+    DATA_EXPIRED = "data-expired"
+    CANCELED = "canceled"
+    # Unexpected Error
+    NOT_IMPLEMENTED = "not-implemented"
+    DEPRECATED = "deprecated"
+    # MISMATCH means the current state of the server does not match the expected state.
+    # MISMATCH is used when the server is in a state that is not expected.
+    MISMATCH = "mismatch"
+
+
+@dataclass
+class ErrorCode:
+    """
+    A dataclass to represent error codes for Backend.AI errors.
+
+    All fields are lowercase.
+
+    The top-level domain is set to backendai. Other domains represent the specific
+    area where the error occurred, such as kernel, user, session, etc.
+    Whenever possible, use detailed domain names instead of backendai of general purpose errors.
+
+    The operation field represents the operation where the error occurred,
+    such as create, delete, update, get, list, etc.
+
+    The error_detail field describes the specific error that occurred during the operation.
+    If it consists of two or more words, they should be connected with a hyphen (-).
+    """
+
+    domain: ErrorDomain
+    operation: ErrorOperation
+    error_detail: ErrorDetail
+
+    def __str__(self) -> str:
+        return f"{self.domain}_{self.operation}_{self.error_detail}"
+
+
+class BackendAIError(web.HTTPError, ABC):
     """
     An RFC-7807 error class as a drop-in replacement of the original
     aiohttp.web.HTTPError subclasses.
@@ -181,22 +311,92 @@ class BackendError(web.HTTPError):
             self.__dict__,
         )
 
+    @classmethod
+    @abstractmethod
+    def error_code(cls) -> ErrorCode:
+        """
+        Returns the error code for this error.
+        This is used in the API response to indicate the type of error.
 
-class MalformedRequestBody(BackendError, web.HTTPBadRequest):
+        The error code is in the form {domain}_{operation}_{error}.
+        For example, "kernel_create_invalid-image" or "kernel_create_timeout".
+        """
+        raise NotImplementedError("Subclasses must implement error_code() method.")
+
+
+class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Malformed request body."
 
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
 
-class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
+
+class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Invalid or Missing API Parameters."
 
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
 
-class MiddlewareParamParsingFailed(BackendError, web.HTTPInternalServerError):
+
+class MiddlewareParamParsingFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Middleware parameter parsing failed."
 
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
 
-class ParameterNotParsedError(BackendError, web.HTTPInternalServerError):
+
+class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Parameter Not Parsed Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/bgtask-failed"
+    error_title = "Background Task Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/bgtask-cancelled"
+    error_title = "Background Task Cancelled"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.CANCELED,
+        )

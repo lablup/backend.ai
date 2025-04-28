@@ -73,14 +73,14 @@ if TYPE_CHECKING:
     from ..registry import AgentRegistry
     from .storage import StorageSessionManager
 
-from ..api.exceptions import (
+from ..data.image.types import ImageStatus
+from ..errors.exceptions import (
     ImageNotFound,
     InsufficientPrivilege,
     InvalidAPIParameters,
     ObjectNotFound,
     TooManyKernelsFound,
 )
-from ..data.image.types import ImageStatus
 from .acl import PredefinedAtomicPermission
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .gql_models.agent import (

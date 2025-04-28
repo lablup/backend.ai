@@ -43,9 +43,8 @@ from ..exceptions import (
     Forbidden,
     InsufficientPrivilege,
     InternalServerError,
-    InvalidParameter,
-    ObjectNotFound,
     VFolderAlreadyExists,
+    VFolderInvalidParameter,
     VFolderNotFound,
 )
 from ..types import VFolderInvitationInfo
@@ -176,7 +175,7 @@ class VFolderInviteService:
             invitation_row = await db_session.scalar(query)
             invitation_row = cast(VFolderInvitationRow, invitation_row)
             if invitation_row is None:
-                raise ObjectNotFound()
+                raise VFolderNotFound()
 
             # Get target user.
             query = sa.select(UserRow).where(UserRow.email == invitation_row.invitee)
@@ -253,7 +252,7 @@ class VFolderInviteService:
                 user_row = await db_session.scalar(requester_query)
                 user_row = cast(UserRow, user_row)
                 if invitation_row is None:
-                    raise ObjectNotFound("vfolder invitation")
+                    raise VFolderNotFound("vfolder invitation")
                 if user_row.email == invitation_row.inviter:
                     state = VFolderInvitationState.CANCELED
                 elif user_row.email == invitation_row.invitee:
@@ -353,7 +352,7 @@ class VFolderInviteService:
             )
             requester_user_row = cast(UserRow, requester_user_row)
             if vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
-                raise InvalidParameter("Cannot leave a group vfolder.")
+                raise VFolderInvalidParameter("Cannot leave a group vfolder.")
 
             if action.shared_user_uuid:
                 # Allow only superadmin to leave the shared vfolder of others.

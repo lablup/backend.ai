@@ -52,8 +52,8 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 
-from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
+from ..errors.exceptions import ImageNotFound
 from ..models.container_registry import ContainerRegistryRow
 from .base import (
     GUID,

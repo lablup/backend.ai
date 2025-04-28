@@ -14,8 +14,8 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors.exceptions import RateLimitExceeded
 from .context import RootContext
-from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

@@ -21,8 +21,8 @@ from ai.backend.common import redis_helper
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import VFolderOperationFailed
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.errors.exceptions import VFolderOperationFailed
 from ai.backend.manager.models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     VFolderDeletionInfo,

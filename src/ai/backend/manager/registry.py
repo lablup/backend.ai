@@ -129,7 +129,9 @@ from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
-from .api.exceptions import (
+from .config import LocalConfig, SharedConfig
+from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
+from .errors.exceptions import (
     BackendError,
     GenericForbidden,
     ImageNotFound,
@@ -142,8 +144,6 @@ from .api.exceptions import (
     SessionNotFound,
     TooManySessionsMatched,
 )
-from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,

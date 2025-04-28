@@ -40,7 +40,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import (
+from ..defs import DEFAULT_ROLE
+from ..errors.exceptions import (
     BackendError,
     KernelCreationFailed,
     KernelDestructionFailed,
@@ -49,7 +50,6 @@ from ..api.exceptions import (
     KernelRestartFailed,
     SessionNotFound,
 )
-from ..defs import DEFAULT_ROLE
 from ..exceptions import AgentError
 from .base import (
     GUID,

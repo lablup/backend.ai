@@ -27,11 +27,11 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ...api.exceptions import (
-    VFolderOperationFailed,
-)
 from ...defs import (
     DEFAULT_CHUNK_SIZE,
+)
+from ...errors.exceptions import (
+    VFolderOperationFailed,
 )
 from ..base import (
     BigInt,

@@ -13,6 +13,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors.exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from ..models import (
     TemplateType,
     UserRole,
@@ -26,7 +27,6 @@ from ..models import (
 from ..models import association_groups_users as agus
 from ..models.session_template import check_cluster_template
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes

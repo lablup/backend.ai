@@ -14,10 +14,10 @@ from ai.backend.common import validators as tx
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors.exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from ..models import TemplateType, groups, session_templates, users
 from ..models.session_template import check_task_template
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, Iterable, WebMiddleware
