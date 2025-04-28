@@ -19,16 +19,6 @@ class DummyKernel(AbstractKernel):
     def __init__(
         self,
         args: KernelInitArgs,
-        # ownership_data: KernelOwnershipData,
-        # network_id: str,
-        # image: ImageRef,
-        # version: int,
-        # *,
-        # agent_config: Mapping[str, Any],
-        # resource_spec: KernelResourceSpec,
-        # service_ports: Any,  # TODO: type-annotation
-        # environ: Mapping[str, Any],
-        # data: Dict[str, Any],
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(args)
