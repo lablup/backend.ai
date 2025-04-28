@@ -1424,18 +1424,19 @@ class AbstractAgent(
         Scan the kernel containers and check if they are in the kernel registry.
         Produce `DanglingContainerDetected` events if there are any.
         """
+        log.debug("scan_containers() triggered")
 
         try:
             async with asyncio.timeout(20):
                 containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
         except asyncio.TimeoutError:
-            log.warning("scan_mismatch_kernels() timeout, continuing")
+            log.warning("scan_containers() timeout, continuing")
             return
 
         for existing_kernel, container in containers:
             if existing_kernel not in self.kernel_registry:
                 log.warning(
-                    "scan_mismatch_kernels() detected dangling container (k:{},c:{})",
+                    "scan_containers() detected dangling container (k:{},c:{})",
                     existing_kernel,
                     container.id,
                 )
@@ -1447,7 +1448,7 @@ class AbstractAgent(
         for registered_kernel_id in self.kernel_registry:
             if registered_kernel_id not in existing_kernel_ids:
                 log.warning(
-                    "scan_mismatch_kernels() detected dangling kernel (k:{})",
+                    "scan_containers() detected dangling kernel (k:{})",
                     registered_kernel_id,
                 )
                 await self.produce_event(
