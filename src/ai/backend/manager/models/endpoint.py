@@ -275,7 +275,7 @@ class EndpointRow(Base):
         self.project = project
         self.resource_group = resource_group
         self.resource_slots = resource_slots
-        self.cluster_mode = cluster_mode.name
+        self.cluster_mode = cluster_mode
         self.cluster_size = cluster_size
         self.extra_mounts = extra_mounts
         self.model_mount_destination = model_mount_destination or "/models"

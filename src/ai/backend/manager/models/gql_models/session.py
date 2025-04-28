@@ -64,7 +64,7 @@ from ..gql_relay import (
 )
 from ..minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
+from ..minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ..rbac import ScopeType
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
@@ -110,7 +110,7 @@ __all__ = (
 
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
-    "type": ("session_type", enum_field_getter(SessionTypes)),
+    "type": ("session_type", lambda s: SessionTypes(s)),
     "name": ("name", None),
     "priority": ("priority", None),
     "images": (ArrayFieldItem("images"), None),
@@ -124,11 +124,11 @@ _queryfilter_fieldspec: FieldSpecType = {
     "user_email": (ORMFieldItem(UserRow.email), None),
     "access_key": ("access_key", None),
     "scaling_group": ("scaling_group_name", None),
-    "cluster_mode": ("cluster_mode", lambda s: ClusterMode[s]),
+    "cluster_mode": ("cluster_mode", lambda s: ClusterMode(s)),
     "cluster_size": ("cluster_size", None),
-    "status": ("status", enum_field_getter(SessionStatus)),
+    "status": ("status", lambda s: SessionStatus(s)),
     "status_info": ("status_info", None),
-    "result": ("result", enum_field_getter(SessionResult)),
+    "result": ("result", lambda s: SessionResult(s)),
     "created_at": ("created_at", dtparse),
     "terminated_at": ("terminated_at", dtparse),
     "starts_at": ("starts_at", dtparse),
@@ -974,7 +974,7 @@ class ComputeSession(graphene.ObjectType):
 
     _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
-        "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
+        "type": ("sessions_session_type", SessionTypes),
         "name": ("sessions_name", None),
         "priority": ("sessions_priority", None),
         "image": (ArrayFieldItem("sessions_images"), None),
@@ -988,11 +988,11 @@ class ComputeSession(graphene.ObjectType):
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
-        "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
+        "cluster_mode": ("sessions_cluster_mode", ClusterMode),
         "cluster_size": ("sessions_cluster_size", None),
-        "status": ("sessions_status", enum_field_getter(SessionStatus)),
+        "status": ("sessions_status", SessionStatus),
         "status_info": ("sessions_status_info", None),
-        "result": ("sessions_result", enum_field_getter(SessionResult)),
+        "result": ("sessions_result", SessionResult),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),

@@ -1143,7 +1143,7 @@ class ModifyEndpoint(graphene.Mutation):
                         "preopen_ports": None,
                         "agent_list": None,
                     },
-                    ClusterMode[endpoint_row.cluster_mode],
+                    ClusterMode(endpoint_row.cluster_mode),
                     endpoint_row.cluster_size,
                     bootstrap_script=endpoint_row.bootstrap_script,
                     startup_command=endpoint_row.startup_command,

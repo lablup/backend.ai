@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.6.1",
+    "version": "25.6.2",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -748,14 +748,6 @@
         },
         "type": "array"
       },
-      "ClusterMode": {
-        "enum": [
-          "single-node",
-          "multi-node"
-        ],
-        "title": "ClusterMode",
-        "type": "string"
-      },
       "MountOptionModel": {
         "properties": {
           "mount_destination": {
@@ -991,8 +983,9 @@
             "type": "integer"
           },
           "clusterMode": {
-            "$ref": "#/components/schemas/ClusterMode",
-            "default": "single-node"
+            "default": "SINGLE_NODE",
+            "title": "Clustermode",
+            "type": "string"
           },
           "tag": {
             "anyOf": [
@@ -5339,7 +5332,7 @@
                       "single-node",
                       "multi-node"
                     ],
-                    "default": "single-node"
+                    "default": "SINGLE_NODE"
                   },
                   "config": {
                     "type": "object",
@@ -5504,7 +5497,7 @@
                       "single-node",
                       "multi-node"
                     ],
-                    "default": "single-node"
+                    "default": "SINGLE_NODE"
                   },
                   "config": {
                     "type": "object",
@@ -5675,7 +5668,7 @@
                       "single-node",
                       "multi-node"
                     ],
-                    "default": "single-node"
+                    "default": "SINGLE_NODE"
                   },
                   "config": {
                     "type": "object",
