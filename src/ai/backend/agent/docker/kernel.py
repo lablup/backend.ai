@@ -21,9 +21,10 @@ from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
-from ai.backend.common.events import DanglingKernelDetected, EventProducer
+from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.runner import ProbeRunner
+from ai.backend.common.types import CommitStatus, ContainerId, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -31,12 +32,9 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 from ..kernel import AbstractCodeRunner, AbstractKernel, KernelInitArgs
 from ..types import (
     AgentEventData,
-    Container,
-    ContainerStatus,
-    KernelLifecycleStatus,
 )
 from ..utils import closing_async, get_arch_name
-from .utils import container_from_docker_container
+from .probe import DockerKernelProbe
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -65,64 +63,15 @@ class DockerKernel(AbstractKernel):
             props["network_driver"] = "bridge"
         super().__setstate__(props)
 
-    async def _get_container_info(self) -> Optional[Container]:
-        if self.container_id is None:
-            return None
-        async with closing_async(Docker()) as docker:
-            container = await docker.containers.get(self.container_id)
-        return container_from_docker_container(container)
-
-    def _compare_with_container(self, container: Container) -> None:
-        match self.state:
-            case KernelLifecycleStatus.PREPARING:
-                raise
-            case KernelLifecycleStatus.RUNNING:
-                if container.status != ContainerStatus.RUNNING:
-                    raise
-            case KernelLifecycleStatus.TERMINATING:
-                # There might be a delay in the container status change
-                # after the kernel is being terminated.
-                pass
-
-    async def _check_own_container_status(self) -> None:
-        try:
-            container = await self._get_container_info()
-        except DockerError as e:
-            if e.status == 404:
-                raise
-            raise
-        if container is None:
-            if self.state == KernelLifecycleStatus.RUNNING:
-                await self._event_producer.produce_event(
-                    DanglingKernelDetected(kernel_id=self.kernel_id), self.agent_id
-                )
-            return
-        self._compare_with_container(container)
-
-    async def _check_own_container_status_task(
-        self, interval: float, timeout: Optional[float] = None
-    ) -> None:
-        while True:
-            try:
-                async with asyncio.timeout(5):
-                    await self._check_own_container_status()
-                await asyncio.sleep(interval)
-            except asyncio.TimeoutError:
-                continue
-            except asyncio.CancelledError:
-                if self.state == KernelLifecycleStatus.TERMINATING:
-                    # The kernel is being terminated.
-                    # No need to check the container status anymore.
-                    break
-                await asyncio.sleep(interval)
-            except Exception as e:
-                if self.state == KernelLifecycleStatus.TERMINATING:
-                    break
-                # Any other exception should be logged and ignored.
-                log.exception(
-                    f"Unexpected exception occurred while checking container status. (e: {e})"
-                )
-                await asyncio.sleep(interval)
+    @override
+    def _get_probe_runner(self) -> ProbeRunner:
+        probe = DockerKernelProbe(
+            self.kernel_id,
+            ContainerId(self.container_id) if self.container_id is not None else None,
+            self.state,
+            self._event_producer,
+        )
+        return ProbeRunner(5.0, [probe])
 
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int

@@ -45,6 +45,7 @@ from ai.backend.common.events import (
     ModelServiceStatusEvent,
 )
 from ai.backend.common.json import dump_json, load_json
+from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -189,7 +190,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
-    _container_checker_task: Optional[asyncio.Task]
     _event_producer: EventProducer
 
     _tasks: Set[asyncio.Task]
@@ -220,8 +220,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
-        self._container_checker_task = None
         self._event_producer = args.event_producer
+        self._probe_runner = self._get_probe_runner()
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -233,17 +233,15 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = await self.create_code_runner(
             event_producer, client_features=default_client_features, api_version=default_api_version
         )
-        self._container_checker_task = asyncio.create_task(
-            self._check_own_container_status_task(10)
-        )
+        await self._probe_runner.run()
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["agent_config"]
         del props["clean_event"]
         del props["_tasks"]
-        del props["_container_checker_task"]
         del props["_event_producer"]
+        del props["_probe_runner"]
         return props
 
     def __setstate__(self, props) -> None:
@@ -260,15 +258,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         # agent_config and _event_producer are set by the pickle.loads() caller.
         self.clean_event = None
         self._tasks = set()
-        self._container_checker_task = None
 
     async def close(self) -> None:
         """
         Release internal resources used for interacting with the kernel.
         Note that this does NOT terminate the container.
         """
-        if self._container_checker_task is not None:
-            self._container_checker_task.cancel()
+        await self._probe_runner.close()
 
     # We don't have "allocate_slots()" method here because:
     # - resource_spec is initialized by allocating slots at computer's alloc_map
@@ -285,9 +281,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
 
     @abstractmethod
-    async def _check_own_container_status_task(
-        self, interval: float, timeout: Optional[float] = None
-    ) -> None:
+    def _get_probe_runner(self) -> ProbeRunner:
         raise NotImplementedError
 
     @abstractmethod

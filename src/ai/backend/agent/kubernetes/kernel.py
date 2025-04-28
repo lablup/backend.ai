@@ -17,6 +17,7 @@ from kubernetes_asyncio import watch
 
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.events import EventProducer
+from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -39,11 +40,9 @@ class KubernetesKernel(AbstractKernel):
         await super().close()
         await self.scale(0)
 
-    async def _check_own_container_status_task(
-        self, interval: float, timeout: Optional[float] = None
-    ) -> None:
-        # TODO: Implement container status check
-        pass
+    @override
+    def _get_probe_runner(self) -> ProbeRunner:
+        return ProbeRunner.nop()
 
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int

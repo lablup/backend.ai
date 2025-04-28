@@ -4,9 +4,10 @@ import asyncio
 import os
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
-from typing import Any, FrozenSet, Optional, override
+from typing import Any, FrozenSet, override
 
 from ai.backend.common.events import EventProducer
+from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.types import CommitStatus
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, KernelInitArgs, NextResult, ResultRecord
@@ -29,10 +30,8 @@ class DummyKernel(AbstractKernel):
     async def close(self) -> None:
         pass
 
-    async def _check_own_container_status_task(
-        self, interval: float, timeout: Optional[float] = None
-    ) -> None:
-        pass
+    def _get_probe_runner(self) -> ProbeRunner:
+        return ProbeRunner.nop()
 
     async def create_code_runner(
         self,
