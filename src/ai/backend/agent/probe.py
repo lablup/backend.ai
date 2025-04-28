@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 
 from ai.backend.common.events import DanglingKernelDetected, EventProducer
 from ai.backend.common.types import ContainerId, KernelId
@@ -46,3 +46,14 @@ class BaseKernelProbe:
             self._compare_with_container(container)
         except DanglingKernel:
             await self._event_producer.produce_event(DanglingKernelDetected(self._kernel_id))
+
+
+class AgentProbe:
+    def __init__(
+        self,
+        task: Callable[..., Awaitable[None]],
+    ) -> None:
+        self._task = task
+
+    async def probe(self) -> None:
+        await self._task()

@@ -121,6 +121,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -172,6 +173,7 @@ from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, match_distro_data
+from .probe import AgentProbe
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -673,6 +675,7 @@ class AbstractAgent(
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
     _metric_registry: CommonMetricRegistry
+    _probe_runner: ProbeRunner
 
     def __init__(
         self,
@@ -712,6 +715,7 @@ class AbstractAgent(
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
+        self._probe_runner = self._get_probe_runner()
 
     async def __ainit__(self) -> None:
         """
@@ -834,6 +838,8 @@ class AbstractAgent(
         self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
+        await self._probe_runner.run()
+
         # Notify the gateway.
         await self.produce_event(AgentStartedEvent(reason="self-started"))
 
@@ -874,6 +880,7 @@ class AbstractAgent(
         It must call this super method in an appropriate order, only once.
         """
         await cancel_tasks(self._ongoing_exec_batch_tasks)
+        await self._probe_runner.close()
 
         async with self.registry_lock:
             # Close all pending kernel runners.
@@ -1412,7 +1419,7 @@ class AbstractAgent(
                             kernel_id,
                         )
 
-    async def _scan_containers(self, interval: float) -> None:
+    async def _scan_containers(self) -> None:
         """
         Scan the kernel containers and check if they are in the kernel registry.
         Produce `DanglingContainerDetected` events if there are any.
@@ -1446,6 +1453,10 @@ class AbstractAgent(
                 await self.produce_event(
                     DanglingKernelDetected(registered_kernel_id),
                 )
+
+    def _get_probe_runner(self) -> ProbeRunner:
+        probe = AgentProbe(self._scan_containers)
+        return ProbeRunner(11.0, [probe])
 
     async def sync_container_lifecycles(self, interval: float) -> None:
         """
