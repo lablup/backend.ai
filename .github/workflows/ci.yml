@@ -531,7 +531,7 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=5.0'
+        pip install -U 'twine~=6.0'
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
