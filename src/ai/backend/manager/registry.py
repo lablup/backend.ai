@@ -4393,12 +4393,14 @@ async def handle_check_agent_resource(
 async def handle_dangling_kernel(
     context: AgentRegistry, source: AgentId, event: DanglingKernelDetected
 ) -> None:
+    # TODO: Impl dangling kernel handler
     pass
 
 
 async def handle_dangling_container(
     context: AgentRegistry, source: AgentId, event: DanglingContainerDetected
 ) -> None:
+    # TODO: Impl dangling container handler
     pass
 
 
