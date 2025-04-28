@@ -20,17 +20,14 @@ class BaseKernelProbe:
     def __init__(
         self,
         kernel_id: KernelId,
-        container_id: Optional[ContainerId],
-        kernel_state: KernelLifecycleStatus,
+        kernel_state_getter: Callable[..., KernelLifecycleStatus],
+        container_id_getter: Callable[..., Optional[ContainerId]],
         event_producer: EventProducer,
     ) -> None:
         self._kernel_id = kernel_id
-        self._container_id = container_id
-        self._kernel_state = kernel_state
+        self._container_id_getter = container_id_getter
+        self._kernel_state_getter = kernel_state_getter
         self._event_producer = event_producer
-
-    def set_container_id(self, value: Optional[ContainerId]) -> None:
-        self._container_id = value
 
     @abstractmethod
     async def _get_container_info(self) -> Optional[Container]:

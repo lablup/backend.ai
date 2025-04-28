@@ -47,9 +47,9 @@ class ProbeRunner:
 
     @classmethod
     def nop(cls) -> "ProbeRunner":
-        result = cls(0, [])
-        result._closed = True
-        return result
+        obj = cls(0, [])
+        obj._closed = True
+        return obj
 
     async def close(self) -> None:
         self._closed = True

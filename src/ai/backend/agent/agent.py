@@ -2355,6 +2355,7 @@ class AbstractAgent(
                     )
                 async with self.registry_lock:
                     self.kernel_registry[kernel_id].data.update(container_data)
+                    self.kernel_registry[kernel_id].set_container_id(container_data["container_id"])
                 await kernel_obj.init(self.event_producer)
 
                 current_task = asyncio.current_task()

@@ -49,6 +49,7 @@ from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
+    ContainerId,
     KernelId,
     ModelServiceStatus,
     ServicePort,
@@ -258,6 +259,16 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         # agent_config and _event_producer are set by the pickle.loads() caller.
         self.clean_event = None
         self._tasks = set()
+
+    def set_container_id(self, value: ContainerId) -> None:
+        # TODO: Change self.container_id to ContainerId type
+        self.container_id = str(value)
+
+    def get_container_id(self) -> Optional[ContainerId]:
+        return ContainerId(self.container_id) if self.container_id is not None else None
+
+    def get_kernel_lifecycle_state(self) -> KernelLifecycleStatus:
+        return self.state
 
     async def close(self) -> None:
         """

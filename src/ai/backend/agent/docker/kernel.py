@@ -24,7 +24,7 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.runner import ProbeRunner
-from ai.backend.common.types import CommitStatus, ContainerId, KernelId, Sentinel
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -67,8 +67,8 @@ class DockerKernel(AbstractKernel):
     def _get_probe_runner(self) -> ProbeRunner:
         probe = DockerKernelProbe(
             self.kernel_id,
-            ContainerId(self.container_id) if self.container_id is not None else None,
-            self.state,
+            self.get_kernel_lifecycle_state,
+            self.get_container_id,
             self._event_producer,
         )
         return ProbeRunner(5.0, [probe])
