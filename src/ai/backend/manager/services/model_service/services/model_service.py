@@ -750,22 +750,22 @@ class ModelService:
                 extra_mounts_input = action.modifier.extra_mounts.optional_value()
                 if extra_mounts_input is not None:
                     extra_mounts = {
-                        m.vfolder_id.value(): MountOptionModel(
+                        mount.vfolder_id.value(): MountOptionModel(
                             mount_destination=(
-                                m.mount_destination.value()
-                                if m.mount_destination.optional_value() is not None
+                                mount.mount_destination.value()
+                                if mount.mount_destination.optional_value() is not None
                                 else None
                             ),
-                            type=MountTypes(m.type.value())
-                            if m.type.optional_value() is not None
+                            type=MountTypes(mount.type.value())
+                            if mount.type.optional_value() is not None
                             else MountTypes.BIND,
                             permission=(
-                                MountPermission(m.permission.value())
-                                if m.permission.optional_value() is not None
+                                MountPermission(mount.permission.value())
+                                if mount.permission.optional_value() is not None
                                 else None
                             ),
                         )
-                        for m in extra_mounts_input
+                        for mount in extra_mounts_input
                     }
                     vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
                         conn,
@@ -847,13 +847,11 @@ class ModelService:
                 return MutationResult(
                     success=True,
                     message="success",
-                    data=endpoint_row,
+                    data=EndpointData.from_row(endpoint_row),
                 )
 
         result = await self._db_mutation_wrapper(_do_mutate)
-        return ModifyEndpointActionResult(
-            success=result.success, data=EndpointData.from_row(result.data)
-        )
+        return ModifyEndpointActionResult(success=result.success, data=result.data)
 
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[MutationResult]]

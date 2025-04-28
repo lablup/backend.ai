@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     EndpointId,
     MountPermission,
     MountTypes,
+    ResourceSlot,
     RuleId,
     RuntimeVariant,
 )
@@ -991,9 +992,12 @@ class ExtraMountInput(graphene.InputObjectType):
         description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
     )
 
-    def to_action_field(self) -> ExtraMount:
+    def to_action_field(self, info: graphene.ResolveInfo) -> ExtraMount:
+        _, raw_vfolder_id = AsyncNode.resolve_global_id(info, self.vfolder_id)
+        if not raw_vfolder_id:
+            raw_vfolder_id = self.vfolder_id
         return ExtraMount(
-            vfolder_id=OptionalState.from_graphql(self.vfolder_id),
+            vfolder_id=OptionalState.from_graphql(UUID(raw_vfolder_id)),
             mount_destination=OptionalState.from_graphql(self.mount_destination),
             type=OptionalState.from_graphql(self.type),
             permission=OptionalState.from_graphql(self.permission),
@@ -1024,7 +1028,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
     runtime_variant = graphene.String(description="Added in 24.03.5.")
 
     def to_action(
-        self, requester_ctx: RequesterCtx, endpoint_id: uuid.UUID
+        self, requester_ctx: RequesterCtx, endpoint_id: uuid.UUID, info: graphene.ResolveInfo
     ) -> ModifyEndpointAction:
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
             registry: OptionalState = OptionalState.nop()
@@ -1061,14 +1065,30 @@ class ModifyEndpointInput(graphene.InputObjectType):
                 "Cannot set both desired_session_count and replicas. Use replicas for future use."
             )
 
+        def convert_extra_mounts(
+            extra_mounts_gql: list[ExtraMountInput] | UndefinedType,
+        ) -> list[ExtraMount] | UndefinedType:
+            if isinstance(extra_mounts_gql, UndefinedType):
+                return extra_mounts_gql
+            elif extra_mounts_gql is None:
+                raise InvalidAPIParameters("Extra mounts cannot be None")
+
+            return [extra_mount.to_action_field(info) for extra_mount in extra_mounts_gql]
+
         return ModifyEndpointAction(
             requester_ctx=requester_ctx,
             endpoint_id=endpoint_id,
             modifier=EndpointModifier(
-                resource_slots=OptionalState.from_graphql(self.resource_slots),
+                resource_slots=OptionalState.from_graphql(
+                    self.resource_slots
+                    if (self.resource_slots is Undefined or self.resource_slots is None)
+                    else ResourceSlot.from_user_input(self.resource_slots, None)
+                ),
                 resource_opts=TriState.from_graphql(self.resource_opts),
                 cluster_mode=OptionalState.from_graphql(
-                    ClusterMode(self.cluster_mode) if self.cluster_mode is not Undefined else None,
+                    self.cluster_mode
+                    if (self.cluster_mode is Undefined or self.cluster_mode is None)
+                    else ClusterMode(self.cluster_mode)
                 ),
                 cluster_size=OptionalState.from_graphql(self.cluster_size),
                 replicas=OptionalState.from_graphql(self.replicas),
@@ -1085,9 +1105,9 @@ class ModifyEndpointInput(graphene.InputObjectType):
                     self.open_to_public,
                 ),
                 extra_mounts=OptionalState.from_graphql(
-                    [extra_mount.to_action_field() for extra_mount in self.extra_mounts]
-                    if self.extra_mounts is not Undefined
-                    else None,
+                    self.extra_mounts
+                    if (self.extra_mounts is Undefined or self.extra_mounts is None)
+                    else convert_extra_mounts(self.extra_mounts),
                 ),
                 environ=TriState.from_graphql(
                     self.environ,
@@ -1128,6 +1148,7 @@ class ModifyEndpoint(graphene.Mutation):
                 domain_name=graph_ctx.user["domain_name"],
             ),
             endpoint_id=endpoint_id,
+            info=info,
         )
 
         result = await graph_ctx.processors.model_service.modify_endpoint.wait_for_complete(action)

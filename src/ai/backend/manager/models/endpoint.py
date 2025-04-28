@@ -782,7 +782,6 @@ class ModelServicePredicateChecker:
         which is not covered by the validation procedure (`create_session(dry_run=True)` call at the bottom part of `create()` API)
         so we have to manually cover this part here.
         """
-
         if model_id in extra_mounts:
             raise InvalidAPIParameters(
                 "Same VFolder appears on both model specification and VFolder mount"
