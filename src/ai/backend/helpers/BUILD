@@ -13,7 +13,7 @@ python_distribution(
         ":src",
     ],
     provides=python_artifact(
-        name="backend_ai-kernel-helper",
+        name="backend.ai-kernel-helper",
         description="Backend.AI Kernel Runner Prebuilt Binaries Package",
         license="LGPLv3",
     ),

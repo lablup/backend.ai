@@ -40,7 +40,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend_ai-common",
+        name="backend.ai-common",
         description="Backend.AI commons library",
         license="LGPLv3",
     ),

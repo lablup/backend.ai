@@ -13,7 +13,7 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend_ai-accelerator-mock",
+        name="backend.ai-accelerator-mock",
         description="Backend.AI Mockup Accelerator Plugin",
         license="LGPLv3",
     ),
