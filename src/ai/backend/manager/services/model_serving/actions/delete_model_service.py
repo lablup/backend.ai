@@ -3,16 +3,14 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_service.types import RequesterCtx
+from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_serving.types import RequesterCtx
 
 
 @dataclass
-class UpdateRouteAction(ModelServiceAction):
-    requester_ctx: RequesterCtx
+class DeleteModelServiceAction(ModelServiceAction):
     service_id: uuid.UUID
-    route_id: uuid.UUID
-    traffic_ratio: float
+    requester_ctx: RequesterCtx
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -20,11 +18,11 @@ class UpdateRouteAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "update"
+        return "delete"
 
 
 @dataclass
-class UpdateRouteActionResult(BaseActionResult):
+class DeleteModelServiceActionResult(BaseActionResult):
     success: bool
 
     @override

@@ -3,24 +3,26 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_service.types import RequesterCtx
+from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_serving.types import RequesterCtx
 
 
 @dataclass
-class ForceSyncAction(ModelServiceAction):
-    service_id: uuid.UUID
+class ClearErrorAction(ModelServiceAction):
     requester_ctx: RequesterCtx
+    service_id: uuid.UUID
 
+    @override
     def entity_id(self) -> Optional[str]:
         return None
 
+    @override
     def operation_type(self) -> str:
-        return "sync"
+        return "clear"
 
 
 @dataclass
-class ForceSyncActionResult(BaseActionResult):
+class ClearErrorActionResult(BaseActionResult):
     success: bool
 
     @override

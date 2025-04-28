@@ -6,10 +6,10 @@ from pydantic.dataclasses import dataclass
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.model_service.actions.base import (
+from ai.backend.manager.services.model_serving.actions.base import (
     ModelServiceAction,
 )
-from ai.backend.manager.services.model_service.types import (
+from ai.backend.manager.services.model_serving.types import (
     RequesterCtx,
 )
 

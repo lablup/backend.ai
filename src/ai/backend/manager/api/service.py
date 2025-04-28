@@ -41,34 +41,34 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.model_service.actions.clear_error import ClearErrorAction
-from ai.backend.manager.services.model_service.actions.create_model_service import (
+from ai.backend.manager.services.model_serving.actions.clear_error import ClearErrorAction
+from ai.backend.manager.services.model_serving.actions.create_model_service import (
     CreateModelServiceAction,
     CreateModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.delete_model_service import (
+from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
 )
-from ai.backend.manager.services.model_service.actions.delete_route import DeleteRouteAction
-from ai.backend.manager.services.model_service.actions.dry_run_model_service import (
+from ai.backend.manager.services.model_serving.actions.delete_route import DeleteRouteAction
+from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
 )
-from ai.backend.manager.services.model_service.actions.force_sync import ForceSyncAction
-from ai.backend.manager.services.model_service.actions.generate_token import GenerateTokenAction
-from ai.backend.manager.services.model_service.actions.get_model_service_info import (
+from ai.backend.manager.services.model_serving.actions.force_sync import ForceSyncAction
+from ai.backend.manager.services.model_serving.actions.generate_token import GenerateTokenAction
+from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
 )
-from ai.backend.manager.services.model_service.actions.list_errors import ListErrorsAction
-from ai.backend.manager.services.model_service.actions.list_model_service import (
+from ai.backend.manager.services.model_serving.actions.list_errors import ListErrorsAction
+from ai.backend.manager.services.model_serving.actions.list_model_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.scale_service_replicas import (
+from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
 )
-from ai.backend.manager.services.model_service.actions.update_route import UpdateRouteAction
-from ai.backend.manager.services.model_service.types import (
+from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
+from ai.backend.manager.services.model_serving.types import (
     ModelServiceCreator,
     ModelServicePrepareCtx,
     MountOption,
@@ -169,7 +169,7 @@ async def list_serve(
 
     action = ListModelServiceAction(session_owener_id=request["user"]["uuid"], name=params.name)
     result: ListModelServiceActionResult = (
-        await root_ctx.processors.model_service.list_model_service.wait_for_complete(action)
+        await root_ctx.processors.model_serving.list_model_service.wait_for_complete(action)
     )
 
     return [
@@ -278,7 +278,7 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         service_id=service_id,
     )
     result: GetModelServiceInfoActionResult = (
-        await root_ctx.processors.model_service.get_model_service_info.wait_for_complete(action)
+        await root_ctx.processors.model_serving.get_model_service_info.wait_for_complete(action)
     )
 
     return ServeInfoModel.from_dto(result.data)
@@ -646,7 +646,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     )
 
     result: CreateModelServiceActionResult = (
-        await root_ctx.processors.model_service.create_model_service.wait_for_complete(action)
+        await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
     )
 
     return ServeInfoModel.from_dto(result.data)
@@ -670,7 +670,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
         sudo_session_enabled=request["user"]["sudo_session_enabled"],
     )
 
-    result = await root_ctx.processors.model_service.dry_run_model_service.wait_for_complete(action)
+    result = await root_ctx.processors.model_serving.dry_run_model_service.wait_for_complete(action)
 
     return TryStartResponseModel(task_id=str(result.task_id))
 
@@ -700,7 +700,7 @@ async def delete(request: web.Request) -> SuccessResponseModel:
         ),
     )
 
-    result = await root_ctx.processors.model_service.delete_model_service.wait_for_complete(action)
+    result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(action)
 
     return SuccessResponseModel(success=result.success)
 
@@ -729,7 +729,7 @@ async def sync(request: web.Request) -> SuccessResponseModel:
             domain_name=request["user"]["domain_name"],
         ),
     )
-    result = await root_ctx.processors.model_service.force_sync.wait_for_complete(action)
+    result = await root_ctx.processors.model_serving.force_sync.wait_for_complete(action)
 
     return SuccessResponseModel(success=result.success)
 
@@ -773,7 +773,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         to=params.to,
     )
 
-    result = await root_ctx.processors.model_service_auto_scaling.scale_service_replicas.wait_for_complete(
+    result = await root_ctx.processors.model_serving_auto_scaling.scale_service_replicas.wait_for_complete(
         action
     )
 
@@ -820,7 +820,7 @@ async def update_route(
         traffic_ratio=params.traffic_ratio,
     )
 
-    result = await root_ctx.processors.model_service.update_route.wait_for_complete(action)
+    result = await root_ctx.processors.model_serving.update_route.wait_for_complete(action)
 
     return SuccessResponseModel(success=result.success)
 
@@ -855,7 +855,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         route_id=route_id,
     )
 
-    result = await root_ctx.processors.model_service.delete_route.wait_for_complete(action)
+    result = await root_ctx.processors.model_serving.delete_route.wait_for_complete(action)
 
     return SuccessResponseModel(success=result.success)
 
@@ -924,7 +924,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
         expires_at=params.expires_at,
     )
 
-    result = await root_ctx.processors.model_service.generate_token.wait_for_complete(action)
+    result = await root_ctx.processors.model_serving.generate_token.wait_for_complete(action)
 
     return TokenResponseModel(token=result.data.token)
 
@@ -970,7 +970,7 @@ async def list_errors(request: web.Request) -> ErrorListResponseModel:
         service_id=service_id,
     )
 
-    result = await root_ctx.processors.model_service.list_errors.wait_for_complete(action)
+    result = await root_ctx.processors.model_serving.list_errors.wait_for_complete(action)
 
     return ErrorListResponseModel(
         errors=[
@@ -1005,7 +1005,7 @@ async def clear_error(request: web.Request) -> web.Response:
         service_id=service_id,
     )
 
-    await root_ctx.processors.model_service.clear_error.wait_for_complete(action)
+    await root_ctx.processors.model_serving.clear_error.wait_for_complete(action)
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 

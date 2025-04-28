@@ -1,57 +1,57 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.services.model_service.actions.clear_error import (
+from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
 )
-from ai.backend.manager.services.model_service.actions.create_model_service import (
+from ai.backend.manager.services.model_serving.actions.create_model_service import (
     CreateModelServiceAction,
     CreateModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.delete_model_service import (
+from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.delete_route import (
+from ai.backend.manager.services.model_serving.actions.delete_route import (
     DeleteRouteAction,
     DeleteRouteActionResult,
 )
-from ai.backend.manager.services.model_service.actions.dry_run_model_service import (
+from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
     DryRunModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.force_sync import (
+from ai.backend.manager.services.model_serving.actions.force_sync import (
     ForceSyncAction,
     ForceSyncActionResult,
 )
-from ai.backend.manager.services.model_service.actions.generate_token import (
+from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
 )
-from ai.backend.manager.services.model_service.actions.get_model_service_info import (
+from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
 )
-from ai.backend.manager.services.model_service.actions.list_errors import (
+from ai.backend.manager.services.model_serving.actions.list_errors import (
     ListErrorsAction,
     ListErrorsActionResult,
 )
-from ai.backend.manager.services.model_service.actions.list_model_service import (
+from ai.backend.manager.services.model_serving.actions.list_model_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.modify_endpoint import (
+from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
 )
-from ai.backend.manager.services.model_service.actions.update_route import (
+from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
 )
-from ai.backend.manager.services.model_service.services.model_service import ModelService
+from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 
 
-class ModelServiceProcessors:
+class ModelServingProcessors:
     create_model_service: ActionProcessor[CreateModelServiceAction, CreateModelServiceActionResult]
     list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
     delete_model_service: ActionProcessor[DeleteModelServiceAction, DeleteModelServiceActionResult]
@@ -67,7 +67,7 @@ class ModelServiceProcessors:
     generate_token: ActionProcessor[GenerateTokenAction, GenerateTokenActionResult]
     modify_endpoint: ActionProcessor[ModifyEndpointAction, ModifyEndpointActionResult]
 
-    def __init__(self, service: ModelService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(self, service: ModelServingService, action_monitors: list[ActionMonitor]) -> None:
         self.create_model_service = ActionProcessor(service.create, action_monitors)
         self.list_model_service = ActionProcessor(service.list_serve, action_monitors)
         self.delete_model_service = ActionProcessor(service.delete, action_monitors)

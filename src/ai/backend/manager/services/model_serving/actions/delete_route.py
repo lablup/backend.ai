@@ -3,14 +3,15 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_service.types import ErrorInfo, RequesterCtx
+from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_serving.types import RequesterCtx
 
 
 @dataclass
-class ListErrorsAction(ModelServiceAction):
+class DeleteRouteAction(ModelServiceAction):
     requester_ctx: RequesterCtx
     service_id: uuid.UUID
+    route_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -18,13 +19,12 @@ class ListErrorsAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "list"
+        return "delete"
 
 
 @dataclass
-class ListErrorsActionResult(BaseActionResult):
-    error_info: list[ErrorInfo]
-    retries: int
+class DeleteRouteActionResult(BaseActionResult):
+    success: bool
 
     @override
     def entity_id(self) -> Optional[str]:

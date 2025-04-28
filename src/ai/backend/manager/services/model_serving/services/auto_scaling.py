@@ -10,31 +10,31 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow, EndpointRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.services.model_service.actions.create_auto_scaling_rule import (
+from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_service.actions.delete_auto_scaling_rule import (
+from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule import (
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_service.actions.modify_auto_scaling_rule import (
+from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
     ModifyEndpointAutoScalingRuleAction,
     ModifyEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_service.actions.scale_service_replicas import (
+from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
 )
-from ai.backend.manager.services.model_service.exceptions import (
+from ai.backend.manager.services.model_serving.exceptions import (
     EndpointAutoScalingRuleNotFound,
     EndpointNotFound,
     GenericForbidden,
     InvalidAPIParameters,
     ModelServiceNotFound,
 )
-from ai.backend.manager.services.model_service.services.utils import verify_user_access_scopes
-from ai.backend.manager.services.model_service.types import (
+from ai.backend.manager.services.model_serving.services.utils import verify_user_access_scopes
+from ai.backend.manager.services.model_serving.types import (
     EndpointAutoScalingRuleData,
     MutationResult,
 )

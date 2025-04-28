@@ -1,21 +1,21 @@
-import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_service.types import (
-    EndpointData,
-    EndpointModifier,
+from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_serving.types import (
+    EndpointAutoScalingRuleData,
+    EndpointAutoScalingRuleModifier,
     RequesterCtx,
 )
 
 
 @dataclass
-class ModifyEndpointAction(ModelServiceAction):
+class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
     requester_ctx: RequesterCtx
-    endpoint_id: uuid.UUID
-    modifier: EndpointModifier
+    id: RuleId
+    modifier: EndpointAutoScalingRuleModifier
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,9 +27,9 @@ class ModifyEndpointAction(ModelServiceAction):
 
 
 @dataclass
-class ModifyEndpointActionResult(BaseActionResult):
+class ModifyEndpointAutoScalingRuleActionResult(BaseActionResult):
     success: bool
-    data: Optional[EndpointData]
+    data: Optional[EndpointAutoScalingRuleData]
 
     @override
     def entity_id(self) -> Optional[str]:

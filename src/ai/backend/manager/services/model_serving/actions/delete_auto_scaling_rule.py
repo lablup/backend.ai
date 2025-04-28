@@ -1,16 +1,16 @@
-import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.model_service.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_service.types import RequesterCtx
+from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+from ai.backend.manager.services.model_serving.types import RequesterCtx
 
 
 @dataclass
-class ClearErrorAction(ModelServiceAction):
+class DeleteEndpointAutoScalingRuleAction(ModelServiceAction):
     requester_ctx: RequesterCtx
-    service_id: uuid.UUID
+    id: RuleId
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -18,11 +18,11 @@ class ClearErrorAction(ModelServiceAction):
 
     @override
     def operation_type(self) -> str:
-        return "clear"
+        return "delete"
 
 
 @dataclass
-class ClearErrorActionResult(BaseActionResult):
+class DeleteEndpointAutoScalingRuleActionResult(BaseActionResult):
     success: bool
 
     @override

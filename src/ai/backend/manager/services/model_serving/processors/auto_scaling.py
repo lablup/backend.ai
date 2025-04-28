@@ -1,25 +1,25 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.services.model_service.actions.create_auto_scaling_rule import (
+from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_service.actions.delete_auto_scaling_rule import (
+from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule import (
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_service.actions.modify_auto_scaling_rule import (
+from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
     ModifyEndpointAutoScalingRuleAction,
     ModifyEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_service.actions.scale_service_replicas import (
+from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
 )
-from ai.backend.manager.services.model_service.services.auto_scaling import AutoScalingService
+from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 
 
-class ModelServiceAutoScalingProcessors:
+class ModelServingAutoScalingProcessors:
     scale_service_replicas: ActionProcessor[
         ScaleServiceReplicasAction, ScaleServiceReplicasActionResult
     ]

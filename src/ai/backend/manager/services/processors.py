@@ -29,14 +29,16 @@ from ai.backend.manager.services.metric.processors.utilization_metric import (
     UtilizationMetricProcessors,
 )
 from ai.backend.manager.services.metric.root_service import UtilizationMetricService
-from ai.backend.manager.services.model_service.processors.auto_scaling import (
-    ModelServiceAutoScalingProcessors,
+from ai.backend.manager.services.model_serving.processors.auto_scaling import (
+    ModelServingAutoScalingProcessors,
 )
-from ai.backend.manager.services.model_service.processors.model_service import (
-    ModelServiceProcessors,
+from ai.backend.manager.services.model_serving.processors.model_serving import (
+    ModelServingProcessors,
 )
-from ai.backend.manager.services.model_service.services.auto_scaling import AutoScalingService
-from ai.backend.manager.services.model_service.services.model_service import ModelService
+from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
+from ai.backend.manager.services.model_serving.services.model_serving import (
+    ModelServingService,
+)
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -89,8 +91,8 @@ class Services:
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
     utilization_metric: UtilizationMetricService
-    model_service: ModelService
-    model_service_auto_scaling: AutoScalingService
+    model_serving: ModelServingService
+    model_serving_auto_scaling: AutoScalingService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -127,7 +129,7 @@ class Services:
             args.db, args.agent_registry, args.shared_config
         )
         utilization_metric_service = UtilizationMetricService(args.shared_config)
-        model_service = ModelService(
+        model_serving_service = ModelServingService(
             db=args.db,
             agent_registry=args.agent_registry,
             background_task_manager=args.background_task_manager,
@@ -135,7 +137,7 @@ class Services:
             storage_manager=args.storage_manager,
             shared_config=args.shared_config,
         )
-        model_service_auto_scaling = AutoScalingService(args.db)
+        model_serving_auto_scaling = AutoScalingService(args.db)
 
         return cls(
             agent=agent_service,
@@ -153,8 +155,8 @@ class Services:
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
             utilization_metric=utilization_metric_service,
-            model_service=model_service,
-            model_service_auto_scaling=model_service_auto_scaling,
+            model_serving=model_serving_service,
+            model_serving_auto_scaling=model_serving_auto_scaling,
         )
 
 
@@ -180,8 +182,8 @@ class Processors:
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
     utilization_metric: UtilizationMetricProcessors
-    model_service: ModelServiceProcessors
-    model_service_auto_scaling: ModelServiceAutoScalingProcessors
+    model_serving: ModelServingProcessors
+    model_serving_auto_scaling: ModelServingAutoScalingProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -212,9 +214,9 @@ class Processors:
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
-        model_service_processors = ModelServiceProcessors(services.model_service, action_monitors)
-        model_service_auto_scaling_processors = ModelServiceAutoScalingProcessors(
-            services.model_service_auto_scaling, action_monitors
+        model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)
+        model_serving_auto_scaling_processors = ModelServingAutoScalingProcessors(
+            services.model_serving_auto_scaling, action_monitors
         )
         utilization_metric_processors = UtilizationMetricProcessors(
             services.utilization_metric, action_monitors
@@ -235,6 +237,6 @@ class Processors:
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
             utilization_metric=utilization_metric_processors,
-            model_service=model_service_processors,
-            model_service_auto_scaling=model_service_auto_scaling_processors,
+            model_serving=model_serving_processors,
+            model_serving_auto_scaling=model_serving_auto_scaling_processors,
         )

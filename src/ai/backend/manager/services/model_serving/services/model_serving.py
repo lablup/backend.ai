@@ -51,62 +51,62 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.services.model_service.actions.clear_error import (
+from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
 )
-from ai.backend.manager.services.model_service.actions.create_model_service import (
+from ai.backend.manager.services.model_serving.actions.create_model_service import (
     CreateModelServiceAction,
     CreateModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.delete_model_service import (
+from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.delete_route import (
+from ai.backend.manager.services.model_serving.actions.delete_route import (
     DeleteRouteAction,
     DeleteRouteActionResult,
 )
-from ai.backend.manager.services.model_service.actions.dry_run_model_service import (
+from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
     DryRunModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.force_sync import (
+from ai.backend.manager.services.model_serving.actions.force_sync import (
     ForceSyncAction,
     ForceSyncActionResult,
 )
-from ai.backend.manager.services.model_service.actions.generate_token import (
+from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
 )
-from ai.backend.manager.services.model_service.actions.get_model_service_info import (
+from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
 )
-from ai.backend.manager.services.model_service.actions.list_errors import (
+from ai.backend.manager.services.model_serving.actions.list_errors import (
     ListErrorsAction,
     ListErrorsActionResult,
 )
-from ai.backend.manager.services.model_service.actions.list_model_service import (
+from ai.backend.manager.services.model_serving.actions.list_model_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_service.actions.modify_endpoint import (
+from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
 )
-from ai.backend.manager.services.model_service.actions.update_route import (
+from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
 )
-from ai.backend.manager.services.model_service.exceptions import (
+from ai.backend.manager.services.model_serving.exceptions import (
     EndpointNotFound,
     InvalidAPIParameters,
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.services.model_service.services.utils import verify_user_access_scopes
-from ai.backend.manager.services.model_service.types import (
+from ai.backend.manager.services.model_serving.services.utils import verify_user_access_scopes
+from ai.backend.manager.services.model_serving.types import (
     CompactServiceInfo,
     EndpointData,
     ErrorInfo,
@@ -119,7 +119,7 @@ from ai.backend.manager.types import MountOptionModel, UserScope
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class ModelService:
+class ModelServingService:
     _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
     _background_task_manager: BackgroundTaskManager
@@ -642,8 +642,9 @@ class ModelService:
                 token = token_json["token"]
 
         async with self._db.begin_session() as db_sess:
+            token_id = uuid.uuid4()
             token_row = EndpointTokenRow(
-                uuid.uuid4(),
+                token_id,
                 token,
                 endpoint.id,
                 endpoint.domain,
@@ -652,6 +653,7 @@ class ModelService:
             )
             db_sess.add(token_row)
             await db_sess.commit()
+            await db_sess.refresh(token_row)
 
         return GenerateTokenActionResult(token_row.to_dataclass())
 
