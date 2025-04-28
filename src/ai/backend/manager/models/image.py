@@ -558,6 +558,12 @@ class ImageRow(Base):
         return image_row
 
     @classmethod
+    def from_optional_dataclass(cls, image_data: Optional[ImageData]) -> Optional[Self]:
+        if image_data is None:
+            return None
+        return cls.from_dataclass(image_data)
+
+    @classmethod
     async def resolve(
         cls,
         session: AsyncSession,
