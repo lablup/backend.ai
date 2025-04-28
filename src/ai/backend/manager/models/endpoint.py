@@ -77,6 +77,7 @@ from .vfolder import VFolderRow, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.manager.config import SharedConfig
+    from ai.backend.manager.services.model_serving.types import EndpointTokenData
 
     from .gql import GraphQueryContext
 
@@ -630,6 +631,19 @@ class EndpointTokenRow(Base):
     def delegate_ownership(self, user_uuid: UUID) -> None:
         self.session_owner = user_uuid
 
+    def to_dataclass(self) -> EndpointTokenData:
+        from ai.backend.manager.services.model_serving.types import EndpointTokenData
+
+        return EndpointTokenData(
+            id=self.id,
+            token=self.token,
+            endpoint=self.endpoint,
+            domain=self.domain,
+            project=self.project,
+            session_owner=self.session_owner,
+            created_at=self.created_at,
+        )
+
 
 class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
@@ -768,7 +782,6 @@ class ModelServicePredicateChecker:
         which is not covered by the validation procedure (`create_session(dry_run=True)` call at the bottom part of `create()` API)
         so we have to manually cover this part here.
         """
-
         if model_id in extra_mounts:
             raise InvalidAPIParameters(
                 "Same VFolder appears on both model specification and VFolder mount"
