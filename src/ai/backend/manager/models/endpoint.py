@@ -77,6 +77,7 @@ from .vfolder import VFolderRow, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.manager.config import SharedConfig
+    from ai.backend.manager.services.model_service.types import EndpointTokenData
 
     from .gql import GraphQueryContext
 
@@ -629,6 +630,19 @@ class EndpointTokenRow(Base):
 
     def delegate_ownership(self, user_uuid: UUID) -> None:
         self.session_owner = user_uuid
+
+    def to_dataclass(self) -> EndpointTokenData:
+        from ai.backend.manager.services.model_service.types import EndpointTokenData
+
+        return EndpointTokenData(
+            id=self.id,
+            token=self.token,
+            endpoint=self.endpoint,
+            domain=self.domain,
+            project=self.project,
+            session_owner=self.session_owner,
+            created_at=self.created_at,
+        )
 
 
 class EndpointAutoScalingRuleRow(Base):

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.events import EventDispatcher
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -28,6 +29,14 @@ from ai.backend.manager.services.metric.processors.utilization_metric import (
     UtilizationMetricProcessors,
 )
 from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.model_service.processors.auto_scaling import (
+    ModelServiceAutoScalingProcessors,
+)
+from ai.backend.manager.services.model_service.processors.model_service import (
+    ModelServiceProcessors,
+)
+from ai.backend.manager.services.model_service.services.auto_scaling import AutoScalingService
+from ai.backend.manager.services.model_service.services.model_service import ModelService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -60,6 +69,7 @@ class ServiceArgs:
     agent_registry: AgentRegistry
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
+    event_dispatcher: EventDispatcher
 
 
 @dataclass
@@ -79,6 +89,8 @@ class Services:
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
     utilization_metric: UtilizationMetricService
+    model_service: ModelService
+    model_service_auto_scaling: AutoScalingService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -115,6 +127,15 @@ class Services:
             args.db, args.agent_registry, args.shared_config
         )
         utilization_metric_service = UtilizationMetricService(args.shared_config)
+        model_service = ModelService(
+            db=args.db,
+            agent_registry=args.agent_registry,
+            background_task_manager=args.background_task_manager,
+            event_dispatcher=args.event_dispatcher,
+            storage_manager=args.storage_manager,
+            shared_config=args.shared_config,
+        )
+        model_service_auto_scaling = AutoScalingService(args.db)
 
         return cls(
             agent=agent_service,
@@ -132,6 +153,8 @@ class Services:
             project_resource_policy=project_resource_policy_service,
             resource_preset=resource_preset_service,
             utilization_metric=utilization_metric_service,
+            model_service=model_service,
+            model_service_auto_scaling=model_service_auto_scaling,
         )
 
 
@@ -157,6 +180,8 @@ class Processors:
     project_resource_policy: ProjectResourcePolicyProcessors
     resource_preset: ResourcePresetProcessors
     utilization_metric: UtilizationMetricProcessors
+    model_service: ModelServiceProcessors
+    model_service_auto_scaling: ModelServiceAutoScalingProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -187,6 +212,10 @@ class Processors:
         resource_preset_processors = ResourcePresetProcessors(
             services.resource_preset, action_monitors
         )
+        model_service_processors = ModelServiceProcessors(services.model_service, action_monitors)
+        model_service_auto_scaling_processors = ModelServiceAutoScalingProcessors(
+            services.model_service_auto_scaling, action_monitors
+        )
         utilization_metric_processors = UtilizationMetricProcessors(
             services.utilization_metric, action_monitors
         )
@@ -206,4 +235,6 @@ class Processors:
             project_resource_policy=project_resource_policy_processors,
             resource_preset=resource_preset_processors,
             utilization_metric=utilization_metric_processors,
+            model_service=model_service_processors,
+            model_service_auto_scaling=model_service_auto_scaling_processors,
         )

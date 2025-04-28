@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import decimal
+import uuid
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence, cast
 from uuid import UUID
 
@@ -10,40 +11,56 @@ import jwt
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from graphql import Undefined
+from graphql import Undefined, UndefinedType
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
-    ImageAlias,
     MountPermission,
     MountTypes,
-    ResourceSlot,
     RuleId,
     RuntimeVariant,
-    SessionTypes,
 )
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.gql_models.base import ImageRefType
 from ai.backend.manager.models.gql_models.image import ImageNode
 from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.minilang import EnumFieldItem
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, Routing
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.types import MountOptionModel, UserScope
+from ai.backend.manager.services.model_service.actions.create_auto_scaling_rule import (
+    CreateEndpointAutoScalingRuleAction,
+)
+from ai.backend.manager.services.model_service.actions.delete_auto_scaling_rule import (
+    DeleteEndpointAutoScalingRuleAction,
+)
+from ai.backend.manager.services.model_service.actions.modify_auto_scaling_rule import (
+    ModifyEndpointAutoScalingRuleAction,
+)
+from ai.backend.manager.services.model_service.actions.modify_endpoint import ModifyEndpointAction
+from ai.backend.manager.services.model_service.types import (
+    EndpointAutoScalingRuleCreator,
+    EndpointAutoScalingRuleData,
+    EndpointAutoScalingRuleModifier,
+    EndpointData,
+    EndpointModifier,
+    ExtraMount,
+    ImageRef,
+    RequesterCtx,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 from ...api.exceptions import (
     EndpointNotFound,
     EndpointTokenNotFound,
     GenericForbidden,
-    InvalidAPIParameters,
     ObjectNotFound,
 )
 from ..base import (
@@ -52,17 +69,13 @@ from ..base import (
     Item,
     OrderExprArg,
     PaginatedList,
-    filter_gql_undefined,
     generate_sql_info_for_gql_connection,
-    gql_mutation_wrapper,
-    orm_set_if_set,
 )
 from ..endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
-    ModelServicePredicateChecker,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
@@ -136,6 +149,24 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
     last_triggered_at = GQLDateTime()
 
     endpoint = graphene.UUID(required=True)
+
+    @classmethod
+    def from_dto(cls, dto: EndpointAutoScalingRuleData) -> Self:
+        return cls(
+            id=dto.id,
+            row_id=dto.id,
+            metric_source=dto.metric_source,
+            metric_name=dto.metric_name,
+            threshold=dto.threshold,
+            comparator=dto.comparator,
+            step_size=dto.step_size,
+            cooldown_seconds=dto.cooldown_seconds,
+            min_replicas=dto.min_replicas,
+            max_replicas=dto.max_replicas,
+            created_at=dto.created_at,
+            last_triggered_at=dto.last_triggered_at,
+            endpoint=dto.endpoint,
+        )
 
     @classmethod
     def from_row(cls, graph_ctx: GraphQueryContext, row: EndpointAutoScalingRuleRow) -> Self:
@@ -283,6 +314,24 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
+    def to_action(
+        self, requester_ctx: RequesterCtx, endpoint_id: EndpointId
+    ) -> CreateEndpointAutoScalingRuleAction:
+        return CreateEndpointAutoScalingRuleAction(
+            requester_ctx=requester_ctx,
+            endpoint_id=endpoint_id,
+            creator=EndpointAutoScalingRuleCreator(
+                metric_source=AutoScalingMetricSource(self.metric_source),
+                metric_name=self.metric_name,
+                threshold=self.threshold,
+                comparator=AutoScalingMetricComparator(self.comparator),
+                step_size=self.step_size,
+                cooldown_seconds=self.cooldown_seconds,
+                min_replicas=self.min_replicas if self.min_replicas is not Undefined else None,
+                max_replicas=self.max_replicas if self.max_replicas is not Undefined else None,
+            ),
+        )
+
 
 class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     class Meta:
@@ -302,6 +351,57 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     cooldown_seconds = graphene.Int()
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
+
+    def to_action(
+        self, requester_ctx: RequesterCtx, id: RuleId
+    ) -> ModifyEndpointAutoScalingRuleAction:
+        def convert_to_decimal(
+            value: Optional[str] | UndefinedType,
+        ) -> decimal.Decimal | UndefinedType:
+            if isinstance(value, UndefinedType):
+                return value
+            elif value is None:
+                raise InvalidAPIParameters("Threshold cannot be None")
+
+            try:
+                return decimal.Decimal(value)
+            except decimal.InvalidOperation:
+                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal")
+
+        return ModifyEndpointAutoScalingRuleAction(
+            requester_ctx=requester_ctx,
+            id=id,
+            modifier=EndpointAutoScalingRuleModifier(
+                metric_source=OptionalState.from_graphql(
+                    AutoScalingMetricSource(self.metric_source)
+                    if self.metric_source is not Undefined
+                    else None,
+                ),
+                metric_name=OptionalState.from_graphql(
+                    self.metric_name,
+                ),
+                threshold=OptionalState.from_graphql(
+                    convert_to_decimal(self.threshold),
+                ),
+                comparator=OptionalState.from_graphql(
+                    AutoScalingMetricComparator(self.comparator)
+                    if self.comparator is not Undefined
+                    else None,
+                ),
+                step_size=OptionalState.from_graphql(
+                    self.step_size,
+                ),
+                cooldown_seconds=OptionalState.from_graphql(
+                    self.cooldown_seconds,
+                ),
+                min_replicas=TriState.from_graphql(
+                    self.min_replicas,
+                ),
+                max_replicas=TriState.from_graphql(
+                    self.max_replicas,
+                ),
+            ),
+        )
 
 
 class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
@@ -326,60 +426,36 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         endpoint: str,
         props: EndpointAutoScalingRuleInput,
     ) -> Self:
+        graph_ctx: GraphQueryContext = info.context
         _, raw_endpoint_id = AsyncNode.resolve_global_id(info, endpoint)
         if not raw_endpoint_id:
             raw_endpoint_id = endpoint
-        if not props.metric_source:
-            raise InvalidAPIParameters("metric_source is a required field")
-        if not props.comparator:
-            raise InvalidAPIParameters("comparator is a required field")
-
         try:
             _endpoint_id = EndpointId(UUID(raw_endpoint_id))
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint")
 
-        graph_ctx: GraphQueryContext = info.context
-        async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointRow.get(db_session, _endpoint_id)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="Endpoint")
+        action = props.to_action(
+            requester_ctx=RequesterCtx(
+                is_authorized=None,
+                user_id=info.context.user["uuid"],
+                user_role=info.context.user["role"],
+                domain_name=info.context.user["domain_name"],
+            ),
+            endpoint_id=_endpoint_id,
+        )
 
-            match graph_ctx.user["role"]:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.domain != graph_ctx.user["domain_name"]:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.created_user != graph_ctx.user["uuid"]:
-                        raise GenericForbidden
+        result = await graph_ctx.processors.model_service_auto_scaling.create_endpoint_auto_scaling_rule.wait_for_complete(
+            action
+        )
 
-            try:
-                _threshold = decimal.Decimal(props.threshold)
-            except decimal.InvalidOperation:
-                raise InvalidAPIParameters(f"Cannot convert {props.threshold} to Decimal")
-
-            async def _do_mutate() -> Self:
-                created_rule = await row.create_auto_scaling_rule(
-                    db_session,
-                    props.metric_source,
-                    props.metric_name,
-                    _threshold,
-                    props.comparator,
-                    props.step_size,
-                    cooldown_seconds=props.cooldown_seconds,
-                    min_replicas=filter_gql_undefined(props.min_replicas),
-                    max_replicas=filter_gql_undefined(props.max_replicas),
-                )
-                return cls(
-                    ok=True,
-                    msg="Auto scaling rule created",
-                    rule=EndpointAutoScalingRuleNode.from_row(info.context, created_rule),
-                )
-
-            return await gql_mutation_wrapper(cls, _do_mutate)
+        return cls(
+            ok=result.success,
+            msg="Auto scaling rule created"
+            if result.success
+            else "Failed to create auto scaling rule",
+            rule=EndpointAutoScalingRuleNode.from_dto(result.data) if result.data else None,
+        )
 
 
 class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
@@ -407,51 +483,33 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         _, rule_id = AsyncNode.resolve_global_id(info, id)
         if not rule_id:
             rule_id = id
-
         try:
             _rule_id = RuleId(UUID(rule_id))
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
-
         graph_ctx: GraphQueryContext = info.context
-        async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
-            match graph_ctx.user["role"]:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.endpoint_row.domain != graph_ctx.user["domain_name"]:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.endpoint_row.created_user != graph_ctx.user["uuid"]:
-                        raise GenericForbidden
+        action = props.to_action(
+            requester_ctx=RequesterCtx(
+                is_authorized=None,
+                user_id=graph_ctx.user["uuid"],
+                user_role=graph_ctx.user["role"],
+                domain_name=graph_ctx.user["domain_name"],
+            ),
+            id=_rule_id,
+        )
 
-            async def _do_mutate() -> Self:
-                if (_newval := props.threshold) and _newval is not Undefined:
-                    try:
-                        row.threshold = decimal.Decimal(_newval)
-                    except decimal.InvalidOperation:
-                        raise InvalidAPIParameters(f"Cannot convert {_newval} to Decimal")
+        result = await graph_ctx.processors.model_service_auto_scaling.modify_endpoint_auto_scaling_rule.wait_for_complete(
+            action
+        )
 
-                orm_set_if_set(props, row, "metric_source")
-                orm_set_if_set(props, row, "metric_name")
-                orm_set_if_set(props, row, "comparator")
-                orm_set_if_set(props, row, "step_size")
-                orm_set_if_set(props, row, "cooldown_seconds")
-                orm_set_if_set(props, row, "min_replicas")
-                orm_set_if_set(props, row, "max_replicas")
-
-                return cls(
-                    ok=True,
-                    msg="Auto scaling rule updated",
-                    rule=EndpointAutoScalingRuleNode.from_row(info.context, row),
-                )
-
-            return await gql_mutation_wrapper(cls, _do_mutate)
+        return cls(
+            ok=result.success,
+            msg="Auto scaling rule updated"
+            if result.success
+            else "Failed to update auto scaling rule",
+            rule=EndpointAutoScalingRuleNode.from_dto(result.data) if result.data else None,
+        )
 
 
 class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
@@ -474,39 +532,33 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         id: str,
     ) -> Self:
         _, rule_id = AsyncNode.resolve_global_id(info, id)
-        if not rule_id:
-            rule_id = id
-
         try:
             _rule_id = RuleId(UUID(rule_id))
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
         graph_ctx: GraphQueryContext = info.context
-        async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
-            try:
-                row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
-            match graph_ctx.user["role"]:
-                case UserRole.SUPERADMIN:
-                    pass
-                case UserRole.ADMIN:
-                    if row.endpoint_row.domain != graph_ctx.user["domain_name"]:
-                        raise GenericForbidden
-                case UserRole.USER:
-                    if row.endpoint_row.created_user != graph_ctx.user["uuid"]:
-                        raise GenericForbidden
+        action = DeleteEndpointAutoScalingRuleAction(
+            requester_ctx=RequesterCtx(
+                is_authorized=None,
+                user_id=graph_ctx.user["uuid"],
+                user_role=graph_ctx.user["role"],
+                domain_name=graph_ctx.user["domain_name"],
+            ),
+            id=_rule_id,
+        )
 
-            async def _do_mutate() -> Self:
-                await db_session.delete(row)
-                return cls(
-                    ok=True,
-                    msg="Auto scaling rule removed",
-                )
+        result = await graph_ctx.processors.model_service_auto_scaling.delete_endpoint_auto_scaling_rule.wait_for_complete(
+            action
+        )
 
-            return await gql_mutation_wrapper(cls, _do_mutate)
+        return cls(
+            ok=result.success,
+            msg="Auto scaling rule deleted"
+            if result.success
+            else "Failed to delete auto scaling rule",
+        )
 
 
 class RuntimeVariantInfo(graphene.ObjectType):
@@ -659,6 +711,48 @@ class Endpoint(graphene.ObjectType):
             routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
             runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
+        )
+
+    @classmethod
+    def from_dto(cls, ctx, dto: Optional[EndpointData]) -> Optional[Self]:
+        if dto is None:
+            return None
+        return cls(
+            endpoint_id=dto.id,
+            image_object=ImageNode.from_row(ctx, ImageRow.from_optional_dataclass(dto.image)),
+            domain=dto.domain,
+            project=dto.project,
+            resource_group=dto.resource_group,
+            resource_slots=dto.resource_slots.to_json(),
+            url=dto.url,
+            model=dto.model,
+            model_definition_path=dto.model_definition_path,
+            model_mount_destiation=dto.model_mount_destination,
+            model_mount_destination=dto.model_mount_destination,
+            created_user=dto.created_user_id,
+            created_user_id=dto.created_user_id,
+            created_user_email=dto.created_user_email,
+            session_owner=dto.session_owner_id,
+            session_owner_id=dto.session_owner_id,
+            session_owner_email=dto.session_owner_email,
+            tag=dto.tag,
+            startup_command=dto.startup_command,
+            bootstrap_script=dto.bootstrap_script,
+            callback_url=dto.callback_url,
+            environ=dto.environ,
+            name=dto.name,
+            resource_opts=dto.resource_opts,
+            replicas=dto.replicas,
+            desired_session_count=dto.replicas,
+            cluster_mode=dto.cluster_mode,
+            cluster_size=dto.cluster_size,
+            open_to_public=dto.open_to_public,
+            created_at=dto.created_at,
+            destroyed_at=dto.destroyed_at,
+            retries=dto.retries,
+            routings=[Routing.from_dto(r) for r in dto.routings] if dto.routings else None,
+            lifecycle_stage=dto.lifecycle_stage,
+            runtime_variant=RuntimeVariantInfo.from_enum(dto.runtime_variant),
         )
 
     @classmethod
@@ -897,6 +991,14 @@ class ExtraMountInput(graphene.InputObjectType):
         description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
     )
 
+    def to_action_field(self) -> ExtraMount:
+        return ExtraMount(
+            vfolder_id=OptionalState.from_graphql(self.vfolder_id),
+            mount_destination=OptionalState.from_graphql(self.mount_destination),
+            type=OptionalState.from_graphql(self.type),
+            permission=OptionalState.from_graphql(self.permission),
+        )
+
 
 class ModifyEndpointInput(graphene.InputObjectType):
     resource_slots = graphene.JSONString()
@@ -921,6 +1023,81 @@ class ModifyEndpointInput(graphene.InputObjectType):
     environ = graphene.JSONString(description="Added in 24.03.5.")
     runtime_variant = graphene.String(description="Added in 24.03.5.")
 
+    def to_action(
+        self, requester_ctx: RequesterCtx, endpoint_id: uuid.UUID
+    ) -> ModifyEndpointAction:
+        def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
+            registry: OptionalState = OptionalState.nop()
+            if (
+                graphene_image_input.registry is not Undefined
+                and graphene_image_input.registry is not None
+            ):
+                registry = OptionalState.update(graphene_image_input.registry)
+
+            architecture: OptionalState = OptionalState.nop()
+            if (
+                graphene_image_input.architecture is not Undefined
+                and graphene_image_input.architecture is not None
+            ):
+                architecture = OptionalState.update(graphene_image_input.architecture)
+
+            return ImageRef(graphene_image_input.name, registry, architecture)
+
+        def convert_runtime_variant(
+            value: Optional[str] | UndefinedType,
+        ) -> RuntimeVariant | UndefinedType:
+            if isinstance(value, UndefinedType):
+                return value
+            elif value is None:
+                raise InvalidAPIParameters("Runtime variant cannot be None")
+
+            try:
+                return RuntimeVariant(value)
+            except KeyError:
+                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}")
+
+        if self.desired_session_count is not Undefined and self.replicas is not Undefined:
+            raise InvalidAPIParameters(
+                "Cannot set both desired_session_count and replicas. Use replicas for future use."
+            )
+
+        return ModifyEndpointAction(
+            requester_ctx=requester_ctx,
+            endpoint_id=endpoint_id,
+            modifier=EndpointModifier(
+                resource_slots=OptionalState.from_graphql(self.resource_slots),
+                resource_opts=TriState.from_graphql(self.resource_opts),
+                cluster_mode=OptionalState.from_graphql(
+                    ClusterMode(self.cluster_mode) if self.cluster_mode is not Undefined else None,
+                ),
+                cluster_size=OptionalState.from_graphql(self.cluster_size),
+                replicas=OptionalState.from_graphql(self.replicas),
+                desired_session_count=OptionalState.from_graphql(self.desired_session_count),
+                image=TriState.from_graphql(
+                    create_image_ref_from_input(self.image)
+                    if self.image is not Undefined
+                    else None,
+                ),
+                name=OptionalState.from_graphql(self.name),
+                resource_group=OptionalState.from_graphql(self.resource_group),
+                model_definition_path=TriState.from_graphql(self.model_definition_path),
+                open_to_public=OptionalState.from_graphql(
+                    self.open_to_public,
+                ),
+                extra_mounts=OptionalState.from_graphql(
+                    [extra_mount.to_action_field() for extra_mount in self.extra_mounts]
+                    if self.extra_mounts is not Undefined
+                    else None,
+                ),
+                environ=TriState.from_graphql(
+                    self.environ,
+                ),
+                runtime_variant=OptionalState.from_graphql(
+                    convert_runtime_variant(self.runtime_variant),
+                ),
+            ),
+        )
+
 
 class ModifyEndpoint(graphene.Mutation):
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -943,227 +1120,22 @@ class ModifyEndpoint(graphene.Mutation):
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _do_mutate() -> Self:
-            async with graph_ctx.db.begin_session() as db_session:
-                try:
-                    endpoint_row = await EndpointRow.get(
-                        db_session,
-                        endpoint_id,
-                        load_session_owner=True,
-                        load_model=True,
-                        load_routes=True,
-                    )
-                    match graph_ctx.user["role"]:
-                        case UserRole.SUPERADMIN:
-                            pass
-                        case UserRole.ADMIN:
-                            domain_name = graph_ctx.user["domain_name"]
-                            if endpoint_row.domain != domain_name:
-                                raise EndpointNotFound
-                        case _:
-                            user_id = graph_ctx.user["uuid"]
-                            if endpoint_row.session_owner != user_id:
-                                raise EndpointNotFound
-                except NoResultFound:
-                    raise EndpointNotFound
-                if endpoint_row.lifecycle_stage in (
-                    EndpointLifecycle.DESTROYING,
-                    EndpointLifecycle.DESTROYED,
-                ):
-                    raise InvalidAPIParameters("Cannot update endpoint marked for removal")
+        action = props.to_action(
+            requester_ctx=RequesterCtx(
+                is_authorized=None,
+                user_role=graph_ctx.user["role"],
+                user_id=graph_ctx.user["uuid"],
+                domain_name=graph_ctx.user["domain_name"],
+            ),
+            endpoint_id=endpoint_id,
+        )
 
-                if (_newval := props.resource_slots) and _newval is not Undefined:
-                    endpoint_row.resource_slots = ResourceSlot.from_user_input(_newval, None)
+        result = await graph_ctx.processors.model_service.modify_endpoint.wait_for_complete(action)
 
-                if (_newval := props.resource_opts) and _newval is not Undefined:
-                    endpoint_row.resource_opts = _newval
-
-                if (_newval := props.cluster_mode) and _newval is not Undefined:
-                    endpoint_row.cluster_mode = _newval
-
-                if (_newval := props.cluster_size) and _newval is not Undefined:
-                    endpoint_row.cluster_size = _newval
-
-                if (_newval := props.model_definition_path) and _newval is not Undefined:
-                    endpoint_row.model_definition_path = _newval
-
-                if (_newval := props.environ) is not None and _newval is not Undefined:
-                    endpoint_row.environ = _newval
-
-                if (_newval := props.runtime_variant) and _newval is not Undefined:
-                    try:
-                        endpoint_row.runtime_variant = RuntimeVariant(_newval)
-                    except KeyError:
-                        raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
-
-                if (
-                    (_legacy_replicas := props.desired_session_count) is not None
-                    and _legacy_replicas is not Undefined
-                    and (_new_replicas := props.replicas) is not None
-                    and _new_replicas is not Undefined
-                ):
-                    raise InvalidAPIParameters(
-                        "Cannot set both desired_session_count and replicas. Use replicas for future use."
-                    )
-
-                if (
-                    _newval := props.desired_session_count
-                ) is not None and _newval is not Undefined:
-                    endpoint_row.replicas = _newval
-
-                if (_newval := props.replicas) is not None and _newval is not Undefined:
-                    endpoint_row.replicas = _newval
-
-                if (_newval := props.resource_group) and _newval is not Undefined:
-                    endpoint_row.resource_group = _newval
-
-                if (image := props.image) and image is not Undefined:
-                    image_name = image["name"]
-                    arch = image.get("architecture")
-                    image_row = await ImageRow.resolve(
-                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
-                    )
-                    endpoint_row.image = image_row.id
-
-                session_owner: UserRow = endpoint_row.session_owner_row
-
-                conn = await db_session.connection()
-                assert conn
-
-                await ModelServicePredicateChecker.check_scaling_group(
-                    conn,
-                    endpoint_row.resource_group,
-                    session_owner.main_access_key,
-                    endpoint_row.domain,
-                    endpoint_row.project,
-                )
-
-                def _get_vfolder_id(id_input: str) -> UUID:
-                    _, raw_vfolder_id = AsyncNode.resolve_global_id(info, id_input)
-                    if not raw_vfolder_id:
-                        raw_vfolder_id = id_input
-                    return UUID(raw_vfolder_id)
-
-                user_scope = UserScope(
-                    domain_name=endpoint_row.domain,
-                    group_id=endpoint_row.project,
-                    user_uuid=session_owner.uuid,
-                    user_role=session_owner.role,
-                )
-
-                query = (
-                    sa.select([keypair_resource_policies])
-                    .select_from(keypair_resource_policies)
-                    .where(keypair_resource_policies.c.name == session_owner.resource_policy)
-                )
-                result = await conn.execute(query)
-
-                resource_policy = result.first()
-                if (extra_mounts_input := props.extra_mounts) is not Undefined:
-                    extra_mounts_input = cast(list[ExtraMountInput], extra_mounts_input)
-                    extra_mounts = {
-                        _get_vfolder_id(m.vfolder_id): MountOptionModel(
-                            mount_destination=(
-                                m.mount_destination
-                                if m.mount_destination is not Undefined
-                                else None
-                            ),
-                            type=MountTypes(m.type) if m.type is not Undefined else MountTypes.BIND,
-                            permission=(
-                                MountPermission(m.permission)
-                                if m.permission is not Undefined
-                                else None
-                            ),
-                        )
-                        for m in extra_mounts_input
-                    }
-                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
-                        conn,
-                        graph_ctx.shared_config,
-                        graph_ctx.storage_manager,
-                        endpoint_row.model,
-                        endpoint_row.model_mount_destination,
-                        extra_mounts,
-                        user_scope,
-                        resource_policy,
-                    )
-                    endpoint_row.extra_mounts = vfolder_mounts
-
-                if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
-                    await ModelServicePredicateChecker.validate_model_definition(
-                        graph_ctx.storage_manager,
-                        endpoint_row.model_row,
-                        endpoint_row.model_definition_path,
-                    )
-                elif (
-                    endpoint_row.runtime_variant != RuntimeVariant.CMD
-                    and endpoint_row.model_mount_destination != "/models"
-                ):
-                    raise InvalidAPIParameters(
-                        "Model mount destination must be /models for non-custom runtimes"
-                    )
-
-                async with graph_ctx.db.begin_session() as db_session:
-                    image_row = await ImageRow.resolve(
-                        db_session,
-                        [
-                            ImageIdentifier(
-                                endpoint_row.image_row.name, endpoint_row.image_row.architecture
-                            ),
-                        ],
-                    )
-
-                await graph_ctx.registry.create_session(
-                    "",
-                    image_row.image_ref,
-                    user_scope,
-                    session_owner.main_access_key,
-                    resource_policy,
-                    SessionTypes.INFERENCE,
-                    {
-                        "mounts": [
-                            endpoint_row.model,
-                            *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
-                        ],
-                        "mount_map": {
-                            endpoint_row.model: endpoint_row.model_mount_destination,
-                            **{
-                                m.vfid.folder_id: m.kernel_path.as_posix()
-                                for m in endpoint_row.extra_mounts
-                            },
-                        },
-                        "mount_options": {
-                            m.vfid.folder_id: {"permission": m.mount_perm}
-                            for m in endpoint_row.extra_mounts
-                        },
-                        "environ": endpoint_row.environ,
-                        "scaling_group": endpoint_row.resource_group,
-                        "resources": endpoint_row.resource_slots,
-                        "resource_opts": endpoint_row.resource_opts,
-                        "preopen_ports": None,
-                        "agent_list": None,
-                    },
-                    ClusterMode(endpoint_row.cluster_mode),
-                    endpoint_row.cluster_size,
-                    bootstrap_script=endpoint_row.bootstrap_script,
-                    startup_command=endpoint_row.startup_command,
-                    tag=endpoint_row.tag,
-                    callback_url=endpoint_row.callback_url,
-                    sudo_session_enabled=session_owner.sudo_session_enabled,
-                    dry_run=True,
-                )
-
-                await db_session.commit()
-
-                return cls(
-                    True,
-                    "success",
-                    await Endpoint.from_row(graph_ctx, endpoint_row),
-                )
-
-        return await gql_mutation_wrapper(
-            cls,
-            _do_mutate,
+        return cls(
+            ok=result.success,
+            msg="success" if result.success else "failed",
+            endpoint=Endpoint.from_dto(graph_ctx, result.data),
         )
 
 
