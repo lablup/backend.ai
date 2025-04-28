@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
@@ -26,6 +27,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.services.vfolder.actions.file import FetchServiceConfigAction
 
 from ...api.exceptions import (
     VFolderOperationFailed,
@@ -117,6 +119,8 @@ class VirtualFolderNode(graphene.ObjectType):
         VFolderPermissionValueField,
         description=f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}.",
     )
+
+    service_config = graphene.JSONString(description="Added in 25.7.0.")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", uuid.UUID),
@@ -392,6 +396,21 @@ class VirtualFolderNode(graphene.ObjectType):
             for vf in vfolder_rows
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def resolve_service_config(self, info: graphene.ResolveInfo) -> str:
+        graph_ctx: GraphQueryContext = info.context
+
+        action_result = (
+            await graph_ctx.processors.vfolder_file.fetch_service_config.wait_for_complete(
+                FetchServiceConfigAction(
+                    vfolder_uuid=self.row_id,
+                    quota_scope_id=self.quota_scope_id,
+                    host=self.host,
+                    unmanaged_path=self.unmanaged_path,
+                )
+            )
+        )
+        return json.dumps(action_result.result.model_dump())
 
 
 class VirtualFolderConnection(Connection):
