@@ -4,19 +4,18 @@ import logging
 import logging.config
 import os
 import re
-import signal
 import socket
 import ssl
 import sys
 import time
 import traceback
-from collections.abc import MutableMapping, Sequence
+from collections.abc import MutableMapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Mapping, Optional, cast
 
 import aiohttp_cors
 import aiotools
@@ -24,7 +23,6 @@ import click
 import jinja2
 import tomli
 from aiohttp import web
-from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
@@ -270,7 +268,7 @@ async def login_handler(request: web.Request) -> web.Response:
     stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     if session.get("authenticated", False):
-        raise web.HTTPBadRequest(
+        return web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-bad-request",
                 "title": "You have already logged in.",
@@ -291,7 +289,7 @@ async def login_handler(request: web.Request) -> web.Response:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
     if "username" not in creds or not creds["username"]:
-        raise web.HTTPBadRequest(
+        return web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the username field.",
@@ -299,7 +297,7 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     if "password" not in creds or not creds["password"]:
-        raise web.HTTPBadRequest(
+        return web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the password field.",
@@ -311,11 +309,8 @@ async def login_handler(request: web.Request) -> web.Response:
         "data": None,
     }
 
-    redis: Redis = request.app["redis"]
-    BLOCK_TIME = config["session"]["login_block_time"]
-
     async def _get_login_history():
-        login_history = await redis.get(
+        login_history = await request.app["redis"].get(
             f"login_history_{creds['username']}",
         )
         if not login_history:
@@ -340,9 +335,10 @@ async def login_handler(request: web.Request) -> web.Response:
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
         })
-        await redis.set(key, value, ex=BLOCK_TIME)
+        await request.app["redis"].set(key, value)
 
     # Block login if there are too many consecutive failed login attempts.
+    BLOCK_TIME = config["session"]["login_block_time"]
     ALLOWED_FAIL_COUNT = config["session"]["login_allowed_fail_count"]
     login_time = time.time()
     login_history = await _get_login_history()
@@ -360,7 +356,7 @@ async def login_handler(request: web.Request) -> web.Response:
             client_ip,
         )
         await _set_login_history(last_login_attempt, login_fail_count)
-        raise web.HTTPTooManyRequests(
+        return web.HTTPTooManyRequests(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/too-many-requests",
                 "title": "Too many failed login attempts",
@@ -583,8 +579,8 @@ async def server_cleanup(app) -> None:
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Sequence[Any],
-) -> AsyncGenerator[Any, signal.Signals]:
+    _args: tuple[Any, ...],
+) -> AsyncIterator[Any]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
     log_endpoint = _args[1]
     logger = Logger(
@@ -608,7 +604,7 @@ async def server_main_logwrapper(
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    args: Sequence[Any],
+    args: tuple[Any, ...],
 ) -> AsyncIterator[Any]:
     config = args[0]
     app = web.Application(

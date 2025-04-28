@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import codecs
 import io
-import json
 import logging
 import math
 import os
@@ -37,7 +36,7 @@ import zmq.asyncio
 from async_timeout import timeout
 
 from ai.backend.common import msgpack
-from ai.backend.common.asyncio import cancel_task, current_loop
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import (
@@ -45,7 +44,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
 )
-from ai.backend.common.json import load_json
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -53,7 +52,6 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     ServicePort,
     SessionId,
-    SessionTypes,
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -107,11 +105,6 @@ default_client_features = frozenset({
     ClientFeatures.CONTINUATION.value,
 })
 default_api_version = 4
-RUN_ID_FOR_BATCH_JOB = "batch-job"  # TODO: Deprecate usage of run-id
-
-
-def _dump_json_bytes(obj: Any) -> bytes:
-    return json.dumps(obj).encode("utf-8")
 
 
 class RunEvent(Exception):
@@ -178,10 +171,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     last_used: float
     termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
+    stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
-    state: KernelLifecycleStatus
-    session_type: SessionTypes
+    status: KernelLifecycleStatus
 
     _tasks: Set[asyncio.Task]
 
@@ -199,7 +192,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         service_ports: Any,  # TODO: type-annotation
         data: Dict[Any, Any],
         environ: Mapping[str, Any],
-        session_type: SessionTypes = SessionTypes.INTERACTIVE,
     ) -> None:
         self.agent_config = agent_config
         self.ownership_data = ownership_data
@@ -215,11 +207,12 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.last_used = time.monotonic()
         self.termination_reason = None
         self.clean_event = None
+        self.stats_enabled = False
+        self._tasks = set()
         self.environ = environ
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
-        self.session_type = session_type
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -228,21 +221,15 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             default_api_version,
             default_client_features,
         )
-        try:
-            self.runner = await self.create_code_runner(
-                event_producer,
-                client_features=default_client_features,
-                api_version=default_api_version,
-            )
-        except Exception as e:
-            log.error("kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e)
-            self.runner = None
-            raise
+        self.runner = await self.create_code_runner(
+            event_producer, client_features=default_client_features, api_version=default_api_version
+        )
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["agent_config"]
         del props["clean_event"]
+        del props["_tasks"]
         return props
 
     def __setstate__(self, props) -> None:
@@ -255,14 +242,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                 props["session_id"],
                 props["agent_id"],
             )
-        if "session_type" not in props:
-            props["session_type"] = SessionTypes.INTERACTIVE
-        if "stats_enabled" in props:
-            # stats_enabled is a property, not an attribute.
-            del props["stats_enabled"]
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
+        self._tasks = set()
 
     @abstractmethod
     async def close(self) -> None:
@@ -285,13 +268,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         """
         for accel_key, accel_alloc in self.resource_spec.allocations.items():
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
-
-    @property
-    def stats_enabled(self) -> bool:
-        """
-        Returns True if the kernel supports statistics gathering.
-        """
-        return self.state == KernelLifecycleStatus.RUNNING
 
     @abstractmethod
     async def create_code_runner(
@@ -352,7 +328,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike | str, filedata) -> None:
         """
         Put the uploaded file to the designated container path.
         The path should be inside /home/work of the container.
@@ -416,15 +392,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         api_version: int,
         flush_timeout: float,
     ) -> NextResult:
+        myself = asyncio.current_task()
+        assert myself is not None
         assert self.runner is not None
+        self._tasks.add(myself)
         try:
-            log.info(
-                "kernel.execute(k:{0}, run_id:{1}, mode:{2}, opts:{3})",
-                self.kernel_id,
-                run_id,
-                mode,
-                opts,
-            )
             await self.runner.attach_output_queue(run_id)
             try:
                 if mode == "batch":
@@ -446,6 +418,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             await self.runner.close()
             raise
+        finally:
+            self._tasks.remove(myself)
 
 
 _zctx = None
@@ -456,7 +430,6 @@ class RobustSocket:
     _sock: zmq.asyncio.Socket
     _socket_type: int
     _addr: str
-    _closed: bool
 
     def __init__(
         self,
@@ -469,7 +442,6 @@ class RobustSocket:
         self._sock = self._zctx.socket(self._socket_type)
         self._sock.connect(self._addr)
         self._sock.setsockopt(zmq.LINGER, 50)
-        self._closed = False
 
     @property
     def addr(self) -> str:
@@ -479,12 +451,7 @@ class RobustSocket:
     def socket(self) -> zmq.asyncio.Socket:
         return self._sock
 
-    @property
-    def closed(self) -> bool:
-        return self._closed
-
     def close(self) -> None:
-        self._closed = True
         try:
             self._sock.close()
         except zmq.ZMQError:
@@ -608,8 +575,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self._closed = False
 
     async def __ainit__(self) -> None:
+        loop = current_loop()
         await self._get_socket_pair()
-        await self._create_tasks()
+        self.status_task = loop.create_task(self.ping_status())
+        self.read_task = loop.create_task(self.read_output())
+        if self.exec_timeout > 0:
+            self.watchdog_task = loop.create_task(self.watchdog())
+        else:
+            self.watchdog_task = None
 
     async def _create_sockets(self) -> SocketPair:
         input_sock = RobustSocket(zmq.PUSH, await self.get_repl_in_addr())
@@ -681,7 +654,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return
         self._closed = True
         try:
-            await self._close_tasks()
+            if self.watchdog_task and not self.watchdog_task.done():
+                self.watchdog_task.cancel()
+                await self.watchdog_task
+            if self.status_task and not self.status_task.done():
+                self.status_task.cancel()
+                await self.status_task
+            if self.read_task and not self.read_task.done():
+                self.read_task.cancel()
+                await self.read_task
             if self._sockets is not None:
                 self._sockets.close()
             # WARNING:
@@ -689,27 +670,6 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # may cause deadlocks.
         except Exception:
             log.exception("AbstractCodeRunner.close(): unexpected error")
-
-    async def _create_tasks(self) -> None:
-        # close the previous task if any
-        await self._close_tasks()
-
-        loop = asyncio.get_running_loop()
-        self.status_task = loop.create_task(self.ping_status())
-        self.read_task = loop.create_task(self.read_output())
-        if self.exec_timeout > 0:
-            self.watchdog_task = loop.create_task(self.watchdog())
-
-    async def _close_tasks(self) -> None:
-        concurrent_safe_tasks: tuple[Optional[asyncio.Task], ...] = (
-            self.status_task,
-            self.read_task,
-            self.watchdog_task,
-        )
-        await asyncio.gather(
-            *[cancel_task(task) for task in concurrent_safe_tasks if task is not None],
-            return_exceptions=True,
-        )
 
     async def ping(self) -> dict[str, float] | None:
         try:
@@ -772,7 +732,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             "type": evdata.type,
             "data": evdata.data,
         }
-        await sock.send_multipart([b"event", _dump_json_bytes(data)])
+        await sock.send_multipart([b"event", dump_json(data)])
 
     async def feed_interrupt(self):
         sock = await self._get_socket_pair()
@@ -796,7 +756,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         payload.update(opts)
         await sock.send_multipart([
             b"complete",
-            _dump_json_bytes(payload),
+            dump_json(payload),
         ])
         try:
             result = await self.completion_queue.get()
@@ -809,7 +769,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-model-service",
-            _dump_json_bytes(model_info),
+            dump_json(model_info),
         ])
         if health_check_info := model_info.get("service", {}).get("health_check"):
             timeout_seconds = (
@@ -831,7 +791,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
-            _dump_json_bytes(service_info),
+            dump_json(service_info),
         ])
         try:
             with timeout(10):
@@ -847,7 +807,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"shutdown-service",
-            _dump_json_bytes(service_name),
+            dump_json(service_name),
         ])
 
     async def feed_service_apps(self):
@@ -987,7 +947,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
-            self.next_output_queue()
+            self.resume_output_queue()
             return result
         except BuildFinished as e:
             result = {
@@ -997,7 +957,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
-            self.next_output_queue()
+            self.resume_output_queue()
             return result
         except RunFinished as e:
             result = {
@@ -1045,12 +1005,6 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.pending_queues[run_id] = (activated, q)
         else:
             activated, q = self.pending_queues[run_id]
-        log.info(
-            "CodeRunner.attach_output_queue(k:{0}, run_id:{1}, is running event set:{2})",
-            self.kernel_id,
-            run_id,
-            activated.is_set(),
-        )
         if self.output_queue is None:
             self.output_queue = q
         else:

@@ -307,15 +307,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     ) -> None:
         async with concurrency_sema.get():
             rqst_args = copy.deepcopy(rqst_args)
-            acceptables = [
-                self.MEDIA_TYPE_DOCKER_MANIFEST_LIST,
-                self.MEDIA_TYPE_DOCKER_MANIFEST,
-                self.MEDIA_TYPE_OCI_INDEX,
-                self.MEDIA_TYPE_OCI_MANIFEST,
-                self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON,
-                self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS,
-            ]
-            rqst_args["headers"]["Accept"] = ",".join(acceptables)
+            rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST_LIST
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
             ) as resp:
@@ -431,9 +423,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
         # we should favor `config` instead of `container_config` since `config` can contain additional datas
         # set when commiting image via `--change` flag
-        if _config_labels := (data.get("config") or {}).get("Labels"):
+        if _config_labels := data.get("config", {}).get("Labels"):
             labels = _config_labels
-        elif _container_config_labels := (data.get("container_config") or {}).get("Labels"):
+        elif _container_config_labels := data.get("container_config", {}).get("Labels"):
             labels = _container_config_labels
 
         return {
@@ -493,9 +485,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 config_data = await read_json(resp)
 
         labels = {}
-        if _config_labels := (config_data.get("config") or {}).get("Labels"):
+        if _config_labels := config_data.get("config", {}).get("Labels"):
             labels = _config_labels
-        elif _container_config_labels := (config_data.get("container_config") or {}).get("Labels"):
+        elif _container_config_labels := config_data.get("container_config", {}).get("Labels"):
             labels = _container_config_labels
 
         if not labels:

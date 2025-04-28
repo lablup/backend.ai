@@ -229,10 +229,15 @@ class KubernetesKernel(AbstractKernel):
     @override
     async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         loop = current_loop()
+        container_home_path = PurePosixPath("/home/work")
+        try:
+            home_relpath = PurePosixPath(container_path).relative_to(container_home_path)
+        except ValueError:
+            raise PermissionError("Not allowed to upload files outside /home/work")
         host_work_dir: Path = (
             self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
         )
-        host_abspath = (host_work_dir / container_path).resolve(strict=False)
+        host_abspath = (host_work_dir / home_relpath).resolve(strict=False)
         if not host_abspath.is_relative_to(host_work_dir):
             raise PermissionError("Not allowed to upload files outside /home/work")
 

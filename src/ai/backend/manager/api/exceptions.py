@@ -113,11 +113,6 @@ class GenericBadRequest(BackendError, web.HTTPBadRequest):
     error_title = "Bad request."
 
 
-class KernelNotReady(BackendError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/kernel-not-ready"
-    error_title = "Kernel not ready."
-
-
 class RejectedByHook(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/rejected-by-hook"
     error_title = "Operation rejected by a hook plugin."
@@ -341,11 +336,6 @@ class VFolderNotFound(ObjectNotFound):
 class VFolderAlreadyExists(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."
-
-
-class VFolderGone(BackendError, web.HTTPGone):
-    error_type = "https://api.backend.ai/probs/vfolder-gone"
-    error_title = "The virtual folder is gone."
 
 
 class ModelServiceDependencyNotCleared(BackendError, web.HTTPBadRequest):

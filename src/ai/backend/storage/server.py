@@ -5,13 +5,12 @@ import logging
 import multiprocessing
 import os
 import pwd
-import signal
 import ssl
 import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncGenerator, AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
 import aiotools
@@ -54,7 +53,7 @@ async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
     _args: Sequence[Any],
-) -> AsyncGenerator[None, signal.Signals]:
+) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
     try:
         asyncio.get_child_watcher()

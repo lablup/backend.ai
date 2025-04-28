@@ -39,20 +39,6 @@ async def cancel_tasks(
     return await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
 
-async def cancel_task(task: asyncio.Task) -> None:
-    """
-    Cancel the given task and wait for its completion.
-    """
-    being_canceled = task.cancel()
-    if not being_canceled:
-        # the task is already cancelled or done
-        return
-    await asyncio.sleep(0)  # yield to the event loop
-    if task.done():
-        return
-    await task
-
-
 current_loop: Callable[[], asyncio.AbstractEventLoop]
 if hasattr(asyncio, "get_running_loop"):
     current_loop = asyncio.get_running_loop  # type: ignore

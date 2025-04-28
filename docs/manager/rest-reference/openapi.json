@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.6.12",
+    "version": "25.6.3",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -3853,7 +3853,7 @@
         "description": "\nDelete `delete-pending` vfolders in storage proxy\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/folders/{folder_id}/force": {
+    "/folders/{name}/force": {
       "delete": {
         "operationId": "folders.force_delete",
         "tags": [
@@ -3871,7 +3871,7 @@
         ],
         "parameters": [
           {
-            "name": "folder_id",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {

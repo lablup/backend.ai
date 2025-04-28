@@ -1218,20 +1218,6 @@ class DeviceModelInfo(TypedDict):
     data: ComputedDeviceCapacity  # name kept for backward compat with plugins
 
 
-@dataclass
-class KernelContainerId:
-    kernel_id: KernelId
-    container_id: ContainerId
-
-    @property
-    def human_readable_container_id(self) -> str:
-        """
-        Returns a human-readable version of the container ID.
-        This is useful for logging and debugging purposes.
-        """
-        return str(self.container_id)[:12]
-
-
 class KernelCreationResult(TypedDict):
     id: KernelId
     container_id: ContainerId

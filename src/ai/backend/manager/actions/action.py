@@ -2,7 +2,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from ai.backend.manager.actions.types import OperationStatus
 
@@ -59,7 +59,6 @@ class BaseBatchActionResult(ABC):
 @dataclass
 class BaseActionResultMeta:
     action_id: uuid.UUID
-    entity_id: Optional[str]
     status: OperationStatus
     description: str
     started_at: datetime
@@ -72,5 +71,6 @@ TActionResult = TypeVar("TActionResult", bound=BaseActionResult)
 
 
 @dataclass
-class ProcessResult:
+class ProcessResult(Generic[TActionResult]):
     meta: BaseActionResultMeta
+    result: Optional[TActionResult]

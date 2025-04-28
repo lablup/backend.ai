@@ -34,7 +34,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -127,9 +126,6 @@ __all__ = (
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
     "name": ("name", None),
-    "namespace": ("image", None),
-    "tag": ("tag", None),
-    "status": (EnumFieldItem("status", ImageStatus), None),
     "project": ("project", None),
     "image": ("image", None),
     "created_at": ("created_at", dtparse),
@@ -137,7 +133,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "registry_id": ("registry_id", None),
     "architecture": ("architecture", None),
     "is_local": ("is_local", None),
-    "type": (EnumFieldItem("type", ImageType), None),
+    "type": ("session_type", ImageType),
     "accelerators": ("accelerators", None),
 }
 

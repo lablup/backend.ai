@@ -1,7 +1,6 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
-import logging
 import time
 import uuid
 from collections.abc import Mapping, Sequence
@@ -14,7 +13,6 @@ from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
-from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
     AuditLogNode,
@@ -273,8 +271,6 @@ from .vfolder import (
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
 )
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -3124,7 +3120,6 @@ class GQLExceptionMiddleware:
         try:
             res = next(root, info, **args)
         except Exception as e:
-            log.exception("GraphQL exception: {}", e)
             raise GraphQLError(
                 message=str(e),
                 # TODO: Add extensions (error_code) after BackendError refactoring

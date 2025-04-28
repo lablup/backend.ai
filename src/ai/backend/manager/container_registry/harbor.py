@@ -113,11 +113,9 @@ class HarborRegistry_v1(BaseContainerRegistry):
 
                     # we should favor `config` instead of `container_config` since `config` can contain additional datas
                     # set when commiting image via `--change` flag
-                    if _config_labels := (data.get("config") or {}).get("Labels"):
+                    if _config_labels := data.get("config", {}).get("Labels"):
                         labels = _config_labels
-                    elif _container_config_labels := (data.get("container_config") or {}).get(
-                        "Labels"
-                    ):
+                    elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                         labels = _container_config_labels
 
                     if not labels:
@@ -378,9 +376,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> None:
         rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers") or {}
-        rqst_args["headers"].update({
-            "Accept": ", ".join([self.MEDIA_TYPE_OCI_INDEX, self.MEDIA_TYPE_OCI_MANIFEST])
-        })
+        rqst_args["headers"].update({"Accept": self.MEDIA_TYPE_OCI_INDEX})
 
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
@@ -442,9 +438,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 config_data = await read_json(resp)
 
         labels = {}
-        if _config_labels := (config_data.get("config") or {}).get("Labels"):
+        if _config_labels := config_data.get("config", {}).get("Labels"):
             labels = _config_labels
-        elif _container_config_labels := (config_data.get("container_config") or {}).get("Labels"):
+        elif _container_config_labels := config_data.get("container_config", {}).get("Labels"):
             labels = _container_config_labels
 
         if not labels:
@@ -571,9 +567,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 resp.raise_for_status()
                 data = await read_json(resp)
             labels = {}
-            if _config_labels := (data.get("config") or {}).get("Labels"):
+            if _config_labels := data.get("config", {}).get("Labels"):
                 labels = _config_labels
-            elif _container_config_labels := (data.get("container_config") or {}).get("Labels"):
+            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
             if not labels:
@@ -624,9 +620,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 resp.raise_for_status()
                 data = await read_json(resp)
             labels = {}
-            if _config_labels := (data.get("config") or {}).get("Labels"):
+            if _config_labels := data.get("config", {}).get("Labels"):
                 labels = _config_labels
-            elif _container_config_labels := (data.get("container_config") or {}).get("Labels"):
+            elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
             if not labels:

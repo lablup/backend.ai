@@ -11,6 +11,7 @@ from ai.backend.manager.api.auth import _extract_auth_params, check_date
 from ai.backend.manager.api.exceptions import InvalidAuthParameters
 from ai.backend.manager.server import (
     database_ctx,
+    event_dispatcher_ctx,
     hook_plugin_ctx,
     monitoring_ctx,
     redis_ctx,
@@ -90,15 +91,13 @@ def test_check_date():
 
 
 @pytest.mark.asyncio
-async def test_authorize(
-    etcd_fixture, event_dispatcher_test_ctx, database_fixture, create_app_and_client, get_headers
-):
+async def test_authorize(etcd_fixture, database_fixture, create_app_and_client, get_headers):
     # The auth module requires config_server and database to be set up.
     app, client = await create_app_and_client(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_test_ctx,
+            event_dispatcher_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,

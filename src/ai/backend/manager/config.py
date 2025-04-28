@@ -550,7 +550,7 @@ volume_config_iv = t.Dict({
     t.Key("default_host"): t.String,
     t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     t.Key("proxies"): t.Mapping(
-        t.String,
+        tx.Slug,
         t.Dict({
             t.Key("client_api"): t.String,
             t.Key("manager_api"): t.String,

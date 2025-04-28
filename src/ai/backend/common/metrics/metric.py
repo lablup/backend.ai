@@ -184,7 +184,7 @@ class EventMetricObserver:
         exception: BaseException,
     ) -> None:
         exception_name = exception.__class__.__name__
-        self._event_failure_count.labels(event_type=event_type, exception=exception_name).inc()
+        self._event_failure_count.labels(event_type=event_type, exeception=exception_name).inc()
         self._event_count.labels(event_type=event_type).inc()
         self._event_processing_time_sec.labels(event_type=event_type, status="failure").observe(
             duration

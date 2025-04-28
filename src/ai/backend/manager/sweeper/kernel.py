@@ -14,13 +14,7 @@ from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
-from ..models import (
-    DEAD_KERNEL_STATUSES,
-    DEAD_SESSION_STATUSES,
-    KernelRow,
-    KernelStatus,
-    SessionRow,
-)
+from ..models import DEAD_KERNEL_STATUSES, DEAD_SESSION_STATUSES, KernelRow, SessionRow
 from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -32,7 +26,7 @@ class KernelSweeper(AbstractSweeper):
         query = (
             sa.select(KernelRow)
             .join(SessionRow, KernelRow.session_id == SessionRow.id)
-            .where(KernelRow.status.not_in({*DEAD_KERNEL_STATUSES, KernelStatus.ERROR}))
+            .where(KernelRow.status.not_in(DEAD_KERNEL_STATUSES))
             .where(SessionRow.status.in_(DEAD_SESSION_STATUSES))
             .options(
                 noload("*"),

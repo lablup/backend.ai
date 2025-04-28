@@ -65,14 +65,6 @@ class Container:
     ports: Sequence[Port]
     backend_obj: Any  # used to keep the backend-specific data
 
-    @property
-    def human_readable_id(self) -> str:
-        """
-        Returns a human-readable version of the container ID.
-        This is useful for logging and debugging purposes.
-        """
-        return str(self.id)[:12]
-
 
 class KernelLifecycleStatus(enum.StrEnum):
     """
@@ -117,22 +109,6 @@ class ContainerLifecycleEvent:
             f"c:{cid}, "
             f"reason:{self.reason!r})"
         )
-
-    def set_done_future_result(self, result: Any):
-        if self.done_future is not None:
-            try:
-                self.done_future.set_result(result)
-            except asyncio.InvalidStateError:
-                # The future is already done, ignore the error
-                pass
-
-    def set_done_future_exception(self, exception: Exception):
-        if self.done_future is not None:
-            try:
-                self.done_future.set_exception(exception)
-            except asyncio.InvalidStateError:
-                # The future is already done, ignore the error
-                pass
 
 
 @dataclass

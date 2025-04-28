@@ -2,11 +2,17 @@ import asyncio
 import logging
 import secrets
 import uuid
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    Self,
+    Sequence,
+    Tuple,
+)
 
 import aiohttp
 import aiohttp_cors
@@ -56,7 +62,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageIdentifier
-from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
@@ -303,7 +308,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         default={},
     )
 
-    environ: Optional[dict[str, str]] = Field(
+    environ: dict[str, str] | None = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
     )
@@ -531,12 +536,6 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     validation_result = await _validate(request, params)
 
     async with root_ctx.db.begin_readonly_session() as session:
-        model_vfolder_row = await VFolderRow.get(session, validation_result.model_id)
-        if model_vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
-            raise InvalidAPIParameters(
-                "Cannot create model service with the project type's vfolder"
-            )
-
         image_row = await ImageRow.resolve(
             session,
             [
@@ -997,7 +996,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
     )
     async with root_ctx.db.begin_readonly_session() as db_sess:
         try:
-            route = await RoutingRow.get(db_sess, route_id, load_endpoint=True, load_session=True)
+            route = await RoutingRow.get(db_sess, route_id, load_session=True)
         except NoResultFound:
             raise ObjectNotFound
         if route.endpoint != service_id:
@@ -1238,7 +1237,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> tuple[web.Application, Iterable[WebMiddleware]]:
+) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "services"
     app["api_versions"] = (4, 5)

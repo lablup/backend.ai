@@ -40,7 +40,6 @@ from ai.backend.manager.api.exceptions import (
     AppNotFound,
     GenericForbidden,
     InternalServerError,
-    KernelNotReady,
     QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
@@ -1258,12 +1257,7 @@ class SessionService:
         if sess_type in PRIVATE_SESSION_TYPES:
             public_host = sess.main_kernel.agent_row.public_host
             found_ports: dict[str, list[str]] = {}
-            service_ports = cast(Optional[list[dict[str, Any]]], sess.main_kernel.service_ports)
-            if service_ports is None:
-                raise KernelNotReady(
-                    f"Kernel of the session has no service ports yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
-                )
-            for sport in service_ports:
+            for sport in sess.main_kernel.service_ports:
                 if sport["name"] == "sshd":
                     found_ports["sshd"] = sport["host_ports"]
                 elif sport["name"] == "sftpd":

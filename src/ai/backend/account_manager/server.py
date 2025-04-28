@@ -6,7 +6,6 @@ import grp
 import logging
 import os
 import pwd
-import signal
 import ssl
 import sys
 import traceback
@@ -17,7 +16,6 @@ from logging import LoggerAdapter
 from pathlib import Path
 from typing import (
     Any,
-    AsyncGenerator,
     AsyncIterator,
     Final,
     Optional,
@@ -281,7 +279,7 @@ def build_internal_app() -> web.Application:
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Sequence[Any],
+    _args: list[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     internal_app = build_internal_app()
@@ -381,8 +379,8 @@ async def server_main(
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Sequence[Any],
-) -> AsyncGenerator[None, signal.Signals]:
+    _args: list[Any],
+) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: account-manager worker-{pidx}")
     log_endpoint = _args[1]
     logging_config = _args[0].logging

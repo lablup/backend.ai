@@ -5,6 +5,7 @@ import pytest
 import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.manager.server import (
     database_ctx,
+    event_dispatcher_ctx,
     hook_plugin_ctx,
     monitoring_ctx,
     redis_ctx,
@@ -16,14 +17,13 @@ from ai.backend.manager.server import (
 async def test_check_rlim_for_anonymous_query(
     etcd_fixture,
     database_fixture,
-    event_dispatcher_test_ctx,
     create_app_and_client,
 ):
     app, client = await create_app_and_client(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_test_ctx,
+            event_dispatcher_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -41,7 +41,6 @@ async def test_check_rlim_for_anonymous_query(
 async def test_check_rlim_for_authorized_query(
     etcd_fixture,
     database_fixture,
-    event_dispatcher_test_ctx,
     create_app_and_client,
     get_headers,
 ):
@@ -49,7 +48,7 @@ async def test_check_rlim_for_authorized_query(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_test_ctx,
+            event_dispatcher_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,

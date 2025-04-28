@@ -150,28 +150,10 @@ __all__ = (
     "SchedulerDispatcher",
 )
 
-# Memoization cache for scheduler and agent selector classes
-_scheduler_class_cache: dict[str, type[AbstractScheduler]] = {}
-_agent_selector_class_cache: dict[str, type[AbstractAgentSelector]] = {}
-
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
 _log_args: ContextVar[tuple[Any, ...]] = ContextVar("_log_args")
-
-
-def _load_scheduler_class(name: str) -> type[AbstractScheduler]:
-    """Load and memoize scheduler class by name."""
-    if name not in _scheduler_class_cache:
-        entry_prefix = "backendai_scheduler_v10"
-        for entrypoint in scan_entrypoints(entry_prefix):
-            if entrypoint.name == name:
-                log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module)
-                scheduler_cls = entrypoint.load()
-                _scheduler_class_cache[name] = scheduler_cls
-                return scheduler_cls
-        raise ImportError("Cannot load the scheduler plugin", name)
-    return _scheduler_class_cache[name]
 
 
 def load_scheduler(
@@ -179,22 +161,13 @@ def load_scheduler(
     sgroup_opts: ScalingGroupOpts,
     scheduler_config: Mapping[str, Any],
 ) -> AbstractScheduler:
-    scheduler_cls = _load_scheduler_class(name)
-    return scheduler_cls(sgroup_opts, scheduler_config)
-
-
-def _load_agent_selector_class(name: str) -> type[AbstractAgentSelector]:
-    """Load and memoize agent selector class by name."""
-    if name not in _agent_selector_class_cache:
-        entry_prefix = "backendai_agentselector_v10"
-        for entrypoint in scan_entrypoints(entry_prefix):
-            if entrypoint.name == name:
-                log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
-                selector_cls = entrypoint.load()
-                _agent_selector_class_cache[name] = selector_cls
-                return selector_cls
-        raise ImportError("Cannot load the agent-selector plugin", name)
-    return _agent_selector_class_cache[name]
+    entry_prefix = "backendai_scheduler_v10"
+    for entrypoint in scan_entrypoints(entry_prefix):
+        if entrypoint.name == name:
+            log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module)
+            scheduler_cls = entrypoint.load()
+            return scheduler_cls(sgroup_opts, scheduler_config)
+    raise ImportError("Cannot load the scheduler plugin", name)
 
 
 def load_agent_selector(
@@ -217,8 +190,13 @@ def load_agent_selector(
             state_store=state_store,
         )
 
-    selector_cls = _load_agent_selector_class(name)
-    return create_agent_selector(selector_cls)
+    entry_prefix = "backendai_agentselector_v10"
+    for entrypoint in scan_entrypoints(entry_prefix):
+        if entrypoint.name == name:
+            log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
+            selector_cls = entrypoint.load()
+            return create_agent_selector(selector_cls)
+    raise ImportError("Cannot load the agent-selector plugin", name)
 
 
 async def get_kernel_count_per_agent_at_endpoint(

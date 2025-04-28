@@ -9,7 +9,6 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -81,11 +80,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import (
-    build_root_app,
-    event_dispatcher_ctx,
-    event_dispatcher_start_ctx,
-)
+from ai.backend.manager.server import build_root_app
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -1042,14 +1037,3 @@ async def session_info(database_engine):
         )
         await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
         await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))
-
-
-@pytest.fixture
-def event_dispatcher_test_ctx():
-    @actxmgr
-    async def test_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-        async with event_dispatcher_ctx(root_ctx):
-            async with event_dispatcher_start_ctx(root_ctx):
-                yield
-
-    return test_ctx

@@ -123,7 +123,6 @@ class RedisStorage(AbstractStorage):
                 # response.headers.set('X-BackendAI-SessionID', "")
             else:
                 key = str(key)
-                response._headers["X-BackendAI-SessionID"] = key
                 self.save_cookie(
                     response=response,
                     cookie_data=key,

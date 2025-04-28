@@ -63,7 +63,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ..api.exceptions import (
     InvalidAPIParameters,
     ObjectNotFound,
-    VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
@@ -1455,8 +1454,6 @@ async def initiate_vfolder_deletion(
         except (VFolderOperationFailed, InvalidAPIParameters) as e:
             if e.status == 410:
                 already_deleted.append(vfolder_info)
-        except VFolderGone:
-            already_deleted.append(vfolder_info)
     if already_deleted:
         vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
 
@@ -2336,7 +2333,11 @@ WhereClauseType: TypeAlias = (
 OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     perm for perm in VFolderRBACPermission
 ])
-ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    VFolderRBACPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.UPDATE_ATTRIBUTE,
+    VFolderRBACPermission.DELETE_VFOLDER,
+])
 MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,

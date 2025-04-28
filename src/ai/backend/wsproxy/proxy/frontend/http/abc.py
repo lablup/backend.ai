@@ -109,7 +109,6 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
                     "error.jinja2",
                     request,
                     ex.body_dict,
-                    status=ex.status_code,
                 )
         return resp
 

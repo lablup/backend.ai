@@ -81,7 +81,6 @@ from ai.backend.common.events import (
     ModelServiceStatusEvent,
     RouteCreatedEvent,
     SessionCancelledEvent,
-    SessionCheckingPrecondEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
     SessionPreparingEvent,
@@ -200,6 +199,7 @@ from .models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
     is_db_retry_error,
+    reenter_txn,
     reenter_txn_session,
     sql_json_merge,
 )
@@ -366,7 +366,6 @@ class AgentRegistry:
             name="api.session.sterm",
         )
         evd.consume(SessionEnqueuedEvent, self, invoke_session_callback)
-        evd.consume(SessionCheckingPrecondEvent, self, invoke_session_callback)
         evd.consume(SessionScheduledEvent, self, invoke_session_callback)
         evd.consume(SessionPreparingEvent, self, invoke_session_callback)
         evd.consume(SessionSuccessEvent, self, handle_batch_result)
@@ -564,8 +563,7 @@ class AgentRegistry:
                 "sessionId": str(sess.id),
                 "sessionName": str(sess.name),
                 "status": sess.status.name,
-                "service_ports": sess.main_kernel.service_ports,  # deprecated, left for compatibility.
-                "servicePorts": sess.main_kernel.service_ports,
+                "service_ports": sess.main_kernel.service_ports,
                 "created": False,
             }
         except SessionNotFound:
@@ -1666,8 +1664,7 @@ class AgentRegistry:
         log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
 
         if scheduled_session.network_type == NetworkType.VOLATILE:
-
-            async def _update_network_id(db_sess: AsyncSession) -> None:
+            async with self.db.begin_session() as db_sess:
                 query = (
                     sa.update(SessionRow)
                     .values({
@@ -1676,9 +1673,6 @@ class AgentRegistry:
                     .where(SessionRow.id == scheduled_session.id)
                 )
                 await db_sess.execute(query)
-
-            async with self.db.connect() as db_conn:
-                await execute_with_txn_retry(_update_network_id, self.db.begin_session, db_conn)
 
         keyfunc = lambda binding: binding.kernel.cluster_role
         replicas = {
@@ -3000,6 +2994,25 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
+    async def kill_all_sessions_in_agent(self, agent_id, agent_addr):
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            coro = rpc.call.clean_all_kernels("manager-freeze-force-kill")
+            return await coro
+
+    async def kill_all_sessions(self, conn=None):
+        async with reenter_txn(self.db, conn, {"postgresql_readonly": True}) as conn:
+            query = sa.select([agents.c.id, agents.c.addr]).where(
+                agents.c.status == AgentStatus.ALIVE
+            )
+            result = await conn.execute(query)
+            rows = result.fetchall()
+        tasks = []
+        for row in rows:
+            tasks.append(
+                self.kill_all_sessions_in_agent(row["id"], row["addr"]),
+            )
+        await asyncio.gather(*tasks, return_exceptions=True)
+
     async def handle_heartbeat(self, agent_id, agent_info):
         now = datetime.now(tzutc())
         slot_key_and_units = {
@@ -3993,7 +4006,6 @@ async def invoke_session_callback(
     source: AgentId,
     event: (
         SessionEnqueuedEvent
-        | SessionCheckingPrecondEvent
         | SessionScheduledEvent
         | SessionPreparingEvent
         | SessionStartedEvent
@@ -4272,7 +4284,7 @@ async def handle_route_creation(
                 ],
             )
 
-            environ = dict(endpoint.environ or {})
+            environ = {**endpoint.environ}
             if "BACKEND_MODEL_NAME" not in environ:
                 environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
 

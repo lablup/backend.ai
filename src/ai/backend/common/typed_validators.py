@@ -1,6 +1,6 @@
 import datetime
 import re
-from typing import Annotated, Any, Final, TypeAlias
+from typing import Annotated, Any, TypeAlias
 
 from dateutil.relativedelta import relativedelta
 from pydantic import (
@@ -150,10 +150,8 @@ TimeDuration = Annotated[
 NaiveTimeDuration = Annotated[TVariousDelta, _NaiveTimeDurationPydanticAnnotation]
 """Time duration validator which also accepts negative value"""
 
-SESSION_NAME_MAX_LENGTH: Final[int] = 24
-SESSION_NAME_MATCHER = re.compile(
-    r"^(?=.{4,%d}$)\w[\w.-]*\w$" % (SESSION_NAME_MAX_LENGTH,), re.ASCII
-)
+
+SESSION_NAME_MATCHER = re.compile(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII)
 
 
 def session_name_validator(s: str) -> str:

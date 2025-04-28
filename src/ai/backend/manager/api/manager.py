@@ -200,9 +200,7 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
 
     if force_kill:
-        # It supposed to kill all running sessions and kernels
-        # but there is no RPC to do that.
-        pass
+        await root_ctx.registry.kill_all_sessions()
     await root_ctx.shared_config.update_manager_status(status)
 
     return web.Response(status=HTTPStatus.NO_CONTENT)

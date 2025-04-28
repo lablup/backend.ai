@@ -43,7 +43,6 @@ class UserModifier(PartialModifier):
         self.totp_activated.update_dict(to_update, "totp_activated")
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.sudo_session_enabled.update_dict(to_update, "sudo_session_enabled")
-        self.main_access_key.update_dict(to_update, "main_access_key")
         self.container_uid.update_dict(to_update, "container_uid")
         self.container_main_gid.update_dict(to_update, "container_main_gid")
         self.container_gids.update_dict(to_update, "container_gids")

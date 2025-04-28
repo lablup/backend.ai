@@ -8,7 +8,6 @@ import importlib.resources
 import logging
 import os
 import pwd
-import signal
 import ssl
 import sys
 import traceback
@@ -23,9 +22,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
-    AsyncGenerator,
     AsyncIterator,
     Final,
+    List,
     Optional,
     cast,
 )
@@ -72,10 +71,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
@@ -284,8 +283,6 @@ async def exception_middleware(
     root_ctx: RootContext = request.app["_root.context"]
     error_monitor = root_ctx.error_monitor
     stats_monitor = root_ctx.stats_monitor
-    method = request.method
-    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
@@ -298,17 +295,8 @@ async def exception_middleware(
         else:
             raise InvalidAPIParameters()
     except BackendError as ex:
-        if ex.status_code // 100 == 4:
-            log.warning(
-                "client error raised inside handlers: ({} {}): {}", method, endpoint, repr(ex)
-            )
-        elif ex.status_code // 100 == 5:
-            log.exception(
-                "Internal server error raised inside handlers: ({} {}): {}",
-                method,
-                endpoint,
-                repr(ex),
-            )
+        if ex.status_code == 500:
+            log.warning("Internal server error raised inside handlers")
         await error_monitor.capture_exception()
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
         await stats_monitor.report_metric(
@@ -320,12 +308,6 @@ async def exception_middleware(
         await stats_monitor.report_metric(
             INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
         )
-        if ex.status_code // 100 == 4:
-            log.warning("client error raised inside handlers: ({} {}): {}", method, endpoint, ex)
-        elif ex.status_code // 100 == 5:
-            log.exception(
-                "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
-            )
         if ex.status_code == 404:
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
@@ -333,6 +315,7 @@ async def exception_middleware(
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
             )
+        log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
@@ -341,9 +324,7 @@ async def exception_middleware(
         raise e
     except Exception as e:
         await error_monitor.capture_exception()
-        log.exception(
-            "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
-        )
+        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.local_config["debug"]["enabled"]:
             raise InternalServerError(traceback.format_exc())
         else:
@@ -478,6 +459,11 @@ def _make_registered_reporters(
         trigger_policy = SMTPTriggerPolicy[smtp_conf["trigger-policy"]]
         reporters[smtp_conf["name"]] = SMTPReporter(smtp_args, trigger_policy)
 
+    audit_log_configs = root_ctx.local_config["reporter"]["audit-log"]
+    for audit_log_conf in audit_log_configs:
+        reporters[audit_log_conf["name"]] = AuditLogReporter(
+            root_ctx.db,
+        )
     return reporters
 
 
@@ -489,14 +475,12 @@ def _make_action_reporters(
     action_monitor_configs = root_ctx.local_config["reporter"]["action-monitors"]
     for action_monitor_conf in action_monitor_configs:
         reporter_name: str = action_monitor_conf["reporter"]
-        try:
-            reporter = reporters[reporter_name]
-        except KeyError:
-            log.warning(f'Invalid Reporter: "{reporter_name}"')
-            continue
-
-        for action_type in action_monitor_conf["subscribed-actions"]:
-            action_monitors.setdefault(action_type, []).append(reporter)
+        reporter = reporters[reporter_name]
+        action_types: list[str] = action_monitor_conf["subscribed-actions"]
+        for action_type in action_types:
+            monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
+            monitors.append(reporter)
+            action_monitors[action_type] = monitors
 
     return action_monitors
 
@@ -512,7 +496,6 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
-    audit_log_monitor = AuditLogMonitor(root_ctx.db)
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -526,7 +509,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
             )
         ),
-        [reporter_monitor, prometheus_monitor, audit_log_monitor],
+        [reporter_monitor, prometheus_monitor],
     )
     yield
 
@@ -554,12 +537,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
     await root_ctx.event_dispatcher.close()
-
-
-@actxmgr
-async def event_dispatcher_start_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    await root_ctx.event_dispatcher.start()
-    yield
 
 
 def _make_message_queue(
@@ -930,7 +907,6 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
-            event_dispatcher_start_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
@@ -1003,7 +979,7 @@ def build_public_app(
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Sequence[Any],
+    _args: List[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     internal_app = build_internal_app()
@@ -1114,12 +1090,12 @@ async def server_main(
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    tuple_args: Sequence[Any],
-) -> AsyncGenerator[None, signal.Signals]:
+    _args: List[Any],
+) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
-    log_endpoint = tuple_args[1]
+    log_endpoint = _args[1]
     logger = Logger(
-        tuple_args[0]["logging"],
+        _args[0]["logging"],
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -1129,7 +1105,7 @@ async def server_main_logwrapper(
     )
     try:
         with logger:
-            async with server_main(loop, pidx, tuple_args):
+            async with server_main(loop, pidx, _args):
                 yield
     except Exception:
         traceback.print_exc()
