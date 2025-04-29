@@ -10,8 +10,8 @@ from aiohttp import web
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.openapi import generate_openapi
 
+from ..errors.exceptions import GenericForbidden
 from .auth import auth_required
-from .exceptions import GenericForbidden
 from .types import CORSOptions, Iterable, WebMiddleware
 
 if TYPE_CHECKING:

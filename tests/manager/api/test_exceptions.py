@@ -3,7 +3,7 @@ import pickle
 
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.utils import odict
-from ai.backend.manager.api.exceptions import BackendAgentError, BackendError
+from ai.backend.manager.errors.exceptions import BackendAgentError, BackendError
 
 
 def test_backend_error_obj():

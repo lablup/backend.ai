@@ -5,8 +5,8 @@ import pytest
 from aiohttp import web
 
 from ai.backend.manager.api import vfolder
-from ai.backend.manager.api.exceptions import TooManyVFoldersFound, VFolderNotFound
 from ai.backend.manager.api.vfolder import with_vfolder_rows_resolved, with_vfolder_status_checked
+from ai.backend.manager.errors.exceptions import TooManyVFoldersFound, VFolderNotFound
 from ai.backend.manager.models.vfolder import (
     VFolderPermissionSetAlias,
     VFolderRow,

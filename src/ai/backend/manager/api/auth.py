@@ -26,6 +26,18 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors.exceptions import (
+    AuthorizationFailed,
+    GenericBadRequest,
+    GenericForbidden,
+    InternalServerError,
+    InvalidAPIParameters,
+    InvalidAuthParameters,
+    ObjectNotFound,
+    PasswordExpired,
+    RejectedByHook,
+    UserNotFound,
+)
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
@@ -40,18 +52,6 @@ from ..models.user import (
     compare_to_hashed_password,
 )
 from ..models.utils import execute_with_retry
-from .exceptions import (
-    AuthorizationFailed,
-    GenericBadRequest,
-    GenericForbidden,
-    InternalServerError,
-    InvalidAPIParameters,
-    InvalidAuthParameters,
-    ObjectNotFound,
-    PasswordExpired,
-    RejectedByHook,
-    UserNotFound,
-)
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
 

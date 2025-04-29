@@ -1,2 +1,0 @@
-class BaseActionException(Exception):
-    pass

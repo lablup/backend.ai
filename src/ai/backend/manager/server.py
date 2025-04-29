@@ -90,14 +90,6 @@ from . import __version__
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
-from .api.exceptions import (
-    BackendError,
-    GenericBadRequest,
-    InternalServerError,
-    InvalidAPIParameters,
-    MethodNotAllowed,
-    URLNotFound,
-)
 from .api.types import (
     AppCreator,
     CleanupContext,
@@ -105,6 +97,14 @@ from .api.types import (
 )
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
+from .errors.exceptions import (
+    BackendError,
+    GenericBadRequest,
+    InternalServerError,
+    InvalidAPIParameters,
+    MethodNotAllowed,
+    URLNotFound,
+)
 from .exceptions import InvalidArgument
 from .sweeper.kernel import stale_kernel_sweeper_ctx
 from .sweeper.session import stale_session_sweeper_ctx

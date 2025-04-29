@@ -33,7 +33,7 @@ from ..actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
-from ..exceptions import InvalidParameter
+from ..exceptions import VFolderInvalidParameter
 from ..types import FileInfo
 
 
@@ -147,7 +147,7 @@ class VFolderFileService:
                 extra_vf_conds=(VFolderRow.id == action.vfolder_uuid),
             )
             if not vfolder_dicts:
-                raise InvalidParameter("The specified vfolder is not accessible.")
+                raise VFolderInvalidParameter("The specified vfolder is not accessible.")
             vfolder_row = vfolder_dicts[0]
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_row["host"], is_unmanaged(vfolder_row["unmanaged_path"])
@@ -227,7 +227,7 @@ class VFolderFileService:
                 extra_vf_conds=(VFolderRow.id == action.vfolder_uuid),
             )
             if not vfolder_dicts:
-                raise InvalidParameter("The specified vfolder is not accessible.")
+                raise VFolderInvalidParameter("The specified vfolder is not accessible.")
             vfolder_row = vfolder_dicts[0]
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_row["host"], is_unmanaged(vfolder_row["unmanaged_path"])
@@ -248,7 +248,7 @@ class VFolderFileService:
 
     async def mkdir(self, action: MkdirAction) -> MkdirActionResult:
         if isinstance(action.path, list) and len(action.path) > 50:
-            raise InvalidParameter("Too many directories specified.")
+            raise VFolderInvalidParameter("Too many directories specified.")
         async with self._db.begin_readonly_session() as db_session:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
             vfolder_row = await db_session.scalar(query_vfolder)

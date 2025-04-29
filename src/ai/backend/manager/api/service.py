@@ -78,6 +78,7 @@ from ai.backend.manager.services.model_serving.types import (
 )
 
 from ..defs import DEFAULT_IMAGE_ARCH
+from ..errors.exceptions import InvalidAPIParameters, VFolderNotFound
 from ..models import (
     ModelServicePredicateChecker,
     UserRole,
@@ -87,7 +88,6 @@ from ..models import (
 )
 from ..types import MountOptionModel, UserScope
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware

@@ -7,7 +7,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 
-from ..api.exceptions import GenericBadRequest
+from ..errors.exceptions import GenericBadRequest
 
 if TYPE_CHECKING:
     from ..models.session import SessionRow

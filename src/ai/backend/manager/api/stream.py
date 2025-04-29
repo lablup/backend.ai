@@ -51,9 +51,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..models import KernelLoadingStrategy, KernelRow, SessionRow
-from .auth import auth_required
-from .exceptions import (
+from ..errors.exceptions import (
     AppNotFound,
     BackendError,
     InternalServerError,
@@ -61,6 +59,8 @@ from .exceptions import (
     SessionNotFound,
     TooManySessionsMatched,
 )
+from ..models import KernelLoadingStrategy, KernelRow, SessionRow
+from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import call_non_bursty, check_api_params

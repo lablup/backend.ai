@@ -7,11 +7,11 @@ from typing import TypedDict, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import GenericBadRequest
 from ai.backend.manager.client.container_registry.harbor import (
     AbstractPerProjectRegistryQuotaClient,
     PerProjectHarborQuotaClient,
 )
+from ai.backend.manager.errors.exceptions import GenericBadRequest
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.service.container_registry.base import (
     ContainerRegistryRowInfo,

@@ -44,6 +44,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     RedisConnectionInfo,
     VFolderHostPermission,
@@ -55,6 +56,19 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.models.storage import StorageSessionManager
 
+from ..errors.exceptions import (
+    BackendAgentError,
+    InsufficientPrivilege,
+    InternalServerError,
+    InvalidAPIParameters,
+    ModelServiceDependencyNotCleared,
+    ObjectNotFound,
+    TooManyVFoldersFound,
+    VFolderFilterStatusFailed,
+    VFolderFilterStatusNotAvailable,
+    VFolderNotFound,
+    VFolderOperationFailed,
+)
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
@@ -122,28 +136,14 @@ from ..services.vfolder.actions.invite import (
     UpdateInvitationAction,
 )
 from ..services.vfolder.exceptions import (
-    InvalidParameter,
-    VFolderAlreadyExists,
-    VFolderServiceException,
+    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
 )
 from ..services.vfolder.exceptions import (
-    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
+    VFolderAlreadyExists,
+    VFolderInvalidParameter,
 )
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
-from .exceptions import (
-    BackendAgentError,
-    InsufficientPrivilege,
-    InternalServerError,
-    InvalidAPIParameters,
-    ModelServiceDependencyNotCleared,
-    ObjectNotFound,
-    TooManyVFoldersFound,
-    VFolderFilterStatusFailed,
-    VFolderFilterStatusNotAvailable,
-    VFolderNotFound,
-    VFolderOperationFailed,
-)
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .utils import (
     LegacyBaseRequestModel,
@@ -444,9 +444,9 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 creator_email=request["user"]["email"],
             )
         )
-    except (InvalidParameter, VFolderAlreadyExists) as e:
+    except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
         raise InvalidAPIParameters(str(e))
-    except VFolderServiceException as e:
+    except BackendAIError as e:
         raise InternalServerError(str(e))
     resp = {
         "id": result.id.hex,
@@ -1733,7 +1733,7 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
                 vfolder_uuid=folder_id,
             )
         )
-    except InvalidParameter as e:
+    except VFolderInvalidParameter as e:
         raise InvalidAPIParameters(str(e))
     except VFolderMountedOnModelService:
         raise ModelServiceDependencyNotCleared()
@@ -1846,7 +1846,7 @@ async def delete_from_trash_bin(
                 vfolder_uuid=folder_id,
             )
         )
-    except InvalidParameter as e:
+    except VFolderInvalidParameter as e:
         raise InvalidAPIParameters(str(e))
     except TooManyVFoldersFound:
         raise InternalServerError("Too many vfolders found")

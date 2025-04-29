@@ -41,7 +41,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
+from ..errors.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
 from .base import Item, PaginatedList
 from .rbac import (

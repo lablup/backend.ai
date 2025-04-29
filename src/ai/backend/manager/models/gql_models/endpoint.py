@@ -58,7 +58,7 @@ from ai.backend.manager.services.model_serving.types import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...api.exceptions import (
+from ...errors.exceptions import (
     EndpointNotFound,
     EndpointTokenNotFound,
     GenericForbidden,
