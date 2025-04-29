@@ -83,8 +83,6 @@ from ai.backend.common.events import (
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
-    DanglingContainerDetected,
-    DanglingKernelDetected,
     DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoVolumeMountEvent,
@@ -715,7 +713,6 @@ class AbstractAgent(
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
-        self._probe_runner = self._get_probe_runner()
 
     async def __ainit__(self) -> None:
         """
@@ -838,6 +835,7 @@ class AbstractAgent(
         self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
+        self._probe_runner = self._get_probe_runner()
         await self._probe_runner.run()
 
         # Notify the gateway.
@@ -1419,44 +1417,15 @@ class AbstractAgent(
                             kernel_id,
                         )
 
-    async def _scan_containers(self) -> None:
-        """
-        Scan the kernel containers and check if they are in the kernel registry.
-        Produce `DanglingContainerDetected` events if there are any.
-        """
-        log.debug("scan_containers() triggered")
-
-        try:
-            async with asyncio.timeout(20):
-                containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
-        except asyncio.TimeoutError:
-            log.warning("scan_containers() timeout, continuing")
-            return
-
-        for existing_kernel, container in containers:
-            if existing_kernel not in self.kernel_registry:
-                log.warning(
-                    "scan_containers() detected dangling container (k:{},c:{})",
-                    existing_kernel,
-                    container.id,
-                )
-                await self.produce_event(
-                    DanglingContainerDetected(container.id),
-                )
-
-        existing_kernel_ids = set([k for k, _ in containers])
-        for registered_kernel_id in self.kernel_registry:
-            if registered_kernel_id not in existing_kernel_ids:
-                log.warning(
-                    "scan_containers() detected dangling kernel (k:{})",
-                    registered_kernel_id,
-                )
-                await self.produce_event(
-                    DanglingKernelDetected(registered_kernel_id),
-                )
+    def get_kernel_registry(self) -> Mapping[KernelId, AbstractKernel]:
+        return self.kernel_registry
 
     def _get_probe_runner(self) -> ProbeRunner:
-        probe = AgentProbe(self._scan_containers)
+        probe = AgentProbe(
+            self.enumerate_containers,
+            self.get_kernel_registry,
+            self.event_producer,
+        )
         return ProbeRunner(11.0, [probe])
 
     async def sync_container_lifecycles(self, interval: float) -> None:

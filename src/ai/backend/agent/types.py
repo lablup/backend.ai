@@ -3,7 +3,7 @@ import enum
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
+from typing import Any, Awaitable, Callable, Mapping, Optional, Self, Sequence
 
 import attrs
 from aiohttp import web
@@ -54,6 +54,10 @@ class ContainerStatus(enum.StrEnum):
     EXITED = "exited"
     DEAD = "dead"
     REMOVING = "removing"
+
+    @classmethod
+    def all(cls) -> frozenset[Self]:
+        return frozenset(cls)
 
 
 @attrs.define(auto_attribs=True, slots=True)
