@@ -41,7 +41,7 @@ class KubernetesKernel(AbstractKernel):
         await self.scale(0)
 
     @override
-    def _get_probe_runner(self) -> ProbeRunner:
+    def _init_probe_runner_obj(self) -> ProbeRunner:
         return ProbeRunner.nop()
 
     async def create_code_runner(

@@ -291,11 +291,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
 
     @abstractmethod
-    def _get_probe_runner(self) -> ProbeRunner:
+    def _init_probe_runner_obj(self) -> ProbeRunner:
         raise NotImplementedError
 
     async def init_probe_runner(self) -> None:
-        self._probe_runner = self._get_probe_runner()
+        self._probe_runner = self._init_probe_runner_obj()
         await self._probe_runner.run()
 
     @abstractmethod

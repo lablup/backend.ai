@@ -30,7 +30,8 @@ class DummyKernel(AbstractKernel):
     async def close(self) -> None:
         pass
 
-    def _get_probe_runner(self) -> ProbeRunner:
+    @override
+    def _init_probe_runner_obj(self) -> ProbeRunner:
         return ProbeRunner.nop()
 
     async def create_code_runner(

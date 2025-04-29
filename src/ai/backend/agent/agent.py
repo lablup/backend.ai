@@ -835,7 +835,7 @@ class AbstractAgent(
         self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
-        self._probe_runner = self._get_probe_runner()
+        self._probe_runner = self._init_probe_runner_obj()
         await self._probe_runner.run()
 
         # Notify the gateway.
@@ -1420,7 +1420,7 @@ class AbstractAgent(
     def get_kernel_registry(self) -> Mapping[KernelId, AbstractKernel]:
         return self.kernel_registry
 
-    def _get_probe_runner(self) -> ProbeRunner:
+    def _init_probe_runner_obj(self) -> ProbeRunner:
         probe = AgentProbe(
             self.enumerate_containers,
             self.get_kernel_registry,

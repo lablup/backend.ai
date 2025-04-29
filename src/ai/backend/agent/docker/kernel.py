@@ -64,7 +64,7 @@ class DockerKernel(AbstractKernel):
         super().__setstate__(props)
 
     @override
-    def _get_probe_runner(self) -> ProbeRunner:
+    def _init_probe_runner_obj(self) -> ProbeRunner:
         probe = DockerKernelProbe(
             self.kernel_id,
             self.get_kernel_lifecycle_state,
