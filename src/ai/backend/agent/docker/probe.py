@@ -5,7 +5,7 @@ from typing import Optional, override
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
-from ..probe import BaseKernelProbe
+from ..probe import BaseKernelProbe, DanglingKernel
 from ..types import (
     Container,
     ContainerStatus,
@@ -13,10 +13,6 @@ from ..types import (
 )
 from ..utils import closing_async
 from .utils import container_from_docker_container
-
-
-class DanglingKernel(Exception):
-    pass
 
 
 class DockerKernelProbe(BaseKernelProbe):
