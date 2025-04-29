@@ -243,17 +243,17 @@ class HiRedisQueue(AbstractMessageQueue):
 
     async def _read_broadcast_messages_loop(self) -> None:
         log.debug("Reading broadcast messages from stream {}", self._stream_key)
-        last_msg_id = "$"
+        last_msg_id = b"$"
         while not self._closed:
             try:
                 last_msg_id = await self._read_broadcast_messages(last_msg_id)
             except hiredis.HiredisError as e:
                 await self._failover_consumer(e)
-                last_msg_id = "$"
+                last_msg_id = b"$"
             except Exception as e:
                 log.error("Error while reading broadcast messages: {}", e)
 
-    async def _read_broadcast_messages(self, last_msg_id: str) -> str:
+    async def _read_broadcast_messages(self, last_msg_id: bytes) -> bytes:
         async with RedisConnection(self._conf, db=self._db) as client:
             reply = await client.execute(
                 ["XREAD", "BLOCK", "1000", "STREAMS", self._stream_key, last_msg_id],
@@ -271,7 +271,7 @@ class HiRedisQueue(AbstractMessageQueue):
                         payload[key] = value
                     msg = MQMessage(msg_id, payload)
                     await self._subscribe_queue.put(msg)
-                    last_msg_id = str(msg_id)
+                    last_msg_id = msg_id
         return last_msg_id
 
     async def _failover_consumer(self, e: hiredis.HiredisError) -> None:
