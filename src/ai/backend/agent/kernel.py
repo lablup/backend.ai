@@ -222,7 +222,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
         self._event_producer = args.event_producer
-        self._probe_runner = self._get_probe_runner()
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -234,7 +233,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = await self.create_code_runner(
             event_producer, client_features=default_client_features, api_version=default_api_version
         )
-        await self._probe_runner.run()
+        await self.init_probe_runner()
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
@@ -294,6 +293,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     @abstractmethod
     def _get_probe_runner(self) -> ProbeRunner:
         raise NotImplementedError
+
+    async def init_probe_runner(self) -> None:
+        self._probe_runner = self._get_probe_runner()
+        await self._probe_runner.run()
 
     @abstractmethod
     async def create_code_runner(

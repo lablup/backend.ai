@@ -1799,6 +1799,7 @@ class AbstractAgent(
             if kernel_obj.runner is not None:
                 kernel_obj.runner.event_producer = self.event_producer
                 await kernel_obj.runner.__ainit__()
+            await kernel_obj.init_probe_runner()
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
