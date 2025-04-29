@@ -51,9 +51,20 @@ class BaseKernelProbe(ABC):
     async def _get_container_info(self) -> Optional[Container]:
         raise NotImplementedError
 
-    @abstractmethod
     def _compare_with_container(self, container: Optional[Container]) -> None:
-        raise NotImplementedError
+        kernel_state = self._kernel_state_getter()
+        match kernel_state:
+            case KernelLifecycleStatus.PREPARING:
+                if container is not None:
+                    # container exists but kernel is hanging in PREPARING state
+                    raise DanglingKernel
+            case KernelLifecycleStatus.RUNNING:
+                if container is None or container.status != ContainerStatus.RUNNING:
+                    raise DanglingKernel
+            case KernelLifecycleStatus.TERMINATING:
+                # There might be a delay in the container status change
+                # after the kernel is being terminated.
+                pass
 
     async def probe(self) -> None:
         try:
