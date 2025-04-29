@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.4 (2025-04-29)
+
+### Fixes
+* Fix invalid msg_id type in hiredis message queue ([#4309](https://github.com/lablup/backend.ai/issues/4309))
+
+
 ## 25.6.3 (2025-04-28)
 No significant changes.
 
