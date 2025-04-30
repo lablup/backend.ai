@@ -328,7 +328,7 @@ async def connect_database(
 
     username = local_config.db.user
     password = local_config.db.password
-    address = local_config.db.addr
+    address = local_config.db.addr.to_trafaret()
     dbname = local_config.db.name
     url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
 

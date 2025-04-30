@@ -76,6 +76,7 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
@@ -271,7 +272,7 @@ class SchedulerDispatcher(aobject):
 
     def __init__(
         self,
-        local_config: LocalConfig,
+        local_config: ManagerLocalConfig,
         shared_config: SharedConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
@@ -391,7 +392,7 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.local_config.manager.id
         redis_key = f"manager.{manager_id}.schedule"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -416,7 +417,7 @@ class SchedulerDispatcher(aobject):
             known_slot_types=known_slot_types,
         )
 
-        lock_lifetime = self.local_config["manager"]["session_schedule_lock_lifetime"]
+        lock_lifetime = self.local_config.manager.session_schedule_lock_lifetime
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
@@ -524,9 +525,9 @@ class SchedulerDispatcher(aobject):
             **dynamic_config,
         }
 
-        agent_selection_resource_priority = self.local_config["manager"][
-            "agent-selection-resource-priority"
-        ]
+        agent_selection_resource_priority = (
+            self.local_config.manager.agent_selection_resource_priority
+        )
 
         return load_agent_selector(
             agselector_name,
@@ -1295,7 +1296,7 @@ class SchedulerDispatcher(aobject):
         Let event handlers transit session and kernel status from
         `ImagePullStartedEvent` and `ImagePullFinishedEvent` events.
         """
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.local_config.manager.id
         redis_key = f"manager.{manager_id}.check_precondition"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1314,7 +1315,7 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        lock_lifetime = self.local_config["manager"]["session_check_precondition_lock_lifetime"]
+        lock_lifetime = self.local_config.manager.session_check_precondition_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
@@ -1390,7 +1391,7 @@ class SchedulerDispatcher(aobject):
 
         Session status transition: PREPARED -> CREATING
         """
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.local_config.manager.id
         redis_key = f"manager.{manager_id}.start"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1409,7 +1410,7 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
+        lock_lifetime = self.local_config.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
@@ -1639,7 +1640,7 @@ class SchedulerDispatcher(aobject):
     ) -> None:
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by invoking this method
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.local_config.manager.id
         redis_key = f"manager.{manager_id}.scale_services"
 
         def _pipeline(r: Redis) -> RedisPipeline:
