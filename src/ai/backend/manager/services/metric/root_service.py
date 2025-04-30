@@ -1,4 +1,4 @@
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config_legacy import SharedConfig
 
 from .container_metric import ContainerUtilizationMetricService
 

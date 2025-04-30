@@ -24,8 +24,8 @@ from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 
-from ..config import LocalConfig, SharedConfig
-from ..config import load as load_config
+from ..config_legacy import LocalConfig, SharedConfig
+from ..config_legacy import load as load_config
 
 
 class CLIContext:

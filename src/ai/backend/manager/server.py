@@ -95,8 +95,8 @@ from .api.types import (
     CleanupContext,
     WebRequestHandler,
 )
-from .config import LocalConfig, SharedConfig, volume_config_iv
-from .config import load as load_config
+from .config_legacy import LocalConfig, SharedConfig, volume_config_iv
+from .config_legacy import load as load_config
 from .errors.exceptions import (
     BackendError,
     GenericBadRequest,

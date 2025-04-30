@@ -209,8 +209,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from ..manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
 from .api import ManagerStatus
+from .defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
 from .errors.exceptions import ServerMisconfiguredError
 from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock

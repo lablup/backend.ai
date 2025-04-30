@@ -17,7 +17,7 @@ from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
-from ..config import session_hang_tolerance_iv
+from ..config_legacy import session_hang_tolerance_iv
 from ..models import SessionRow
 from ..models.session import SessionStatus
 from ..models.utils import ExtendedAsyncSAEngine

@@ -45,7 +45,7 @@ from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ..config import LocalConfig
+    from ..config_legacy import LocalConfig
 
 from ..defs import LockID
 from ..types import Sentinel

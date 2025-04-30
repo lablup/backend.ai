@@ -9,7 +9,7 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config_legacy import SharedConfig
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry

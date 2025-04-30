@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ai.backend.common.types import RedisConnectionInfo
 
     from ..agent_cache import AgentRPCCache
-    from ..config import LocalConfig, SharedConfig
+    from ..config_legacy import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine

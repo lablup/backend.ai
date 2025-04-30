@@ -67,7 +67,7 @@ from .utils import call_non_bursty, check_api_params
 from .wsproxy import TCPProxy
 
 if TYPE_CHECKING:
-    from ..config import SharedConfig
+    from ..config_legacy import SharedConfig
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

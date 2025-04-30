@@ -6,7 +6,7 @@ from ai.backend.common.events import EventDispatcher
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config_legacy import SharedConfig
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

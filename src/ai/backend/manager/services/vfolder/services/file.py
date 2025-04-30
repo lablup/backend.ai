@@ -8,7 +8,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
 )
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config_legacy import SharedConfig
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

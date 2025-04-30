@@ -33,7 +33,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config_legacy import SharedConfig
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,

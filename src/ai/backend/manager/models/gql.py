@@ -71,7 +71,7 @@ if TYPE_CHECKING:
     )
 
     from ..api.manager import ManagerStatus
-    from ..config import LocalConfig, SharedConfig
+    from ..config_legacy import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry

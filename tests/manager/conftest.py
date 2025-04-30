@@ -50,8 +50,8 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
-from ai.backend.manager.config import LocalConfig, SharedConfig
-from ai.backend.manager.config import load as load_config
+from ai.backend.manager.config_legacy import LocalConfig, SharedConfig
+from ai.backend.manager.config_legacy import load as load_config
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,

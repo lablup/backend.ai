@@ -141,7 +141,7 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from ..config import LocalConfig, SharedConfig
+    from ..config_legacy import LocalConfig, SharedConfig
     from ..registry import AgentRegistry
 
 __all__ = (

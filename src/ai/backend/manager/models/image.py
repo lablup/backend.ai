@@ -81,7 +81,7 @@ from .utils import ExtendedAsyncSAEngine
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
 
-    from ..config import SharedConfig
+    from ..config_legacy import SharedConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

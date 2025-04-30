@@ -76,7 +76,7 @@ from .user import UserRow
 from .vfolder import VFolderRow, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
-    from ai.backend.manager.config import SharedConfig
+    from ai.backend.manager.config_legacy import SharedConfig
     from ai.backend.manager.services.model_serving.types import EndpointTokenData
 
     from .gql import GraphQueryContext

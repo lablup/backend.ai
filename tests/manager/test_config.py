@@ -3,7 +3,7 @@ from pprint import pprint
 import pytest
 import yarl
 
-from ai.backend.manager.config import (
+from ai.backend.manager.config_legacy import (
     SharedConfig,
 )
 
