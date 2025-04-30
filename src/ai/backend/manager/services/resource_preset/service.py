@@ -51,6 +51,8 @@ from ai.backend.manager.services.resource_preset.actions.modify_preset import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+_INTRINSIC_RESOURCE_SLOTS = ["cpu", "mem"]
+
 
 def filter_by_name(name: str) -> Callable[[QueryStatement], QueryStatement]:
     return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
@@ -81,13 +83,16 @@ class ResourcePresetService:
         name = action.creator.name
         creator = action.creator
 
+        if not all(slot in creator.resource_slots for slot in _INTRINSIC_RESOURCE_SLOTS):
+            raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
+
         async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
             return await ResourcePresetRow.create(creator, db_session=db_session)
 
         async with self._db.connect() as db_conn:
             preset_row = await execute_with_txn_retry(_create, self._db.begin_session, db_conn)
         if preset_row is None:
-            raise ValueError(
+            raise InvalidAPIParameters(
                 f"Duplicate resource preset name (name:{name}, scaling_group:{creator.scaling_group_name})"
             )
 
@@ -101,7 +106,11 @@ class ResourcePresetService:
         modifier = action.modifier
 
         if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
+            raise InvalidAPIParameters("One of (`id` or `name`) parameter should be not null")
+
+        if resource_slots := modifier.resource_slots.optional_value():
+            if not all(slot in resource_slots for slot in _INTRINSIC_RESOURCE_SLOTS):
+                raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         async with self._db.begin_session() as db_sess:
             if preset_id is not None:
@@ -137,7 +146,7 @@ class ResourcePresetService:
         preset_id = action.id
 
         if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
+            raise InvalidAPIParameters("One of (`id` or `name`) parameter should be not null")
 
         async with self._db.begin_session() as db_sess:
             if preset_id is not None:
