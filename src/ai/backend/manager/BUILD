@@ -6,6 +6,7 @@ python_sources(
         "src/ai/backend/manager/actions:src",
         "src/ai/backend/manager/actions/monitors:src",
         "src/ai/backend/manager/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
+        "src/ai/backend/manager/config:src",
         "src/ai/backend/manager/network:src",
         "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
         "src/ai/backend/manager/scheduler:src",
