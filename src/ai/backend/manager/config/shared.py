@@ -7,6 +7,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, IPvAnyNetwork
 
+from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
+from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
+
 from .local import HostPortPair
 
 
@@ -244,7 +247,7 @@ class InterContainerNetworkConfig(BaseModel):
     )
 
 
-class SubnetConfig(BaseModel):
+class SubnetNetworkConfig(BaseModel):
     agent: IPvAnyNetwork = Field(
         default=IPv4Network("0.0.0.0/0"),
         description="""
@@ -273,8 +276,8 @@ class NetworkConfig(BaseModel):
         Controls how containers communicate with each other.
         """,
     )
-    subnet: SubnetConfig = Field(
-        default_factory=SubnetConfig,
+    subnet: SubnetNetworkConfig = Field(
+        default_factory=SubnetNetworkConfig,
         description="""
         Subnet configurations for the Backend.AI network.
         Defines IP ranges for agents and containers.
@@ -293,7 +296,7 @@ class WatcherConfig(BaseModel):
         examples=[None, "random-secure-token"],
     )
     file_io_timeout: float = Field(
-        default=10,
+        default=DEFAULT_FILE_IO_TIMEOUT,
         description="""
         Timeout in seconds for file I/O operations in watcher.
         Controls how long the watcher waits for file operations to complete.
@@ -353,6 +356,28 @@ class SessionConfig(BaseModel):
         Configuration for detecting and handling hung sessions.
         Controls how the system detects and recovers from session failures.
         """,
+    )
+
+
+class MetricConfig(BaseModel):
+    address: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=9090),
+        description="""
+        Network address and port of the Redis server.
+        Redis is used for distributed caching and messaging between managers.
+        Set to None when using Sentinel for high availability.
+        """,
+        examples=[None, {"host": "127.0.0.1", "port": 6379}],
+        alias="addr",
+    )
+    timewindow: str = Field(
+        default=DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW,
+        description="""
+        Time window for metric collection.
+        Controls how often metrics are collected and reported.
+        Format is a duration string like "1h" for 1 hour.
+        """,
+        examples=["1m", "1h"],
     )
 
 
@@ -419,5 +444,12 @@ class SharedManagerConfig(BaseModel):
         description="""
         Compute session configuration.
         Controls behavior and limits of compute sessions.
+        """,
+    )
+    metric: MetricConfig = Field(
+        default_factory=MetricConfig,
+        description="""
+        Metric collection settings.
+        Controls how metrics are collected and reported.
         """,
     )

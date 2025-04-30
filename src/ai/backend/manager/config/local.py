@@ -5,13 +5,27 @@ import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Any, List, Literal, Optional, Self
+from typing import Any, List, Literal, Mapping, Optional, Self
 
 import click
 from pydantic import BaseModel, DirectoryPath, Field, FilePath
 
 from ai.backend.common import config
+from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.logging.types import LogLevel
+from ai.backend.manager.pglock import PgAdvisoryLock
+
+_default_smtp_template = """
+Action type: {{ action_type }}
+Entity ID: {{ entity_id }}
+Status: {{ status }}
+Description: {{ description }}
+Started at: {{ created_at }}
+Finished at: {{ ended_at }}
+Duration: {{ duration }} seconds
+
+This email is sent from Backend.AI SMTP Reporter.
+"""
 
 
 class HostPortPair(BaseModel):
@@ -246,6 +260,13 @@ class ManagerConfig(BaseModel):
         """,
         examples=[{"host": "127.0.0.1", "port": 8080}],
     )
+    internal_addr: HostPortPair = Field(
+        default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
+        # TODO: Write description
+        description="""
+        """,
+        examples=[{"host": "127.0.0.1", "port": 18080}],
+    )
     rpc_auth_manager_keypair: FilePath = Field(
         default=Path("fixtures/manager/manager.key_secret"),
         description="""
@@ -322,6 +343,38 @@ class ManagerConfig(BaseModel):
         - etcetra: etcd v3 API-compatible distributed locking
         """,
         examples=[item.value for item in DistributedLockType],
+    )
+    pg_advisory_config: Mapping[str, Any] = Field(
+        default=PgAdvisoryLock.default_config,
+        description="""
+        Configuration for PostgreSQL advisory locks.
+        This is used when distributed_lock is set to pg_advisory.
+        """,
+        examples=[],
+    )
+    filelock_config: Mapping[str, Any] = Field(
+        default=FileLock.default_config,
+        description="""
+        Configuration for file-based locks.
+        This is used when distributed_lock is set to filelock.
+        """,
+        examples=[],
+    )
+    redlock_config: Mapping[str, Any] = Field(
+        default=RedisLock.default_config,
+        description="""
+        Configuration for Redis-based distributed locking.
+        This is used when distributed_lock is set to redlock.
+        """,
+        examples=[],
+    )
+    etcdlock_config: Mapping[str, Any] = Field(
+        default=EtcdLock.default_config,
+        description="""
+        Configuration for etcd-based distributed locking.
+        This is used when distributed_lock is set to etcd.
+        """,
+        examples=[],
     )
     session_schedule_lock_lifetime: float = Field(
         default=30,
@@ -530,7 +583,7 @@ class PyroscopeConfig(BaseModel):
         This name will identify this manager instance in Pyroscope UI.
         Required if Pyroscope is enabled.
         """,
-        examples=["backend-half-manager"],
+        examples=["backendai-half-manager"],
     )
     server_addr: Optional[str] = Field(
         default=None,
@@ -549,6 +602,149 @@ class PyroscopeConfig(BaseModel):
         Balance based on your performance monitoring needs.
         """,
         examples=[10, 100, 1000],
+    )
+
+
+class SMTPReporterConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the SMTP reporter.
+        Used to identify this reporter in the system.
+        """,
+        examples=["smtp"],
+    )
+    host: str = Field(
+        description="""
+        Host address of the service.
+        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.
+        """,
+        examples=["127.0.0.1"],
+    )
+    port: int = Field(
+        ge=1,
+        le=65535,
+        description="""
+        Port number of the service.
+        Must be between 1 and 65535.
+        Ports below 1024 require root/admin privileges.
+        """,
+        examples=[465, 587],
+    )
+    username: str = Field(
+        description="""
+        Username for authenticating with the SMTP server.
+        This is required for sending emails through the SMTP service.
+        """,
+        examples=["user@example.com"],
+    )
+    password: str = Field(
+        description="""
+        Password for authenticating with the SMTP server.
+        This is required for sending emails through the SMTP service.
+        """,
+        examples=["password"],
+    )
+    sender: str = Field(
+        description="""
+        Email address of the sender.
+        This is the address that will appear as the sender in emails.
+        """,
+        examples=["sender@example.com"],
+    )
+    recipients: list[str] = Field(
+        description="""
+        List of email addresses to send notifications to.
+        Can include multiple recipients separated by commas.
+        """,
+        examples=[["recipient1@example.com", "recipient2@example.com"]],
+    )
+    use_tls: bool = Field(
+        default=True,
+        description="""
+        Whether to use TLS for secure communication with the SMTP server.
+        Recommended for production environments to protect sensitive information.
+        """,
+        examples=[True, False],
+    )
+    max_workers: int = Field(
+        default=5,
+        ge=1,
+        description="""
+        Maximum number of worker threads for sending emails.
+        Controls how many emails can be sent concurrently.
+        Higher values may improve performance but increase resource usage.
+        """,
+        examples=[5, 10],
+    )
+    template: str = Field(
+        default=_default_smtp_template,
+        description="""
+        Template for the email body.
+        Can include placeholders for dynamic content.
+        Placeholders will be replaced with actual values when sending emails.
+        """,
+        examples=[_default_smtp_template],
+    )
+    trigger_policy: Literal["ALL", "ON_ERROR"] = Field(
+        default="ALL",
+        description="""
+        Policy for triggering email notifications.
+        - ALL: Send emails for all events.
+        - ON_ERROR: Send emails only for error events.
+        Choose based on your notification needs.
+        """,
+        examples=["ALL", "ON_ERROR"],
+    )
+
+
+class AuditLogConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the audit log reporter.
+        Used to identify this reporter in the system.
+        """,
+        examples=["audit_log"],
+    )
+
+
+class ActionMonitorsConfig(BaseModel):
+    subscribed_actions: list[str] = Field(
+        description="""
+        List of action types to subscribe to for monitoring.
+        """,
+        examples=[["session.create_from_params"]],
+    )
+    reporter: str = Field(
+        description="""
+        Name of the reporter to use for sending notifications.
+        This should match the name of a configured reporter.
+        """,
+        examples=["smtp", "audit_log"],
+    )
+
+
+class ReporterConfig(BaseModel):
+    smtp: list[SMTPReporterConfig] = Field(
+        default=[],
+        description="""
+        SMTP reporter configuration.
+        Controls how email notifications are sent.
+        Includes settings for SMTP server, authentication, and email templates.
+        """,
+    )
+    audit_log: list[AuditLogConfig] = Field(
+        default=[],
+        description="""
+        Audit log reporter configuration.
+        Controls how audit logs are reported.
+        """,
+    )
+    action_monitors: list[ActionMonitorsConfig] = Field(
+        default=[],
+        description="""
+        Action monitors configuration.
+        Each reporter can be configured to subscribe to specific actions.
+        """,
     )
 
 
@@ -659,6 +855,14 @@ class ManagerLocalConfig(BaseModel):
         Controls various debugging features and tools.
         Should typically be disabled in production environments.
         """,
+    )
+    reporter: ReporterConfig = Field(
+        description="""
+        Reporter configuration.
+        Controls how notifications and logs are reported.
+        Includes settings for SMTP, audit logs, and action monitors.
+        Each reporter can be configured with its own settings.
+        """
     )
 
     @classmethod
