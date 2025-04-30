@@ -31,6 +31,13 @@ This email is sent from Backend.AI SMTP Reporter.
 _max_num_proc = os.cpu_count() or 8
 _file_perm = (Path(__file__).parent.parent / "server.py").stat()
 
+    # TODO: Remove this after all pydantic migration jobs done
+    def to_trafaret(self) -> LegacyHostPortPair:
+        return LegacyHostPortPair(
+            host=self.host,
+            port=self.port,
+        )
+
 
 class DatabaseType(enum.StrEnum):
     postgresql = "postgresql"
