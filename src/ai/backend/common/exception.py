@@ -351,7 +351,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ResourcePresetConflictError(BackendAIError, web.HTTPConflict):
+class ResourcePresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-resource"
     error_title = "Duplicate Resource Preset"
 
