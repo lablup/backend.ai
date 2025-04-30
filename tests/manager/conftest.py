@@ -361,10 +361,10 @@ def etcd_fixture(
 async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
     root_ctx: RootContext = app["_root.context"]
     shared_config = SharedConfig(
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
+        root_ctx.local_config.etcd.addr.to_trafaret(),
+        root_ctx.local_config.etcd.user,
+        root_ctx.local_config.etcd.password,
+        root_ctx.local_config.etcd.namespace,
     )
     await shared_config.reload()
     root_ctx.shared_config = shared_config
@@ -377,9 +377,9 @@ def database(request, local_config, test_db) -> None:
     Create a new database for the current test session
     and install the table schema using alembic.
     """
-    db_addr = local_config["db"]["addr"]
-    db_user = local_config["db"]["user"]
-    db_pass = local_config["db"]["password"]
+    db_addr = local_config.db.addr
+    db_user = local_config.db.user
+    db_pass = local_config.db.password
 
     # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
@@ -685,12 +685,13 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            str(root_ctx.local_config["manager"]["service-addr"].host),
-            root_ctx.local_config["manager"]["service-addr"].port,
+            # str(root_ctx.local_config["manager"]["service-addr"].host),
+            str(root_ctx.local_config.manager.service_addr.host),
+            root_ctx.local_config.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.local_config["manager"]["service-addr"].port
+        port = root_ctx.local_config.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client
@@ -752,7 +753,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config.manager.service_addr.port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,

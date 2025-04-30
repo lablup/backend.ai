@@ -125,11 +125,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
-from .config_legacy import LocalConfig, SharedConfig
+from .config_legacy import SharedConfig
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.exceptions import (
     BackendError,
@@ -235,7 +236,7 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
-    local_config: LocalConfig
+    local_config: ManagerLocalConfig
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -243,7 +244,7 @@ class AgentRegistry:
 
     def __init__(
         self,
-        local_config: LocalConfig,
+        local_config: ManagerLocalConfig,
         shared_config: SharedConfig,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,

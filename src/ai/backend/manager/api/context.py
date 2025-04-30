@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import attrs
 
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from ai.backend.common.types import RedisConnectionInfo
 
     from ..agent_cache import AgentRPCCache
-    from ..config_legacy import LocalConfig, SharedConfig
+    from ..config_legacy import SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
@@ -44,7 +45,7 @@ class RootContext(BaseContext):
     redis_stream: RedisConnectionInfo
     redis_lock: RedisConnectionInfo
     shared_config: SharedConfig
-    local_config: LocalConfig
+    local_config: ManagerLocalConfig
     cors_options: CORSOptions
 
     webapp_plugin_ctx: WebappPluginContext

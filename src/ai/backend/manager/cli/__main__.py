@@ -129,8 +129,8 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         cmd = [
             "psql",
             (
-                f"postgres://{local_config['db']['user']}:{local_config['db']['password']}"
-                f"@{local_config['db']['addr']}/{local_config['db']['name']}"
+                f"postgres://{local_config.db.user}:{local_config.db.password}"
+                f"@{local_config.db.addr}/{local_config.db.name}"
             ),
             *psql_args,
         ]
@@ -146,9 +146,9 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         container_name,
         "psql",
         "-U",
-        local_config["db"]["user"],
+        local_config.db.user,
         "-d",
-        local_config["db"]["name"],
+        local_config.db.name,
         *psql_args,
     ]
     subprocess.run(cmd)

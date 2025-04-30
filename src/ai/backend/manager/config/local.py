@@ -12,6 +12,7 @@ from pydantic import BaseModel, DirectoryPath, Field, FilePath
 
 from ai.backend.common import config
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
+from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -46,6 +47,13 @@ class HostPortPair(BaseModel):
         """,
         examples=[8080],
     )
+
+    # TODO: Remove this after all pydantic migration jobs done
+    def to_trafaret(self) -> LegacyHostPortPair:
+        return LegacyHostPortPair(
+            host=self.host,
+            port=self.port,
+        )
 
 
 class DatabaseType(enum.StrEnum):
@@ -146,7 +154,7 @@ class DatabaseConfig(BaseModel):
 
 
 _max_num_proc = os.cpu_count() or 8
-_file_perm = (Path(__file__).parent / "server.py").stat()
+_file_perm = (Path(__file__).parent.parent / "server.py").stat()
 
 
 class EventLoopType(enum.StrEnum):
@@ -412,7 +420,7 @@ class ManagerConfig(BaseModel):
         """,
         examples=["/var/run/manager.pid"],
     )
-    allowed_plugins: Optional[List[str]] = Field(
+    allowed_plugins: Optional[set[str]] = Field(
         None,
         description="""
         List of explicitly allowed plugins to load.
@@ -422,7 +430,7 @@ class ManagerConfig(BaseModel):
         """,
         examples=[["example.plugin.what.you.want"]],
     )
-    disabled_plugins: Optional[List[str]] = Field(
+    disabled_plugins: Optional[set[str]] = Field(
         default=None,
         description="""
         List of plugins to explicitly disable.
@@ -807,6 +815,7 @@ class DebugConfig(BaseModel):
 
 class ManagerLocalConfig(BaseModel):
     _src_config_path: Path
+
     db: DatabaseConfig = Field(
         description="""
         Database configuration settings.
@@ -910,9 +919,8 @@ class ManagerLocalConfig(BaseModel):
             config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
         # Validate and fill configurations
-        # (allow_extra will make configs to be forward-compatible)
         try:
-            cfg = cls(**raw_cfg)
+            cfg = cls.model_validate(raw_cfg)
             if cfg.debug.enabled:
                 print("== Manager configuration ==", file=sys.stderr)
                 print(pformat(cfg), file=sys.stderr)
@@ -930,6 +938,3 @@ class ManagerLocalConfig(BaseModel):
             raise click.Abort()
         else:
             return cfg
-
-    async def reload(self) -> None:
-        raise NotImplementedError
