@@ -203,7 +203,7 @@ class EtcdConfig(BaseModel):
 
 class ManagerConfig(BaseModel):
     ipc_base_path: DirectoryPath = Field(
-        Path("/tmp/backend.ai/ipc"),
+        default=Path("/tmp/backend.ai/ipc"),
         description="""
         Base directory path for inter-process communication files.
         Used for Unix domain sockets and other IPC mechanisms.
@@ -459,7 +459,7 @@ class ManagerConfig(BaseModel):
         examples=["lablup/importer:manylinux2010"],
     )
     max_wsmsg_size: int = Field(
-        default=16 * (2**20),
+        default=16 * (2**20),  # default: 16 MiB
         description="""
         Maximum WebSocket message size in bytes.
         Controls the largest message that can be sent over WebSocket connections.
@@ -618,7 +618,7 @@ class SMTPReporterConfig(BaseModel):
         Host address of the service.
         Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.
         """,
-        examples=["127.0.0.1"],
+        examples=["smtp.gmail.com"],
     )
     port: int = Field(
         ge=1,
