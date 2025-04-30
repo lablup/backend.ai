@@ -81,7 +81,7 @@ class ResourcePresetService:
         name = action.creator.name
         creator = action.creator
 
-        if not creator.resource_slots.has_intrinsic_slot():
+        if not creator.resource_slots.has_intrinsic_slots():
             raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
@@ -107,7 +107,7 @@ class ResourcePresetService:
             raise InvalidAPIParameters("One of (`id` or `name`) parameter should be not null")
 
         if resource_slots := modifier.resource_slots.optional_value():
-            if not resource_slots.has_intrinsic_slot():
+            if not resource_slots.has_intrinsic_slots():
                 raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         async with self._db.begin_session() as db_sess:
