@@ -51,8 +51,6 @@ from ai.backend.manager.services.resource_preset.actions.modify_preset import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_INTRINSIC_RESOURCE_SLOTS = ["cpu", "mem"]
-
 
 def filter_by_name(name: str) -> Callable[[QueryStatement], QueryStatement]:
     return lambda query_stmt: query_stmt.where(ResourcePresetRow.name == name)
@@ -83,7 +81,7 @@ class ResourcePresetService:
         name = action.creator.name
         creator = action.creator
 
-        if not all(slot in creator.resource_slots for slot in _INTRINSIC_RESOURCE_SLOTS):
+        if not creator.resource_slots.has_intrinsic_slot():
             raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
@@ -109,7 +107,7 @@ class ResourcePresetService:
             raise InvalidAPIParameters("One of (`id` or `name`) parameter should be not null")
 
         if resource_slots := modifier.resource_slots.optional_value():
-            if not all(slot in resource_slots for slot in _INTRINSIC_RESOURCE_SLOTS):
+            if not resource_slots.has_intrinsic_slot():
                 raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         async with self._db.begin_session() as db_sess:

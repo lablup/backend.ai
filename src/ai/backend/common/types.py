@@ -937,6 +937,9 @@ class ResourceSlot(UserDict):
     def to_json(self) -> Mapping[str, str]:
         return {k: _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None}
 
+    def has_intrinsic_slot(self) -> bool:
+        return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
+
 
 class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
