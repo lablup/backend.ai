@@ -149,6 +149,7 @@ class ErrorDomain(enum.StrEnum):
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
     MODEL_SERVICE = "model-service"
+    RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
     AGENT = "agent"
     PERMISSION = "permission"
@@ -347,6 +348,19 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ResourcePresetConflictError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-resource"
+    error_title = "Duplicate Resource Preset"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_PRESET,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 

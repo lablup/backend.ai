@@ -8,7 +8,7 @@ from graphene import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflictError
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -90,7 +90,7 @@ class ResourcePresetService:
         async with self._db.connect() as db_conn:
             preset_row = await execute_with_txn_retry(_create, self._db.begin_session, db_conn)
         if preset_row is None:
-            raise InvalidAPIParameters(
+            raise ResourcePresetConflictError(
                 f"Duplicate resource preset name (name:{name}, scaling_group:{creator.scaling_group_name})"
             )
 
