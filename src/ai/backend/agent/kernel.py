@@ -259,10 +259,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.clean_event = None
         self._tasks = set()
 
-    def set_container_id(self, value: ContainerId) -> None:
-        # TODO: Change self.container_id to ContainerId type
-        self.container_id = str(value)
-
     def get_container_id(self) -> Optional[ContainerId]:
         return ContainerId(self.container_id) if self.container_id is not None else None
 
