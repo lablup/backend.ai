@@ -2,22 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Awaitable, Callable, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from ai.backend.common.events import (
     DanglingContainerDetected,
     DanglingKernelDetected,
     EventProducer,
 )
-from ai.backend.common.types import ContainerId, KernelId
+from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
 from .types import (
     Container,
     ContainerStatus,
-    KernelLifecycleStatus,
 )
 
 if TYPE_CHECKING:
@@ -32,46 +30,6 @@ class DanglingKernel(Exception):
 
 class DanglingContainer(Exception):
     pass
-
-
-class BaseKernelProbe(ABC):
-    def __init__(
-        self,
-        kernel_id: KernelId,
-        kernel_state_getter: Callable[..., KernelLifecycleStatus],
-        container_id_getter: Callable[..., Optional[ContainerId]],
-        event_producer: EventProducer,
-    ) -> None:
-        self._kernel_id = kernel_id
-        self._container_id_getter = container_id_getter
-        self._kernel_state_getter = kernel_state_getter
-        self._event_producer = event_producer
-
-    @abstractmethod
-    async def _get_container_info(self) -> Optional[Container]:
-        raise NotImplementedError
-
-    def _compare_with_container(self, container: Optional[Container]) -> None:
-        kernel_state = self._kernel_state_getter()
-        match kernel_state:
-            case KernelLifecycleStatus.PREPARING:
-                if container is not None:
-                    # container exists but kernel is hanging in PREPARING state
-                    raise DanglingKernel
-            case KernelLifecycleStatus.RUNNING:
-                if container is None or container.status != ContainerStatus.RUNNING:
-                    raise DanglingKernel
-            case KernelLifecycleStatus.TERMINATING:
-                # There might be a delay in the container status change
-                # after the kernel is being terminated.
-                pass
-
-    async def probe(self) -> None:
-        try:
-            container = await self._get_container_info()
-            self._compare_with_container(container)
-        except DanglingKernel:
-            await self._event_producer.produce_event(DanglingKernelDetected(self._kernel_id))
 
 
 class AgentProbe:
