@@ -359,9 +359,6 @@ def database(request, local_config, test_db) -> None:
     db_addr = local_config.db.addr.to_legacy()
     db_user = local_config.db.user
     db_pass = local_config.db.password
-    print("db_addr!@!@!", db_addr)
-    print("db_user!@!@!", db_user)
-    print("db_pass!@!@!", db_pass)
 
     # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
