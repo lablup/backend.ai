@@ -124,9 +124,6 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[SharedConfig]:
     )
     await shared_config.reload()
 
-    # raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
-    # TODO: 이거 필요 없는 거 맞음? 매니저 local_config엔 필요 없어 보이긴 함.
-    # local_config["redis"] = redis_config_iv.check(raw_redis_config)
     try:
         yield shared_config
     finally:
@@ -151,8 +148,6 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         local_config.etcd.namespace,
     )
     await shared_config.reload()
-    # local_config["redis"] = redis_config_iv.check(raw_redis_config)
-    # TODO: 이거 잘 됨?
     raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
     redis_config = EtcdRedisConfig.from_dict(dict(raw_redis_config))
 

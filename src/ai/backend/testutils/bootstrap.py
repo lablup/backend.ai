@@ -14,7 +14,7 @@ from typing import Final, Iterator
 
 import pytest
 
-from ai.backend.common.types import HostPortPair
+from ai.backend.manager.config.local import HostPortPair as HostPortPairModel
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__spec__.name)
@@ -90,7 +90,7 @@ def wait_health_check(container_id):
 
 
 @pytest.fixture(scope="session", autouse=False)
-def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
+def etcd_container() -> Iterator[tuple[str, HostPortPairModel]]:
     # Spawn a single-node etcd container for a testing session.
     random_id = secrets.token_hex(8)
     published_port = get_next_tcp_port()[0]
@@ -125,7 +125,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
         raise RuntimeError("etcd_container: failed to create container", proc.stderr.decode())
     log.info("spawning etcd container (parallel slot: %d)", get_parallel_slot())
     wait_health_check(container_id)
-    yield container_id, HostPortPair("127.0.0.1", published_port)
+    yield container_id, HostPortPairModel(host="127.0.0.1", port=published_port)
     subprocess.run(
         [
             "docker",
@@ -139,8 +139,8 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 
 
 @pytest.fixture(scope="session", autouse=False)
-def redis_container() -> Iterator[tuple[str, HostPortPair]]:
-    # Spawn a single-node etcd container for a testing session.
+def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
+    # Spawn a single-node redis container for a testing session.
     random_id = secrets.token_hex(8)
     published_port = get_next_tcp_port()[0]
     proc = subprocess.run(
@@ -180,7 +180,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             time.sleep(0.1)
             continue
     time.sleep(0.5)
-    yield container_id, HostPortPair("127.0.0.1", published_port)
+    yield container_id, HostPortPairModel(host="127.0.0.1", port=published_port)
     subprocess.run(
         [
             "docker",
@@ -194,7 +194,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 
 
 @pytest.fixture(scope="session", autouse=False)
-def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
+def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
     # Spawn a single-node etcd container for a testing session.
     random_id = secrets.token_hex(8)
     published_port = get_next_tcp_port()[0]
@@ -228,7 +228,7 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
         raise RuntimeError("postgres_container: failed to create container", proc.stderr.decode())
     log.info("spawning postgres container (parallel slot: %d)", get_parallel_slot())
     wait_health_check(container_id)
-    yield container_id, HostPortPair("127.0.0.1", published_port)
+    yield container_id, HostPortPairModel(host="127.0.0.1", port=published_port)
     subprocess.run(
         [
             "docker",
