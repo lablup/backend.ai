@@ -45,7 +45,7 @@ from ai.backend.common.events import (
     ModelServiceStatusEvent,
 )
 from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.runner import ProbeRunnerWithNoResource
+from ai.backend.common.runner import ProbeRunnerWithNoResourceCtx
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -287,7 +287,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
 
     @abstractmethod
-    def _init_probe_runner_obj(self) -> ProbeRunnerWithNoResource:
+    def _init_probe_runner_obj(self) -> ProbeRunnerWithNoResourceCtx:
         raise NotImplementedError
 
     async def init_probe_runner(self) -> None:

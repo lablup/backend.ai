@@ -17,7 +17,7 @@ from kubernetes_asyncio import watch
 
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.events import EventProducer
-from ai.backend.common.runner import ProbeRunnerWithNoResource
+from ai.backend.common.runner import ProbeRunnerWithNoResourceCtx
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -41,8 +41,8 @@ class KubernetesKernel(AbstractKernel):
         await self.scale(0)
 
     @override
-    def _init_probe_runner_obj(self) -> ProbeRunnerWithNoResource:
-        return ProbeRunnerWithNoResource.nop()
+    def _init_probe_runner_obj(self) -> ProbeRunnerWithNoResourceCtx:
+        return ProbeRunnerWithNoResourceCtx.nop()
 
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int

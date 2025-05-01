@@ -13,7 +13,7 @@ class HeartbeatService(Protocol):
         pass
 
 
-class ProbeRunnerWithNoResource:
+class ProbeRunnerWithNoResourceCtx:
     _closed: bool
     _runner_task: Optional[asyncio.Task]
 
@@ -35,7 +35,7 @@ class ProbeRunnerWithNoResource:
         self._heartbeart_services = heartbeart_services
 
     @classmethod
-    def nop(cls) -> "ProbeRunnerWithNoResource":
+    def nop(cls) -> "ProbeRunnerWithNoResourceCtx":
         obj = cls(0, [])
         obj._closed = True
         return obj

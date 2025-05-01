@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, FrozenSet, override
 
 from ai.backend.common.events import EventProducer
-from ai.backend.common.runner import ProbeRunnerWithNoResource
+from ai.backend.common.runner import ProbeRunnerWithNoResourceCtx
 from ai.backend.common.types import CommitStatus
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, KernelInitArgs, NextResult, ResultRecord
@@ -31,8 +31,8 @@ class DummyKernel(AbstractKernel):
         pass
 
     @override
-    def _init_probe_runner_obj(self) -> ProbeRunnerWithNoResource:
-        return ProbeRunnerWithNoResource.nop()
+    def _init_probe_runner_obj(self) -> ProbeRunnerWithNoResourceCtx:
+        return ProbeRunnerWithNoResourceCtx.nop()
 
     async def create_code_runner(
         self,
