@@ -204,6 +204,8 @@ from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
 from ai.backend.manager.errors.exceptions import ServerMisconfiguredError
 
+from .local import HostPortPair as HostPortPairModel
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
@@ -431,6 +433,7 @@ class DockerImageConfig(BaseModel):
         'none': Never pull automatically (manual control)
         """,
         examples=[item.value for item in DockerImageAutoPullPolicy],
+        alias="auto-pull",
     )
 
 
