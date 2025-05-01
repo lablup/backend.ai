@@ -119,7 +119,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
-from ai.backend.common.runner import ProbeRunner
+from ai.backend.common.runner import ProbeRunnerWithNoResource
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -673,7 +673,7 @@ class AbstractAgent(
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
     _metric_registry: CommonMetricRegistry
-    _probe_runner: ProbeRunner
+    _probe_runner: ProbeRunnerWithNoResource
 
     def __init__(
         self,
@@ -1420,13 +1420,13 @@ class AbstractAgent(
     def get_kernel_registry(self) -> Mapping[KernelId, AbstractKernel]:
         return self.kernel_registry
 
-    def _init_probe_runner_obj(self) -> ProbeRunner:
+    def _init_probe_runner_obj(self) -> ProbeRunnerWithNoResource:
         probe = AgentProbe(
             self.enumerate_containers,
             self.get_kernel_registry,
             self.event_producer,
         )
-        return ProbeRunner(11.0, [probe])
+        return ProbeRunnerWithNoResource(11.0, [probe])
 
     async def sync_container_lifecycles(self, interval: float) -> None:
         """

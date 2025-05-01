@@ -1,53 +1,70 @@
 import asyncio
 from collections.abc import Sequence
-from typing import Optional, Protocol
+from typing import Generic, Optional, Protocol, TypeVar
+
+TResourceCtx = TypeVar("TResourceCtx")
+TResourceCtx_Co = TypeVar("TResourceCtx_Co", covariant=True)
+TResourceCtx_Contra = TypeVar("TResourceCtx_Contra", contravariant=True)
 
 
-class Resource(Protocol):
-    async def open(self) -> None:
+class ResourceCtx(Protocol[TResourceCtx_Co]):
+    async def open(self) -> TResourceCtx_Co:
         pass
 
     async def close(self) -> None:
         pass
 
 
-class Probe(Protocol):
-    async def probe(self) -> None:
+class NopResourceCtx:
+    def __init__(self) -> None:
+        pass
+
+    async def open(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+
+class Probe(Protocol[TResourceCtx_Contra]):
+    async def probe(self, resource_ctx: TResourceCtx_Contra) -> None:
         pass
 
 
-class HeartbeatService(Protocol):
-    async def heartbeat(self) -> None:
+class HeartbeatService(Protocol[TResourceCtx_Contra]):
+    async def heartbeat(self, resource_ctx: TResourceCtx_Contra) -> None:
         pass
 
 
-class ProbeRunner:
+class ProbeRunner(Generic[TResourceCtx]):
     _closed: bool
     _runner_task: Optional[asyncio.Task]
 
+    _resource_ctx: ResourceCtx[TResourceCtx]
+
     _interval: float
-    _resources: Sequence[Resource]
     _heartbeart_services: Sequence[HeartbeatService]
-    _probes: Sequence[Probe]
+    _probes: Sequence[Probe[TResourceCtx]]
 
     def __init__(
         self,
         interval: float,
-        probes: Sequence[Probe],
-        resources: Sequence[Resource] = tuple(),
-        heartbeart_services: Sequence[HeartbeatService] = tuple(),
+        resource_ctx: ResourceCtx[TResourceCtx],
+        probes: Sequence[Probe[TResourceCtx]],
+        heartbeart_services: Sequence[HeartbeatService[TResourceCtx]] = tuple(),
     ) -> None:
         self._closed = False
         self._runner_task = None
 
+        self._resource_ctx = resource_ctx
+
         self._interval = interval
         self._probes = probes
-        self._resources = resources
         self._heartbeart_services = heartbeart_services
 
     @classmethod
-    def nop(cls) -> "ProbeRunner":
-        obj = cls(0, [])
+    def nop(cls) -> "ProbeRunner[None]":
+        obj = ProbeRunner[None](0, NopResourceCtx(), [])
         obj._closed = True
         return obj
 
@@ -55,32 +72,24 @@ class ProbeRunner:
         self._closed = True
         if self._runner_task is not None:
             self._runner_task.cancel()
-        await self._close_resources()
+        await self._resource_ctx.close()
 
-    async def _run_probes(self) -> None:
+    async def _run_probes(self, resource: TResourceCtx) -> None:
         for probe in self._probes:
-            await probe.probe()
+            await probe.probe(resource)
 
-    async def _heartbeat(self) -> None:
+    async def _heartbeat(self, resource: TResourceCtx) -> None:
         for service in self._heartbeart_services:
-            await service.heartbeat()
-
-    async def _open_resources(self) -> None:
-        for resource in self._resources:
-            await resource.open()
-
-    async def _close_resources(self) -> None:
-        for resource in self._resources:
-            await resource.close()
+            await service.heartbeat(resource)
 
     async def _task(self) -> None:
         while not self._closed:
             try:
-                await self._open_resources()
-                await self._run_probes()
-                await self._heartbeat()
+                resource = await self._resource_ctx.open()
+                await self._run_probes(resource)
+                await self._heartbeat(resource)
             finally:
-                await self._close_resources()
+                await self._resource_ctx.close()
 
             await asyncio.sleep(self._interval)
 
