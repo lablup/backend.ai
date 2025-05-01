@@ -18,3 +18,5 @@ for pkgname in "kernel_binary"; do
     mv "dist/backend_ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
         "dist/backend_ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
 done
+
+ls -lh dist
