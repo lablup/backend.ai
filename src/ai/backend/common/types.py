@@ -1388,7 +1388,10 @@ class EtcdRedisConfig:
 
         addr = None
         if addr_data := data.get("addr"):
-            addr = HostPortPair(addr_data.get("host"), addr_data.get("port"))
+            if isinstance(addr_data, HostPortPair):
+                addr = HostPortPair(addr_data.host, addr_data.port)
+            else:
+                addr = HostPortPair(addr_data.get("host"), addr_data.get("port"))
 
         return cls(
             addr=addr,

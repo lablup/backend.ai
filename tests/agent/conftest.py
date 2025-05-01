@@ -103,11 +103,11 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         "logging": logging_config,
         "debug": defaultdict(lambda: False),
         "etcd": {
-            "addr": etcd_addr,
+            "addr": etcd_addr.to_trafaret(),
             "namespace": f"ns-{test_id}",
         },
         "redis": {
-            "addr": redis_container[1],
+            "addr": redis_container[1].to_trafaret(),
             "sentinel": None,
             "service_name": None,
             "password": None,
