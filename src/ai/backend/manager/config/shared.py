@@ -506,6 +506,17 @@ class InterContainerNetworkConfig(BaseModel):
         description="""
         """,
     )
+    enabled: bool = Field(
+        default=False,
+        description="""
+        """,
+        examples=[True, False],
+    )
+    plugin: Optional[str] = Field(
+        default=None,
+        description="""
+        """,
+    )
 
 
 class SubnetNetworkConfig(BaseModel):
