@@ -1,26 +1,126 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+import logging
+import sys
+import urllib
+from contextvars import ContextVar
+from datetime import datetime, timedelta, timezone, tzinfo
 from ipaddress import IPv4Network
-from typing import Any, Dict, List, Optional
+from pprint import pformat
+from typing import Annotated, Any, Dict, Final, List, Mapping, Optional, Sequence, TypeAlias
 
-from pydantic import BaseModel, Field, IPvAnyNetwork
+import aiotools
+import click
+import yarl
+from dateutil import tz
+from dateutil.relativedelta import relativedelta
+from pydantic import BaseModel, Field, IPvAnyNetwork, PlainValidator
 
+from ai.backend.common import config
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
-from ai.backend.common.types import HostPortPair
-from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.identity import get_instance_id
+from ai.backend.common.types import (
+    HostPortPair,
+    SlotName,
+    SlotTypes,
+    current_resource_slots,
+)
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api import ManagerStatus
+from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
+from ai.backend.manager.errors.exceptions import ServerMisconfiguredError
 
-# current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
+DEFAULT_INFLIGHT_CHUNKS: Final = 8
+
+NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
+
+current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
+
+
+TimeDelta = timedelta | relativedelta
+
+
+def _parse_time_duration(v: Any) -> TimeDelta:
+    if isinstance(v, (relativedelta, timedelta)):
+        return v
+
+    if isinstance(v, (int, float)):
+        if v < 0:
+            raise ValueError("value must be positive")
+        return timedelta(seconds=v)
+
+    if not isinstance(v, str) or len(v) == 0:
+        raise ValueError("value must be a number or string")
+
+    try:
+        if v[-2:].isalpha():
+            num_part, unit = v[:-2], v[-2:].lower()
+            if not num_part:
+                raise ValueError("value must not be empty")
+            t = int(num_part)
+            if t < 0:
+                raise ValueError("value must be positive")
+            if unit == "yr":
+                return relativedelta(years=t)
+            if unit == "mo":
+                return relativedelta(months=t)
+            raise ValueError("value is not a known time duration")
+
+        unit = v[-1].lower()
+        num_part = v[:-1] if unit.isalpha() else v
+        seconds_value: float = float(num_part)
+        if seconds_value < 0:
+            raise ValueError("value must be positive")
+
+        if not unit.isalpha():
+            return timedelta(seconds=seconds_value)
+        if unit == "w":
+            return timedelta(weeks=seconds_value)
+        if unit == "d":
+            return timedelta(days=seconds_value)
+        if unit == "h":
+            return timedelta(hours=seconds_value)
+        if unit == "m":
+            return timedelta(minutes=seconds_value)
+        if unit == "s":
+            return timedelta(seconds=seconds_value)
+
+        raise ValueError("value is not a known time duration")
+    except ValueError as exc:
+        raise ValueError(str(exc)) from None
+
+
+TimeDuration = Annotated[timedelta, PlainValidator(_parse_time_duration)]
+
+
+def _parse_to_tzinfo(v: Any) -> tzinfo:
+    if isinstance(v, tzinfo):
+        return v
+    if isinstance(v, str):
+        tzobj = tz.gettz(v)
+        if tzobj is None:
+            raise ValueError(f"unknown timezone: {v!r}")
+        return tzobj
+    raise TypeError("timezone must be str or tzinfo")
+
+
+TimeZone = Annotated[
+    tzinfo,
+    PlainValidator(_parse_to_tzinfo),
+]
 
 
 class SystemConfig(BaseModel):
-    timezone: str = Field(
-        default="UTC",
+    timezone: TimeZone = Field(
+        default_factory=lambda: timezone.utc,
         description="""
         Timezone setting for the manager.
         Uses pytz-compatible timezone names.
-        Affects how the manager reports timestamps in logs and APIs.
         """,
         examples=["UTC"],
     )
@@ -246,6 +346,17 @@ class InterContainerNetworkConfig(BaseModel):
         """,
         examples=["overlay", None],
     )
+    enabled: bool = Field(
+        default=False,
+        description="""
+        """,
+        examples=[True, False],
+    )
+    plugin: Optional[str] = Field(
+        default=None,
+        description="""
+        """,
+    )
 
 
 class SubnetNetworkConfig(BaseModel):
@@ -269,6 +380,14 @@ class SubnetNetworkConfig(BaseModel):
     )
 
 
+class RpcConfig(BaseModel):
+    keepalive_timeout: float = Field(
+        default=60.0,
+        description="""
+        """,
+    )
+
+
 class NetworkConfig(BaseModel):
     inter_container: InterContainerNetworkConfig = Field(
         default_factory=InterContainerNetworkConfig,
@@ -282,6 +401,11 @@ class NetworkConfig(BaseModel):
         description="""
         Subnet configurations for the Backend.AI network.
         Defines IP ranges for agents and containers.
+        """,
+    )
+    rpc: RpcConfig = Field(
+        default_factory=RpcConfig,
+        description="""
         """,
     )
 
@@ -308,7 +432,7 @@ class WatcherConfig(BaseModel):
 
 
 class AuthConfig(BaseModel):
-    max_password_age: Optional[datetime] = Field(
+    max_password_age: Optional[TimeDuration] = Field(
         default=None,
         description="""
         Maximum password age before requiring a change.
@@ -383,7 +507,7 @@ class MetricConfig(BaseModel):
 
 
 # TODO: Need to rethink if we need to separate shared manager configs
-class SharedManagerConfig(BaseModel):
+class SharedManagerConfigModel(BaseModel):
     system: SystemConfig = Field(
         default_factory=SystemConfig,
         description="""
@@ -456,165 +580,167 @@ class SharedManagerConfig(BaseModel):
     )
 
 
-# class SharedConfig(AbstractConfig):
-#     def __init__(
-#         self,
-#         etcd_addr: HostPortPair,
-#         etcd_user: Optional[str],
-#         etcd_password: Optional[str],
-#         namespace: str,
-#     ) -> None:
-#         super().__init__()
-#         credentials = None
-#         if etcd_user:
-#             assert etcd_user is not None
-#             assert etcd_password is not None
-#             credentials = {
-#                 "user": etcd_user,
-#                 "password": etcd_password,
-#             }
-#         scope_prefix_map = {
-#             ConfigScopes.GLOBAL: "",
-#             # TODO: provide a way to specify other scope prefixes
-#         }
-#         self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
+class SharedManagerConfig:
+    data: SharedManagerConfigModel
 
-#     async def close(self) -> None:
-#         await self.etcd.close()
+    def __init__(
+        self,
+        etcd_addr: HostPortPair,
+        etcd_user: Optional[str],
+        etcd_password: Optional[str],
+        namespace: str,
+    ) -> None:
+        super().__init__()
+        credentials = None
+        if etcd_user:
+            assert etcd_user is not None
+            assert etcd_password is not None
+            credentials = {
+                "user": etcd_user,
+                "password": etcd_password,
+            }
+        scope_prefix_map = {
+            ConfigScopes.GLOBAL: "",
+            # TODO: provide a way to specify other scope prefixes
+        }
+        self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
 
-#     async def reload(self) -> None:
-#         raw_cfg = await self.etcd.get_prefix(
-#             "config"
-#         )  # Mapping[str, GetPrefixValue | Optional[str]]
-#         try:
-#             cfg = shared_config_iv.check(raw_cfg)
-#         except config.ConfigurationError as e:
-#             print("Validation of shared etcd configuration has failed:", file=sys.stderr)
-#             print(pformat(e.invalid_data), file=sys.stderr)
-#             raise click.Abort()
-#         else:
-#             self.data = cfg
+    async def close(self) -> None:
+        await self.etcd.close()
 
-#     def __hash__(self) -> int:
-#         # When used as a key in dicts, we don't care our contents.
-#         # Just treat it like an opaque object.
-#         return hash(id(self))
+    async def reload(self) -> None:
+        raw_cfg = await self.etcd.get_prefix("config")
 
-#     @classmethod
-#     def flatten(cls, key_prefix: str, inner_dict: NestedStrKeyedDict) -> dict[str, str]:
-#         flattend_dict: dict[str, str] = {}
-#         for k, v in inner_dict.items():
-#             if k == "":
-#                 flattened_key = key_prefix
-#             else:
-#                 flattened_key = key_prefix + "/" + urllib.parse.quote(k, safe="")
-#             match v:
-#                 case Mapping():
-#                     flattend_dict.update(cls.flatten(flattened_key, v))  # type: ignore
-#                 case str():
-#                     flattend_dict[flattened_key] = v
-#                 case int() | float() | yarl.URL():
-#                     flattend_dict[flattened_key] = str(v)
-#                 case _:
-#                     raise ValueError(
-#                         f"The value {v!r} must be serialized before storing to the etcd"
-#                     )
-#         return flattend_dict
+        try:
+            self.data = SharedManagerConfigModel.model_validate(raw_cfg)
+        except config.ConfigurationError as e:
+            print("Validation of shared etcd configuration has failed:", file=sys.stderr)
+            print(pformat(e.invalid_data), file=sys.stderr)
+            raise click.Abort()
 
-#     async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
-#         value = await self.etcd.get(key)
-#         if not allow_null and value is None:
-#             raise ServerMisconfiguredError("A required etcd config is missing.", key)
-#         return value
+    def __hash__(self) -> int:
+        # When used as a key in dicts, we don't care our contents.
+        # Just treat it like an opaque object.
+        return hash(id(self))
 
-#     async def register_myself(self) -> None:
-#         instance_id = await get_instance_id()
-#         manager_info = {
-#             f"nodes/manager/{instance_id}": "up",
-#         }
-#         await self.etcd.put_dict(manager_info)
+    @classmethod
+    def flatten(cls, key_prefix: str, inner_dict: NestedStrKeyedDict) -> dict[str, str]:
+        flattend_dict: dict[str, str] = {}
+        for k, v in inner_dict.items():
+            if k == "":
+                flattened_key = key_prefix
+            else:
+                flattened_key = key_prefix + "/" + urllib.parse.quote(k, safe="")
+            match v:
+                case Mapping():
+                    flattend_dict.update(cls.flatten(flattened_key, v))  # type: ignore
+                case str():
+                    flattend_dict[flattened_key] = v
+                case int() | float() | yarl.URL():
+                    flattend_dict[flattened_key] = str(v)
+                case _:
+                    raise ValueError(
+                        f"The value {v!r} must be serialized before storing to the etcd"
+                    )
+        return flattend_dict
 
-#     async def deregister_myself(self) -> None:
-#         instance_id = await get_instance_id()
-#         await self.etcd.delete_prefix(f"nodes/manager/{instance_id}")
+    async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
+        value = await self.etcd.get(key)
+        if not allow_null and value is None:
+            raise ServerMisconfiguredError("A required etcd config is missing.", key)
+        return value
 
-#     async def update_resource_slots(
-#         self,
-#         slot_key_and_units: Mapping[SlotName, SlotTypes],
-#     ) -> None:
-#         updates = {}
-#         known_slots = await self.get_resource_slots()
-#         for k, v in slot_key_and_units.items():
-#             if k not in known_slots or v != known_slots[k]:
-#                 updates[f"config/resource_slots/{k}"] = v.value
-#         if updates:
-#             await self.etcd.put_dict(updates)
+    async def register_myself(self) -> None:
+        instance_id = await get_instance_id()
+        manager_info = {
+            f"nodes/manager/{instance_id}": "up",
+        }
+        await self.etcd.put_dict(manager_info)
 
-#     async def update_manager_status(self, status) -> None:
-#         await self.etcd.put("manager/status", status.value)
-#         self.get_manager_status.cache_clear()
+    async def deregister_myself(self) -> None:
+        instance_id = await get_instance_id()
+        await self.etcd.delete_prefix(f"nodes/manager/{instance_id}")
 
-#     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-#     async def _get_resource_slots(self):
-#         raw_data = await self.etcd.get_prefix_dict("config/resource_slots")
-#         return {SlotName(k): SlotTypes(v) for k, v in raw_data.items()}
+    async def update_resource_slots(
+        self,
+        slot_key_and_units: Mapping[SlotName, SlotTypes],
+    ) -> None:
+        updates = {}
+        known_slots = await self.get_resource_slots()
+        for k, v in slot_key_and_units.items():
+            if k not in known_slots or v != known_slots[k]:
+                updates[f"config/resource_slots/{k}"] = v.value
+        if updates:
+            await self.etcd.put_dict(updates)
 
-#     async def get_resource_slots(self) -> Mapping[SlotName, SlotTypes]:
-#         """
-#         Returns the system-wide known resource slots and their units.
-#         """
-#         try:
-#             ret = current_resource_slots.get()
-#         except LookupError:
-#             configured_slots = await self._get_resource_slots()
-#             ret = {**INTRINSIC_SLOTS, **configured_slots}
-#             current_resource_slots.set(ret)
-#         return ret
+    async def update_manager_status(self, status) -> None:
+        await self.etcd.put("manager/status", status.value)
+        self.get_manager_status.cache_clear()
 
-#     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-#     async def _get_vfolder_types(self):
-#         return await self.etcd.get_prefix("volumes/_types")
+    @aiotools.lru_cache(maxsize=1, expire_after=2.0)
+    async def _get_resource_slots(self):
+        raw_data = await self.etcd.get_prefix_dict("config/resource_slots")
+        return {SlotName(k): SlotTypes(v) for k, v in raw_data.items()}
 
-#     async def get_vfolder_types(self) -> Sequence[str]:
-#         """
-#         Returns the vfolder types currently set. One of "user" and/or "group".
-#         If none is specified, "user" type is implicitly assumed.
-#         """
-#         try:
-#             ret = current_vfolder_types.get()
-#         except LookupError:
-#             vf_types = await self._get_vfolder_types()
-#             ret = list(vf_types.keys())
-#             current_vfolder_types.set(ret)
-#         return ret
+    async def get_resource_slots(self) -> Mapping[SlotName, SlotTypes]:
+        """
+        Returns the system-wide known resource slots and their units.
+        """
+        try:
+            ret = current_resource_slots.get()
+        except LookupError:
+            configured_slots = await self._get_resource_slots()
+            ret = {**INTRINSIC_SLOTS, **configured_slots}
+            current_resource_slots.set(ret)
+        return ret
 
-#     @aiotools.lru_cache(maxsize=1, expire_after=5.0)
-#     async def get_manager_nodes_info(self):
-#         return await self.etcd.get_prefix_dict("nodes/manager")
+    @aiotools.lru_cache(maxsize=1, expire_after=2.0)
+    async def _get_vfolder_types(self):
+        return await self.etcd.get_prefix("volumes/_types")
 
-#     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-#     async def get_manager_status(self) -> ManagerStatus:
-#         status = await self.etcd.get("manager/status")
-#         if status is None:
-#             return ManagerStatus.TERMINATED
-#         return ManagerStatus(status)
+    async def get_vfolder_types(self) -> Sequence[str]:
+        """
+        Returns the vfolder types currently set. One of "user" and/or "group".
+        If none is specified, "user" type is implicitly assumed.
+        """
+        try:
+            ret = current_vfolder_types.get()
+        except LookupError:
+            vf_types = await self._get_vfolder_types()
+            ret = list(vf_types.keys())
+            current_vfolder_types.set(ret)
+        return ret
 
-#     async def watch_manager_status(self):
-#         async with aiotools.aclosing(self.etcd.watch("manager/status")) as agen:
-#             async for ev in agen:
-#                 yield ev
+    @aiotools.lru_cache(maxsize=1, expire_after=5.0)
+    async def get_manager_nodes_info(self):
+        return await self.etcd.get_prefix_dict("nodes/manager")
 
-#     # TODO: refactor using contextvars in Python 3.7 so that the result is cached
-#     #       in a per-request basis.
-#     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-#     async def get_allowed_origins(self):
-#         return await self.etcd.get("config/api/allow-origins")
+    @aiotools.lru_cache(maxsize=1, expire_after=2.0)
+    async def get_manager_status(self) -> ManagerStatus:
+        status = await self.etcd.get("manager/status")
+        if status is None:
+            return ManagerStatus.TERMINATED
+        return ManagerStatus(status)
 
-#     def get_redis_url(self, db: int = 0) -> yarl.URL:
-#         """
-#         Returns a complete URL composed from the given Redis config.
-#         """
-#         url = yarl.URL("redis://host").with_host(str(self.data["redis"]["addr"][0])).with_port(
-#             self.data["redis"]["addr"][1]
-#         ).with_password(self.data["redis"]["password"]) / str(db)
-#         return url
+    async def watch_manager_status(self):
+        async with aiotools.aclosing(self.etcd.watch("manager/status")) as agen:
+            async for ev in agen:
+                yield ev
+
+    # TODO: refactor using contextvars in Python 3.7 so that the result is cached
+    #       in a per-request basis.
+    @aiotools.lru_cache(maxsize=1, expire_after=2.0)
+    async def get_allowed_origins(self):
+        return await self.etcd.get("config/api/allow-origins")
+
+    def get_redis_url(self, db: int = 0) -> yarl.URL:
+        """
+        Returns a complete URL composed from the given Redis config.
+        """
+        if not self.data.redis.addr:
+            raise ValueError("Redis config is not set.")
+
+        url = yarl.URL("redis://host").with_host(str(self.data.redis.addr.host)).with_port(
+            self.data.redis.addr.port
+        ).with_password(self.data.redis.password) / str(db)
+        return url

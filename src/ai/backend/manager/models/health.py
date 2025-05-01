@@ -137,9 +137,7 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
             num_connections = cast(int, pool._created_connections)  # type: ignore[attr-defined]
             max_connections = pool.max_connections
         except Exception as e:
-            redis_config = cast(
-                RedisHelperConfig, shared_config.data["redis"].get("redis_helper_config")
-            )
+            redis_config = cast(RedisHelperConfig, shared_config.data.redis.redis_helper_config)
             max_connections = redis_config["max_connections"]
             err_msg = f"Cannot get connection info from `{info.name}`. (e:{str(e)})"
         redis_objects.append(

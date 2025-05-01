@@ -74,6 +74,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.shared import SharedManagerConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
@@ -96,7 +97,7 @@ from .api.types import (
     CleanupContext,
     WebRequestHandler,
 )
-from .config_legacy import SharedConfig, volume_config_iv
+from .config_legacy import volume_config_iv
 from .errors.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -337,7 +338,7 @@ async def exception_middleware(
 @actxmgr
 async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # populate public interfaces
-    root_ctx.shared_config = SharedConfig(
+    root_ctx.shared_config = SharedManagerConfig(
         root_ctx.local_config.etcd.addr.to_trafaret(),
         root_ctx.local_config.etcd.user,
         root_ctx.local_config.etcd.password,
@@ -380,7 +381,7 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             await root_ctx.shared_config.update_manager_status(ManagerStatus.RUNNING)
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
-        tz = root_ctx.shared_config["system"]["timezone"]
+        tz = root_ctx.shared_config.data.system.timezone
         log.info("Configured timezone: {}", tz.tzname(datetime.now()))
     yield
 
@@ -388,7 +389,7 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data["redis"]
+        root_ctx.shared_config.data.redis.model_dump()
     )
 
     root_ctx.redis_live = redis_helper.get_redis_object(
@@ -546,7 +547,7 @@ def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
     etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data["redis"]
+        root_ctx.shared_config.data.redis.model_dump()
     )
     stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(

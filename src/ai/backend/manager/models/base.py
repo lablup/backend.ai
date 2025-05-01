@@ -1691,7 +1691,7 @@ def generate_sql_info_for_gql_connection(
         ret = GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
 
     ctx: GraphQueryContext = info.context
-    max_page_size = cast(int | None, ctx.shared_config["api"]["max-gql-connection-page-size"])
+    max_page_size = cast(Optional[int], ctx.shared_config.data.api.max_gql_connection_page_size)
     if max_page_size is not None and ret.requested_page_size > max_page_size:
         raise ValueError(
             f"Cannot fetch a page larger than {max_page_size}. "

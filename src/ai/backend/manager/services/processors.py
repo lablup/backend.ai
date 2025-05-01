@@ -6,7 +6,7 @@ from ai.backend.common.events import EventDispatcher
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.config_legacy import SharedConfig
+from ai.backend.manager.config.shared import SharedManagerConfig
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -64,7 +64,7 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 @dataclass
 class ServiceArgs:
     db: ExtendedAsyncSAEngine
-    shared_config: SharedConfig
+    shared_config: SharedManagerConfig
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
     background_task_manager: BackgroundTaskManager

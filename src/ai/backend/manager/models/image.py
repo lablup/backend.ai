@@ -80,8 +80,7 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
-
-    from ..config_legacy import SharedConfig
+    from ai.backend.manager.config.shared import SharedManagerConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -704,7 +703,7 @@ class ImageRow(Base):
 
     async def get_slot_ranges(
         self,
-        shared_config: SharedConfig,
+        shared_config: SharedManagerConfig,
     ) -> Tuple[ResourceSlot, ResourceSlot]:
         slot_units = await shared_config.get_resource_slots()
         min_slot = ResourceSlot()

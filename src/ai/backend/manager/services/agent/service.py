@@ -9,7 +9,7 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config_legacy import SharedConfig
+from ai.backend.manager.config.shared import SharedManagerConfig
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -43,14 +43,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class AgentService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedConfig
+    _shared_config: SharedManagerConfig
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
-        shared_config: SharedConfig,
+        shared_config: SharedManagerConfig,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
@@ -62,7 +62,7 @@ class AgentService:
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
         :return token: agent watcher token ("insecure" if not set in config server)
         """
-        token = self._shared_config["watcher"]["token"]
+        token = self._shared_config.data.watcher.token
         if token is None:
             token = "insecure"
         agent_ip = await self._shared_config.etcd.get(f"nodes/agents/{agent_id}/ip")

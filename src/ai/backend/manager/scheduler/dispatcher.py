@@ -77,6 +77,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.shared import SharedManagerConfig
 from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
@@ -142,7 +143,6 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from ..config_legacy import LocalConfig, SharedConfig
     from ..registry import AgentRegistry
 
 __all__ = (
@@ -176,7 +176,7 @@ def load_agent_selector(
     sgroup_opts: ScalingGroupOpts,
     selector_config: Mapping[str, Any],
     agent_selection_resource_priority: list[str],
-    shared_config: SharedConfig,
+    shared_config: SharedManagerConfig,
 ) -> AbstractAgentSelector[AbstractResourceGroupState]:
     def create_agent_selector(
         selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
@@ -254,8 +254,8 @@ class LoadAgentSelectorArgs:
 
 
 class SchedulerDispatcher(aobject):
-    config: LocalConfig
-    shared_config: SharedConfig
+    config: ManagerLocalConfig
+    shared_config: SharedManagerConfig
     registry: AgentRegistry
     db: SAEngine
 
@@ -273,7 +273,7 @@ class SchedulerDispatcher(aobject):
     def __init__(
         self,
         local_config: ManagerLocalConfig,
-        shared_config: SharedConfig,
+        shared_config: SharedManagerConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
@@ -287,7 +287,7 @@ class SchedulerDispatcher(aobject):
         self.lock_factory = lock_factory
         self.db = registry.db
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-            self.shared_config.data["redis"]
+            self.shared_config.data.redis.model_dump()
         )
         self.redis_live = redis_helper.get_redis_object(
             etcd_redis_config.get_override_config(RedisRole.LIVE),
@@ -469,8 +469,8 @@ class SchedulerDispatcher(aobject):
 
     def _load_scheduler(self, args: LoadSchedulerArgs) -> AbstractScheduler:
         global_scheduler_opts = {}
-        if self.shared_config["plugins"]["scheduler"]:
-            global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
+        if self.shared_config.data.plugins.scheduler:
+            global_scheduler_opts = self.shared_config.data.plugins.scheduler.get(
                 args.scheduler_name, {}
             )
         scheduler_config = {**global_scheduler_opts, **args.sgroup_opts.config}
@@ -515,8 +515,8 @@ class SchedulerDispatcher(aobject):
                 )
 
         global_agselector_opts = {}
-        if self.shared_config["plugins"]["agent-selector"]:
-            global_agselector_opts = self.shared_config["plugins"]["agent-selector"].get(
+        if self.shared_config.data.plugins.agent_selector:
+            global_agselector_opts = self.shared_config.data.plugins.agent_selector.get(
                 agselector_name, {}
             )
         agselector_config = {

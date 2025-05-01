@@ -31,7 +31,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config_legacy import SharedConfig
+from ai.backend.manager.config.shared import SharedManagerConfig
 
 from ..models import AgentRow, KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
@@ -305,7 +305,9 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
 
     base_key: Final[str] = "resource-group-states"
 
-    def __init__(self, state_cls: type[T_ResourceGroupState], shared_config: SharedConfig) -> None:
+    def __init__(
+        self, state_cls: type[T_ResourceGroupState], shared_config: SharedManagerConfig
+    ) -> None:
         super().__init__(state_cls)
         self.shared_config = shared_config
 

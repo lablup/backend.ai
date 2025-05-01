@@ -76,7 +76,7 @@ from .user import UserRow
 from .vfolder import VFolderRow, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
-    from ai.backend.manager.config_legacy import SharedConfig
+    from ai.backend.manager.config.shared import SharedManagerConfig
     from ai.backend.manager.services.model_serving.types import EndpointTokenData
 
     from .gql import GraphQueryContext
@@ -768,7 +768,7 @@ class ModelServicePredicateChecker:
     @staticmethod
     async def check_extra_mounts(
         conn: AsyncConnection,
-        shared_config: "SharedConfig",
+        shared_config: SharedManagerConfig,
         storage_manager: StorageSessionManager,
         model_id: UUID,
         model_mount_destination: str,

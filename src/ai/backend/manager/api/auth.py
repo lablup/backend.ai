@@ -8,7 +8,7 @@ import secrets
 from collections import ChainMap
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple, cast
+from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Optional, Tuple, cast
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -25,6 +25,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.shared import AuthConfig
 
 from ..errors.exceptions import (
     AuthorizationFailed,
@@ -409,12 +410,9 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
 
 
 async def check_password_age(
-    db: ExtendedAsyncSAEngine, user: Row, auth_config: Mapping[str, Any] | None
+    db: ExtendedAsyncSAEngine, user: Row, auth_config: Optional[AuthConfig]
 ) -> None:
-    if (
-        auth_config is not None
-        and (max_password_age := auth_config["max_password_age"]) is not None
-    ):
+    if auth_config is not None and (max_password_age := auth_config.max_password_age) is not None:
         password_changed_at: datetime = user.users_password_changed_at
 
         async with db.begin_readonly() as db_conn:
@@ -731,7 +729,7 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         raise AuthorizationFailed("This account needs email verification.")
     if user["status"] in INACTIVE_USER_STATUSES:
         raise AuthorizationFailed("User credential mismatch.")
-    await check_password_age(root_ctx.db, user, root_ctx.shared_config["auth"])
+    await check_password_age(root_ctx.db, user, root_ctx.shared_config.data.auth)
     async with root_ctx.db.begin_session() as db_session:
         user_row = await UserRow.query_user_by_uuid(user["uuid"], db_session)
         if user_row is None:
@@ -1030,9 +1028,9 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
     log_args = (params["domain"], params["username"])
     log.info(log_fmt, *log_args)
 
-    if (auth_config := root_ctx.shared_config["auth"]) is None or auth_config[
-        "max_password_age"
-    ] is None:
+    if (
+        auth_config := root_ctx.shared_config.data.auth
+    ) is None or auth_config.max_password_age is None:
         raise GenericBadRequest("Unsupported function.")
 
     checked_user = await check_credential(

@@ -8,7 +8,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
 )
-from ai.backend.manager.config_legacy import SharedConfig
+from ai.backend.manager.config.shared import SharedManagerConfig
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -39,13 +39,13 @@ from ..types import FileInfo
 
 class VFolderFileService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedConfig
+    _shared_config: SharedManagerConfig
     _storage_manager: StorageSessionManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        shared_config: SharedConfig,
+        shared_config: SharedManagerConfig,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db

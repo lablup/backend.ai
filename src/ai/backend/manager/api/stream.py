@@ -67,7 +67,8 @@ from .utils import call_non_bursty, check_api_params
 from .wsproxy import TCPProxy
 
 if TYPE_CHECKING:
-    from ..config_legacy import SharedConfig
+    from ai.backend.manager.config.shared import SharedManagerConfig
+
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -690,7 +691,7 @@ async def handle_kernel_terminating(
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
     redis_live = root_ctx.redis_live
-    shared_config: SharedConfig = root_ctx.shared_config
+    shared_config: SharedManagerConfig = root_ctx.shared_config
     try:
         while True:
             try:

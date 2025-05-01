@@ -51,7 +51,7 @@ from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.local import HostPortPair as HostPortPairModel
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config_legacy import SharedConfig
+from ai.backend.manager.config.shared import SharedManagerConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -337,9 +337,9 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
+async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedManagerConfig]:
     root_ctx: RootContext = app["_root.context"]
-    shared_config = SharedConfig(
+    shared_config = SharedManagerConfig(
         root_ctx.local_config.etcd.addr.to_trafaret(),
         root_ctx.local_config.etcd.user,
         root_ctx.local_config.etcd.password,

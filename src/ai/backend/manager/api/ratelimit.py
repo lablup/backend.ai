@@ -94,7 +94,7 @@ async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
     etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data["redis"]
+        root_ctx.shared_config.data.redis.model_dump()
     )
     app_ctx.redis_rlim = redis_helper.get_redis_object(
         etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),
