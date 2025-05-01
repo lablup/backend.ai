@@ -970,7 +970,7 @@ class SchedulerDispatcher(aobject):
                 log_fmt + "unexpected-error, during agent allocation",
                 *log_args,
             )
-            exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
+            exc_data = convert_to_status_data(e, self.local_config.debug.enabled)
 
             async def _update_generic_failure() -> None:
                 async with self.db.begin_session() as kernel_db_sess:
@@ -1199,7 +1199,7 @@ class SchedulerDispatcher(aobject):
                         log_fmt + "unexpected-error, during agent allocation",
                         *log_args,
                     )
-                    exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
+                    exc_data = convert_to_status_data(e, self.local_config.debug.enabled)
 
                     async def _update_generic_failure() -> None:
                         async with self.db.begin_session() as kernel_db_sess:
@@ -1863,7 +1863,7 @@ class SchedulerDispatcher(aobject):
             assert len(session.kernels) > 0
             await self.registry.start_session(sched_ctx, session)
         except (asyncio.CancelledError, Exception) as e:
-            status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
+            status_data = convert_to_status_data(e, self.local_config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
             #       SCHEDULED and retry within some limit using status_data.

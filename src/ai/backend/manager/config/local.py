@@ -889,7 +889,7 @@ class ManagerLocalConfig(BaseModel):
         """,
     )
     docker_registry: DockerRegistryConfig = Field(
-        default=DockerRegistryConfig(ssl_verify=True),
+        default=DockerRegistryConfig.model_validate({"ssl-verify": True}),
         description="""
         Docker registry configuration.
         Contains settings for connecting to Docker registries.
