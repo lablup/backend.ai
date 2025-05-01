@@ -1386,8 +1386,12 @@ class EtcdRedisConfig:
                 target: RedisConfig(**cfg) for target, cfg in data["override_configs"].items()
             }
 
+        addr = None
+        if addr_data := data.get("addr"):
+            addr = HostPortPair(addr_data.get("host"), addr_data.get("port"))
+
         return cls(
-            addr=data.get("addr"),
+            addr=addr,
             sentinel=data.get("sentinel"),
             service_name=data.get("service_name"),
             password=data.get("password"),

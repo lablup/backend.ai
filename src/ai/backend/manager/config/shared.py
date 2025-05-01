@@ -8,7 +8,7 @@ from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone, tzinfo
 from ipaddress import IPv4Network
 from pprint import pformat
-from typing import Annotated, Any, Dict, Final, List, Mapping, Optional, Sequence, TypeAlias
+from typing import Annotated, Any, Final, List, Mapping, Optional, Sequence, TypeAlias
 
 import aiotools
 import click
@@ -31,6 +31,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
 from ai.backend.manager.errors.exceptions import ServerMisconfiguredError
+
+from .local import HostPortPair as HostPortPairModel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -135,6 +137,7 @@ class APIConfig(BaseModel):
         Important for browser-based clients connecting to the API.
         """,
         examples=["*", "https://example.com"],
+        alias="allow-origins",
     )
     allow_graphql_schema_introspection: bool = Field(
         default=False,
@@ -144,6 +147,7 @@ class APIConfig(BaseModel):
         When disabled, GraphQL tools like GraphiQL won't be able to explore the schema.
         """,
         examples=[True, False],
+        alias="allow-graphql-schema-introspection",
     )
     allow_openapi_schema_introspection: bool = Field(
         default=False,
@@ -153,6 +157,7 @@ class APIConfig(BaseModel):
         When disabled, Swagger UI and similar tools won't work.
         """,
         examples=[True, False],
+        alias="allow-openapi-schema-introspection",
     )
     max_gql_query_depth: Optional[int] = Field(
         default=None,
@@ -163,6 +168,7 @@ class APIConfig(BaseModel):
         Set to None to disable the limit.
         """,
         examples=[None, 10, 15],
+        alias="max-gql-query-depth",
     )
     max_gql_connection_page_size: Optional[int] = Field(
         default=None,
@@ -173,6 +179,7 @@ class APIConfig(BaseModel):
         Set to None to use the default page size.
         """,
         examples=[None, 100, 500],
+        alias="max-gql-connection-page-size",
     )
 
 
@@ -207,7 +214,7 @@ class RedisHelperConfig(BaseModel):
 
 
 class SingleRedisConfig(BaseModel):
-    addr: Optional[HostPortPair] = Field(
+    addr: Optional[HostPortPairModel] = Field(
         default=None,
         description="""
         Network address and port of the Redis server.
@@ -216,7 +223,7 @@ class SingleRedisConfig(BaseModel):
         """,
         examples=[None, {"host": "127.0.0.1", "port": 6379}],
     )
-    sentinel: Optional[List[HostPortPair]] = Field(
+    sentinel: Optional[list[HostPortPairModel]] = Field(
         default=None,
         description="""
         List of Redis Sentinel addresses for high availability.
@@ -236,6 +243,7 @@ class SingleRedisConfig(BaseModel):
         Identifies which service to monitor for failover.
         """,
         examples=[None, "mymaster", "backend-ai"],
+        alias="service-name",
     )
     password: Optional[str] = Field(
         default=None,
@@ -253,11 +261,12 @@ class SingleRedisConfig(BaseModel):
         Controls timeouts and reconnection behavior.
         Adjust based on network conditions and reliability requirements.
         """,
+        alias="redis-helper-config",
     )
 
 
 class RedisConfig(SingleRedisConfig):
-    override_configs: Optional[Dict[str, SingleRedisConfig]] = Field(
+    override_configs: Optional[dict[str, SingleRedisConfig]] = Field(
         default=None,
         description="""
         Optional override configurations for specific Redis contexts.
@@ -274,6 +283,7 @@ class RedisConfig(SingleRedisConfig):
                 }
             },
         ],
+        alias="override-configs",
     )
 
 
@@ -293,6 +303,7 @@ class DockerImageConfig(BaseModel):
         'none': Never pull automatically (manual control)
         """,
         examples=[item.value for item in DockerImageAutoPullPolicy],
+        alias="auto-pull",
     )
 
 
@@ -333,6 +344,7 @@ class PluginsConfig(BaseModel):
         Can implement various selection strategies based on load, resource availability, etc.
         """,
         examples=[{}],
+        alias="agent-selector",
     )
 
 
@@ -345,6 +357,7 @@ class InterContainerNetworkConfig(BaseModel):
         Container communication performance depends on this setting.
         """,
         examples=["overlay", None],
+        alias="default-driver",
     )
     enabled: bool = Field(
         default=False,
@@ -385,6 +398,8 @@ class RpcConfig(BaseModel):
         default=60.0,
         description="""
         """,
+        examples=[60.0, 120.0],
+        alias="keepalive-timeout",
     )
 
 
@@ -395,6 +410,7 @@ class NetworkConfig(BaseModel):
         Settings for networks between containers.
         Controls how containers communicate with each other.
         """,
+        alias="inter-container",
     )
     subnet: SubnetNetworkConfig = Field(
         default_factory=SubnetNetworkConfig,
@@ -428,6 +444,7 @@ class WatcherConfig(BaseModel):
         Increase for handling large files or slow storage systems.
         """,
         examples=[60.0, 120.0],
+        alias="file-io-timeout",
     )
 
 
@@ -485,8 +502,8 @@ class SessionConfig(BaseModel):
 
 
 class MetricConfig(BaseModel):
-    address: HostPortPair = Field(
-        default=HostPortPair(host="127.0.0.1", port=9090),
+    address: HostPortPairModel = Field(
+        default=HostPortPairModel(host="127.0.0.1", port=9090),
         description="""
         Network address and port of the Redis server.
         Redis is used for distributed caching and messaging between managers.

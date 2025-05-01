@@ -1,14 +1,15 @@
 import enum
+import ipaddress
 import os
 import secrets
 import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Any, List, Literal, Mapping, Optional, Self
+from typing import Annotated, Any, List, Literal, Mapping, Optional, Self, Sequence
 
 import click
-from pydantic import BaseModel, DirectoryPath, Field, FilePath
+from pydantic import BaseModel, DirectoryPath, Field, FilePath, PlainValidator
 
 from ai.backend.common import config
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
@@ -29,7 +30,7 @@ This email is sent from Backend.AI SMTP Reporter.
 """
 
 
-class HostPortPair(BaseModel):
+class _HostPortPair(BaseModel):
     host: str = Field(
         description="""
         Host address of the service.
@@ -54,6 +55,50 @@ class HostPortPair(BaseModel):
             host=self.host,
             port=self.port,
         )
+
+
+def _parse_host_port_pair(value: Any, *, allow_blank_host: bool = False) -> _HostPortPair:
+    if isinstance(value, _HostPortPair):
+        return value
+
+    if isinstance(value, str):
+        pair = value.rsplit(":", maxsplit=1)
+        if len(pair) == 1:
+            raise ValueError("value as string must contain both address and number")
+        host = pair[0]
+        port = pair[1]
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        if len(value) != 2:
+            raise ValueError("value as array must contain only two values for address and number")
+        host, port = value
+    elif isinstance(value, Mapping):
+        try:
+            host, port = value["host"], value["port"]
+        except KeyError:
+            raise ValueError('value as map must contain "host" and "port" keys') from None
+    else:
+        raise TypeError("unrecognized value type")
+
+    if isinstance(host, str):
+        try:
+            _host = ipaddress.ip_address(host.strip("[]"))
+        except ValueError:
+            pass
+
+    if not allow_blank_host and (host is None or host == ""):
+        raise ValueError("value has empty host")
+
+    try:
+        _port = int(port)
+    except (TypeError, ValueError):
+        raise ValueError("port number must be between 1 and 65535") from None
+    if not (1 <= _port <= 65535):
+        raise ValueError("port number must be between 1 and 65535")
+
+    return _HostPortPair(host=str(_host), port=_port)
+
+
+HostPortPair = Annotated[_HostPortPair, PlainValidator(_parse_host_port_pair)]
 
 
 class DatabaseType(enum.StrEnum):

@@ -85,7 +85,7 @@ class ContainerUtilizationMetricService:
 
     def __init__(self, shared_config: SharedManagerConfig) -> None:
         metric_config = shared_config.data.metric
-        metric_query_addr: HostPortPair = metric_config.address
+        metric_query_addr: HostPortPair = metric_config.address.to_trafaret()
         self._metric_query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
         self._range_vector_timewindow = cast(str, metric_config.timewindow)
 
