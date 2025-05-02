@@ -79,11 +79,10 @@ def _parse_host_port_pair(value: Any, *, allow_blank_host: bool = False) -> _Hos
     else:
         raise TypeError("unrecognized value type")
 
-    if isinstance(host, str):
-        try:
-            _host = ipaddress.ip_address(host.strip("[]"))
-        except ValueError:
-            pass
+    try:
+        _host = str(ipaddress.ip_address(host.strip("[]")))
+    except ValueError:
+        _host = host
 
     if not allow_blank_host and (host is None or host == ""):
         raise ValueError("value has empty host")
@@ -95,7 +94,7 @@ def _parse_host_port_pair(value: Any, *, allow_blank_host: bool = False) -> _Hos
     if not (1 <= _port <= 65535):
         raise ValueError("port number must be between 1 and 65535")
 
-    return _HostPortPair(host=str(_host), port=_port)
+    return _HostPortPair(host=_host, port=_port)
 
 
 HostPortPair = Annotated[_HostPortPair, PlainValidator(_parse_host_port_pair)]

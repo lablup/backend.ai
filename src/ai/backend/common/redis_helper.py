@@ -521,10 +521,14 @@ def get_redis_object(
         )
     else:
         redis_url = redis_config.addr
+        if redis_url is None:
+            raise ValueError("Redis URL is not provided in the configuration.")
+
         assert redis_url is not None
-        url = yarl.URL("redis://host").with_host(redis_url.host).with_port(
-            redis_url.port
-        ).with_password(redis_config.password) / str(db)
+        url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
+            redis_url[1]
+        ).with_password(redis_config.get("password")) / str(db)
+
         return RedisConnectionInfo(
             # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
             client=Redis(
