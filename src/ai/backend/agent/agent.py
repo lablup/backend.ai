@@ -2348,6 +2348,11 @@ class AbstractAgent(
                                             service_port.update(live_service)
                                             break
                             else:
+                                log.warning(
+                                    "Failed to retrieve service app info, retrying. (kernel:{}, container:{})",
+                                    kernel_id,
+                                    container_data["container_id"],
+                                )
                                 raise TryAgain
                     if self.local_config["debug"]["log-kernel-config"]:
                         log.debug("service ports:\n{!r}", pretty(service_ports))
