@@ -524,7 +524,6 @@ def get_redis_object(
         if redis_url is None:
             raise ValueError("Redis URL is not provided in the configuration.")
 
-        assert redis_url is not None
         url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
