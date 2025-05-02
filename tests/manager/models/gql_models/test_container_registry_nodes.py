@@ -130,6 +130,7 @@ async def test_modify_container_registry(
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
+    print("r!!", response)
 
     target_container_registries = list(
         filter(
