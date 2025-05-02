@@ -55,6 +55,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from tenacity import (
     AsyncRetrying,
+    RetryError,
     TryAgain,
     retry_if_exception_type,
     stop_after_attempt,
@@ -2349,7 +2350,7 @@ class AbstractAgent(
                                             break
                             else:
                                 log.warning(
-                                    "Failed to retrieve service app info, retrying. (kernel:{}, container:{})",
+                                    "Failed to retrieve service app info, retrying (kernel:{}, container:{})",
                                     kernel_id,
                                     container_data["container_id"],
                                 )
@@ -2378,6 +2379,20 @@ class AbstractAgent(
                     raise AgentError(
                         f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                     )
+                except RetryError:
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
+                    )
+                    err_msg = (
+                        "Container startup failed, the container might be missing or failed to initialize "
+                        f"(k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                    )
+                    log.exception(err_msg)
+                    raise AgentError(err_msg)
                 except BaseException as e:
                     log.exception(
                         "unexpected error while waiting container startup (k: {}, e: {})",
