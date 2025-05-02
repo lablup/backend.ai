@@ -55,6 +55,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from tenacity import (
     AsyncRetrying,
+    TryAgain,
     retry_if_exception_type,
     stop_after_attempt,
     stop_after_delay,
@@ -2328,7 +2329,8 @@ class AbstractAgent(
                             stop_after_attempt(kernel_init_polling_attempt)
                             | stop_after_delay(kernel_init_polling_timeout)
                         ),
-                        retry=retry_if_exception_type(zmq.error.ZMQError),
+                        retry=retry_if_exception_type(zmq.error.ZMQError)
+                        | retry_if_exception_type(TryAgain),
                     ):
                         with attempt:
                             # Wait until bootstrap script is executed.
@@ -2345,6 +2347,8 @@ class AbstractAgent(
                                         if live_service["name"] == service_port["name"]:
                                             service_port.update(live_service)
                                             break
+                            else:
+                                raise TryAgain
                     if self.local_config["debug"]["log-kernel-config"]:
                         log.debug("service ports:\n{!r}", pretty(service_ports))
                 except asyncio.TimeoutError:
