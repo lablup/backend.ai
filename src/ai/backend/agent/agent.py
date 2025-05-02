@@ -2330,8 +2330,10 @@ class AbstractAgent(
                             stop_after_attempt(kernel_init_polling_attempt)
                             | stop_after_delay(kernel_init_polling_timeout)
                         ),
-                        retry=retry_if_exception_type(zmq.error.ZMQError)
-                        | retry_if_exception_type(TryAgain),
+                        retry=(
+                            retry_if_exception_type(zmq.error.ZMQError)
+                            | retry_if_exception_type(TryAgain)
+                        ),
                     ):
                         with attempt:
                             # Wait until bootstrap script is executed.
