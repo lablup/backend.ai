@@ -32,6 +32,14 @@ This email is sent from Backend.AI SMTP Reporter.
 _max_num_proc = os.cpu_count() or 8
 _file_perm = (Path(__file__).parent.parent / "server.py").stat()
 
+    def __getitem__(self, *args) -> int | str:
+        if args[0] == 0:
+            return self.host
+        elif args[0] == 1:
+            return self.port
+        else:
+            raise KeyError(*args)
+
     # TODO: Remove this after all pydantic migration jobs done
     def to_trafaret(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(
