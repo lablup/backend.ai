@@ -101,6 +101,10 @@ class LabelName(enum.StrEnum):
     CUSTOMIZED_ID = "ai.backend.customized-image.id"
     CUSTOMIZED_USER_EMAIL = "ai.backend.customized-image.user.email"
 
+    # Identification
+    KERNEL_ID = "ai.backend.kernel-id"
+    SESSION_ID = "ai.backend.session-id"
+
 
 class KernelFeatures(StringSetFlag):
     UID_MATCH = "uid-match"

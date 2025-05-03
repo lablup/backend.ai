@@ -9,6 +9,7 @@ import attrs
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
+from ai.backend.common.docker import LabelName
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, ContainerId, KernelId, MountTypes, SessionId
 
@@ -71,7 +72,7 @@ class Container:
 
     @property
     def kernel_id(self) -> Optional[KernelId]:
-        raw_kernel_id = self.labels.get("ai.backend.kernel-id")
+        raw_kernel_id = self.labels.get(LabelName.KERNEL_ID.value)
         try:
             return KernelId(uuid.UUID(raw_kernel_id))
         except (TypeError, ValueError):
@@ -79,7 +80,7 @@ class Container:
 
     @property
     def session_id(self) -> Optional[SessionId]:
-        _session_id = self.labels.get("ai.backend.session-id")
+        _session_id = self.labels.get(LabelName.SESSION_ID.value)
         try:
             return SessionId(uuid.UUID(_session_id))
         except (TypeError, ValueError):
