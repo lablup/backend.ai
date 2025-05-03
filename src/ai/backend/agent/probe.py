@@ -85,7 +85,7 @@ class AgentProbe:
                     DanglingKernelDetected(registered_kernel_id),
                 )
 
-    async def probe(self) -> None:
+    async def probe(self, resource_ctx: None) -> None:
         """
         Scan containers and compare with kernel registry.
         """

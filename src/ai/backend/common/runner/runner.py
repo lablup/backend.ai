@@ -63,6 +63,16 @@ class ProbeRunner(Generic[TResourceCtx]):
         self._heartbeart_services = heartbeart_services
 
     @classmethod
+    def with_nop_resource_ctx(
+        cls,
+        interval: float,
+        probes: Sequence[Probe[None]],
+        heartbeart_services: Sequence[HeartbeatService[None]] = tuple(),
+    ) -> "ProbeRunner[None]":
+        obj = ProbeRunner[None](interval, NopResourceCtx(), probes, heartbeart_services)
+        return obj
+
+    @classmethod
     def nop(cls) -> "ProbeRunner[None]":
         obj = ProbeRunner[None](0, NopResourceCtx(), [])
         obj._closed = True

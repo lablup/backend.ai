@@ -61,7 +61,7 @@ class DockerKernelProbe:
                 # after the kernel is being terminated.
                 pass
 
-    async def probe(self) -> None:
+    async def probe(self, resource_ctx: None) -> None:
         try:
             container = await self._get_container_info()
             self._compare_with_container(container)
