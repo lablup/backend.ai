@@ -11,6 +11,7 @@ from aiohttp.typedefs import Handler, Middleware
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.utils import closing_async
+from ai.backend.common.docker import LabelName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
@@ -56,7 +57,11 @@ async def container_resolver_middleware(
         return web.Response(status=HTTPStatus.FORBIDDEN)
     async with closing_async(Docker()) as docker:
         containers = await docker.containers.list(
-            filters='{"label":["ai.backend.kernel-id"],"network":["bridge"],"status":["running"]}',
+            filters=(
+                '{"label":["'
+                + LabelName.KERNEL_ID.value
+                + '"],"network":["bridge"],"status":["running"]}'
+            )
         )
     target_container = list(
         filter(
@@ -71,7 +76,7 @@ async def container_resolver_middleware(
     request["container-ip"] = container_ip
     request["container"] = target_container[0]
     request["kernel"] = request.app["kernel-registry"].get(
-        UUID(target_container[0]["Labels"]["ai.backend.kernel-id"])
+        UUID(target_container[0]["Labels"][LabelName.KERNEL_ID.value])
     )
     return await handler(request)
 
