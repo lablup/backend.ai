@@ -771,7 +771,8 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
             owner_access_key=owner_access_key,
         )
     )
-    return web.json_response(result.result, status=HTTPStatus.OK)
+    resp = result.commit_info.asdict()
+    return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -796,7 +797,7 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
             owner_access_key=owner_access_key,
         )
     )
-    return web.json_response(result.result or {}, status=HTTPStatus.OK)
+    return web.json_response(result.abuse_report or {}, status=HTTPStatus.OK)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -1156,7 +1157,7 @@ async def get_info(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("GET_INFO: exception")
         raise
-    return web.json_response(result.result, status=HTTPStatus.OK)
+    return web.json_response(result.session_info.asdict(), status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)

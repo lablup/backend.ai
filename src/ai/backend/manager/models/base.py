@@ -37,6 +37,7 @@ import trafaret as t
 import yarl
 from aiodataloader import DataLoader
 from aiotools import apartial
+from dateutil.parser import isoparse
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql import Undefined
@@ -1355,6 +1356,13 @@ async def populate_fixture(
         async with engine.begin() as conn:
             # Apply typedecorator manually for required columns
             for col in table.columns:
+                if isinstance(col.type, sa.sql.sqltypes.DateTime):
+                    for row in rows:
+                        if col.name in row:
+                            if row[col.name] is not None:
+                                row[col.name] = isoparse(row[col.name])
+                            else:
+                                row[col.name] = None
                 if isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:
@@ -1363,12 +1371,19 @@ async def populate_fixture(
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls(row[col.name])
-                elif isinstance(
-                    col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)
-                ):
+                elif isinstance(col.type, (StructuredJSONObjectColumn)):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._schema.from_json(row[col.name])
+                elif isinstance(col.type, (StructuredJSONObjectListColumn)):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            row[col.name] = [
+                                item
+                                if isinstance(item, col.type._schema)
+                                else col.type._schema.from_json(item)
+                                for item in row[col.name]
+                            ]
 
             match op_mode:
                 case FixtureOpModes.INSERT:
