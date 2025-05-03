@@ -18,8 +18,8 @@ class ProbeRunnerWithNoResourceCtx:
     _runner_task: Optional[asyncio.Task]
 
     _interval: float
-    _heartbeart_services: Sequence[HeartbeatService]
     _probes: Sequence[Probe]
+    _heartbeart_services: Sequence[HeartbeatService]
 
     def __init__(
         self,
@@ -58,6 +58,8 @@ class ProbeRunnerWithNoResourceCtx:
             await self._run_probes()
             await self._heartbeat()
 
+            if self._closed:
+                break
             await asyncio.sleep(self._interval)
 
     async def run(self) -> None:

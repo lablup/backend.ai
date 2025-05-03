@@ -43,8 +43,8 @@ class ProbeRunner(Generic[TResourceCtx]):
     _resource_ctx: ResourceCtx[TResourceCtx]
 
     _interval: float
-    _heartbeart_services: Sequence[HeartbeatService]
     _probes: Sequence[Probe[TResourceCtx]]
+    _heartbeart_services: Sequence[HeartbeatService[TResourceCtx]]
 
     def __init__(
         self,
@@ -91,6 +91,8 @@ class ProbeRunner(Generic[TResourceCtx]):
             finally:
                 await self._resource_ctx.close()
 
+            if self._closed:
+                break
             await asyncio.sleep(self._interval)
 
     async def run(self) -> None:
