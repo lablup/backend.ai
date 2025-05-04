@@ -173,20 +173,19 @@ import sys
 import urllib
 from collections.abc import Mapping
 from contextvars import ContextVar
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import datetime, timezone
 from ipaddress import IPv4Network
 from pprint import pformat
-from typing import Annotated, Any, Final, List, Optional, Sequence, TypeAlias
+from typing import Any, Final, List, Optional, Sequence, TypeAlias
 
 import aiotools
 import click
 import yarl
-from dateutil import tz
-from dateutil.relativedelta import relativedelta
-from pydantic import BaseModel, Field, IPvAnyNetwork, PlainValidator
+from pydantic import BaseModel, Field, IPvAnyNetwork
 
 from ai.backend.common import config
 from ai.backend.common.configs.types import HostPortPair as HostPortPairModel
+from ai.backend.common.configs.types import TimeDuration, TimeZone
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
@@ -209,79 +208,6 @@ DEFAULT_INFLIGHT_CHUNKS: Final = 8
 NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
 
 current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
-
-
-TimeDelta = timedelta | relativedelta
-
-
-def _parse_time_duration(v: Any) -> TimeDelta:
-    if isinstance(v, (relativedelta, timedelta)):
-        return v
-
-    if isinstance(v, (int, float)):
-        if v < 0:
-            raise ValueError("value must be positive")
-        return timedelta(seconds=v)
-
-    if not isinstance(v, str) or len(v) == 0:
-        raise ValueError("value must be a number or string")
-
-    try:
-        if v[-2:].isalpha():
-            num_part, unit = v[:-2], v[-2:].lower()
-            if not num_part:
-                raise ValueError("value must not be empty")
-            t = int(num_part)
-            if t < 0:
-                raise ValueError("value must be positive")
-            if unit == "yr":
-                return relativedelta(years=t)
-            if unit == "mo":
-                return relativedelta(months=t)
-            raise ValueError("value is not a known time duration")
-
-        unit = v[-1].lower()
-        num_part = v[:-1] if unit.isalpha() else v
-        seconds_value: float = float(num_part)
-        if seconds_value < 0:
-            raise ValueError("value must be positive")
-
-        if not unit.isalpha():
-            return timedelta(seconds=seconds_value)
-        if unit == "w":
-            return timedelta(weeks=seconds_value)
-        if unit == "d":
-            return timedelta(days=seconds_value)
-        if unit == "h":
-            return timedelta(hours=seconds_value)
-        if unit == "m":
-            return timedelta(minutes=seconds_value)
-        if unit == "s":
-            return timedelta(seconds=seconds_value)
-
-        raise ValueError("value is not a known time duration")
-    except ValueError as exc:
-        raise ValueError(str(exc)) from None
-
-
-TimeDuration = Annotated[timedelta, PlainValidator(_parse_time_duration)]
-
-
-def _parse_to_tzinfo(v: Any) -> tzinfo:
-    if isinstance(v, tzinfo):
-        return v
-    if isinstance(v, str):
-        tzobj = tz.gettz(v)
-        if tzobj is None:
-            raise ValueError(f"unknown timezone: {v!r}")
-        return tzobj
-    raise TypeError("timezone must be str or tzinfo")
-
-
-TimeZone = Annotated[
-    tzinfo,
-    PlainValidator(_parse_to_tzinfo),
-]
 
 
 class SystemConfig(BaseModel):
