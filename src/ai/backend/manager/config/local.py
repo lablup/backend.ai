@@ -1,5 +1,4 @@
 import enum
-import ipaddress
 import os
 import secrets
 import socket
@@ -12,6 +11,7 @@ import click
 from pydantic import BaseModel, Field, FilePath
 
 from ai.backend.common import config
+from ai.backend.common.configs.types import HostPortPair
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import AutoDirectoryPath, GroupID, HostPortPair, UserID
 from ai.backend.logging.types import LogLevel
