@@ -171,11 +171,12 @@ import enum
 import logging
 import sys
 import urllib
+from collections.abc import Mapping
 from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone, tzinfo
 from ipaddress import IPv4Network
 from pprint import pformat
-from typing import Annotated, Any, Final, List, Mapping, Optional, Sequence, TypeAlias
+from typing import Annotated, Any, Final, List, Optional, Sequence, TypeAlias
 
 import aiotools
 import click
