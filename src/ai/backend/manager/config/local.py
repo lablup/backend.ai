@@ -65,17 +65,21 @@ class _HostPortPair(BaseModel):
         )
 
 
-def _parse_host_port_pair(value: Any, *, allow_blank_host: bool = False) -> _HostPortPair:
+# TODO: allow_blank_host가 False인 HostPortPair 타입을 하나 더 만들어야 할지?
+def _parse_host_port_pair(value: Any, *, allow_blank_host: bool = True) -> _HostPortPair:
     if isinstance(value, _HostPortPair):
         return value
 
     if isinstance(value, str):
+        host: str | ipaddress._BaseAddress
+        port: str | int
+
         pair = value.rsplit(":", maxsplit=1)
         if len(pair) == 1:
             raise ValueError("value as string must contain both address and number")
         host = pair[0]
         port = pair[1]
-    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+    elif isinstance(value, Sequence):
         if len(value) != 2:
             raise ValueError("value as array must contain only two values for address and number")
         host, port = value
@@ -83,26 +87,29 @@ def _parse_host_port_pair(value: Any, *, allow_blank_host: bool = False) -> _Hos
         try:
             host, port = value["host"], value["port"]
         except KeyError:
-            raise ValueError('value as map must contain "host" and "port" keys') from None
+            raise ValueError('value as map must contain "host" and "port" keys')
     else:
         raise TypeError("unrecognized value type")
 
     try:
-        _host = str(ipaddress.ip_address(host.strip("[]")))
+        if isinstance(host, str):
+            host = str(ipaddress.ip_address(host.strip("[]")))
+        elif isinstance(host, ipaddress._BaseAddress):
+            pass
     except ValueError:
-        _host = host
+        pass
 
-    if not allow_blank_host and (host is None or host == ""):
+    if not allow_blank_host and not host:
         raise ValueError("value has empty host")
 
     try:
-        _port = int(port)
+        port = int(port)
     except (TypeError, ValueError):
-        raise ValueError("port number must be between 1 and 65535") from None
-    if not (1 <= _port <= 65535):
+        raise ValueError("port number must be between 1 and 65535")
+    if not (1 <= port <= 65535):
         raise ValueError("port number must be between 1 and 65535")
 
-    return _HostPortPair(host=_host, port=_port)
+    return _HostPortPair(host=str(host), port=port)
 
 
 HostPortPair = Annotated[_HostPortPair, PlainValidator(_parse_host_port_pair)]
