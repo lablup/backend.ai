@@ -2,11 +2,11 @@ import datetime
 import ipaddress
 from collections.abc import Mapping
 from datetime import timedelta, tzinfo
-from typing import Annotated, Any, ClassVar, Sequence
+from typing import Any, ClassVar, Sequence
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
-from pydantic import BaseModel, Field, PlainValidator, model_validator
+from pydantic import BaseModel, Field, RootModel, model_validator
 
 from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
@@ -97,72 +97,76 @@ class HostPortPair(BaseModel):
 TimeDelta = timedelta | relativedelta
 
 
-def _parse_time_duration(value: Any, *, allow_negative: bool = False) -> TimeDelta:
-    if isinstance(value, (relativedelta, timedelta)):
-        return value
+class TimeDuration(RootModel[TimeDelta]):
+    root: TimeDelta
+    _allow_negative: ClassVar[bool] = False
 
-    if not isinstance(value, (int, float, str)):
-        raise ValueError("value must be a number or string")
-    if isinstance(value, (int, float)):
-        return timedelta(seconds=value)
-    if not isinstance(value, str):
-        raise ValueError("value must be a number or string")
+    @model_validator(mode="before")
+    @classmethod
+    def _parse(cls, value: Any) -> Any:
+        if isinstance(value, (relativedelta, datetime.timedelta)):
+            return value
 
-    if len(value) == 0:
-        raise ValueError("value must not be empty")
+        if isinstance(value, (int, float)):
+            return datetime.timedelta(seconds=value)
 
-    try:
-        unit = value[-1]
-        if unit.isdigit():
-            t = float(value)
-            if not allow_negative and t < 0:
-                raise ValueError(f"value {value} must be positive")
-            return datetime.timedelta(seconds=t)
-        elif value[-2:].isalpha():
-            t = int(value[:-2])
-            if not allow_negative and t < 0:
-                raise ValueError(f"value {value} must be positive")
-            if value[-2:] == "yr":
-                return relativedelta(years=t)
-            elif value[-2:] == "mo":
-                return relativedelta(months=t)
-            else:
-                raise ValueError(f"value {value} is not a known time duration")
-        else:
-            t = float(value[:-1])
-            if not allow_negative and t < 0:
-                raise ValueError(f"value {value} must be positive")
-            if value[-1] == "w":
-                return datetime.timedelta(weeks=t)
-            elif value[-1] == "d":
-                return datetime.timedelta(days=t)
-            elif value[-1] == "h":
-                return datetime.timedelta(hours=t)
-            elif value[-1] == "m":
-                return datetime.timedelta(minutes=t)
-            elif value[-1] == "s":
+        if not isinstance(value, str):
+            raise ValueError("value must be a number or string")
+        if len(value) == 0:
+            raise ValueError("value must not be empty")
+
+        try:
+            unit = value[-1]
+            if unit.isdigit():
+                t = float(value)
+                if not cls._allow_negative and t < 0:
+                    raise ValueError(f"value {value} must be positive")
                 return datetime.timedelta(seconds=t)
+
+            elif value[-2:].isalpha():
+                t = int(value[:-2])
+                if not cls._allow_negative and t < 0:
+                    raise ValueError(f"value {value} must be positive")
+                if value[-2:] == "yr":
+                    return relativedelta(years=t)
+                elif value[-2:] == "mo":
+                    return relativedelta(months=t)
+                else:
+                    raise ValueError(f"value {value} is not a known time duration")
+
             else:
-                raise ValueError(f"value {value} is not a known time duration")
-    except ValueError:
-        raise ValueError(f"invalid numeric literal: {value[:-1]}")
+                t = float(value[:-1])
+                if not cls._allow_negative and t < 0:
+                    raise ValueError(f"value {value} must be positive")
+                match value[-1]:
+                    case "w":
+                        return datetime.timedelta(weeks=t)
+                    case "d":
+                        return datetime.timedelta(days=t)
+                    case "h":
+                        return datetime.timedelta(hours=t)
+                    case "m":
+                        return datetime.timedelta(minutes=t)
+                    case "s":
+                        return datetime.timedelta(seconds=t)
+                    case _:
+                        raise ValueError(f"value {value} is not a known time duration")
+
+        except ValueError:
+            raise ValueError(f"invalid numeric literal: {value[:-1]}")
 
 
-TimeDuration = Annotated[timedelta, PlainValidator(_parse_time_duration)]
+class TimeZone(RootModel[tzinfo]):
+    root: tzinfo
 
-
-def _parse_to_tzinfo(value: Any) -> tzinfo:
-    if isinstance(value, tzinfo):
-        return value
-    if isinstance(value, str):
-        tzobj = tz.gettz(value)
-        if tzobj is None:
-            raise ValueError(f"value is not a known timezone: {value!r}")
-        return tzobj
-    raise TypeError("value must be string or tzinfo")
-
-
-TimeZone = Annotated[
-    tzinfo,
-    PlainValidator(_parse_to_tzinfo),
-]
+    @model_validator(mode="before")
+    @classmethod
+    def _parse(cls, value: Any) -> Any:
+        if isinstance(value, tzinfo):
+            return value
+        if isinstance(value, str):
+            tzobj = tz.gettz(value)
+            if tzobj is None:
+                raise ValueError(f"value is not a known timezone: {value!r}")
+            return tzobj
+        raise TypeError("value must be string or tzinfo")
