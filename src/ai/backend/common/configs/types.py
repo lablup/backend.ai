@@ -1,3 +1,4 @@
+import datetime
 import ipaddress
 from datetime import timedelta, tzinfo
 from typing import Annotated, Any, Mapping, Sequence
@@ -97,68 +98,69 @@ HostPortPair = Annotated[_HostPortPair, PlainValidator(_parse_host_port_pair)]
 TimeDelta = timedelta | relativedelta
 
 
-def _parse_time_duration(v: Any) -> TimeDelta:
-    if isinstance(v, (relativedelta, timedelta)):
-        return v
+def _parse_time_duration(value: Any, *, allow_negative: bool = False) -> TimeDelta:
+    if isinstance(value, (relativedelta, timedelta)):
+        return value
 
-    if isinstance(v, (int, float)):
-        if v < 0:
-            raise ValueError("value must be positive")
-        return timedelta(seconds=v)
-
-    if not isinstance(v, str) or len(v) == 0:
+    if not isinstance(value, (int, float, str)):
+        raise ValueError("value must be a number or string")
+    if isinstance(value, (int, float)):
+        return timedelta(seconds=value)
+    if not isinstance(value, str):
         raise ValueError("value must be a number or string")
 
+    if len(value) == 0:
+        raise ValueError("value must not be empty")
+
     try:
-        if v[-2:].isalpha():
-            num_part, unit = v[:-2], v[-2:].lower()
-            if not num_part:
-                raise ValueError("value must not be empty")
-            t = int(num_part)
-            if t < 0:
-                raise ValueError("value must be positive")
-            if unit == "yr":
+        unit = value[-1]
+        if unit.isdigit():
+            t = float(value)
+            if not allow_negative and t < 0:
+                raise ValueError(f"value {value} must be positive")
+            return datetime.timedelta(seconds=t)
+        elif value[-2:].isalpha():
+            t = int(value[:-2])
+            if not allow_negative and t < 0:
+                raise ValueError(f"value {value} must be positive")
+            if value[-2:] == "yr":
                 return relativedelta(years=t)
-            if unit == "mo":
+            elif value[-2:] == "mo":
                 return relativedelta(months=t)
-            raise ValueError("value is not a known time duration")
-
-        unit = v[-1].lower()
-        num_part = v[:-1] if unit.isalpha() else v
-        seconds_value: float = float(num_part)
-        if seconds_value < 0:
-            raise ValueError("value must be positive")
-
-        if not unit.isalpha():
-            return timedelta(seconds=seconds_value)
-        if unit == "w":
-            return timedelta(weeks=seconds_value)
-        if unit == "d":
-            return timedelta(days=seconds_value)
-        if unit == "h":
-            return timedelta(hours=seconds_value)
-        if unit == "m":
-            return timedelta(minutes=seconds_value)
-        if unit == "s":
-            return timedelta(seconds=seconds_value)
-
-        raise ValueError("value is not a known time duration")
-    except ValueError as exc:
-        raise ValueError(str(exc)) from None
+            else:
+                raise ValueError(f"value {value} is not a known time duration")
+        else:
+            t = float(value[:-1])
+            if not allow_negative and t < 0:
+                raise ValueError(f"value {value} must be positive")
+            if value[-1] == "w":
+                return datetime.timedelta(weeks=t)
+            elif value[-1] == "d":
+                return datetime.timedelta(days=t)
+            elif value[-1] == "h":
+                return datetime.timedelta(hours=t)
+            elif value[-1] == "m":
+                return datetime.timedelta(minutes=t)
+            elif value[-1] == "s":
+                return datetime.timedelta(seconds=t)
+            else:
+                raise ValueError(f"value {value} is not a known time duration")
+    except ValueError:
+        raise ValueError(f"invalid numeric literal: {value[:-1]}")
 
 
 TimeDuration = Annotated[timedelta, PlainValidator(_parse_time_duration)]
 
 
-def _parse_to_tzinfo(v: Any) -> tzinfo:
-    if isinstance(v, tzinfo):
-        return v
-    if isinstance(v, str):
-        tzobj = tz.gettz(v)
+def _parse_to_tzinfo(value: Any) -> tzinfo:
+    if isinstance(value, tzinfo):
+        return value
+    if isinstance(value, str):
+        tzobj = tz.gettz(value)
         if tzobj is None:
-            raise ValueError(f"unknown timezone: {v!r}")
+            raise ValueError(f"value is not a known timezone: {value!r}")
         return tzobj
-    raise TypeError("timezone must be str or tzinfo")
+    raise TypeError("value must be string or tzinfo")
 
 
 TimeZone = Annotated[
