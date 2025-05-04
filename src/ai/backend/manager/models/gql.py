@@ -12,6 +12,7 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
@@ -3146,15 +3147,28 @@ class GQLMetricMiddleware:
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
+                error_code=None,
                 success=True,
                 duration=time.perf_counter() - start,
             )
+        except BackendAIError as e:
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                error_code=e.error_code(),
+                success=False,
+                duration=time.perf_counter() - start,
+            )
+            raise e
         except BaseException as e:
             graph_ctx.metric_observer.observe_request(
                 operation_type=operation_type,
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
+                error_code=ErrorCode.default(),
                 success=False,
                 duration=time.perf_counter() - start,
             )

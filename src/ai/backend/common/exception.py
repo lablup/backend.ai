@@ -2,7 +2,7 @@ import enum
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Self
 
 from aiohttp import web
 
@@ -244,6 +244,19 @@ class ErrorCode:
     domain: ErrorDomain
     operation: ErrorOperation
     error_detail: ErrorDetail
+
+    @classmethod
+    def default(cls) -> Self:
+        """
+        Returns the default error code for Backend.AI errors.
+        This is used when the error code is not specified.
+        The default error code is `backendai_generic_internal-error`.
+        """
+        return cls(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
 
     def __str__(self) -> str:
         return f"{self.domain}_{self.operation}_{self.error_detail}"
