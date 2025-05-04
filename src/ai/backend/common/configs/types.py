@@ -1,7 +1,8 @@
 import datetime
 import ipaddress
+from collections.abc import Mapping
 from datetime import timedelta, tzinfo
-from typing import Annotated, Any, ClassVar, Mapping, Self, Sequence
+from typing import Annotated, Any, ClassVar, Sequence
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -33,7 +34,7 @@ class HostPortPair(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _parse(cls, value: Any) -> Self:
+    def _parse(cls, value: Any) -> Any:
         host: str | ipaddress._BaseAddress
         port: str | int
 
@@ -79,7 +80,7 @@ class HostPortPair(BaseModel):
         if not (1 <= port <= 65535):
             raise ValueError("port number must be between 1 and 65535")
 
-        return cls(host=str(host), port=port)
+        return {"host": str(host), "port": port}
 
     def __getitem__(self, *args) -> int | str:
         if args[0] == 0:
