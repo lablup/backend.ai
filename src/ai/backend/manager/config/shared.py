@@ -186,6 +186,7 @@ from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, Field, IPvAnyNetwork, PlainValidator
 
 from ai.backend.common import config
+from ai.backend.common.configs.types import HostPortPair as HostPortPairModel
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
@@ -199,8 +200,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
 from ai.backend.manager.errors.exceptions import ServerMisconfiguredError
-
-from .local import HostPortPair as HostPortPairModel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

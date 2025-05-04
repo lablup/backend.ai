@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
+from ai.backend.common.configs.types import HostPortPair as HostPortPairModel
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.logging import LocalLogger, LogLevel
@@ -49,7 +50,6 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
-from ai.backend.manager.config.local import HostPortPair as HostPortPairModel
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import SharedManagerConfig
 from ai.backend.manager.defs import DEFAULT_ROLE

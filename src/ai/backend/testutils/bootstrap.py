@@ -14,7 +14,7 @@ from typing import Final, Iterator
 
 import pytest
 
-from ai.backend.manager.config.local import HostPortPair as HostPortPairModel
+from ai.backend.common.configs.types import HostPortPair as HostPortPairModel
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__spec__.name)
