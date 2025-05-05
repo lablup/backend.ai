@@ -77,7 +77,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
@@ -176,7 +176,7 @@ def load_agent_selector(
     sgroup_opts: ScalingGroupOpts,
     selector_config: Mapping[str, Any],
     agent_selection_resource_priority: list[str],
-    shared_config: SharedManagerConfig,
+    shared_config: ManagerSharedConfig,
 ) -> AbstractAgentSelector[AbstractResourceGroupState]:
     def create_agent_selector(
         selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
@@ -255,7 +255,7 @@ class LoadAgentSelectorArgs:
 
 class SchedulerDispatcher(aobject):
     config: ManagerLocalConfig
-    shared_config: SharedManagerConfig
+    shared_config: ManagerSharedConfig
     registry: AgentRegistry
     db: SAEngine
 
@@ -273,7 +273,7 @@ class SchedulerDispatcher(aobject):
     def __init__(
         self,
         local_config: ManagerLocalConfig,
-        shared_config: SharedManagerConfig,
+        shared_config: ManagerSharedConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,

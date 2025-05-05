@@ -83,7 +83,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.types import AgentId, KernelId, SessionId
-    from ai.backend.manager.config.shared import SharedManagerConfig
+    from ai.backend.manager.config.shared import ManagerSharedConfig
 
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
@@ -194,7 +194,7 @@ class IdleCheckerHost:
     def __init__(
         self,
         db: SAEngine,
-        shared_config: SharedManagerConfig,
+        shared_config: ManagerSharedConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
@@ -1259,7 +1259,7 @@ checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
 
 async def init_idle_checkers(
     db: SAEngine,
-    shared_config: SharedManagerConfig,
+    shared_config: ManagerSharedConfig,
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
     lock_factory: DistributedLockFactory,

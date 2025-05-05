@@ -23,7 +23,7 @@ from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 
 
 class CLIContext:
@@ -112,10 +112,10 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 
 
 @contextlib.asynccontextmanager
-async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[SharedManagerConfig]:
+async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerSharedConfig]:
     local_config = cli_ctx.local_config
     # scope_prefix_map is created inside ConfigServer
-    shared_config = SharedManagerConfig(
+    shared_config = ManagerSharedConfig(
         local_config.etcd.addr.to_legacy(),
         local_config.etcd.user,
         local_config.etcd.password,
@@ -140,7 +140,7 @@ class RedisConnectionSet:
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     local_config = cli_ctx.local_config
-    shared_config = SharedManagerConfig(
+    shared_config = ManagerSharedConfig(
         local_config.etcd.addr.to_legacy(),
         local_config.etcd.user,
         local_config.etcd.password,

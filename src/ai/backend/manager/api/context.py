@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
-    from ai.backend.manager.config.shared import SharedManagerConfig
+    from ai.backend.manager.config.shared import ManagerSharedConfig
 
     from ..agent_cache import AgentRPCCache
     from ..idle import IdleCheckerHost
@@ -44,7 +44,7 @@ class RootContext(BaseContext):
     redis_image: RedisConnectionInfo
     redis_stream: RedisConnectionInfo
     redis_lock: RedisConnectionInfo
-    shared_config: SharedManagerConfig
+    shared_config: ManagerSharedConfig
     local_config: ManagerLocalConfig
     cors_options: CORSOptions
 

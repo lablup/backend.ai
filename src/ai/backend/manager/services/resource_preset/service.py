@@ -14,7 +14,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.domain import domains
@@ -62,14 +62,14 @@ def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
 
 class ResourcePresetService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedManagerConfig
+    _shared_config: ManagerSharedConfig
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
-        shared_config: SharedManagerConfig,
+        shared_config: ManagerSharedConfig,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry

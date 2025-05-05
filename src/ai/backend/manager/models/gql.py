@@ -18,7 +18,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
     AuditLogNode,
@@ -283,7 +283,7 @@ class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
     local_config: ManagerLocalConfig
-    shared_config: SharedManagerConfig
+    shared_config: ManagerSharedConfig
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str

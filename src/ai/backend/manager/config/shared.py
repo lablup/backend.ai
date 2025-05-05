@@ -623,7 +623,7 @@ class MetricConfig(BaseModel):
 
 
 # TODO: Need to rethink if we need to separate shared manager configs
-class SharedManagerConfigModel(BaseModel):
+class ManagerSharedConfigDataModel(BaseModel):
     system: SystemConfig = Field(
         default_factory=SystemConfig,
         description="""
@@ -696,8 +696,8 @@ class SharedManagerConfigModel(BaseModel):
     )
 
 
-class SharedManagerConfig:
-    data: SharedManagerConfigModel
+class ManagerSharedConfig:
+    data: ManagerSharedConfigDataModel
 
     def __init__(
         self,
@@ -728,7 +728,7 @@ class SharedManagerConfig:
         raw_cfg = await self.etcd.get_prefix("config")
 
         try:
-            self.data = SharedManagerConfigModel.model_validate(raw_cfg)
+            self.data = ManagerSharedConfigDataModel.model_validate(raw_cfg)
         except config.ConfigurationError as e:
             print("Validation of shared etcd configuration has failed:", file=sys.stderr)
             print(pformat(e.invalid_data), file=sys.stderr)

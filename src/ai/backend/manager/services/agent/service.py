@@ -9,7 +9,7 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -43,14 +43,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class AgentService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedManagerConfig
+    _shared_config: ManagerSharedConfig
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
-        shared_config: SharedManagerConfig,
+        shared_config: ManagerSharedConfig,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry

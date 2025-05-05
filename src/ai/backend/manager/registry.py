@@ -126,7 +126,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
@@ -245,7 +245,7 @@ class AgentRegistry:
     def __init__(
         self,
         local_config: ManagerLocalConfig,
-        shared_config: SharedManagerConfig,
+        shared_config: ManagerSharedConfig,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
         redis_stat: RedisConnectionInfo,

@@ -74,7 +74,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
@@ -338,7 +338,7 @@ async def exception_middleware(
 @actxmgr
 async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # populate public interfaces
-    root_ctx.shared_config = SharedManagerConfig(
+    root_ctx.shared_config = ManagerSharedConfig(
         root_ctx.local_config.etcd.addr.to_legacy(),
         root_ctx.local_config.etcd.user,
         root_ctx.local_config.etcd.password,

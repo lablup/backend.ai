@@ -19,7 +19,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.errors.exceptions import VFolderOperationFailed
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import (
@@ -74,7 +74,7 @@ class MutationResult:
 
 class GroupService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedManagerConfig
+    _shared_config: ManagerSharedConfig
     _redis_stat: RedisConnectionInfo
     _storage_manager: StorageSessionManager
 
@@ -82,7 +82,7 @@ class GroupService:
         self,
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
-        shared_config: SharedManagerConfig,
+        shared_config: ManagerSharedConfig,
         redis_stat: RedisConnectionInfo,
     ) -> None:
         self._db = db

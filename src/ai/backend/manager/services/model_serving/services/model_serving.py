@@ -33,7 +33,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.shared import SharedManagerConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
@@ -125,7 +125,7 @@ class ModelServingService:
     _background_task_manager: BackgroundTaskManager
     _event_dispatcher: EventDispatcher
     _storage_manager: StorageSessionManager
-    _shared_config: SharedManagerConfig
+    _shared_config: ManagerSharedConfig
 
     def __init__(
         self,
@@ -134,7 +134,7 @@ class ModelServingService:
         background_task_manager: BackgroundTaskManager,
         event_dispatcher: EventDispatcher,
         storage_manager: StorageSessionManager,
-        shared_config: SharedManagerConfig,
+        shared_config: ManagerSharedConfig,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
