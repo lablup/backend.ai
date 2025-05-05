@@ -339,7 +339,7 @@ async def exception_middleware(
 async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # populate public interfaces
     root_ctx.shared_config = SharedManagerConfig(
-        root_ctx.local_config.etcd.addr.to_trafaret(),
+        root_ctx.local_config.etcd.addr.to_legacy(),
         root_ctx.local_config.etcd.user,
         root_ctx.local_config.etcd.password,
         root_ctx.local_config.etcd.namespace,

@@ -340,7 +340,7 @@ def etcd_fixture(
 async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedManagerConfig]:
     root_ctx: RootContext = app["_root.context"]
     shared_config = SharedManagerConfig(
-        root_ctx.local_config.etcd.addr.to_trafaret(),
+        root_ctx.local_config.etcd.addr.to_legacy(),
         root_ctx.local_config.etcd.user,
         root_ctx.local_config.etcd.password,
         root_ctx.local_config.etcd.namespace,

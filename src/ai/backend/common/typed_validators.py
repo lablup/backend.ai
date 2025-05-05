@@ -277,7 +277,7 @@ class HostPortPair(BaseModel):
         else:
             raise KeyError(*args)
 
-    def to_trafaret(self) -> LegacyHostPortPair:
+    def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
 
 

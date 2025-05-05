@@ -100,7 +100,7 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
         # TODO: provide a way to specify other scope prefixes
     }
     etcd = AsyncEtcd(
-        local_config.etcd.addr.to_trafaret(),
+        local_config.etcd.addr.to_legacy(),
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=creds,
@@ -116,7 +116,7 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[SharedManagerConfig]:
     local_config = cli_ctx.local_config
     # scope_prefix_map is created inside ConfigServer
     shared_config = SharedManagerConfig(
-        local_config.etcd.addr.to_trafaret(),
+        local_config.etcd.addr.to_legacy(),
         local_config.etcd.user,
         local_config.etcd.password,
         local_config.etcd.namespace,
@@ -141,7 +141,7 @@ class RedisConnectionSet:
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     local_config = cli_ctx.local_config
     shared_config = SharedManagerConfig(
-        local_config.etcd.addr.to_trafaret(),
+        local_config.etcd.addr.to_legacy(),
         local_config.etcd.user,
         local_config.etcd.password,
         local_config.etcd.namespace,
