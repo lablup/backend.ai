@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 import pytest
@@ -7,6 +8,7 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
 )
 from ai.backend.common.service_discovery.service_discovery import (
     HealthStatus,
+    ServiceDiscoveryLoop,
     ServiceEndpoint,
     ServiceMetadata,
 )
@@ -14,68 +16,68 @@ from ai.backend.common.service_discovery.service_discovery import (
 
 async def test_etcd_discovery_register(
     etcd_discovery: ETCDServiceDiscovery,
-    default_etcd_metadata: ServiceMetadata,
+    default_service_metadata: ServiceMetadata,
 ) -> None:
     await etcd_discovery.register(
-        service=default_etcd_metadata,
+        service=default_service_metadata,
     )
     service = await etcd_discovery.get_service(
-        service_group=default_etcd_metadata.service_group,
-        service_id=default_etcd_metadata.id,
+        service_group=default_service_metadata.service_group,
+        service_id=default_service_metadata.id,
     )
-    assert service == default_etcd_metadata
+    assert service == default_service_metadata
 
 
 async def test_etcd_discovery_heartbeat(
     etcd_discovery: ETCDServiceDiscovery,
-    default_etcd_metadata: ServiceMetadata,
+    default_service_metadata: ServiceMetadata,
 ) -> None:
     await etcd_discovery.register(
-        service=default_etcd_metadata,
+        service=default_service_metadata,
     )
     await etcd_discovery.heartbeat(
-        service_group=default_etcd_metadata.service_group,
-        service_id=default_etcd_metadata.id,
+        service_group=default_service_metadata.service_group,
+        service_id=default_service_metadata.id,
     )
     updated_service_meta: ServiceMetadata = await etcd_discovery.get_service(
-        service_group=default_etcd_metadata.service_group,
-        service_id=default_etcd_metadata.id,
+        service_group=default_service_metadata.service_group,
+        service_id=default_service_metadata.id,
     )
     assert (
-        default_etcd_metadata.health_status.last_heartbeat
+        default_service_metadata.health_status.last_heartbeat
         < updated_service_meta.health_status.last_heartbeat
     )
-    assert default_etcd_metadata == updated_service_meta
+    assert default_service_metadata == updated_service_meta
 
 
 async def test_etcd_discovery_unregister(
     etcd_discovery: ETCDServiceDiscovery,
-    default_etcd_metadata: ServiceMetadata,
+    default_service_metadata: ServiceMetadata,
 ) -> None:
     await etcd_discovery.register(
-        service=default_etcd_metadata,
+        service=default_service_metadata,
     )
     await etcd_discovery.unregister(
-        service_group=default_etcd_metadata.service_group,
-        service_id=default_etcd_metadata.id,
+        service_group=default_service_metadata.service_group,
+        service_id=default_service_metadata.id,
     )
     with pytest.raises(ValueError):
         await etcd_discovery.get_service(
-            service_group=default_etcd_metadata.service_group,
-            service_id=default_etcd_metadata.id,
+            service_group=default_service_metadata.service_group,
+            service_id=default_service_metadata.id,
         )
 
 
 async def test_etcd_discovery_discover_single_service(
     etcd_discovery: ETCDServiceDiscovery,
-    default_etcd_metadata: ServiceMetadata,
+    default_service_metadata: ServiceMetadata,
 ) -> None:
     await etcd_discovery.register(
-        service=default_etcd_metadata,
+        service=default_service_metadata,
     )
     services = await etcd_discovery.discover()
     assert len(services) == 1
-    assert services[0] == default_etcd_metadata
+    assert services[0] == default_service_metadata
 
 
 def make_mock_service_metadata(
@@ -169,3 +171,44 @@ async def test_etcd_discovery_get_service_when_multiple_services(
         service_id=first_service.id,
     )
     assert service == first_service
+
+
+async def test_etcd_discovery_loop_heartbeat(
+    etcd_discovery: ETCDServiceDiscovery,
+    default_service_metadata: ServiceMetadata,
+) -> None:
+    loop = ServiceDiscoveryLoop(etcd_discovery, default_service_metadata)
+    loop.start()
+
+    await asyncio.sleep(5)
+    updated_service_meta: ServiceMetadata = await etcd_discovery.get_service(
+        service_group=default_service_metadata.service_group,
+        service_id=default_service_metadata.id,
+    )
+    assert (
+        default_service_metadata.health_status.last_heartbeat
+        < updated_service_meta.health_status.last_heartbeat
+    )
+    await loop.close()
+
+
+async def test_etcd_discovery_loop_with_unhealthy_metadata(
+    etcd_discovery: ETCDServiceDiscovery,
+    default_service_metadata: ServiceMetadata,
+    unhealthy_service_metadata: ServiceMetadata,
+) -> None:
+    await etcd_discovery.register(
+        service=unhealthy_service_metadata,
+    )
+
+    loop = ServiceDiscoveryLoop(etcd_discovery, default_service_metadata)
+    loop.start()
+
+    await asyncio.sleep(5)
+
+    with pytest.raises(ValueError):
+        await etcd_discovery.get_service(
+            service_group=unhealthy_service_metadata.service_group,
+            service_id=unhealthy_service_metadata.id,
+        )
+    await loop.close()

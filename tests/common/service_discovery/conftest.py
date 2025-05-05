@@ -1,3 +1,4 @@
+import time
 import uuid
 
 import pytest
@@ -28,7 +29,7 @@ async def etcd_discovery(etcd: AsyncEtcd):
 
 
 @pytest.fixture
-async def default_etcd_metadata():
+async def default_service_metadata():
     yield ServiceMetadata(
         id=uuid.uuid4(),
         display_name="test_service",
@@ -41,4 +42,26 @@ async def default_etcd_metadata():
             prometheus_address="localhost:9090",
         ),
         health_status=HealthStatus(),
+    )
+
+
+@pytest.fixture
+async def unhealthy_service_metadata():
+    before_10_minutes = time.time() - 60 * 10
+    print(f"Unhealthy service metadata: {before_10_minutes}")
+    yield ServiceMetadata(
+        id=uuid.uuid4(),
+        display_name="test_service",
+        service_group="test_group",
+        version="1.0.0",
+        endpoint=ServiceEndpoint(
+            address="localhost",
+            port=8080,
+            protocol="http",
+            prometheus_address="localhost:9090",
+        ),
+        health_status=HealthStatus(
+            registration_time=before_10_minutes,
+            last_heartbeat=before_10_minutes,
+        ),
     )

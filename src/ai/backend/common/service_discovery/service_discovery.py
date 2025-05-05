@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -6,8 +7,12 @@ from typing import Any, Optional, Self, Sequence
 
 from pydantic import BaseModel, Field
 
+from ai.backend.logging.utils import BraceStyleAdapter
+
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
 _DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minute
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ServiceEndpoint(BaseModel):
@@ -181,11 +186,8 @@ class ServiceDiscoveryLoop:
         self._closed = True
         if self._run_service_task is not None:
             self._run_service_task.cancel()
-            try:
-                await self._run_service_task
-            except asyncio.CancelledError:
-                pass
-            self._run_service_task = None
+        if self._sweep_unhealthy_services_task is not None:
+            self._sweep_unhealthy_services_task.cancel()
 
     async def _sweep_unhealthy_services_loop(self) -> None:
         """
@@ -202,7 +204,7 @@ class ServiceDiscoveryLoop:
                             service_id=service.id,
                         )
             except Exception as e:
-                print(f"Error sweeping unhealthy services: {e}")
+                log.error("Error sweeping unhealthy services: {}", e)
             await asyncio.sleep(_DEFAULT_SWEEP_INTERVAL)
 
     async def _run_service_loop(self) -> None:
@@ -214,7 +216,7 @@ class ServiceDiscoveryLoop:
                     service_id=self._metadata.id,
                 )
             except Exception as e:
-                print(f"Error sending heartbeat: {e}")
+                log.error("Error sending heartbeat: {}", e)
             await asyncio.sleep(self._interval_seconds)
         await self._service_discovery.unregister(
             service_group=self._metadata.service_group,

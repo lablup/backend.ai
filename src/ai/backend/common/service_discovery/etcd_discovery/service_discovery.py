@@ -30,7 +30,6 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         """
 
         prefix = self._service_prefix(service.service_group, service.id)
-        service.health_status.update_heartbeat()
         await self._etcd.put_prefix(prefix, service.to_dict())
 
     async def unregister(self, service_group: str, service_id: uuid.UUID) -> None:
