@@ -67,7 +67,6 @@ from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
     EtcdRedisConfig,
-    HostPortPair,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -1043,11 +1042,11 @@ async def server_main(
             internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
             await runner.setup()
             await internal_runner.setup()
-            service_addr = cast(HostPortPair, root_ctx.local_config.manager.service_addr)
-            internal_addr = cast(HostPortPair, root_ctx.local_config.manager.internal_addr)
+            service_addr = root_ctx.local_config.manager.service_addr
+            internal_addr = root_ctx.local_config.manager.internal_addr
             site = web.TCPSite(
                 runner,
-                str(service_addr.host),
+                service_addr.host,
                 service_addr.port,
                 backlog=1024,
                 reuse_port=True,
@@ -1055,16 +1054,14 @@ async def server_main(
             )
             internal_site = web.TCPSite(
                 internal_runner,
-                str(internal_addr.host),
+                internal_addr.host,
                 internal_addr.port,
                 backlog=1024,
                 reuse_port=True,
             )
             await site.start()
             await internal_site.start()
-            public_metrics_port = cast(
-                Optional[int], root_ctx.local_config.manager.public_metrics_port
-            )
+            public_metrics_port = root_ctx.local_config.manager.public_metrics_port
             if public_metrics_port is not None:
                 _app = build_public_app(
                     root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
@@ -1073,7 +1070,7 @@ async def server_main(
                 await _runner.setup()
                 _site = web.TCPSite(
                     _runner,
-                    str(service_addr.host),
+                    service_addr.host,
                     public_metrics_port,
                     backlog=1024,
                     reuse_port=True,

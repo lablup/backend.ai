@@ -278,7 +278,7 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
-        self.rpc_keepalive_timeout = int(shared_config.data.network.rpc.keepalive_timeout or 60)
+        self.rpc_keepalive_timeout = int(shared_config.data.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
