@@ -1,11 +1,13 @@
+import asyncio
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Self, Sequence
+from typing import Any, Optional, Self, Sequence
 
 from pydantic import BaseModel, Field
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
+_DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minute
 
 
 class ServiceEndpoint(BaseModel):
@@ -88,20 +90,20 @@ class ServiceDiscovery(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def unregister(self, service_group: str, uuid: uuid.UUID) -> None:
+    async def unregister(self, service_group: str, service_id: uuid.UUID) -> None:
         """
         Unregister a service.
         :param service_group: Name of the service group.
-        :param uuid: UUID of the service.
+        :param service_id: UUID of the service.
         """
         raise NotImplementedError
 
     @abstractmethod
-    async def heartbeat(self, service_group: str, uuid: uuid.UUID) -> None:
+    async def heartbeat(self, service_group: str, service_id: uuid.UUID) -> None:
         """
         Send a heartbeat to the service discovery.
         :param service_group: Name of the service group.
-        :param uuid: UUID of the service.
+        :param service_id: UUID of the service.
         """
         raise NotImplementedError
 
@@ -123,11 +125,98 @@ class ServiceDiscovery(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_service(self, service_group: str, uuid: uuid.UUID) -> ServiceMetadata:
+    async def get_service(self, service_group: str, service_id: uuid.UUID) -> ServiceMetadata:
         """
         Get service address by name.
         :param service_group: Name of the service group.
-        :param uuid: UUID of the service.
+        :param service_id: UUID of the service.
         :return: Service metadata.
         """
         raise NotImplementedError
+
+
+class ServiceDiscoveryLoop:
+    """
+    Service discovery loop.
+    This class is used to discover services in a distributed system.
+    """
+
+    _service_discovery: ServiceDiscovery
+    _metadata: ServiceMetadata
+    _interval_seconds: int
+    _closed: bool = False
+    _run_service_task: Optional[asyncio.Task[None]]
+    _sweep_unhealthy_services_task: Optional[asyncio.Task[None]]
+
+    def __init__(
+        self,
+        service_discovery: ServiceDiscovery,
+        metadata: ServiceMetadata,
+        interval_seconds: int = 60,
+    ) -> None:
+        self._service_discovery = service_discovery
+        self._metadata = metadata
+        self._interval_seconds = interval_seconds
+        self._closed = False
+        self._run_service_task = None
+        self._sweep_unhealthy_services_task = None
+
+    def start(self) -> None:
+        """
+        Start the service discovery loop.
+        """
+        if self._run_service_task is not None:
+            raise RuntimeError("Service discovery loop is already running.")
+        self._run_service_task = asyncio.create_task(self._run_service_loop())
+        self._sweep_unhealthy_services_task = asyncio.create_task(
+            self._sweep_unhealthy_services_loop()
+        )
+
+    async def close(self) -> None:
+        """
+        Close the service discovery loop.
+        """
+        if self._closed:
+            return
+        self._closed = True
+        if self._run_service_task is not None:
+            self._run_service_task.cancel()
+            try:
+                await self._run_service_task
+            except asyncio.CancelledError:
+                pass
+            self._run_service_task = None
+
+    async def _sweep_unhealthy_services_loop(self) -> None:
+        """
+        Sweep unhealthy services.
+        This method is used to sweep unhealthy services in the service discovery.
+        """
+        while not self._closed:
+            try:
+                services = await self._service_discovery.discover()
+                for service in services:
+                    if not service.health_status.is_healthy:
+                        await self._service_discovery.unregister(
+                            service_group=service.service_group,
+                            service_id=service.id,
+                        )
+            except Exception as e:
+                print(f"Error sweeping unhealthy services: {e}")
+            await asyncio.sleep(_DEFAULT_SWEEP_INTERVAL)
+
+    async def _run_service_loop(self) -> None:
+        await self._service_discovery.register(self._metadata)
+        while not self._closed:
+            try:
+                await self._service_discovery.heartbeat(
+                    service_group=self._metadata.service_group,
+                    service_id=self._metadata.id,
+                )
+            except Exception as e:
+                print(f"Error sending heartbeat: {e}")
+            await asyncio.sleep(self._interval_seconds)
+        await self._service_discovery.unregister(
+            service_group=self._metadata.service_group,
+            service_id=self._metadata.id,
+        )
