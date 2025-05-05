@@ -34,8 +34,7 @@ class HealthStatus(BaseModel):
     registration_time: float = Field(default_factory=time.time)
     last_heartbeat: float = Field(default_factory=time.time)
 
-    @property
-    def is_healthy(self, timeout: float = _DEFAULT_HEARTBEAT_TIMEOUT) -> bool:
+    def check_healthy(self, timeout: float = _DEFAULT_HEARTBEAT_TIMEOUT) -> bool:
         """
         Check if the service is healthy.
         :return: True if the service is healthy, False otherwise.
@@ -198,7 +197,7 @@ class ServiceDiscoveryLoop:
             try:
                 services = await self._service_discovery.discover()
                 for service in services:
-                    if not service.health_status.is_healthy:
+                    if not service.health_status.check_healthy():
                         await self._service_discovery.unregister(
                             service_group=service.service_group,
                             service_id=service.id,
