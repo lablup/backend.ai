@@ -181,14 +181,18 @@ from typing import Any, Final, List, Optional, Sequence, TypeAlias
 import aiotools
 import click
 import yarl
-from pydantic import BaseModel, Field, IPvAnyNetwork, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, IPvAnyNetwork, field_serializer
 
 from ai.backend.common import config
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.typed_validators import TimeDuration, TimeZone
+from ai.backend.common.typed_validators import (
+    TimeDuration,
+    TimeZone,
+    _TimeDurationPydanticAnnotation,
+)
 from ai.backend.common.types import (
     HostPortPair,
     SlotName,
@@ -218,6 +222,17 @@ class SystemConfig(BaseModel):
         Uses pytz-compatible timezone names.
         """,
         examples=["UTC"],
+    )
+
+
+class ResourcesConfig(BaseModel):
+    group_resource_visibility: bool = Field(
+        default=False,
+        description="""
+        Whether to return group resource status in check-presets.
+        If true, group resources are visible to all users in the group.
+        """,
+        examples=[True, False],
     )
 
 
@@ -273,6 +288,14 @@ class APIConfig(BaseModel):
         """,
         examples=[None, 100, 500],
         alias="max-gql-connection-page-size",
+    )
+    resources: Optional[ResourcesConfig] = Field(
+        default=None,
+        description="""
+        Resource visibility settings.
+        Controls how resources are shared and visible between users and groups.
+        """,
+        examples=[None, {"group_resource_visibility": True}],
     )
 
 
@@ -450,6 +473,13 @@ class PluginsConfig(BaseModel):
         """,
         examples=[{}],
         alias="agent-selector",
+    )
+    network: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="""
+        Network plugin configurations.
+        """,
+        examples=[{"overlay": {"mtu": 1500}}],
     )
 
 
@@ -633,6 +663,144 @@ class MetricConfig(BaseModel):
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 
+class IdleCheckerConfig(BaseModel):
+    enabled: str = Field(
+        default="timeout,utilization",
+        description="""
+        Enabled idle checkers.
+        Comma-separated list of checker names.
+        """,
+        examples=["timeout", "utilization"],
+    )
+    app_streaming_packet_timeout: TimeDuration = Field(
+        default=_TimeDurationPydanticAnnotation.time_duration_validator("5m"),
+        description="""
+        Timeout for app-streaming TCP connections.
+        Controls how long the system waits before considering a connection idle.
+        """,
+        examples=["5m", "10m"],
+    )
+    checkers: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="""
+        Idle checkers configurations.
+        """,
+        examples=[
+            {
+                "timeout": {
+                    "threshold": "10m",
+                },
+                "utilization": {
+                    "resource-thresholds": {
+                        "cpu_util": {
+                            "average": 30,
+                        },
+                        "mem": {
+                            "average": 30,
+                        },
+                        "cuda_util": {
+                            "average": 30,
+                        },
+                        "cuda_mem": {
+                            "average": 30,
+                        },
+                    }
+                },
+                "thresholds-check-operator": "and",
+                "time-window": "12h",
+                "initial-grace-period": "5m",
+            }
+        ],
+    )
+
+
+class VolumesConfig(BaseModel):
+    types: dict[str, Any] = Field(
+        default_factory=dict,
+        description="""
+        """,
+        examples=[{"user": {}, "group": {}}],
+        alias="_types",
+    )
+    default_host: Optional[str] = Field(
+        default=None,
+        description="""
+        """,
+        examples=[None, "localhost:6021"],
+    )
+    proxies: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="""
+        """,
+        examples=[
+            {
+                "local": {
+                    "client_api": "http://localhost:6021",
+                    "manager_api": "http://localhost:6022",
+                    "secret": "xxxxxx...",
+                    "ssl_verify": True,
+                    "sftp_scaling_groups": "group-1,group-2,...",
+                },
+                "mynas1": {
+                    "client_api": "https://proxy1.example.com:6021",
+                    "manager_api": "https://proxy1.example.com:6022",
+                    "secret": "xxxxxx...",
+                    "ssl_verify": True,
+                    "sftp_scaling_groups": "group-3,group-4,...",
+                },
+            }
+        ],
+    )
+    exposed_volume_info: Optional[str] = Field(
+        default=None,
+        description="""
+        """,
+        examples=[None, "percentage"],
+    )
+
+
+# TODO: Make this more precise type
+class ResourceSlotsConfig(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+    )
+
+
+# TODO: Make this more precise type
+class AgentsConfig(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+    )
+
+
+class NodesConfig(BaseModel):
+    manager: dict[str, str] = Field(
+        default_factory=dict,
+        description="""
+        """,
+        examples=[{"instance-id": "up"}],
+    )
+    redis: RedisConfig = Field(
+        default_factory=RedisConfig,
+        description="""
+        """,
+    )
+    agents: AgentsConfig = Field(
+        default_factory=AgentsConfig,
+        description="""
+        Agent configuration settings.
+        Controls how agents are managed and monitored.
+        """,
+    )
+
+
+# TODO: Make this more precise type
+class ScalingGroupConfig(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+    )
+
+
 # TODO: Need to rethink if we need to separate shared manager configs
 class ManagerSharedConfigDataModel(BaseModel):
     system: SystemConfig = Field(
@@ -654,6 +822,12 @@ class ManagerSharedConfigDataModel(BaseModel):
         description="""
         Redis database configuration.
         Used for distributed caching and messaging between managers.
+        """,
+    )
+    idle: IdleCheckerConfig = Field(
+        default_factory=IdleCheckerConfig,
+        description="""
+        Idle session checker configuration.
         """,
     )
     docker: DockerConfig = Field(
@@ -703,6 +877,34 @@ class ManagerSharedConfigDataModel(BaseModel):
         description="""
         Metric collection settings.
         Controls how metrics are collected and reported.
+        """,
+    )
+    volumes: VolumesConfig = Field(
+        default_factory=VolumesConfig,
+        description="""
+        Volume management settings.
+        Controls how volumes are managed and accessed.
+        """,
+    )
+    nodes: NodesConfig = Field(
+        default_factory=NodesConfig,
+        description="""
+        Configuration for nodes in the system.
+        Controls how nodes are defined and managed.
+        """,
+    )
+    sgroup: ScalingGroupConfig = Field(
+        default_factory=ScalingGroupConfig,
+        description="""
+        Scaling group configuration settings.
+        Controls how scaling groups are managed and monitored.
+        """,
+    )
+    resource_slots: ResourceSlotsConfig = Field(
+        default_factory=ResourceSlotsConfig,
+        description="""
+        Resource slots configuration.
+        Controls how resources are allocated and managed.
         """,
     )
 

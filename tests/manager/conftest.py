@@ -664,7 +664,7 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            str(root_ctx.local_config.manager.service_addr.host),
+            root_ctx.local_config.manager.service_addr.host,
             root_ctx.local_config.manager.service_addr.port,
             reuse_port=True,
         )
