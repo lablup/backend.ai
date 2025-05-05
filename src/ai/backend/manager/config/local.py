@@ -461,7 +461,7 @@ class ManagerConfig(BaseModel):
     importer_image: str = Field(
         default="lablup/importer:manylinux2010",
         description="""
-        Container image used for the importer service.
+        Deprecated: Container image used for the importer service.
         The importer handles tasks like installing additional packages.
         Should be compatible with the Backend.AI environment.
         """,
@@ -576,9 +576,8 @@ class DockerRegistryConfig(BaseModel):
     ssl_verify: bool = Field(
         default=True,
         description="""
-        Whether to verify SSL certificates when connecting to Docker registries.
+        Deprecated: Whether to verify SSL certificates when connecting to Docker registries.
         Disabling this is not recommended except for testing with self-signed certificates.
-        Note: This configuration is deprecated as of v20.09.
         """,
         examples=[True, False],
         alias="ssl-verify",
@@ -737,7 +736,7 @@ class ActionMonitorsConfig(BaseModel):
         description="""
         List of action types to subscribe to for monitoring.
         """,
-        examples=[["session.create_from_params"]],
+        examples=[["session.create_from_params", "session.create_cluster"]],
         alias="subscribed-actions",
     )
     reporter: str = Field(
@@ -864,9 +863,8 @@ class ManagerLocalConfig(BaseModel):
     docker_registry: DockerRegistryConfig = Field(
         default=DockerRegistryConfig.model_validate({"ssl-verify": True}),
         description="""
-        Docker registry configuration.
+        Deprecated: Docker registry configuration.
         Contains settings for connecting to Docker registries.
-        Note: This configuration is deprecated as of v20.09.
         """,
         alias="docker-registry",
     )
@@ -895,7 +893,7 @@ class ManagerLocalConfig(BaseModel):
         description="""
         Reporter configuration.
         Controls how notifications and logs are reported.
-        Includes settings for SMTP, audit logs, and action monitors.
+        Includes settings for Audit Logs, and Action Monitors, and SMTP reporters.
         Each reporter can be configured with its own settings.
         """
     )
