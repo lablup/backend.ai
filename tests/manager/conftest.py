@@ -40,7 +40,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
-from ai.backend.common.configs.types import HostPortPair as HostPortPairModel
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
