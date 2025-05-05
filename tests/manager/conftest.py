@@ -356,7 +356,7 @@ def database(request, local_config, test_db) -> None:
     Create a new database for the current test session
     and install the table schema using alembic.
     """
-    db_addr = local_config.db.addr.to_trafaret()
+    db_addr = local_config.db.addr.to_legacy()
     db_user = local_config.db.user
     db_pass = local_config.db.password
 
@@ -474,7 +474,7 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
     Populate the example data as fixtures to the database
     and delete them after use.
     """
-    db_addr = local_config.db.addr.to_trafaret()
+    db_addr = local_config.db.addr.to_legacy()
     db_user = local_config.db.user
     db_pass = local_config.db.password
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"

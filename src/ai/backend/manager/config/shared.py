@@ -357,12 +357,6 @@ class SingleRedisConfig(BaseModel):
         alias="redis-helper-config",
     )
 
-    # @field_serializer("addr")
-    # def _ser_addr(self, addr: Optional[HostPortPairModel]) -> Optional[str]:
-    #     if addr is None:
-    #         return None
-    #     return f"{addr.host}:{addr.port}"
-
 
 class RedisConfig(SingleRedisConfig):
     override_configs: Optional[dict[str, SingleRedisConfig]] = Field(

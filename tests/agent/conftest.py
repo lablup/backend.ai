@@ -56,6 +56,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
     var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
+    redis_addr = redis_container[1]
     mount_path = Path.cwd() / "vfroot"
 
     registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
@@ -103,11 +104,11 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         "logging": logging_config,
         "debug": defaultdict(lambda: False),
         "etcd": {
-            "addr": etcd_addr.to_trafaret(),
+            "addr": etcd_addr.to_legacy(),
             "namespace": f"ns-{test_id}",
         },
         "redis": {
-            "addr": redis_container[1].to_trafaret(),
+            "addr": redis_addr.to_legacy(),
             "sentinel": None,
             "service_name": None,
             "password": None,
