@@ -36,6 +36,7 @@ python_distribution(
         "src/ai/backend/common/middlewares:src",
         "src/ai/backend/common/metrics:src",
         "src/ai/backend/common/plugin:src",
+        "src/ai/backend/common/service_discovery:src",
         "src/ai/backend/common/web/session:src",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
