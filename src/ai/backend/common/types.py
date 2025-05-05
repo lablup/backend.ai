@@ -1393,9 +1393,11 @@ class EtcdRedisConfig:
                 addr = HostPortPair(addr_data.host, addr_data.port)
             elif isinstance(addr_data, Mapping):
                 addr = HostPortPair(addr_data["host"], addr_data["port"])
-            else:
+            elif isinstance(addr_data, str):
                 addr_data = addr_data.split(":")
                 addr = HostPortPair(addr_data[0], int(addr_data[1]))
+            else:
+                raise ValueError(f"Invalid addr format: {addr_data}")
 
         return cls(
             addr=addr,
