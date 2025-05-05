@@ -1,8 +1,8 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Sequence
+from dataclasses import asdict, dataclass
+from typing import Any, Self, Sequence
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
 
@@ -37,6 +37,12 @@ class HealthStatus:
         now = time.time()
         return (now - self.last_heartbeat) < timeout
 
+    def update_heartbeat(self) -> None:
+        """
+        Update the last heartbeat time.
+        """
+        self.last_heartbeat = time.time()
+
 
 @dataclass
 class ServiceMetadata:
@@ -50,6 +56,17 @@ class ServiceMetadata:
     version: str
     endpoint: ServiceEndpoint
     health_status: HealthStatus
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        return cls(**data)
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Convert the service metadata to a dictionary.
+        :return: Dictionary representation of the service metadata.
+        """
+        return asdict(self)
 
 
 class ServiceDiscovery(ABC):
@@ -67,17 +84,19 @@ class ServiceDiscovery(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def unregister(self, uuid: uuid.UUID) -> None:
+    async def unregister(self, service_group: str, uuid: uuid.UUID) -> None:
         """
         Unregister a service.
+        :param service_group: Name of the service group.
         :param uuid: UUID of the service.
         """
         raise NotImplementedError
 
     @abstractmethod
-    async def heartbeat(self, uuid: uuid.UUID) -> None:
+    async def heartbeat(self, service_group: str, uuid: uuid.UUID) -> None:
         """
         Send a heartbeat to the service discovery.
+        :param service_group: Name of the service group.
         :param uuid: UUID of the service.
         """
         raise NotImplementedError
@@ -86,7 +105,7 @@ class ServiceDiscovery(ABC):
     async def discover(self) -> Sequence[ServiceMetadata]:
         """
         Discover services.
-        :return: List of service addresses.
+        :return: List of service metadata.
         """
         raise NotImplementedError
 
@@ -95,15 +114,16 @@ class ServiceDiscovery(ABC):
         """
         Get services by group.
         :param service_group: Name of the service group.
-        :return: List of service addresses.
+        :return: List of service metadata.
         """
         raise NotImplementedError
 
     @abstractmethod
-    async def get_service(self, uuid: uuid.UUID) -> ServiceMetadata:
+    async def get_service(self, service_group: str, uuid: uuid.UUID) -> ServiceMetadata:
         """
         Get service address by name.
-        :param service_name: Name of the service.
-        :return: Service address.
+        :param service_group: Name of the service group.
+        :param uuid: UUID of the service.
+        :return: Service metadata.
         """
         raise NotImplementedError
