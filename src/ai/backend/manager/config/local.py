@@ -11,8 +11,8 @@ import click
 from pydantic import BaseModel, DirectoryPath, Field, FilePath
 
 from ai.backend.common import config
-from ai.backend.common.configs.types import HostPortPair
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
+from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.pglock import PgAdvisoryLock
 
