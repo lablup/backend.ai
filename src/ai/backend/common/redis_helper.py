@@ -249,7 +249,7 @@ async def execute(
             redis.exceptions.ReadOnlyError,
             redis.exceptions.ConnectionError,
             ConnectionResetError,
-            TypeError,  # The current version of redis.py raises a TypeError when the Connection is closed.
+            TypeError,  # 4.5.5 version of redis.py raises a TypeError when the Connection is closed.
         ) as e:
             warn_on_first_attempt = True
             if (
