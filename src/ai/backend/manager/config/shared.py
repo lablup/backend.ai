@@ -452,12 +452,14 @@ class InterContainerNetworkConfig(BaseModel):
         examples=["overlay", None],
         alias="default-driver",
     )
+    # TODO: Write description
     enabled: bool = Field(
         default=False,
         description="""
         """,
         examples=[True, False],
     )
+    # TODO: Write description
     plugin: Optional[str] = Field(
         default=None,
         description="""
@@ -489,6 +491,7 @@ class SubnetNetworkConfig(BaseModel):
 class RpcConfig(BaseModel):
     keepalive_timeout: float = Field(
         default=60.0,
+        # TODO: Write description
         description="""
         """,
         examples=[60.0, 120.0],
@@ -598,9 +601,7 @@ class MetricConfig(BaseModel):
     address: HostPortPairModel = Field(
         default=HostPortPairModel(host="127.0.0.1", port=9090),
         description="""
-        Network address and port of the Redis server.
-        Redis is used for distributed caching and messaging between managers.
-        Set to None when using Sentinel for high availability.
+        Address for the metric collection service.
         """,
         examples=[None, {"host": "127.0.0.1", "port": 6379}],
         alias="addr",

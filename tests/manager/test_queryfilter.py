@@ -18,9 +18,9 @@ class UserTypes(enum.Enum):
 
 @pytest.fixture
 async def virtual_user_db(postgres_container):  # noqa
-    host_and_port = postgres_container[1]
-    host = host_and_port.host
-    port = host_and_port.port
+    pgsql_addr = postgres_container[1]
+    host = pgsql_addr.host
+    port = pgsql_addr.port
 
     db_id = secrets.token_hex(16)
     engine = sa.engine.create_engine(
