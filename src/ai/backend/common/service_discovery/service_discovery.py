@@ -1,14 +1,14 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
 from typing import Any, Self, Sequence
+
+from pydantic import BaseModel, Field
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
 
 
-@dataclass
-class ServiceEndpoint:
+class ServiceEndpoint(BaseModel):
     """
     Service endpoint.
     """
@@ -19,14 +19,13 @@ class ServiceEndpoint:
     prometheus_address: str
 
 
-@dataclass
-class HealthStatus:
+class HealthStatus(BaseModel):
     """
     Health status of a service.
     """
 
-    registration_time: float
-    last_heartbeat: float
+    registration_time: float = Field(default_factory=time.time)
+    last_heartbeat: float = Field(default_factory=time.time)
 
     @property
     def is_healthy(self, timeout: float = _DEFAULT_HEARTBEAT_TIMEOUT) -> bool:
@@ -43,9 +42,14 @@ class HealthStatus:
         """
         self.last_heartbeat = time.time()
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, HealthStatus):
+            return False
+        # Heartbeat time is not considered for equality check
+        return self.registration_time == value.registration_time
 
-@dataclass
-class ServiceMetadata:
+
+class ServiceMetadata(BaseModel):
     """
     Metadata for a service.
     """
@@ -55,7 +59,7 @@ class ServiceMetadata:
     service_group: str
     version: str
     endpoint: ServiceEndpoint
-    health_status: HealthStatus
+    health_status: HealthStatus = Field(default_factory=HealthStatus)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -66,7 +70,7 @@ class ServiceMetadata:
         Convert the service metadata to a dictionary.
         :return: Dictionary representation of the service metadata.
         """
-        return asdict(self)
+        return self.model_dump()
 
 
 class ServiceDiscovery(ABC):
