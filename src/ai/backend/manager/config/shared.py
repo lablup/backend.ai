@@ -181,7 +181,7 @@ from typing import Any, Final, List, Optional, Sequence, TypeAlias
 import aiotools
 import click
 import yarl
-from pydantic import BaseModel, Field, IPvAnyNetwork
+from pydantic import BaseModel, Field, IPvAnyNetwork, field_serializer
 
 from ai.backend.common import config
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
@@ -356,6 +356,18 @@ class SingleRedisConfig(BaseModel):
         """,
         alias="redis-helper-config",
     )
+
+    @field_serializer("addr")
+    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info) -> Optional[str]:
+        return None if addr is None else f"{addr.host}:{addr.port}"
+
+    @field_serializer("sentinel")
+    def _serialize_sentinel(
+        self, sentinel: Optional[list[HostPortPairModel]], _info
+    ) -> Optional[str]:
+        if sentinel is None:
+            return None
+        return ",".join(f"{hp.host}:{hp.port}" for hp in sentinel)
 
 
 class RedisConfig(SingleRedisConfig):
@@ -603,7 +615,7 @@ class MetricConfig(BaseModel):
         description="""
         Address for the metric collection service.
         """,
-        examples=[None, {"host": "127.0.0.1", "port": 6379}],
+        examples=[None, {"host": "127.0.0.1", "port": 9090}],
         alias="addr",
     )
     timewindow: str = Field(
@@ -615,6 +627,10 @@ class MetricConfig(BaseModel):
         """,
         examples=["1m", "1h"],
     )
+
+    @field_serializer("address")
+    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info: Any) -> Optional[str]:
+        return None if addr is None else f"{addr.host}:{addr.port}"
 
 
 # TODO: Need to rethink if we need to separate shared manager configs

@@ -251,8 +251,8 @@ class ManagerConfig(BaseModel):
     )
     internal_addr: HostPortPair = Field(
         default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
-        # TODO: Write description
         description="""
+        Set the internal hostname/port to accept internal API requests.
         """,
         examples=[{"host": "127.0.0.1", "port": 18080}],
         alias="internal-addr",
