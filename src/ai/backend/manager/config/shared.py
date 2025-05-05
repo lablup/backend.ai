@@ -513,6 +513,7 @@ class InterContainerNetworkConfig(BaseModel):
         """,
         examples=[True, False],
     )
+    # TODO: Write description
     plugin: Optional[str] = Field(
         default=None,
         description="""
