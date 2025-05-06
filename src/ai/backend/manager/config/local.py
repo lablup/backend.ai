@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, FilePath
 
 from ai.backend.common import config
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.typed_validators import AutoDirectoryPath, HostPortPair
+from ai.backend.common.typed_validators import AutoDirectoryPath, GroupID, HostPortPair, UserID
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -221,8 +221,8 @@ class ManagerConfig(BaseModel):
         """,
         examples=["i-manager123"],
     )
-    user: Optional[int] = Field(
-        default=_file_perm.st_uid,
+    user: Optional[UserID] = Field(
+        default=UserID(_file_perm.st_uid),
         description="""
         User ID (UID) under which the manager process runs.
         If not specified, defaults to the UID of the server.py file.
@@ -230,8 +230,8 @@ class ManagerConfig(BaseModel):
         """,
         examples=[_file_perm.st_uid],
     )
-    group: Optional[int] = Field(
-        default=_file_perm.st_gid,
+    group: Optional[GroupID] = Field(
+        default=GroupID(_file_perm.st_gid),
         description="""
         Group ID (GID) under which the manager process runs.
         If not specified, defaults to the GID of the server.py file.
@@ -312,7 +312,7 @@ class ManagerConfig(BaseModel):
         default=None,
         description="""
         Path to the SSL private key file.
-        Required if ssl_enabled is True.
+        Required if `ssl_enabled` is True.
         Should be a PEM-formatted private key corresponding to the certificate.
         """,
         examples=["fixtures/manager/manager.key"],

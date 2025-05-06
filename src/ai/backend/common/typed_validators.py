@@ -1,10 +1,12 @@
 import datetime
 import ipaddress
+import os
+import pwd
 import re
 from collections.abc import Mapping
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Sequence, TypeAlias
+from typing import Annotated, Any, ClassVar, Optional, Sequence, TypeAlias
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -316,3 +318,93 @@ class AutoDirectoryPath(DirectoryPath):
             core_schema.no_info_plain_validator_function(ensure_exists),
             handler(DirectoryPath),
         ])
+
+
+class UserID(int):
+    _default_uid: Optional[int] = None
+
+    @classmethod
+    def check_and_return(cls, value: Any) -> int:
+        if value is None:
+            if cls._default_uid is not None:
+                return cls._default_uid
+            else:
+                return os.getuid()
+        elif isinstance(value, int):
+            if value == -1:
+                return os.getuid()
+        elif isinstance(value, str):
+            if not value:
+                if cls._default_uid is not None:
+                    return cls._default_uid
+                else:
+                    return os.getuid()
+            try:
+                value = int(value)
+            except ValueError:
+                try:
+                    return pwd.getpwnam(value).pw_uid
+                except KeyError:
+                    raise ValueError(f"no such user {value} in system")
+            else:
+                return cls.check_and_return(value)
+        else:
+            raise ValueError("value must be either int or str")
+        return value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        def _validate(value: Any) -> "UserID":
+            uid_int = cls.check_and_return(value)
+            return cls(uid_int)
+
+        return core_schema.no_info_plain_validator_function(_validate)
+
+
+class GroupID(int):
+    _default_gid: Optional[int] = None
+
+    @classmethod
+    def check_and_return(cls, value: Any) -> int:
+        if value is None:
+            if cls._default_gid is not None:
+                return cls._default_gid
+            else:
+                return os.getgid()
+        elif isinstance(value, int):
+            if value == -1:
+                return os.getgid()
+        elif isinstance(value, str):
+            if not value:
+                if cls._default_gid is not None:
+                    return cls._default_gid
+                else:
+                    return os.getgid()
+            try:
+                value = int(value)
+            except ValueError:
+                try:
+                    return pwd.getpwnam(value).pw_gid
+                except KeyError:
+                    raise ValueError(f"no such group {value!r} in system")
+            else:
+                return cls.check_and_return(value)
+        else:
+            raise ValueError("value must be either int or str")
+        return value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        def _validate(value: Any) -> "GroupID":
+            gid_int = cls.check_and_return(value)
+            return cls(gid_int)
+
+        return core_schema.no_info_plain_validator_function(_validate)
