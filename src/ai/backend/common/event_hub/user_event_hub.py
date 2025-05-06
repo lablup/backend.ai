@@ -2,12 +2,22 @@ import enum
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, MutableMapping
+from typing import MutableMapping, Optional
 
 
 class UserEvent(ABC):
     @abstractmethod
-    def serialize_user_event(self) -> dict[str, Any]:
+    def event_name(self) -> Optional[str]:
+        """Get the name of the event."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def retry_count(self) -> Optional[int]:
+        """Get the retry count for the event."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def serialize_user_event(self) -> str:
         """Serialize the user event to a dictionary."""
         raise NotImplementedError
 
@@ -16,6 +26,11 @@ class UserEventSender(ABC):
     @abstractmethod
     async def send_event(self, event: UserEvent) -> None:
         """Send an event to the event hub."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Close the sender."""
         raise NotImplementedError
 
 
@@ -27,6 +42,7 @@ class AliasDomain(enum.StrEnum):
     USER = "user"
     SESSION = "session"
     KERNEL = "kernel"
+    BGTASK = "bg_task"
 
 
 @dataclass
