@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from ai.backend.logging.utils import BraceStyleAdapter
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
-_DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minute
+_DEFAULT_SWEEP_INTERVAL = 60 * 10  # 10 minutes
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
