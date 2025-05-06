@@ -48,6 +48,7 @@ from .types import AgentId, DispatchResult, RedisConnectionInfo, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 TaskStatus = Literal[
     "bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed", "bgtask_partial_success"
 ]
@@ -96,7 +97,7 @@ class ProgressReporter:
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
-            tracker_key = f"bgtask.{self._task_id}"
+            tracker_key = self._tracker_id(self._task_id)
             await pipe.hset(
                 tracker_key,
                 mapping={
@@ -233,8 +234,8 @@ class BackgroundTaskManager:
         RHS of return tuple will be filled with extra informations when needed
         (e.g. progress information of task when callee is trying to poll information of already completed one)
         """
-        tracker_key = f"bgtask.{task_id}"
-        task_info: dict = await redis_helper.execute(
+        tracker_key = self._tracker_id(task_id)
+        task_info = await redis_helper.execute(
             self._redis_client,
             lambda r: r.hgetall(tracker_key),
             encoding="utf-8",
@@ -312,7 +313,7 @@ class BackgroundTaskManager:
         status: TaskStatus,
         msg: str = "",
     ) -> None:
-        tracker_key = f"bgtask.{task_id}"
+        tracker_key = self._tracker_id(task_id)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
@@ -425,3 +426,6 @@ class BackgroundTaskManager:
         log.info(
             "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
         )
+
+    def _tracker_id(self, task_id: uuid.UUID) -> str:
+        return f"bgtask.{task_id}"
