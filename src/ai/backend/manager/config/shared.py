@@ -766,41 +766,6 @@ class ResourceSlotsConfig(BaseModel):
     )
 
 
-# TODO: Make this more precise type
-class AgentsConfig(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-    )
-
-
-class NodesConfig(BaseModel):
-    manager: dict[str, str] = Field(
-        default_factory=dict,
-        description="""
-        """,
-        examples=[{"instance-id": "up"}],
-    )
-    redis: RedisConfig = Field(
-        default_factory=RedisConfig,
-        description="""
-        """,
-    )
-    agents: AgentsConfig = Field(
-        default_factory=AgentsConfig,
-        description="""
-        Agent configuration settings.
-        Controls how agents are managed and monitored.
-        """,
-    )
-
-
-# TODO: Make this more precise type
-class ScalingGroupConfig(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-    )
-
-
 # TODO: Need to rethink if we need to separate shared manager configs
 class ManagerSharedConfigDataModel(BaseModel):
     system: SystemConfig = Field(
@@ -884,20 +849,6 @@ class ManagerSharedConfigDataModel(BaseModel):
         description="""
         Volume management settings.
         Controls how volumes are managed and accessed.
-        """,
-    )
-    nodes: NodesConfig = Field(
-        default_factory=NodesConfig,
-        description="""
-        Configuration for nodes in the system.
-        Controls how nodes are defined and managed.
-        """,
-    )
-    sgroup: ScalingGroupConfig = Field(
-        default_factory=ScalingGroupConfig,
-        description="""
-        Scaling group configuration settings.
-        Controls how scaling groups are managed and monitored.
         """,
     )
     resource_slots: ResourceSlotsConfig = Field(
