@@ -74,6 +74,7 @@ from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.volume import VolumeConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
@@ -96,7 +97,6 @@ from .api.types import (
     CleanupContext,
     WebRequestHandler,
 )
-from .config_legacy import volume_config_iv
 from .errors.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -596,7 +596,7 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.storage import StorageSessionManager
 
     raw_vol_config = await root_ctx.shared_config.etcd.get_prefix("volumes")
-    config = volume_config_iv.check(raw_vol_config)
+    config = VolumeConfig.model_validate(raw_vol_config)
     root_ctx.storage_manager = StorageSessionManager(config)
     yield
     await root_ctx.storage_manager.aclose()

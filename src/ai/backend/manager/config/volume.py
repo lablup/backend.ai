@@ -2,9 +2,11 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from ai.backend.common.typed_validators import CommaSeparatedStrList
+
 
 class VFolderTypeConfig(BaseModel):
-    user: Optional[dict[str, Any]] = Field(
+    user: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
         User vFolder type configuration.
@@ -12,7 +14,7 @@ class VFolderTypeConfig(BaseModel):
         Standard folder type for individual users.
         """,
     )
-    group: Optional[dict[str, Any]] = Field(
+    group: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
         Group vFolder type configuration.
@@ -56,7 +58,7 @@ class VFolderProxyConfig(BaseModel):
         """,
         examples=[True, False],
     )
-    sftp_scaling_groups: Optional[list[str]] = Field(
+    sftp_scaling_groups: Optional[CommaSeparatedStrList] = Field(
         default=None,
         description="""
         List of SFTP scaling groups that the volume is mapped to.
@@ -67,12 +69,13 @@ class VFolderProxyConfig(BaseModel):
 
 
 class VolumeConfig(BaseModel):
-    _types: VFolderTypeConfig = Field(
+    types: VFolderTypeConfig = Field(
         default_factory=lambda: VFolderTypeConfig(user={}),
         description="""
         Defines which types of virtual folders are enabled.
         Contains configuration for user and group folders.
         """,
+        alias="_types",
     )
     default_host: str = Field(
         description="""
@@ -82,8 +85,8 @@ class VolumeConfig(BaseModel):
         """,
         examples=["local:default", "nas:main-volume"],
     )
-    exposed_volume_info: list[str] = Field(
-        default=["percentage"],
+    exposed_volume_info: CommaSeparatedStrList = Field(
+        default=CommaSeparatedStrList(["percentage"]),
         description="""
         Controls what volume information is exposed to users.
         Options include "percentage" for disk usage percentage.
