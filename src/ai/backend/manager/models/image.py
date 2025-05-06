@@ -694,7 +694,9 @@ class ImageRow(Base):
             "mem": {"min": INTRINSIC_SLOTS_MIN[SlotName("mem")], "max": None},
         }
 
-        for k, v in filter(lambda pair: pair[0].startswith(RESOURCE_LABEL_PREFIX), self.labels):
+        for k, v in filter(
+            lambda pair: pair[0].startswith(RESOURCE_LABEL_PREFIX), self.labels.items()
+        ):
             res_key = k[len(RESOURCE_LABEL_PREFIX) :]
             resources[res_key] = {"min": v}
 
