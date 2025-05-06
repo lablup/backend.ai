@@ -3,6 +3,7 @@ import ipaddress
 import re
 from collections.abc import Mapping
 from datetime import tzinfo
+from pathlib import Path
 from typing import Annotated, Any, ClassVar, Sequence, TypeAlias
 
 from dateutil import tz
@@ -10,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 from pydantic import (
     AfterValidator,
     BaseModel,
+    DirectoryPath,
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
@@ -296,3 +298,21 @@ TimeZone = Annotated[
     tzinfo,
     PlainValidator(_parse_to_tzinfo),
 ]
+
+
+class AutoDirectoryPath(DirectoryPath):
+    """`DirectoryPath` that silently creates the directory if it is missing."""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        def ensure_exists(value: Any) -> Path:
+            p = Path(value)
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+
+        return core_schema.chain_schema([
+            core_schema.no_info_plain_validator_function(ensure_exists),
+            handler(DirectoryPath),
+        ])

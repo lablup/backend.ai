@@ -5,14 +5,14 @@ import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Any, List, Literal, Mapping, Optional, Self
+from typing import Any, Literal, Mapping, Optional, Self
 
 import click
-from pydantic import BaseModel, DirectoryPath, Field, FilePath
+from pydantic import BaseModel, Field, FilePath
 
 from ai.backend.common import config
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.common.typed_validators import AutoDirectoryPath, HostPortPair
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -104,7 +104,7 @@ class DatabaseConfig(BaseModel):
         Helps detect stale connections before they cause application errors.
         Adds a small overhead but improves reliability.
         """,
-        examples=[True],
+        examples=[True, False],
         alias="pool-pre-ping",
     )
     max_overflow: int = Field(
@@ -188,8 +188,8 @@ class EtcdConfig(BaseModel):
 
 
 class ManagerConfig(BaseModel):
-    ipc_base_path: DirectoryPath = Field(
-        default=Path("/tmp/backend.ai/ipc"),
+    ipc_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="""
         Base directory path for inter-process communication files.
         Used for Unix domain sockets and other IPC mechanisms.
@@ -302,7 +302,7 @@ class ManagerConfig(BaseModel):
         default=None,
         description="""
         Path to the SSL certificate file.
-        Required if ssl_enabled is True.
+        Required if `ssl_enabled` is True.
         Should be a PEM-formatted certificate file, either self-signed or from a CA.
         """,
         examples=["fixtures/manager/manager.crt"],
@@ -339,7 +339,7 @@ class ManagerConfig(BaseModel):
         - etcetra: etcd v3 API-compatible distributed locking
         """,
         examples=[item.value for item in DistributedLockType],
-        alias="distributed-lock-type",
+        alias="distributed-lock",
     )
     pg_advisory_config: Mapping[str, Any] = Field(
         default=PgAdvisoryLock.default_config,
@@ -385,7 +385,7 @@ class ManagerConfig(BaseModel):
         Prevents deadlocks in case a manager fails during scheduling.
         """,
         examples=[30.0, 60.0],
-        alias="session-schedule-lock-lifetime",
+        # Don't use alias for compatibility with the legacy config
     )
     session_check_precondition_lock_lifetime: float = Field(
         default=30,
@@ -395,7 +395,7 @@ class ManagerConfig(BaseModel):
         Should be balanced to prevent both deadlocks and race conditions.
         """,
         examples=[30.0, 60.0],
-        alias="session-check-precondition-lock-lifetime",
+        # Don't use alias for compatibility with the legacy config
     )
     session_start_lock_lifetime: float = Field(
         default=30,
@@ -405,7 +405,7 @@ class ManagerConfig(BaseModel):
         Longer values are safer but may block other managers longer on failure.
         """,
         examples=[30.0, 60.0],
-        alias="session-start-lock-lifetime",
+        # Don't use alias for compatibility with the legacy config
     )
     pid_file: Path = Field(
         default=Path(os.devnull),
@@ -418,7 +418,7 @@ class ManagerConfig(BaseModel):
         alias="pid-file",
     )
     allowed_plugins: Optional[set[str]] = Field(
-        None,
+        default=None,
         description="""
         List of explicitly allowed plugins to load.
         If specified, only these plugins will be loaded, even if others are installed.
@@ -448,7 +448,7 @@ class ManagerConfig(BaseModel):
         examples=[True, False],
         alias="hide-agents",
     )
-    agent_selection_resource_priority: List[str] = Field(
+    agent_selection_resource_priority: list[str] = Field(
         default=["cuda", "rocm", "tpu", "cpu", "mem"],
         description="""
         Priority order for resources when selecting agents for compute sessions.
@@ -485,7 +485,7 @@ class ManagerConfig(BaseModel):
         le=65535,
         description="""
         Deprecated: Port for the aiomonitor terminal UI.
-        Use aiomonitor_termui_port instead.
+        Use `aiomonitor_termui_port` instead.
         """,
         examples=[38100, 38200],
         alias="aiomonitor-port",
