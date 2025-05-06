@@ -97,7 +97,7 @@ class ProgressReporter:
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
-            tracker_key = self._tracker_id(self._task_id)
+            tracker_key = f"bgtask.{self._task_id}"
             await pipe.hset(
                 tracker_key,
                 mapping={

@@ -57,7 +57,7 @@ class SenderInfo:
 
 class UserEventHub:
     _senders: MutableMapping[uuid.UUID, SenderInfo]
-    _key_alias: MutableMapping[tuple[AliasDomain, uuid.UUID], uuid.UUID]
+    _key_alias: MutableMapping[tuple[AliasDomain, uuid.UUID], set[uuid.UUID]]
 
     def __init__(self) -> None:
         self._senders = {}
@@ -82,7 +82,7 @@ class UserEventHub:
         for alias in aliases:
             if alias in self._key_alias:
                 raise ValueError(f"Alias {alias} already registered.")
-            self._key_alias[alias] = sender_id
+            self._add_alias(alias, sender_id)
 
     def unregister_sender(self, sender_id: uuid.UUID) -> None:
         """
@@ -95,7 +95,7 @@ class UserEventHub:
         sender_info = self._senders[sender_id]
         for alias in sender_info.aliases:
             if alias in self._key_alias:
-                del self._key_alias[alias]
+                self._remove_alias(alias, sender_id)
         del self._senders[sender_id]
 
     async def send_event(self, sender_id: uuid.UUID, event: UserEvent) -> None:
@@ -125,5 +125,37 @@ class UserEventHub:
         if (alias_domain, alias_id) not in self._key_alias:
             raise ValueError(f"Alias {alias_domain}:{alias_id} not found.")
 
-        sender_id = self._key_alias[(alias_domain, alias_id)]
-        await self.send_event(sender_id, event)
+        sender_set = self._key_alias[(alias_domain, alias_id)]
+        for sender_id in sender_set:
+            await self.send_event(sender_id, event)
+
+    def _add_alias(
+        self,
+        alias_key: tuple[AliasDomain, uuid.UUID],
+        sender_id: uuid.UUID,
+    ) -> None:
+        """
+        Add an alias for a sender.
+        :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
+        :param alias_id: The ID of the alias.
+        :param sender_id: Unique identifier for the sender.
+        """
+        if alias_key not in self._key_alias:
+            self._key_alias[alias_key] = set()
+        self._key_alias[alias_key].add(sender_id)
+
+    def _remove_alias(
+        self,
+        alias_key: tuple[AliasDomain, uuid.UUID],
+        sender_id: uuid.UUID,
+    ) -> None:
+        """
+        Remove an alias for a sender.
+        :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
+        :param alias_id: The ID of the alias.
+        :param sender_id: Unique identifier for the sender.
+        """
+        if alias_key in self._key_alias:
+            self._key_alias[alias_key].discard(sender_id)
+            if not self._key_alias[alias_key]:
+                del self._key_alias[alias_key]
