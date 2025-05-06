@@ -96,7 +96,7 @@ class VolumeInfo(TypedDict):
 
 class StorageSessionManager:
     _proxies: Mapping[str, StorageProxyInfo]
-    _exposed_volume_info: List[str]
+    _exposed_volume_info: list[str]
 
     def __init__(self, storage_config: VolumeConfig) -> None:
         self.config = storage_config
@@ -172,7 +172,7 @@ class StorageSessionManager:
         _ctx_volumes_cache.set(results)
         return results
 
-    async def get_sftp_scaling_groups(self, proxy_name: str) -> List[str]:
+    async def get_sftp_scaling_groups(self, proxy_name: str) -> list[str]:
         if proxy_name not in self._proxies:
             raise IndexError(f"proxy {proxy_name} does not exist")
         return self._proxies[proxy_name].sftp_scaling_groups or []

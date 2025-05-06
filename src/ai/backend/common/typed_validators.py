@@ -6,7 +6,7 @@ import re
 from collections.abc import Mapping
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Generic, Optional, Sequence, TypeAlias, TypeVar
+from typing import Annotated, Any, ClassVar, Optional, Sequence, TypeAlias, TypeVar
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -415,12 +415,10 @@ class GroupID(int):
 TItem = TypeVar("TItem")
 
 
-class DelimiterSeparatedList(list[TItem], Generic[TItem]):
+class DelimiterSeparatedList(list[TItem]):
     delimiter: str = ","
     min_length: Optional[int] = None
     empty_str_as_empty_list: bool = False
-
-    _item_adapter: Optional[TypeAdapter] = None
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -428,22 +426,21 @@ class DelimiterSeparatedList(list[TItem], Generic[TItem]):
         _source_type: Any,
         _handler: GetCoreSchemaHandler,
     ) -> core_schema.CoreSchema:
-        item_type = getattr(cls, "__args__", (str,))[0]
-        cls._item_adapter = TypeAdapter(item_type)
+        def _validate(value: Any, _info: core_schema.ValidationInfo) -> list[TItem]:
+            item_type = getattr(cls, "__args__", (str,))[0]
+            item_adapter = TypeAdapter(item_type)
 
-        def _validate(value: Any, _info: core_schema.ValidationInfo) -> Sequence[TItem]:
             if not isinstance(value, str):
                 value = str(value)
             if cls.empty_str_as_empty_list and value == "":
-                return []
+                return cls([])
             items = value.split(cls.delimiter)
 
             if cls.min_length is not None and len(items) < cls.min_length:
                 raise ValueError(f"the number of items should be greater than {cls.min_length}")
 
-            assert cls._item_adapter is not None
             try:
-                return [cls._item_adapter.validate_python(x) for x in items]
+                return cls([item_adapter.validate_python(x) for x in items])
             except ValidationError as e:
                 raise ValueError(str(e))
 
