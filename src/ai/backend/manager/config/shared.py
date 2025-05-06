@@ -431,7 +431,6 @@ class DockerImageConfig(BaseModel):
         'none': Never pull automatically (manual control)
         """,
         examples=[item.value for item in DockerImageAutoPullPolicy],
-        alias="auto-pull",
     )
 
 
@@ -446,7 +445,7 @@ class DockerConfig(BaseModel):
 
 
 class PluginsConfig(BaseModel):
-    accelerator: dict[str, dict[str, Any]] = Field(
+    accelerator: dict[str, Any] = Field(
         default_factory=dict,
         description="""
         Accelerator plugin configurations.
@@ -636,6 +635,7 @@ class SessionConfig(BaseModel):
         Configuration for detecting and handling hung sessions.
         Controls how the system detects and recovers from session failures.
         """,
+        alias="hang-tolerance",
     )
 
 
@@ -680,7 +680,7 @@ class IdleCheckerConfig(BaseModel):
         """,
         examples=["5m", "10m"],
     )
-    checkers: dict[str, dict[str, Any]] = Field(
+    checkers: dict[str, Any] = Field(
         default_factory=dict,
         description="""
         Idle checkers configurations.
