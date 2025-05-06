@@ -5,11 +5,11 @@ from pydantic import BaseModel, Field
 from ai.backend.common.typed_validators import CommaSeparatedStrList
 
 
-class VFolderTypeConfig(BaseModel):
+class VolumeTypeConfig(BaseModel):
     user: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
-        User vFolder type configuration.
+        User VFolder type configuration.
         When present, enables user-owned virtual folders.
         Standard folder type for individual users.
         """,
@@ -17,14 +17,14 @@ class VFolderTypeConfig(BaseModel):
     group: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
-        Group vFolder type configuration.
+        Group VFolder type configuration.
         When present, enables group-owned virtual folders.
         Used for sharing files within a group of users.
         """,
     )
 
 
-class VFolderProxyConfig(BaseModel):
+class VolumeProxyConfig(BaseModel):
     client_api: str = Field(
         description="""
         Client-facing API endpoint URL of the volume proxy.
@@ -69,8 +69,8 @@ class VFolderProxyConfig(BaseModel):
 
 
 class VolumeConfig(BaseModel):
-    types: VFolderTypeConfig = Field(
-        default_factory=lambda: VFolderTypeConfig(user={}),
+    types: VolumeTypeConfig = Field(
+        default_factory=lambda: VolumeTypeConfig(user={}),
         description="""
         Defines which types of virtual folders are enabled.
         Contains configuration for user and group folders.
@@ -93,7 +93,7 @@ class VolumeConfig(BaseModel):
         """,
         examples=[["percentage"], ["percentage", "bytes"]],
     )
-    proxies: dict[str, VFolderProxyConfig] = Field(
+    proxies: dict[str, VolumeProxyConfig] = Field(
         description="""
         Mapping of volume proxy configurations.
         Each key is a proxy name used in volume host references.
