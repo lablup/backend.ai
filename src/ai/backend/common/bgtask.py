@@ -229,7 +229,7 @@ class BackgroundTaskManager:
         (e.g. progress information of task when callee is trying to poll information of already completed one)
         """
         tracker_key = f"bgtask.{task_id}"
-        task_info = await redis_helper.execute(
+        task_info: dict = await redis_helper.execute(
             self._redis_client,
             lambda r: r.hgetall(tracker_key),
             encoding="utf-8",
@@ -245,8 +245,8 @@ class BackgroundTaskManager:
                 BgtaskDoneEvent(task_id, message=task_info["msg"]),
                 {
                     "status": task_info["status"],
-                    "current_progress": task_info["current"],
-                    "total_progress": task_info["total"],
+                    "current_progress": task_info.get("current", 0),
+                    "total_progress": task_info.get("total", 0),
                 },
             )
             return
