@@ -143,12 +143,12 @@ class NopBackgroundTaskObserver:
 
 
 class BackgroundTaskManager:
-    _dict_lock: asyncio.Lock
     _redis_client: RedisConnectionInfo
     _event_producer: EventProducer
-    _metric_observer: BackgroundTaskObserver
     _ongoing_tasks: weakref.WeakSet[asyncio.Task]
     _task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
+    _metric_observer: BackgroundTaskObserver
+    _dict_lock: asyncio.Lock
 
     def __init__(
         self,
@@ -161,8 +161,8 @@ class BackgroundTaskManager:
         self._event_producer = event_producer
         self._ongoing_tasks = weakref.WeakSet()
         self._task_update_queues = defaultdict(set)
-        self._dict_lock = asyncio.Lock()
         self._metric_observer = bgtask_observer
+        self._dict_lock = asyncio.Lock()
 
     def register_event_handlers(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -272,8 +272,8 @@ class BackgroundTaskManager:
                 finally:
                     my_queue.task_done()
         finally:
-            self._task_update_queues[task_id].remove(my_queue)
             async with self._dict_lock:
+                self._task_update_queues[task_id].remove(my_queue)
                 if len(self._task_update_queues[task_id]) == 0:
                     del self._task_update_queues[task_id]
 

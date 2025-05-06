@@ -32,6 +32,7 @@ python_distribution(
         "src/ai/backend/common/dto/agent:src",
         "src/ai/backend/common/dto/manager:src",
         "src/ai/backend/common/dto/storage:src",
+        "src/ai/backend/common/event_hub:src",
         "src/ai/backend/common/message_queue:src",
         "src/ai/backend/common/middlewares:src",
         "src/ai/backend/common/metrics:src",
