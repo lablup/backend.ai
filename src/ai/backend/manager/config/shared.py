@@ -431,7 +431,6 @@ class DockerImageConfig(BaseModel):
         'none': Never pull automatically (manual control)
         """,
         examples=[item.value for item in DockerImageAutoPullPolicy],
-        alias="auto-pull",
     )
 
 
