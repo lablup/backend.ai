@@ -201,6 +201,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
+from ai.backend.manager.config.loader.etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW, INTRINSIC_SLOTS
 from ai.backend.manager.errors.exceptions import ServerMisconfiguredError
 
@@ -901,7 +902,8 @@ class ManagerSharedConfig:
         await self.etcd.close()
 
     async def reload(self) -> None:
-        raw_cfg = await self.etcd.get_prefix("config")
+        loader = LegacyEtcdLoader(self.etcd)
+        raw_cfg = await loader.load()
 
         try:
             self.data = ManagerSharedConfigDataModel.model_validate(raw_cfg)
