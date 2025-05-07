@@ -19,6 +19,7 @@ def test_backend_error_obj():
     assert json.loads(eobj.body) == json.loads(
         json.dumps(
             odict(
+                ("error_code", str(ErrorCode.default())),
                 ("type", eobj.error_type),
                 ("title", eobj.error_title),
             )
