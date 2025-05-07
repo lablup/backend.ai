@@ -1,13 +1,24 @@
 import time
-from typing import Protocol
+from typing import Optional, Protocol
 
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+)
+
 
 class APIMetricObserverProtocol(Protocol):
     def observe_request(
-        self, *, method: str, endpoint: str, status_code: int, duration: float
+        self,
+        *,
+        method: str,
+        endpoint: str,
+        error_code: Optional[ErrorCode],
+        status_code: int,
+        duration: float,
     ) -> None: ...
 
 
@@ -23,14 +34,21 @@ def build_api_metric_middleware(metric: APIMetricObserverProtocol) -> Middleware
         endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
         status_code = -1
         start = time.perf_counter()
+        error_code: Optional[ErrorCode] = None
         try:
             resp = await handler(request)
             status_code = resp.status
+        except BackendAIError as e:
+            status_code = e.status_code
+            error_code = e.error_code()
+            raise
         except web.HTTPError as e:
             status_code = e.status_code
+            error_code = ErrorCode.default()
             raise
         except Exception:
             status_code = 500
+            error_code = ErrorCode.default()
             raise
         else:
             return resp
@@ -38,7 +56,11 @@ def build_api_metric_middleware(metric: APIMetricObserverProtocol) -> Middleware
             end = time.perf_counter()
             elapsed = end - start
             metric.observe_request(
-                method=method, endpoint=endpoint, status_code=status_code, duration=elapsed
+                method=method,
+                endpoint=endpoint,
+                error_code=error_code,
+                status_code=status_code,
+                duration=elapsed,
             )
 
     return metric_middleware

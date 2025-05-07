@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Generic, Optional, TypeVar
 
+from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
 
 
@@ -64,6 +65,7 @@ class BaseActionResultMeta:
     started_at: datetime
     ended_at: datetime
     duration: timedelta
+    error_code: Optional[ErrorCode]
 
 
 TAction = TypeVar("TAction", bound=BaseAction)

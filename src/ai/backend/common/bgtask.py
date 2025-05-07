@@ -30,6 +30,7 @@ from aiohttp_sse import EventSourceResponse, sse_response
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
+from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging import BraceStyleAdapter
 
 from . import redis_helper
@@ -126,14 +127,18 @@ BackgroundTask = Callable[
 
 class BackgroundTaskObserver(Protocol):
     def observe_bgtask_started(self, *, task_name: str) -> None: ...
-    def observe_bgtask_done(self, *, task_name: str, status: str, duration: float) -> None: ...
+    def observe_bgtask_done(
+        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+    ) -> None: ...
 
 
 class NopBackgroundTaskObserver:
     def observe_bgtask_started(self, *, task_name: str) -> None:
         pass
 
-    def observe_bgtask_done(self, *, task_name: str, status: str, duration: float) -> None:
+    def observe_bgtask_done(
+        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+    ) -> None:
         pass
 
 
@@ -373,11 +378,23 @@ class BackgroundTaskManager:
             bgtask_result_event = await self._run_bgtask(func, task_id, **kwargs)
         except asyncio.CancelledError:
             return BgtaskCancelledEvent(task_id, "")
-
+        except BackendAIError as e:
+            duration = time.perf_counter() - start_time
+            self._metric_observer.observe_bgtask_done(
+                task_name=task_name or func.__name__,
+                status="bgtask_failed",
+                duration=duration,
+                error_code=e.error_code(),
+            )
+            log.exception("Task %s (%s): BackendAIError: %s", task_id, task_name, e)
+            return BgtaskFailedEvent(task_id, repr(e))
         except Exception as e:
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(
-                task_name=task_name or func.__name__, status="bgtask_failed", duration=duration
+                task_name=task_name or func.__name__,
+                status="bgtask_failed",
+                duration=duration,
+                error_code=ErrorCode.default(),
             )
             log.exception("Task %s (%s): unhandled error", task_id, task_name)
             return BgtaskFailedEvent(task_id, repr(e))
@@ -387,6 +404,7 @@ class BackgroundTaskManager:
             task_name=task_name or func.__name__,
             status=bgtask_result_event.name,
             duration=duration,
+            error_code=None,
         )
 
         msg = getattr(bgtask_result_event, "msg", "") or ""
