@@ -55,6 +55,8 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from tenacity import (
     AsyncRetrying,
+    RetryError,
+    TryAgain,
     retry_if_exception_type,
     stop_after_attempt,
     stop_after_delay,
@@ -2348,7 +2350,10 @@ class AbstractAgent(
                             stop_after_attempt(kernel_init_polling_attempt)
                             | stop_after_delay(kernel_init_polling_timeout)
                         ),
-                        retry=retry_if_exception_type(zmq.error.ZMQError),
+                        retry=(
+                            retry_if_exception_type(zmq.error.ZMQError)
+                            | retry_if_exception_type(TryAgain)
+                        ),
                     ):
                         with attempt:
                             # Wait until bootstrap script is executed.
@@ -2365,6 +2370,13 @@ class AbstractAgent(
                                         if live_service["name"] == service_port["name"]:
                                             service_port.update(live_service)
                                             break
+                            else:
+                                log.warning(
+                                    "Failed to retrieve service app info, retrying (kernel:{}, container:{})",
+                                    kernel_id,
+                                    container_data["container_id"],
+                                )
+                                raise TryAgain
                     if self.local_config["debug"]["log-kernel-config"]:
                         log.debug("service ports:\n{!r}", pretty(service_ports))
                 except asyncio.TimeoutError:
@@ -2389,6 +2401,20 @@ class AbstractAgent(
                     raise AgentError(
                         f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                     )
+                except RetryError:
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
+                    )
+                    err_msg = (
+                        "Container startup failed, the container might be missing or failed to initialize "
+                        f"(k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                    )
+                    log.exception(err_msg)
+                    raise AgentError(err_msg)
                 except BaseException as e:
                     log.exception(
                         "unexpected error while waiting container startup (k: {}, e: {})",
