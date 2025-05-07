@@ -64,6 +64,13 @@ class Reject(Exception):
         self.reason = reason
 
 
+class HTTPResponse(Exception):
+    def __init__(self, status: int, reason: str):
+        super().__init__(reason)
+        self.status = status
+        self.reason = reason
+
+
 class HookResults(enum.Enum):
     PASSED = 0
     REJECTED = 1

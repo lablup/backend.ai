@@ -748,6 +748,8 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
     )
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
+    if hook_result.result is not None:
+        return hook_result.result
     return web.json_response({
         "data": {
             "access_key": main_keypair_row.access_key,
