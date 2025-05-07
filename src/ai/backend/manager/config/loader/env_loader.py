@@ -1,6 +1,6 @@
 import os
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, override
 
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
@@ -11,6 +11,7 @@ class EnvLoader(AbstractConfigLoader):
     def __init__(self, envs: list[tuple[tuple[str, ...], str]]) -> None:
         self._envs = envs
 
+    @override
     async def load(self) -> Mapping[str, Any]:
         cfg: dict[str, Any] = {}
 

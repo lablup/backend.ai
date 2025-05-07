@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
@@ -11,6 +11,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     def __init__(self, etcd: AsyncEtcd):
         self._etcd = etcd
 
+    @override
     async def load(self) -> Mapping[str, Any]:
         raw_cfg = await self._etcd.get_prefix("config")
         return raw_cfg

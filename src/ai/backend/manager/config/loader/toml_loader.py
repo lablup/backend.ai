@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, override
 
 from ai.backend.common import config
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
@@ -21,6 +21,7 @@ class TomlConfigLoader(AbstractConfigLoader):
         self.daemon_name = loader_args.daemon_name
         self.discovered_path = None
 
+    @override
     async def load(self) -> Mapping[str, Any]:
         raw_cfg, discovered_path = config.read_from_file(self.path, self.daemon_name)
         self.discovered_path = discovered_path

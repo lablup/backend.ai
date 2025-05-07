@@ -1,4 +1,4 @@
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, override
 
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
@@ -10,6 +10,7 @@ class ConfigOverrider(AbstractConfigLoader):
     ) -> None:
         self._overrides = overrides
 
+    @override
     async def load(self) -> Mapping[str, Any]:
         cfg: dict[str, Any] = {}
 

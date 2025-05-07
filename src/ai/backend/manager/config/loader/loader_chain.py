@@ -1,6 +1,6 @@
 from collections.abc import Mapping, MutableMapping, Sequence
 from copy import deepcopy
-from typing import Any
+from typing import Any, override
 
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
@@ -22,6 +22,7 @@ class LoaderChain(AbstractConfigLoader):
     def __init__(self, loaders: Sequence[AbstractConfigLoader]) -> None:
         self._loaders = loaders
 
+    @override
     async def load(self) -> Mapping[str, Any]:
         merged: MutableMapping[str, Any] = {}
         for loader in self._loaders:
