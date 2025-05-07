@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import os
 import sys
@@ -23,6 +24,7 @@ from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.local import load as load_manager_local_config
 from ai.backend.manager.config.shared import ManagerSharedConfig
 
 
@@ -40,7 +42,9 @@ class CLIContext:
         # Lazy-load the configuration only when requested.
         try:
             if self._local_config is None:
-                self._local_config = ManagerLocalConfig.load(self.config_path, self.log_level)
+                self._local_config = asyncio.run(
+                    load_manager_local_config(self.config_path, self.log_level)
+                )
         except ConfigurationError as e:
             print(
                 "ConfigurationError: Could not read or validate the manager local config:",

@@ -73,6 +73,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.local import load as load_manager_local_config
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.volume import VolumeConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -1159,7 +1160,8 @@ def main(
     """
     Start the manager service as a foreground process.
     """
-    cfg = ManagerLocalConfig.load(config_path, LogLevel.DEBUG if debug else log_level)
+    log_level = LogLevel.DEBUG if debug else log_level
+    cfg = asyncio.run(load_manager_local_config(config_path, log_level))
 
     if ctx.invoked_subcommand is None:
         cfg.manager.pid_file.write_text(str(os.getpid()))

@@ -51,6 +51,7 @@ from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.local import load as load_manager_local_config
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
@@ -254,7 +255,7 @@ def local_config(
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = ManagerLocalConfig.load()
+        fs_local_config = asyncio.run(load_manager_local_config())
         cfg.etcd.addr = fs_local_config.etcd.addr
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "user")
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "password")
