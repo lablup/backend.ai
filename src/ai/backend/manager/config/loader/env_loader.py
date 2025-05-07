@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.manager.config.loader.type import AbstractConfigLoader
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
 
 class EnvLoader(AbstractConfigLoader):

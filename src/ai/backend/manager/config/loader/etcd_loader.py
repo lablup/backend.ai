@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.manager.config.loader.type import AbstractConfigLoader
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
 
 class LegacyEtcdLoader(AbstractConfigLoader):

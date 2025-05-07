@@ -1,6 +1,6 @@
 from typing import Any, Mapping, Sequence
 
-from ai.backend.manager.config.loader.type import AbstractConfigLoader
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
 
 class ConfigOverrider(AbstractConfigLoader):

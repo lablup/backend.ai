@@ -2,7 +2,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from copy import deepcopy
 from typing import Any
 
-from ai.backend.manager.config.loader.type import AbstractConfigLoader
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
 
 
 def merge_configs(
