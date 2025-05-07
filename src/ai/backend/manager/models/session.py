@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events import (
+from ai.backend.common.events.events import (
     DoStartSessionEvent,
     DoUpdateSessionStatusEvent,
     EventDispatcher,

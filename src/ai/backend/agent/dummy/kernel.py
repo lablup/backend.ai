@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events.events import EventProducer
 from ai.backend.common.types import CommitStatus
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord

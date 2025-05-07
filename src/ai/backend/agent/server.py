@@ -59,7 +59,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import (
+from ai.backend.common.events.events import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,

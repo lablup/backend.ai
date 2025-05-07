@@ -7,7 +7,7 @@ from typing import Any, FrozenSet, Optional, cast
 import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
 
 from ...exception import NotEmptyError

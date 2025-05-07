@@ -40,7 +40,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import (
+from ai.backend.common.events.events import (
     AgentStartedEvent,
     CoalescingOptions,
     DoCheckPrecondEvent,
@@ -402,7 +402,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event.event_name(),
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1306,7 +1306,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event.__class__.event_name(),
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1401,7 +1401,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event.event_name(),
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1652,7 +1652,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event.event_name(),
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )

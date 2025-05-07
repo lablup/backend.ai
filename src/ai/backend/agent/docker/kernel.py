@@ -22,7 +22,7 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events.events import EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop

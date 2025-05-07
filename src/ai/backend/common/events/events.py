@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import abc
 import asyncio
 import enum
 import logging
 import secrets
 import time
 import uuid
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import (
     Any,
     Callable,
-    ClassVar,
     Coroutine,
     Generic,
     Mapping,
@@ -34,11 +33,13 @@ from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events.user_event.user_event import UserEvent
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
-from . import msgpack
-from .types import (
+from .. import msgpack
+from ..types import (
     AgentId,
     KernelId,
     ModelServiceStatus,
@@ -59,66 +60,204 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AbstractEvent(metaclass=abc.ABCMeta):
-    # derivatives should define the fields.
+class EventDomain(enum.StrEnum):
+    BGTASK = "bgtask"
+    IMAGE = "image"
+    KERNEL = "kernel"
+    MODEL_SERVICE = "model_service"
+    ROUTE = "route"
+    SCHEDULE = "schedule"
+    IDLE_CHECK = "idle_check"
+    SESSION = "session"
+    AGENT = "agent"
+    VFOLDER = "vfolder"
+    VOLUME = "volume"
+    LOG = "log"
 
-    name: ClassVar[str] = "undefined"
 
-    @abc.abstractmethod
+class AbstractEvent(ABC):
+    @abstractmethod
     def serialize(self) -> tuple[bytes, ...]:
         """
         Return a msgpack-serializable tuple.
         """
-        pass
+        raise NotImplementedError
 
     @classmethod
-    @abc.abstractmethod
+    @abstractmethod
     def deserialize(cls, value: tuple[bytes, ...]) -> Self:
         """
         Construct the event args from a tuple deserialized from msgpack.
         """
-        pass
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def event_domain(self) -> EventDomain:
+        """
+        Return the event domain.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def event_name(cls) -> str:
+        """
+        Return the event name.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def domain_id(self) -> Optional[str]:
+        """
+        Return the domain ID.
+        It's used to identify the event domain in the event hub.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def user_event(self) -> Optional[UserEvent]:
+        """
+        Return the event as a UserEvent.
+        If user event is not supported, return None.
+        """
+        raise NotImplementedError
 
 
-class EmptyEventArgs:
+class BaseScheduleEvent(AbstractEvent):
+    @override
     def serialize(self) -> tuple:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    @override
+    def deserialize(cls, value: tuple) -> Self:
         return cls()
 
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SCHEDULE
 
-class DoScheduleEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_schedule"
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
 
-
-class DoCheckPrecondEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_check_precond"
-
-
-class DoStartSessionEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_start_session"
-
-
-class DoScaleEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_scale"
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_idle_check"
+class DoScheduleEvent(BaseScheduleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_schedule"
 
 
-class DoUpdateSessionStatusEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_update_session_status"
+class DoCheckPrecondEvent(BaseScheduleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_check_precond"
 
 
-@attrs.define(slots=True, frozen=True)
-class DoTerminateSessionEvent(AbstractEvent):
-    name = "do_terminate_session"
+class DoStartSessionEvent(BaseScheduleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_start_session"
 
-    session_id: SessionId = attrs.field()
-    reason: KernelLifecycleEventReason = attrs.field()
+
+class DoScaleEvent(BaseScheduleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_scale"
+
+
+class BaseIdleCheckEvent(AbstractEvent):
+    @override
+    def serialize(self) -> tuple:
+        return tuple()
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls()
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.IDLE_CHECK
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+class DoIdleCheckEvent(BaseIdleCheckEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_idle_check"
+
+
+class SessionLifecycleEvent(AbstractEvent):
+    @override
+    def serialize(self) -> tuple:
+        return tuple()
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls()
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class DoUpdateSessionStatusEvent(SessionLifecycleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_update_session_status"
+
+
+class BaseSessionEvent(AbstractEvent):
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class DoTerminateSessionEvent(BaseSessionEvent):
+    session_id: SessionId
+    reason: KernelLifecycleEventReason
 
     def serialize(self) -> tuple:
         return (
@@ -127,43 +266,84 @@ class DoTerminateSessionEvent(AbstractEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    @override
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
         )
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_terminate_session"
 
-@attrs.define(slots=True, frozen=True)
-class GenericAgentEventArgs:
-    reason: str = attrs.field(default="")
 
+class BaseAgentEvent(AbstractEvent):
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.AGENT
+
+
+@dataclass
+class BaseAgentLifecycleEvent(BaseAgentEvent):
+    reason: str
+
+    @override
     def serialize(self) -> tuple:
         return (self.reason,)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    @override
+    def deserialize(cls, value: tuple) -> Self:
         return cls(value[0])
 
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
 
-class AgentStartedEvent(GenericAgentEventArgs, AbstractEvent):
-    name = "agent_started"
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-class AgentTerminatedEvent(GenericAgentEventArgs, AbstractEvent):
-    name = "agent_terminated"
+@dataclass
+class AgentStartedEvent(BaseAgentLifecycleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_started"
 
 
-@attrs.define(slots=True, frozen=True)
-class AgentErrorEvent(AbstractEvent):
-    name = "agent_error"
+@dataclass
+class AgentTerminatedEvent(BaseAgentLifecycleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_terminated"
 
-    message: str = attrs.field()
-    traceback: Optional[str] = attrs.field(default=None)
-    user: Optional[Any] = attrs.field(default=None)
-    context_env: Mapping[str, Any] = attrs.field(factory=dict)
-    severity: LogLevel = attrs.field(default=LogLevel.ERROR)
 
+@dataclass
+class AgentOperationEvent(BaseAgentEvent):
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class AgentErrorEvent(AgentOperationEvent):
+    message: str
+    traceback: Optional[str] = None
+    user: Optional[Any] = None
+    context_env: Mapping[str, Any] = field(default_factory=dict)
+    severity: LogLevel = LogLevel.ERROR
+
+    @override
     def serialize(self) -> tuple:
         return (
             self.message,
@@ -174,7 +354,8 @@ class AgentErrorEvent(AbstractEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    @override
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             value[0],
             value[1],
@@ -183,59 +364,94 @@ class AgentErrorEvent(AbstractEvent):
             LogLevel(value[4]),
         )
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_error"
 
-@attrs.define(slots=True, frozen=True)
-class AgentHeartbeatEvent(AbstractEvent):
-    name = "agent_heartbeat"
 
-    agent_info: Mapping[str, Any] = attrs.field()
+@dataclass
+class AgentHeartbeatEvent(AgentOperationEvent):
+    agent_info: Mapping[str, Any]
 
+    @override
     def serialize(self) -> tuple:
         return (self.agent_info,)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    @override
+    def deserialize(cls, value: tuple) -> Self:
         return cls(value[0])
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_heartbeat"
 
-@attrs.define(slots=True, frozen=True)
-class AgentImagesRemoveEvent(AbstractEvent):
-    name = "agent_images_remove"
-    image_canonicals: list[str] = attrs.field()
 
+@dataclass
+class AgentImagesRemoveEvent(AgentOperationEvent):
+    image_canonicals: list[str]
+
+    @override
     def serialize(self) -> tuple:
         return (self.image_canonicals,)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    @override
+    def deserialize(cls, value: tuple) -> Self:
         return cls(value[0])
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_images_remove"
 
-@attrs.define(slots=True, frozen=True)
-class DoAgentResourceCheckEvent(AbstractEvent):
-    name = "do_agent_resource_check"
 
-    agent_id: AgentId = attrs.field()
+@dataclass
+class DoAgentResourceCheckEvent(AgentOperationEvent):
+    agent_id: AgentId
 
+    @override
     def serialize(self) -> tuple:
         return (self.agent_id,)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    @override
+    def deserialize(cls, value: tuple) -> Self:
         return cls(
             AgentId(value[0]),
         )
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_agent_resource_check"
 
-@attrs.define(slots=True, frozen=True)
-class ImagePullStartedEvent(AbstractEvent):
-    name = "image_pull_started"
 
-    image: str = attrs.field()  # deprecated, use image_ref
-    agent_id: AgentId = attrs.field()
-    timestamp: float = attrs.field()
-    image_ref: Optional[ImageRef] = attrs.field(default=None)
+class BaseImageEvent(AbstractEvent):
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.IMAGE
 
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class ImagePullStartedEvent(BaseImageEvent):
+    image: str
+    agent_id: AgentId
+    timestamp: float
+    image_ref: Optional[ImageRef] = None
+
+    @override
     def serialize(self) -> tuple:
         if self.image_ref is None:
             return (self.image, str(self.agent_id), self.timestamp)
@@ -248,6 +464,7 @@ class ImagePullStartedEvent(AbstractEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         # Backward compatibility
         if len(value) <= 3:
@@ -264,17 +481,21 @@ class ImagePullStartedEvent(AbstractEvent):
             image_ref=value[3],
         )
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "image_pull_started"
 
-@attrs.define(slots=True, frozen=True)
-class ImagePullFinishedEvent(AbstractEvent):
-    name = "image_pull_finished"
 
-    image: str = attrs.field()  # deprecated, use image_ref
-    agent_id: AgentId = attrs.field()
-    timestamp: float = attrs.field()
-    msg: Optional[str] = attrs.field(default=None)
-    image_ref: Optional[ImageRef] = attrs.field(default=None)
+@dataclass
+class ImagePullFinishedEvent(BaseImageEvent):
+    image: str
+    agent_id: AgentId
+    timestamp: float
+    msg: Optional[str] = None
+    image_ref: Optional[ImageRef] = None
 
+    @override
     def serialize(self) -> tuple:
         return (
             self.image,
@@ -285,6 +506,7 @@ class ImagePullFinishedEvent(AbstractEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         # Backward compatibility
         if len(value) <= 4:
@@ -303,22 +525,27 @@ class ImagePullFinishedEvent(AbstractEvent):
             image_ref=value[4],
         )
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "image_pull_finished"
 
-@attrs.define(slots=True, frozen=True)
-class ImagePullFailedEvent(AbstractEvent):
-    name = "image_pull_failed"
 
-    image: str = attrs.field()  # deprecated, use image_ref
-    agent_id: AgentId = attrs.field()
-    msg: str = attrs.field()
-    image_ref: Optional[ImageRef] = attrs.field(default=None)
+@dataclass
+class ImagePullFailedEvent(BaseImageEvent):
+    image: str
+    agent_id: AgentId
+    msg: str
+    image_ref: Optional[ImageRef] = None
 
+    @override
     def serialize(self) -> tuple:
         if self.image_ref is None:
             return (self.image, str(self.agent_id), self.msg)
         return (self.image, str(self.agent_id), self.msg, self.image_ref)
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple) -> ImagePullFailedEvent:
         # Backward compatibility
         if len(value) <= 3:
@@ -334,6 +561,11 @@ class ImagePullFailedEvent(AbstractEvent):
             msg=value[2],
             image_ref=value[3],
         )
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "image_pull_failed"
 
 
 class KernelLifecycleEventReason(enum.StrEnum):
@@ -378,13 +610,33 @@ class KernelLifecycleEventReason(enum.StrEnum):
         return None
 
 
-@attrs.define(slots=True, frozen=True)
-class KernelCreationEventArgs:
-    kernel_id: KernelId = attrs.field()
-    session_id: SessionId = attrs.field()
-    reason: str = attrs.field(default="")
-    creation_info: Mapping[str, Any] = attrs.field(factory=dict)
+class BaseKernelEvent(AbstractEvent):
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.KERNEL
 
+
+@dataclass
+class KernelLifecycleEvent(BaseKernelEvent):
+    kernel_id: KernelId
+    session_id: SessionId
+    reason: str = ""
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.kernel_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class KernelCreationEvent(KernelLifecycleEvent):
+    creation_info: Mapping[str, Any] = field(default_factory=dict)
+
+    @override
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
@@ -394,6 +646,7 @@ class KernelCreationEventArgs:
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
@@ -402,60 +655,76 @@ class KernelCreationEventArgs:
             creation_info=value[3],
         )
 
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.kernel_id)
 
-class KernelPreparingEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_preparing"
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-class KernelPullingEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_pulling"
+@dataclass
+class KernelPreparingEvent(KernelCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_preparing"
 
 
-# TODO: Remove this event
-@attrs.define(auto_attribs=True, slots=True)
-class KernelPullProgressEvent(AbstractEvent):
-    name = "kernel_pull_progress"
-    kernel_id: uuid.UUID = attrs.field()
-    current_progress: float = attrs.field()
-    total_progress: float = attrs.field()
-    message: Optional[str] = attrs.field(default=None)
+@dataclass
+class KernelPullingEvent(KernelCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_pulling"
 
+
+@dataclass
+class KernelCreatingEvent(KernelCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_creating"
+
+
+class KernelStartedEvent(KernelCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_started"
+
+
+class KernelCancelledEvent(KernelLifecycleEvent):
+    @override
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
-            self.current_progress,
-            self.total_progress,
-            self.message,
+            str(self.session_id),
+            self.reason,
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         return cls(
-            uuid.UUID(value[0]),
-            value[1],
-            value[2],
-            value[3],
+            kernel_id=KernelId(uuid.UUID(value[0])),
+            session_id=SessionId(uuid.UUID(value[1])),
+            reason=value[2],
         )
 
-
-class KernelCreatingEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_creating"
-
-
-class KernelStartedEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_started"
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_cancelled"
 
 
-class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_cancelled"
-
-
-@attrs.define(slots=True, frozen=True)
-class ModelServiceStatusEventArgs:
-    kernel_id: KernelId = attrs.field()
-    session_id: SessionId = attrs.field()
-    model_name: str = attrs.field()
-    new_status: ModelServiceStatus = attrs.field()
+@dataclass
+class ModelServiceStatusEventArgs(AbstractEvent):
+    kernel_id: KernelId
+    session_id: SessionId
+    model_name: str
+    new_status: ModelServiceStatus
 
     def serialize(self) -> tuple:
         return (
@@ -474,18 +743,35 @@ class ModelServiceStatusEventArgs:
             new_status=ModelServiceStatus(value[3]),
         )
 
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.MODEL_SERVICE
 
-class ModelServiceStatusEvent(ModelServiceStatusEventArgs, AbstractEvent):
-    name = "model_service_status_updated"
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-@attrs.define(slots=True, frozen=True)
-class KernelTerminationEventArgs:
-    kernel_id: KernelId = attrs.field()
-    session_id: SessionId = attrs.field()
-    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
-    exit_code: int = attrs.field(default=-1)
+class ModelServiceStatusEvent(ModelServiceStatusEventArgs):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "model_service_status_updated"
 
+
+@dataclass
+class KernelTerminationEvent(BaseKernelEvent):
+    kernel_id: KernelId
+    session_id: SessionId
+    reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+    exit_code: int = -1
+
+    @override
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
@@ -495,6 +781,7 @@ class KernelTerminationEventArgs:
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         return cls(
             KernelId(uuid.UUID(value[0])),
@@ -503,21 +790,36 @@ class KernelTerminationEventArgs:
             exit_code=value[3],
         )
 
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
 
-class KernelTerminatingEvent(KernelTerminationEventArgs, AbstractEvent):
-    name = "kernel_terminating"
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
-    name = "kernel_terminated"
+class KernelTerminatingEvent(KernelTerminationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_terminating"
 
 
-@attrs.define(slots=True, frozen=True)
-class SessionCreationEventArgs:
-    session_id: SessionId = attrs.field()
-    creation_id: str = attrs.field()
-    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
+class KernelTerminatedEvent(KernelTerminationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_terminated"
 
+
+@dataclass
+class SessionCreationEvent(AbstractEvent):
+    session_id: SessionId
+    creation_id: str
+    reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+
+    @override
     def serialize(self) -> tuple:
         return (
             str(self.session_id),
@@ -526,6 +828,7 @@ class SessionCreationEventArgs:
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         return cls(
             SessionId(uuid.UUID(value[0])),
@@ -533,36 +836,68 @@ class SessionCreationEventArgs:
             value[2],
         )
 
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
 
-class SessionEnqueuedEvent(SessionCreationEventArgs, AbstractEvent):
-    name = "session_enqueued"
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.session_id)
 
-
-class SessionScheduledEvent(SessionCreationEventArgs, AbstractEvent):
-    name = "session_scheduled"
-
-
-class SessionCheckingPrecondEvent(SessionCreationEventArgs, AbstractEvent):
-    name = "session_checking_precondition"
-
-
-class SessionPreparingEvent(SessionCreationEventArgs, AbstractEvent):
-    name = "session_preparing"
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-class SessionCancelledEvent(SessionCreationEventArgs, AbstractEvent):
-    name = "session_cancelled"
+class SessionEnqueuedEvent(SessionCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_enqueued"
 
 
-class SessionStartedEvent(SessionCreationEventArgs, AbstractEvent):
-    name = "session_started"
+class SessionScheduledEvent(SessionCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_scheduled"
 
 
-@attrs.define(slots=True, frozen=True)
-class SessionTerminationEventArgs:
-    session_id: SessionId = attrs.field()
-    reason: str = attrs.field(default="")
+class SessionCheckingPrecondEvent(SessionCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_checking_precondition"
 
+
+class SessionPreparingEvent(SessionCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_preparing"
+
+
+class SessionCancelledEvent(SessionCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_cancelled"
+
+
+class SessionStartedEvent(SessionCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_started"
+
+
+@dataclass
+class SessionTerminationEvent(AbstractEvent):
+    session_id: SessionId
+    reason: str = ""
+
+    @override
     def serialize(self) -> tuple:
         return (
             str(self.session_id),
@@ -570,26 +905,46 @@ class SessionTerminationEventArgs:
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
         )
 
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
 
-class SessionTerminatingEvent(SessionTerminationEventArgs, AbstractEvent):
-    name = "session_terminating"
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.session_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
-    name = "session_terminated"
+class SessionTerminatingEvent(SessionTerminationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_terminating"
 
 
-@attrs.define(slots=True, frozen=True)
-class SessionResultEventArgs:
-    session_id: SessionId = attrs.field()
-    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
-    exit_code: int = attrs.field(default=-1)
+class SessionTerminatedEvent(SessionTerminationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_terminated"
+
+
+@dataclass
+class SessionResultEvent(AbstractEvent):
+    session_id: SessionId
+    reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+    exit_code: int = -1
 
     def serialize(self) -> tuple:
         return (
@@ -606,17 +961,35 @@ class SessionResultEventArgs:
             value[2],
         )
 
+    @classmethod
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
 
-class SessionSuccessEvent(SessionResultEventArgs, AbstractEvent):
-    name = "session_success"
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.session_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-class SessionFailureEvent(SessionResultEventArgs, AbstractEvent):
-    name = "session_failure"
+class SessionSuccessEvent(SessionResultEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_success"
 
 
-@attrs.define(slots=True, frozen=True)
-class RouteCreationEventArgs:
+class SessionFailureEvent(SessionResultEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_failure"
+
+
+@dataclass
+class RouteCreationEvent(AbstractEvent):
     route_id: uuid.UUID = attrs.field()
 
     def serialize(self) -> tuple:
@@ -626,17 +999,31 @@ class RouteCreationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(uuid.UUID(value[0]))
 
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.ROUTE
 
-class RouteCreatedEvent(RouteCreationEventArgs, AbstractEvent):
-    name = "route_created"
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.route_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-@attrs.define(auto_attribs=True, slots=True)
+class RouteCreatedEvent(RouteCreationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "route_created"
+
+
+@dataclass
 class DoSyncKernelLogsEvent(AbstractEvent):
-    name = "do_sync_kernel_logs"
-
-    kernel_id: KernelId = attrs.field()
-    container_id: str = attrs.field()
+    kernel_id: KernelId
+    container_id: str
 
     def serialize(self) -> tuple:
         return (
@@ -651,69 +1038,104 @@ class DoSyncKernelLogsEvent(AbstractEvent):
             value[1],
         )
 
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.KERNEL
 
-@attrs.define(auto_attribs=True, slots=True)
-class GenericSessionEventArgs(AbstractEvent):
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.kernel_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "do_sync_kernel_logs"
+
+
+@dataclass
+class GenericSessionEvent(AbstractEvent):
     session_id: SessionId = attrs.field()
 
+    @override
     def serialize(self) -> tuple:
         return (str(self.session_id),)
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         return cls(
             SessionId(uuid.UUID(value[0])),
         )
 
-
-class ExecutionStartedEvent(GenericSessionEventArgs, AbstractEvent):
-    name = "execution_started"
-
-
-class ExecutionFinishedEvent(GenericSessionEventArgs, AbstractEvent):
-    name = "execution_finished"
-
-
-class ExecutionTimeoutEvent(GenericSessionEventArgs, AbstractEvent):
-    name = "execution_timeout"
-
-
-class ExecutionCancelledEvent(GenericSessionEventArgs, AbstractEvent):
-    name = "execution_cancelled"
-
-
-class AbstractBgtaskEventType(AbstractEvent):
-    @abstractmethod
-    def retry_count(self) -> Optional[int]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def should_close(self) -> bool:
-        raise NotImplementedError
-
-    @abstractmethod
-    def event_body(self, extra_data: dict) -> dict[str, Any]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def event_name(self, extra_data: dict) -> str:
-        raise NotImplementedError
-
-
-class AbstractBgtaskDoneEventType(AbstractBgtaskEventType):
+    @classmethod
     @override
-    def should_close(self) -> bool:
-        return True
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.session_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-@attrs.define(auto_attribs=True, slots=True)
-class BgtaskUpdatedEvent(AbstractBgtaskEventType):
-    name = "bgtask_updated"
+class ExecutionStartedEvent(GenericSessionEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "execution_started"
 
-    task_id: uuid.UUID = attrs.field()
-    current_progress: float = attrs.field()
-    total_progress: float = attrs.field()
-    message: Optional[str] = attrs.field(default=None)
+
+class ExecutionFinishedEvent(GenericSessionEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "execution_finished"
+
+
+class ExecutionTimeoutEvent(GenericSessionEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "execution_timeout"
+
+
+class ExecutionCancelledEvent(GenericSessionEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "execution_cancelled"
+
+
+@dataclass
+class BaseBgtaskEvent(AbstractEvent, ABC):
+    task_id: uuid.UUID
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.BGTASK
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.task_id)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class BgtaskUpdatedEvent(BaseBgtaskEvent):
+    current_progress: float
+    total_progress: float
+    message: Optional[str] = None
 
     def serialize(self) -> tuple:
         return (
@@ -732,37 +1154,21 @@ class BgtaskUpdatedEvent(AbstractBgtaskEventType):
             value[3],
         )
 
+    @classmethod
     @override
-    def retry_count(self) -> Optional[int]:
-        return 5
-
-    @override
-    def should_close(self) -> bool:
-        return False
-
-    @override
-    def event_body(self, extra_data: dict) -> dict[str, Any]:
-        return {
-            "task_id": str(self.task_id),
-            "message": self.message,
-            "current_progress": self.current_progress,
-            "total_progress": self.total_progress,
-        }
-
-    @override
-    def event_name(self, extra_data: dict) -> str:
-        return self.name
+    def event_name(cls) -> str:
+        return "bgtask_updated"
 
 
-@attrs.define(auto_attribs=True, slots=True)
-class BgtaskDoneEventArgs:
+@dataclass
+class BaseBgtaskDoneEvent(BaseBgtaskEvent):
     """
     Arguments for events that are triggered when the Bgtask is completed.
     """
 
-    task_id: uuid.UUID = attrs.field()
-    message: Optional[str] = attrs.field(default=None)
+    message: Optional[str] = None
 
+    @override
     def serialize(self) -> tuple:
         return (
             str(self.task_id),
@@ -770,6 +1176,7 @@ class BgtaskDoneEventArgs:
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         # TODO: Remove this after renaming BgtaskPartialSuccessEvent.
         if len(value) == 3:
@@ -784,75 +1191,66 @@ class BgtaskDoneEventArgs:
         )
 
 
-class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
+@dataclass
+class BgtaskDoneEvent(BaseBgtaskDoneEvent):
     """
     Event triggered when the Bgtask is successfully completed.
     """
 
-    name = "bgtask_done"
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "bgtask_done"
+
+
+@dataclass
+class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
+    """
+    Event triggered when the Bgtask is already completed.
+    An event recreated based on the last status of the Bgtask.
+    """
+
+    status: str
+    message: Optional[str] = None
+    current: str = "0"
+    total: str = "0"
 
     @override
-    def retry_count(self) -> Optional[int]:
-        return None
+    def serialize(self) -> tuple:
+        raise UnreachableError("BgtaskAlreadyDoneEvent should not be serialized.")
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple):
+        raise UnreachableError("BsgtaskAlreadyDoneEvent should not be deserialized.")
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "bgtask_already_done"
+
+
+@dataclass
+class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "bgtask_cancelled"
+
+
+@dataclass
+class BgtaskFailedEvent(BaseBgtaskDoneEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "bgtask_failed"
+
+
+@dataclass
+class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
+    errors: list[str] = field(default_factory=list)
 
     @override
-    def event_body(self, extra_data: dict) -> dict[str, Any]:
-        return {
-            "task_id": str(self.task_id),
-            "message": self.message,
-            **extra_data,
-        }
-
-    @override
-    def event_name(self, extra_data: dict) -> str:
-        if extra_data:
-            return f"bgtask_{extra_data['status']}"
-        return self.name
-
-
-class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
-    name = "bgtask_cancelled"
-
-    @override
-    def retry_count(self) -> Optional[int]:
-        return None
-
-    @override
-    def event_body(self, extra_data: dict) -> dict[str, Any]:
-        return {"task_id": str(self.task_id), "message": self.message}
-
-    @override
-    def event_name(self, extra_data):
-        return self.name
-
-
-class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
-    name = "bgtask_failed"
-
-    @override
-    def retry_count(self) -> Optional[int]:
-        return None
-
-    @override
-    def event_body(self, extra_data: dict) -> dict[str, Any]:
-        return {"task_id": str(self.task_id), "message": self.message}
-
-    @override
-    def event_name(self, extra_data: dict) -> str:
-        return self.name
-
-
-# TODO: Change the event name after handling the `bgtask_partial_success` event in clients such as WebUI.
-# BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_partial_success"
-BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
-
-
-@attrs.define(auto_attribs=True, slots=True)
-class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
-    name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
-
-    errors: list[str] = attrs.field(factory=list)
-
     def serialize(self) -> tuple:
         return (
             str(self.task_id),
@@ -861,6 +1259,7 @@ class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple):
         return cls(
             uuid.UUID(value[0]),
@@ -868,42 +1267,44 @@ class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType
             value[2],
         )
 
+    @classmethod
     @override
-    def retry_count(self) -> Optional[int]:
+    def event_name(cls) -> str:
+        return "bgtask_partial_success"
+
+
+class BaseVolumeEvent(AbstractEvent):
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.VOLUME
+
+    @override
+    def domain_id(self) -> Optional[str]:
         return None
 
     @override
-    def event_body(self, extra_data: dict) -> dict[str, Any]:
-        return {
-            "task_id": str(self.task_id),
-            "message": self.message,
-            "errors": self.errors,
-        }
-
-    @override
-    def event_name(self, extra_data: dict) -> str:
-        return self.name
+    def user_event(self) -> Optional[UserEvent]:
+        return None
 
 
-@attrs.define(slots=True)
-class DoVolumeMountEvent(AbstractEvent):
-    name = "do_volume_mount"
-
+@dataclass
+class DoVolumeMountEvent(BaseVolumeEvent):
     # Let storage proxies and agents find the real path of volume
     # with their mount_path or mount_prefix.
-    dir_name: str = attrs.field()
-    volume_backend_name: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
+    dir_name: str
+    volume_backend_name: str
+    quota_scope_id: QuotaScopeID
 
-    fs_location: str = attrs.field()
-    fs_type: str = attrs.field(default="nfs")
-    cmd_options: str | None = attrs.field(default=None)
-    scaling_group: str | None = attrs.field(default=None)
+    fs_location: str
+    fs_type: str = "nfs"
+    cmd_options: Optional[str] = None
+    scaling_group: Optional[str] = None
 
     # if `edit_fstab` is False, `fstab_path` is ignored
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
-    edit_fstab: bool = attrs.field(default=False)
-    fstab_path: str = attrs.field(default="/etc/fstab")
+    edit_fstab: bool = False
+    fstab_path: str = "/etc/fstab"
 
     def serialize(self) -> tuple:
         return (
@@ -932,22 +1333,24 @@ class DoVolumeMountEvent(AbstractEvent):
             fstab_path=value[8],
         )
 
+    @classmethod
+    def event_name(cls) -> str:
+        return "do_volume_mount"
 
-@attrs.define(slots=True)
-class DoVolumeUnmountEvent(AbstractEvent):
-    name = "do_volume_unmount"
 
+@dataclass
+class DoVolumeUnmountEvent(BaseVolumeEvent):
     # Let storage proxies and agents find the real path of volume
     # with their mount_path or mount_prefix.
-    dir_name: str = attrs.field()
-    volume_backend_name: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
-    scaling_group: str | None = attrs.field(default=None)
+    dir_name: str
+    volume_backend_name: str
+    quota_scope_id: QuotaScopeID
+    scaling_group: Optional[str] = None
 
     # if `edit_fstab` is False, `fstab_path` is ignored
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
-    edit_fstab: bool = attrs.field(default=False)
-    fstab_path: str | None = attrs.field(default=None)
+    edit_fstab: bool = False
+    fstab_path: Optional[str] = None
 
     def serialize(self) -> tuple:
         return (
@@ -970,14 +1373,18 @@ class DoVolumeUnmountEvent(AbstractEvent):
             fstab_path=value[5],
         )
 
+    @classmethod
+    def event_name(cls) -> str:
+        return "do_volume_unmount"
 
-@attrs.define(auto_attribs=True, slots=True)
-class VolumeMountEventArgs(AbstractEvent):
-    node_id: str = attrs.field()
-    node_type: VolumeMountableNodeType = attrs.field()
-    mount_path: str = attrs.field()
-    quota_scope_id: QuotaScopeID = attrs.field()
-    err_msg: str | None = attrs.field(default=None)
+
+@dataclass
+class BaseAgentVolumeMountEvent(BaseVolumeEvent):
+    node_id: str
+    node_type: VolumeMountableNodeType
+    mount_path: str
+    quota_scope_id: QuotaScopeID
+    err_msg: Optional[str] = None
 
     def serialize(self) -> tuple:
         return (
@@ -999,20 +1406,38 @@ class VolumeMountEventArgs(AbstractEvent):
         )
 
 
-class VolumeMounted(VolumeMountEventArgs, AbstractEvent):
-    name = "volume_mounted"
+class VolumeMounted(BaseAgentVolumeMountEvent):
+    @classmethod
+    def event_name(cls) -> str:
+        return "volume_mounted"
 
 
-class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
-    name = "volume_unmounted"
+class VolumeUnmounted(BaseAgentVolumeMountEvent):
+    @classmethod
+    def event_name(cls) -> str:
+        return "volume_unmounted"
 
 
-@attrs.define(auto_attribs=True, slots=True)
-class VFolderDeletionSuccessEvent(AbstractEvent):
-    name = "vfolder_deletion_success"
-
+@dataclass
+class VFolderEvent(AbstractEvent):
     vfid: VFolderID
 
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.VFOLDER
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return str(self.vfid)
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
+class VFolderDeletionSuccessEvent(VFolderEvent):
     def serialize(self) -> tuple:
         return (str(self.vfid),)
 
@@ -1022,12 +1447,13 @@ class VFolderDeletionSuccessEvent(AbstractEvent):
             VFolderID.from_str(value[0]),
         )
 
+    @classmethod
+    def event_name(cls) -> str:
+        return "vfolder_deletion_success"
 
-@attrs.define(auto_attribs=True, slots=True)
-class VFolderDeletionFailureEvent(AbstractEvent):
-    name = "vfolder_deletion_failure"
 
-    vfid: VFolderID
+@dataclass
+class VFolderDeletionFailureEvent(VFolderEvent):
     message: str
 
     def serialize(self) -> tuple:
@@ -1042,6 +1468,10 @@ class VFolderDeletionFailureEvent(AbstractEvent):
             VFolderID.from_str(value[0]),
             value[1],
         )
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "vfolder_deletion_failure"
 
 
 class RedisConnectorFunc(Protocol):
@@ -1250,14 +1680,14 @@ class EventDispatcher:
             CoalescingState(),
             args_matcher,
         )
-        self._consumers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
+        self._consumers[event_cls.event_name()].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
     def unconsume(
         self,
         handler: EventHandler[TContext, TEvent],
     ) -> None:
-        self._consumers[handler.event_cls.name].discard(
+        self._consumers[handler.event_cls.event_name()].discard(
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
@@ -1291,7 +1721,7 @@ class EventDispatcher:
             CoalescingState(),
             args_matcher,
         )
-        override_event_name = override_event_name or event_cls.name
+        override_event_name = override_event_name or event_cls.event_name()
         self._subscribers[override_event_name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
@@ -1301,7 +1731,7 @@ class EventDispatcher:
         *,
         override_event_name: Optional[str] = None,
     ) -> None:
-        override_event_name = override_event_name or handler.event_cls.name
+        override_event_name = override_event_name or handler.event_cls.event_name()
         self._subscribers[override_event_name].discard(
             cast(EventHandler[Any, AbstractEvent], handler)
         )
@@ -1459,7 +1889,7 @@ class EventProducer:
             source_bytes = source_override.encode()
 
         raw_event = {
-            b"name": event.name.encode(),
+            b"name": event.event_name().encode(),
             b"source": source_bytes,
             b"args": msgpack.packb(event.serialize()),
         }

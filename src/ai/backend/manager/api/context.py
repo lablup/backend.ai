@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import attrs
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -13,7 +14,7 @@ from ai.backend.manager.services.processors import Processors
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
-    from ai.backend.common.events import EventDispatcher, EventProducer
+    from ai.backend.common.events.events import EventDispatcher, EventProducer
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
@@ -63,6 +64,7 @@ class RootContext(BaseContext):
     background_task_manager: BackgroundTaskManager
     metrics: CommonMetricRegistry
     processors: Processors
+    event_hub: EventHub
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
         super().__init__(**kwargs)

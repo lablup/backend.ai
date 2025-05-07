@@ -9,7 +9,7 @@ import aiotools
 import sqlalchemy as sa
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events.events import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 

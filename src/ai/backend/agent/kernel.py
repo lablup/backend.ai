@@ -39,7 +39,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
-from ai.backend.common.events import (
+from ai.backend.common.events.events import (
     EventProducer,
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,

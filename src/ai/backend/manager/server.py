@@ -51,7 +51,8 @@ from ai.backend.common.defs import (
     RedisRole,
 )
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events.events import EventDispatcher, EventProducer
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -552,6 +553,13 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.event_hub = EventHub()
+    yield
+    await root_ctx.event_hub.shutdown()
+
+
+@actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mq = _make_message_queue(root_ctx)
     root_ctx.event_producer = EventProducer(
@@ -933,6 +941,7 @@ def build_root_app(
 
     if cleanup_contexts is None:
         cleanup_contexts = [
+            event_hub_ctx,
             manager_status_ctx,
             redis_ctx,
             database_ctx,

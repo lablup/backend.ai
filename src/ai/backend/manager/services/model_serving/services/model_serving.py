@@ -11,7 +11,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
 from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.events import (
+from ai.backend.common.events.events import (
     EventDispatcher,
     EventHandler,
     KernelLifecycleEventReason,
@@ -407,7 +407,7 @@ class ModelServingService:
                 | SessionTerminatedEvent
                 | ModelServiceStatusEvent,
             ) -> None:
-                task_message = {"event": event.name, "session_id": str(event.session_id)}
+                task_message = {"event": event.event_name(), "session_id": str(event.session_id)}
                 match event:
                     case ModelServiceStatusEvent():
                         task_message["is_healthy"] = event.new_status.value

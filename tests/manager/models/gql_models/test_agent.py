@@ -1,14 +1,14 @@
 import asyncio
 import json
+from dataclasses import asdict
 from unittest.mock import AsyncMock, patch
 
-import attr
 import pytest
 from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.events.events import BgtaskDoneEvent, EventDispatcher
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
@@ -19,6 +19,7 @@ from ai.backend.manager.server import (
     background_task_ctx,
     database_ctx,
     event_dispatcher_ctx,
+    event_hub_ctx,
     hook_plugin_ctx,
     monitoring_ctx,
     network_plugin_ctx,
@@ -118,6 +119,7 @@ async def test_scan_gpu_alloc_maps(
 ):
     test_app, _ = await create_app_and_client(
         [
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
@@ -143,7 +145,7 @@ async def test_scan_gpu_alloc_maps(
         source: AgentId,
         event: BgtaskDoneEvent,
     ) -> None:
-        update_body = attr.asdict(event)  # type: ignore
+        update_body = asdict(event)
         done_handler_ctx.update(**update_body)
         done_event.set()
 

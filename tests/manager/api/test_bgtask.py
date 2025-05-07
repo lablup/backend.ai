@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 import enum
 from collections.abc import AsyncIterator
+from dataclasses import asdict
 from typing import Any, TypeAlias
 
-import attr
 import pytest
 
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
-from ai.backend.common.events import (
+from ai.backend.common.events.events import (
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskUpdatedEvent,
@@ -23,6 +23,7 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
     background_task_ctx,
     event_dispatcher_ctx,
+    event_hub_ctx,
     redis_ctx,
 )
 
@@ -40,6 +41,7 @@ async def bgtask_fixture(
 ) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
         [
+            event_hub_ctx, 
             mock_etcd_ctx,
             mock_unified_config_ctx,
             redis_ctx,
@@ -86,9 +88,9 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
         # Copy the arguments to the uppser scope
         # since assertions inside the handler does not affect the test result
         # because the handlers are executed inside a separate asyncio task.
-        update_handler_ctx["event_name"] = event.name
+        update_handler_ctx["event_name"] = event.event_name()
         # type checker complains event is not a subclass of AttrsInstance, but it definitely is...
-        update_body = attr.asdict(event)  # type: ignore
+        update_body = asdict(event)
         update_handler_ctx.update(**update_body)
 
     async def done_sub(
@@ -97,8 +99,8 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
         event: BgtaskDoneEvent,
     ) -> None:
         done_handler_ctx["context"] = context
-        done_handler_ctx["event_name"] = event.name
-        update_body = attr.asdict(event)  # type: ignore
+        done_handler_ctx["event_name"] = event.event_name()
+        update_body = asdict(event)
         done_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter):
@@ -141,8 +143,8 @@ async def test_background_task_fail(bgtask_fixture: BgtaskFixture) -> None:
         event: BgtaskFailedEvent,
     ) -> None:
         fail_handler_ctx["context"] = context
-        fail_handler_ctx["event_name"] = event.name
-        update_body = attr.asdict(event)  # type: ignore
+        fail_handler_ctx["event_name"] = event.event_name()
+        update_body = asdict(event)
         fail_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter):

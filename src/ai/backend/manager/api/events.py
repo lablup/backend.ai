@@ -24,12 +24,7 @@ from aiotools import adefer
 from sqlalchemy.orm import load_only
 
 from ai.backend.common import validators as tx
-from ai.backend.common.events import (
-    BgtaskCancelledEvent,
-    BgtaskDoneEvent,
-    BgtaskFailedEvent,
-    BgtaskPartialSuccessEvent,
-    BgtaskUpdatedEvent,
+from ai.backend.common.events.events import (
     EventDispatcher,
     KernelCancelledEvent,
     KernelCreatingEvent,
@@ -47,11 +42,12 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
+from ai.backend.common.events.hub.hub import AsyncBypassPropagator
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
+from ..errors.exceptions import GenericForbidden, GroupNotFound
 from ..models import UserRole, groups, kernels
 from ..models.session import SessionRow
 from ..models.utils import execute_with_retry
@@ -69,13 +65,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 sentinel: Final = Sentinel.token
 
 SessionEventInfo = Tuple[str, dict, str, Optional[int]]
-BgtaskEvents = (
-    BgtaskUpdatedEvent
-    | BgtaskDoneEvent
-    | BgtaskCancelledEvent
-    | BgtaskFailedEvent
-    | BgtaskPartialSuccessEvent
-)
 
 
 @server_status_required(READ_ALLOWED)
@@ -188,10 +177,42 @@ async def push_background_task_events(
     task_id = params["task_id"]
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
-    try:
-        return await root_ctx.background_task_manager.push_bgtask_events(request, task_id)
-    except ValueError as e:
-        raise ObjectNotFound(extra_data=str(e), object_name="background task")
+    async with sse_response(request) as resp:
+        propagator = AsyncBypassPropagator()
+        root_ctx.event_hub.register_event_propagator(propagator)
+        try:
+            last_event = await root_ctx.background_task_manager.fetch_last_finishied_event(task_id)
+            if last_event is not None:
+                # if the task is finished, send the last event
+                # and close the connection
+                user_event = last_event.user_event()
+                if user_event is None:
+                    log.warning(
+                        "Background task {} is finished, but no user event is found",
+                        task_id,
+                    )
+                    raise ValueError
+                await resp.send(
+                    dump_json_str(user_event.user_event_dict()),
+                    event=user_event.event_name(),
+                    retry=user_event.retry_count(),
+                )
+                return resp
+            # if the task is not finished, wait for the events
+            # and send them to the client
+            async for event in propagator.receive():
+                user_event = event.user_event()
+                if user_event is None:
+                    continue
+                await resp.send(
+                    dump_json_str(user_event.user_event_dict()),
+                    event=user_event.event_name(),
+                    retry=user_event.retry_count(),
+                )
+            await resp.send(dump_json_str({}), event="server_close")
+        finally:
+            root_ctx.event_hub.unregister_event_propagator(propagator.id())
+    return resp
 
 
 async def enqueue_kernel_creation_status_update(
@@ -228,7 +249,7 @@ async def enqueue_kernel_creation_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason, None))
+        q.put_nowait((event.event_name(), row._mapping, event.reason, None))
 
 
 async def enqueue_kernel_termination_status_update(
@@ -270,7 +291,7 @@ async def enqueue_kernel_termination_status_update(
             if isinstance(event, (KernelTerminatingEvent, KernelTerminatedEvent))
             else None
         )
-        q.put_nowait((event.name, row._mapping, event.reason, exit_code))
+        q.put_nowait((event.event_name(), row._mapping, event.reason, exit_code))
 
 
 async def enqueue_session_creation_status_update(
@@ -313,7 +334,7 @@ async def enqueue_session_creation_status_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, None))
+        q.put_nowait((event.event_name(), row_map, event.reason, None))
 
 
 async def enqueue_session_termination_status_update(
@@ -354,7 +375,7 @@ async def enqueue_session_termination_status_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, None))
+        q.put_nowait((event.event_name(), row_map, event.reason, None))
 
 
 async def enqueue_batch_task_result_update(
@@ -395,7 +416,7 @@ async def enqueue_batch_task_result_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, event.exit_code))
+        q.put_nowait((event.event_name(), row_map, event.reason, event.exit_code))
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

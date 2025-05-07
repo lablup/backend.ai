@@ -3,7 +3,7 @@ from typing import Self
 
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventDispatcher
+from ai.backend.common.events.events import EventDispatcher
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor

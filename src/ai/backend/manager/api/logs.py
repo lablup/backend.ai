@@ -5,7 +5,7 @@ import logging
 import uuid
 from datetime import datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any, MutableMapping, Optional, Self, Tuple, override
 
 import aiohttp_cors
 import attrs
@@ -16,7 +16,8 @@ from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
 from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
+from ai.backend.common.events.events import AbstractEvent, EventDomain, EventHandler
+from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
@@ -34,8 +35,28 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class DoLogCleanupEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_log_cleanup"
+class DoLogCleanupEvent(AbstractEvent):
+    @override
+    def serialize(self) -> tuple:
+        return tuple()
+
+    @classmethod
+    def deserialize(cls, data: tuple) -> Self:
+        return cls()
+
+    @classmethod
+    def event_domain(self) -> EventDomain:
+        return EventDomain.LOG
+
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "do_log_cleanup"
 
 
 @server_status_required(READ_ALLOWED)

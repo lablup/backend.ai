@@ -78,7 +78,7 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events import (
+from ai.backend.common.events.events import (
     AbstractEvent,
     AgentErrorEvent,
     AgentHeartbeatEvent,
