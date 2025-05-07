@@ -189,6 +189,10 @@ async def execute(
     Note that when retried, the given function may be executed *multiple* times, so the caller
     should take care of side-effects of it.
     """
+
+    if not callable(func):
+        raise TypeError("The func must be a function or a coroutinefunction with no arguments.")
+
     redis_client = redis_obj.client
     service_name = service_name or redis_obj.service_name
     reconnect_poll_interval = redis_obj.redis_helper_config.get("reconnect_poll_timeout", 0.0)
@@ -214,20 +218,15 @@ async def execute(
     while True:
         try:
             async with redis_client:
-                if callable(func):
-                    aw_or_pipe = func(redis_client)
-                else:
-                    raise TypeError(
-                        "The func must be a function or a coroutinefunction with no arguments."
-                    )
+                aw_or_pipe = func(redis_client)
                 if isinstance(aw_or_pipe, Pipeline):
                     async with aw_or_pipe:
                         result = await aw_or_pipe.execute()
                 elif inspect.isawaitable(aw_or_pipe):
                     result = await aw_or_pipe
                 else:
-                    raise TypeError(
-                        "The return value must be an awaitable"
+                    raise ValueError(
+                        "The redis execute's return value must be an awaitable"
                         " or redis.asyncio.client.Pipeline object"
                     )
                 if isinstance(result, Pipeline):
@@ -250,6 +249,7 @@ async def execute(
             redis.exceptions.ReadOnlyError,
             redis.exceptions.ConnectionError,
             ConnectionResetError,
+            TypeError,  # 4.5.5 version of redis.py raises a TypeError when the Connection is closed.
         ) as e:
             warn_on_first_attempt = True
             if (
