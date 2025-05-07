@@ -28,6 +28,9 @@ Duration: {{ duration }} seconds
 This email is sent from Backend.AI SMTP Reporter.
 """
 
+_max_num_proc = os.cpu_count() or 8
+_file_perm = (Path(__file__).parent.parent / "server.py").stat()
+
 
 class DatabaseType(enum.StrEnum):
     postgresql = "postgresql"
@@ -129,10 +132,6 @@ class DatabaseConfig(BaseModel):
         examples=[0, 30],
         alias="lock-conn-timeout",
     )
-
-
-_max_num_proc = os.cpu_count() or 8
-_file_perm = (Path(__file__).parent.parent / "server.py").stat()
 
 
 class EventLoopType(enum.StrEnum):
