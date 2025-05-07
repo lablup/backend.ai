@@ -286,6 +286,7 @@ class BackendAIError(web.HTTPError, ABC):
         body = {
             "type": self.error_type,
             "title": self.error_title,
+            "error_code": str(self.error_code()),
         }
         if extra_msg is not None:
             body["msg"] = extra_msg

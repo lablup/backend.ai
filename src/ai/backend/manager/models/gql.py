@@ -12,7 +12,10 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
-from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+)
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
@@ -3120,11 +3123,19 @@ class GQLExceptionMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         try:
             res = next(root, info, **args)
+        except BackendAIError as e:
+            raise GraphQLError(
+                message=str(e),
+                extensions={
+                    "code": str(e.error_code()),
+                },
+            )
         except Exception as e:
             raise GraphQLError(
                 message=str(e),
-                # TODO: Add extensions (error_code) after BackendError refactoring
-                # extensions={},
+                extensions={
+                    "code": str(ErrorCode.default()),
+                },
             )
         return res
 
