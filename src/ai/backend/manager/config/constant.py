@@ -1,4 +1,3 @@
-# list[tuple[tuple[str], str]]
 MANAGER_LOCAL_CFG_OVERRIDE_ENVS: list[tuple[tuple[str, ...], str]] = [
     (("etcd", "namespace"), "BACKEND_NAMESPACE"),
     (("etcd", "addr"), "BACKEND_ETCD_ADDR"),

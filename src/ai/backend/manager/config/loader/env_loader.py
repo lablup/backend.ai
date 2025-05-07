@@ -6,9 +6,9 @@ from ai.backend.manager.config.loader.type import AbstractConfigLoader
 
 
 class EnvLoader(AbstractConfigLoader):
-    _envs: list[tuple[Any, str]]
+    _envs: list[tuple[tuple[str, ...], str]]
 
-    def __init__(self, envs: list[tuple[Any, str]]) -> None:
+    def __init__(self, envs: list[tuple[tuple[str, ...], str]]) -> None:
         self._envs = envs
 
     async def load(self) -> Mapping[str, Any]:
