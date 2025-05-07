@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.5 (2025-05-07)
+
+### Fixes
+* Agent retries retrieving kernel service info if it fails during the kernel creation step ([#4321](https://github.com/lablup/backend.ai/issues/4321))
+* Add TypeError handling in redis_helper ([#4339](https://github.com/lablup/backend.ai/issues/4339))
+* Add default value of task_info value ([#4340](https://github.com/lablup/backend.ai/issues/4340))
+* Use label's items for making resource info ([#4341](https://github.com/lablup/backend.ai/issues/4341))
+
+
 ## 25.6.4 (2025-04-29)
 
 ### Fixes
