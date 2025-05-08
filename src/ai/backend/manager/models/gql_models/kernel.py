@@ -155,7 +155,7 @@ class KernelNode(graphene.ObjectType):
         if is_superadmin:
             hide_agents = False
         else:
-            hide_agents = ctx.local_config.manager.hide_agents
+            hide_agents = ctx.unified_config.local.manager.hide_agents
         status_history = row.status_history or {}
         return KernelNode(
             id=row.id,  # auto-converted to Relay global ID
@@ -278,7 +278,7 @@ class ComputeContainer(graphene.ObjectType):
         if is_superadmin:
             hide_agents = False
         else:
-            hide_agents = ctx.local_config.manager.hide_agents
+            hide_agents = ctx.unified_config.local.manager.hide_agents
         status_history = row.status_history or {}
         return {
             # identity
@@ -703,7 +703,7 @@ class LegacyComputeSession(graphene.ObjectType):
         if is_superadmin:
             hide_agents = False
         else:
-            hide_agents = ctx.local_config.manager.hide_agents
+            hide_agents = ctx.unified_config.local.manager.hide_agents
         return {
             "id": row["id"],
             "sess_id": row["session_name"],  # legacy, will be deprecated

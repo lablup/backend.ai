@@ -211,7 +211,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
 
 async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogCleanupEvent) -> None:
     root_ctx: RootContext = app["_root.context"]
-    etcd = root_ctx.shared_config.etcd
+    etcd = root_ctx.unified_config.shared_config_loader._etcd
     raw_lifetime = await etcd.get("config/logs/error/retention")
     if raw_lifetime is None:
         raw_lifetime = "90d"

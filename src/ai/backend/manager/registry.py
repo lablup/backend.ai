@@ -126,7 +126,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
@@ -244,8 +244,7 @@ class AgentRegistry:
 
     def __init__(
         self,
-        local_config: ManagerLocalConfig,
-        shared_config: ManagerSharedConfig,
+        unified_config: ManagerUnifiedConfig,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
         redis_stat: RedisConnectionInfo,
@@ -262,8 +261,7 @@ class AgentRegistry:
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
     ) -> None:
-        self.local_config = local_config
-        self.shared_config = shared_config
+        self.unified_config = unified_config
         self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
@@ -278,7 +276,7 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
-        self.rpc_keepalive_timeout = int(shared_config.data.network.rpc.keepalive_timeout)
+        self.rpc_keepalive_timeout = int(unified_config.shared.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
@@ -500,7 +498,9 @@ class AgentRegistry:
                     )
 
         if _resources := config["resources"]:
-            available_resource_slots = await self.shared_config.get_resource_slots()
+            available_resource_slots = (
+                await self.unified_config.shared_config_loader.get_resource_slots()
+            )
             try:
                 ResourceSlot.from_user_input(_resources, available_resource_slots)
             except ValueError as e:
@@ -1018,7 +1018,9 @@ class AgentRegistry:
             requested_mount_options = (
                 session_enqueue_configs["creation_config"].get("mount_options") or {}
             )
-            allowed_vfolder_types = await self.shared_config.get_vfolder_types()
+            allowed_vfolder_types = (
+                await self.unified_config.shared_config_loader.get_vfolder_types()
+            )
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
                 self.storage_manager,
@@ -1172,8 +1174,10 @@ class AgentRegistry:
                     "enqueue_session(): image ref => {} ({})", image_ref, image_ref.architecture
                 )
                 image_row = await ImageRow.resolve(session, [image_ref])
-            image_min_slots, image_max_slots = await image_row.get_slot_ranges(self.shared_config)
-            known_slot_types = await self.shared_config.get_resource_slots()
+            image_min_slots, image_max_slots = await image_row.get_slot_ranges(
+                self.unified_config.shared_config_loader
+            )
+            known_slot_types = await self.unified_config.shared_config_loader.get_resource_slots()
 
             labels = cast(dict, image_row.labels)
 
@@ -1465,7 +1469,7 @@ class AgentRegistry:
     ) -> None:
         if not bindings:
             return
-        auto_pull = cast(str, self.shared_config.data.docker.image.auto_pull)
+        auto_pull = self.unified_config.shared.docker.image.auto_pull.value
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
             if binding.agent_alloc_ctx.agent_id is None:
@@ -1559,7 +1563,7 @@ class AgentRegistry:
                 result = await db_sess.execute(query)
                 resource_policy = result.scalars().first()
                 idle_timeout = cast(int, resource_policy.idle_timeout)
-                auto_pull = cast(str, self.shared_config.data.docker.image.auto_pull)
+                auto_pull = self.unified_config.shared.docker.image.auto_pull.value
 
                 # Aggregate image registry information
                 image_refs: set[ImageRef] = set()
@@ -1622,7 +1626,7 @@ class AgentRegistry:
                     }
                 elif ClusterMode(scheduled_session.cluster_mode) == ClusterMode.MULTI_NODE:
                     # Create overlay network for multi-node sessions
-                    driver = self.shared_config.data.network.inter_container.default_driver
+                    driver = self.unified_config.shared.network.inter_container.default_driver
                     if driver is None:
                         raise ValueError("No inter-container network driver is configured.")
 
@@ -2716,11 +2720,11 @@ class AgentRegistry:
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
                     raise ValueError("network_id should not be None!")
-                if self.shared_config.data.network.inter_container.default_driver is None:
+                if self.unified_config.shared.network.inter_container.default_driver is None:
                     raise ValueError("No inter-container network driver is configured.")
 
                 network_plugin = self.network_plugin_ctx.plugins[
-                    self.shared_config.data.network.inter_container.default_driver
+                    self.unified_config.shared.network.inter_container.default_driver
                 ]
                 try:
                     await network_plugin.destroy_network(network_ref_name)
@@ -3066,7 +3070,9 @@ class AgentRegistry:
                     if row is None or row["status"] is None:
                         # new agent detected!
                         log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.shared_config.update_resource_slots(slot_key_and_units)
+                        await self.unified_config.shared_config_loader.update_resource_slots(
+                            slot_key_and_units
+                        )
                         self.agent_cache.update(
                             agent_id,
                             current_addr,
@@ -3122,13 +3128,17 @@ class AgentRegistry:
                                 agent_info["public_key"],
                             )
                         if updates:
-                            await self.shared_config.update_resource_slots(slot_key_and_units)
+                            await self.unified_config.shared_config_loader.update_resource_slots(
+                                slot_key_and_units
+                            )
                             update_query = (
                                 sa.update(agents).values(updates).where(agents.c.id == agent_id)
                             )
                             await conn.execute(update_query)
                     elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.shared_config.update_resource_slots(slot_key_and_units)
+                        await self.unified_config.shared_config_loader.update_resource_slots(
+                            slot_key_and_units
+                        )
                         instance_rejoin = True
                         self.agent_cache.update(
                             agent_id,

@@ -71,7 +71,7 @@ def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
-            status = await root_ctx.shared_config.get_manager_status()
+            status = await root_ctx.unified_config.shared_config_loader.get_manager_status()
             if status not in allowed_status:
                 if status == ManagerStatus.FROZEN:
                     raise ServerFrozen
@@ -104,11 +104,15 @@ class GQLMutationUnfrozenRequiredMiddleware:
 
 async def detect_status_update(root_ctx: RootContext) -> None:
     try:
-        async with aclosing(root_ctx.shared_config.watch_manager_status()) as agen:
+        async with aclosing(
+            root_ctx.unified_config.shared_config_loader.watch_manager_status()
+        ) as agen:
             async for ev in agen:
                 if ev.event == "put":
-                    root_ctx.shared_config.get_manager_status.cache_clear()
-                    updated_status = await root_ctx.shared_config.get_manager_status()
+                    root_ctx.unified_config.shared_config_loader.get_manager_status.cache_clear()
+                    updated_status = (
+                        await root_ctx.unified_config.shared_config_loader.get_manager_status()
+                    )
                     log.debug(
                         "Process-{0} detected manager status update: {1}",
                         root_ctx.pidx,
@@ -119,7 +123,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(Optional[float], root_ctx.local_config.manager.status_update_interval)
+    interval = cast(Optional[float], root_ctx.unified_config.local.manager.status_update_interval)
     if interval is None:
         # Do not run bgtask if interval is not set
         return
@@ -138,9 +142,9 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     log.info("MANAGER.FETCH_MANAGER_STATUS ()")
     try:
-        status = await root_ctx.shared_config.get_manager_status()
+        status = await root_ctx.unified_config.shared_config_loader.get_manager_status()
         # etcd_info = await root_ctx.shared_config.get_manager_nodes_info()
-        configs = root_ctx.local_config.manager
+        configs = root_ctx.unified_config.local.manager
 
         async with root_ctx.db.begin() as conn:
             query = (
@@ -201,14 +205,15 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
 
     if force_kill:
         await root_ctx.registry.kill_all_sessions()
-    await root_ctx.shared_config.update_manager_status(status)
+    await root_ctx.unified_config.shared_config_loader.update_manager_status(status)
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def get_announcement(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    data = await root_ctx.shared_config.etcd.get("manager/announcement")
+    etcd = root_ctx.unified_config.shared_config_loader._etcd
+    data = await etcd.get("manager/announcement")
     if data is None:
         ret = {"enabled": False, "message": ""}
     else:
@@ -225,12 +230,14 @@ async def get_announcement(request: web.Request) -> web.Response:
 )
 async def update_announcement(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
+    etcd = root_ctx.unified_config.shared_config_loader._etcd
+
     if params["enabled"]:
         if not params["message"]:
             raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
-        await root_ctx.shared_config.etcd.put("manager/announcement", params["message"])
+        await etcd.put("manager/announcement", params["message"])
     else:
-        await root_ctx.shared_config.etcd.delete("manager/announcement")
+        await etcd.delete("manager/announcement")
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -294,7 +301,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 @superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    manager_id = root_ctx.local_config.manager.id
+    manager_id = root_ctx.unified_config.local.manager.id
 
     scheduler_status = {}
     for event in SchedulerEvent:

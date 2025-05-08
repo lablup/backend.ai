@@ -5,7 +5,7 @@ import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Mapping, Optional
+from typing import Any, Literal, Mapping, Optional, Self
 
 from pydantic import BaseModel, Field, FilePath
 
@@ -17,6 +17,7 @@ from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
 from ai.backend.manager.config.loader.env_loader import EnvLoader
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
 from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 _default_smtp_template = """
@@ -98,6 +99,10 @@ def _parse_host_port_pair(value: Any, *, allow_blank_host: bool = True) -> _Host
 
 
 HostPortPair = Annotated[_HostPortPair, PlainValidator(_parse_host_port_pair)]
+
+
+_max_num_proc = os.cpu_count() or 8
+_file_perm = (Path(__file__).parent.parent / "server.py").stat()
 
 
 class DatabaseType(enum.StrEnum):
@@ -969,36 +974,35 @@ class ManagerLocalConfig(BaseModel):
     def __repr__(self):
         return pformat(self.model_dump())
 
-
-async def load(
-    config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET
-) -> ManagerLocalConfig:
-    overrides: list[tuple[tuple[str, ...], Any]] = [
-        (("debug", "enabled"), log_level == LogLevel.DEBUG),
-    ]
-    if log_level != LogLevel.NOTSET:
-        overrides += [
-            (("logging", "level"), log_level),
-            (("logging", "pkg-ns", "ai.backend"), log_level),
-            (("logging", "pkg-ns", "aiohttp"), log_level),
+    # CLI에선 etcd에 굳이 연결 하고 싶지 않음. -> shared_config를 얻고 싶지 않으므로 UnfiedConfig 대신 이걸 쓰면?
+    @classmethod
+    async def load(
+        cls, config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET
+    ) -> tuple[Self, AbstractConfigLoader]:
+        overrides: list[tuple[tuple[str, ...], Any]] = [
+            (("debug", "enabled"), log_level == LogLevel.DEBUG),
         ]
+        if log_level != LogLevel.NOTSET:
+            overrides += [
+                (("logging", "level"), log_level),
+                (("logging", "pkg-ns", "ai.backend"), log_level),
+                (("logging", "pkg-ns", "aiohttp"), log_level),
+            ]
 
-    file_loader = TomlConfigLoader(config_path, "manager")
-    env_loader = EnvLoader(MANAGER_LOCAL_CFG_OVERRIDE_ENVS)
-    cfg_overrider = ConfigOverrider(overrides)
-    cfg_loader = LoaderChain([
-        file_loader,
-        env_loader,
-        cfg_overrider,
-    ])
-    raw_cfg = await cfg_loader.load()
+        file_loader = TomlConfigLoader(config_path, "manager")
+        env_loader = EnvLoader(MANAGER_LOCAL_CFG_OVERRIDE_ENVS)
+        cfg_overrider = ConfigOverrider(overrides)
+        cfg_loader = LoaderChain([
+            file_loader,
+            env_loader,
+            cfg_overrider,
+        ])
+        raw_cfg = await cfg_loader.load()
 
-    # UnifiedConfig 통해 로드하도록 변경하고
-    # task, watcher 하나 두고 reload 가능한 구조로 변경.
-    cfg = ManagerLocalConfig.model_validate(raw_cfg)
+        cfg = cls.model_validate(raw_cfg)
 
-    if cfg.debug.enabled:
-        print("== Manager configuration ==", file=sys.stderr)
-        print(pformat(cfg), file=sys.stderr)
+        if cfg.debug.enabled:
+            print("== Manager configuration ==", file=sys.stderr)
+            print(pformat(cfg), file=sys.stderr)
 
-    return cfg
+        return cfg, cfg_loader

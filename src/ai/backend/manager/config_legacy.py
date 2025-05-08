@@ -8,7 +8,6 @@ import sys
 from abc import abstractmethod
 from collections import UserDict
 from collections.abc import Mapping
-from contextvars import ContextVar
 from pathlib import Path
 from pprint import pformat
 from typing import (
@@ -44,8 +43,6 @@ DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
-
-current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
 
 _default_pyroscope_config: dict[str, Any] = {
     "enabled": False,

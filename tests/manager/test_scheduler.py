@@ -23,6 +23,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow, SessionStatus
@@ -597,6 +598,13 @@ async def test_manually_assign_agent_available(
         mock_event_dispatcher,
         mock_event_producer,
     ) = registry_ctx
+    mock_unified_config = ManagerUnifiedConfig(
+        local=mock_local_config,
+        shared=mock_shared_config,
+        local_config_loader=MagicMock(),
+        shared_config_loader=MagicMock(),
+        shared_config_watcher=MagicMock(),
+    )
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()
     mock_redis_wrapper = MagicMock()
@@ -616,8 +624,7 @@ async def test_manually_assign_agent_available(
     sess_ctx = example_pending_sessions[0]
 
     dispatcher = SchedulerDispatcher(
-        local_config=mock_local_config,
-        shared_config=mock_shared_config,
+        unified_config=mock_unified_config,
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,

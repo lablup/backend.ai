@@ -50,9 +50,10 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
+from ai.backend.manager.config.loader.etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.local import load as load_manager_local_config
 from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -255,7 +256,7 @@ def local_config(
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = asyncio.run(load_manager_local_config())
+        fs_local_config = asyncio.run(ManagerLocalConfig.load())[0]
         cfg.etcd.addr = fs_local_config.etcd.addr
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "user")
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "password")
@@ -340,14 +341,9 @@ def etcd_fixture(
 @pytest.fixture
 async def shared_config(app, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    shared_config = ManagerSharedConfig(
-        root_ctx.local_config.etcd.addr.to_legacy(),
-        root_ctx.local_config.etcd.user,
-        root_ctx.local_config.etcd.password,
-        root_ctx.local_config.etcd.namespace,
-    )
-    await shared_config.reload()
-    root_ctx.shared_config = shared_config
+    loader = LegacyEtcdLoader(root_ctx.unified_config.local.etcd)
+    raw_shared_config = await loader.load()
+    shared_config = ManagerSharedConfig(**raw_shared_config)
     yield shared_config
 
 
@@ -665,12 +661,12 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            root_ctx.local_config.manager.service_addr.host,
-            root_ctx.local_config.manager.service_addr.port,
+            root_ctx.unified_config.local.manager.service_addr.host,
+            root_ctx.unified_config.local.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.local_config.manager.service_addr.port
+        port = root_ctx.unified_config.local.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client
@@ -732,7 +728,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config.manager.service_addr.port}"
+        hostname = f"127.0.0.1:{root_ctx.unified_config.local.manager.service_addr.port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -843,6 +839,13 @@ class DummyEtcd:
 async def registry_ctx(mocker):
     mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
+    mock_unified_config = ManagerUnifiedConfig(
+        local=mock_local_config,
+        shared=mock_shared_config,
+        local_config_loader=MagicMock(),
+        shared_config_loader=MagicMock(),
+        shared_config_watcher=MagicMock(),
+    )
     mock_shared_config.update_resource_slots = AsyncMock()
     mocked_etcd = DummyEtcd()
     mock_shared_config.etcd = mocked_etcd
@@ -878,8 +881,7 @@ async def registry_ctx(mocker):
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
-        local_config=mock_local_config,
-        shared_config=mock_shared_config,
+        unified_config=mock_unified_config,
         db=mock_db,
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,

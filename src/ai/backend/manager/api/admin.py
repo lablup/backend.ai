@@ -56,12 +56,12 @@ class GQLLoggingMiddleware:
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["admin.context"]
-    manager_status = await root_ctx.shared_config.get_manager_status()
-    known_slot_types = await root_ctx.shared_config.get_resource_slots()
+    manager_status = await root_ctx.unified_config.shared_config_loader.get_manager_status()
+    known_slot_types = await root_ctx.unified_config.shared_config_loader.get_resource_slots()
     rules = []
-    if not root_ctx.shared_config.data.api.allow_graphql_schema_introspection:
+    if not root_ctx.unified_config.shared.api.allow_graphql_schema_introspection:
         rules.append(DisableIntrospection)
-    max_depth = cast(int | None, root_ctx.shared_config.data.api.max_gql_query_depth)
+    max_depth = cast(int | None, root_ctx.unified_config.shared.api.max_gql_query_depth)
     if max_depth is not None:
         rules.append(depth_limit_validator(max_depth=max_depth))
     if rules:
@@ -75,9 +75,9 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     gql_ctx = GraphQueryContext(
         schema=app_ctx.gql_schema,
         dataloader_manager=DataLoaderManager(),
-        local_config=root_ctx.local_config,
-        shared_config=root_ctx.shared_config,
-        etcd=root_ctx.shared_config.etcd,
+        unified_config=root_ctx.unified_config,
+        # TODO: 타입 문제 해결
+        etcd=root_ctx.unified_config.shared_config_loader._etcd,
         user=request["user"],
         access_key=request["keypair"]["access_key"],
         db=root_ctx.db,
@@ -172,7 +172,7 @@ async def init(app: web.Application) -> None:
         auto_camelcase=False,
     )
     root_ctx: RootContext = app["_root.context"]
-    if root_ctx.shared_config.data.api.allow_graphql_schema_introspection:
+    if root_ctx.unified_config.shared.api.allow_graphql_schema_introspection:
         log.warning(
             "GraphQL schema introspection is enabled. "
             "It is strongly advised to disable this in production setups."

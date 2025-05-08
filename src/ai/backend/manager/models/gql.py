@@ -17,8 +17,7 @@ from ai.backend.common.exception import (
     ErrorCode,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
-from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
     AuditLogNode,
@@ -282,8 +281,7 @@ from .vfolder import (
 class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
-    local_config: ManagerLocalConfig
-    shared_config: ManagerSharedConfig
+    unified_config: ManagerUnifiedConfig
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
@@ -1244,7 +1242,7 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config.manager.hide_agents:
+        if ctx.unified_config.local.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         loader = ctx.dataloader_manager.get_loader_by_func(
@@ -1273,7 +1271,7 @@ class Queries(graphene.ObjectType):
         status: str | None = None,
     ) -> AgentSummaryList:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config.manager.hide_agents:
+        if ctx.unified_config.local.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         total_count = await AgentSummary.load_count(
