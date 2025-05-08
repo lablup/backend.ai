@@ -11,7 +11,7 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.types import SlotName, SlotTypes, current_resource_slots
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
-from ai.backend.manager.config.local import EtcdConfig
+from ai.backend.manager.data.config.types import EtcdConfigData
 from ai.backend.manager.defs import INTRINSIC_SLOTS
 from ai.backend.manager.errors.exceptions import ServerMisconfiguredError
 
@@ -25,7 +25,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     _etcd: AsyncEtcd
     _config_prefix: str = "config"
 
-    def __init__(self, etcd_config: EtcdConfig, config_prefix: Optional[str] = None) -> None:
+    def __init__(self, etcd_config: EtcdConfigData, config_prefix: Optional[str] = None) -> None:
         super().__init__()
         etcd_addr = etcd_config.addr.to_legacy()
         namespace = etcd_config.namespace

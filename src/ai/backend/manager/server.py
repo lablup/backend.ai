@@ -18,13 +18,13 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
     Final,
-    List,
     Optional,
     cast,
 )
@@ -72,6 +72,10 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.config.loader.etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
+from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
@@ -333,15 +337,27 @@ async def exception_middleware(
 
 
 @actxmgr
-async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # populate public interfaces
-    # 이미 load 되었으므로 필요 X
+async def unified_config_ctx(
+    root_ctx: RootContext, local_config: ManagerLocalConfig, local_cfg_loader: AbstractConfigLoader
+) -> AsyncIterator[ManagerUnifiedConfig]:
+    etcd_loader = LegacyEtcdLoader(local_config.etcd.to_dataclass())
+    raw_shared_cfg = await etcd_loader.load()
+    shared_cfg = ManagerSharedConfig(**raw_shared_cfg)
 
-    # etcd_loader = LegacyEtcdLoader(root_ctx.unified_config.local.etcd)
-    # raw_shared_cfg = await etcd_loader.load()
-    # root_ctx.unified_config.shared = ManagerSharedConfig(**raw_shared_cfg)
-    yield
-    # await etcd_loader.close()
+    unified_config = ManagerUnifiedConfig(
+        local=local_config,
+        local_config_loader=local_cfg_loader,
+        shared=shared_cfg,
+        shared_config_loader=etcd_loader,
+    )
+    root_ctx.unified_config = unified_config
+
+    async def shared_config_change_callback(shared_config: ManagerSharedConfig) -> None:
+        await root_ctx.unified_config.load_shared_config()
+
+    root_ctx.unified_config.register_shared_config_change_callback(shared_config_change_callback)
+    # root_ctx.unified_config.start_watcher()
+    yield root_ctx.unified_config
 
 
 @actxmgr
@@ -381,12 +397,6 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log.info("Manager status: {}", mgr_status)
         tz = root_ctx.unified_config.shared.system.timezone
         log.info("Configured timezone: {}", tz.tzname(datetime.now()))
-    yield
-
-
-@actxmgr
-async def unified_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # 여기서 콜백을 등록
     yield
 
 
@@ -845,15 +855,14 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
 def build_root_app(
     pidx: int,
-    unified_config: ManagerUnifiedConfig,
+    local_config: ManagerLocalConfig,
     *,
     cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
-    local_config = unified_config.local
-    if unified_config.local.pyroscope.enabled:
+    if local_config.pyroscope.enabled:
         if (
             not local_config.pyroscope.app_name
             or not local_config.pyroscope.server_addr
@@ -891,7 +900,6 @@ def build_root_app(
         "/container-registries/webhook",
     ]
 
-    root_ctx.unified_config = unified_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
         "*": aiohttp_cors.ResourceOptions(
@@ -929,7 +937,6 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
-            # unified_config_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
@@ -998,26 +1005,35 @@ def build_public_app(
     return app
 
 
+@dataclass
+class ServerMainArgs:
+    local_cfg: ManagerLocalConfig
+    local_cfg_loader: AbstractConfigLoader
+    log_endpoint: str
+
+
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: List[Any],
+    args: ServerMainArgs,
 ) -> AsyncIterator[None]:
-    print("server_main!!!")
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
+    local_config = args.local_cfg
+    local_cfg_loader = args.local_cfg_loader
+
+    root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
     internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
-    loop.set_debug(root_ctx.unified_config.local.debug.asyncio)
+    loop.set_debug(local_config.debug.asyncio)
     m = aiomonitor.Monitor(
         loop,
-        termui_port=root_ctx.unified_config.local.manager.aiomonitor_termui_port + pidx,
-        webui_port=root_ctx.unified_config.local.manager.aiomonitor_webui_port + pidx,
+        termui_port=local_config.manager.aiomonitor_termui_port + pidx,
+        webui_port=local_config.manager.aiomonitor_webui_port + pidx,
         console_enabled=False,
-        hook_task_factory=root_ctx.unified_config.local.debug.enhanced_aiomonitor_task_info,
+        hook_task_factory=local_config.debug.enhanced_aiomonitor_task_info,
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
     # Add some useful console_locals for ease of debugging
@@ -1034,9 +1050,7 @@ async def server_main(
     # which freezes on_startup event.
     try:
         async with (
-            # 왜 얘만 cleanup_contexts에 없고 여기에 있지?
-            # 이거 여기서 빼도 되는거겠지?;
-            # shared_config_ctx(root_ctx),
+            unified_config_ctx(root_ctx, local_config, local_cfg_loader),
             webapp_plugin_ctx(root_app),
         ):
             ssl_ctx = None
@@ -1117,15 +1131,15 @@ async def server_main(
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: List[Any],
+    tuple_args: tuple[Any, ...],
 ) -> AsyncIterator[None]:
-    print("server_main_logwrapper!!!")
     setproctitle(f"backend.ai: manager worker-{pidx}")
-    log_endpoint = _args[1]
+    args = ServerMainArgs(*tuple_args)
+
     logger = Logger(
-        _args[0].local.logging,
+        args.local_cfg.logging,
         is_master=False,
-        log_endpoint=log_endpoint,
+        log_endpoint=args.log_endpoint,
         msgpack_options={
             "pack_opts": DEFAULT_PACK_OPTS,
             "unpack_opts": DEFAULT_UNPACK_OPTS,
@@ -1133,7 +1147,7 @@ async def server_main_logwrapper(
     )
     try:
         with logger:
-            async with server_main(loop, pidx, _args):
+            async with server_main(loop, pidx, args):
                 yield
     except Exception:
         traceback.print_exc()
@@ -1170,16 +1184,16 @@ def main(
     Start the manager service as a foreground process.
     """
     log_level = LogLevel.DEBUG if debug else log_level
-    cfg = asyncio.run(ManagerUnifiedConfig.load(config_path, log_level))
+    local_cfg, local_cfg_loader = asyncio.run(ManagerLocalConfig.load(config_path, log_level))
 
     if ctx.invoked_subcommand is None:
-        cfg.local.manager.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = cfg.local.manager.ipc_base_path
+        local_cfg.manager.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = local_cfg.manager.ipc_base_path
         log_sockpath = ipc_base_path / f"manager-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
         try:
             logger = Logger(
-                cfg.local.logging,
+                local_cfg.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -1188,13 +1202,13 @@ def main(
                 },
             )
             with logger:
-                ns = cfg.local.etcd.namespace
+                ns = local_cfg.etcd.namespace
                 setproctitle(f"backend.ai: manager {ns}")
                 log.info("Backend.AI Manager {0}", __version__)
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
-                if cfg.local.manager.event_loop == "uvloop":
+                if local_cfg.manager.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -1202,16 +1216,16 @@ def main(
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
-                        num_workers=cfg.local.manager.num_proc,
-                        args=(cfg, log_endpoint),
+                        num_workers=local_cfg.manager.num_proc,
+                        args=(local_cfg, local_cfg_loader, log_endpoint),
                         wait_timeout=5.0,
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg.local.manager.pid_file.is_file():
+            if local_cfg.manager.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg.local.manager.pid_file.unlink()
+                local_cfg.manager.pid_file.unlink()
     else:
         # Click is going to invoke a subcommand.
         pass

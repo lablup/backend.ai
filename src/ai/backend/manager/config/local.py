@@ -12,13 +12,15 @@ from pydantic import BaseModel, Field, FilePath
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import AutoDirectoryPath, GroupID, HostPortPair, UserID
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.config.constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
-from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
-from ai.backend.manager.config.loader.env_loader import EnvLoader
-from ai.backend.manager.config.loader.loader_chain import LoaderChain
-from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
+from ai.backend.manager.data.config.types import EtcdConfigData
 from ai.backend.manager.pglock import PgAdvisoryLock
+
+from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
+from .loader.config_overrider import ConfigOverrider
+from .loader.env_loader import EnvLoader
+from .loader.loader_chain import LoaderChain
+from .loader.toml_loader import TomlConfigLoader
+from .loader.types import AbstractConfigLoader
 
 _default_smtp_template = """
 Action type: {{ action_type }}
@@ -258,6 +260,14 @@ class EtcdConfig(BaseModel):
         examples=["develove", "ETCD_PASSWORD"],
     )
 
+    def to_dataclass(self) -> EtcdConfigData:
+        return EtcdConfigData(
+            namespace=self.namespace,
+            addr=self.addr,
+            user=self.user,
+            password=self.password,
+        )
+
 
 class ManagerConfig(BaseModel):
     ipc_base_path: AutoDirectoryPath = Field(
@@ -420,7 +430,7 @@ class ManagerConfig(BaseModel):
         Configuration for PostgreSQL advisory locks.
         This is used when distributed_lock is set to pg_advisory.
         """,
-        examples=[],
+        examples=[{}],
         alias="pg-advisory-config",
     )
     filelock_config: Mapping[str, Any] = Field(
@@ -429,7 +439,7 @@ class ManagerConfig(BaseModel):
         Configuration for file-based locks.
         This is used when distributed_lock is set to filelock.
         """,
-        examples=[],
+        examples=[{}],
         alias="filelock-config",
     )
     redlock_config: Mapping[str, Any] = Field(
@@ -438,7 +448,7 @@ class ManagerConfig(BaseModel):
         Configuration for Redis-based distributed locking.
         This is used when distributed_lock is set to redlock.
         """,
-        examples=[],
+        examples=[{"lock_retry_interval": 1.0}],
         alias="redlock-config",
     )
     etcdlock_config: Mapping[str, Any] = Field(
@@ -447,7 +457,7 @@ class ManagerConfig(BaseModel):
         Configuration for etcd-based distributed locking.
         This is used when distributed_lock is set to etcd.
         """,
-        examples=[],
+        examples=[{}],
         alias="etcdlock-config",
     )
     session_schedule_lock_lifetime: float = Field(
@@ -974,7 +984,6 @@ class ManagerLocalConfig(BaseModel):
     def __repr__(self):
         return pformat(self.model_dump())
 
-    # CLI에선 etcd에 굳이 연결 하고 싶지 않음. -> shared_config를 얻고 싶지 않으므로 UnfiedConfig 대신 이걸 쓰면?
     @classmethod
     async def load(
         cls, config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET

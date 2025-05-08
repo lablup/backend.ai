@@ -603,7 +603,6 @@ async def test_manually_assign_agent_available(
         shared=mock_shared_config,
         local_config_loader=MagicMock(),
         shared_config_loader=MagicMock(),
-        shared_config_watcher=MagicMock(),
     )
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()

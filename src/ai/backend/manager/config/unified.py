@@ -1,17 +1,12 @@
 import asyncio
-import sys
 from collections.abc import Mapping
-from pathlib import Path
-from pprint import pformat
-from typing import Any, Awaitable, Callable, Optional, Self
+from typing import Any, Awaitable, Callable, Optional
 
-from ai.backend.logging.types import LogLevel
-from ai.backend.manager.config.loader.etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
-from ai.backend.manager.config.shared import ManagerSharedConfig
-from ai.backend.manager.config.watchers.etcd_watcher import EtcdConfigWatcher
-
+from .loader.etcd_loader import LegacyEtcdLoader
+from .loader.types import AbstractConfigLoader
 from .local import ManagerLocalConfig
+from .shared import ManagerSharedConfig
+from .watchers.etcd_watcher import EtcdConfigWatcher
 
 SharedConfigChangeCallback = Callable[[ManagerSharedConfig], Awaitable[None]]
 
@@ -33,23 +28,21 @@ class ManagerUnifiedConfig:
         shared: ManagerSharedConfig,
         local_config_loader: AbstractConfigLoader,
         shared_config_loader: LegacyEtcdLoader,
-        shared_config_watcher: EtcdConfigWatcher,
         shared_config_change_callback: Optional[SharedConfigChangeCallback] = None,
     ) -> None:
         self.local = local
         self.shared = shared
         self.local_config_loader = local_config_loader
         self.shared_config_loader = shared_config_loader
-        self._shared_config_watcher = shared_config_watcher
+        self._shared_config_watcher = EtcdConfigWatcher(shared_config_loader)
         self._shared_config_change_callback = shared_config_change_callback
 
-    async def start_watcher(self) -> None:
-        # Initial load
+    def start_watcher(self) -> None:
         self._shared_config_watcher_task = asyncio.create_task(
             self._watch_shared_config_change(), name="shared_cfg_watcher"
         )
 
-    async def stop_watcher(self) -> None:
+    def stop_watcher(self) -> None:
         self._shared_config_watcher_task.cancel()
 
     def register_shared_config_change_callback(self, cb: SharedConfigChangeCallback) -> None:
@@ -68,26 +61,11 @@ class ManagerUnifiedConfig:
         async for raw_local in self._shared_config_watcher.watch():
             await self._load_shared_cfg(raw_local)
 
-    @classmethod
-    async def load(
-        cls, config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET
-    ) -> Self:
-        local_cfg, local_cfg_loader = await ManagerLocalConfig.load(config_path, log_level)
-
-        if local_cfg.debug.enabled:
-            print("== Manager configuration ==", file=sys.stderr)
-            print(pformat(local_cfg), file=sys.stderr)
-
-        # etcd_config는 local_config가 먼저 로드된 후에야 로드될 수 있음.
-        # 그래서 unified_config load 시점에 두 개를 한 꺼번에 로드하는건 부적절함.
-        shared_cfg_loader = LegacyEtcdLoader(local_cfg.etcd)
+    async def load_shared_config(self) -> None:
+        shared_cfg_loader = LegacyEtcdLoader(self.local.etcd.to_dataclass())
         raw_shared_cfg = await shared_cfg_loader.load()
         shared_cfg = ManagerSharedConfig.model_validate(raw_shared_cfg)
-
-        return cls(
-            local=local_cfg,
-            shared=shared_cfg,
-            local_config_loader=local_cfg_loader,
-            shared_config_loader=shared_cfg_loader,
-            shared_config_watcher=EtcdConfigWatcher(shared_cfg_loader),
-        )
+        self.shared = shared_cfg
+        self.shared_config_loader = shared_cfg_loader
+        shared_config_watcher = EtcdConfigWatcher(shared_cfg_loader)
+        self._shared_config_watcher = shared_config_watcher

@@ -11,7 +11,6 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     redis_ctx,
     services_ctx,
-    shared_config_ctx,
 )
 from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
@@ -51,13 +50,14 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 async def test_harbor_create_project_quota(
     test_case,
     etcd_fixture,
+    mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -136,13 +136,14 @@ async def test_harbor_create_project_quota(
 async def test_harbor_read_project_quota(
     test_case,
     etcd_fixture,
+    mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -214,13 +215,14 @@ async def test_harbor_read_project_quota(
 async def test_harbor_update_project_quota(
     test_case,
     etcd_fixture,
+    mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -299,13 +301,14 @@ async def test_harbor_update_project_quota(
 async def test_harbor_delete_project_quota(
     test_case,
     etcd_fixture,
+    mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
