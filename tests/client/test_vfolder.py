@@ -1,4 +1,3 @@
-import asyncio
 from http import HTTPStatus
 from typing import Mapping, Optional, Union
 from unittest import mock
@@ -273,7 +272,6 @@ def test_vfolder_clone():
 
 
 def test_vfolder_force_delete() -> None:
-    loop = asyncio.get_event_loop()
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         vfolder_uuid = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
@@ -287,5 +285,5 @@ def test_vfolder_force_delete() -> None:
             status=HTTPStatus.NO_CONTENT,
             payload={},
         )
-        resp = loop.run_until_complete(session.VFolder(vfolder_name).force_delete())
+        resp = session.VFolder(vfolder_name).force_delete()
         assert resp.get("success") is True
