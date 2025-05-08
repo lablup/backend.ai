@@ -32,6 +32,7 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
+from ai.backend.common.bgtask.types import TaskStatus
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.exception import UnreachableError
@@ -1130,6 +1131,10 @@ class BaseBgtaskEvent(AbstractEvent, ABC):
     def user_event(self) -> Optional[UserEvent]:
         return None
 
+    @abstractmethod
+    def status(self) -> TaskStatus:
+        raise NotImplementedError
+
 
 @dataclass
 class BgtaskUpdatedEvent(BaseBgtaskEvent):
@@ -1159,6 +1164,10 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
     def event_name(cls) -> str:
         return "bgtask_updated"
 
+    @override
+    def status(self) -> TaskStatus:
+        return TaskStatus.STARTED
+
 
 @dataclass
 class BaseBgtaskDoneEvent(BaseBgtaskEvent):
@@ -1178,13 +1187,6 @@ class BaseBgtaskDoneEvent(BaseBgtaskEvent):
     @classmethod
     @override
     def deserialize(cls, value: tuple):
-        # TODO: Remove this after renaming BgtaskPartialSuccessEvent.
-        if len(value) == 3:
-            return BgtaskPartialSuccessEvent(
-                uuid.UUID(value[0]),
-                value[1],
-                value[2],
-            )
         return cls(
             uuid.UUID(value[0]),
             value[1],
@@ -1202,6 +1204,10 @@ class BgtaskDoneEvent(BaseBgtaskDoneEvent):
     def event_name(cls) -> str:
         return "bgtask_done"
 
+    @override
+    def status(self) -> TaskStatus:
+        return TaskStatus.DONE
+
 
 @dataclass
 class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
@@ -1210,7 +1216,7 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     An event recreated based on the last status of the Bgtask.
     """
 
-    status: str
+    task_status: TaskStatus
     message: Optional[str] = None
     current: str = "0"
     total: str = "0"
@@ -1229,6 +1235,10 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     def event_name(cls) -> str:
         return "bgtask_already_done"
 
+    @override
+    def status(self) -> TaskStatus:
+        return self.task_status
+
 
 @dataclass
 class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
@@ -1237,6 +1247,10 @@ class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
     def event_name(cls) -> str:
         return "bgtask_cancelled"
 
+    @override
+    def status(self) -> TaskStatus:
+        return TaskStatus.CANCELLED
+
 
 @dataclass
 class BgtaskFailedEvent(BaseBgtaskDoneEvent):
@@ -1244,6 +1258,10 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
     @override
     def event_name(cls) -> str:
         return "bgtask_failed"
+
+    @override
+    def status(self) -> TaskStatus:
+        return TaskStatus.FAILED
 
 
 @dataclass
@@ -1271,6 +1289,11 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
     @override
     def event_name(cls) -> str:
         return "bgtask_partial_success"
+
+    @override
+    def status(self) -> TaskStatus:
+        # TODO: When client side is ready, we can change this to `TaskStatus.PARTIAL_SUCCESS`
+        return TaskStatus.DONE
 
 
 class BaseVolumeEvent(AbstractEvent):

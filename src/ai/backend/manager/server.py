@@ -39,7 +39,7 @@ from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (

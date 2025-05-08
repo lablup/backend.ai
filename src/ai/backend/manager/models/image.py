@@ -80,7 +80,7 @@ from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import ProgressReporter
+    from ai.backend.common.bgtask.bgtask import ProgressReporter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

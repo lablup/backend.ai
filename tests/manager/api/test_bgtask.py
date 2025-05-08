@@ -9,7 +9,7 @@ from typing import Any, TypeAlias
 import pytest
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.events import (
     BgtaskDoneEvent,
@@ -41,7 +41,7 @@ async def bgtask_fixture(
 ) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
         [
-            event_hub_ctx, 
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
             redis_ctx,

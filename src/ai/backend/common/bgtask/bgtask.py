@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import enum
 import logging
 import time
 import uuid
@@ -21,19 +20,17 @@ from typing import (
     Set,
     TypeAlias,
     Union,
-    cast,
 )
 
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
-from ai.backend.common.exception import BackendAIError, ErrorCode
-from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.exception import BgtaskNotFoundError
+from ai.backend.common.bgtask.types import TaskStatus
+from ai.backend.common.exception import BackendAIError, BgtaskNotFoundError, ErrorCode
 from ai.backend.logging import BraceStyleAdapter
 
-from . import redis_helper
-from .events.events import (
+from .. import redis_helper
+from ..events.events import (
     BaseBgtaskEvent,
     BgtaskAlreadyDoneEvent,
     BgtaskCancelledEvent,
@@ -44,21 +41,10 @@ from .events.events import (
     EventDispatcher,
     EventProducer,
 )
-from .types import AgentId, DispatchResult, RedisConnectionInfo, Sentinel
+from ..types import AgentId, DispatchResult, RedisConnectionInfo, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class TaskStatus(enum.StrEnum):
-    STARTED = "bgtask_started"
-    DONE = "bgtask_done"
-    CANCELLED = "bgtask_cancelled"
-    FAILED = "bgtask_failed"
-    PARTIAL_SUCCESS = "bgtask_partial_success"
-
-    def finished(self) -> bool:
-        return self in {self.DONE, self.CANCELLED, self.FAILED, self.PARTIAL_SUCCESS}
 
 
 BgtaskEvents: TypeAlias = (
@@ -196,20 +182,6 @@ class NopBackgroundTaskObserver:
         pass
 
 
-class BackgroundTaskRelayer:
-    _event_hub: EventHub
-    _redis_client: RedisConnectionInfo
-
-    def __init__(self, event_hub: EventHub, redis_client: RedisConnectionInfo) -> None:
-        self._event_hub = event_hub
-        self._redis_client = redis_client
-
-    async def relay_event(
-        self,
-        event: BgtaskEvents,
-    ) -> None: ...
-
-
 class BackgroundTaskManager:
     _redis_client: RedisConnectionInfo
     _event_producer: EventProducer
@@ -253,7 +225,7 @@ class BackgroundTaskManager:
         return BgtaskAlreadyDoneEvent(
             task_id=task_id,
             message=task_info.msg,
-            status=task_info.status,
+            task_status=task_info.status,
             current=task_info.current,
             total=task_info.total,
         )
@@ -459,7 +431,7 @@ class BackgroundTaskManager:
         )
 
         msg = getattr(bgtask_result_event, "msg", "") or ""
-        task_status = cast(TaskStatus, bgtask_result_event.event_name())
+        task_status = bgtask_result_event.status()
         await self._update_bgtask_status(task_id, task_status, msg=msg)
 
         return bgtask_result_event
