@@ -77,6 +77,7 @@ from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.watchers.etcd import EtcdConfigController, EtcdConfigWatcher
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
@@ -344,20 +345,23 @@ async def unified_config_ctx(
     raw_shared_cfg = await etcd_loader.load()
     shared_cfg = ManagerSharedConfig(**raw_shared_cfg)
 
+    etcd_watcher = EtcdConfigWatcher(etcd_loader._etcd)
+    etcd_controller = EtcdConfigController(etcd_watcher, shared_cfg)
+
     unified_config = ManagerUnifiedConfig(
         local=local_config,
         local_config_loader=local_cfg_loader,
         shared=shared_cfg,
         shared_config_loader=etcd_loader,
+        config_controllers=[etcd_controller],
     )
     root_ctx.unified_config = unified_config
 
-    async def shared_config_change_callback(shared_config: ManagerSharedConfig) -> None:
-        await root_ctx.unified_config.load_shared_config()
-
-    root_ctx.unified_config.register_shared_config_change_callback(shared_config_change_callback)
-    # root_ctx.unified_config.start_watcher()
-    yield root_ctx.unified_config
+    try:
+        await etcd_controller.start()
+        yield root_ctx.unified_config
+    finally:
+        await etcd_controller.stop()
 
 
 @actxmgr
