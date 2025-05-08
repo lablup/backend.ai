@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
+from collections.abc import Mapping, Sequence
+from typing import Any, FrozenSet, override
 
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
+from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.types import CommitStatus
 
-from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
+from ..kernel import AbstractCodeRunner, AbstractKernel, KernelInitArgs, NextResult, ResultRecord
+from ..types import AgentEventData
 
 
 class DummyKernel(AbstractKernel):
@@ -19,35 +19,20 @@ class DummyKernel(AbstractKernel):
 
     def __init__(
         self,
-        ownership_data: KernelOwnershipData,
-        network_id: str,
-        image: ImageRef,
-        version: int,
-        *,
-        agent_config: Mapping[str, Any],
-        resource_spec: KernelResourceSpec,
-        service_ports: Any,  # TODO: type-annotation
-        environ: Mapping[str, Any],
-        data: Dict[str, Any],
+        args: KernelInitArgs,
         dummy_config: Mapping[str, Any],
     ) -> None:
-        super().__init__(
-            ownership_data,
-            network_id,
-            image,
-            version,
-            agent_config=agent_config,
-            resource_spec=resource_spec,
-            service_ports=service_ports,
-            data=data,
-            environ=environ,
-        )
+        super().__init__(args)
         self.is_commiting = False
         self.dummy_config = dummy_config
         self.dummy_kernel_cfg = self.dummy_config["kernel"]
 
     async def close(self) -> None:
         pass
+
+    @override
+    def _init_probe_runner_obj(self) -> ProbeRunner:
+        return ProbeRunner.nop()
 
     async def create_code_runner(
         self,

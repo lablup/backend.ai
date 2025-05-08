@@ -40,6 +40,7 @@ from ai.backend.logging import BraceStyleAdapter, LogLevel
 from . import msgpack
 from .types import (
     AgentId,
+    ContainerId,
     KernelId,
     ModelServiceStatus,
     QuotaScopeID,
@@ -1041,6 +1042,37 @@ class VFolderDeletionFailureEvent(AbstractEvent):
         return cls(
             VFolderID.from_str(value[0]),
             value[1],
+        )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class DanglingKernelDetected(AbstractEvent):
+    name = "dangling_kernel_detected"
+    kernel_id: KernelId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (str(self.kernel_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            KernelId(uuid.UUID(value[0])),
+        )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class DanglingContainerDetected(AbstractEvent):
+    name = "dangling_container_detected"
+
+    container_id: ContainerId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (str(self.container_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            ContainerId(value[0]),
         )
 
 

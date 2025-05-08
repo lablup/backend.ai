@@ -45,9 +45,11 @@ from ai.backend.common.events import (
     ModelServiceStatusEvent,
 )
 from ai.backend.common.json import dump_json, load_json
+from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
+    ContainerId,
     KernelId,
     ModelServiceStatus,
     ServicePort,
@@ -155,6 +157,20 @@ class NextResult(TypedDict):
     console: NotRequired[Sequence[Any]]
 
 
+@dataclass
+class KernelInitArgs:
+    ownership_data: KernelOwnershipData
+    network_id: str
+    image: ImageRef
+    version: int
+    agent_config: Mapping[str, Any]
+    resource_spec: KernelResourceSpec
+    service_ports: Any  # TODO: type-annotation
+    data: dict[Any, Any]
+    environ: Mapping[str, Any]
+    event_producer: EventProducer
+
+
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     version: int
     ownership_data: KernelOwnershipData
@@ -174,7 +190,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
-    status: KernelLifecycleStatus
+    state: KernelLifecycleStatus
+    _event_producer: EventProducer
 
     _tasks: Set[asyncio.Task]
 
@@ -182,37 +199,29 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     def __init__(
         self,
-        ownership_data: KernelOwnershipData,
-        network_id: str,
-        image: ImageRef,
-        version: int,
-        *,
-        agent_config: Mapping[str, Any],
-        resource_spec: KernelResourceSpec,
-        service_ports: Any,  # TODO: type-annotation
-        data: Dict[Any, Any],
-        environ: Mapping[str, Any],
+        args: KernelInitArgs,
     ) -> None:
-        self.agent_config = agent_config
-        self.ownership_data = ownership_data
-        self.kernel_id = ownership_data.kernel_id
-        self.session_id = ownership_data.session_id
-        self.agent_id = ownership_data.agent_id
-        self.network_id = network_id
-        self.image = image
-        self.version = version
-        self.resource_spec = resource_spec
-        self.service_ports = service_ports
-        self.data = data
+        self.agent_config = args.agent_config
+        self.ownership_data = args.ownership_data
+        self.kernel_id = self.ownership_data.kernel_id
+        self.session_id = self.ownership_data.session_id
+        self.agent_id = self.ownership_data.agent_id
+        self.network_id = args.network_id
+        self.image = args.image
+        self.version = args.version
+        self.resource_spec = args.resource_spec
+        self.service_ports = args.service_ports
+        self.data = args.data
         self.last_used = time.monotonic()
         self.termination_reason = None
         self.clean_event = None
         self.stats_enabled = False
         self._tasks = set()
-        self.environ = environ
+        self.environ = args.environ
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
+        self._event_producer = args.event_producer
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -224,12 +233,15 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = await self.create_code_runner(
             event_producer, client_features=default_client_features, api_version=default_api_version
         )
+        await self.init_probe_runner()
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["agent_config"]
         del props["clean_event"]
         del props["_tasks"]
+        del props["_event_producer"]
+        del props["_probe_runner"]
         return props
 
     def __setstate__(self, props) -> None:
@@ -243,17 +255,22 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                 props["agent_id"],
             )
         self.__dict__.update(props)
-        # agent_config is set by the pickle.loads() caller.
+        # agent_config and _event_producer are set by the pickle.loads() caller.
         self.clean_event = None
         self._tasks = set()
 
-    @abstractmethod
+    def get_container_id(self) -> Optional[ContainerId]:
+        return ContainerId(self.container_id) if self.container_id is not None else None
+
+    def get_kernel_lifecycle_state(self) -> KernelLifecycleStatus:
+        return self.state
+
     async def close(self) -> None:
         """
         Release internal resources used for interacting with the kernel.
         Note that this does NOT terminate the container.
         """
-        pass
+        await self._probe_runner.close()
 
     # We don't have "allocate_slots()" method here because:
     # - resource_spec is initialized by allocating slots at computer's alloc_map
@@ -268,6 +285,14 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         """
         for accel_key, accel_alloc in self.resource_spec.allocations.items():
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
+
+    @abstractmethod
+    def _init_probe_runner_obj(self) -> ProbeRunner:
+        raise NotImplementedError
+
+    async def init_probe_runner(self) -> None:
+        self._probe_runner = self._init_probe_runner_obj()
+        await self._probe_runner.run()
 
     @abstractmethod
     async def create_code_runner(

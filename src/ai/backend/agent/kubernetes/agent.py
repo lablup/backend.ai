@@ -66,7 +66,7 @@ from ..agent import (
     ScanImagesResult,
 )
 from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelInitArgs
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..types import Container, ContainerStatus, KernelOwnershipData, MountInfo, Port
 from .kernel import KubernetesKernel
@@ -647,15 +647,18 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         # TODO: Mark shmem feature as unsupported when advertising agent
 
         kernel_obj = KubernetesKernel(
-            self.ownership_data,
-            self.kernel_config["network_id"],
-            self.image_ref,
-            self.kspec_version,
-            agent_config=self.local_config,
-            service_ports=service_ports,
-            resource_spec=resource_spec,
-            environ=environ,
-            data={},
+            KernelInitArgs(
+                ownership_data=self.ownership_data,
+                network_id=self.kernel_config["network_id"],
+                image=self.image_ref,
+                version=self.kspec_version,
+                agent_config=self.local_config,
+                resource_spec=resource_spec,
+                service_ports=service_ports,
+                environ=environ,
+                data={},
+                event_producer=self.event_producer,
+            )
         )
         return kernel_obj
 

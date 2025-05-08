@@ -98,7 +98,7 @@ from ..agent import (
 )
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelInitArgs
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
@@ -111,7 +111,6 @@ from ..types import (
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
-    Port,
 )
 from ..utils import (
     closing_async,
@@ -123,7 +122,7 @@ from ..utils import (
 from .kernel import DockerKernel
 from .metadata.server import MetadataServer
 from .resources import load_resources, scan_available_resources
-from .utils import PersistentServiceContainer
+from .utils import PersistentServiceContainer, container_from_docker_container
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -144,27 +143,6 @@ known_glibc_distros: Final[dict[float, str]] = {
     2.35: "ubuntu22.04",
     2.39: "ubuntu24.04",
 }
-
-
-def container_from_docker_container(src: DockerContainer) -> Container:
-    ports = []
-    for private_port, host_ports in src["NetworkSettings"]["Ports"].items():
-        private_port = int(private_port.split("/")[0])
-        if host_ports is None:
-            host_ip = "127.0.0.1"
-            host_port = 0
-        else:
-            host_ip = host_ports[0]["HostIp"]
-            host_port = int(host_ports[0]["HostPort"])
-        ports.append(Port(host_ip, private_port, host_port))
-    return Container(
-        id=src._id,
-        status=src["State"]["Status"],
-        image=src["Config"]["Image"],
-        labels=src["Config"]["Labels"],
-        ports=ports,
-        backend_obj=src,
-    )
 
 
 async def _clean_scratch(
@@ -874,16 +852,19 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
 
         kernel_obj = DockerKernel(
-            self.ownership_data,
-            self.kernel_config["network_id"],
-            self.image_ref,
-            self.kspec_version,
-            cluster_info["network_config"].get("mode", "bridge"),
-            agent_config=self.local_config,
-            service_ports=service_ports,
-            resource_spec=resource_spec,
-            environ=environ,
-            data={},
+            KernelInitArgs(
+                ownership_data=self.ownership_data,
+                network_id=self.kernel_config["network_id"],
+                image=self.image_ref,
+                version=self.kspec_version,
+                agent_config=self.local_config,
+                service_ports=service_ports,
+                resource_spec=resource_spec,
+                environ=environ,
+                data={},
+                event_producer=self.event_producer,
+            ),
+            network_driver=cluster_info["network_config"].get("mode", "bridge"),
         )
         return kernel_obj
 
