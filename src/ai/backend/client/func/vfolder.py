@@ -301,7 +301,7 @@ class VFolderByName(BaseFunction):
     @api_function
     async def force_delete(self) -> Mapping[str, Any]:
         await self.update_id_by_name()
-        rqst = Request("DELETE", "/folders/{0}/force-delete".format(self.name))
+        rqst = Request("DELETE", "/folders/{0}/force".format(self.name))
         async with rqst.fetch() as resp:
             return {"success": resp.status == HTTPStatus.NO_CONTENT}
 

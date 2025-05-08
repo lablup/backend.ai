@@ -7,7 +7,7 @@ import pytest
 from aioresponses import aioresponses
 
 from ai.backend.client.config import API_VERSION, APIConfig
-from ai.backend.client.session import AsyncSession, Session
+from ai.backend.client.session import Session
 from ai.backend.testutils.mock import AsyncMock
 
 
@@ -271,14 +271,13 @@ def test_vfolder_clone():
         assert resp == payload
 
 
-@pytest.mark.asyncio
-async def test_vfolder_force_delete() -> None:
-    async with AsyncSession() as session, aioresponses() as m:
+def test_vfolder_force_delete() -> None:
+    with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         m.delete(
-            build_url(session.config, "/folders/{}/force-delete".format(vfolder_name)),
+            build_url(session.config, "/folders/{}/force".format(vfolder_name)),
             status=HTTPStatus.NO_CONTENT,
             payload={},
         )
-        resp = await session.VFolder(vfolder_name).force_delete()
+        resp = session.VFolder(vfolder_name).force_delete()
         assert resp.get("success") is True
