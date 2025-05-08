@@ -10,8 +10,17 @@ import sqlalchemy as sa
 from ai.backend.common.types import AccessKey, RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.group import (
+    AssocGroupUserRow,
+    GroupRow,
+    ProjectType,
+)
+from ai.backend.manager.models.keypair import (
+    KeyPairRow,
+    generate_keypair,
+    generate_ssh_keypair,
+    keypairs,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -84,39 +93,78 @@ def create_user(
         sudo_session_enabled: bool = False,
         is_active: bool = True,
     ) -> AsyncGenerator[uuid.UUID, None]:
-        create_user_action = CreateUserAction(
-            UserCreator(
-                username=name,
-                password=password,
-                email=email,
-                need_password_change=need_password_change,
-                full_name=full_name,
-                domain_name=domain_name,
-                is_active=is_active,
-                role=role,
-                status=UserStatus.ACTIVE,
-                allowed_client_ip=None,
-                group_ids=None,
-                resource_policy=resource_policy_name,
-                description=description,
-                totp_activated=totp_activated,
-                sudo_session_enabled=sudo_session_enabled,
-                container_uid=None,
-                container_main_gid=None,
-                container_gids=None,
-            ),
-        )
-        result: CreateUserActionResult = await processors.create_user.wait_for_complete(
-            create_user_action
-        )
-        assert result.data is not None
-        user_id = result.data.id
+        user_data = {
+            "username": name,
+            "password": password,
+            "email": email,
+            "need_password_change": need_password_change,
+            "full_name": full_name,
+            "domain_name": domain_name,
+            "role": role,
+            "status": UserStatus.ACTIVE,
+            "allowed_client_ip": None,
+            "resource_policy": resource_policy_name,
+            "description": description,
+            "totp_activated": totp_activated,
+            "sudo_session_enabled": sudo_session_enabled,
+            "container_uid": None,
+            "container_main_gid": None,
+            "container_gids": None,
+        }
+        async with database_engine.begin_session() as session:
+            await session.execute(sa.insert(UserRow).values(user_data))
+            user_id = await session.scalar(sa.select(UserRow.uuid).where(UserRow.email == email))
+
+            ak, sk = generate_keypair()
+            pubkey, privkey = generate_ssh_keypair()
+            kp_data = {
+                "user_id": email,
+                "access_key": ak,
+                "secret_key": sk,
+                "is_active": is_active,
+                "is_admin": role == UserRole.SUPERADMIN or role == UserRole.ADMIN,
+                "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
+                "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
+                "num_queries": 0,
+                "ssh_public_key": pubkey,
+                "ssh_private_key": privkey,
+            }
+            await session.execute(
+                sa.insert(keypairs).values(
+                    **kp_data,
+                    user=user_id,
+                )
+            )
+            await session.execute(
+                sa.update(UserRow).where(UserRow.uuid == user_id).values(main_access_key=ak)
+            )
+
+            model_store_project = await session.scalar(
+                sa.select(GroupRow).where(GroupRow.type == ProjectType.MODEL_STORE)
+            )
+            gids_to_join = [model_store_project.id] if model_store_project is not None else []
+
+            # Add user to groups if group_ids parameter is provided.
+            if len(gids_to_join) > 0:
+                query = (
+                    sa.select(GroupRow.id)
+                    .where(GroupRow.domain_name == domain_name)
+                    .where(GroupRow.id.in_(gids_to_join))
+                )
+                grps = (await session.execute(query)).all()
+                if grps:
+                    group_data = [{"user_id": user_id, "group_id": grp.id} for grp in grps]
+                    group_insert_query = sa.insert(AssocGroupUserRow).values(group_data)
+                    await session.execute(group_insert_query)
 
         try:
             yield user_id
 
         finally:
             async with database_engine.begin_session() as session:
+                await session.execute(
+                    sa.delete(AssocGroupUserRow).where(AssocGroupUserRow.user_id == user_id)
+                )
                 await session.execute(sa.delete(keypairs).where(keypairs.c.user_id == email))
                 await session.execute(sa.delete(UserRow).where(UserRow.uuid == user_id))
 
