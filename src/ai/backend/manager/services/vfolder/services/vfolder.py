@@ -145,7 +145,7 @@ class VFolderService:
                 raise Forbidden("Insufficient permission")
                 # Assign ghost host to unmanaged vfolder
 
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
 
         if action.name.startswith(".") and action.name != ".local":
             if action.group_id_or_name is not None:
@@ -404,7 +404,7 @@ class VFolderService:
         self, action: UpdateVFolderAttributeAction
     ) -> UpdateVFolderAttributeActionResult:
         modifier = action.modifier
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
 
         async def _update(db_session: AsyncSession) -> None:
             requester_user_row = await db_session.scalar(
@@ -443,7 +443,7 @@ class VFolderService:
         return UpdateVFolderAttributeActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def get(self, action: GetVFolderAction) -> GetVFolderActionResult:
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
@@ -507,7 +507,7 @@ class VFolderService:
         )
 
     async def list(self, action: ListVFolderAction) -> ListVFolderActionResult:
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
@@ -555,7 +555,7 @@ class VFolderService:
         self, action: MoveToTrashVFolderAction
     ) -> MoveToTrashVFolderActionResult:
         # Only the effective folder owner can delete the folder.
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
         async with self._db.connect() as db_conn:
             async with self._db.begin_session(db_conn) as db_session:
                 requester_user_row = await db_session.scalar(
@@ -612,7 +612,7 @@ class VFolderService:
     async def restore(
         self, action: RestoreVFolderFromTrashAction
     ) -> RestoreVFolderFromTrashActionResult:
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
 
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
@@ -648,7 +648,7 @@ class VFolderService:
     async def delete_forever(
         self, action: DeleteForeverVFolderAction
     ) -> DeleteForeverVFolderActionResult:
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
 
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
@@ -682,7 +682,7 @@ class VFolderService:
     async def force_delete(
         self, action: ForceDeleteVFolderAction
     ) -> ForceDeleteVFolderActionResult:
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
 
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
@@ -711,7 +711,7 @@ class VFolderService:
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
         if "user" not in allowed_vfolder_types:
             raise VFolderInvalidParameter("user vfolder cannot be created in this host")
         requester_user_row = await UserRow.get_by_id_with_policies(

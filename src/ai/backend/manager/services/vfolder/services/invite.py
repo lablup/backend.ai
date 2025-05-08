@@ -80,7 +80,7 @@ class VFolderInviteService:
         if vfolder_row.name.startswith("."):
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
 
-        allowed_vfolder_types = await self._unified_config.shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await self._unified_config.etcd_config_loader.get_vfolder_types()
         async with self._db.begin_session() as db_session:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
             vfolder_row = await db_session.scalar(query_vfolder)

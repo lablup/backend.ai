@@ -343,6 +343,7 @@ async def exception_middleware(
 async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
     root_ctx.etcd = AsyncEtcd.initialize(etcd_config)
     yield
+    await root_ctx.etcd.close()
 
 
 @actxmgr
@@ -399,10 +400,10 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 @actxmgr
 async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.pidx == 0:
-        mgr_status = await root_ctx.unified_config.shared_config_loader.get_manager_status()
+        mgr_status = await root_ctx.unified_config.etcd_config_loader.get_manager_status()
         if mgr_status is None or mgr_status not in (ManagerStatus.RUNNING, ManagerStatus.FROZEN):
             # legacy transition: we now have only RUNNING or FROZEN for HA setup.
-            await root_ctx.unified_config.shared_config_loader.update_manager_status(
+            await root_ctx.unified_config.etcd_config_loader.update_manager_status(
                 ManagerStatus.RUNNING
             )
             mgr_status = ManagerStatus.RUNNING

@@ -15,8 +15,7 @@ class ManagerUnifiedConfig:
     shared: ManagerSharedConfig
     # TODO: Remove this.
     local_config_loader: AbstractConfigLoader
-    # TODO: Rename this to etcd_config_loader
-    shared_config_loader: LegacyEtcdLoader
+    etcd_config_loader: LegacyEtcdLoader
 
     config_controllers: list[AbstractConfigController]
 
@@ -31,5 +30,5 @@ class ManagerUnifiedConfig:
         self.local = local
         self.shared = shared
         self.local_config_loader = local_config_loader
-        self.shared_config_loader = shared_config_loader
+        self.etcd_config_loader = shared_config_loader
         self.config_controllers = config_controllers

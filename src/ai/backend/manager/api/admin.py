@@ -56,8 +56,8 @@ class GQLLoggingMiddleware:
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["admin.context"]
-    manager_status = await root_ctx.unified_config.shared_config_loader.get_manager_status()
-    known_slot_types = await root_ctx.unified_config.shared_config_loader.get_resource_slots()
+    manager_status = await root_ctx.unified_config.etcd_config_loader.get_manager_status()
+    known_slot_types = await root_ctx.unified_config.etcd_config_loader.get_resource_slots()
     rules = []
     if not root_ctx.unified_config.shared.api.allow_graphql_schema_introspection:
         rules.append(DisableIntrospection)

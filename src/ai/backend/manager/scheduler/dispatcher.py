@@ -412,7 +412,7 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        known_slot_types = await self.unified_config.shared_config_loader.get_resource_slots()
+        known_slot_types = await self.unified_config.etcd_config_loader.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
             known_slot_types=known_slot_types,
@@ -535,7 +535,7 @@ class SchedulerDispatcher(aobject):
             sgroup_opts,
             agselector_config,
             agent_selection_resource_priority,
-            self.unified_config.shared_config_loader,
+            self.unified_config.etcd_config_loader,
         )
 
     async def _schedule_in_sgroup(
@@ -1415,9 +1415,7 @@ class SchedulerDispatcher(aobject):
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
-                known_slot_types = (
-                    await self.unified_config.shared_config_loader.get_resource_slots()
-                )
+                known_slot_types = await self.unified_config.etcd_config_loader.get_resource_slots()
                 sched_ctx = SchedulingContext(
                     self.registry,
                     known_slot_types,

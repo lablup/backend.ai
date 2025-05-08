@@ -194,7 +194,7 @@ class ResourcePresetService:
         resource_policy = action.resource_policy
         domain_name = action.domain_name
 
-        known_slot_types = await self._unified_config.shared_config_loader.get_resource_slots()
+        known_slot_types = await self._unified_config.etcd_config_loader.get_resource_slots()
 
         async with self._db.begin_readonly() as conn:
             # Check keypair resource limit.
@@ -352,7 +352,7 @@ class ResourcePresetService:
                 })
 
             # Return group resource status as NaN if not allowed.
-            group_resource_visibility = await self._unified_config.shared_config_loader.get_raw(
+            group_resource_visibility = await self._unified_config.etcd_config_loader.get_raw(
                 "config/api/resources/group_resource_visibility"
             )
             group_resource_visibility = t.ToBool().check(group_resource_visibility)
