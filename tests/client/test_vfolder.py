@@ -273,7 +273,6 @@ def test_vfolder_clone():
 
 def test_vfolder_force_delete() -> None:
     with Session() as session, aioresponses() as m:
-        vfolder_name = "fake-vfolder-name"
         vfolder_uuid = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
             build_url(session.config, "/folders/_/id"),
@@ -281,9 +280,9 @@ def test_vfolder_force_delete() -> None:
             payload={"id": vfolder_uuid.hex},
         )
         m.delete(
-            build_url(session.config, "/folders/{}/force".format(vfolder_name)),
+            build_url(session.config, "/folders/{}/force".format(vfolder_uuid.hex)),
             status=HTTPStatus.NO_CONTENT,
             payload={},
         )
-        resp = session.VFolder(vfolder_name).force_delete()
+        resp = session.VFolder("", id=vfolder_uuid).force_delete()
         assert resp.get("success") is True
