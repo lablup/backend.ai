@@ -7,6 +7,7 @@ from aioresponses import aioresponses
 
 from ai.backend.manager.server import (
     database_ctx,
+    etcd_ctx,
     hook_plugin_ctx,
     monitoring_ctx,
     redis_ctx,
@@ -50,6 +51,7 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 async def test_harbor_create_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
@@ -57,6 +59,7 @@ async def test_harbor_create_project_quota(
 ):
     app, client = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
@@ -136,6 +139,7 @@ async def test_harbor_create_project_quota(
 async def test_harbor_read_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
@@ -143,6 +147,8 @@ async def test_harbor_read_project_quota(
 ):
     app, client = await create_app_and_client(
         [
+            etcd_ctx,
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
@@ -215,6 +221,7 @@ async def test_harbor_read_project_quota(
 async def test_harbor_update_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
@@ -222,6 +229,8 @@ async def test_harbor_update_project_quota(
 ):
     app, client = await create_app_and_client(
         [
+            etcd_ctx,
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
@@ -301,6 +310,7 @@ async def test_harbor_update_project_quota(
 async def test_harbor_delete_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
@@ -308,6 +318,8 @@ async def test_harbor_delete_project_quota(
 ):
     app, client = await create_app_and_client(
         [
+            etcd_ctx,
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,

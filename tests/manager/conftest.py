@@ -82,7 +82,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app, unified_config_ctx
+from ai.backend.manager.server import build_root_app, etcd_ctx, unified_config_ctx
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -280,6 +280,15 @@ def local_config(
         shutil.rmtree(ipc_base_path)
     except IOError:
         pass
+
+
+@pytest.fixture(scope="session")
+def mock_etcd_ctx(
+    local_config,
+) -> Any:
+    argument_binding_ctx = partial(etcd_ctx, etcd_config=local_config.etcd.to_dataclass())
+    update_wrapper(argument_binding_ctx, etcd_ctx)
+    return argument_binding_ctx
 
 
 @pytest.fixture(scope="session")
@@ -660,7 +669,7 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
                 # if isinstance(ctx, AsyncContextManager):
-                if ctx.__name__ in ["unified_config_ctx", "webapp_plugins_ctx"]:
+                if ctx.__name__ in ["webapp_plugins_ctx"]:
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:
                     _cleanup_ctxs.append(ctx)

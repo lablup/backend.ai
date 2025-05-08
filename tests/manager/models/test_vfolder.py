@@ -22,8 +22,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
+        unified_config=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",

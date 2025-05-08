@@ -55,8 +55,7 @@ def get_graphquery_context(
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
+        unified_config=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -177,6 +176,7 @@ async def test_image_rescan_on_docker_registry(
     client: Client,
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     extra_fixtures,
     database_fixture,
@@ -184,6 +184,7 @@ async def test_image_rescan_on_docker_registry(
 ):
     app, _ = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
@@ -332,12 +333,14 @@ async def test_image_rescan_on_docker_registry(
 async def test_image_rescan_on_cr_backend_ai(
     client: Client,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
 ):
     app, _ = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,

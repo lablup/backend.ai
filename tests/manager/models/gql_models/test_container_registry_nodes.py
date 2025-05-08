@@ -1,9 +1,12 @@
+from unittest.mock import MagicMock
+
 import pytest
 from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -30,11 +33,16 @@ def client() -> Client:
 def get_graphquery_context(
     database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ) -> GraphQueryContext:
+    unified_config = ManagerUnifiedConfig(
+        local=MagicMock(),  # type: ignore
+        shared=shared_config,
+        local_config_loader=MagicMock(),  # type: ignore
+        shared_config_loader=MagicMock(),  # type: ignore
+    )
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=shared_config,
+        unified_config=unified_config,
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",

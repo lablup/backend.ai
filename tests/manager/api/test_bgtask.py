@@ -36,10 +36,16 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 
 @pytest.fixture
 async def bgtask_fixture(
-    etcd_fixture, mock_unified_config_ctx, create_app_and_client
+    etcd_fixture, mock_etcd_ctx, mock_unified_config_ctx, create_app_and_client
 ) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
-        [mock_unified_config_ctx, redis_ctx, event_dispatcher_ctx, background_task_ctx],
+        [
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
+            redis_ctx,
+            event_dispatcher_ctx,
+            background_task_ctx,
+        ],
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]

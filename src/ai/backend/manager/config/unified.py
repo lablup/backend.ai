@@ -13,7 +13,6 @@ SharedConfigChangeCallback = Callable[[ManagerSharedConfig], Awaitable[None]]
 class ManagerUnifiedConfig:
     local: ManagerLocalConfig
     shared: ManagerSharedConfig
-    # TODO: Remove this.
     local_config_loader: AbstractConfigLoader
     etcd_config_loader: LegacyEtcdLoader
 
