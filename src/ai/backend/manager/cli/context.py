@@ -118,8 +118,10 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 @contextlib.asynccontextmanager
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerSharedConfig]:
     # scope_prefix_map is created inside ConfigServer
+
     local_config = cli_ctx.local_config
-    etcd_loader = LegacyEtcdLoader(local_config.etcd.to_dataclass())
+    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    etcd_loader = LegacyEtcdLoader(etcd)
     redis_config = await etcd_loader.load()
     shared_config = ManagerSharedConfig(**redis_config)
 
@@ -140,7 +142,9 @@ class RedisConnectionSet:
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     local_config = cli_ctx.local_config
-    loader = LegacyEtcdLoader(local_config.etcd.to_dataclass(), config_prefix="config/redis")
+
+    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
     raw_redis_config = await loader.load()
     redis_config = RedisConfig(**raw_redis_config)
     etcd_redis_config = EtcdRedisConfig.from_dict(redis_config.model_dump())

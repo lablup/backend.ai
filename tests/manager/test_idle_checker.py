@@ -110,7 +110,7 @@ async def new_user_grace_period_checker(
     }
     kernel = {"user_created_at": user_created_at}
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -171,7 +171,7 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -224,7 +224,7 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -281,7 +281,7 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -343,7 +343,7 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -418,7 +418,7 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -465,7 +465,7 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -517,7 +517,7 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -571,7 +571,7 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -659,7 +659,7 @@ async def utilization_idle_checker__utilization(
         "enabled": "utilization",
     }
 
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -758,7 +758,7 @@ async def utilization_idle_checker(
         },
         "enabled": "utilization",
     }
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -842,7 +842,7 @@ async def utilization_idle_checker(
         },
         "enabled": "utilization",
     }
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,
@@ -926,7 +926,7 @@ async def utilization_idle_checker(
         },
         "enabled": "utilization",
     }
-    await root_ctx.unified_config.shared_config_loader._etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.unified_config,

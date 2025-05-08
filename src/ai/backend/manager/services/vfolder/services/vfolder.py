@@ -133,9 +133,7 @@ class VFolderService:
         unmanaged_path = action.unmanaged_path
         # Resolve host for the new virtual folder.
         if not folder_host:
-            folder_host = await self._unified_config.shared_config_loader._etcd.get(
-                "volumes/default_host"
-            )
+            folder_host = self._unified_config.shared.volumes.default_host
             if not folder_host:
                 raise VFolderInvalidParameter(
                     "You must specify the vfolder host because the default host is not configured."
@@ -765,9 +763,7 @@ class VFolderService:
                         raise VFolderInvalidParameter("VFolder name conflicts with your dotfile.")
 
             if not target_folder_host:
-                target_folder_host = await self._unified_config.shared_config_loader._etcd.get(
-                    "volumes/default_host"
-                )
+                target_folder_host = self._unified_config.shared.volumes.default_host
                 if not target_folder_host:
                     raise VFolderInvalidParameter(
                         "You must specify the vfolder host because the default host is not configured."

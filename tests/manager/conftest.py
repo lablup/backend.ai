@@ -363,8 +363,8 @@ def etcd_fixture(
 @pytest.fixture
 async def shared_config(app, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    loader = LegacyEtcdLoader(root_ctx.unified_config.local.etcd.to_dataclass())
-    raw_shared_config = await loader.load()
+    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+    raw_shared_config = await etcd_loader.load()
     shared_config = ManagerSharedConfig(**raw_shared_config)
     yield shared_config
 

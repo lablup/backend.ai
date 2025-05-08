@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
@@ -64,6 +65,7 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 @dataclass
 class ServiceArgs:
     db: ExtendedAsyncSAEngine
+    etcd: AsyncEtcd
     unified_config: ManagerUnifiedConfig
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
@@ -98,6 +100,7 @@ class Services:
     def create(cls, args: ServiceArgs) -> Self:
         agent_service = AgentService(
             args.db,
+            args.etcd,
             args.agent_registry,
             args.unified_config,
         )

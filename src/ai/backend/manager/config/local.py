@@ -9,10 +9,10 @@ from typing import Any, Literal, Mapping, Optional, Self
 
 from pydantic import BaseModel, Field, FilePath
 
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import AutoDirectoryPath, GroupID, HostPortPair, UserID
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.data.config.types import EtcdConfigData
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS

@@ -232,10 +232,7 @@ class IdleCheckerHost:
 
     async def start(self) -> None:
         self._frozen = True
-        raw_config = await self._unified_config.shared_config_loader._etcd.get_prefix_dict(
-            "config/idle/checkers",
-        )
-        raw_config = cast(Mapping[str, Mapping[str, Any]], raw_config)
+        raw_config = self._unified_config.shared.idle.checkers
         await self._grace_period_checker.populate_config(
             raw_config.get(self._grace_period_checker.name) or {}
         )
@@ -1278,7 +1275,7 @@ async def init_idle_checkers(
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default
-    enabled_checkers = await unified_config.shared_config_loader._etcd.get("config/idle/enabled")
+    enabled_checkers = unified_config.shared.idle.enabled
     if enabled_checkers:
         for checker_name in enabled_checkers.split(","):
             checker_name = checker_name.strip()

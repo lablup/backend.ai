@@ -212,8 +212,7 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
 
 async def get_announcement(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    etcd = root_ctx.unified_config.shared_config_loader._etcd
-    data = await etcd.get("manager/announcement")
+    data = await root_ctx.etcd.get("manager/announcement")
     if data is None:
         ret = {"enabled": False, "message": ""}
     else:
@@ -230,14 +229,13 @@ async def get_announcement(request: web.Request) -> web.Response:
 )
 async def update_announcement(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    etcd = root_ctx.unified_config.shared_config_loader._etcd
 
     if params["enabled"]:
         if not params["message"]:
             raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
-        await etcd.put("manager/announcement", params["message"])
+        await root_ctx.etcd.put("manager/announcement", params["message"])
     else:
-        await etcd.delete("manager/announcement")
+        await root_ctx.etcd.delete("manager/announcement")
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 

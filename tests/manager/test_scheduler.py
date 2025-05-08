@@ -621,9 +621,11 @@ async def test_manually_assign_agent_available(
     candidate_agents = example_agents
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
     sess_ctx = example_pending_sessions[0]
+    mock_etcd = MagicMock()
 
     dispatcher = SchedulerDispatcher(
         unified_config=mock_unified_config,
+        etcd=mock_etcd,
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,

@@ -689,13 +689,12 @@ async def handle_kernel_terminating(
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
     redis_live = root_ctx.redis_live
-    etcd = root_ctx.unified_config.shared_config_loader._etcd
     try:
         while True:
             try:
                 # TODO: no_packet_timeout: timedelta = root_ctx.unified_config.shared.idle.app_streaming_packet_timeout 로 대체
                 no_packet_timeout: timedelta = tx.TimeDuration().check(
-                    await etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
+                    await root_ctx.etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
                 )
             except GRPCStatusError as e:
                 err_detail = e.args[0]

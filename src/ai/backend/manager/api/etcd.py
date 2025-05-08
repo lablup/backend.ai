@@ -192,12 +192,10 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
     )
     if params["prefix"]:
         # Flatten the returned ChainMap object for JSON serialization
-        tree_value = dict(
-            await root_ctx.unified_config.shared_config_loader._etcd.get_prefix_dict(params["key"])
-        )
+        tree_value = dict(await root_ctx.etcd.get_prefix_dict(params["key"]))
         return web.json_response({"result": tree_value})
     else:
-        scalar_value = await root_ctx.unified_config.shared_config_loader._etcd.get(params["key"])
+        scalar_value = await root_ctx.etcd.get(params["key"])
         return web.json_response({"result": scalar_value})
 
 
@@ -234,9 +232,9 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
         # TODO: chunk support if there are too many keys
         if len(updates) > 16:
             raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
-        await root_ctx.unified_config.shared_config_loader._etcd.put_dict(updates)
+        await root_ctx.etcd.put_dict(updates)
     else:
-        await root_ctx.unified_config.shared_config_loader._etcd.put(params["key"], params["value"])
+        await root_ctx.etcd.put(params["key"], params["value"])
     return web.json_response({"result": "ok"})
 
 
@@ -279,9 +277,9 @@ async def delete_config(request: web.Request, params: Any) -> web.Response:
         params["prefix"],
     )
     if params["prefix"]:
-        await root_ctx.unified_config.shared_config_loader._etcd.delete_prefix(params["key"])
+        await root_ctx.etcd.delete_prefix(params["key"])
     else:
-        await root_ctx.unified_config.shared_config_loader._etcd.delete(params["key"])
+        await root_ctx.etcd.delete(params["key"])
     return web.json_response({"result": "ok"})
 
 

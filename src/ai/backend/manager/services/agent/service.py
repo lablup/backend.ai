@@ -5,6 +5,7 @@ import sqlalchemy as sa
 import yarl
 from async_timeout import timeout as _timeout
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import (
     AgentId,
 )
@@ -43,16 +44,19 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class AgentService:
     _db: ExtendedAsyncSAEngine
+    _etcd: AsyncEtcd
     _unified_config: ManagerUnifiedConfig
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        etcd: AsyncEtcd,
         agent_registry: AgentRegistry,
         unified_config: ManagerUnifiedConfig,
     ) -> None:
         self._db = db
+        self._etcd = etcd
         self._agent_registry = agent_registry
         self._unified_config = unified_config
 
@@ -65,10 +69,8 @@ class AgentService:
         token = self._unified_config.shared.watcher.token
         if token is None:
             token = "insecure"
-        agent_ip = await self._unified_config.shared_config_loader._etcd.get(
-            f"nodes/agents/{agent_id}/ip"
-        )
-        raw_watcher_port = await self._unified_config.shared_config_loader._etcd.get(
+        agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")
+        raw_watcher_port = await self._etcd.get(
             f"nodes/agents/{agent_id}/watcher_port",
         )
         watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)

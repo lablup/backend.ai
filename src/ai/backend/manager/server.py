@@ -41,6 +41,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
@@ -49,6 +50,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_LOCK,
     RedisRole,
 )
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -338,10 +340,16 @@ async def exception_middleware(
 
 
 @actxmgr
+async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
+    root_ctx.etcd = AsyncEtcd.initialize(etcd_config)
+    yield
+
+
+@actxmgr
 async def unified_config_ctx(
     root_ctx: RootContext, local_config: ManagerLocalConfig, local_cfg_loader: AbstractConfigLoader
 ) -> AsyncIterator[ManagerUnifiedConfig]:
-    etcd_loader = LegacyEtcdLoader(local_config.etcd.to_dataclass())
+    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     raw_shared_cfg = await etcd_loader.load()
     shared_cfg = ManagerSharedConfig(**raw_shared_cfg)
 
@@ -370,7 +378,7 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(
-        root_ctx.unified_config.shared_config_loader._etcd,
+        root_ctx.etcd,
         root_ctx.unified_config.local.model_dump(),
     )
     await plugin_ctx.init(
@@ -521,6 +529,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         ProcessorArgs(
             service_args=ServiceArgs(
                 db=root_ctx.db,
+                etcd=root_ctx.etcd,
                 unified_config=root_ctx.unified_config,
                 storage_manager=root_ctx.storage_manager,
                 redis_stat=root_ctx.redis_stat,
@@ -622,7 +631,7 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = NetworkPluginContext(
-        root_ctx.unified_config.shared_config_loader._etcd,
+        root_ctx.etcd,
         root_ctx.unified_config.local.model_dump(),
     )
     root_ctx.network_plugin_ctx = ctx
@@ -638,7 +647,7 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(
-        root_ctx.unified_config.shared_config_loader._etcd,
+        root_ctx.etcd,
         root_ctx.unified_config.local.model_dump(),
     )
     root_ctx.hook_plugin_ctx = ctx
@@ -699,6 +708,7 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     sched_dispatcher = await SchedulerDispatcher.new(
         root_ctx.unified_config,
+        root_ctx.etcd,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -712,9 +722,8 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
-    etcd = root_ctx.unified_config.shared_config_loader._etcd
-    ectx = ManagerErrorPluginContext(etcd, root_ctx.unified_config.local.model_dump())
-    sctx = ManagerStatsPluginContext(etcd, root_ctx.unified_config.local.model_dump())
+    ectx = ManagerErrorPluginContext(root_ctx.etcd, root_ctx.unified_config.local.model_dump())
+    sctx = ManagerStatsPluginContext(root_ctx.etcd, root_ctx.unified_config.local.model_dump())
     init_success = False
 
     try:
@@ -850,7 +859,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             return lambda lock_id, lifetime_hint: EtcdLock(
                 str(lock_id),
-                root_ctx.unified_config.shared_config_loader._etcd,
+                root_ctx.etcd,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
             )
         case other:
@@ -1054,6 +1063,7 @@ async def server_main(
     # which freezes on_startup event.
     try:
         async with (
+            etcd_ctx(root_ctx, local_config.etcd.to_dataclass()),
             unified_config_ctx(root_ctx, local_config, local_cfg_loader),
             webapp_plugin_ctx(root_app),
         ):
