@@ -285,4 +285,4 @@ def test_vfolder_force_delete() -> None:
             payload={},
         )
         resp = session.VFolder("", id=vfolder_uuid).force_delete()
-    assert resp.get("success") is True
+    assert resp == {}

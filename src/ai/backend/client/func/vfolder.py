@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence, TypeAlias, TypeVar, Union
 
@@ -302,8 +301,8 @@ class VFolderByName(BaseFunction):
     async def force_delete(self) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("DELETE", "/folders/{0}/force".format(self.request_key))
-        async with rqst.fetch() as resp:
-            return {"success": resp.status == HTTPStatus.NO_CONTENT}
+        async with rqst.fetch():
+            return {}
 
     @api_function
     async def rename(self, new_name):
