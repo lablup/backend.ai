@@ -7,14 +7,20 @@ from pathlib import Path
 from pprint import pformat
 from typing import Any, Literal, Mapping, Optional, Self
 
-import click
 from pydantic import BaseModel, Field, FilePath
 
-from ai.backend.common import config
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import AutoDirectoryPath, GroupID, HostPortPair, UserID
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.pglock import PgAdvisoryLock
+
+from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
+from .loader.config_overrider import ConfigOverrider
+from .loader.env_loader import EnvLoader
+from .loader.loader_chain import LoaderChain
+from .loader.toml_loader import TomlConfigLoader
+from .loader.types import AbstractConfigLoader
 
 _default_smtp_template = """
 Action type: {{ action_type }}
@@ -185,6 +191,14 @@ class EtcdConfig(BaseModel):
         examples=["develove", "ETCD_PASSWORD"],
     )
 
+    def to_dataclass(self) -> EtcdConfigData:
+        return EtcdConfigData(
+            namespace=self.namespace,
+            addr=self.addr,
+            user=self.user,
+            password=self.password,
+        )
+
 
 class ManagerConfig(BaseModel):
     ipc_base_path: AutoDirectoryPath = Field(
@@ -277,8 +291,9 @@ class ManagerConfig(BaseModel):
         examples=[1.0, 40.0],
         alias="heartbeat-timeout",
     )
-    secret: Optional[str] = Field(
-        default=None,
+    # TODO: Don't use this. Change to use KMS.
+    secret: str = Field(
+        default_factory=lambda: secrets.token_urlsafe(16),
         description="""
         Secret key for manager authentication and signing.
         Used for securing API tokens and inter-service communication.
@@ -346,7 +361,7 @@ class ManagerConfig(BaseModel):
         Configuration for PostgreSQL advisory locks.
         This is used when distributed_lock is set to pg_advisory.
         """,
-        examples=[],
+        examples=[{}],
         alias="pg-advisory-config",
     )
     filelock_config: Mapping[str, Any] = Field(
@@ -355,7 +370,7 @@ class ManagerConfig(BaseModel):
         Configuration for file-based locks.
         This is used when distributed_lock is set to filelock.
         """,
-        examples=[],
+        examples=[{}],
         alias="filelock-config",
     )
     redlock_config: Mapping[str, Any] = Field(
@@ -364,7 +379,7 @@ class ManagerConfig(BaseModel):
         Configuration for Redis-based distributed locking.
         This is used when distributed_lock is set to redlock.
         """,
-        examples=[],
+        examples=[{"lock_retry_interval": 1.0}],
         alias="redlock-config",
     )
     etcdlock_config: Mapping[str, Any] = Field(
@@ -373,7 +388,7 @@ class ManagerConfig(BaseModel):
         Configuration for etcd-based distributed locking.
         This is used when distributed_lock is set to etcd.
         """,
-        examples=[],
+        examples=[{}],
         alias="etcdlock-config",
     )
     session_schedule_lock_lifetime: float = Field(
@@ -901,66 +916,33 @@ class ManagerLocalConfig(BaseModel):
         return pformat(self.model_dump())
 
     @classmethod
-    def load(
-        cls,
-        config_path: Optional[Path] = None,
-        log_level: LogLevel = LogLevel.NOTSET,
-    ) -> Self:
-        # Determine where to read configuration.
-        raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
-
-        # Override the read config with environment variables (for legacy).
-        config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-        config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-        config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-        config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-        config.override_with_env(raw_cfg, ("db", "addr"), "BACKEND_DB_ADDR")
-        config.override_with_env(raw_cfg, ("db", "name"), "BACKEND_DB_NAME")
-        config.override_with_env(raw_cfg, ("db", "user"), "BACKEND_DB_USER")
-        config.override_with_env(raw_cfg, ("db", "password"), "BACKEND_DB_PASSWORD")
-        config.override_with_env(raw_cfg, ("manager", "num-proc"), "BACKEND_MANAGER_NPROC")
-        config.override_with_env(raw_cfg, ("manager", "ssl-cert"), "BACKEND_SSL_CERT")
-        config.override_with_env(raw_cfg, ("manager", "ssl-privkey"), "BACKEND_SSL_KEY")
-        config.override_with_env(raw_cfg, ("manager", "pid-file"), "BACKEND_PID_FILE")
-        config.override_with_env(
-            raw_cfg, ("manager", "api-listen-addr", "host"), "BACKEND_SERVICE_IP"
-        )
-        config.override_with_env(
-            raw_cfg, ("manager", "api-listen-addr", "port"), "BACKEND_SERVICE_PORT"
-        )
-        config.override_with_env(
-            raw_cfg, ("manager", "event-listen-addr", "host"), "BACKEND_ADVERTISED_MANAGER_HOST"
-        )
-        config.override_with_env(
-            raw_cfg, ("manager", "event-listen-addr", "port"), "BACKEND_EVENTS_PORT"
-        )
-        config.override_with_env(
-            raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
-        )
-
-        config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    async def load(
+        cls, config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET
+    ) -> tuple[Self, AbstractConfigLoader]:
+        overrides: list[tuple[tuple[str, ...], Any]] = [
+            (("debug", "enabled"), log_level == LogLevel.DEBUG),
+        ]
         if log_level != LogLevel.NOTSET:
-            config.override_key(raw_cfg, ("logging", "level"), log_level)
-            config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-            config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
+            overrides += [
+                (("logging", "level"), log_level),
+                (("logging", "pkg-ns", "ai.backend"), log_level),
+                (("logging", "pkg-ns", "aiohttp"), log_level),
+            ]
 
-        # Validate and fill configurations
-        try:
-            cfg = cls.model_validate(raw_cfg)
-            if cfg.debug.enabled:
-                print("== Manager configuration ==", file=sys.stderr)
-                print(pformat(cfg), file=sys.stderr)
-            cfg._src_config_path = cfg_src_path
+        file_loader = TomlConfigLoader(config_path, "manager")
+        env_loader = EnvLoader(MANAGER_LOCAL_CFG_OVERRIDE_ENVS)
+        cfg_overrider = ConfigOverrider(overrides)
+        cfg_loader = LoaderChain([
+            file_loader,
+            env_loader,
+            cfg_overrider,
+        ])
+        raw_cfg = await cfg_loader.load()
 
-            if cfg.manager.secret is None:
-                cfg.manager.secret = secrets.token_urlsafe(16)
-        except config.ConfigurationError as e:
-            print(
-                "ConfigurationError: Could not read or validate the manager local config:",
-                file=sys.stderr,
-            )
-            print(pformat(e.invalid_data), file=sys.stderr)
-            # TODO: Instead of cli error, raise custom exception
-            raise click.Abort()
-        else:
-            return cfg
+        cfg = cls.model_validate(raw_cfg)
+
+        if cfg.debug.enabled:
+            print("== Manager configuration ==", file=sys.stderr)
+            print(pformat(cfg), file=sys.stderr)
+
+        return cfg, cfg_loader

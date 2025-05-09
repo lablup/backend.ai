@@ -40,7 +40,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.volume import VolumeConfig
+from ai.backend.manager.config.shared import VolumesConfig
 
 from ..errors.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
@@ -98,7 +98,7 @@ class StorageSessionManager:
     _proxies: Mapping[str, StorageProxyInfo]
     _exposed_volume_info: list[str]
 
-    def __init__(self, storage_config: VolumeConfig) -> None:
+    def __init__(self, storage_config: VolumesConfig) -> None:
         self.config = storage_config
         self._exposed_volume_info = self.config.exposed_volume_info
         self._proxies = {}

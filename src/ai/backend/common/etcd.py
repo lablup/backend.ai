@@ -24,6 +24,7 @@ from typing import (
     MutableMapping,
     Optional,
     ParamSpec,
+    Self,
     Tuple,
     TypeAlias,
     TypeVar,
@@ -54,6 +55,7 @@ from etcd_client import (
     Txn as EtcdTransactionAction,
 )
 
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.logging import BraceStyleAdapter
 
 from .types import HostPortPair, QueueSentinel
@@ -283,6 +285,29 @@ class AsyncEtcd(AbstractKVStore):
             [f"http://{addr.host}:{addr.port}"],
             connect_options=self._connect_options,
         )
+
+    @classmethod
+    def initialize(cls, etcd_config: EtcdConfigData) -> Self:
+        etcd_addr = etcd_config.addr.to_legacy()
+        namespace = etcd_config.namespace
+        etcd_user = etcd_config.user
+        etcd_password = etcd_config.password
+
+        credentials = None
+        if etcd_user:
+            if etcd_password is None:
+                raise RuntimeError("etcd user is set, but etcd password is not set")
+
+            credentials = {
+                "user": etcd_user,
+                "password": etcd_password,
+            }
+        scope_prefix_map = {
+            ConfigScopes.GLOBAL: "",
+            # TODO: provide a way to specify other scope prefixes
+        }
+
+        return cls(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
 
     async def close(self):
         pass  # for backward compatibility

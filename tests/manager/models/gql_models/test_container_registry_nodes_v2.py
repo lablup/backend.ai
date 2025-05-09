@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import pytest
 from graphene import Schema
 from graphene.test import Client
@@ -72,13 +70,10 @@ def client() -> Client:
 
 
 def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
-    mock_shared_config = MagicMock()
-
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=mock_shared_config,  # type: ignore
+        unified_config=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -458,10 +453,18 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     ids=["Associate One group with one container registry"],
 )
 async def test_associate_container_registry_with_group(
-    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
+    client: Client,
+    mock_etcd_ctx,
+    mock_unified_config_ctx,
+    database_fixture,
+    extra_fixtures,
+    test_case,
+    create_app_and_client,
 ):
     test_app, _ = await create_app_and_client(
         [
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
             database_ctx,
         ],
         [],
@@ -522,10 +525,18 @@ async def test_associate_container_registry_with_group(
     ids=["Disassociate One group with one container registry"],
 )
 async def test_disassociate_container_registry_with_group(
-    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
+    client: Client,
+    mock_etcd_ctx,
+    mock_unified_config_ctx,
+    database_fixture,
+    extra_fixtures,
+    test_case,
+    create_app_and_client,
 ):
     test_app, _ = await create_app_and_client(
         [
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
             database_ctx,
         ],
         [],

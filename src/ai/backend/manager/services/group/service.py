@@ -351,7 +351,7 @@ class GroupService:
         kernels = await fetch_resource_usage(
             self._db, start_date, end_date, project_ids=project_ids
         )
-        local_tz = self._shared_config.data.system.timezone
+        local_tz = self._shared_config.system.timezone
         usage_groups = await parse_resource_usage_groups(kernels, self._redis_stat, local_tz)
         total_groups, _ = parse_total_resource_group(usage_groups)
         return total_groups
@@ -422,7 +422,7 @@ class GroupService:
         raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
 
         objs_per_group = {}
-        local_tz = self._shared_config.data.system.timezone
+        local_tz = self._shared_config.system.timezone
 
         for row, raw_stat in zip(rows, raw_stats):
             group_id = str(row["group_id"])
@@ -544,7 +544,7 @@ class GroupService:
     # group (or all the groups)
     async def usage_per_month(self, action: UsagePerMonthAction) -> UsagePerMonthActionResult:
         month = action.month
-        local_tz = self._shared_config.data.system.timezone
+        local_tz = self._shared_config.system.timezone
 
         try:
             start_date = datetime.strptime(month, "%Y%m").replace(tzinfo=local_tz)
@@ -557,7 +557,7 @@ class GroupService:
 
     # group (or all the groups)
     async def usage_per_period(self, action: UsagePerPeriodAction) -> UsagePerPeriodActionResult:
-        local_tz = self._shared_config.data.system.timezone
+        local_tz = self._shared_config.system.timezone
         project_id = action.project_id
 
         try:

@@ -2,6 +2,7 @@ import asyncio
 import json
 from http import HTTPStatus
 from typing import Callable
+from unittest.mock import MagicMock
 
 import attr
 import pytest
@@ -36,7 +37,6 @@ from ai.backend.manager.server import (
     processors_ctx,
     redis_ctx,
     services_ctx,
-    shared_config_ctx,
     storage_manager_ctx,
 )
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
@@ -56,9 +56,8 @@ def get_graphquery_context(
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
-        etcd=None,  # type: ignore
+        unified_config=None,  # type: ignore
+        etcd=MagicMock(),  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=database_engine,  # type: ignore
@@ -178,13 +177,16 @@ async def test_image_rescan_on_docker_registry(
     client: Client,
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_unified_config_ctx,
     extra_fixtures,
     database_fixture,
     create_app_and_client,
 ):
     app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -332,12 +334,15 @@ async def test_image_rescan_on_docker_registry(
 async def test_image_rescan_on_cr_backend_ai(
     client: Client,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
 ):
     app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,

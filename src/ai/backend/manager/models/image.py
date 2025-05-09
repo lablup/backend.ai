@@ -41,6 +41,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -80,7 +81,6 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
-    from ai.backend.manager.config.shared import ManagerSharedConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -703,9 +703,9 @@ class ImageRow(Base):
 
     async def get_slot_ranges(
         self,
-        shared_config: ManagerSharedConfig,
-    ) -> Tuple[ResourceSlot, ResourceSlot]:
-        slot_units = await shared_config.get_resource_slots()
+        etcd_loader: LegacyEtcdLoader,
+    ) -> tuple[ResourceSlot, ResourceSlot]:
+        slot_units = await etcd_loader.get_resource_slots()
         min_slot = ResourceSlot()
         max_slot = ResourceSlot()
 

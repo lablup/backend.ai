@@ -33,7 +33,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
@@ -125,7 +125,7 @@ class ModelServingService:
     _background_task_manager: BackgroundTaskManager
     _event_dispatcher: EventDispatcher
     _storage_manager: StorageSessionManager
-    _shared_config: ManagerSharedConfig
+    _unified_config: ManagerUnifiedConfig
 
     def __init__(
         self,
@@ -134,14 +134,14 @@ class ModelServingService:
         background_task_manager: BackgroundTaskManager,
         event_dispatcher: EventDispatcher,
         storage_manager: StorageSessionManager,
-        shared_config: ManagerSharedConfig,
+        unified_config: ManagerUnifiedConfig,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
         self._event_dispatcher = event_dispatcher
         self._storage_manager = storage_manager
-        self._shared_config = shared_config
+        self._unified_config = unified_config
 
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx
@@ -772,7 +772,7 @@ class ModelServingService:
                     }
                     vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
                         conn,
-                        self._shared_config,
+                        self._unified_config.legacy_etcd_config_loader,
                         self._storage_manager,
                         endpoint_row.model,
                         endpoint_row.model_mount_destination,

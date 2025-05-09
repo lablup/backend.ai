@@ -166,7 +166,7 @@ class KeyPair(graphene.ObjectType):
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-            ctx.shared_config.data.redis.model_dump()
+            ctx.unified_config.shared.redis.model_dump()
         )
         redis_rlim = redis_helper.get_redis_object(
             etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),

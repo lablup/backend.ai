@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import os
 import sys
@@ -22,8 +23,9 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig, RedisConfig
 
 
 class CLIContext:
@@ -40,7 +42,9 @@ class CLIContext:
         # Lazy-load the configuration only when requested.
         try:
             if self._local_config is None:
-                self._local_config = ManagerLocalConfig.load(self.config_path, self.log_level)
+                self._local_config = asyncio.run(
+                    ManagerLocalConfig.load(self.config_path, self.log_level)
+                )[0]
         except ConfigurationError as e:
             print(
                 "ConfigurationError: Could not read or validate the manager local config:",
@@ -113,20 +117,18 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 
 @contextlib.asynccontextmanager
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerSharedConfig]:
-    local_config = cli_ctx.local_config
     # scope_prefix_map is created inside ConfigServer
-    shared_config = ManagerSharedConfig(
-        local_config.etcd.addr.to_legacy(),
-        local_config.etcd.user,
-        local_config.etcd.password,
-        local_config.etcd.namespace,
-    )
-    await shared_config.reload()
+
+    local_config = cli_ctx.local_config
+    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    etcd_loader = LegacyEtcdLoader(etcd)
+    redis_config = await etcd_loader.load()
+    shared_config = ManagerSharedConfig(**redis_config)
 
     try:
         yield shared_config
     finally:
-        await shared_config.close()
+        await etcd_loader.close()
 
 
 @attrs.define(auto_attribs=True, frozen=True, slots=True)
@@ -140,33 +142,30 @@ class RedisConnectionSet:
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     local_config = cli_ctx.local_config
-    shared_config = ManagerSharedConfig(
-        local_config.etcd.addr.to_legacy(),
-        local_config.etcd.user,
-        local_config.etcd.password,
-        local_config.etcd.namespace,
-    )
-    await shared_config.reload()
-    raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
-    redis_config = EtcdRedisConfig.from_dict(dict(raw_redis_config))
+
+    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
+    raw_redis_config = await loader.load()
+    redis_config = RedisConfig(**raw_redis_config)
+    etcd_redis_config = EtcdRedisConfig.from_dict(redis_config.model_dump())
 
     redis_live = redis_helper.get_redis_object(
-        redis_config.get_override_config(RedisRole.LIVE),
+        etcd_redis_config.get_override_config(RedisRole.LIVE),
         name="mgr_cli.live",
         db=REDIS_LIVE_DB,
     )
     redis_stat = redis_helper.get_redis_object(
-        redis_config.get_override_config(RedisRole.STATISTICS),
+        etcd_redis_config.get_override_config(RedisRole.STATISTICS),
         name="mgr_cli.stat",
         db=REDIS_STATISTICS_DB,
     )
     redis_image = redis_helper.get_redis_object(
-        redis_config.get_override_config(RedisRole.IMAGE),
+        etcd_redis_config.get_override_config(RedisRole.IMAGE),
         name="mgr_cli.image",
         db=REDIS_IMAGE_DB,
     )
     redis_stream = redis_helper.get_redis_object(
-        redis_config.get_override_config(RedisRole.STREAM),
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         name="mgr_cli.stream",
         db=REDIS_STREAM_DB,
     )

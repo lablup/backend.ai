@@ -4,8 +4,9 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -16,7 +17,6 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
-    from ai.backend.manager.config.shared import ManagerSharedConfig
 
     from ..agent_cache import AgentRPCCache
     from ..idle import IdleCheckerHost
@@ -39,13 +39,13 @@ class RootContext(BaseContext):
     distributed_lock_factory: DistributedLockFactory
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
+    etcd: AsyncEtcd
     redis_live: RedisConnectionInfo
     redis_stat: RedisConnectionInfo
     redis_image: RedisConnectionInfo
     redis_stream: RedisConnectionInfo
     redis_lock: RedisConnectionInfo
-    shared_config: ManagerSharedConfig
-    local_config: ManagerLocalConfig
+    unified_config: ManagerUnifiedConfig
     cors_options: CORSOptions
 
     webapp_plugin_ctx: WebappPluginContext

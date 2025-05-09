@@ -10,7 +10,7 @@ import tempfile
 import textwrap
 import uuid
 from datetime import datetime
-from functools import partial
+from functools import partial, update_wrapper
 from pathlib import Path
 from typing import (
     Any,
@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -50,8 +51,10 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -80,7 +83,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app
+from ai.backend.manager.server import build_root_app, etcd_ctx, unified_config_ctx
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -185,6 +188,16 @@ def ipc_base_path() -> Path:
 
 
 @pytest.fixture(scope="session")
+def local_config_loader():
+    return MagicMock()
+
+
+@pytest.fixture(scope="session")
+def shared_config_loader():
+    return MagicMock()
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
     ipc_base_path: Path,
@@ -254,7 +267,7 @@ def local_config(
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = ManagerLocalConfig.load()
+        fs_local_config = asyncio.run(ManagerLocalConfig.load())[0]
         cfg.etcd.addr = fs_local_config.etcd.addr
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "user")
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "password")
@@ -268,6 +281,27 @@ def local_config(
         shutil.rmtree(ipc_base_path)
     except IOError:
         pass
+
+
+@pytest.fixture(scope="session")
+def mock_etcd_ctx(
+    local_config,
+) -> Any:
+    argument_binding_ctx = partial(etcd_ctx, etcd_config=local_config.etcd.to_dataclass())
+    update_wrapper(argument_binding_ctx, etcd_ctx)
+    return argument_binding_ctx
+
+
+@pytest.fixture(scope="session")
+def mock_unified_config_ctx(
+    local_config,
+    local_config_loader,
+) -> Any:
+    argument_binding_ctx = partial(
+        unified_config_ctx, local_config=local_config, local_cfg_loader=local_config_loader
+    )
+    update_wrapper(argument_binding_ctx, unified_config_ctx)
+    return argument_binding_ctx
 
 
 @pytest.fixture(scope="session")
@@ -337,16 +371,13 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
+async def shared_config(app, local_config, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    shared_config = ManagerSharedConfig(
-        root_ctx.local_config.etcd.addr.to_legacy(),
-        root_ctx.local_config.etcd.user,
-        root_ctx.local_config.etcd.password,
-        root_ctx.local_config.etcd.namespace,
-    )
-    await shared_config.reload()
-    root_ctx.shared_config = shared_config
+    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    root_ctx.etcd = etcd
+    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+    raw_shared_config = await etcd_loader.load()
+    shared_config = ManagerSharedConfig(**raw_shared_config)
     yield shared_config
 
 
@@ -641,7 +672,7 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
                 # if isinstance(ctx, AsyncContextManager):
-                if ctx.__name__ in ["shared_config_ctx", "webapp_plugins_ctx"]:
+                if ctx.__name__ in ["webapp_plugins_ctx"]:
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:
                     _cleanup_ctxs.append(ctx)
@@ -664,12 +695,12 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            root_ctx.local_config.manager.service_addr.host,
-            root_ctx.local_config.manager.service_addr.port,
+            root_ctx.unified_config.local.manager.service_addr.host,
+            root_ctx.unified_config.local.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.local_config.manager.service_addr.port
+        port = root_ctx.unified_config.local.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client
@@ -718,7 +749,7 @@ def monitor_keypair():
 
 
 @pytest.fixture
-def get_headers(app, default_keypair):
+def get_headers(app, default_keypair, local_config):
     def create_header(
         method,
         url,
@@ -730,8 +761,7 @@ def get_headers(app, default_keypair):
         keypair=default_keypair,
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
-        root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config.manager.service_addr.port}"
+        hostname = f"127.0.0.1:{local_config.manager.service_addr.port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -840,11 +870,19 @@ class DummyEtcd:
 
 @pytest.fixture
 async def registry_ctx(mocker):
+    mocked_etcd = DummyEtcd()
     mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
-    mock_shared_config.update_resource_slots = AsyncMock()
-    mocked_etcd = DummyEtcd()
-    mock_shared_config.etcd = mocked_etcd
+    mock_etcd_config_loader = MagicMock()
+    mock_etcd_config_loader.update_resource_slots = AsyncMock()
+    mock_etcd_config_loader._etcd = mocked_etcd
+    mock_unified_config = ManagerUnifiedConfig(
+        local=mock_local_config,
+        shared=mock_shared_config,
+        local_config_loader=MagicMock(),
+        etcd_config_loader=mock_etcd_config_loader,
+        etcd_watcher=MagicMock(),
+    )
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
     mock_dbsess = MagicMock()
@@ -877,8 +915,7 @@ async def registry_ctx(mocker):
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
-        local_config=mock_local_config,
-        shared_config=mock_shared_config,
+        unified_config=mock_unified_config,
         db=mock_db,
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,
@@ -900,7 +937,7 @@ async def registry_ctx(mocker):
             mock_dbconn,
             mock_dbsess,
             mock_dbresult,
-            mock_shared_config,
+            mock_unified_config,
             mock_event_dispatcher,
             mock_event_producer,
         )

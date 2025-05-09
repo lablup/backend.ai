@@ -23,7 +23,6 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     network_plugin_ctx,
     redis_ctx,
-    shared_config_ctx,
     storage_manager_ctx,
 )
 
@@ -37,8 +36,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
+        unified_config=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -108,6 +106,8 @@ EXTRA_FIXTURES = {
 )
 async def test_scan_gpu_alloc_maps(
     mock_agent_responses,
+    mock_etcd_ctx,
+    mock_unified_config_ctx,
     client,
     local_config,
     etcd_fixture,
@@ -118,7 +118,8 @@ async def test_scan_gpu_alloc_maps(
 ):
     test_app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
             database_ctx,
             redis_ctx,
             monitoring_ctx,

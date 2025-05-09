@@ -24,7 +24,6 @@ from ai.backend.manager.server import (
     background_task_ctx,
     event_dispatcher_ctx,
     redis_ctx,
-    shared_config_ctx,
 )
 
 
@@ -36,9 +35,17 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 
 
 @pytest.fixture
-async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[BgtaskFixture]:
+async def bgtask_fixture(
+    etcd_fixture, mock_etcd_ctx, mock_unified_config_ctx, create_app_and_client
+) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
-        [shared_config_ctx, redis_ctx, event_dispatcher_ctx, background_task_ctx],
+        [
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
+            redis_ctx,
+            event_dispatcher_ctx,
+            background_task_ctx,
+        ],
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]
@@ -48,7 +55,7 @@ async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[B
     yield root_ctx.background_task_manager, producer, dispatcher
 
     etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data.redis.model_dump()
+        root_ctx.unified_config.shared.redis.model_dump()
     )
     stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
