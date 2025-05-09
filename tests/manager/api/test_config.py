@@ -9,7 +9,7 @@ from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 @pytest.mark.asyncio
 async def test_register_myself(local_config, mocker):
     instance_id = "i-test-manager"
-    from ai.backend.manager.config.loader import etcd_loader as loader_mod
+    from ai.backend.manager.config.loader import legacy_etcd_loader as loader_mod
 
     mocked_get_instance_id = AsyncMock(return_value=instance_id)
     mocker.patch.object(loader_mod, "get_instance_id", mocked_get_instance_id)

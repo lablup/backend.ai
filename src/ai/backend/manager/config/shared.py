@@ -656,7 +656,7 @@ class MetricConfig(BaseModel):
 
 class IdleCheckerConfig(BaseModel):
     enabled: str = Field(
-        default="timeout,utilization",
+        default="",
         description="""
         Enabled idle checkers.
         Comma-separated list of checker names.

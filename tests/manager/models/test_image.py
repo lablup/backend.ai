@@ -2,6 +2,7 @@ import asyncio
 import json
 from http import HTTPStatus
 from typing import Callable
+from unittest.mock import MagicMock
 
 import attr
 import pytest
@@ -56,7 +57,7 @@ def get_graphquery_context(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
         unified_config=None,  # type: ignore
-        etcd=None,  # type: ignore
+        etcd=MagicMock(),  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=database_engine,  # type: ignore

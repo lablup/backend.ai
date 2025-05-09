@@ -70,6 +70,7 @@ FIXTURES_WITH_ASSOC = [
 async def test_associate_container_registry_with_group(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     extra_fixtures,
     database_fixture,
@@ -78,6 +79,7 @@ async def test_associate_container_registry_with_group(
 ):
     app, client = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,
@@ -124,6 +126,7 @@ async def test_associate_container_registry_with_group(
 async def test_disassociate_container_registry_with_group(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     extra_fixtures,
     database_fixture,
@@ -132,6 +135,7 @@ async def test_disassociate_container_registry_with_group(
 ):
     app, client = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
             monitoring_ctx,

@@ -44,7 +44,7 @@ def get_graphquery_context(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
         unified_config=unified_config,
-        etcd=None,  # type: ignore
+        etcd=MagicMock(),  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=database_engine,  # type: ignore

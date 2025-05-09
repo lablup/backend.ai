@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -370,8 +371,10 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
+async def shared_config(app, local_config, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
     root_ctx: RootContext = app["_root.context"]
+    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    root_ctx.etcd = etcd
     etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     raw_shared_config = await etcd_loader.load()
     shared_config = ManagerSharedConfig(**raw_shared_config)
@@ -867,18 +870,19 @@ class DummyEtcd:
 
 @pytest.fixture
 async def registry_ctx(mocker):
+    mocked_etcd = DummyEtcd()
     mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
+    mock_etcd_config_loader = MagicMock()
+    mock_etcd_config_loader.update_resource_slots = AsyncMock()
+    mock_etcd_config_loader._etcd = mocked_etcd
     mock_unified_config = ManagerUnifiedConfig(
         local=mock_local_config,
         shared=mock_shared_config,
         local_config_loader=MagicMock(),
-        etcd_config_loader=MagicMock(),
+        etcd_config_loader=mock_etcd_config_loader,
         etcd_watcher=MagicMock(),
     )
-    mock_shared_config.update_resource_slots = AsyncMock()
-    mocked_etcd = DummyEtcd()
-    mock_shared_config.etcd = mocked_etcd
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
     mock_dbsess = MagicMock()
@@ -933,7 +937,7 @@ async def registry_ctx(mocker):
             mock_dbconn,
             mock_dbsess,
             mock_dbresult,
-            mock_shared_config,
+            mock_unified_config,
             mock_event_dispatcher,
             mock_event_producer,
         )

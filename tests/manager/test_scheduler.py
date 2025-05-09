@@ -23,7 +23,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow, SessionStatus
@@ -576,6 +575,9 @@ class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
 
+    async def get(self, key: str) -> Any:
+        return None
+
 
 @pytest.mark.asyncio
 async def test_manually_assign_agent_available(
@@ -587,24 +589,16 @@ async def test_manually_assign_agent_available(
 ) -> None:
     example_agents = create_example_agents()
     example_pending_sessions = create_example_pending_sessions()
-    mock_local_config = MagicMock()
 
     (
         registry,
         mock_dbconn,
         mock_dbsess,
         mock_dbresult,
-        mock_shared_config,
+        mock_unified_config,
         mock_event_dispatcher,
         mock_event_producer,
     ) = registry_ctx
-    mock_unified_config = ManagerUnifiedConfig(
-        local=mock_local_config,
-        shared=mock_shared_config,
-        local_config_loader=MagicMock(),
-        etcd_config_loader=MagicMock(),
-        etcd_watcher=MagicMock(),
-    )
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()
     mock_redis_wrapper = MagicMock()
@@ -622,7 +616,7 @@ async def test_manually_assign_agent_available(
     candidate_agents = example_agents
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
     sess_ctx = example_pending_sessions[0]
-    mock_etcd = MagicMock()
+    mock_etcd = DummyEtcd()
 
     dispatcher = SchedulerDispatcher(
         unified_config=mock_unified_config,

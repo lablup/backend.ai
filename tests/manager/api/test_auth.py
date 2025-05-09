@@ -91,6 +91,7 @@ def test_check_date():
 
 @pytest.mark.asyncio
 async def test_authorize(
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     etcd_fixture,
     database_fixture,
@@ -100,6 +101,7 @@ async def test_authorize(
     # The auth module requires config_server and database to be set up.
     app, client = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             redis_ctx,
             event_dispatcher_ctx,

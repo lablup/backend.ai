@@ -15,12 +15,14 @@ from ai.backend.manager.server import (
 @pytest.mark.asyncio
 async def test_check_rlim_for_anonymous_query(
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
 ):
     app, client = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             redis_ctx,
             event_dispatcher_ctx,
@@ -40,6 +42,7 @@ async def test_check_rlim_for_anonymous_query(
 @pytest.mark.asyncio
 async def test_check_rlim_for_authorized_query(
     etcd_fixture,
+    mock_etcd_ctx,
     mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
@@ -47,6 +50,7 @@ async def test_check_rlim_for_authorized_query(
 ):
     app, client = await create_app_and_client(
         [
+            mock_etcd_ctx,
             mock_unified_config_ctx,
             redis_ctx,
             event_dispatcher_ctx,
