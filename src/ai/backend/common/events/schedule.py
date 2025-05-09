@@ -4,7 +4,7 @@ from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
 
-class BaseIdleCheckEvent(AbstractEvent):
+class BaseScheduleEvent(AbstractEvent):
     @override
     def serialize(self) -> tuple:
         return tuple()
@@ -17,7 +17,7 @@ class BaseIdleCheckEvent(AbstractEvent):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:
-        return EventDomain.IDLE_CHECK
+        return EventDomain.SCHEDULE
 
     @override
     def domain_id(self) -> Optional[str]:
@@ -28,8 +28,29 @@ class BaseIdleCheckEvent(AbstractEvent):
         return None
 
 
-class DoIdleCheckEvent(BaseIdleCheckEvent):
+class DoScheduleEvent(BaseScheduleEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
-        return "do_idle_check"
+        return "do_schedule"
+
+
+class DoCheckPrecondEvent(BaseScheduleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_check_precond"
+
+
+class DoStartSessionEvent(BaseScheduleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_start_session"
+
+
+class DoScaleEvent(BaseScheduleEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_scale"

@@ -20,7 +20,7 @@ from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.events import (
+from ai.backend.common.events.dispatcher import (
     AbstractEvent,
     EventDispatcher,
     EventDomain,

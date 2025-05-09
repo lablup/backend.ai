@@ -11,10 +11,12 @@ import pytest
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
-from ai.backend.common.events.events import (
+from ai.backend.common.events.bgtask import (
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskUpdatedEvent,
+)
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )

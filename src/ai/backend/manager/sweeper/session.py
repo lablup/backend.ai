@@ -11,7 +11,7 @@ from dateutil.tz import tzutc
 from sqlalchemy import and_
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common.events.events import KernelLifecycleEventReason
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.metrics.metric import SweeperMetricObserver
 from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter

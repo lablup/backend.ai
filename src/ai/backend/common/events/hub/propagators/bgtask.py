@@ -5,7 +5,8 @@ from typing import AsyncIterator, Optional, Protocol
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ...events import AbstractEvent, BaseBgtaskEvent
+from ...bgtask import BaseBgtaskEvent
+from ...dispatcher import AbstractEvent
 from ..hub import EventPropagator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

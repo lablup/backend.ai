@@ -14,7 +14,7 @@ from ai.backend.manager.services.processors import Processors
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-    from ai.backend.common.events.events import EventDispatcher, EventProducer
+    from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo

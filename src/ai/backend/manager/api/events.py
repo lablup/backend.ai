@@ -25,9 +25,12 @@ from aiotools import adefer
 from sqlalchemy.orm import load_only
 
 from ai.backend.common import validators as tx
-from ai.backend.common.events.events import (
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventDomain,
+)
+from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.kernel import (
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelPreparingEvent,
@@ -35,6 +38,8 @@ from ai.backend.common.events.events import (
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+)
+from ai.backend.common.events.session import (
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -44,7 +49,6 @@ from ai.backend.common.events.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter

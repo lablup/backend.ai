@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import MutableMapping
 
-from ai.backend.common.events.events import AbstractEvent, EventDomain
+from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

@@ -36,7 +36,7 @@ from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.events import EventProducer
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AutoPullBehavior,

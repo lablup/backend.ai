@@ -8,7 +8,8 @@ from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.events.bgtask import BgtaskDoneEvent
+from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext

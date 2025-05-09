@@ -78,32 +78,40 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events.events import (
-    AbstractEvent,
+from ai.backend.common.events.agent import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
-    DoSyncKernelLogsEvent,
-    DoVolumeMountEvent,
-    DoVolumeUnmountEvent,
+)
+from ai.backend.common.events.dispatcher import (
+    AbstractEvent,
     EventDispatcher,
     EventProducer,
-    ExecutionCancelledEvent,
-    ExecutionFinishedEvent,
-    ExecutionStartedEvent,
-    ExecutionTimeoutEvent,
+)
+from ai.backend.common.events.kernel import (
+    DoSyncKernelLogsEvent,
     KernelCreatingEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
-    ModelServiceStatusEvent,
+)
+from ai.backend.common.events.model_serving import ModelServiceStatusEvent
+from ai.backend.common.events.session import (
+    ExecutionCancelledEvent,
+    ExecutionFinishedEvent,
+    ExecutionStartedEvent,
+    ExecutionTimeoutEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
+)
+from ai.backend.common.events.volume import (
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
     VolumeMountableNodeType,
     VolumeMounted,
     VolumeUnmounted,

@@ -47,13 +47,17 @@ from ai.backend.common import typed_validators as tv
 from ai.backend.common.config import BaseSchema, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.events.events import (
+from ai.backend.common.events.dispatcher import (
     AbstractEvent,
-    DoIdleCheckEvent,
-    DoTerminateSessionEvent,
     EventDispatcher,
     EventHandler,
     EventProducer,
+)
+from ai.backend.common.events.idle import (
+    DoIdleCheckEvent,
+)
+from ai.backend.common.events.session import (
+    DoTerminateSessionEvent,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,

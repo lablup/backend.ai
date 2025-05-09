@@ -3,7 +3,7 @@ import logging
 import uuid
 from typing import AsyncIterator, Optional
 
-from ai.backend.common.events.events import AbstractEvent
+from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..hub import EventPropagator

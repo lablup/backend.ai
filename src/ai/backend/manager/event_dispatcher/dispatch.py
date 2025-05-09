@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 
-from ai.backend.common.events.events import (
+from ai.backend.common.events.bgtask import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
+)
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
 from ai.backend.common.events.hub.hub import EventHub

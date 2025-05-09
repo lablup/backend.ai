@@ -12,10 +12,12 @@ from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.common.events.events import (
+from ai.backend.common.events.bgtask import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
+)
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver

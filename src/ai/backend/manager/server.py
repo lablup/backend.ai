@@ -51,7 +51,7 @@ from ai.backend.common.defs import (
     RedisRole,
 )
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue

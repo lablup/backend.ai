@@ -1,4 +1,4 @@
-from ai.backend.common.events.events import AbstractEvent
+from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.types import AgentId
 

@@ -59,17 +59,20 @@ from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events.events import (
+from ai.backend.common.events.agent import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
-    DoSyncKernelLogsEvent,
-    DoTerminateSessionEvent,
+)
+from ai.backend.common.events.image import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
+)
+from ai.backend.common.events.kernel import (
+    DoSyncKernelLogsEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelLifecycleEventReason,
@@ -78,8 +81,13 @@ from ai.backend.common.events.events import (
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+)
+from ai.backend.common.events.model_serving import (
     ModelServiceStatusEvent,
     RouteCreatedEvent,
+)
+from ai.backend.common.events.session import (
+    DoTerminateSessionEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -89,6 +97,8 @@ from ai.backend.common.events.events import (
     SessionSuccessEvent,
     SessionTerminatedEvent,
     SessionTerminatingEvent,
+)
+from ai.backend.common.events.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -211,7 +221,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
-    from ai.backend.common.events.events import EventDispatcher, EventProducer
+    from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 
     from .agent_cache import AgentRPCCache
     from .models.storage import StorageSessionManager

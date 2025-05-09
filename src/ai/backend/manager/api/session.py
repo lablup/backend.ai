@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.events import (
+from ai.backend.common.events.agent import (
     AgentTerminatedEvent,
 )
 from ai.backend.common.plugin.monitor import GAUGE

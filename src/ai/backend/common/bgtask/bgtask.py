@@ -26,7 +26,7 @@ from ai.backend.common.exception import BackendAIError, BgtaskNotFoundError, Err
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import redis_helper
-from ..events.events import (
+from ..events.bgtask import (
     BaseBgtaskEvent,
     BgtaskAlreadyDoneEvent,
     BgtaskCancelledEvent,
@@ -34,6 +34,8 @@ from ..events.events import (
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
+)
+from ..events.dispatcher import (
     EventProducer,
 )
 from ..types import DispatchResult, RedisConnectionInfo, Sentinel

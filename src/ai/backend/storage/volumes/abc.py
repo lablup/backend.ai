@@ -17,7 +17,7 @@ from typing import (
 
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 

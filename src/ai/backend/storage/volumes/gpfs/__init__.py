@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter

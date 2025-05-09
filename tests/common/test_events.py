@@ -9,7 +9,7 @@ import pytest
 
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
-from ai.backend.common.events.events import (
+from ai.backend.common.events.dispatcher import (
     AbstractEvent,
     CoalescingOptions,
     CoalescingState,

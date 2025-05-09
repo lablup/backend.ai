@@ -18,7 +18,7 @@ from aiohttp.typedefs import Middleware
 
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.events import (
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
