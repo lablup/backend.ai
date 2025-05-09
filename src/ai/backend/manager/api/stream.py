@@ -692,7 +692,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
     try:
         while True:
             try:
-                # TODO: no_packet_timeout: timedelta = root_ctx.unified_config.shared.idle.app_streaming_packet_timeout 로 대체
+                # TODO: Use `no_packet_timeout` from the shared config after resolving type issue.
                 no_packet_timeout: timedelta = tx.TimeDuration().check(
                     await root_ctx.etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
                 )

@@ -76,7 +76,6 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         schema=app_ctx.gql_schema,
         dataloader_manager=DataLoaderManager(),
         unified_config=root_ctx.unified_config,
-        # TODO: 타입 문제 해결
         etcd=root_ctx.etcd,
         user=request["user"],
         access_key=request["keypair"]["access_key"],

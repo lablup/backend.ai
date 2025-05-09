@@ -704,7 +704,7 @@ class ImageRow(Base):
     async def get_slot_ranges(
         self,
         etcd_loader: LegacyEtcdLoader,
-    ) -> Tuple[ResourceSlot, ResourceSlot]:
+    ) -> tuple[ResourceSlot, ResourceSlot]:
         slot_units = await etcd_loader.get_resource_slots()
         min_slot = ResourceSlot()
         max_slot = ResourceSlot()
