@@ -66,7 +66,6 @@ class EventHub:
         Register a new event propagator.
         :param event_propagator: The event propagator instance implementing EventPropagator.
         :param aliases: List of aliases for the propagator.
-        :raises ValueError: If the propagator is already registered.
         """
         propagator_id = event_propagator.id()
         self._propagators[propagator_id] = _PropagatorInfo(event_propagator, aliases)
@@ -109,6 +108,10 @@ class EventHub:
         Close all propagators associated with the specified alias.
         :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
         :param alias_id: The ID of the alias.
+        :raises
+            ValueError: If the alias is not found.
+        :raises
+            RuntimeError: If the propagator is already closed.
         """
         if (alias_domain, alias_id) not in self._key_alias:
             raise ValueError(f"Alias {alias_domain}:{alias_id} not found.")
@@ -126,7 +129,7 @@ class EventHub:
         Get the propagator associated with the specified alias.
         :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
         :param alias_id: The ID of the alias.
-        :return: The propagator associated with the alias, or None if not found.
+        :return: The propagator associated with the alias.
         """
         if (alias_domain, alias_id) not in self._key_alias:
             return set()
@@ -144,8 +147,7 @@ class EventHub:
     ) -> None:
         """
         Add an alias for a propagator.
-        :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
-        :param alias_id: The ID of the alias.
+        :param alias_key: The key for the alias (e.g., (USER, "user_id")).
         :param propagator_id: Unique identifier for the propagator.
         """
         if alias_key not in self._key_alias:
@@ -159,8 +161,7 @@ class EventHub:
     ) -> None:
         """
         Remove an alias for a propagator.
-        :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
-        :param alias_id: The ID of the alias.
+        :param alias_key: The key for the alias (e.g., (USER, "user_id")).
         :param propagator_id: Unique identifier for the propagator.
         """
         if alias_key in self._key_alias:

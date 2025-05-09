@@ -21,5 +21,5 @@ class UserBgTaskEvent(UserEvent):  # TODO: Need to separate UserPartialSuccessEv
         return None
 
     @override
-    def user_event_dict(self) -> Mapping[str, Any]:
+    def user_event_mapping(self) -> Mapping[str, Any]:
         return asdict(self)

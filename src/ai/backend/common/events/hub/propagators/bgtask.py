@@ -13,7 +13,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class BgtaskLastDoneEventFetcher(Protocol):
-    async def fetch_last_finishied_event(
+    async def fetch_last_finished_event(
         self,
         task_id: uuid.UUID,
     ) -> Optional[BaseBgtaskEvent]:
@@ -21,7 +21,7 @@ class BgtaskLastDoneEventFetcher(Protocol):
         Fetch the last finished event for a given task ID.
         This method should be implemented by the class that uses this protocol.
         """
-        pass
+        ...
 
 
 class BgtaskPropagator(EventPropagator):
@@ -54,13 +54,13 @@ class BgtaskPropagator(EventPropagator):
         If the last event is not None, it yields that event.
         Then, it enters a loop to receive events from the queue until closed.
         """
-        last_event = await self._last_done_event_fetcher.fetch_last_finishied_event(task_id)
+        last_event = await self._last_done_event_fetcher.fetch_last_finished_event(task_id)
         if last_event is not None:
-            yield last_event
             log.debug(
                 "Yielding last finished event: {}",
                 last_event,
             )
+            yield last_event
             return
         while not self._closed:
             event = await self._queue.get()

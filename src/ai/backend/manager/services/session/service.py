@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.bgtask.types import TaskStatus
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
 from ai.backend.common.events.bgtask import (
     BaseBgtaskDoneEvent,
@@ -472,14 +472,14 @@ class SessionService:
                             continue
                         match event.status():
                             case (
-                                TaskStatus.DONE,
-                                TaskStatus.PARTIAL_SUCCESS,
+                                BgtaskStatus.DONE,
+                                BgtaskStatus.PARTIAL_SUCCESS,
                             ):  # TODO: PARTIAL_SUCCESS should be handled
                                 await reporter.update(increment=1, message="Committed image")
                                 break
-                            case TaskStatus.FAILED:
+                            case BgtaskStatus.FAILED:
                                 raise BgtaskFailedError(extra_msg=event.message)
-                            case TaskStatus.CANCELLED:
+                            case BgtaskStatus.CANCELLED:
                                 raise BgtaskCancelledError(extra_msg="Operation cancelled")
                             case _:
                                 log.warning("unexpected bgtask done event: {}", event)
@@ -510,11 +510,11 @@ class SessionService:
                                 log.warning("unexpected event: {}", event)
                                 continue
                             match event.status():
-                                case TaskStatus.DONE, TaskStatus.PARTIAL_SUCCESS:
+                                case BgtaskStatus.DONE, BgtaskStatus.PARTIAL_SUCCESS:
                                     break
-                                case TaskStatus.FAILED:
+                                case BgtaskStatus.FAILED:
                                     raise BgtaskFailedError(extra_msg=event.message)
-                                case TaskStatus.CANCELLED:
+                                case BgtaskStatus.CANCELLED:
                                     raise BgtaskCancelledError(extra_msg="Operation cancelled")
                                 case _:
                                     log.warning("unexpected bgtask done event: {}", event)

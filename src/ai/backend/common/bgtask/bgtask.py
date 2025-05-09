@@ -21,7 +21,7 @@ from typing import (
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
-from ai.backend.common.bgtask.types import TaskStatus
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.exception import BackendAIError, BgtaskNotFoundError, ErrorCode
 from ai.backend.logging import BraceStyleAdapter
 
@@ -57,7 +57,7 @@ _MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
 @dataclass
 class _BgTaskInfo:
-    status: TaskStatus
+    status: BgtaskStatus
     msg: str
     started_at: str
     last_update: str
@@ -68,7 +68,7 @@ class _BgTaskInfo:
     def started(cls, msg: str = "") -> _BgTaskInfo:
         now = str(time.time())
         return cls(
-            status=TaskStatus.STARTED,
+            status=BgtaskStatus.STARTED,
             msg=msg,
             started_at=now,
             last_update=now,
@@ -77,7 +77,7 @@ class _BgTaskInfo:
         )
 
     @classmethod
-    def finished(cls, status: TaskStatus, msg: str = "") -> _BgTaskInfo:
+    def finished(cls, status: BgtaskStatus, msg: str = "") -> _BgTaskInfo:
         now = str(time.time())
         return cls(
             status=status,
@@ -199,7 +199,7 @@ class BackgroundTaskManager:
         self._metric_observer = bgtask_observer
         self._dict_lock = asyncio.Lock()
 
-    async def fetch_last_finishied_event(
+    async def fetch_last_finished_event(
         self,
         task_id: uuid.UUID,
     ) -> Optional[BaseBgtaskEvent]:
@@ -232,7 +232,7 @@ class BackgroundTaskManager:
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
-        await self._update_bgtask_status(task_id=task_id, status=TaskStatus.STARTED, msg="")
+        await self._update_bgtask_status(task_id=task_id, status=BgtaskStatus.STARTED, msg="")
         task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
         self._ongoing_tasks.add(task)
         return task_id
@@ -251,7 +251,7 @@ class BackgroundTaskManager:
     async def _update_bgtask_status(
         self,
         task_id: uuid.UUID,
-        status: TaskStatus,
+        status: BgtaskStatus,
         msg: str = "",
     ) -> None:
         tracker_key = _tracker_id(task_id)

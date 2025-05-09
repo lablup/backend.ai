@@ -23,13 +23,9 @@ async def test_check_rlim_for_anonymous_query(
 ):
     app, client = await create_app_and_client(
         [
-<<<<<<< HEAD
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
-=======
-            event_hub_ctx,
-            shared_config_ctx,
->>>>>>> cb000ee2c (Add new fragment)
             redis_ctx,
             event_dispatcher_ctx,
             database_ctx,

@@ -198,7 +198,7 @@ async def push_background_task_events(
                     )
                     continue
                 await resp.send(
-                    dump_json_str(user_event.user_event_dict()),
+                    dump_json_str(user_event.user_event_mapping()),
                     event=user_event.event_name(),
                     retry=user_event.retry_count(),
                 )

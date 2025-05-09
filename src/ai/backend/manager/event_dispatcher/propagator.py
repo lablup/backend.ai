@@ -9,7 +9,7 @@ class PropagatorEventDispatcher:
     def __init__(self, event_hub: EventHub) -> None:
         self._event_hub = event_hub
 
-    async def propagate_bgtask_event(
+    async def propagate_event(
         self,
         context: None,
         source: AgentId,

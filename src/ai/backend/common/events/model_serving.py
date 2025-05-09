@@ -34,7 +34,7 @@ class ModelServiceStatusEventArgs(AbstractEvent):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:
-        return EventDomain.MODEL_SERVICE
+        return EventDomain.MODEL_SERVING
 
     @override
     def domain_id(self) -> Optional[str]:
@@ -66,7 +66,7 @@ class RouteCreationEvent(AbstractEvent):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:
-        return EventDomain.ROUTE
+        return EventDomain.MODEL_ROUTE
 
     @override
     def domain_id(self) -> Optional[str]:

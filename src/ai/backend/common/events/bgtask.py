@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, override
 
-from ai.backend.common.bgtask.types import TaskStatus
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.exception import UnreachableError
@@ -27,7 +27,7 @@ class BaseBgtaskEvent(AbstractEvent, ABC):
         return None
 
     @abstractmethod
-    def status(self) -> TaskStatus:
+    def status(self) -> BgtaskStatus:
         raise NotImplementedError
 
 
@@ -60,8 +60,8 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
         return "bgtask_updated"
 
     @override
-    def status(self) -> TaskStatus:
-        return TaskStatus.STARTED
+    def status(self) -> BgtaskStatus:
+        return BgtaskStatus.STARTED
 
 
 @dataclass
@@ -100,8 +100,8 @@ class BgtaskDoneEvent(BaseBgtaskDoneEvent):
         return "bgtask_done"
 
     @override
-    def status(self) -> TaskStatus:
-        return TaskStatus.DONE
+    def status(self) -> BgtaskStatus:
+        return BgtaskStatus.DONE
 
 
 @dataclass
@@ -111,7 +111,7 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     An event recreated based on the last status of the Bgtask.
     """
 
-    task_status: TaskStatus
+    task_status: BgtaskStatus
     message: Optional[str] = None
     current: str = "0"
     total: str = "0"
@@ -123,7 +123,7 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     @classmethod
     @override
     def deserialize(cls, value: tuple):
-        raise UnreachableError("BsgtaskAlreadyDoneEvent should not be deserialized.")
+        raise UnreachableError("BgtaskAlreadyDoneEvent should not be deserialized.")
 
     @classmethod
     @override
@@ -131,7 +131,7 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
         return "bgtask_already_done"
 
     @override
-    def status(self) -> TaskStatus:
+    def status(self) -> BgtaskStatus:
         return self.task_status
 
 
@@ -143,8 +143,8 @@ class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
         return "bgtask_cancelled"
 
     @override
-    def status(self) -> TaskStatus:
-        return TaskStatus.CANCELLED
+    def status(self) -> BgtaskStatus:
+        return BgtaskStatus.CANCELLED
 
 
 @dataclass
@@ -155,8 +155,8 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
         return "bgtask_failed"
 
     @override
-    def status(self) -> TaskStatus:
-        return TaskStatus.FAILED
+    def status(self) -> BgtaskStatus:
+        return BgtaskStatus.FAILED
 
 
 @dataclass
@@ -186,6 +186,6 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
         return "bgtask_partial_success"
 
     @override
-    def status(self) -> TaskStatus:
+    def status(self) -> BgtaskStatus:
         # TODO: When client side is ready, we can change this to `TaskStatus.PARTIAL_SUCCESS`
-        return TaskStatus.DONE
+        return BgtaskStatus.DONE

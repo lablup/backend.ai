@@ -345,13 +345,9 @@ async def test_image_rescan_on_cr_backend_ai(
 ):
     app, _ = await create_app_and_client(
         [
-<<<<<<< HEAD
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
-=======
-            event_hub_ctx,
-            shared_config_ctx,
->>>>>>> 12213482c (Change hub to be used for generic purposes)
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,

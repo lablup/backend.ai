@@ -14,6 +14,6 @@ class UserEvent(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def user_event_dict(self) -> Mapping[str, Any]:
+    def user_event_mapping(self) -> Mapping[str, Any]:
         """Get the user event as a dictionary."""
         raise NotImplementedError
