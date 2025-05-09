@@ -38,7 +38,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
             return
         db_username = cli_ctx.local_config.db.user
         db_password = cli_ctx.local_config.db.password
-        db_addr = cli_ctx.local_config.db.addr
+        db_addr = cli_ctx.local_config.db.addr.to_legacy()
         db_name = cli_ctx.local_config.db.name
         engine = sa.ext.asyncio.create_async_engine(
             f"postgresql+asyncpg://{urlquote(db_username)}:{urlquote(db_password)}@{db_addr}/{db_name}",
