@@ -873,7 +873,8 @@ async def registry_ctx(mocker):
         local=mock_local_config,
         shared=mock_shared_config,
         local_config_loader=MagicMock(),
-        shared_config_loader=MagicMock(),
+        etcd_config_loader=MagicMock(),
+        etcd_watcher=MagicMock(),
     )
     mock_shared_config.update_resource_slots = AsyncMock()
     mocked_etcd = DummyEtcd()

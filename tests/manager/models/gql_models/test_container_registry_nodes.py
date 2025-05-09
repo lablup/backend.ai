@@ -37,7 +37,8 @@ def get_graphquery_context(
         local=MagicMock(),  # type: ignore
         shared=shared_config,
         local_config_loader=MagicMock(),  # type: ignore
-        shared_config_loader=MagicMock(),  # type: ignore
+        etcd_config_loader=MagicMock(),  # type: ignore
+        etcd_watcher=MagicMock(),
     )
     return GraphQueryContext(
         schema=None,  # type: ignore

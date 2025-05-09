@@ -602,7 +602,8 @@ async def test_manually_assign_agent_available(
         local=mock_local_config,
         shared=mock_shared_config,
         local_config_loader=MagicMock(),
-        shared_config_loader=MagicMock(),
+        etcd_config_loader=MagicMock(),
+        etcd_watcher=MagicMock(),
     )
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()
