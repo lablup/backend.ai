@@ -620,7 +620,7 @@ async def test_manually_assign_agent_available(
 
     dispatcher = SchedulerDispatcher(
         unified_config=mock_unified_config,
-        etcd=mock_etcd,
+        etcd=mock_etcd,  # type: ignore
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,
