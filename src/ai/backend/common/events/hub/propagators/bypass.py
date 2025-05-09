@@ -35,7 +35,6 @@ class AsyncBypassPropagator(EventPropagator):
         """
         Receive events from the queue.
         This method is a generator that yields events until the queue is closed.
-        When use this method, don't use the receive_once method.
         """
         while not self._closed:
             event = await self._queue.get()

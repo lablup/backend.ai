@@ -991,7 +991,7 @@ class SessionFailureEvent(SessionResultEvent):
 
 @dataclass
 class RouteCreationEvent(AbstractEvent):
-    route_id: uuid.UUID = attrs.field()
+    route_id: uuid.UUID
 
     def serialize(self) -> tuple:
         return (str(self.route_id),)
@@ -1059,7 +1059,7 @@ class DoSyncKernelLogsEvent(AbstractEvent):
 
 @dataclass
 class GenericSessionEvent(AbstractEvent):
-    session_id: SessionId = attrs.field()
+    session_id: SessionId
 
     @override
     def serialize(self) -> tuple:

@@ -188,7 +188,7 @@ async def push_background_task_events(
             async for event in propagator.receive(task_id):
                 user_event = event.user_event()
                 if user_event is None:
-                    log.debug(
+                    log.warning(
                         "Received unsupported user event: {}",
                         event.event_name(),
                     )
@@ -439,7 +439,6 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     event_dispatcher.subscribe(SessionCancelledEvent, app, enqueue_session_creation_status_update)
     event_dispatcher.subscribe(SessionSuccessEvent, app, enqueue_batch_task_result_update)
     event_dispatcher.subscribe(SessionFailureEvent, app, enqueue_batch_task_result_update)
-    root_ctx.background_task_manager.register_event_handlers(event_dispatcher)
     yield
 
 

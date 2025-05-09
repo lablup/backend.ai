@@ -5,19 +5,15 @@ import logging
 import time
 import uuid
 import weakref
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import (
-    AsyncIterator,
     Awaitable,
     Callable,
     Concatenate,
-    DefaultDict,
     Final,
     Mapping,
     Optional,
     Protocol,
-    Set,
     TypeAlias,
     Union,
 )
@@ -38,10 +34,9 @@ from ..events.events import (
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
-    EventDispatcher,
     EventProducer,
 )
-from ..types import AgentId, DispatchResult, RedisConnectionInfo, Sentinel
+from ..types import DispatchResult, RedisConnectionInfo, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -186,7 +181,6 @@ class BackgroundTaskManager:
     _redis_client: RedisConnectionInfo
     _event_producer: EventProducer
     _ongoing_tasks: weakref.WeakSet[asyncio.Task]
-    _task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
     _metric_observer: BackgroundTaskObserver
     _dict_lock: asyncio.Lock
 
@@ -200,7 +194,6 @@ class BackgroundTaskManager:
         self._redis_client = redis_client
         self._event_producer = event_producer
         self._ongoing_tasks = weakref.WeakSet()
-        self._task_update_queues = defaultdict(set)
         self._metric_observer = bgtask_observer
         self._dict_lock = asyncio.Lock()
 
@@ -230,87 +223,6 @@ class BackgroundTaskManager:
             total=task_info.total,
         )
 
-    def register_event_handlers(self, event_dispatcher: EventDispatcher) -> None:
-        """
-        Add bgtask related event handlers to the given event dispatcher.
-        """
-        event_dispatcher.subscribe(BgtaskUpdatedEvent, None, self._enqueue_bgtask_status_update)
-        event_dispatcher.subscribe(BgtaskDoneEvent, None, self._enqueue_bgtask_status_update)
-        event_dispatcher.subscribe(
-            BgtaskPartialSuccessEvent,
-            None,
-            self._enqueue_bgtask_status_update,
-            # TODO: Remove below event name overriding after renaming BgtaskPartialSuccessEvent
-            override_event_name="bgtask_partial_success",
-        )
-        event_dispatcher.subscribe(BgtaskCancelledEvent, None, self._enqueue_bgtask_status_update)
-        event_dispatcher.subscribe(BgtaskFailedEvent, None, self._enqueue_bgtask_status_update)
-
-    async def _enqueue_bgtask_status_update(
-        self,
-        context: None,
-        source: AgentId,
-        event: BgtaskEvents,
-    ) -> None:
-        task_id = event.task_id
-        if task_id is None:
-            raise BgtaskNotFoundError(f"Task ID is not set in the {event.event_name()} event!")
-
-        for q in self._task_update_queues[task_id]:
-            q.put_nowait(event)
-
-    async def poll_bgtask_event(
-        self,
-        task_id: uuid.UUID,
-    ) -> AsyncIterator[tuple[BgtaskEvents, dict]]:
-        """
-        RHS of return tuple will be filled with extra informations when needed
-        (e.g. progress information of task when callee is trying to poll information of already completed one)
-        """
-        tracker_key = _tracker_id(task_id)
-        task_info = await redis_helper.execute(
-            self._redis_client,
-            lambda r: r.hgetall(tracker_key),
-            encoding="utf-8",
-        )
-
-        if task_info is None:
-            # The task ID is invalid or represents a task completed more than 24 hours ago.
-            raise ValueError("No such background task.")
-
-        if task_info["status"] != "started":
-            # It is an already finished task!
-            yield (
-                BgtaskDoneEvent(task_id, message=task_info["msg"]),
-                {
-                    "status": task_info["status"],
-                    "current_progress": task_info.get("current", 0),
-                    "total_progress": task_info.get("total", 0),
-                },
-            )
-            return
-
-        # It is an ongoing task.
-        my_queue: asyncio.Queue[BgtaskEvents | Sentinel] = asyncio.Queue()
-        async with self._dict_lock:
-            self._task_update_queues[task_id].add(my_queue)
-        try:
-            while True:
-                event = await my_queue.get()
-                try:
-                    if event is sentinel:
-                        break
-                    if task_id != event.task_id:
-                        continue
-                    yield event, {}
-                finally:
-                    my_queue.task_done()
-        finally:
-            async with self._dict_lock:
-                self._task_update_queues[task_id].remove(my_queue)
-                if len(self._task_update_queues[task_id]) == 0:
-                    del self._task_update_queues[task_id]
-
     async def start(
         self,
         func: BackgroundTask,
@@ -324,7 +236,6 @@ class BackgroundTaskManager:
         return task_id
 
     async def shutdown(self) -> None:
-        join_tasks = []
         log.info("Cancelling remaining background tasks...")
         for task in self._ongoing_tasks.copy():
             if task.done():
@@ -334,11 +245,6 @@ class BackgroundTaskManager:
                 await task
             except asyncio.CancelledError:
                 pass
-        for qset in self._task_update_queues.values():
-            for tq in qset:
-                tq.put_nowait(sentinel)
-                join_tasks.append(tq.join())
-        await asyncio.gather(*join_tasks)
 
     async def _update_bgtask_status(
         self,
