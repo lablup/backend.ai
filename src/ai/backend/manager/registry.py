@@ -1954,7 +1954,7 @@ class AgentRegistry:
         }
 
     async def get_user_occupancy(self, user_id, *, db_sess=None):
-        known_slot_types = await self.shared_config.get_resource_slots()
+        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -1976,7 +1976,7 @@ class AgentRegistry:
         return await execute_with_retry(_query)
 
     async def get_keypair_occupancy(self, access_key, *, db_sess=None):
-        known_slot_types = await self.shared_config.get_resource_slots()
+        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2003,7 +2003,7 @@ class AgentRegistry:
 
     async def get_domain_occupancy(self, domain_name, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
-        known_slot_types = await self.shared_config.get_resource_slots()
+        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2031,7 +2031,7 @@ class AgentRegistry:
 
     async def get_group_occupancy(self, group_id, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
-        known_slot_types = await self.shared_config.get_resource_slots()
+        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
