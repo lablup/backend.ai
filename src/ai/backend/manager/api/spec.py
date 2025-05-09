@@ -74,7 +74,7 @@ GRAPHIQL_HTML = """
 @auth_required
 async def render_graphiql_html(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    if not root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+    if not root_ctx.shared_config.data.api.allow_graphql_schema_introspection:
         raise GenericForbidden
 
     return web.Response(
@@ -87,7 +87,7 @@ async def render_graphiql_html(request: web.Request) -> web.Response:
 @auth_required
 async def render_openapi_html(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
+    if not root_ctx.shared_config.data.api.allow_openapi_schema_introspection:
         raise GenericForbidden
 
     return web.Response(
@@ -100,7 +100,7 @@ async def render_openapi_html(request: web.Request) -> web.Response:
 @auth_required
 async def generate_openapi_spec(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    if not root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
+    if not root_ctx.shared_config.data.api.allow_openapi_schema_introspection:
         raise GenericForbidden
 
     return web.json_response(generate_openapi(request.app["_root_app"]._subapps))
@@ -108,7 +108,7 @@ async def generate_openapi_spec(request: web.Request) -> web.Response:
 
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
-    if root_ctx.shared_config["api"]["allow-openapi-schema-introspection"]:
+    if root_ctx.shared_config.data.api.allow_openapi_schema_introspection:
         log.warning(
             "OpenAPI schema introspection is enabled. "
             "It is strongly advised to disable this in production setups."

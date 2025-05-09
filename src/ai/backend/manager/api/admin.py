@@ -59,9 +59,9 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     manager_status = await root_ctx.shared_config.get_manager_status()
     known_slot_types = await root_ctx.shared_config.get_resource_slots()
     rules = []
-    if not root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+    if not root_ctx.shared_config.data.api.allow_graphql_schema_introspection:
         rules.append(DisableIntrospection)
-    max_depth = cast(int | None, root_ctx.shared_config["api"]["max-gql-query-depth"])
+    max_depth = cast(int | None, root_ctx.shared_config.data.api.max_gql_query_depth)
     if max_depth is not None:
         rules.append(depth_limit_validator(max_depth=max_depth))
     if rules:
@@ -172,7 +172,7 @@ async def init(app: web.Application) -> None:
         auto_camelcase=False,
     )
     root_ctx: RootContext = app["_root.context"]
-    if root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+    if root_ctx.shared_config.data.api.allow_graphql_schema_introspection:
         log.warning(
             "GraphQL schema introspection is enabled. "
             "It is strongly advised to disable this in production setups."

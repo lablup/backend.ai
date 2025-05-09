@@ -1386,8 +1386,19 @@ class EtcdRedisConfig:
                 target: RedisConfig(**cfg) for target, cfg in data["override_configs"].items()
             }
 
+        addr = None
+        # TODO: Remove this match statement after pydantic migration done.
+        if addr_data := data.get("addr"):
+            if isinstance(addr_data, HostPortPair):
+                addr = HostPortPair(addr_data.host, addr_data.port)
+            elif isinstance(addr_data, Mapping):
+                addr = HostPortPair(addr_data["host"], addr_data["port"])
+            else:
+                addr_data = addr_data.split(":")
+                addr = HostPortPair(addr_data[0], int(addr_data[1]))
+
         return cls(
-            addr=data.get("addr"),
+            addr=addr,
             sentinel=data.get("sentinel"),
             service_name=data.get("service_name"),
             password=data.get("password"),

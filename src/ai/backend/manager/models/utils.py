@@ -45,7 +45,7 @@ from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ..config import LocalConfig
+    from ai.backend.manager.config.local import ManagerLocalConfig
 
 from ..defs import LockID
 from ..types import Sentinel
@@ -321,15 +321,15 @@ def create_async_engine(
 
 @actxmgr
 async def connect_database(
-    local_config: LocalConfig | Mapping[str, Any],
+    local_config: ManagerLocalConfig,
     isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
-    username = local_config["db"]["user"]
-    password = local_config["db"]["password"]
-    address = local_config["db"]["addr"]
-    dbname = local_config["db"]["name"]
+    username = local_config.db.user
+    password = local_config.db.password
+    address = local_config.db.addr.to_legacy()
+    dbname = local_config.db.name
     url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
 
     version_check_db = create_async_engine(url)
@@ -344,18 +344,18 @@ async def connect_database(
     db = create_async_engine(
         url,
         connect_args=pgsql_connect_opts,
-        pool_size=local_config["db"]["pool-size"],
-        pool_recycle=local_config["db"]["pool-recycle"],
-        pool_pre_ping=local_config["db"]["pool-pre-ping"],
-        max_overflow=local_config["db"]["max-overflow"],
+        pool_size=local_config.db.pool_size,
+        pool_recycle=local_config.db.pool_recycle,
+        pool_pre_ping=local_config.db.pool_pre_ping,
+        max_overflow=local_config.db.max_overflow,
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
         future=True,
         _txn_concurrency_threshold=max(
-            int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
+            int(local_config.db.pool_size + max(0, local_config.db.max_overflow) * 0.5),
             2,
         ),
-        _lock_conn_timeout=local_config["db"]["lock-conn-timeout"],
+        _lock_conn_timeout=int(local_config.db.lock_conn_timeout),
     )
     yield db
     await db.dispose()
@@ -543,9 +543,7 @@ def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
 
 
-async def vacuum_db(
-    local_config: LocalConfig | Mapping[str, Any], vacuum_full: bool = False
-) -> None:
+async def vacuum_db(local_config: ManagerLocalConfig, vacuum_full: bool = False) -> None:
     async with connect_database(local_config, isolation_level="AUTOCOMMIT") as db:
         async with db.begin() as conn:
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"

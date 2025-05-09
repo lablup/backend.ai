@@ -3,13 +3,13 @@ from pprint import pprint
 import pytest
 import yarl
 
-from ai.backend.manager.config import (
-    SharedConfig,
+from ai.backend.manager.config.shared import (
+    ManagerSharedConfig,
 )
 
 
 def test_shared_config_flatten():
-    data = SharedConfig.flatten(
+    data = ManagerSharedConfig.flatten(
         "abc/def",
         {
             "": yarl.URL("https://example.com"),
@@ -28,14 +28,14 @@ def test_shared_config_flatten():
     assert data["abc/def/aa%3Abb%2Fcc/f2"] == "1234"
 
     with pytest.raises(ValueError):
-        SharedConfig.flatten(
+        ManagerSharedConfig.flatten(
             "abc/def",
             {
                 "": None,  # undefined serialization
             },
         )
     with pytest.raises(ValueError):
-        SharedConfig.flatten(
+        ManagerSharedConfig.flatten(
             "abc/def",
             {
                 "key": [0, 1, 2],  # undefined serialization

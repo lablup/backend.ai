@@ -17,6 +17,8 @@ from ai.backend.common.exception import (
     ErrorCode,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
     AuditLogNode,
@@ -71,7 +73,6 @@ if TYPE_CHECKING:
     )
 
     from ..api.manager import ManagerStatus
-    from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
@@ -281,8 +282,8 @@ from .vfolder import (
 class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
-    local_config: LocalConfig
-    shared_config: SharedConfig
+    local_config: ManagerLocalConfig
+    shared_config: ManagerSharedConfig
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
@@ -1243,7 +1244,7 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
+        if ctx.local_config.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         loader = ctx.dataloader_manager.get_loader_by_func(
@@ -1272,7 +1273,7 @@ class Queries(graphene.ObjectType):
         status: str | None = None,
     ) -> AgentSummaryList:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
+        if ctx.local_config.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         total_count = await AgentSummary.load_count(

@@ -35,14 +35,14 @@ import pytest
 import sqlalchemy as sa
 from aiohttp import web
 from dateutil.tz import tzutc
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
+from ai.backend.common.config import ConfigurationError
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
@@ -50,8 +50,8 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
-from ai.backend.manager.config import LocalConfig, SharedConfig
-from ai.backend.manager.config import load as load_config
+from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -193,44 +193,18 @@ def local_config(
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
     test_db,
-) -> Iterator[LocalConfig]:
+) -> Iterator[ManagerLocalConfig]:
     etcd_addr = etcd_container[1]
-    redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
     # Establish a self-contained config.
-    cfg = LocalConfig({
-        **etcd_config_iv.check({
-            "etcd": {
-                "namespace": test_id,
-                "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
-            },
-        }),
-        "redis": redis_config_iv.check({
-            "addr": {
-                "host": redis_addr.host,
-                "port": redis_addr.port,
-            },
-            "redis_helper_config": config.redis_helper_default_config,
-            "override_configs": {
-                "stat": {
-                    "addr": {
-                        "host": redis_addr.host,
-                        "port": redis_addr.port,
-                    },
-                    "redis_helper_config": config.redis_helper_default_config,
-                },
-                "stream": {
-                    "addr": {
-                        "host": redis_addr.host,
-                        "port": redis_addr.port,
-                    },
-                    "redis_helper_config": config.redis_helper_default_config,
-                },
-            },
-        }),
+    cfg = ManagerLocalConfig.model_validate({
+        "etcd": {
+            "namespace": test_id,
+            "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
+        },
         "db": {
             "addr": postgres_addr,
             "name": test_db,
@@ -247,7 +221,9 @@ def local_config(
             "num-proc": 1,
             "distributed-lock": "filelock",
             "ipc-base-path": ipc_base_path,
-            "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+            "service-addr": HostPortPairModel(
+                host="127.0.0.1", port=29100 + get_parallel_slot() * 10
+            ),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
             "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
@@ -272,22 +248,19 @@ def local_config(
         },
     })
 
-    def _override_if_exists(src: dict, dst: dict, key: str) -> None:
-        sentinel = object()
-        if (val := src.get(key, sentinel)) is not sentinel:
-            dst[key] = val
+    def _override_if_exists(src: BaseModel, dst: BaseModel, key: str) -> None:
+        if key in src.model_fields_set:
+            setattr(dst, key, getattr(src, key))
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = load_config()
-        cfg["etcd"]["addr"] = fs_local_config["etcd"]["addr"]
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "user")
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "password")
-        cfg["redis"]["addr"] = fs_local_config["redis"]["addr"]
-        _override_if_exists(fs_local_config["redis"], cfg["redis"], "password")
-        cfg["db"]["addr"] = fs_local_config["db"]["addr"]
-        _override_if_exists(fs_local_config["db"], cfg["db"], "user")
-        _override_if_exists(fs_local_config["db"], cfg["db"], "password")
+        fs_local_config = ManagerLocalConfig.load()
+        cfg.etcd.addr = fs_local_config.etcd.addr
+        _override_if_exists(fs_local_config.etcd, cfg.etcd, "user")
+        _override_if_exists(fs_local_config.etcd, cfg.etcd, "password")
+        cfg.db.addr = fs_local_config.db.addr
+        _override_if_exists(fs_local_config.db, cfg.db, "user")
+        _override_if_exists(fs_local_config.db, cfg.db, "password")
     except ConfigurationError:
         pass
     yield cfg
@@ -299,10 +272,16 @@ def local_config(
 
 @pytest.fixture(scope="session")
 def etcd_fixture(
-    test_id, local_config, vfolder_mount, vfolder_fsprefix, vfolder_host
+    test_id,
+    local_config,
+    redis_container,  # noqa: F811
+    vfolder_mount,
+    vfolder_fsprefix,
+    vfolder_host,
 ) -> Iterator[None]:
     # Clear and reset etcd namespace using CLI functions.
-    redis_addr = local_config["redis"]["addr"]
+    redis_addr = redis_container[1]
+
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
         log_level=LogLevel.DEBUG,
@@ -358,13 +337,13 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
+async def shared_config(app, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    shared_config = SharedConfig(
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
+    shared_config = ManagerSharedConfig(
+        root_ctx.local_config.etcd.addr.to_legacy(),
+        root_ctx.local_config.etcd.user,
+        root_ctx.local_config.etcd.password,
+        root_ctx.local_config.etcd.namespace,
     )
     await shared_config.reload()
     root_ctx.shared_config = shared_config
@@ -377,9 +356,9 @@ def database(request, local_config, test_db) -> None:
     Create a new database for the current test session
     and install the table schema using alembic.
     """
-    db_addr = local_config["db"]["addr"]
-    db_user = local_config["db"]["user"]
-    db_pass = local_config["db"]["password"]
+    db_addr = local_config.db.addr.to_legacy()
+    db_user = local_config.db.user
+    db_pass = local_config.db.password
 
     # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
@@ -495,9 +474,9 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
     Populate the example data as fixtures to the database
     and delete them after use.
     """
-    db_addr = local_config["db"]["addr"]
-    db_user = local_config["db"]["user"]
-    db_pass = local_config["db"]["password"]
+    db_addr = local_config.db.addr.to_legacy()
+    db_user = local_config.db.user
+    db_pass = local_config.db.password
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
@@ -685,12 +664,12 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            str(root_ctx.local_config["manager"]["service-addr"].host),
-            root_ctx.local_config["manager"]["service-addr"].port,
+            root_ctx.local_config.manager.service_addr.host,
+            root_ctx.local_config.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.local_config["manager"]["service-addr"].port
+        port = root_ctx.local_config.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client
@@ -752,7 +731,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config.manager.service_addr.port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,

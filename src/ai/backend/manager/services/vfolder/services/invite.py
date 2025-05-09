@@ -10,7 +10,7 @@ from sqlalchemy.orm import contains_eager
 from ai.backend.common.types import (
     VFolderHostPermission,
 )
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
@@ -57,9 +57,9 @@ from ..types import VFolderInvitationInfo
 
 class VFolderInviteService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedConfig
+    _shared_config: ManagerSharedConfig
 
-    def __init__(self, db: ExtendedAsyncSAEngine, shared_config: SharedConfig) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig) -> None:
         self._db = db
         self._shared_config = shared_config
 

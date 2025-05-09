@@ -2,27 +2,29 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from ai.backend.common.typed_validators import CommaSeparatedStrList
 
-class VFolderTypeConfig(BaseModel):
-    user: Optional[dict[str, Any]] = Field(
+
+class VolumeTypeConfig(BaseModel):
+    user: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
-        User vFolder type configuration.
+        User VFolder type configuration.
         When present, enables user-owned virtual folders.
         Standard folder type for individual users.
         """,
     )
-    group: Optional[dict[str, Any]] = Field(
+    group: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
-        Group vFolder type configuration.
+        Group VFolder type configuration.
         When present, enables group-owned virtual folders.
         Used for sharing files within a group of users.
         """,
     )
 
 
-class VFolderProxyConfig(BaseModel):
+class VolumeProxyConfig(BaseModel):
     client_api: str = Field(
         description="""
         Client-facing API endpoint URL of the volume proxy.
@@ -56,7 +58,7 @@ class VFolderProxyConfig(BaseModel):
         """,
         examples=[True, False],
     )
-    sftp_scaling_groups: Optional[list[str]] = Field(
+    sftp_scaling_groups: Optional[CommaSeparatedStrList] = Field(
         default=None,
         description="""
         List of SFTP scaling groups that the volume is mapped to.
@@ -67,12 +69,13 @@ class VFolderProxyConfig(BaseModel):
 
 
 class VolumeConfig(BaseModel):
-    _types: VFolderTypeConfig = Field(
-        default_factory=lambda: VFolderTypeConfig(user={}),
+    types: VolumeTypeConfig = Field(
+        default_factory=lambda: VolumeTypeConfig(user={}),
         description="""
         Defines which types of virtual folders are enabled.
         Contains configuration for user and group folders.
         """,
+        alias="_types",
     )
     default_host: str = Field(
         description="""
@@ -82,15 +85,15 @@ class VolumeConfig(BaseModel):
         """,
         examples=["local:default", "nas:main-volume"],
     )
-    exposed_volume_info: list[str] = Field(
-        default=["percentage"],
+    exposed_volume_info: CommaSeparatedStrList = Field(
+        default=CommaSeparatedStrList(["percentage"]),
         description="""
         Controls what volume information is exposed to users.
         Options include "percentage" for disk usage percentage.
         """,
         examples=[["percentage"], ["percentage", "bytes"]],
     )
-    proxies: dict[str, VFolderProxyConfig] = Field(
+    proxies: dict[str, VolumeProxyConfig] = Field(
         description="""
         Mapping of volume proxy configurations.
         Each key is a proxy name used in volume host references.

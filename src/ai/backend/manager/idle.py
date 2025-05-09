@@ -83,8 +83,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.types import AgentId, KernelId, SessionId
+    from ai.backend.manager.config.shared import ManagerSharedConfig
 
-    from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -194,7 +194,7 @@ class IdleCheckerHost:
     def __init__(
         self,
         db: SAEngine,
-        shared_config: SharedConfig,
+        shared_config: ManagerSharedConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
@@ -207,7 +207,7 @@ class IdleCheckerHost:
         self._event_producer = event_producer
         self._lock_factory = lock_factory
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-            self._shared_config.data["redis"]
+            self._shared_config.data.redis.model_dump()
         )
         self._redis_live = redis_helper.get_redis_object(
             etcd_redis_config.get_override_config(RedisRole.LIVE),
@@ -1259,7 +1259,7 @@ checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
 
 async def init_idle_checkers(
     db: SAEngine,
-    shared_config: SharedConfig,
+    shared_config: ManagerSharedConfig,
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
     lock_factory: DistributedLockFactory,

@@ -67,7 +67,8 @@ from .utils import call_non_bursty, check_api_params
 from .wsproxy import TCPProxy
 
 if TYPE_CHECKING:
-    from ..config import SharedConfig
+    from ai.backend.manager.config.shared import ManagerSharedConfig
+
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -106,7 +107,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             root_ctx.registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"])
+    ws = web.WebSocketResponse(max_msg_size=root_ctx.local_config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -317,7 +318,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=local_config["manager"]["max-wsmsg-size"])
+    ws = web.WebSocketResponse(max_msg_size=local_config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -603,7 +604,7 @@ async def stream_proxy(
         # TODO: weakref to proxies for graceful shutdown?
         ws = web.WebSocketResponse(
             autoping=False,
-            max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"],
+            max_msg_size=root_ctx.local_config.manager.max_wsmsg_size,
         )
         await ws.prepare(request)
         proxy = proxy_cls(
@@ -690,7 +691,7 @@ async def handle_kernel_terminating(
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
     redis_live = root_ctx.redis_live
-    shared_config: SharedConfig = root_ctx.shared_config
+    shared_config: ManagerSharedConfig = root_ctx.shared_config
     try:
         while True:
             try:

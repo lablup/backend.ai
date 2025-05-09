@@ -119,7 +119,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(Optional[float], root_ctx.local_config["manager"]["status-update-interval"])
+    interval = cast(Optional[float], root_ctx.local_config.manager.status_update_interval)
     if interval is None:
         # Do not run bgtask if interval is not set
         return
@@ -140,7 +140,7 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
     try:
         status = await root_ctx.shared_config.get_manager_status()
         # etcd_info = await root_ctx.shared_config.get_manager_nodes_info()
-        configs = root_ctx.local_config["manager"]
+        configs = root_ctx.local_config.manager
 
         async with root_ctx.db.begin() as conn:
             query = (
@@ -153,14 +153,14 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
             )
             active_sessions_num = await conn.scalar(query)
 
-            _id = configs["id"] if configs.get("id") else socket.gethostname()
+            _id = configs.id if configs.id else socket.gethostname()
             nodes = [
                 {
                     "id": _id,
-                    "num_proc": configs["num-proc"],
-                    "service_addr": str(configs["service-addr"]),
-                    "heartbeat_timeout": configs["heartbeat-timeout"],
-                    "ssl_enabled": configs["ssl-enabled"],
+                    "num_proc": configs.num_proc,
+                    "service_addr": str(configs.service_addr),
+                    "heartbeat_timeout": configs.heartbeat_timeout,
+                    "ssl_enabled": configs.ssl_enabled,
                     "active_sessions": active_sessions_num,
                     "status": status.value,
                     "version": __version__,
@@ -294,7 +294,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 @superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    manager_id = root_ctx.local_config["manager"]["id"]
+    manager_id = root_ctx.local_config.manager.id
 
     scheduler_status = {}
     for event in SchedulerEvent:

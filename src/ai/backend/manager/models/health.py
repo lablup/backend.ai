@@ -137,9 +137,7 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
             num_connections = cast(int, pool._created_connections)  # type: ignore[attr-defined]
             max_connections = pool.max_connections
         except Exception as e:
-            redis_config = cast(
-                RedisHelperConfig, shared_config.data["redis"].get("redis_helper_config")
-            )
+            redis_config = cast(RedisHelperConfig, shared_config.data.redis.redis_helper_config)
             max_connections = redis_config["max_connections"]
             err_msg = f"Cannot get connection info from `{info.name}`. (e:{str(e)})"
         redis_objects.append(
@@ -154,7 +152,7 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
 
 
 async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProcess:
-    node_id = root_ctx.local_config["manager"].get("id", socket.gethostname())
+    node_id = root_ctx.local_config.manager.id or socket.gethostname()
     pid = os.getpid()
 
     sqlalchemy_info = await get_sqlalchemy_connection_info(root_ctx)
@@ -165,7 +163,7 @@ async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProces
 
 
 async def report_manager_status(root_ctx: RootContext) -> None:
-    lifetime = cast(Optional[int], root_ctx.local_config["manager"]["status-lifetime"])
+    lifetime = cast(Optional[int], root_ctx.local_config.manager.status_lifetime)
     cxn_info = await _get_connnection_info(root_ctx)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 

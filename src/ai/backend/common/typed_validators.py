@@ -1,15 +1,31 @@
 import datetime
+import ipaddress
+import os
+import pwd
 import re
-from typing import Annotated, Any, TypeAlias
+from collections.abc import Mapping
+from datetime import tzinfo
+from pathlib import Path
+from typing import Annotated, Any, ClassVar, Optional, Sequence, TypeAlias, TypeVar
 
+from dateutil import tz
 from dateutil.relativedelta import relativedelta
 from pydantic import (
     AfterValidator,
+    BaseModel,
+    DirectoryPath,
+    Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
+    PlainValidator,
+    TypeAdapter,
+    ValidationError,
+    model_validator,
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
+
+from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
     API_VFOLDER_LENGTH_LIMIT,
@@ -186,3 +202,257 @@ def _vfolder_name_validator(name: str) -> str:
 
 
 VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]
+
+
+class HostPortPair(BaseModel):
+    host: str = Field(
+        description="""
+        Host address of the service.
+        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.
+        """,
+        examples=["127.0.0.1"],
+    )
+    port: int = Field(
+        ge=1,
+        le=65535,
+        description="""
+        Port number of the service.
+        Must be between 1 and 65535.
+        Ports below 1024 require root/admin privileges.
+        """,
+        examples=[8080],
+    )
+
+    _allow_blank_host: ClassVar[bool] = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse(cls, value: Any) -> Any:
+        host: str | ipaddress._BaseAddress
+        port: str | int
+
+        if isinstance(value, cls):
+            return value
+
+        if isinstance(value, str):
+            pair = value.rsplit(":", maxsplit=1)
+            if len(pair) == 1:
+                raise ValueError("value as string must contain both address and number")
+            host = pair[0]
+            port = pair[1]
+
+        elif isinstance(value, Sequence):
+            if len(value) != 2:
+                raise ValueError(
+                    "value as array must contain only two values for address and number"
+                )
+            host, port = value
+
+        elif isinstance(value, Mapping):
+            try:
+                host, port = value["host"], value["port"]
+            except KeyError:
+                raise ValueError('value as map must contain "host" and "port" keys')
+
+        else:
+            raise TypeError("unrecognized value type")
+
+        try:
+            if isinstance(host, str):
+                host = str(ipaddress.ip_address(host.strip("[]")))
+        except ValueError:
+            pass
+
+        if not cls._allow_blank_host and not host:
+            raise ValueError("value has empty host")
+
+        try:
+            port = int(port)
+        except (TypeError, ValueError):
+            raise ValueError("port number must be an integer")
+        if not (1 <= port <= 65535):
+            raise ValueError("port number must be between 1 and 65535")
+
+        return {"host": str(host), "port": port}
+
+    def __getitem__(self, *args) -> int | str:
+        if args[0] == 0:
+            return self.host
+        elif args[0] == 1:
+            return self.port
+        else:
+            raise KeyError(*args)
+
+    def to_legacy(self) -> LegacyHostPortPair:
+        return LegacyHostPortPair(host=self.host, port=self.port)
+
+
+def _parse_to_tzinfo(value: Any) -> tzinfo:
+    if isinstance(value, tzinfo):
+        return value
+    if isinstance(value, str):
+        tzobj = tz.gettz(value)
+        if tzobj is None:
+            raise ValueError(f"value is not a known timezone: {value!r}")
+        return tzobj
+    raise TypeError("value must be string or tzinfo")
+
+
+TimeZone = Annotated[
+    tzinfo,
+    PlainValidator(_parse_to_tzinfo),
+]
+
+
+class AutoDirectoryPath(DirectoryPath):
+    """`DirectoryPath` that silently creates the directory if it is missing."""
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        def ensure_exists(value: Any) -> Path:
+            p = Path(value)
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+
+        return core_schema.chain_schema([
+            core_schema.no_info_plain_validator_function(ensure_exists),
+            handler(DirectoryPath),
+        ])
+
+
+class UserID(int):
+    _default_uid: Optional[int] = None
+
+    @classmethod
+    def check_and_return(cls, value: Any) -> int:
+        if value is None:
+            if cls._default_uid is not None:
+                return cls._default_uid
+            else:
+                return os.getuid()
+        elif isinstance(value, int):
+            if value == -1:
+                return os.getuid()
+        elif isinstance(value, str):
+            if not value:
+                if cls._default_uid is not None:
+                    return cls._default_uid
+                else:
+                    return os.getuid()
+            try:
+                value = int(value)
+            except ValueError:
+                try:
+                    return pwd.getpwnam(value).pw_uid
+                except KeyError:
+                    raise ValueError(f"no such user {value} in system")
+            else:
+                return cls.check_and_return(value)
+        else:
+            raise ValueError("value must be either int or str")
+        return value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        def _validate(value: Any) -> "UserID":
+            uid_int = cls.check_and_return(value)
+            return cls(uid_int)
+
+        return core_schema.no_info_plain_validator_function(_validate)
+
+
+class GroupID(int):
+    _default_gid: Optional[int] = None
+
+    @classmethod
+    def check_and_return(cls, value: Any) -> int:
+        if value is None:
+            if cls._default_gid is not None:
+                return cls._default_gid
+            else:
+                return os.getgid()
+        elif isinstance(value, int):
+            if value == -1:
+                return os.getgid()
+        elif isinstance(value, str):
+            if not value:
+                if cls._default_gid is not None:
+                    return cls._default_gid
+                else:
+                    return os.getgid()
+            try:
+                value = int(value)
+            except ValueError:
+                try:
+                    return pwd.getpwnam(value).pw_gid
+                except KeyError:
+                    raise ValueError(f"no such group {value!r} in system")
+            else:
+                return cls.check_and_return(value)
+        else:
+            raise ValueError("value must be either int or str")
+        return value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        def _validate(value: Any) -> "GroupID":
+            gid_int = cls.check_and_return(value)
+            return cls(gid_int)
+
+        return core_schema.no_info_plain_validator_function(_validate)
+
+
+TItem = TypeVar("TItem")
+
+
+class DelimiterSeparatedList(list[TItem]):
+    delimiter: str = ","
+    min_length: Optional[int] = None
+    empty_str_as_empty_list: bool = False
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        def _validate(value: Any, _info: core_schema.ValidationInfo) -> list[TItem]:
+            item_type = getattr(cls, "__args__", (str,))[0]
+            item_adapter = TypeAdapter(item_type)
+
+            if not isinstance(value, str):
+                value = str(value)
+            if cls.empty_str_as_empty_list and value == "":
+                return cls([])
+            items = value.split(cls.delimiter)
+
+            if cls.min_length is not None and len(items) < cls.min_length:
+                raise ValueError(f"the number of items should be greater than {cls.min_length}")
+
+            try:
+                return cls([item_adapter.validate_python(x) for x in items])
+            except ValidationError as e:
+                raise ValueError(str(e))
+
+        def _serialize(val: Sequence[Any], _info):
+            return cls.delimiter.join(str(x) for x in val)
+
+        return core_schema.with_info_plain_validator_function(
+            _validate,
+            serialization=core_schema.plain_serializer_function_ser_schema(_serialize),
+        )
+
+
+class CommaSeparatedStrList(DelimiterSeparatedList[str]):
+    delimiter = ","
+    min_length = None

@@ -21,7 +21,8 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.config import DEFAULT_CHUNK_SIZE, SharedConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config_legacy import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.errors.exceptions import ObjectNotFound, StorageProxyError
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -106,14 +107,14 @@ async def _check_vfolder_status(
 
 class VFolderService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedConfig
+    _shared_config: ManagerSharedConfig
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        shared_config: SharedConfig,
+        shared_config: ManagerSharedConfig,
         storage_manager: StorageSessionManager,
         background_task_manager: BackgroundTaskManager,
     ) -> None:

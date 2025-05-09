@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, tzinfo
 from enum import Enum
 from typing import Any, Mapping, Optional, Sequence
 from uuid import UUID
@@ -8,7 +8,6 @@ from uuid import UUID
 import attrs
 import msgpack
 import sqlalchemy as sa
-from dateutil.tz.tz import tzfile
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.orm import joinedload, load_only
@@ -492,7 +491,7 @@ def parse_resource_usage(
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
     redis_stat: RedisConnectionInfo,
-    local_tz: tzfile,
+    local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
     stat_map = {k.id: k.last_stat for k in kernels}
     stat_empty_kerns = [k.id for k in kernels if not k.last_stat]

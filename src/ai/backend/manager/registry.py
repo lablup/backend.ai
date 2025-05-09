@@ -125,11 +125,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.local import ManagerLocalConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
-from .config import LocalConfig, SharedConfig
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.exceptions import (
     BackendError,
@@ -235,7 +236,7 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
-    local_config: LocalConfig
+    local_config: ManagerLocalConfig
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -243,8 +244,8 @@ class AgentRegistry:
 
     def __init__(
         self,
-        local_config: LocalConfig,
-        shared_config: SharedConfig,
+        local_config: ManagerLocalConfig,
+        shared_config: ManagerSharedConfig,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
         redis_stat: RedisConnectionInfo,
@@ -277,9 +278,7 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
-        self.rpc_keepalive_timeout = int(
-            shared_config.get("config/network/rpc/keepalive-timeout", "60")
-        )
+        self.rpc_keepalive_timeout = int(shared_config.data.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
@@ -1466,7 +1465,7 @@ class AgentRegistry:
     ) -> None:
         if not bindings:
             return
-        auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
+        auto_pull = cast(str, self.shared_config.data.docker.image.auto_pull)
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
             if binding.agent_alloc_ctx.agent_id is None:
@@ -1560,7 +1559,7 @@ class AgentRegistry:
                 result = await db_sess.execute(query)
                 resource_policy = result.scalars().first()
                 idle_timeout = cast(int, resource_policy.idle_timeout)
-                auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
+                auto_pull = cast(str, self.shared_config.data.docker.image.auto_pull)
 
                 # Aggregate image registry information
                 image_refs: set[ImageRef] = set()
@@ -1623,7 +1622,10 @@ class AgentRegistry:
                     }
                 elif ClusterMode(scheduled_session.cluster_mode) == ClusterMode.MULTI_NODE:
                     # Create overlay network for multi-node sessions
-                    driver = self.shared_config["network"]["inter-container"]["default-driver"]
+                    driver = self.shared_config.data.network.inter_container.default_driver
+                    if driver is None:
+                        raise ValueError("No inter-container network driver is configured.")
+
                     network_plugin = self.network_plugin_ctx.plugins[driver]
                     try:
                         network_info = await network_plugin.create_network(
@@ -2712,9 +2714,13 @@ class AgentRegistry:
                             f"Failed to destroy the agent-local network {network_ref_name}"
                         )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
-                assert network_ref_name, "network_id should not be None!"
+                if network_ref_name is None:
+                    raise ValueError("network_id should not be None!")
+                if self.shared_config.data.network.inter_container.default_driver is None:
+                    raise ValueError("No inter-container network driver is configured.")
+
                 network_plugin = self.network_plugin_ctx.plugins[
-                    self.shared_config["network"]["inter-container"]["default-driver"]
+                    self.shared_config.data.network.inter_container.default_driver
                 ]
                 try:
                     await network_plugin.destroy_network(network_ref_name)
