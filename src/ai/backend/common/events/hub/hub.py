@@ -1,9 +1,8 @@
-import asyncio
 import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import AsyncIterator, MutableMapping, Optional
+from typing import MutableMapping
 
 from ai.backend.common.events.events import AbstractEvent, EventDomain
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -32,63 +31,6 @@ class EventPropagator(ABC):
         Close the propagator.
         """
         raise NotImplementedError
-
-
-class AsyncBypassPropagator(EventPropagator):
-    """
-    A simple event propagator that uses an asyncio queue to propagate events.
-    """
-
-    _id: uuid.UUID
-    _queue: asyncio.Queue[Optional[AbstractEvent]]
-    _closed: bool = False
-
-    def __init__(self) -> None:
-        self._id = uuid.uuid4()
-        self._queue = asyncio.Queue()
-        self._closed = False
-
-    def id(self) -> uuid.UUID:
-        """
-        Get the unique identifier for the propagator.
-        """
-        return self._id
-
-    async def receive_once(self) -> AbstractEvent:
-        """
-        Receive an event from the queue.
-        When use this method, don't use the receive method.
-        """
-        if self._closed:
-            raise RuntimeError("AsyncBypassPropagator is closed")
-        event = await self._queue.get()
-        if event is None:
-            raise RuntimeError("AsyncBypassPropagator is closed")
-        return event
-
-    async def receive(self) -> AsyncIterator[AbstractEvent]:
-        """
-        Receive events from the queue.
-        This method is a generator that yields events until the queue is closed.
-        When use this method, don't use the receive_once method.
-        """
-        while not self._closed:
-            event = await self._queue.get()
-            try:
-                if event is None:
-                    break
-                yield event
-            except Exception as e:
-                log.error("Error propagating event: {}", e)
-
-    async def propagate_event(self, event: AbstractEvent) -> None:
-        await self._queue.put(event)
-
-    async def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        await self._queue.put(None)
 
 
 @dataclass

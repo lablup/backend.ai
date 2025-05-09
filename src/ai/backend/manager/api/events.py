@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,6 +27,7 @@ from sqlalchemy.orm import load_only
 from ai.backend.common import validators as tx
 from ai.backend.common.events.events import (
     EventDispatcher,
+    EventDomain,
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelPreparingEvent,
@@ -42,7 +44,7 @@ from ai.backend.common.events.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.events.hub.hub import AsyncBypassPropagator
+from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
@@ -174,35 +176,22 @@ async def push_background_task_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    task_id = params["task_id"]
+    task_id = uuid.UUID(params["task_id"])
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     async with sse_response(request) as resp:
-        propagator = AsyncBypassPropagator()
-        root_ctx.event_hub.register_event_propagator(propagator)
+        propagator = BgtaskPropagator(root_ctx.background_task_manager)
+        root_ctx.event_hub.register_event_propagator(
+            propagator, [(EventDomain.BGTASK, str(task_id))]
+        )
         try:
-            last_event = await root_ctx.background_task_manager.fetch_last_finishied_event(task_id)
-            if last_event is not None:
-                # if the task is finished, send the last event
-                # and close the connection
-                user_event = last_event.user_event()
-                if user_event is None:
-                    log.warning(
-                        "Background task {} is finished, but no user event is found",
-                        task_id,
-                    )
-                    raise ValueError
-                await resp.send(
-                    dump_json_str(user_event.user_event_dict()),
-                    event=user_event.event_name(),
-                    retry=user_event.retry_count(),
-                )
-                return resp
-            # if the task is not finished, wait for the events
-            # and send them to the client
-            async for event in propagator.receive():
+            async for event in propagator.receive(task_id):
                 user_event = event.user_event()
                 if user_event is None:
+                    log.debug(
+                        "Received unsupported user event: {}",
+                        event.event_name(),
+                    )
                     continue
                 await resp.send(
                     dump_json_str(user_event.user_event_dict()),

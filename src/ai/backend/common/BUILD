@@ -34,6 +34,8 @@ python_distribution(
         "src/ai/backend/common/dto/manager:src",
         "src/ai/backend/common/dto/storage:src",
         "src/ai/backend/common/events:src",
+        "src/ai/backend/common/events/hub:src",
+        "src/ai/backend/common/events/hub/propagators:src",
         "src/ai/backend/common/events/user_event:src",
         "src/ai/backend/common/message_queue:src",
         "src/ai/backend/common/middlewares:src",
