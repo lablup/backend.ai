@@ -74,12 +74,12 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
-from ai.backend.manager.config.loader.etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.config.watchers.etcd import EtcdConfigController, EtcdConfigWatcher
+from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
@@ -355,22 +355,21 @@ async def unified_config_ctx(
     shared_cfg = ManagerSharedConfig(**raw_shared_cfg)
 
     etcd_watcher = EtcdConfigWatcher(etcd_loader._etcd)
-    etcd_controller = EtcdConfigController(etcd_watcher, shared_cfg)
 
     unified_config = ManagerUnifiedConfig(
         local=local_config,
         local_config_loader=local_cfg_loader,
         shared=shared_cfg,
-        shared_config_loader=etcd_loader,
-        config_controllers=[etcd_controller],
+        etcd_config_loader=etcd_loader,
+        etcd_watcher=etcd_watcher,
     )
     root_ctx.unified_config = unified_config
 
     try:
-        await etcd_controller.start()
+        unified_config.start()
         yield root_ctx.unified_config
     finally:
-        await etcd_controller.stop()
+        unified_config.stop()
 
 
 @actxmgr
@@ -400,10 +399,10 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 @actxmgr
 async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.pidx == 0:
-        mgr_status = await root_ctx.unified_config.etcd_config_loader.get_manager_status()
+        mgr_status = await root_ctx.unified_config.legacy_etcd_config_loader.get_manager_status()
         if mgr_status is None or mgr_status not in (ManagerStatus.RUNNING, ManagerStatus.FROZEN):
             # legacy transition: we now have only RUNNING or FROZEN for HA setup.
-            await root_ctx.unified_config.etcd_config_loader.update_manager_status(
+            await root_ctx.unified_config.legacy_etcd_config_loader.update_manager_status(
                 ManagerStatus.RUNNING
             )
             mgr_status = ManagerStatus.RUNNING

@@ -247,7 +247,9 @@ async def resolve_vfolder_rows(
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+    allowed_vfolder_types = (
+        await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+    )
     vf_user_cond = None
     vf_group_cond = None
 
@@ -598,7 +600,9 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     group_id = params["group_id"]
     domain_admin = request["user"]["role"] == UserRole.ADMIN
     resource_policy = request["keypair"]["resource_policy"]
-    allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+    allowed_vfolder_types = (
+        await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+    )
     async with root_ctx.db.begin() as conn:
         allowed_hosts = VFolderHostPermissionMap()
         if "user" in allowed_vfolder_types:
@@ -616,7 +620,9 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     allowed_hosts = VFolderHostPermissionMap({
         host: perms for host, perms in allowed_hosts.items() if host in all_hosts
     })
-    default_host = await root_ctx.unified_config.etcd_config_loader.get_raw("volumes/default_host")
+    default_host = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw(
+        "volumes/default_host"
+    )
     if default_host not in allowed_hosts:
         default_host = None
 
@@ -675,7 +681,9 @@ async def list_all_hosts(request: web.Request) -> web.Response:
     )
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
     all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
-    default_host = await root_ctx.unified_config.etcd_config_loader.get_raw("volumes/default_host")
+    default_host = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw(
+        "volumes/default_host"
+    )
     if default_host not in all_hosts:
         default_host = None
     resp = {
@@ -721,7 +729,9 @@ async def list_allowed_types(request: web.Request) -> web.Response:
         request["user"]["email"],
         request["keypair"]["access_key"],
     )
-    allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+    allowed_vfolder_types = (
+        await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+    )
     return web.json_response(allowed_vfolder_types, status=HTTPStatus.OK)
 
 
@@ -798,7 +808,9 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     if user_role == UserRole.SUPERADMIN:
         pass
     else:
-        allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+        allowed_vfolder_types = (
+            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         async with root_ctx.db.begin_readonly() as conn:
             extra_vf_conds = [vfolders.c.id == params["id"]]
             entries = await query_accessible_vfolders(
@@ -862,7 +874,9 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     if user_role == UserRole.SUPERADMIN:
         pass
     else:
-        allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+        allowed_vfolder_types = (
+            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         async with root_ctx.db.begin_readonly() as conn:
             await ensure_host_permission_allowed(
                 conn,
@@ -1528,7 +1542,9 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     async with root_ctx.db.begin() as conn:
         from ..models import association_groups_users as agus
 
-        allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+        allowed_vfolder_types = (
+            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         await ensure_host_permission_allowed(
             conn,
             row["host"],
@@ -1630,7 +1646,9 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
     if row["ownership_type"] != VFolderOwnershipType.GROUP:
         raise VFolderNotFound("Only project folders are directly unsharable.")
     async with root_ctx.db.begin() as conn:
-        allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+        allowed_vfolder_types = (
+            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         await ensure_host_permission_allowed(
             conn,
             row["host"],
@@ -1681,7 +1699,9 @@ async def _delete(
             ):
                 raise ModelServiceDependencyNotCleared
         folder_host = vfolder_row["host"]
-        allowed_vfolder_types = await root_ctx.unified_config.etcd_config_loader.get_vfolder_types()
+        allowed_vfolder_types = (
+            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         await ensure_host_permission_allowed(
             db_session.bind,
             folder_host,
@@ -2322,7 +2342,7 @@ async def list_mounts(request: web.Request) -> web.Response:
         "VFOLDER.LIST_MOUNTS(ak:{})",
         access_key,
     )
-    mount_prefix = await root_ctx.unified_config.etcd_config_loader.get_raw("volumes/_mount")
+    mount_prefix = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
 
@@ -2440,7 +2460,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
     log_fmt = "VFOLDER.MOUNT_HOST(ak:{}, name:{}, fs:{}, sg:{})"
     log_args = (access_key, params["name"], params["fs_location"], params["scaling_group"])
     log.info(log_fmt, *log_args)
-    mount_prefix = await root_ctx.unified_config.etcd_config_loader.get_raw("volumes/_mount")
+    mount_prefix = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
 
@@ -2541,7 +2561,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     log_fmt = "VFOLDER.UMOUNT_HOST(ak:{}, name:{}, sg:{})"
     log_args = (access_key, params["name"], params["scaling_group"])
     log.info(log_fmt, *log_args)
-    mount_prefix = await root_ctx.unified_config.etcd_config_loader.get_raw("volumes/_mount")
+    mount_prefix = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = Path(mount_prefix) / params["name"]

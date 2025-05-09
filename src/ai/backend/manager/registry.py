@@ -499,7 +499,7 @@ class AgentRegistry:
 
         if _resources := config["resources"]:
             available_resource_slots = (
-                await self.unified_config.etcd_config_loader.get_resource_slots()
+                await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
             )
             try:
                 ResourceSlot.from_user_input(_resources, available_resource_slots)
@@ -1018,7 +1018,9 @@ class AgentRegistry:
             requested_mount_options = (
                 session_enqueue_configs["creation_config"].get("mount_options") or {}
             )
-            allowed_vfolder_types = await self.unified_config.etcd_config_loader.get_vfolder_types()
+            allowed_vfolder_types = (
+                await self.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            )
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
                 self.storage_manager,
@@ -1173,9 +1175,11 @@ class AgentRegistry:
                 )
                 image_row = await ImageRow.resolve(session, [image_ref])
             image_min_slots, image_max_slots = await image_row.get_slot_ranges(
-                self.unified_config.etcd_config_loader
+                self.unified_config.legacy_etcd_config_loader
             )
-            known_slot_types = await self.unified_config.etcd_config_loader.get_resource_slots()
+            known_slot_types = (
+                await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+            )
 
             labels = cast(dict, image_row.labels)
 
@@ -3068,7 +3072,7 @@ class AgentRegistry:
                     if row is None or row["status"] is None:
                         # new agent detected!
                         log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.unified_config.etcd_config_loader.update_resource_slots(
+                        await self.unified_config.legacy_etcd_config_loader.update_resource_slots(
                             slot_key_and_units
                         )
                         self.agent_cache.update(
@@ -3126,15 +3130,17 @@ class AgentRegistry:
                                 agent_info["public_key"],
                             )
                         if updates:
-                            await self.unified_config.etcd_config_loader.update_resource_slots(
-                                slot_key_and_units
+                            await (
+                                self.unified_config.legacy_etcd_config_loader.update_resource_slots(
+                                    slot_key_and_units
+                                )
                             )
                             update_query = (
                                 sa.update(agents).values(updates).where(agents.c.id == agent_id)
                             )
                             await conn.execute(update_query)
                     elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.unified_config.etcd_config_loader.update_resource_slots(
+                        await self.unified_config.legacy_etcd_config_loader.update_resource_slots(
                             slot_key_and_units
                         )
                         instance_rejoin = True

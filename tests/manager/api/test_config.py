@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.manager.config.loader.etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 
 
 @pytest.mark.asyncio

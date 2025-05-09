@@ -772,7 +772,7 @@ class ModelServingService:
                     }
                     vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
                         conn,
-                        self._unified_config.etcd_config_loader,
+                        self._unified_config.legacy_etcd_config_loader,
                         self._storage_manager,
                         endpoint_row.model,
                         endpoint_row.model_mount_destination,
