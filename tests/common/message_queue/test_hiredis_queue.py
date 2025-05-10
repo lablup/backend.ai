@@ -23,7 +23,7 @@ def queue_args():
 
 @pytest.fixture
 async def redis_queue(redis_container, queue_args):
-    redis_conf = RedisTarget(
+    redis_target = RedisTarget(
         addr=redis_container[1],
         redis_helper_config=RedisHelperConfig(
             socket_timeout=1.0,
@@ -34,9 +34,9 @@ async def redis_queue(redis_container, queue_args):
         ),
     )
 
-    queue = HiRedisQueue(redis_conf, queue_args)
+    queue = HiRedisQueue(redis_target, queue_args)
     yield queue
-    async with RedisConnection(redis_conf, db=queue_args.db) as client:
+    async with RedisConnection(redis_target, db=queue_args.db) as client:
         # Cleanup after tests
         await client.execute(["FLUSHDB"])
     await queue.close()
@@ -96,7 +96,7 @@ async def test_done(redis_queue):
         print(message)
         await redis_queue.done(message.msg_id)
         # Message should be acknowledged in Redis
-        async with RedisConnection(redis_queue._conf, db=redis_queue._db) as client:
+        async with RedisConnection(redis_queue._target, db=redis_queue._db) as client:
             pending = await client.execute([
                 "XPENDING",
                 redis_queue._stream_key,

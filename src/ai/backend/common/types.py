@@ -1343,7 +1343,7 @@ class RedisProfileTarget:
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
-        override_configs: Optional[Mapping[str, RedisTarget]] = None,
+        override_targets: Optional[Mapping[str, RedisTarget]] = None,
     ) -> None:
         self._base_target = RedisTarget(
             addr=addr,
@@ -1352,7 +1352,7 @@ class RedisProfileTarget:
             password=password,
             redis_helper_config=redis_helper_config,
         )
-        self._override_targets = override_configs
+        self._override_targets = override_targets
 
     def profile_target(self, role: RedisRole) -> RedisTarget:
         if self._override_targets and (role in self._override_targets):
@@ -1361,7 +1361,30 @@ class RedisProfileTarget:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
-        return cls(**data)
+        override_targets = None
+        if data.get("override_configs"):
+            override_targets = {
+                target: RedisTarget(**cfg) for target, cfg in data["override_configs"].items()
+            }
+
+        addr = None
+        # TODO: Remove this match statement after pydantic migration done.
+        if addr_data := data.get("addr"):
+            if isinstance(addr_data, HostPortPair):
+                addr = HostPortPair(addr_data.host, addr_data.port)
+            elif isinstance(addr_data, Mapping):
+                addr = HostPortPair(addr_data["host"], addr_data["port"])
+            else:
+                addr_data = addr_data.split(":")
+                addr = HostPortPair(addr_data[0], int(addr_data[1]))
+        return cls(
+            addr=addr,
+            sentinel=data.get("sentinel"),
+            service_name=data.get("service_name"),
+            password=data.get("password"),
+            redis_helper_config=data.get("redis_helper_config"),
+            override_targets=override_targets,
+        )
 
 
 def safe_print_redis_target(config: RedisTarget) -> str:
