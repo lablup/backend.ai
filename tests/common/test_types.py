@@ -1,16 +1,20 @@
 import asyncio
 from decimal import Decimal
 
+import pydantic
 import pytest
 from typeguard import TypeCheckError
 
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     BinarySize,
     DefaultForUnspecified,
     HardwareMetadata,
+    PyTorchDistributedEnviron,
     ResourceSlot,
     SlotName,
     SlotTypes,
+    TensorFlowDistributedEnviron,
     aobject,
     check_typed_dict,
 )
@@ -332,3 +336,42 @@ def test_resource_slot_calc_with_infinity():
     r5 = r1 + r4
     assert r5["a"] == Decimal("Infinity")
     assert r5["b"] == 5
+
+
+def test_pytorch_distributed_environ() -> None:
+    pytorch_distributed_environ = PyTorchDistributedEnviron(
+        world_size="4",
+        world_rank="2",
+        local_rank="0",
+        master_addr="127.0.0.1",
+        master_port="12345",
+    ).model_dump()
+    assert pytorch_distributed_environ["WORLD_SIZE"] == "4"
+    assert pytorch_distributed_environ["WORLD_RANK"] == "2"
+    assert pytorch_distributed_environ["LOCAL_RANK"] == "0"
+    assert pytorch_distributed_environ["MASTER_ADDR"] == "127.0.0.1"
+    assert pytorch_distributed_environ["MASTER_PORT"] == "12345"
+
+
+def test_tensorflow_distributed_environ() -> None:
+    environ = {
+        "TF_CONFIG": {
+            "cluster": {
+                "worker": ["main1:12345", "sub1:12345"],
+            },
+            "task": {
+                "type": "worker",
+                "index": "0",
+            },
+        },
+    }
+    tf_distributed_environ = TensorFlowDistributedEnviron.model_validate(environ).model_dump()
+    assert tf_distributed_environ["TF_CONFIG"] == dump_json_str(environ["TF_CONFIG"])
+
+
+def test_tensorflow_distributed_environ_invalid() -> None:
+    config = {
+        "invalid_key": "invalid_value",
+    }
+    with pytest.raises(pydantic.ValidationError):
+        _ = TensorFlowDistributedEnviron.model_validate({"TF_CONFIG": config})

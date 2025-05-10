@@ -58,3 +58,31 @@ To ease the process, Backend.AI injects the following environment variables into
    * - ``BACKENDAI_CLUSTER_LOCAL_RANK``
      - The zero-based global index of the current container within the entire cluster session.
      - ``0``
+
+Also, the following environment variables are automatically set for each container
+to support distributed training with PyTorch and TensorFlow:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Environment Variable
+     - Meaning
+     - Examples
+   * - ``WORLD_SIZE``
+     - Total number of containers participating in the cluster session.
+     - ``4``
+   * - ``WORLD_RANK``
+     - Zero-based global index of the current container within the cluster.
+     - ``0``
+   * - ``LOCAL_RANK``
+     - Zero-based local index of the current container on its host.
+     - ``0``
+   * - ``MASTER_ADDR``
+     - Hostname of the main container coordinating the cluster session.
+     - ``main1``
+   * - ``MASTER_PORT``
+     - Port number used by the main container for communication.
+     - ``12345``
+   * - ``TF_CONFIG``
+     - JSON-formatted TensorFlow cluster configuration for this container.
+     - ``{"cluster": {"worker": ["main1:12345", "sub1:12345", "sub2:12345", "sub3:12345"]}, "task": {"type": "worker", "index": 0}}``
