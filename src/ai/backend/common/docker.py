@@ -89,6 +89,12 @@ class LabelName(enum.StrEnum):
     ENVS_CORECOUNT = "ai.backend.envs.corecount"
     ACCELERATORS = "ai.backend.accelerators"
     SERVICE_PORTS = "ai.backend.service-ports"
+    BLOCK_SERVICE_PORTS = "ai.backend.internal.block-service-ports"
+
+    # Identification
+    KERNEL_ID = "ai.backend.kernel-id"
+    SESSION_ID = "ai.backend.session-id"
+    OWNER_AGENT = "ai.backend.owner"
 
     # Inference image labels
     ENDPOINT_PORTS = "ai.backend.endpoint-ports"
@@ -100,6 +106,9 @@ class LabelName(enum.StrEnum):
     CUSTOMIZED_NAME = "ai.backend.customized-image.name"
     CUSTOMIZED_ID = "ai.backend.customized-image.id"
     CUSTOMIZED_USER_EMAIL = "ai.backend.customized-image.user.email"
+
+    OWNER_USER = "ai.backend.owner-user-id"
+    OWNER_PROJECT = "ai.backend.owner-project-id"
 
 
 class KernelFeatures(StringSetFlag):
