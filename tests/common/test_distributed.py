@@ -34,7 +34,7 @@ from ai.backend.common.lock import (
     RedisLock,
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AgentId, HostPortPair, RedisConfig, RedisConnectionInfo
+from ai.backend.common.types import AgentId, HostPortPair, RedisConnectionInfo, RedisTarget
 
 
 @dataclass
@@ -107,7 +107,7 @@ async def run_timer(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_addr, redis_helper_config=config.redis_helper_default_config
     )
     stream_redis = redis_helper.get_redis_object(
@@ -163,7 +163,7 @@ def etcd_timer_node_process(
             print("_tick")
             queue.put(time.monotonic())
 
-        redis_config = RedisConfig(
+        redis_config = RedisTarget(
             addr=timer_ctx.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
         stream_redis = redis_helper.get_redis_object(
@@ -246,7 +246,7 @@ class TimerNode(threading.Thread):
             print("_tick")
             self.event_records.append(time.monotonic())
 
-        redis_config = RedisConfig(
+        redis_config = RedisTarget(
             addr=self.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
         stream_redis = redis_helper.get_redis_object(
@@ -459,7 +459,7 @@ async def test_global_timer_join_leave(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
     stream_redis = redis_helper.get_redis_object(

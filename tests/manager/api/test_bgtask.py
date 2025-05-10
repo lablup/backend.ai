@@ -20,7 +20,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.types import AgentId, EtcdRedisConfig
+from ai.backend.common.types import AgentId, RedisProfileTarget
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
     background_task_ctx,
@@ -58,10 +58,10 @@ async def bgtask_fixture(
 
     yield root_ctx.background_task_manager, producer, dispatcher
 
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+    etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.unified_config.shared.redis.model_dump()
     )
-    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis_config = etcd_redis_config.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
         stream_redis_config,
         name="event_producer.stream",

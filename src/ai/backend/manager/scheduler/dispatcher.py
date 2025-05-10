@@ -78,9 +78,9 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
-    EtcdRedisConfig,
     KernelId,
     RedisConnectionInfo,
+    RedisProfileTarget,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -297,16 +297,16 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
-        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             self.unified_config.shared.redis.model_dump()
         )
         self.redis_live = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.LIVE),
+            redis_profile_target.profile_target(RedisRole.LIVE),
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
         self.redis_stat = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="stat",
             db=REDIS_STATISTICS_DB,
         )

@@ -19,7 +19,7 @@ from ai.backend.common.events.dispatcher import (
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AgentId, RedisConfig
+from ai.backend.common.types import AgentId, RedisTarget
 
 
 @dataclass
@@ -55,7 +55,7 @@ EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 async def test_dispatch(redis_container) -> None:
     app = object()
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
     stream_redis = redis_helper.get_redis_object(
@@ -122,7 +122,7 @@ async def test_error_on_dispatch(redis_container) -> None:
     ) -> None:
         exception_log.append(type(exc).__name__)
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
     stream_redis = redis_helper.get_redis_object(

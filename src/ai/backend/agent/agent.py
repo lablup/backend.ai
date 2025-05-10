@@ -143,7 +143,6 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
-    EtcdRedisConfig,
     HardwareMetadata,
     ImageConfig,
     ImageRegistry,
@@ -153,8 +152,9 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
-    RedisConfig,
     RedisConnectionInfo,
+    RedisProfileTarget,
+    RedisTarget,
     RuntimeVariant,
     Sentinel,
     ServicePort,
@@ -730,14 +730,16 @@ class AbstractAgent(
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
 
-        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
-        stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            self.local_config["redis"]
+        )
+        stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         stream_redis = redis_helper.get_redis_object(
-            stream_redis_config,
+            stream_redis_target,
             name="event_producer.stream",
             db=REDIS_STREAM_DB,
         )
-        mq = self._make_message_queue(stream_redis_config, stream_redis)
+        mq = self._make_message_queue(stream_redis_target, stream_redis)
         self.event_producer = EventProducer(
             mq,
             source=self.id,
@@ -749,12 +751,12 @@ class AbstractAgent(
             event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.STREAM),
+            redis_profile_target.profile_target(RedisRole.STREAM),
             name="stream",
             db=REDIS_STREAM_DB,
         )
         self.redis_stat_pool = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="stat",
             db=REDIS_STATISTICS_DB,
         )
@@ -851,7 +853,7 @@ class AbstractAgent(
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
 
     def _make_message_queue(
-        self, stream_redis_config: RedisConfig, stream_redis: RedisConnectionInfo
+        self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
     ) -> AbstractMessageQueue:
         """
         Returns the message queue object.
@@ -859,7 +861,7 @@ class AbstractAgent(
         node_id = self.local_config["agent"]["id"]
         if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
             return HiRedisQueue(
-                stream_redis_config,
+                stream_redis_target,
                 HiRedisMQArgs(
                     stream_key="events",
                     group_name=EVENT_DISPATCHER_CONSUMER_GROUP,

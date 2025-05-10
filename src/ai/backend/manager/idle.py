@@ -68,8 +68,8 @@ from ai.backend.common.events.session import (
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
-    EtcdRedisConfig,
     RedisConnectionInfo,
+    RedisProfileTarget,
     ResourceSlot,
     SessionTypes,
 )
@@ -210,16 +210,16 @@ class IdleCheckerHost:
         self._event_dispatcher = event_dispatcher
         self._event_producer = event_producer
         self._lock_factory = lock_factory
-        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             self._unified_config.shared.redis.model_dump()
         )
         self._redis_live = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.LIVE),
+            redis_profile_target.profile_target(RedisRole.LIVE),
             name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="idle.stat",
             db=REDIS_STATISTICS_DB,
         )
