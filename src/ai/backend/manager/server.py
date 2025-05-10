@@ -69,7 +69,7 @@ from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
-    EtcdRedisConfig,
+    RedisProfileTarget,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -416,32 +416,32 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.unified_config.shared.redis.model_dump()
     )
 
     root_ctx.redis_live = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.LIVE),
+        redis_profile_target.profile_target(RedisRole.LIVE),
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.STATISTICS),
+        redis_profile_target.profile_target(RedisRole.STATISTICS),
         name="stat",  # temporary storage for stat snapshots
         db=REDIS_STATISTICS_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.IMAGE),
+        redis_profile_target.profile_target(RedisRole.IMAGE),
         name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.STREAM),
+        redis_profile_target.profile_target(RedisRole.STREAM),
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.STREAM_LOCK),
+        redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
@@ -585,19 +585,19 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.unified_config.shared.redis.model_dump()
     )
-    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
-        stream_redis_config,
+        stream_redis_target,
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
     )
     node_id = root_ctx.unified_config.local.manager.id
     if root_ctx.unified_config.local.manager.use_experimental_redis_event_dispatcher:
         return HiRedisQueue(
-            stream_redis_config,
+            stream_redis_target,
             HiRedisMQArgs(
                 stream_key="events",
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,

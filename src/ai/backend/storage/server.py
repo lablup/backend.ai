@@ -32,7 +32,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import AGENTID_STORAGE, EtcdRedisConfig, safe_print_redis_config
+from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget, safe_print_redis_target
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -121,15 +121,15 @@ async def server_main(
             log.info(
                 "PID: {0} - configured redis_config: {1}",
                 pidx,
-                safe_print_redis_config(redis_config),
+                safe_print_redis_target(redis_config),
             )
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
-        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(redis_config)
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
         mq = _make_message_queue(
             local_config,
-            etcd_redis_config,
+            redis_profile_target,
         )
         event_producer = EventProducer(
             mq,
@@ -139,7 +139,7 @@ async def server_main(
         log.info(
             "PID: {0} - Event producer created. (redis_config: {1})",
             pidx,
-            safe_print_redis_config(redis_config),
+            safe_print_redis_target(redis_config),
         )
         event_dispatcher = EventDispatcher(
             mq,
@@ -149,7 +149,7 @@ async def server_main(
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
             pidx,
-            safe_print_redis_config(redis_config),
+            safe_print_redis_target(redis_config),
         )
         if local_config["storage-proxy"]["use-watcher"]:
             if not _is_root():
@@ -264,18 +264,18 @@ async def server_main(
 
 def _make_message_queue(
     local_config: dict[str, Any],
-    etcd_redis_config: EtcdRedisConfig,
+    redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
-    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
-        stream_redis_config,
+        stream_redis_target,
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
     )
     node_id = local_config["storage-proxy"]["node-id"]
     if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
         return HiRedisQueue(
-            stream_redis_config,
+            stream_redis_target,
             HiRedisMQArgs(
                 stream_key="events",
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,

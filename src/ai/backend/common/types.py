@@ -123,7 +123,7 @@ __all__ = (
     "ClusterMode",
     "ClusterSSHKeyPair",
     "ClusterSSHPortMapping",
-    "EtcdRedisConfig",
+    "RedisProfileTarget",
     "ReadableCIDR",
     "RedisConnectionInfo",
     "RedisHelperConfig",
@@ -142,7 +142,7 @@ __all__ = (
     "MODEL_SERVICE_RUNTIME_PROFILES",
     "ItemResult",
     "ResultSet",
-    "safe_print_redis_config",
+    "safe_print_redis_target",
 )
 
 
@@ -1301,7 +1301,7 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 
 
 @dataclass
-class RedisConfig:
+class RedisTarget:
     addr: Optional[HostPortPair] = None
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
@@ -1320,8 +1320,8 @@ class RedisConfig:
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
 
-    def copy(self) -> RedisConfig:
-        return RedisConfig(
+    def copy(self) -> RedisTarget:
+        return RedisTarget(
             addr=self.addr,
             sentinel=self.sentinel,
             service_name=self.service_name,
@@ -1331,9 +1331,9 @@ class RedisConfig:
 
 
 @dataclass
-class EtcdRedisConfig:
-    _base_config: RedisConfig
-    _override_configs: Optional[Mapping[str, RedisConfig]]
+class RedisProfileTarget:
+    _base_target: RedisTarget
+    _override_targets: Optional[Mapping[str, RedisTarget]]
 
     def __init__(
         self,
@@ -1343,71 +1343,28 @@ class EtcdRedisConfig:
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
-        override_configs: Optional[Mapping[str, RedisConfig]] = None,
+        override_configs: Optional[Mapping[str, RedisTarget]] = None,
     ) -> None:
-        self._base_config = RedisConfig(
+        self._base_target = RedisTarget(
             addr=addr,
             sentinel=sentinel,
             service_name=service_name,
             password=password,
             redis_helper_config=redis_helper_config,
         )
-        self._override_configs = override_configs
+        self._override_targets = override_configs
 
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self._base_config, key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        setattr(self._base_config, key, value)
-
-    def __contains__(self, key: str) -> bool:
-        return hasattr(self._base_config, key)
-
-    def get_override_config(self, role: RedisRole) -> RedisConfig:
-        if self._override_configs and (role in self._override_configs):
-            return self._override_configs[role]
-        return self._base_config
-
-    def copy(self) -> "EtcdRedisConfig":
-        return EtcdRedisConfig(
-            addr=self._base_config.get("addr"),
-            sentinel=self._base_config.get("sentinel"),
-            service_name=self._base_config.get("service_name"),
-            password=self._base_config.get("password"),
-            redis_helper_config=self._base_config.get("redis_helper_config"),
-            override_configs=dict(self._override_configs) if self._override_configs else None,
-        )
+    def profile_target(self, role: RedisRole) -> RedisTarget:
+        if self._override_targets and (role in self._override_targets):
+            return self._override_targets[role]
+        return self._base_target
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
-        override_configs = None
-        if data.get("override_configs"):
-            override_configs = {
-                target: RedisConfig(**cfg) for target, cfg in data["override_configs"].items()
-            }
-
-        addr = None
-        # TODO: Remove this match statement after pydantic migration done.
-        if addr_data := data.get("addr"):
-            if isinstance(addr_data, HostPortPair):
-                addr = HostPortPair(addr_data.host, addr_data.port)
-            elif isinstance(addr_data, Mapping):
-                addr = HostPortPair(addr_data["host"], addr_data["port"])
-            else:
-                addr_data = addr_data.split(":")
-                addr = HostPortPair(addr_data[0], int(addr_data[1]))
-
-        return cls(
-            addr=addr,
-            sentinel=data.get("sentinel"),
-            service_name=data.get("service_name"),
-            password=data.get("password"),
-            redis_helper_config=data.get("redis_helper_config"),
-            override_configs=override_configs,
-        )
+        return cls(**data)
 
 
-def safe_print_redis_config(config: RedisConfig) -> str:
+def safe_print_redis_target(config: RedisTarget) -> str:
     safe_config = config.copy()
     if "password" in safe_config:
         safe_config["password"] = "********"
