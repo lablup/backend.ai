@@ -61,7 +61,7 @@ from .container_registry import (
 from .rbac import ContainerRegistryScope
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import BackgroundTaskManager
+    from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.types import (
         AccessKey,

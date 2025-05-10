@@ -39,7 +39,7 @@ from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -51,7 +51,8 @@ from ai.backend.common.defs import (
     RedisRole,
 )
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -80,6 +81,7 @@ from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
+from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
@@ -534,6 +536,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 storage_manager=root_ctx.storage_manager,
                 redis_stat=root_ctx.redis_stat,
                 background_task_manager=root_ctx.background_task_manager,
+                event_hub=root_ctx.event_hub,
                 agent_registry=root_ctx.registry,
                 error_monitor=root_ctx.error_monitor,
                 idle_checker_host=root_ctx.idle_checker_host,
@@ -552,6 +555,13 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.event_hub = EventHub()
+    yield
+    await root_ctx.event_hub.shutdown()
+
+
+@actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mq = _make_message_queue(root_ctx)
     root_ctx.event_producer = EventProducer(
@@ -564,6 +574,8 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.unified_config.local.debug.log_events,
         event_observer=root_ctx.metrics.event,
     )
+    dispatchers = Dispatchers(DispatcherArgs(root_ctx.event_hub))
+    dispatchers.dispatch(root_ctx.event_dispatcher)
     yield
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
@@ -933,6 +945,7 @@ def build_root_app(
 
     if cleanup_contexts is None:
         cleanup_contexts = [
+            event_hub_ctx,
             manager_status_ctx,
             redis_ctx,
             database_ctx,

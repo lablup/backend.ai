@@ -59,17 +59,20 @@ from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events import (
+from ai.backend.common.events.agent import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
-    DoSyncKernelLogsEvent,
-    DoTerminateSessionEvent,
+)
+from ai.backend.common.events.image import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
+)
+from ai.backend.common.events.kernel import (
+    DoSyncKernelLogsEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelLifecycleEventReason,
@@ -78,8 +81,13 @@ from ai.backend.common.events import (
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+)
+from ai.backend.common.events.model_serving import (
     ModelServiceStatusEvent,
     RouteCreatedEvent,
+)
+from ai.backend.common.events.session import (
+    DoTerminateSessionEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -89,6 +97,8 @@ from ai.backend.common.events import (
     SessionSuccessEvent,
     SessionTerminatedEvent,
     SessionTerminatingEvent,
+)
+from ai.backend.common.events.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -211,7 +221,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
-    from ai.backend.common.events import EventDispatcher, EventProducer
+    from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 
     from .agent_cache import AgentRPCCache
     from .models.storage import StorageSessionManager
@@ -3873,7 +3883,7 @@ async def handle_kernel_creation_lifecycle(
     """
     log.debug(
         "handle_kernel_creation_lifecycle: ev:{} k:{}",
-        event.name,
+        event.event_name(),
         event.kernel_id,
     )
     match event:
@@ -3922,7 +3932,7 @@ async def handle_session_creation_lifecycle(
     """
     if event.creation_id not in context.session_creation_tracker:
         return
-    log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.name, event.session_id)
+    log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.event_name(), event.session_id)
     if isinstance(event, SessionStartedEvent):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
@@ -4171,7 +4181,7 @@ async def invoke_session_callback(
 
     data = {
         "type": "session_lifecycle",
-        "event": event.name.removeprefix("session_"),
+        "event": event.event_name().removeprefix("session_"),
         "session_id": str(event.session_id),
         "when": datetime.now(tzutc()).isoformat(),
     }

@@ -9,7 +9,7 @@ from aiomonitor.task import preserve_termination_log
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from .events import AbstractEvent, EventProducer
+    from .events.dispatcher import AbstractEvent, EventProducer
     from .lock import AbstractDistributedLock
 
 

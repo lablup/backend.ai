@@ -25,7 +25,7 @@ from ai.backend.common.config import (
     redis_config_iv,
 )
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue

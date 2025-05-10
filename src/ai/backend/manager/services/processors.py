@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventDispatcher
+from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -70,6 +71,7 @@ class ServiceArgs:
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
     background_task_manager: BackgroundTaskManager
+    event_hub: EventHub
     agent_registry: AgentRegistry
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
@@ -123,6 +125,7 @@ class Services:
                 db=args.db,
                 agent_registry=args.agent_registry,
                 background_task_manager=args.background_task_manager,
+                event_hub=args.event_hub,
                 error_monitor=args.error_monitor,
                 idle_checker_host=args.idle_checker_host,
             )

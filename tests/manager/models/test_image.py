@@ -1,10 +1,10 @@
 import asyncio
 import json
+from dataclasses import asdict
 from http import HTTPStatus
 from typing import Callable
 from unittest.mock import MagicMock
 
-import attr
 import pytest
 import sqlalchemy as sa
 from aiohttp import web
@@ -12,10 +12,12 @@ from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.common.events import (
+from ai.backend.common.events.bgtask import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
+)
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
@@ -30,6 +32,7 @@ from ai.backend.manager.server import (
     database_ctx,
     distributed_lock_ctx,
     event_dispatcher_ctx,
+    event_hub_ctx,
     hook_plugin_ctx,
     idle_checker_ctx,
     monitoring_ctx,
@@ -185,6 +188,7 @@ async def test_image_rescan_on_docker_registry(
 ):
     app, _ = await create_app_and_client(
         [
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
@@ -213,8 +217,8 @@ async def test_image_rescan_on_docker_registry(
         source: AgentId,
         event: BgtaskDoneEvent,
     ) -> None:
-        done_handler_ctx["event_name"] = event.name
-        update_body = attr.asdict(event)  # type: ignore
+        done_handler_ctx["event_name"] = event.event_name()
+        update_body = asdict(event)
         done_handler_ctx.update(**update_body)
         done_event.set()
 
@@ -341,6 +345,7 @@ async def test_image_rescan_on_cr_backend_ai(
 ):
     app, _ = await create_app_and_client(
         [
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
             database_ctx,
@@ -369,8 +374,8 @@ async def test_image_rescan_on_cr_backend_ai(
         source: AgentId,
         event: BgtaskDoneEvent,
     ) -> None:
-        done_handler_ctx["event_name"] = event.name
-        update_body = attr.asdict(event)  # type: ignore
+        done_handler_ctx["event_name"] = event.event_name()
+        update_body = asdict(event)
         done_handler_ctx.update(**update_body)
         done_event.set()
 

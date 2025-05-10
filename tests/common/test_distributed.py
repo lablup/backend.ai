@@ -10,10 +10,9 @@ from decimal import Decimal
 from functools import partial
 from multiprocessing import Event, Process, Queue
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Literal, Tuple
+from typing import Any, Callable, Iterable, List, Literal, Optional, Tuple
 
 import aiotools
-import attrs
 import pytest
 from redis.asyncio import Redis
 
@@ -21,7 +20,13 @@ from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import (
+    AbstractEvent,
+    EventDispatcher,
+    EventDomain,
+    EventProducer,
+)
+from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.lock import (
     AbstractDistributedLock,
     EtcdLock,
@@ -61,11 +66,9 @@ def dslice(start: Decimal, stop: Decimal, num: int):
     yield from (start + step * Decimal(tick) for tick in range(0, num))
 
 
-@attrs.define(slots=True, frozen=True)
+@dataclass
 class NoopEvent(AbstractEvent):
-    name = "_noop"
-
-    test_case_ns: str = attrs.field()
+    test_case_ns: str
 
     def serialize(self) -> tuple:
         return (self.test_case_ns,)
@@ -73,6 +76,20 @@ class NoopEvent(AbstractEvent):
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(value[0])
+
+    @classmethod
+    def event_domain(self) -> EventDomain:
+        return EventDomain.AGENT
+
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "noop"
 
 
 EVENT_DISPATCHER_CONSUMER_GROUP = "test"

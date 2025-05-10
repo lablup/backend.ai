@@ -1,30 +1,30 @@
 import asyncio
 import random
+from dataclasses import dataclass
 from types import TracebackType
-from typing import Type
+from typing import Optional, Type
 
 import aiotools
-import attrs
 import pytest
 
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
-from ai.backend.common.events import (
+from ai.backend.common.events.dispatcher import (
     AbstractEvent,
     CoalescingOptions,
     CoalescingState,
     EventDispatcher,
+    EventDomain,
     EventProducer,
 )
+from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AgentId, RedisConfig
 
 
-@attrs.define(slots=True, frozen=True)
+@dataclass
 class DummyEvent(AbstractEvent):
-    name = "testing"
-
-    value: int = attrs.field()
+    value: int
 
     def serialize(self) -> tuple:
         return (self.value + 1,)
@@ -32,6 +32,20 @@ class DummyEvent(AbstractEvent):
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(value[0] + 1)
+
+    @classmethod
+    def event_domain(self) -> EventDomain:
+        return EventDomain.AGENT
+
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+    @classmethod
+    def event_name(self) -> str:
+        return "testing"
 
 
 EVENT_DISPATCHER_CONSUMER_GROUP = "test"
@@ -69,7 +83,7 @@ async def test_dispatch(redis_container) -> None:
         assert context is app
         assert source == AgentId("i-test")
         assert isinstance(event, DummyEvent)
-        assert event.name == "testing"
+        assert event.event_name() == "testing"
         assert event.value == 1001
         await asyncio.sleep(0.01)
         records.add("async")
@@ -78,7 +92,7 @@ async def test_dispatch(redis_container) -> None:
         assert context is app
         assert source == AgentId("i-test")
         assert isinstance(event, DummyEvent)
-        assert event.name == "testing"
+        assert event.event_name() == "testing"
         assert event.value == 1001
         records.add("sync")
 

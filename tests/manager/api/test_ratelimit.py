@@ -6,6 +6,7 @@ import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.manager.server import (
     database_ctx,
     event_dispatcher_ctx,
+    event_hub_ctx,
     hook_plugin_ctx,
     monitoring_ctx,
     redis_ctx,
@@ -22,6 +23,7 @@ async def test_check_rlim_for_anonymous_query(
 ):
     app, client = await create_app_and_client(
         [
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
             redis_ctx,
@@ -50,6 +52,7 @@ async def test_check_rlim_for_authorized_query(
 ):
     app, client = await create_app_and_client(
         [
+            event_hub_ctx,
             mock_etcd_ctx,
             mock_unified_config_ctx,
             redis_ctx,

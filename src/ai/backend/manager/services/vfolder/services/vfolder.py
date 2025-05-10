@@ -12,7 +12,7 @@ from aiohttp import hdrs, web
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.types import (
     QuotaScopeID,

@@ -5,7 +5,7 @@ import sys
 import traceback
 from typing import TYPE_CHECKING, Any, Mapping, Optional
 
-from ai.backend.common.events import AgentErrorEvent
+from ai.backend.common.events.agent import AgentErrorEvent
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel

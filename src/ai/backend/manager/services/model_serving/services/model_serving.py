@@ -10,12 +10,18 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
 
-from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.events import (
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventHandler,
+)
+from ai.backend.common.events.kernel import (
     KernelLifecycleEventReason,
+)
+from ai.backend.common.events.model_serving import (
     ModelServiceStatusEvent,
+)
+from ai.backend.common.events.session import (
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
@@ -407,7 +413,7 @@ class ModelServingService:
                 | SessionTerminatedEvent
                 | ModelServiceStatusEvent,
             ) -> None:
-                task_message = {"event": event.name, "session_id": str(event.session_id)}
+                task_message = {"event": event.event_name(), "session_id": str(event.session_id)}
                 match event:
                     case ModelServiceStatusEvent():
                         task_message["is_healthy"] = event.new_status.value

@@ -39,7 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
-from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,

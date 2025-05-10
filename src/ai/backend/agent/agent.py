@@ -65,7 +65,7 @@ from tenacity import (
 from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STATISTICS_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.docker import (
@@ -78,32 +78,40 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events import (
-    AbstractEvent,
+from ai.backend.common.events.agent import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
-    DoSyncKernelLogsEvent,
-    DoVolumeMountEvent,
-    DoVolumeUnmountEvent,
+)
+from ai.backend.common.events.dispatcher import (
+    AbstractEvent,
     EventDispatcher,
     EventProducer,
-    ExecutionCancelledEvent,
-    ExecutionFinishedEvent,
-    ExecutionStartedEvent,
-    ExecutionTimeoutEvent,
+)
+from ai.backend.common.events.kernel import (
+    DoSyncKernelLogsEvent,
     KernelCreatingEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
-    ModelServiceStatusEvent,
+)
+from ai.backend.common.events.model_serving import ModelServiceStatusEvent
+from ai.backend.common.events.session import (
+    ExecutionCancelledEvent,
+    ExecutionFinishedEvent,
+    ExecutionStartedEvent,
+    ExecutionTimeoutEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
+)
+from ai.backend.common.events.volume import (
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
     VolumeMountableNodeType,
     VolumeMounted,
     VolumeUnmounted,

@@ -25,7 +25,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
