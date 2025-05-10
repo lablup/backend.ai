@@ -298,6 +298,13 @@ class VFolderByName(BaseFunction):
             return {}
 
     @api_function
+    async def force_delete(self) -> dict[str, Any]:
+        await self.update_id_by_name()
+        rqst = Request("DELETE", "/folders/{0}/force".format(self.request_key))
+        async with rqst.fetch():
+            return {}
+
+    @api_function
     async def rename(self, new_name):
         await self.update_id_by_name()
         rqst = Request("POST", "/folders/{0}/rename".format(self.request_key))
