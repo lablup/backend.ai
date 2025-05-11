@@ -4,7 +4,7 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.dto.agent.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.common.utils import join_non_empty

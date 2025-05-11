@@ -57,7 +57,7 @@ from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp
-from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.dto.agent.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.image import (
     ImagePullFailedEvent,

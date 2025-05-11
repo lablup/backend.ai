@@ -34,7 +34,7 @@ from kubernetes_asyncio import config as kube_config
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
-from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.dto.agent.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext

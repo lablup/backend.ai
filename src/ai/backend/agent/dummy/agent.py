@@ -16,7 +16,7 @@ from typing import (
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
-from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.dto.agent.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import (
     AutoPullBehavior,

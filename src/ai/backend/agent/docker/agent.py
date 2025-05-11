@@ -51,7 +51,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
-from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.dto.agent.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag

@@ -77,7 +77,7 @@ from ai.backend.common.docker import (
     LabelName,
 )
 from ai.backend.common.dto.agent.response import PurgeImagesResp
-from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.dto.agent.rpc_request import PurgeImagesReq
 from ai.backend.common.events.agent import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
