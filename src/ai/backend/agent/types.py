@@ -10,7 +10,7 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.common.docker import LabelName
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, ContainerId, KernelId, MountTypes, SessionId
 
 

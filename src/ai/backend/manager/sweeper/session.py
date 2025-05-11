@@ -11,13 +11,13 @@ from dateutil.tz import tzutc
 from sqlalchemy import and_
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.metrics.metric import SweeperMetricObserver
 from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.context import RootContext
-from ..config import session_hang_tolerance_iv
+from ..config_legacy import session_hang_tolerance_iv
 from ..models import SessionRow
 from ..models.session import SessionStatus
 from ..models.utils import ExtendedAsyncSAEngine
@@ -108,8 +108,9 @@ class SessionSweeper(AbstractSweeper):
 
 @actxmgr
 async def stale_session_sweeper_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    # TODO: Resolve type issue and, Use `session_hang_tolerance` from the unified config
     session_hang_tolerance = session_hang_tolerance_iv.check(
-        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
+        await root_ctx.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
     status_threshold_map: dict[SessionStatus, TimeDelta] = {}
     for status, threshold in session_hang_tolerance["threshold"].items():

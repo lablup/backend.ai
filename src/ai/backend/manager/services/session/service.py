@@ -18,13 +18,17 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 
-from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
-from ai.backend.common.events import (
-    BgtaskCancelledEvent,
-    BgtaskDoneEvent,
-    BgtaskFailedEvent,
+from ai.backend.common.events.bgtask import (
+    BaseBgtaskDoneEvent,
 )
+from ai.backend.common.events.dispatcher import (
+    EventDomain,
+)
+from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
 from ai.backend.common.exception import (
     BackendAIError,
     BgtaskCancelledError,
@@ -201,6 +205,7 @@ class SessionServiceArgs:
     db: ExtendedAsyncSAEngine
     agent_registry: AgentRegistry
     background_task_manager: BackgroundTaskManager
+    event_hub: EventHub
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
 
@@ -209,6 +214,7 @@ class SessionService:
     _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
     _background_task_manager: BackgroundTaskManager
+    _event_hub: EventHub
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
     _database_ptask_group: aiotools.PersistentTaskGroup
@@ -220,6 +226,7 @@ class SessionService:
     ) -> None:
         self._db = args.db
         self._agent_registry = args.agent_registry
+        self._event_hub = args.event_hub
         self._background_task_manager = args.background_task_manager
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
@@ -453,17 +460,31 @@ class SessionService:
                     new_image_ref,
                     extra_labels=image_labels,
                 )
-                async for event, _ in self._background_task_manager.poll_bgtask_event(
-                    uuid.UUID(resp["bgtask_id"])
-                ):
-                    match event:
-                        case BgtaskDoneEvent():
-                            await reporter.update(increment=1, message="Committed image")
-                            break
-                        case BgtaskFailedEvent():
-                            raise BgtaskFailedError(extra_msg=event.message)
-                        case BgtaskCancelledEvent():
-                            raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
+                propagator = BgtaskPropagator(self._background_task_manager)
+                self._event_hub.register_event_propagator(
+                    propagator, [(EventDomain.BGTASK, str(bgtask_id))]
+                )
+                try:
+                    async for event in propagator.receive(bgtask_id):
+                        if not isinstance(event, BaseBgtaskDoneEvent):
+                            log.warning("unexpected event: {}", event)
+                            continue
+                        match event.status():
+                            case (
+                                BgtaskStatus.DONE,
+                                BgtaskStatus.PARTIAL_SUCCESS,
+                            ):  # TODO: PARTIAL_SUCCESS should be handled
+                                await reporter.update(increment=1, message="Committed image")
+                                break
+                            case BgtaskStatus.FAILED:
+                                raise BgtaskFailedError(extra_msg=event.message)
+                            case BgtaskStatus.CANCELLED:
+                                raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                            case _:
+                                log.warning("unexpected bgtask done event: {}", event)
+                finally:
+                    self._event_hub.unregister_event_propagator(propagator.id())
 
                 if not new_image_ref.is_local:
                     # push image to registry from local agent
@@ -478,16 +499,27 @@ class SessionService:
                         new_image_ref,
                         image_registry,
                     )
-                    async for event, _ in self._background_task_manager.poll_bgtask_event(
-                        uuid.UUID(resp["bgtask_id"])
-                    ):
-                        match event:
-                            case BgtaskDoneEvent():
-                                break
-                            case BgtaskFailedEvent():
-                                raise BgtaskFailedError(extra_msg=event.message)
-                            case BgtaskCancelledEvent():
-                                raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                    bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
+                    propagator = BgtaskPropagator(self._background_task_manager)
+                    self._event_hub.register_event_propagator(
+                        propagator, [(EventDomain.BGTASK, str(bgtask_id))]
+                    )
+                    try:
+                        async for event in propagator.receive(bgtask_id):
+                            if not isinstance(event, BaseBgtaskDoneEvent):
+                                log.warning("unexpected event: {}", event)
+                                continue
+                            match event.status():
+                                case BgtaskStatus.DONE, BgtaskStatus.PARTIAL_SUCCESS:
+                                    break
+                                case BgtaskStatus.FAILED:
+                                    raise BgtaskFailedError(extra_msg=event.message)
+                                case BgtaskStatus.CANCELLED:
+                                    raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                                case _:
+                                    log.warning("unexpected bgtask done event: {}", event)
+                    finally:
+                        self._event_hub.unregister_event_propagator(propagator.id())
 
                 await reporter.update(increment=1, message="Pushed image to registry")
                 # rescan updated image only

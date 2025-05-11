@@ -16,7 +16,7 @@ from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
 from ai.backend.agent.utils import get_arch_name
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter

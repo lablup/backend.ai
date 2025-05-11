@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import (
+from ai.backend.common.events.agent import (
     AgentTerminatedEvent,
 )
 from ai.backend.common.plugin.monitor import GAUGE
@@ -567,7 +567,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     if agent_list is not None:
         if (
             request["user"]["role"] != UserRole.SUPERADMIN
-            and root_ctx.local_config["manager"]["hide-agents"]
+            and root_ctx.unified_config.local.manager.hide_agents
         ):
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
@@ -947,7 +947,7 @@ async def convert_session_to_image(
 async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
     try:
         now = datetime.now(tzutc())
-        timeout = timedelta(seconds=root_ctx.local_config["manager"]["heartbeat-timeout"])
+        timeout = timedelta(seconds=root_ctx.unified_config.local.manager.heartbeat_timeout)
 
         async def _check_impl(r: Redis):
             async for agent_id, prev in r.hscan_iter("agent.last_seen"):

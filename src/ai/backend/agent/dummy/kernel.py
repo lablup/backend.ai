@@ -6,7 +6,7 @@ from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from typing import Any, FrozenSet, override
 
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.runner import ProbeRunner
 from ai.backend.common.types import CommitStatus
 

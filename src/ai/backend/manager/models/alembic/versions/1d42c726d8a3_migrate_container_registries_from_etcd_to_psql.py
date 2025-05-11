@@ -28,7 +28,7 @@ from sqlalchemy.orm import registry
 
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.manager.config import load
+from ai.backend.manager.config_legacy import load
 from ai.backend.manager.models.base import GUID, IDColumn, StrEnumType, convention
 
 # revision identifiers, used by Alembic.

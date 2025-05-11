@@ -209,6 +209,8 @@ class ErrorDetail(enum.StrEnum):
     )
     # UNAVAILABLE means the resource is not available.
     UNAVAILABLE = "unavailable"
+    # UNREACHABLE means the resource is unreachable.
+    UNREACHABLE = "unreachable"
     # TIMEOUT means the request timed out.
     TASK_TIMEOUT = "task-timeout"
     # DATA_EXPIRED means the data is expired.
@@ -390,6 +392,19 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class BgtaskNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/bgtask-not-found"
+    error_title = "Background Task Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-failed"
     error_title = "Background Task Failed"
@@ -413,4 +428,17 @@ class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.CANCELED,
+        )
+
+
+class UnreachableError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/unreachable"
+    error_title = "Unreachable"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.UNREACHABLE,
         )

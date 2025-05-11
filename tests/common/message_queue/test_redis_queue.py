@@ -6,8 +6,8 @@ from ai.backend.common import redis_helper
 from ai.backend.common.message_queue.queue import MQMessage
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import (
-    RedisConfig,
     RedisHelperConfig,
+    RedisTarget,
 )
 
 
@@ -15,7 +15,7 @@ from ai.backend.common.types import (
 async def redis_conn(redis_container):
     # Configure test Redis connection
     conn = redis_helper.get_redis_object(
-        RedisConfig(
+        RedisTarget(
             addr=redis_container[1],
             redis_helper_config=RedisHelperConfig(
                 socket_timeout=1.0,

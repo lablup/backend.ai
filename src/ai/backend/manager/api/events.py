@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -24,13 +25,12 @@ from aiotools import adefer
 from sqlalchemy.orm import load_only
 
 from ai.backend.common import validators as tx
-from ai.backend.common.events import (
-    BgtaskCancelledEvent,
-    BgtaskDoneEvent,
-    BgtaskFailedEvent,
-    BgtaskPartialSuccessEvent,
-    BgtaskUpdatedEvent,
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
+    EventDomain,
+)
+from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.kernel import (
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelPreparingEvent,
@@ -38,6 +38,8 @@ from ai.backend.common.events import (
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+)
+from ai.backend.common.events.session import (
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -51,7 +53,7 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..errors.exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
+from ..errors.exceptions import GenericForbidden, GroupNotFound
 from ..models import UserRole, groups, kernels
 from ..models.session import SessionRow
 from ..models.utils import execute_with_retry
@@ -69,13 +71,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 sentinel: Final = Sentinel.token
 
 SessionEventInfo = Tuple[str, dict, str, Optional[int]]
-BgtaskEvents = (
-    BgtaskUpdatedEvent
-    | BgtaskDoneEvent
-    | BgtaskCancelledEvent
-    | BgtaskFailedEvent
-    | BgtaskPartialSuccessEvent
-)
 
 
 @server_status_required(READ_ALLOWED)
@@ -185,13 +180,32 @@ async def push_background_task_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    task_id = params["task_id"]
+    task_id = uuid.UUID(params["task_id"])
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
-    try:
-        return await root_ctx.background_task_manager.push_bgtask_events(request, task_id)
-    except ValueError as e:
-        raise ObjectNotFound(extra_data=str(e), object_name="background task")
+    async with sse_response(request) as resp:
+        propagator = BgtaskPropagator(root_ctx.background_task_manager)
+        root_ctx.event_hub.register_event_propagator(
+            propagator, [(EventDomain.BGTASK, str(task_id))]
+        )
+        try:
+            async for event in propagator.receive(task_id):
+                user_event = event.user_event()
+                if user_event is None:
+                    log.warning(
+                        "Received unsupported user event: {}",
+                        event.event_name(),
+                    )
+                    continue
+                await resp.send(
+                    dump_json_str(user_event.user_event_mapping()),
+                    event=user_event.event_name(),
+                    retry=user_event.retry_count(),
+                )
+            await resp.send(dump_json_str({}), event="server_close")
+        finally:
+            root_ctx.event_hub.unregister_event_propagator(propagator.id())
+    return resp
 
 
 async def enqueue_kernel_creation_status_update(
@@ -228,7 +242,7 @@ async def enqueue_kernel_creation_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason, None))
+        q.put_nowait((event.event_name(), row._mapping, event.reason, None))
 
 
 async def enqueue_kernel_termination_status_update(
@@ -270,7 +284,7 @@ async def enqueue_kernel_termination_status_update(
             if isinstance(event, (KernelTerminatingEvent, KernelTerminatedEvent))
             else None
         )
-        q.put_nowait((event.name, row._mapping, event.reason, exit_code))
+        q.put_nowait((event.event_name(), row._mapping, event.reason, exit_code))
 
 
 async def enqueue_session_creation_status_update(
@@ -313,7 +327,7 @@ async def enqueue_session_creation_status_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, None))
+        q.put_nowait((event.event_name(), row_map, event.reason, None))
 
 
 async def enqueue_session_termination_status_update(
@@ -354,7 +368,7 @@ async def enqueue_session_termination_status_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, None))
+        q.put_nowait((event.event_name(), row_map, event.reason, None))
 
 
 async def enqueue_batch_task_result_update(
@@ -395,7 +409,7 @@ async def enqueue_batch_task_result_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, event.exit_code))
+        q.put_nowait((event.event_name(), row_map, event.reason, event.exit_code))
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -429,7 +443,6 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     event_dispatcher.subscribe(SessionCancelledEvent, app, enqueue_session_creation_status_update)
     event_dispatcher.subscribe(SessionSuccessEvent, app, enqueue_batch_task_result_update)
     event_dispatcher.subscribe(SessionFailureEvent, app, enqueue_batch_task_result_update)
-    root_ctx.background_task_manager.register_event_handlers(event_dispatcher)
     yield
 
 

@@ -19,7 +19,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.errors.exceptions import VFolderOperationFailed
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import (
@@ -74,7 +74,7 @@ class MutationResult:
 
 class GroupService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedConfig
+    _shared_config: ManagerSharedConfig
     _redis_stat: RedisConnectionInfo
     _storage_manager: StorageSessionManager
 
@@ -82,7 +82,7 @@ class GroupService:
         self,
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
-        shared_config: SharedConfig,
+        shared_config: ManagerSharedConfig,
         redis_stat: RedisConnectionInfo,
     ) -> None:
         self._db = db
@@ -351,7 +351,7 @@ class GroupService:
         kernels = await fetch_resource_usage(
             self._db, start_date, end_date, project_ids=project_ids
         )
-        local_tz = self._shared_config["system"]["timezone"]
+        local_tz = self._shared_config.system.timezone
         usage_groups = await parse_resource_usage_groups(kernels, self._redis_stat, local_tz)
         total_groups, _ = parse_total_resource_group(usage_groups)
         return total_groups
@@ -422,7 +422,7 @@ class GroupService:
         raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
 
         objs_per_group = {}
-        local_tz = self._shared_config["system"]["timezone"]
+        local_tz = self._shared_config.system.timezone
 
         for row, raw_stat in zip(rows, raw_stats):
             group_id = str(row["group_id"])
@@ -541,10 +541,10 @@ class GroupService:
                 objs_per_group[group_id]["c_infos"].append(c_info)
         return list(objs_per_group.values())
 
-    # group (or group 전체)
+    # group (or all the groups)
     async def usage_per_month(self, action: UsagePerMonthAction) -> UsagePerMonthActionResult:
         month = action.month
-        local_tz = self._shared_config["system"]["timezone"]
+        local_tz = self._shared_config.system.timezone
 
         try:
             start_date = datetime.strptime(month, "%Y%m").replace(tzinfo=local_tz)
@@ -555,9 +555,9 @@ class GroupService:
         log.debug("container list are retrieved for month {0}", month)
         return UsagePerMonthActionResult(result=result)
 
-    # group (or group 전체)
+    # group (or all the groups)
     async def usage_per_period(self, action: UsagePerPeriodAction) -> UsagePerPeriodActionResult:
-        local_tz = self._shared_config["system"]["timezone"]
+        local_tz = self._shared_config.system.timezone
         project_id = action.project_id
 
         try:
