@@ -49,7 +49,7 @@ from ai.backend.common.events.model_serving import (
     ModelServiceStatusEvent,
 )
 from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.runner import ProbeRunner
+from ai.backend.common.runner import LoopRunner
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -170,7 +170,7 @@ class KernelInitArgs:
     agent_config: Mapping[str, Any]
     resource_spec: KernelResourceSpec
     service_ports: Any  # TODO: type-annotation
-    data: dict[Any, Any]
+    data: dict[str, Any]
     environ: Mapping[str, Any]
     event_producer: EventProducer
 
@@ -291,7 +291,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
 
     @abstractmethod
-    def _init_probe_runner_obj(self) -> ProbeRunner:
+    def _init_probe_runner_obj(self) -> LoopRunner:
         raise NotImplementedError
 
     async def init_probe_runner(self) -> None:

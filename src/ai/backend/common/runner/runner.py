@@ -36,7 +36,7 @@ class HeartbeatService(Protocol[TResourceCtx_Contra]):
         pass
 
 
-class ProbeRunner(Generic[TResourceCtx]):
+class LoopRunner(Generic[TResourceCtx]):
     _closed: bool
     _runner_task: Optional[asyncio.Task]
 
@@ -68,13 +68,13 @@ class ProbeRunner(Generic[TResourceCtx]):
         interval: float,
         probes: Sequence[Probe[None]],
         heartbeart_services: Sequence[HeartbeatService[None]] = tuple(),
-    ) -> "ProbeRunner[None]":
-        obj = ProbeRunner[None](interval, NopResourceCtx(), probes, heartbeart_services)
+    ) -> "LoopRunner[None]":
+        obj = LoopRunner[None](interval, NopResourceCtx(), probes, heartbeart_services)
         return obj
 
     @classmethod
-    def nop(cls) -> "ProbeRunner[None]":
-        obj = ProbeRunner[None](0, NopResourceCtx(), [])
+    def nop(cls) -> "LoopRunner[None]":
+        obj = LoopRunner[None](0, NopResourceCtx(), [])
         obj._closed = True
         return obj
 

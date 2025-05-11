@@ -1,6 +1,6 @@
-from .runner import NopResourceCtx, ProbeRunner
+from .runner import LoopRunner, NopResourceCtx
 
 __all__ = (
-    "ProbeRunner",
+    "LoopRunner",
     "NopResourceCtx",
 )

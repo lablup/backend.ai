@@ -23,7 +23,7 @@ from aiotools import TaskGroup
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.runner import ProbeRunner
+from ai.backend.common.runner import LoopRunner
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
@@ -64,14 +64,14 @@ class DockerKernel(AbstractKernel):
         super().__setstate__(props)
 
     @override
-    def _init_probe_runner_obj(self) -> ProbeRunner:
+    def _init_probe_runner_obj(self) -> LoopRunner:
         probe = DockerKernelProbe(
             self.kernel_id,
             self.get_kernel_lifecycle_state,
             self.get_container_id,
             self._event_producer,
         )
-        return ProbeRunner.with_nop_resource_ctx(5.0, [probe])
+        return LoopRunner.with_nop_resource_ctx(5.0, [probe])
 
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
