@@ -261,7 +261,7 @@ class AbstractKernelCreationContext(ABC):
         raise NotImplementedError
 
 
-class AbstractKernelRegistry(ABC):
+class AbstractKernelFactory(ABC):
     @abstractmethod
     async def init_kernel_context(
         self,

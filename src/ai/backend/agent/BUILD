@@ -15,6 +15,9 @@ python_sources(
         "src/ai/backend/agent/docker:src",  # not auto-inferred
         "src/ai/backend/agent/dummy:src",  # not auto-inferred
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
+        "src/ai/backend/agent/runner:src",
+        "src/ai/backend/agent/runner/observers:src",
+        "src/ai/backend/agent/runner/resources:src",
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
         "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)

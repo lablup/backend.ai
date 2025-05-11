@@ -6,8 +6,12 @@ class AbstractObserver(ABC):
     Abstract base class for observers.
     """
 
-    def __init__(self):
-        pass
+    @abstractmethod
+    def name(self) -> str:
+        """
+        Return the name of the observer.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
     async def observe(self) -> None:
@@ -17,14 +21,14 @@ class AbstractObserver(ABC):
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
-    async def observe_interval(self) -> float:
+    def observe_interval(self) -> float:
         """
         Return the interval at which to observe the system.
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
-    async def close(self) -> None:
+    async def cleanup(self) -> None:
         """
         Clean up resources used by the observer.
         """

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .backends.kernel import AbstractKernelRegistry
+from .backends.kernel import AbstractKernelFactory
 from .backends.types import AbstractBackend
 
 
@@ -11,12 +11,12 @@ class AgentArgs:
     """
 
     backend: AbstractBackend
-    kernel_registry: AbstractKernelRegistry
+    kernel_registry: AbstractKernelFactory
 
 
 class Agent:
     _backend: AbstractBackend
-    _kernel_registry: AbstractKernelRegistry
+    _kernel_registry: AbstractKernelFactory
 
     def __init__(self, args: AgentArgs):
         """

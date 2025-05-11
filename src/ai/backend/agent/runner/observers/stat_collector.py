@@ -24,7 +24,7 @@ class NodeStatCollectorObserver(AbstractObserver):
         """
         await self._stat_ctx.collect_node_stat()
 
-    async def observe_interval(self) -> float:
+    def observe_interval(self) -> float:
         """
         Return the interval at which to observe the system.
         """
