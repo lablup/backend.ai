@@ -23,7 +23,7 @@ from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogNode,
     AuditLogSchema,
 )
-from ai.backend.manager.models.gql_models.config import ModifyEtcdConfigs
+from ai.backend.manager.models.gql_models.config import Config, EtcdConfigSchema, ModifyEtcdConfigs
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -1172,6 +1172,21 @@ class Queries(graphene.ObjectType):
     container_utilization_metric_metadata = graphene.Field(
         ContainerUtilizationMetricMetadata,
         description="Added in 25.6.0.",
+    )
+
+    etcd_config_schema = graphene.Field(
+        EtcdConfigSchema,
+        description="Added in 25.8.0.",
+    )
+    config = graphene.Field(
+        Config,
+        component=graphene.String(required=True),
+        server_id=graphene.String(required=True),
+        paths=graphene.List(
+            graphene.String,
+            required=True,
+        ),
+        description="Added in 25.8.0.",
     )
 
     @staticmethod
@@ -3105,6 +3120,17 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
     ) -> ContainerUtilizationMetricMetadata:
         return await ContainerUtilizationMetricMetadata.get_object(info)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_config(
+        root: Any,
+        info: graphene.ResolveInfo,
+        component: str,
+        server_id: str,
+        paths: list[str],
+    ) -> Config:
+        return Config.load(info, component, server_id, paths)
 
 
 class GQLMutationPrivilegeCheckMiddleware:

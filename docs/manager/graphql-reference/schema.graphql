@@ -333,6 +333,12 @@ type Queries {
 
   """Added in 25.6.0."""
   container_utilization_metric_metadata: ContainerUtilizationMetricMetadata
+
+  """Added in 25.8.0."""
+  etcd_config_schema: EtcdConfigSchema
+
+  """Added in 25.8.0."""
+  config(component: String!, server_id: String!, paths: [String]!): Config
 }
 
 """
@@ -2091,6 +2097,24 @@ input UserUtilizationMetricQueryInput {
 """Added in 25.6.0."""
 type ContainerUtilizationMetricMetadata {
   metric_names: [String]
+}
+
+"""Added in 25.8.0."""
+type EtcdConfigSchema {
+  """Possible values of "Config.component". Added in 25.8.0."""
+  component_variants: [String]!
+}
+
+"""Added in 25.8.0."""
+type Config {
+  """Component name. Added in 25.8.0."""
+  component: String!
+
+  """Server ID. Added in 25.8.0."""
+  server_id: String!
+
+  """Configuration to mutate. Added in 25.8.0."""
+  configs: JSONString!
 }
 
 """All available GraphQL mutations."""
