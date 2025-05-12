@@ -354,7 +354,9 @@ async def unified_config_ctx(
 ) -> AsyncIterator[ManagerUnifiedConfig]:
     etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     raw_shared_cfg = await etcd_loader.load()
-    shared_cfg = ManagerSharedConfig(**raw_shared_cfg)
+    volumes_etcd_loader = LegacyEtcdLoader(root_ctx.etcd, config_prefix="volumes")
+    volumes_shared_cfg = await volumes_etcd_loader.load()
+    shared_cfg = ManagerSharedConfig(**raw_shared_cfg, volumes=volumes_shared_cfg)
 
     etcd_watcher = EtcdConfigWatcher(etcd_loader._etcd)
 

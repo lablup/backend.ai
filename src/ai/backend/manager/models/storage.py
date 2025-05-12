@@ -4,6 +4,7 @@ import asyncio
 import itertools
 import logging
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -13,12 +14,7 @@ from typing import (
     Any,
     AsyncIterator,
     Final,
-    Iterable,
-    List,
-    Mapping,
     Optional,
-    Sequence,
-    Tuple,
     TypedDict,
     cast,
     override,
@@ -83,7 +79,7 @@ class StorageProxyInfo:
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 
-_ctx_volumes_cache: ContextVar[List[Tuple[str, VolumeInfo]]] = ContextVar("_ctx_volumes")
+_ctx_volumes_cache: ContextVar[list[tuple[str, VolumeInfo]]] = ContextVar("_ctx_volumes")
 
 
 class VolumeInfo(TypedDict):
@@ -91,7 +87,7 @@ class VolumeInfo(TypedDict):
     backend: str
     path: str
     fsprefix: str
-    capabilities: List[str]
+    capabilities: list[str]
 
 
 class StorageSessionManager:
@@ -120,7 +116,7 @@ class StorageSessionManager:
         await asyncio.gather(*close_aws, return_exceptions=True)
 
     @staticmethod
-    def _split_host(vfolder_host: str) -> Tuple[str, str]:
+    def _split_host(vfolder_host: str) -> tuple[str, str]:
         proxy_name, _, volume_name = vfolder_host.partition(":")
         return proxy_name, volume_name
 
@@ -141,7 +137,7 @@ class StorageSessionManager:
     def is_noop_host(cls, vfolder_host: str) -> bool:
         return cls._split_host(vfolder_host)[1] == NOOP_STORAGE_VOLUME_NAME
 
-    async def get_all_volumes(self) -> Iterable[Tuple[str, VolumeInfo]]:
+    async def get_all_volumes(self) -> Iterable[tuple[str, VolumeInfo]]:
         """
         Returns a list of tuple
         [(proxy_name: str, volume_info: VolumeInfo), ...]
@@ -156,7 +152,7 @@ class StorageSessionManager:
         async def _fetch(
             proxy_name: str,
             proxy_info: StorageProxyInfo,
-        ) -> Iterable[Tuple[str, VolumeInfo]]:
+        ) -> Iterable[tuple[str, VolumeInfo]]:
             async with proxy_info.session.request(
                 "GET",
                 proxy_info.manager_api_url / "volumes",
@@ -204,10 +200,13 @@ class StorageSessionManager:
         request_relpath: str,
         *args,
         **kwargs,
-    ) -> AsyncIterator[Tuple[yarl.URL, aiohttp.ClientResponse]]:
+    ) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientResponse]]:
+        log.warning("vfolder_host_or_proxy_name: {}", vfolder_host_or_proxy_name)
         proxy_name, _ = self.get_proxy_and_volume(vfolder_host_or_proxy_name)
+        log.warning("proxy_name: {}", proxy_name)
         try:
             proxy_info = self._proxies[proxy_name]
+            log.warning("proxy_info: {}", proxy_info)
         except KeyError:
             raise InvalidArgument("There is no such storage proxy", proxy_name)
         headers = kwargs.pop("headers", {})
