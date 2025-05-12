@@ -335,10 +335,10 @@ type Queries {
   container_utilization_metric_metadata: ContainerUtilizationMetricMetadata
 
   """Added in 25.8.0."""
-  config_schema: ConfigSchema
+  config_schema: AvailableService
 
   """Added in 25.8.0."""
-  config(component: String!, server_id: String!, paths: [String]!): Config
+  config(service: String!): Config
 }
 
 """
@@ -2100,18 +2100,15 @@ type ContainerUtilizationMetricMetadata {
 }
 
 """Added in 25.8.0."""
-type ConfigSchema {
-  """Possible values of "Config.component". Added in 25.8.0."""
-  component_variants: [String]!
+type AvailableService {
+  """Possible values of "Config.service". Added in 25.8.0."""
+  service_variants: [String]!
 }
 
 """Added in 25.8.0."""
 type Config {
-  """Component name. Added in 25.8.0."""
-  component: String!
-
-  """Server ID. Added in 25.8.0."""
-  server_id: String!
+  """Service name. Added in 25.8.0."""
+  service: String!
 
   """Configuration to mutate. Added in 25.8.0."""
   configuration: JSONString!
@@ -3085,14 +3082,17 @@ type DeleteResourcePreset {
 
 """Added in 25.8.0."""
 type ModifyEtcdConfigsPayload {
+  """Service name. Added in 25.8.0."""
+  service: String!
+
   """Configuration to mutate. Added in 25.8.0."""
   configuration: JSONString!
 }
 
 """Added in 25.8.0."""
 input ModifyEtcdConfigsInput {
-  """Component name. Added in 25.8.0."""
-  component: String!
+  """Service name. Added in 25.8.0."""
+  service: String!
 
   """Configuration to mutate. Added in 25.8.0."""
   configuration: JSONString!

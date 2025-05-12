@@ -20,6 +20,7 @@ from pydantic import (
     PlainValidator,
     TypeAdapter,
     ValidationError,
+    WithJsonSchema,
     model_validator,
 )
 from pydantic.json_schema import JsonSchemaValue
@@ -301,6 +302,12 @@ def _parse_to_tzinfo(value: Any) -> tzinfo:
 TimeZone = Annotated[
     tzinfo,
     PlainValidator(_parse_to_tzinfo),
+    WithJsonSchema(
+        core_schema.json_or_python_schema(
+            json_schema=core_schema.str_schema(),
+            python_schema=core_schema.str_schema(),
+        ),
+    ),
 ]
 
 
@@ -320,6 +327,14 @@ class AutoDirectoryPath(DirectoryPath):
             core_schema.no_info_plain_validator_function(ensure_exists),
             handler(DirectoryPath),
         ])
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
+        )
 
 
 class UserID(int):
@@ -366,6 +381,14 @@ class UserID(int):
 
         return core_schema.no_info_plain_validator_function(_validate)
 
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
+        )
+
 
 class GroupID(int):
     _default_gid: Optional[int] = None
@@ -411,6 +434,14 @@ class GroupID(int):
 
         return core_schema.no_info_plain_validator_function(_validate)
 
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
+        )
+
 
 TItem = TypeVar("TItem")
 
@@ -450,6 +481,14 @@ class DelimiterSeparatedList(list[TItem]):
         return core_schema.with_info_plain_validator_function(
             _validate,
             serialization=core_schema.plain_serializer_function_ser_schema(_serialize),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
         )
 
 

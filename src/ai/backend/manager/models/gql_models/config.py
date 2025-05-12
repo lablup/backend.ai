@@ -1,9 +1,6 @@
-import json
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Self, Sequence
+from typing import TYPE_CHECKING, Self
 
 import graphene
-from pydantic import BaseModel
 
 from ai.backend.common.utils import deep_merge
 from ai.backend.manager.config.local import ManagerLocalConfig
@@ -16,41 +13,14 @@ if TYPE_CHECKING:
 _PREFIX = "ai/backend/config"
 
 
-def _get_target_attr(cfg: Any, path: Sequence[str]) -> Any:
-    *keys, last_key = path
-    target = cfg
-
-    try:
-        # find the target object
-        for key in keys:
-            target = target[key] if isinstance(target, Mapping) else getattr(target, key)
-
-        if isinstance(target, Mapping):
-            return target[last_key]
-        else:
-            return getattr(target, last_key)
-    except (KeyError, AttributeError):
-        return None
-
-
-def _dump_json_str(cfg: Any) -> Any:
-    if isinstance(cfg, BaseModel):
-        return cfg.model_dump_json()
-    return json.dumps(cfg)
-
-
 class Config(graphene.ObjectType):
     """
     Added in 25.8.0.
     """
 
-    component = graphene.String(
+    service = graphene.String(
         required=True,
-        description="Component name. Added in 25.8.0.",
-    )
-    server_id = graphene.String(
-        required=True,
-        description="Server ID. Added in 25.8.0.",
+        description="Service name. Added in 25.8.0.",
     )
     configuration = graphene.JSONString(
         required=True,
@@ -66,32 +36,39 @@ class Config(graphene.ObjectType):
         description = "Added in 25.8.0."
 
     @classmethod
-    def load(
-        cls, info: graphene.ResolveInfo, component: str, server_id: str, paths: list[str]
-    ) -> Self:
+    def load(cls, info: graphene.ResolveInfo, service: str) -> Self:
         ctx: GraphQueryContext = info.context
-        result = _get_target_attr(ctx.unified_config.local, paths) or _get_target_attr(
-            ctx.unified_config.shared, paths
+        unified_config_schema = None
+
+        def _fallback(x):
+            return str(x)
+
+        merged_raw_unified_config = deep_merge(
+            ctx.unified_config.local.model_dump(mode="json", by_alias=True, fallback=_fallback),
+            ctx.unified_config.shared.model_dump(mode="json", by_alias=True, fallback=_fallback),
         )
 
-        schema = result.model_json_schema() if isinstance(result, BaseModel) else None
+        unified_config_schema = deep_merge(
+            ctx.unified_config.local.model_json_schema(mode="serialization"),
+            ctx.unified_config.shared.model_json_schema(mode="serialization"),
+        )
+
         return cls(
-            component=component,
-            server_id=server_id,
-            configuration=_dump_json_str(result),
-            schema=schema,
+            service=service,
+            configuration=merged_raw_unified_config,
+            schema=unified_config_schema,
         )
 
 
-class ConfigSchema(graphene.ObjectType):
+class AvailableService(graphene.ObjectType):
     """
     Added in 25.8.0.
     """
 
-    component_variants = graphene.List(
+    service_variants = graphene.List(
         graphene.String,
         required=True,
-        description='Possible values of "Config.component". Added in 25.8.0.',
+        description='Possible values of "Config.service". Added in 25.8.0.',
     )
 
     async def resolve_component_variants(self, info: graphene.ResolveInfo) -> list[str]:
@@ -103,9 +80,9 @@ class ModifyEtcdConfigsInput(graphene.InputObjectType):
     Added in 25.8.0.
     """
 
-    component = graphene.String(
+    service = graphene.String(
         required=True,
-        description="Component name. Added in 25.8.0.",
+        description="Service name. Added in 25.8.0.",
     )
     configuration = graphene.JSONString(
         required=True,
@@ -118,6 +95,10 @@ class ModifyEtcdConfigsPayload(graphene.ObjectType):
     Added in 25.8.0.
     """
 
+    service = graphene.String(
+        required=True,
+        description="Service name. Added in 25.8.0.",
+    )
     configuration = graphene.JSONString(
         required=True,
         description="Configuration to mutate. Added in 25.8.0.",
@@ -139,6 +120,10 @@ class ModifyEtcdConfigs(graphene.Mutation):
         input = ModifyEtcdConfigsInput(required=True, description="Added in 25.8.0.")
 
     @classmethod
+    def _get_key(cls, service: str) -> str:
+        return f"{_PREFIX}/{service}"
+
+    @classmethod
     async def mutate(
         cls,
         root,
@@ -150,17 +135,15 @@ class ModifyEtcdConfigs(graphene.Mutation):
         merged_raw_unified_config = deep_merge(
             ctx.unified_config.local.model_dump(by_alias=True),
             ctx.unified_config.shared.model_dump(by_alias=True),
-        )
-        merged_raw_unified_config = deep_merge(
-            merged_raw_unified_config,
             input.configuration,
         )
 
         ctx.unified_config.local = ManagerLocalConfig.model_validate(merged_raw_unified_config)
         ctx.unified_config.shared = ManagerSharedConfig.model_validate(merged_raw_unified_config)
 
-        await ctx.etcd.put_prefix(f"{_PREFIX}/{input.component}", input.configuration)
+        await ctx.etcd.put_prefix(cls._get_key(input.service), input.configuration)
 
         return ModifyEtcdConfigsPayload(
             configuration=input.configuration,
+            service=input.service,
         )

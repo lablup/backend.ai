@@ -440,12 +440,24 @@ def b64encode(s: str) -> str:
 T = TypeVar("T", bound=BaseModel)
 
 
-def deep_merge(a: Mapping[str, Any], b: Mapping[str, Any]) -> dict[str, Any]:
-    merged: dict[str, Any] = dict(a)
-    for k, vb in b.items():
-        va = merged.get(k)
-        if isinstance(va, Mapping) and isinstance(vb, Mapping):
-            merged[k] = deep_merge(va, vb)
-        else:
-            merged[k] = vb
+def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
+    """
+    Recursively merge any number of mappings.
+    Later mappings override earlier ones on key conflicts.
+
+    Example
+    -------
+    >>> deep_merge({"a": 1, "b": {"x": 1}},
+    ...            {"b": {"y": 2}, "c": 3},
+    ...            {"b": {"x": 10}})
+    {'a': 1, 'b': {'x': 10, 'y': 2}, 'c': 3}
+    """
+    merged: dict[str, Any] = {}
+    for m in args:
+        for k, vb in m.items():
+            va = merged.get(k)
+            if isinstance(va, Mapping) and isinstance(vb, Mapping):
+                merged[k] = deep_merge(va, vb)
+            else:
+                merged[k] = vb
     return merged

@@ -23,7 +23,7 @@ from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogNode,
     AuditLogSchema,
 )
-from ai.backend.manager.models.gql_models.config import Config, ConfigSchema, ModifyEtcdConfigs
+from ai.backend.manager.models.gql_models.config import AvailableService, Config, ModifyEtcdConfigs
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -1175,17 +1175,12 @@ class Queries(graphene.ObjectType):
     )
 
     config_schema = graphene.Field(
-        ConfigSchema,
+        AvailableService,
         description="Added in 25.8.0.",
     )
     config = graphene.Field(
         Config,
-        component=graphene.String(required=True),
-        server_id=graphene.String(required=True),
-        paths=graphene.List(
-            graphene.String,
-            required=True,
-        ),
+        service=graphene.String(required=True),
         description="Added in 25.8.0.",
     )
 
@@ -3126,11 +3121,9 @@ class Queries(graphene.ObjectType):
     async def resolve_config(
         root: Any,
         info: graphene.ResolveInfo,
-        component: str,
-        server_id: str,
-        paths: list[str],
+        service: str,
     ) -> Config:
-        return Config.load(info, component, server_id, paths)
+        return Config.load(info, service)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
