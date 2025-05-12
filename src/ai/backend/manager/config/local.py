@@ -5,15 +5,22 @@ import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Any, List, Literal, Mapping, Optional, Self
+from typing import Any, Literal, Mapping, Optional, Self
 
-import click
-from pydantic import BaseModel, DirectoryPath, Field, FilePath
+from pydantic import BaseModel, Field, FilePath
 
-from ai.backend.common import config
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
+from ai.backend.common.typed_validators import AutoDirectoryPath, GroupID, HostPortPair, UserID
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.pglock import PgAdvisoryLock
+
+from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
+from .loader.config_overrider import ConfigOverrider
+from .loader.env_loader import EnvLoader
+from .loader.loader_chain import LoaderChain
+from .loader.toml_loader import TomlConfigLoader
+from .loader.types import AbstractConfigLoader
 
 _default_smtp_template = """
 Action type: {{ action_type }}
@@ -27,25 +34,8 @@ Duration: {{ duration }} seconds
 This email is sent from Backend.AI SMTP Reporter.
 """
 
-
-class HostPortPair(BaseModel):
-    host: str = Field(
-        description="""
-        Host address of the service.
-        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.
-        """,
-        examples=["127.0.0.1"],
-    )
-    port: int = Field(
-        ge=1,
-        le=65535,
-        description="""
-        Port number of the service.
-        Must be between 1 and 65535.
-        Ports below 1024 require root/admin privileges.
-        """,
-        examples=[8080],
-    )
+_max_num_proc = os.cpu_count() or 8
+_file_perm = (Path(__file__).parent.parent / "server.py").stat()
 
 
 class DatabaseType(enum.StrEnum):
@@ -103,6 +93,7 @@ class DatabaseConfig(BaseModel):
         Should be tuned based on expected load and database server capacity.
         """,
         examples=[1, 8],
+        alias="pool-size",
     )
     pool_recycle: float = Field(
         default=-1,
@@ -113,6 +104,7 @@ class DatabaseConfig(BaseModel):
         Useful to handle cases where database connections are closed by the server after inactivity.
         """,
         examples=[-1, 50],
+        alias="pool-recycle",
     )
     pool_pre_ping: bool = Field(
         default=False,
@@ -121,7 +113,8 @@ class DatabaseConfig(BaseModel):
         Helps detect stale connections before they cause application errors.
         Adds a small overhead but improves reliability.
         """,
-        examples=[True],
+        examples=[True, False],
+        alias="pool-pre-ping",
     )
     max_overflow: int = Field(
         default=64,
@@ -132,6 +125,7 @@ class DatabaseConfig(BaseModel):
         These connections are created temporarily when pool_size is insufficient.
         """,
         examples=[-1, 64],
+        alias="max-overflow",
     )
     lock_conn_timeout: float = Field(
         default=0,
@@ -142,11 +136,8 @@ class DatabaseConfig(BaseModel):
         If connections cannot be acquired within this time, an exception is raised.
         """,
         examples=[0, 30],
+        alias="lock-conn-timeout",
     )
-
-
-_max_num_proc = os.cpu_count() or 8
-_file_perm = (Path(__file__).parent / "server.py").stat()
 
 
 class EventLoopType(enum.StrEnum):
@@ -200,10 +191,18 @@ class EtcdConfig(BaseModel):
         examples=["develove", "ETCD_PASSWORD"],
     )
 
+    def to_dataclass(self) -> EtcdConfigData:
+        return EtcdConfigData(
+            namespace=self.namespace,
+            addr=self.addr,
+            user=self.user,
+            password=self.password,
+        )
+
 
 class ManagerConfig(BaseModel):
-    ipc_base_path: DirectoryPath = Field(
-        default=Path("/tmp/backend.ai/ipc"),
+    ipc_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="""
         Base directory path for inter-process communication files.
         Used for Unix domain sockets and other IPC mechanisms.
@@ -211,6 +210,7 @@ class ManagerConfig(BaseModel):
         In production environments, consider using /var/run/backend.ai/ipc instead.
         """,
         examples=["/var/run/backend.ai/ipc"],
+        alias="ipc-base-path",
     )
     num_proc: int = Field(
         default=_max_num_proc,
@@ -222,6 +222,7 @@ class ManagerConfig(BaseModel):
         For optimal performance, set this to match your CPU core count.
         """,
         examples=[1, 4],
+        alias="num-proc",
     )
     id: str = Field(
         default=f"i-{socket.gethostname()}",
@@ -233,8 +234,8 @@ class ManagerConfig(BaseModel):
         """,
         examples=["i-manager123"],
     )
-    user: Optional[int] = Field(
-        default=_file_perm.st_uid,
+    user: Optional[UserID] = Field(
+        default=UserID(_file_perm.st_uid),
         description="""
         User ID (UID) under which the manager process runs.
         If not specified, defaults to the UID of the server.py file.
@@ -242,8 +243,8 @@ class ManagerConfig(BaseModel):
         """,
         examples=[_file_perm.st_uid],
     )
-    group: Optional[int] = Field(
-        default=_file_perm.st_gid,
+    group: Optional[GroupID] = Field(
+        default=GroupID(_file_perm.st_gid),
         description="""
         Group ID (GID) under which the manager process runs.
         If not specified, defaults to the GID of the server.py file.
@@ -259,13 +260,15 @@ class ManagerConfig(BaseModel):
         For private deployments, consider using 127.0.0.1 instead.
         """,
         examples=[{"host": "127.0.0.1", "port": 8080}],
+        alias="service-addr",
     )
     internal_addr: HostPortPair = Field(
         default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
-        # TODO: Write description
         description="""
+        Set the internal hostname/port to accept internal API requests.
         """,
         examples=[{"host": "127.0.0.1", "port": 18080}],
+        alias="internal-addr",
     )
     rpc_auth_manager_keypair: FilePath = Field(
         default=Path("fixtures/manager/manager.key_secret"),
@@ -275,6 +278,7 @@ class ManagerConfig(BaseModel):
         In production, should be stored in a secure location with restricted access.
         """,
         examples=["fixtures/manager/manager.key_secret"],
+        alias="rpc-auth-manager-keypair",
     )
     heartbeat_timeout: float = Field(
         default=40.0,
@@ -285,9 +289,11 @@ class ManagerConfig(BaseModel):
         Should be set higher than the agent's heartbeat interval.
         """,
         examples=[1.0, 40.0],
+        alias="heartbeat-timeout",
     )
-    secret: Optional[str] = Field(
-        default=None,
+    # TODO: Don't use this. Change to use KMS.
+    secret: str = Field(
+        default_factory=lambda: secrets.token_urlsafe(16),
         description="""
         Secret key for manager authentication and signing.
         Used for securing API tokens and inter-service communication.
@@ -304,24 +310,27 @@ class ManagerConfig(BaseModel):
         Requires valid certificate and private key when enabled.
         """,
         examples=[True, False],
+        alias="ssl-enabled",
     )
     ssl_cert: Optional[FilePath] = Field(
         default=None,
         description="""
         Path to the SSL certificate file.
-        Required if ssl_enabled is True.
+        Required if `ssl_enabled` is True.
         Should be a PEM-formatted certificate file, either self-signed or from a CA.
         """,
         examples=["fixtures/manager/manager.crt"],
+        alias="ssl-cert",
     )
     ssl_privkey: Optional[str] = Field(
         default=None,
         description="""
         Path to the SSL private key file.
-        Required if ssl_enabled is True.
+        Required if `ssl_enabled` is True.
         Should be a PEM-formatted private key corresponding to the certificate.
         """,
         examples=["fixtures/manager/manager.key"],
+        alias="ssl-privkey",
     )
     event_loop: EventLoopType = Field(
         default=EventLoopType.asyncio,
@@ -331,6 +340,7 @@ class ManagerConfig(BaseModel):
         'uvloop' is a faster alternative but may have compatibility issues with some libraries.
         """,
         examples=[item.value for item in EventLoopType],
+        alias="event-loop",
     )
     distributed_lock: DistributedLockType = Field(
         default=DistributedLockType.pg_advisory,
@@ -343,6 +353,7 @@ class ManagerConfig(BaseModel):
         - etcetra: etcd v3 API-compatible distributed locking
         """,
         examples=[item.value for item in DistributedLockType],
+        alias="distributed-lock",
     )
     pg_advisory_config: Mapping[str, Any] = Field(
         default=PgAdvisoryLock.default_config,
@@ -350,7 +361,8 @@ class ManagerConfig(BaseModel):
         Configuration for PostgreSQL advisory locks.
         This is used when distributed_lock is set to pg_advisory.
         """,
-        examples=[],
+        examples=[{}],
+        alias="pg-advisory-config",
     )
     filelock_config: Mapping[str, Any] = Field(
         default=FileLock.default_config,
@@ -358,7 +370,8 @@ class ManagerConfig(BaseModel):
         Configuration for file-based locks.
         This is used when distributed_lock is set to filelock.
         """,
-        examples=[],
+        examples=[{}],
+        alias="filelock-config",
     )
     redlock_config: Mapping[str, Any] = Field(
         default=RedisLock.default_config,
@@ -366,7 +379,8 @@ class ManagerConfig(BaseModel):
         Configuration for Redis-based distributed locking.
         This is used when distributed_lock is set to redlock.
         """,
-        examples=[],
+        examples=[{"lock_retry_interval": 1.0}],
+        alias="redlock-config",
     )
     etcdlock_config: Mapping[str, Any] = Field(
         default=EtcdLock.default_config,
@@ -374,7 +388,8 @@ class ManagerConfig(BaseModel):
         Configuration for etcd-based distributed locking.
         This is used when distributed_lock is set to etcd.
         """,
-        examples=[],
+        examples=[{}],
+        alias="etcdlock-config",
     )
     session_schedule_lock_lifetime: float = Field(
         default=30,
@@ -384,6 +399,7 @@ class ManagerConfig(BaseModel):
         Prevents deadlocks in case a manager fails during scheduling.
         """,
         examples=[30.0, 60.0],
+        # Don't use alias for compatibility with the legacy config
     )
     session_check_precondition_lock_lifetime: float = Field(
         default=30,
@@ -393,6 +409,7 @@ class ManagerConfig(BaseModel):
         Should be balanced to prevent both deadlocks and race conditions.
         """,
         examples=[30.0, 60.0],
+        # Don't use alias for compatibility with the legacy config
     )
     session_start_lock_lifetime: float = Field(
         default=30,
@@ -402,8 +419,9 @@ class ManagerConfig(BaseModel):
         Longer values are safer but may block other managers longer on failure.
         """,
         examples=[30.0, 60.0],
+        # Don't use alias for compatibility with the legacy config
     )
-    pid_file: FilePath = Field(
+    pid_file: Path = Field(
         default=Path(os.devnull),
         description="""
         Path to the file where the manager process ID will be written.
@@ -411,9 +429,10 @@ class ManagerConfig(BaseModel):
         Set to /dev/null by default to disable this feature.
         """,
         examples=["/var/run/manager.pid"],
+        alias="pid-file",
     )
-    allowed_plugins: Optional[List[str]] = Field(
-        None,
+    allowed_plugins: Optional[set[str]] = Field(
+        default=None,
         description="""
         List of explicitly allowed plugins to load.
         If specified, only these plugins will be loaded, even if others are installed.
@@ -421,8 +440,9 @@ class ManagerConfig(BaseModel):
         Leave as None to load all available plugins except those in disabled_plugins.
         """,
         examples=[["example.plugin.what.you.want"]],
+        alias="allowed-plugins",
     )
-    disabled_plugins: Optional[List[str]] = Field(
+    disabled_plugins: Optional[set[str]] = Field(
         default=None,
         description="""
         List of plugins to explicitly disable.
@@ -430,6 +450,7 @@ class ManagerConfig(BaseModel):
         Useful for disabling problematic or unwanted plugins without uninstalling them.
         """,
         examples=[["example.plugin.what.you.want"]],
+        alias="disabled-plugins",
     )
     hide_agents: bool = Field(
         default=False,
@@ -439,8 +460,9 @@ class ManagerConfig(BaseModel):
         Useful for security in multi-tenant environments.
         """,
         examples=[True, False],
+        alias="hide-agents",
     )
-    agent_selection_resource_priority: List[str] = Field(
+    agent_selection_resource_priority: list[str] = Field(
         default=["cuda", "rocm", "tpu", "cpu", "mem"],
         description="""
         Priority order for resources when selecting agents for compute sessions.
@@ -448,15 +470,17 @@ class ManagerConfig(BaseModel):
         Default prioritizes GPU resources (CUDA, ROCm) over CPU and memory.
         """,
         examples=[["cuda", "rocm", "tpu", "cpu", "mem"]],
+        alias="agent-selection-resource-priority",
     )
     importer_image: str = Field(
         default="lablup/importer:manylinux2010",
         description="""
-        Container image used for the importer service.
+        Deprecated: Container image used for the importer service.
         The importer handles tasks like installing additional packages.
         Should be compatible with the Backend.AI environment.
         """,
         examples=["lablup/importer:manylinux2010"],
+        alias="importer-image",
     )
     max_wsmsg_size: int = Field(
         default=16 * (2**20),  # default: 16 MiB
@@ -467,6 +491,7 @@ class ManagerConfig(BaseModel):
         Increase for applications that need to transfer larger data chunks.
         """,
         examples=[16 * (2**20), 32 * (2**20)],
+        alias="max-wsmsg-size",
     )
     aiomonitor_port: Optional[int] = Field(
         default=None,
@@ -474,9 +499,10 @@ class ManagerConfig(BaseModel):
         le=65535,
         description="""
         Deprecated: Port for the aiomonitor terminal UI.
-        Use aiomonitor_termui_port instead.
+        Use `aiomonitor_termui_port` instead.
         """,
         examples=[38100, 38200],
+        alias="aiomonitor-port",
     )
     aiomonitor_termui_port: int = Field(
         default=38100,
@@ -488,6 +514,7 @@ class ManagerConfig(BaseModel):
         Should be a port that's not used by other services.
         """,
         examples=[38100, 38200],
+        alias="aiomonitor-termui-port",
     )
     aiomonitor_webui_port: int = Field(
         default=39100,
@@ -499,6 +526,7 @@ class ManagerConfig(BaseModel):
         Should be a port that's not used by other services.
         """,
         examples=[39100, 39200],
+        alias="aiomonitor-webui-port",
     )
     use_experimental_redis_event_dispatcher: bool = Field(
         default=False,
@@ -508,6 +536,7 @@ class ManagerConfig(BaseModel):
         Not recommended for production use unless specifically needed.
         """,
         examples=[True, False],
+        alias="use-experimental-redis-event-dispatcher",
     )
     status_update_interval: Optional[float] = Field(
         default=None,
@@ -518,6 +547,7 @@ class ManagerConfig(BaseModel):
         Smaller values provide more real-time information but increase overhead.
         """,
         examples=[60.0, 120.0],
+        alias="status-update-interval",
     )
     status_lifetime: Optional[int] = Field(
         default=None,
@@ -528,6 +558,7 @@ class ManagerConfig(BaseModel):
         Should be greater than the status_update_interval.
         """,
         examples=[60, 120],
+        alias="status-lifetime",
     )
     public_metrics_port: Optional[int] = Field(
         default=None,
@@ -539,6 +570,7 @@ class ManagerConfig(BaseModel):
         Leave as None to disable public metrics exposure.
         """,
         examples=[8080, 9090],
+        alias="public-metrics-port",
     )
 
     @property
@@ -558,11 +590,11 @@ class DockerRegistryConfig(BaseModel):
     ssl_verify: bool = Field(
         default=True,
         description="""
-        Whether to verify SSL certificates when connecting to Docker registries.
+        Deprecated: Whether to verify SSL certificates when connecting to Docker registries.
         Disabling this is not recommended except for testing with self-signed certificates.
-        Note: This configuration is deprecated as of v20.09.
         """,
         examples=[True, False],
+        alias="ssl-verify",
     )
 
 
@@ -584,6 +616,7 @@ class PyroscopeConfig(BaseModel):
         Required if Pyroscope is enabled.
         """,
         examples=["backendai-half-manager"],
+        alias="app-name",
     )
     server_addr: Optional[str] = Field(
         default=None,
@@ -593,6 +626,7 @@ class PyroscopeConfig(BaseModel):
         Required if Pyroscope is enabled.
         """,
         examples=["http://localhost:4040"],
+        alias="server-addr",
     )
     sample_rate: Optional[int] = Field(
         default=None,
@@ -602,6 +636,7 @@ class PyroscopeConfig(BaseModel):
         Balance based on your performance monitoring needs.
         """,
         examples=[10, 100, 1000],
+        alias="sample-rate",
     )
 
 
@@ -665,6 +700,7 @@ class SMTPReporterConfig(BaseModel):
         Recommended for production environments to protect sensitive information.
         """,
         examples=[True, False],
+        alias="use-tls",
     )
     max_workers: int = Field(
         default=5,
@@ -675,6 +711,7 @@ class SMTPReporterConfig(BaseModel):
         Higher values may improve performance but increase resource usage.
         """,
         examples=[5, 10],
+        alias="max-workers",
     )
     template: str = Field(
         default=_default_smtp_template,
@@ -694,6 +731,7 @@ class SMTPReporterConfig(BaseModel):
         Choose based on your notification needs.
         """,
         examples=["ALL", "ON_ERROR"],
+        alias="trigger-policy",
     )
 
 
@@ -712,7 +750,8 @@ class ActionMonitorsConfig(BaseModel):
         description="""
         List of action types to subscribe to for monitoring.
         """,
-        examples=[["session.create_from_params"]],
+        examples=[["session.create_from_params", "session.create_cluster"]],
+        alias="subscribed-actions",
     )
     reporter: str = Field(
         description="""
@@ -738,6 +777,7 @@ class ReporterConfig(BaseModel):
         Audit log reporter configuration.
         Controls how audit logs are reported.
         """,
+        alias="audit-log",
     )
     action_monitors: list[ActionMonitorsConfig] = Field(
         default=[],
@@ -745,6 +785,7 @@ class ReporterConfig(BaseModel):
         Action monitors configuration.
         Each reporter can be configured to subscribe to specific actions.
         """,
+        alias="action-monitors",
     )
 
 
@@ -775,6 +816,7 @@ class DebugConfig(BaseModel):
         Useful for debugging complex async issues, but adds overhead.
         """,
         examples=[True, False],
+        alias="enhanced-aiomonitor-task-info",
     )
     log_events: bool = Field(
         default=False,
@@ -784,6 +826,7 @@ class DebugConfig(BaseModel):
         Very verbose, but useful for debugging event-related issues.
         """,
         examples=[True, False],
+        alias="log-events",
     )
     log_scheduler_ticks: bool = Field(
         default=False,
@@ -793,6 +836,7 @@ class DebugConfig(BaseModel):
         Useful for debugging scheduling issues, but generates many log entries.
         """,
         examples=[True, False],
+        alias="log-scheduler-ticks",
     )
     periodic_sync_stats: bool = Field(
         default=False,
@@ -802,11 +846,13 @@ class DebugConfig(BaseModel):
         Helpful for monitoring system behavior over time.
         """,
         examples=[True, False],
+        alias="periodic-sync-stats",
     )
 
 
 class ManagerLocalConfig(BaseModel):
     _src_config_path: Path
+
     db: DatabaseConfig = Field(
         description="""
         Database configuration settings.
@@ -828,12 +874,13 @@ class ManagerLocalConfig(BaseModel):
         Includes network settings, process management, and service parameters.
         """,
     )
-    docker_registry: Optional[DockerRegistryConfig] = Field(
+    docker_registry: DockerRegistryConfig = Field(
+        default=DockerRegistryConfig.model_validate({"ssl-verify": True}),
         description="""
-        Docker registry configuration.
+        Deprecated: Docker registry configuration.
         Contains settings for connecting to Docker registries.
-        Note: This configuration is deprecated as of v20.09.
         """,
+        alias="docker-registry",
     )
     logging: Any = Field(
         description="""
@@ -860,76 +907,42 @@ class ManagerLocalConfig(BaseModel):
         description="""
         Reporter configuration.
         Controls how notifications and logs are reported.
-        Includes settings for SMTP, audit logs, and action monitors.
+        Includes settings for Audit Logs, and Action Monitors, and SMTP reporters.
         Each reporter can be configured with its own settings.
         """
     )
 
+    def __repr__(self):
+        return pformat(self.model_dump())
+
     @classmethod
-    def load(
-        cls,
-        config_path: Optional[Path] = None,
-        log_level: LogLevel = LogLevel.NOTSET,
-    ) -> Self:
-        # Determine where to read configuration.
-        raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
-
-        # Override the read config with environment variables (for legacy).
-        config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-        config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-        config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-        config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-        config.override_with_env(raw_cfg, ("db", "addr"), "BACKEND_DB_ADDR")
-        config.override_with_env(raw_cfg, ("db", "name"), "BACKEND_DB_NAME")
-        config.override_with_env(raw_cfg, ("db", "user"), "BACKEND_DB_USER")
-        config.override_with_env(raw_cfg, ("db", "password"), "BACKEND_DB_PASSWORD")
-        config.override_with_env(raw_cfg, ("manager", "num-proc"), "BACKEND_MANAGER_NPROC")
-        config.override_with_env(raw_cfg, ("manager", "ssl-cert"), "BACKEND_SSL_CERT")
-        config.override_with_env(raw_cfg, ("manager", "ssl-privkey"), "BACKEND_SSL_KEY")
-        config.override_with_env(raw_cfg, ("manager", "pid-file"), "BACKEND_PID_FILE")
-        config.override_with_env(
-            raw_cfg, ("manager", "api-listen-addr", "host"), "BACKEND_SERVICE_IP"
-        )
-        config.override_with_env(
-            raw_cfg, ("manager", "api-listen-addr", "port"), "BACKEND_SERVICE_PORT"
-        )
-        config.override_with_env(
-            raw_cfg, ("manager", "event-listen-addr", "host"), "BACKEND_ADVERTISED_MANAGER_HOST"
-        )
-        config.override_with_env(
-            raw_cfg, ("manager", "event-listen-addr", "port"), "BACKEND_EVENTS_PORT"
-        )
-        config.override_with_env(
-            raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
-        )
-
-        config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    async def load(
+        cls, config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET
+    ) -> tuple[Self, AbstractConfigLoader]:
+        overrides: list[tuple[tuple[str, ...], Any]] = [
+            (("debug", "enabled"), log_level == LogLevel.DEBUG),
+        ]
         if log_level != LogLevel.NOTSET:
-            config.override_key(raw_cfg, ("logging", "level"), log_level)
-            config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-            config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
+            overrides += [
+                (("logging", "level"), log_level),
+                (("logging", "pkg-ns", "ai.backend"), log_level),
+                (("logging", "pkg-ns", "aiohttp"), log_level),
+            ]
 
-        # Validate and fill configurations
-        # (allow_extra will make configs to be forward-compatible)
-        try:
-            cfg = cls(**raw_cfg)
-            if cfg.debug.enabled:
-                print("== Manager configuration ==", file=sys.stderr)
-                print(pformat(cfg), file=sys.stderr)
-            cfg._src_config_path = cfg_src_path
+        file_loader = TomlConfigLoader(config_path, "manager")
+        env_loader = EnvLoader(MANAGER_LOCAL_CFG_OVERRIDE_ENVS)
+        cfg_overrider = ConfigOverrider(overrides)
+        cfg_loader = LoaderChain([
+            file_loader,
+            env_loader,
+            cfg_overrider,
+        ])
+        raw_cfg = await cfg_loader.load()
 
-            if cfg.manager.secret is None:
-                cfg.manager.secret = secrets.token_urlsafe(16)
-        except config.ConfigurationError as e:
-            print(
-                "ConfigurationError: Could not read or validate the manager local config:",
-                file=sys.stderr,
-            )
-            print(pformat(e.invalid_data), file=sys.stderr)
-            # TODO: Instead of cli error, raise custom exception
-            raise click.Abort()
-        else:
-            return cfg
+        cfg = cls.model_validate(raw_cfg)
 
-    async def reload(self) -> None:
-        raise NotImplementedError
+        if cfg.debug.enabled:
+            print("== Manager configuration ==", file=sys.stderr)
+            print(pformat(cfg), file=sys.stderr)
+
+        return cfg, cfg_loader

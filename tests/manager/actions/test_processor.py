@@ -5,6 +5,7 @@ from typing import Optional
 import pytest
 from tenacity import BaseAction
 
+from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.action import BaseActionResult, BaseActionResultMeta, ProcessResult
 from ai.backend.manager.actions.processor import ActionProcessor
 
@@ -96,6 +97,7 @@ async def test_processor_success():
                 started_at=None,
                 ended_at=None,
                 duration=0.0,
+                error_code=None,
             ),
             result=MockActionResult(id="1"),
         ),
@@ -121,6 +123,7 @@ async def test_processor_exception():
                 started_at=None,
                 ended_at=None,
                 duration=0.0,
+                error_code=ErrorCode.default(),
             ),
             result=None,
         ),

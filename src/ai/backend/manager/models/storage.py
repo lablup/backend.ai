@@ -40,6 +40,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.shared import VolumesConfig
 
 from ..errors.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
@@ -95,21 +96,21 @@ class VolumeInfo(TypedDict):
 
 class StorageSessionManager:
     _proxies: Mapping[str, StorageProxyInfo]
-    _exposed_volume_info: List[str]
+    _exposed_volume_info: list[str]
 
-    def __init__(self, storage_config: Mapping[str, Any]) -> None:
+    def __init__(self, storage_config: VolumesConfig) -> None:
         self.config = storage_config
-        self._exposed_volume_info = self.config["exposed_volume_info"]
+        self._exposed_volume_info = self.config.exposed_volume_info
         self._proxies = {}
-        for proxy_name, proxy_config in self.config["proxies"].items():
-            connector = aiohttp.TCPConnector(ssl=proxy_config["ssl_verify"])
+        for proxy_name, proxy_config in self.config.proxies.items():
+            connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
             session = aiohttp.ClientSession(connector=connector)
             self._proxies[proxy_name] = StorageProxyInfo(
                 session=session,
-                secret=proxy_config["secret"],
-                client_api_url=yarl.URL(proxy_config["client_api"]),
-                manager_api_url=yarl.URL(proxy_config["manager_api"]),
-                sftp_scaling_groups=proxy_config["sftp_scaling_groups"],
+                secret=proxy_config.secret,
+                client_api_url=yarl.URL(proxy_config.client_api),
+                manager_api_url=yarl.URL(proxy_config.manager_api),
+                sftp_scaling_groups=proxy_config.sftp_scaling_groups or [],
             )
 
     async def aclose(self) -> None:
@@ -171,7 +172,7 @@ class StorageSessionManager:
         _ctx_volumes_cache.set(results)
         return results
 
-    async def get_sftp_scaling_groups(self, proxy_name: str) -> List[str]:
+    async def get_sftp_scaling_groups(self, proxy_name: str) -> list[str]:
         if proxy_name not in self._proxies:
             raise IndexError(f"proxy {proxy_name} does not exist")
         return self._proxies[proxy_name].sftp_scaling_groups or []

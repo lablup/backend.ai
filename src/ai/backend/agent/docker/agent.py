@@ -58,7 +58,8 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.json import (
     dump_json,

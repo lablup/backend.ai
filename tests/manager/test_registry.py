@@ -43,7 +43,7 @@ async def test_handle_heartbeat(
 
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
 
-    registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
+    registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_unified_config, _, _ = registry_ctx
     image_data = zlib.compress(
         msgpack.packb([
             ("index.docker.io/lablup/python:3.6-ubuntu18.04",),
@@ -73,12 +73,12 @@ async def test_handle_heartbeat(
             "auto_terminate_abusing_kernel": False,
         },
     )
-    mock_shared_config.update_resource_slots.assert_awaited_once()
+    mock_unified_config.legacy_etcd_config_loader.update_resource_slots.assert_awaited_once()
     q = mock_dbconn.execute.await_args_list[1].args[0]
     assert isinstance(q, Insert)
 
     # Update alive instance
-    mock_shared_config.update_resource_slots.reset_mock()
+    mock_unified_config.legacy_etcd_config_loader.update_resource_slots.reset_mock()
     mock_dbconn.execute.reset_mock()
     mock_dbresult.first = MagicMock(
         return_value={
@@ -110,7 +110,7 @@ async def test_handle_heartbeat(
             "auto_terminate_abusing_kernel": False,
         },
     )
-    mock_shared_config.update_resource_slots.assert_awaited_once()
+    mock_unified_config.legacy_etcd_config_loader.update_resource_slots.assert_awaited_once()
     q = mock_dbconn.execute.await_args_list[1].args[0]
     assert isinstance(q, Update)
     q_params = q.compile().params
@@ -119,7 +119,7 @@ async def test_handle_heartbeat(
     assert "scaling_group" not in q_params
 
     # Rejoin
-    mock_shared_config.update_resource_slots.reset_mock()
+    mock_unified_config.legacy_etcd_config_loader.update_resource_slots.reset_mock()
     mock_dbconn.execute.reset_mock()
     mock_dbresult.first = MagicMock(
         return_value={
@@ -151,7 +151,7 @@ async def test_handle_heartbeat(
             "auto_terminate_abusing_kernel": False,
         },
     )
-    mock_shared_config.update_resource_slots.assert_awaited_once()
+    mock_unified_config.legacy_etcd_config_loader.update_resource_slots.assert_awaited_once()
     q = mock_dbconn.execute.await_args_list[1].args[0]
     assert isinstance(q, Update)
     q_params = q.compile().params

@@ -7,7 +7,7 @@ import hiredis
 
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import RedisConfig, aobject
+from .types import RedisTarget, aobject
 
 __all__ = (
     "RedisClient",
@@ -191,7 +191,7 @@ class RedisClient(aobject):
 
 
 class RedisConnection(AsyncContextManager[RedisClient]):
-    _redis_config: RedisConfig
+    _redis_target: RedisTarget
     _db: int
 
     _socket_timeout: Optional[float]
@@ -200,14 +200,14 @@ class RedisConnection(AsyncContextManager[RedisClient]):
 
     def __init__(
         self,
-        redis_config: RedisConfig,
+        redis_target: RedisTarget,
         *,
         db: int = 0,
         socket_timeout: Optional[float] = 5.0,
         socket_connect_timeout: Optional[float] = 2.0,
         keepalive_options: dict[int, int] = _keepalive_options,
     ) -> None:
-        self._redis_config = redis_config
+        self._redis_target = redis_target
         self._db = db
 
         self._socket_timeout = socket_timeout
@@ -215,15 +215,15 @@ class RedisConnection(AsyncContextManager[RedisClient]):
         self._keepalive_options = keepalive_options
 
     async def connect(self) -> RedisClient:
-        if self._redis_config.sentinel:
+        if self._redis_target.sentinel:
             raise RuntimeError("Redis with sentinel not supported for this library")
 
-        redis_url = self._redis_config.addr
+        redis_url = self._redis_target.addr
         assert redis_url is not None
 
         host = str(redis_url[0])
         port = redis_url[1]
-        password = self._redis_config.password
+        password = self._redis_target.password
 
         async with asyncio.timeout(self._socket_connect_timeout):
             reader, writer = await asyncio.open_connection(host, port)

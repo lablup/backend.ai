@@ -22,4 +22,5 @@ class PrometheusMonitor(ActionMonitor):
             operation_type=action.operation_type(),
             status=result.meta.status,
             duration=result.meta.duration.total_seconds(),
+            error_code=result.meta.error_code,
         )

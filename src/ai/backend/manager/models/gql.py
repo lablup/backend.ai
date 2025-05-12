@@ -12,7 +12,12 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+)
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
     AuditLogNode,
@@ -56,7 +61,7 @@ from .container_registry import (
 from .rbac import ContainerRegistryScope
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import BackgroundTaskManager
+    from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.types import (
         AccessKey,
@@ -67,7 +72,6 @@ if TYPE_CHECKING:
     )
 
     from ..api.manager import ManagerStatus
-    from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
@@ -277,8 +281,7 @@ from .vfolder import (
 class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
-    local_config: LocalConfig
-    shared_config: SharedConfig
+    unified_config: ManagerUnifiedConfig
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
@@ -1239,7 +1242,7 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
+        if ctx.unified_config.local.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         loader = ctx.dataloader_manager.get_loader_by_func(
@@ -1268,7 +1271,7 @@ class Queries(graphene.ObjectType):
         status: str | None = None,
     ) -> AgentSummaryList:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
+        if ctx.unified_config.local.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         total_count = await AgentSummary.load_count(
@@ -3119,11 +3122,19 @@ class GQLExceptionMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         try:
             res = next(root, info, **args)
+        except BackendAIError as e:
+            raise GraphQLError(
+                message=str(e),
+                extensions={
+                    "code": str(e.error_code()),
+                },
+            )
         except Exception as e:
             raise GraphQLError(
                 message=str(e),
-                # TODO: Add extensions (error_code) after BackendError refactoring
-                # extensions={},
+                extensions={
+                    "code": str(ErrorCode.default()),
+                },
             )
         return res
 
@@ -3146,15 +3157,28 @@ class GQLMetricMiddleware:
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
+                error_code=None,
                 success=True,
                 duration=time.perf_counter() - start,
             )
+        except BackendAIError as e:
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                error_code=e.error_code(),
+                success=False,
+                duration=time.perf_counter() - start,
+            )
+            raise e
         except BaseException as e:
             graph_ctx.metric_observer.observe_request(
                 operation_type=operation_type,
                 field_name=field_name,
                 parent_type=parent_type,
                 operation_name=operation_name,
+                error_code=ErrorCode.default(),
                 success=False,
                 duration=time.perf_counter() - start,
             )

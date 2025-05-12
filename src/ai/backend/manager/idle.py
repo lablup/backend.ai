@@ -47,13 +47,17 @@ from ai.backend.common import typed_validators as tv
 from ai.backend.common.config import BaseSchema, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.events import (
+from ai.backend.common.events.dispatcher import (
     AbstractEvent,
-    DoIdleCheckEvent,
-    DoTerminateSessionEvent,
     EventDispatcher,
     EventHandler,
     EventProducer,
+)
+from ai.backend.common.events.idle import (
+    DoIdleCheckEvent,
+)
+from ai.backend.common.events.session import (
+    DoTerminateSessionEvent,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
@@ -64,13 +68,14 @@ from ai.backend.common.events import (
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
-    EtcdRedisConfig,
     RedisConnectionInfo,
+    RedisProfileTarget,
     ResourceSlot,
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
 from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels
@@ -84,7 +89,6 @@ if TYPE_CHECKING:
 
     from ai.backend.common.types import AgentId, KernelId, SessionId
 
-    from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -194,7 +198,7 @@ class IdleCheckerHost:
     def __init__(
         self,
         db: SAEngine,
-        shared_config: SharedConfig,
+        unified_config: ManagerUnifiedConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
@@ -202,20 +206,20 @@ class IdleCheckerHost:
         self._checkers: list[BaseIdleChecker] = []
         self._frozen = False
         self._db = db
-        self._shared_config = shared_config
+        self._unified_config = unified_config
         self._event_dispatcher = event_dispatcher
         self._event_producer = event_producer
         self._lock_factory = lock_factory
-        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-            self._shared_config.data["redis"]
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            self._unified_config.shared.redis.model_dump()
         )
         self._redis_live = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.LIVE),
+            redis_profile_target.profile_target(RedisRole.LIVE),
             name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="idle.stat",
             db=REDIS_STATISTICS_DB,
         )
@@ -232,10 +236,7 @@ class IdleCheckerHost:
 
     async def start(self) -> None:
         self._frozen = True
-        raw_config = await self._shared_config.etcd.get_prefix_dict(
-            "config/idle/checkers",
-        )
-        raw_config = cast(Mapping[str, Mapping[str, Any]], raw_config)
+        raw_config = self._unified_config.shared.idle.checkers
         await self._grace_period_checker.populate_config(
             raw_config.get(self._grace_period_checker.name) or {}
         )
@@ -1259,7 +1260,7 @@ checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
 
 async def init_idle_checkers(
     db: SAEngine,
-    shared_config: SharedConfig,
+    unified_config: ManagerUnifiedConfig,
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
     lock_factory: DistributedLockFactory,
@@ -1270,7 +1271,7 @@ async def init_idle_checkers(
     """
     checker_host = IdleCheckerHost(
         db,
-        shared_config,
+        unified_config,
         event_dispatcher,
         event_producer,
         lock_factory,
@@ -1278,7 +1279,7 @@ async def init_idle_checkers(
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default
-    enabled_checkers = await shared_config.etcd.get("config/idle/enabled")
+    enabled_checkers = unified_config.shared.idle.enabled
     if enabled_checkers:
         for checker_name in enabled_checkers.split(","):
             checker_name = checker_name.strip()

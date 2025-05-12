@@ -10,10 +10,9 @@ from decimal import Decimal
 from functools import partial
 from multiprocessing import Event, Process, Queue
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Literal, Tuple
+from typing import Any, Callable, Iterable, List, Literal, Optional, Tuple
 
 import aiotools
-import attrs
 import pytest
 from redis.asyncio import Redis
 
@@ -21,7 +20,13 @@ from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import (
+    AbstractEvent,
+    EventDispatcher,
+    EventDomain,
+    EventProducer,
+)
+from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.lock import (
     AbstractDistributedLock,
     EtcdLock,
@@ -29,7 +34,7 @@ from ai.backend.common.lock import (
     RedisLock,
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AgentId, HostPortPair, RedisConfig, RedisConnectionInfo
+from ai.backend.common.types import AgentId, HostPortPair, RedisConnectionInfo, RedisTarget
 
 
 @dataclass
@@ -61,11 +66,9 @@ def dslice(start: Decimal, stop: Decimal, num: int):
     yield from (start + step * Decimal(tick) for tick in range(0, num))
 
 
-@attrs.define(slots=True, frozen=True)
+@dataclass
 class NoopEvent(AbstractEvent):
-    name = "_noop"
-
-    test_case_ns: str = attrs.field()
+    test_case_ns: str
 
     def serialize(self) -> tuple:
         return (self.test_case_ns,)
@@ -73,6 +76,20 @@ class NoopEvent(AbstractEvent):
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(value[0])
+
+    @classmethod
+    def event_domain(self) -> EventDomain:
+        return EventDomain.AGENT
+
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "noop"
 
 
 EVENT_DISPATCHER_CONSUMER_GROUP = "test"
@@ -90,7 +107,7 @@ async def run_timer(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_addr, redis_helper_config=config.redis_helper_default_config
     )
     stream_redis = redis_helper.get_redis_object(
@@ -146,7 +163,7 @@ def etcd_timer_node_process(
             print("_tick")
             queue.put(time.monotonic())
 
-        redis_config = RedisConfig(
+        redis_config = RedisTarget(
             addr=timer_ctx.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
         stream_redis = redis_helper.get_redis_object(
@@ -229,7 +246,7 @@ class TimerNode(threading.Thread):
             print("_tick")
             self.event_records.append(time.monotonic())
 
-        redis_config = RedisConfig(
+        redis_config = RedisTarget(
             addr=self.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
         stream_redis = redis_helper.get_redis_object(
@@ -442,7 +459,7 @@ async def test_global_timer_join_leave(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
     stream_redis = redis_helper.get_redis_object(
