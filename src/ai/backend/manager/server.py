@@ -79,6 +79,7 @@ from ai.backend.manager.config.loader.etcd_loader import EtcdConfigLoader
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
 from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
+from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
@@ -354,21 +355,22 @@ async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncI
 async def unified_config_ctx(
     root_ctx: RootContext, base_local_config: ManagerLocalConfig
 ) -> AsyncIterator[ManagerUnifiedConfig]:
-    toml_config_loader = TomlConfigLoader(base_local_config._src_config_path, "manager")
+    loaders: list[AbstractConfigLoader] = []
+
+    if base_local_config._config_path:
+        toml_config_loader = TomlConfigLoader(base_local_config._config_path, "manager")
+        loaders.append(toml_config_loader)
     legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
-    etcd_loader = EtcdConfigLoader(root_ctx.etcd)
-    unified_config_loader = LoaderChain([
-        toml_config_loader,
-        legacy_etcd_loader,
-        etcd_loader,
-    ])
+    loaders.append(legacy_etcd_loader)
+    loaders.append(EtcdConfigLoader(root_ctx.etcd))
+    unified_config_loader = LoaderChain(loaders)
 
     raw_unified_cfg = await unified_config_loader.load()
     raw_local_config = {**base_local_config.model_dump(), **raw_unified_cfg}
     local_config = ManagerLocalConfig(**raw_local_config)
     shared_config = ManagerSharedConfig(**raw_unified_cfg)
 
-    etcd_watcher = EtcdConfigWatcher(etcd_loader._etcd)
+    etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
     unified_config = ManagerUnifiedConfig(
         local=local_config,

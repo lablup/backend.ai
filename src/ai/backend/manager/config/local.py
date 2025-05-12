@@ -9,6 +9,7 @@ from typing import Any, Literal, Mapping, Optional, Self
 
 from pydantic import BaseModel, Field, FilePath, PrivateAttr
 
+from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import AutoDirectoryPath, GroupID, HostPortPair, UserID
@@ -850,7 +851,11 @@ class DebugConfig(BaseModel):
 
 
 class ManagerLocalConfig(BaseModel):
-    _src_config_path: Path = PrivateAttr()
+    _config_path: Optional[Path] = PrivateAttr(default=None)
+    """
+    The filepath where the LocalConfig is loaded.
+    If this is not set, toml file loader will not be created in the unified_config_ctx.
+    """
 
     db: DatabaseConfig = Field(
         description="""
@@ -936,7 +941,12 @@ class ManagerLocalConfig(BaseModel):
                 (("logging", "pkg-ns", "aiohttp"), log_level),
             ]
 
-        file_loader = TomlConfigLoader(config_path, "manager")
+        if config_path is None:
+            cfg_file_path = find_config_file("manager")
+        else:
+            cfg_file_path = Path(config_path)
+
+        file_loader = TomlConfigLoader(cfg_file_path, "manager")
         env_loader = EnvLoader(MANAGER_LOCAL_CFG_OVERRIDE_ENVS)
         cfg_overrider = ConfigOverrider(overrides)
         cfg_loader = LoaderChain([
@@ -947,9 +957,7 @@ class ManagerLocalConfig(BaseModel):
         raw_cfg = await cfg_loader.load()
 
         cfg = cls.model_validate(raw_cfg)
-        if not file_loader.discovered_path:
-            raise RuntimeError("Failed to find the configuration file path.")
-        cfg._src_config_path = file_loader.discovered_path
+        cfg._config_path = cfg_file_path
 
         if cfg.debug.enabled:
             print("== Manager configuration ==", file=sys.stderr)
