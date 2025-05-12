@@ -359,6 +359,9 @@ async def unified_config_ctx(
     if base_local_config._config_path:
         toml_config_loader = TomlConfigLoader(base_local_config._config_path, "manager")
         loaders.append(toml_config_loader)
+    else:
+        log.warning("No config file path specified. Skipped creating toml file loader...")
+
     legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     loaders.append(legacy_etcd_loader)
     unified_config_loader = LoaderChain(loaders)
@@ -373,7 +376,7 @@ async def unified_config_ctx(
     unified_config = ManagerUnifiedConfig(
         local=local_config,
         shared=shared_config,
-        etcd_config_loader=legacy_etcd_loader,
+        legacy_etcd_config_loader=legacy_etcd_loader,
         etcd_watcher=etcd_watcher,
     )
     root_ctx.unified_config = unified_config
@@ -382,7 +385,7 @@ async def unified_config_ctx(
         unified_config.start()
         yield root_ctx.unified_config
     finally:
-        unified_config.stop()
+        await unified_config.stop()
 
 
 @actxmgr

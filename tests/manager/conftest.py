@@ -876,8 +876,7 @@ async def registry_ctx(mocker):
     mock_unified_config = ManagerUnifiedConfig(
         local=mock_local_config,
         shared=mock_shared_config,
-        local_config_loader=MagicMock(),
-        etcd_config_loader=mock_etcd_config_loader,
+        legacy_etcd_config_loader=mock_etcd_config_loader,
         etcd_watcher=MagicMock(),
     )
     mock_db = MagicMock()

@@ -22,12 +22,12 @@ class ManagerUnifiedConfig:
         self,
         local: ManagerLocalConfig,
         shared: ManagerSharedConfig,
-        etcd_config_loader: LegacyEtcdLoader,
+        legacy_etcd_config_loader: LegacyEtcdLoader,
         etcd_watcher: EtcdConfigWatcher,
     ) -> None:
         self.local = local
         self.shared = shared
-        self.legacy_etcd_config_loader = etcd_config_loader
+        self.legacy_etcd_config_loader = legacy_etcd_config_loader
         self.etcd_watcher = etcd_watcher
 
     async def _run_watcher(self) -> None:
@@ -38,7 +38,12 @@ class ManagerUnifiedConfig:
     def start(self) -> None:
         self._etcd_watcher_task = asyncio.create_task(self._run_watcher())
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         if self._etcd_watcher_task:
             self._etcd_watcher_task.cancel()
-            self._etcd_watcher_task = None
+            try:
+                await self._etcd_watcher_task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._etcd_watcher_task = None

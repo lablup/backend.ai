@@ -36,8 +36,7 @@ def get_graphquery_context(
     unified_config = ManagerUnifiedConfig(
         local=MagicMock(),  # type: ignore
         shared=shared_config,
-        local_config_loader=MagicMock(),  # type: ignore
-        etcd_config_loader=MagicMock(),  # type: ignore
+        legacy_etcd_config_loader=MagicMock(),  # type: ignore
         etcd_watcher=MagicMock(),
     )
     return GraphQueryContext(
