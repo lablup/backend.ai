@@ -79,7 +79,6 @@ from ai.backend.manager.config.loader.etcd_loader import EtcdConfigLoader
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
 from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
@@ -1046,7 +1045,6 @@ def build_public_app(
 @dataclass
 class ServerMainArgs:
     local_cfg: ManagerLocalConfig
-    local_cfg_loader: AbstractConfigLoader
     log_endpoint: str
 
 
@@ -1222,9 +1220,7 @@ def main(
     Start the manager service as a foreground process.
     """
     log_level = LogLevel.DEBUG if debug else log_level
-    local_cfg, local_cfg_loader = asyncio.run(
-        ManagerLocalConfig.load_from_file(config_path, log_level)
-    )
+    local_cfg = asyncio.run(ManagerLocalConfig.load_from_file(config_path, log_level))
 
     if ctx.invoked_subcommand is None:
         local_cfg.manager.pid_file.write_text(str(os.getpid()))
@@ -1257,7 +1253,7 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=local_cfg.manager.num_proc,
-                        args=(local_cfg, local_cfg_loader, log_endpoint),
+                        args=(local_cfg, log_endpoint),
                         wait_timeout=5.0,
                     )
                 finally:

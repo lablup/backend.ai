@@ -20,7 +20,6 @@ from .loader.config_overrider import ConfigOverrider
 from .loader.env_loader import EnvLoader
 from .loader.loader_chain import LoaderChain
 from .loader.toml_loader import TomlConfigLoader
-from .loader.types import AbstractConfigLoader
 
 _default_smtp_template = """
 Action type: {{ action_type }}
@@ -918,7 +917,7 @@ class ManagerLocalConfig(BaseModel):
     @classmethod
     async def load_from_file(
         cls, config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET
-    ) -> tuple[Self, AbstractConfigLoader]:
+    ) -> Self:
         """
         Load configuration from a config file.
 
@@ -956,4 +955,4 @@ class ManagerLocalConfig(BaseModel):
             print("== Manager configuration ==", file=sys.stderr)
             print(pformat(cfg), file=sys.stderr)
 
-        return cfg, cfg_loader
+        return cfg

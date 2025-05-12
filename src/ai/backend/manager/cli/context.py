@@ -44,7 +44,7 @@ class CLIContext:
             if self._local_config is None:
                 self._local_config = asyncio.run(
                     ManagerLocalConfig.load_from_file(self.config_path, self.log_level)
-                )[0]
+                )
         except ConfigurationError as e:
             print(
                 "ConfigurationError: Could not read or validate the manager local config:",
