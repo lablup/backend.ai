@@ -143,6 +143,7 @@ RESOURCE_USAGE_KERNEL_STATUSES = (
 DEAD_KERNEL_STATUSES = (
     KernelStatus.CANCELLED,
     KernelStatus.TERMINATED,
+    KernelStatus.ERROR,
 )
 
 LIVE_STATUS = (KernelStatus.RUNNING,)
