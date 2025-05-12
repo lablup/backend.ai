@@ -171,6 +171,7 @@ import enum
 import logging
 from datetime import datetime, timezone
 from ipaddress import IPv4Network
+from pprint import pformat
 from typing import Any, Final, Optional
 
 import yarl
@@ -901,6 +902,9 @@ class ManagerSharedConfig(BaseModel):
         Controls how resource slots are allocated and managed.
         """,
     )
+
+    def __repr__(self):
+        return pformat(self.model_dump())
 
     def get_redis_url(self, db: int = 0) -> yarl.URL:
         """

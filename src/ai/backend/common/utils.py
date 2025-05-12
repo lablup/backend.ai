@@ -12,6 +12,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from itertools import chain
 from pathlib import Path
+from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -28,6 +29,7 @@ from typing import (
 import aiofiles
 import yarl
 from async_timeout import timeout
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -434,3 +436,17 @@ def b64encode(s: str) -> str:
     """
     b: bytes = s.encode("utf-8") if isinstance(s, str) else s
     return base64.b64encode(b).decode("ascii")
+
+
+T = TypeVar("T", bound=BaseModel)
+
+
+def deep_merge(a: Mapping[str, Any], b: Mapping[str, Any]) -> MappingProxyType[str, Any]:
+    merged: dict[str, Any] = dict(a)
+    for k, vb in b.items():
+        va = merged.get(k)
+        if isinstance(va, Mapping) and isinstance(vb, Mapping):
+            merged[k] = deep_merge(va, vb)
+        else:
+            merged[k] = vb
+    return MappingProxyType(merged)

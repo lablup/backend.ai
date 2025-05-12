@@ -71,7 +71,7 @@ from ai.backend.common.types import (
     AgentSelectionStrategy,
     RedisProfileTarget,
 )
-from ai.backend.common.utils import env_info
+from ai.backend.common.utils import deep_merge, env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
@@ -367,8 +367,11 @@ async def unified_config_ctx(
     unified_config_loader = LoaderChain(loaders)
 
     raw_unified_cfg = await unified_config_loader.load()
-    raw_local_config = {**base_local_config.model_dump(), **raw_unified_cfg}
-    local_config = ManagerLocalConfig(**raw_local_config)
+
+    merged_raw_local_config = deep_merge(
+        base_local_config.model_dump(by_alias=True), raw_unified_cfg
+    )
+    local_config = ManagerLocalConfig.model_validate(merged_raw_local_config)
     shared_config = ManagerSharedConfig(**raw_unified_cfg)
 
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
