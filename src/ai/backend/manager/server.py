@@ -78,7 +78,7 @@ from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.shared import ManagerSharedConfig, VolumesConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
@@ -356,7 +356,7 @@ async def unified_config_ctx(
     raw_shared_cfg = await etcd_loader.load()
     volumes_etcd_loader = LegacyEtcdLoader(root_ctx.etcd, config_prefix="volumes")
     volumes_shared_cfg = await volumes_etcd_loader.load()
-    shared_cfg = ManagerSharedConfig(**raw_shared_cfg, volumes=volumes_shared_cfg)
+    shared_cfg = ManagerSharedConfig(**raw_shared_cfg, volumes=VolumesConfig(**volumes_shared_cfg))
 
     etcd_watcher = EtcdConfigWatcher(etcd_loader._etcd)
 
