@@ -43,7 +43,7 @@ class CLIContext:
         try:
             if self._local_config is None:
                 self._local_config = asyncio.run(
-                    ManagerLocalConfig.load(self.config_path, self.log_level)
+                    ManagerLocalConfig.load_from_file(self.config_path, self.log_level)
                 )[0]
         except ConfigurationError as e:
             print(

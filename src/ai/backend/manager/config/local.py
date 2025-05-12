@@ -7,7 +7,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import Any, Literal, Mapping, Optional, Self
 
-from pydantic import BaseModel, Field, FilePath
+from pydantic import BaseModel, Field, FilePath, PrivateAttr
 
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
@@ -851,7 +851,7 @@ class DebugConfig(BaseModel):
 
 
 class ManagerLocalConfig(BaseModel):
-    _src_config_path: Path
+    _src_config_path: Path = PrivateAttr()
 
     db: DatabaseConfig = Field(
         description="""
@@ -916,9 +916,17 @@ class ManagerLocalConfig(BaseModel):
         return pformat(self.model_dump())
 
     @classmethod
-    async def load(
+    async def load_from_file(
         cls, config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET
     ) -> tuple[Self, AbstractConfigLoader]:
+        """
+        Load configuration from a config file.
+
+        All configurations are loaded by a single LoaderChain in unified_config_ctx.
+        But ManagerLocalConfig must be loaded before unified_config_ctx is invoked since some configurations are required for the manager boot process,
+        So ManagerLocalConfig is first loaded from the file through `load_from_file` and then overridden in unified_config_ctx.
+        """
+
         overrides: list[tuple[tuple[str, ...], Any]] = [
             (("debug", "enabled"), log_level == LogLevel.DEBUG),
         ]
@@ -940,6 +948,9 @@ class ManagerLocalConfig(BaseModel):
         raw_cfg = await cfg_loader.load()
 
         cfg = cls.model_validate(raw_cfg)
+        if not file_loader.discovered_path:
+            raise RuntimeError("Failed to find the configuration file path.")
+        cfg._src_config_path = file_loader.discovered_path
 
         if cfg.debug.enabled:
             print("== Manager configuration ==", file=sys.stderr)

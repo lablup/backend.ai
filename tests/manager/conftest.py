@@ -267,7 +267,7 @@ def local_config(
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = asyncio.run(ManagerLocalConfig.load())[0]
+        fs_local_config = asyncio.run(ManagerLocalConfig.load_from_file())[0]
         cfg.etcd.addr = fs_local_config.etcd.addr
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "user")
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "password")
@@ -295,11 +295,8 @@ def mock_etcd_ctx(
 @pytest.fixture(scope="session")
 def mock_unified_config_ctx(
     local_config,
-    local_config_loader,
 ) -> Any:
-    argument_binding_ctx = partial(
-        unified_config_ctx, local_config=local_config, local_cfg_loader=local_config_loader
-    )
+    argument_binding_ctx = partial(unified_config_ctx, base_local_config=local_config)
     update_wrapper(argument_binding_ctx, unified_config_ctx)
     return argument_binding_ctx
 

@@ -4,7 +4,6 @@ from typing import Awaitable, Callable, Optional
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 
 from .loader.legacy_etcd_loader import LegacyEtcdLoader
-from .loader.types import AbstractConfigLoader
 from .local import ManagerLocalConfig
 from .shared import ManagerSharedConfig
 
@@ -14,7 +13,6 @@ SharedConfigChangeCallback = Callable[[ManagerSharedConfig], Awaitable[None]]
 class ManagerUnifiedConfig:
     local: ManagerLocalConfig
     shared: ManagerSharedConfig
-    local_config_loader: AbstractConfigLoader
     legacy_etcd_config_loader: LegacyEtcdLoader
     etcd_watcher: EtcdConfigWatcher
 
@@ -24,13 +22,11 @@ class ManagerUnifiedConfig:
         self,
         local: ManagerLocalConfig,
         shared: ManagerSharedConfig,
-        local_config_loader: AbstractConfigLoader,
         etcd_config_loader: LegacyEtcdLoader,
         etcd_watcher: EtcdConfigWatcher,
     ) -> None:
         self.local = local
         self.shared = shared
-        self.local_config_loader = local_config_loader
         self.legacy_etcd_config_loader = etcd_config_loader
         self.etcd_watcher = etcd_watcher
 

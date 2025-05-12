@@ -75,7 +75,10 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.config.loader.etcd_loader import EtcdConfigLoader
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.loader.loader_chain import LoaderChain
+from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
@@ -350,19 +353,28 @@ async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncI
 
 @actxmgr
 async def unified_config_ctx(
-    root_ctx: RootContext, local_config: ManagerLocalConfig, local_cfg_loader: AbstractConfigLoader
+    root_ctx: RootContext, base_local_config: ManagerLocalConfig
 ) -> AsyncIterator[ManagerUnifiedConfig]:
-    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
-    raw_shared_cfg = await etcd_loader.load()
-    shared_cfg = ManagerSharedConfig(**raw_shared_cfg)
+    toml_config_loader = TomlConfigLoader(base_local_config._src_config_path, "manager")
+    legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+    etcd_loader = EtcdConfigLoader(root_ctx.etcd)
+    unified_config_loader = LoaderChain([
+        toml_config_loader,
+        legacy_etcd_loader,
+        etcd_loader,
+    ])
+
+    raw_unified_cfg = await unified_config_loader.load()
+    raw_local_config = {**base_local_config.model_dump(), **raw_unified_cfg}
+    local_config = ManagerLocalConfig(**raw_local_config)
+    shared_config = ManagerSharedConfig(**raw_unified_cfg)
 
     etcd_watcher = EtcdConfigWatcher(etcd_loader._etcd)
 
     unified_config = ManagerUnifiedConfig(
         local=local_config,
-        local_config_loader=local_cfg_loader,
-        shared=shared_cfg,
-        etcd_config_loader=etcd_loader,
+        shared=shared_config,
+        etcd_config_loader=legacy_etcd_loader,
         etcd_watcher=etcd_watcher,
     )
     root_ctx.unified_config = unified_config
@@ -1045,7 +1057,6 @@ async def server_main(
     args: ServerMainArgs,
 ) -> AsyncIterator[None]:
     local_config = args.local_cfg
-    local_cfg_loader = args.local_cfg_loader
 
     root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
     internal_app = build_internal_app()
@@ -1077,7 +1088,7 @@ async def server_main(
     try:
         async with (
             etcd_ctx(root_ctx, local_config.etcd.to_dataclass()),
-            unified_config_ctx(root_ctx, local_config, local_cfg_loader),
+            unified_config_ctx(root_ctx, local_config),
             webapp_plugin_ctx(root_app),
         ):
             ssl_ctx = None
@@ -1211,7 +1222,9 @@ def main(
     Start the manager service as a foreground process.
     """
     log_level = LogLevel.DEBUG if debug else log_level
-    local_cfg, local_cfg_loader = asyncio.run(ManagerLocalConfig.load(config_path, log_level))
+    local_cfg, local_cfg_loader = asyncio.run(
+        ManagerLocalConfig.load_from_file(config_path, log_level)
+    )
 
     if ctx.invoked_subcommand is None:
         local_cfg.manager.pid_file.write_text(str(os.getpid()))

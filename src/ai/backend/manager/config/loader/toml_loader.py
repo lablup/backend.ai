@@ -9,6 +9,7 @@ from ai.backend.manager.config.loader.types import AbstractConfigLoader
 class TomlConfigLoader(AbstractConfigLoader):
     discovered_path: Optional[Path]
 
+    # TODO: Make `path` required. and remove `daemon_name` argument
     def __init__(self, path: Optional[Union[Path, str]], daemon_name: str) -> None:
         self._path = path
         self._daemon_name = daemon_name
