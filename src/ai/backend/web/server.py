@@ -13,6 +13,7 @@ from collections.abc import MutableMapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from functools import partial
+from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
 from typing import Any, AsyncIterator, Mapping, Optional, cast
@@ -30,6 +31,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import RedisRole
+from ai.backend.common.dto.manager.auth.field import AuthResponseData, RedirectAuthResponseData
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
@@ -380,20 +382,27 @@ async def login_handler(request: web.Request) -> web.Response:
             extra_keys = set(creds.keys()) ^ {"username", "password"}
             for extra_key in extra_keys:
                 extra_args[extra_key] = creds[extra_key]
-            token = await api_session.User.authorize(
+            auth_result = await api_session.User.authorize(
                 creds["username"], creds["password"], extra_args=extra_args
             )
+            match auth_result.data:
+                case AuthResponseData():
+                    token = auth_result.data
+                case RedirectAuthResponseData():
+                    return web.json_response(
+                        status=HTTPStatus.MOVED_PERMANENTLY, data=auth_result.data.to_dict()
+                    )
             stored_token = {
                 "type": "keypair",
-                "access_key": token.content["access_key"],
-                "secret_key": token.content["secret_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
+                "access_key": token.access_key,
+                "secret_key": token.secret_key,
+                "role": token.role,
+                "status": token.status,
             }
             public_return = {
-                "access_key": token.content["access_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
+                "access_key": token.access_key,
+                "role": token.role,
+                "status": token.status,
             }
             session["authenticated"] = True
             session["token"] = stored_token  # store full token
@@ -527,20 +536,27 @@ async def token_login_handler(request: web.Request) -> web.Response:
             # in token-based login. Each authorize hook plugin will deal with various type of
             # `sToken` and related parameters to authorize a user. In this process, email and
             # password do not play any role.
-            token = await api_session.User.authorize(
+            auth_result = await api_session.User.authorize(
                 "fake-email", "fake-pwd", extra_args=extra_args
             )
+            match auth_result.data:
+                case AuthResponseData():
+                    token = auth_result.data
+                case RedirectAuthResponseData():
+                    return web.json_response(
+                        status=HTTPStatus.MOVED_PERMANENTLY, data=auth_result.data.to_dict()
+                    )
             stored_token = {
                 "type": "keypair",
-                "access_key": token.content["access_key"],
-                "secret_key": token.content["secret_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
+                "access_key": token.access_key,
+                "secret_key": token.secret_key,
+                "role": token.role,
+                "status": token.status,
             }
             public_return = {
-                "access_key": token.content["access_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
+                "access_key": token.access_key,
+                "role": token.role,
+                "status": token.status,
             }
             session["authenticated"] = True
             session["token"] = stored_token  # store full token
