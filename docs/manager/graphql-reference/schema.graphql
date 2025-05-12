@@ -2216,6 +2216,12 @@ type Mutations {
     id: UUID = null
     name: String = null @deprecated(reason: "Deprecated since 25.4.0.")
   ): DeleteResourcePreset
+
+  """Added in 25.8.0"""
+  modify_etcd_configs(
+    """Added in 25.8.0."""
+    input: ModifyEtcdConfigsInput!
+  ): ModifyEtcdConfigsPayload
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup
@@ -3048,6 +3054,21 @@ input ModifyResourcePresetInput {
 type DeleteResourcePreset {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.8.0."""
+type ModifyEtcdConfigsPayload {
+  """Configuration to mutate. Added in 25.8.0."""
+  configs: JSONString!
+}
+
+"""Added in 25.8.0."""
+input ModifyEtcdConfigsInput {
+  """Component name. Added in 25.8.0."""
+  component: String!
+
+  """Configuration to mutate. Added in 25.8.0."""
+  configs: JSONString!
 }
 
 type CreateScalingGroup {
