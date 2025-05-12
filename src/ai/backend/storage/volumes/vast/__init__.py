@@ -9,7 +9,7 @@ import aiofiles
 import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter

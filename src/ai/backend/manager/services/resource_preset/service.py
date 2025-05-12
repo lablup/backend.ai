@@ -14,7 +14,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.domain import domains
@@ -62,18 +62,18 @@ def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
 
 class ResourcePresetService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedConfig
+    _unified_config: ManagerUnifiedConfig
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
-        shared_config: SharedConfig,
+        unified_config: ManagerUnifiedConfig,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
-        self._shared_config = shared_config
+        self._unified_config = unified_config
 
     async def create_preset(
         self, action: CreateResourcePresetAction
@@ -165,9 +165,6 @@ class ResourcePresetService:
         return DeleteResourcePresetActionResult(resource_preset=preset_row)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
-        # TODO: Remove this?
-        await self._shared_config.get_resource_slots()
-
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(ResourcePresetRow)
             query_condition = ResourcePresetRow.scaling_group_name.is_(sa.null())
@@ -197,7 +194,7 @@ class ResourcePresetService:
         resource_policy = action.resource_policy
         domain_name = action.domain_name
 
-        known_slot_types = await self._shared_config.get_resource_slots()
+        known_slot_types = await self._unified_config.legacy_etcd_config_loader.get_resource_slots()
 
         async with self._db.begin_readonly() as conn:
             # Check keypair resource limit.
@@ -355,8 +352,10 @@ class ResourcePresetService:
                 })
 
             # Return group resource status as NaN if not allowed.
-            group_resource_visibility = await self._shared_config.get_raw(
-                "config/api/resources/group_resource_visibility"
+            group_resource_visibility = (
+                await self._unified_config.legacy_etcd_config_loader.get_raw(
+                    "config/api/resources/group_resource_visibility"
+                )
             )
             group_resource_visibility = t.ToBool().check(group_resource_visibility)
             if not group_resource_visibility:

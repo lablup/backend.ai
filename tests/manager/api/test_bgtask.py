@@ -3,28 +3,30 @@ from __future__ import annotations
 import asyncio
 import enum
 from collections.abc import AsyncIterator
+from dataclasses import asdict
 from typing import Any, TypeAlias
 
-import attr
 import pytest
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
-from ai.backend.common.events import (
+from ai.backend.common.events.bgtask import (
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskUpdatedEvent,
+)
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.types import AgentId, EtcdRedisConfig
+from ai.backend.common.types import AgentId, RedisProfileTarget
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
     background_task_ctx,
     event_dispatcher_ctx,
+    event_hub_ctx,
     redis_ctx,
-    shared_config_ctx,
 )
 
 
@@ -36,9 +38,18 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 
 
 @pytest.fixture
-async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[BgtaskFixture]:
+async def bgtask_fixture(
+    etcd_fixture, mock_etcd_ctx, mock_unified_config_ctx, create_app_and_client
+) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
-        [shared_config_ctx, redis_ctx, event_dispatcher_ctx, background_task_ctx],
+        [
+            event_hub_ctx,
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
+            redis_ctx,
+            event_dispatcher_ctx,
+            background_task_ctx,
+        ],
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]
@@ -47,10 +58,10 @@ async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[B
 
     yield root_ctx.background_task_manager, producer, dispatcher
 
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data["redis"]
+    etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
+        root_ctx.unified_config.shared.redis.model_dump()
     )
-    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    stream_redis_config = etcd_redis_config.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
         stream_redis_config,
         name="event_producer.stream",
@@ -79,9 +90,9 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
         # Copy the arguments to the uppser scope
         # since assertions inside the handler does not affect the test result
         # because the handlers are executed inside a separate asyncio task.
-        update_handler_ctx["event_name"] = event.name
+        update_handler_ctx["event_name"] = event.event_name()
         # type checker complains event is not a subclass of AttrsInstance, but it definitely is...
-        update_body = attr.asdict(event)  # type: ignore
+        update_body = asdict(event)
         update_handler_ctx.update(**update_body)
 
     async def done_sub(
@@ -90,8 +101,8 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
         event: BgtaskDoneEvent,
     ) -> None:
         done_handler_ctx["context"] = context
-        done_handler_ctx["event_name"] = event.name
-        update_body = attr.asdict(event)  # type: ignore
+        done_handler_ctx["event_name"] = event.event_name()
+        update_body = asdict(event)
         done_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter):
@@ -134,8 +145,8 @@ async def test_background_task_fail(bgtask_fixture: BgtaskFixture) -> None:
         event: BgtaskFailedEvent,
     ) -> None:
         fail_handler_ctx["context"] = context
-        fail_handler_ctx["event_name"] = event.name
-        update_body = attr.asdict(event)  # type: ignore
+        fail_handler_ctx["event_name"] = event.event_name()
+        update_body = asdict(event)
         fail_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter):

@@ -13,7 +13,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
-from ai.backend.common.types import AccessKey, EtcdRedisConfig
+from ai.backend.common.types import AccessKey, RedisProfileTarget
 from ai.backend.manager.models.gql_models.session import ComputeSession
 from ai.backend.manager.models.keypair import generate_keypair, generate_ssh_keypair, keypairs
 
@@ -165,11 +165,11 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-            ctx.shared_config.data["redis"]
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            ctx.unified_config.shared.redis.model_dump()
         )
         redis_rlim = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),
+            redis_profile_target.profile_target(RedisRole.RATE_LIMIT),
             name="ratelimit",
             db=REDIS_RATE_LIMIT_DB,
         )

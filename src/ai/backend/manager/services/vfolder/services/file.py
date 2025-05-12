@@ -8,7 +8,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
 )
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -39,23 +39,25 @@ from ..types import FileInfo
 
 class VFolderFileService:
     _db: ExtendedAsyncSAEngine
-    _shared_config: SharedConfig
+    _unified_config: ManagerUnifiedConfig
     _storage_manager: StorageSessionManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        shared_config: SharedConfig,
+        unified_config: ManagerUnifiedConfig,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
-        self._shared_config = shared_config
+        self._unified_config = unified_config
         self._storage_manager = storage_manager
 
     async def upload_file(
         self, action: CreateUploadSessionAction
     ) -> CreateUploadSessionActionResult:
-        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        allowed_vfolder_types = (
+            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         async with self._db.begin_readonly_session() as db_session:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
             vfolder_row = await db_session.scalar(query_vfolder)
@@ -93,7 +95,9 @@ class VFolderFileService:
     async def download_file(
         self, action: CreateDownloadSessionAction
     ) -> CreateDownloadSessionActionResult:
-        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        allowed_vfolder_types = (
+            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         async with self._db.begin_readonly_session() as db_session:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
             vfolder_row = await db_session.scalar(query_vfolder)
@@ -131,7 +135,9 @@ class VFolderFileService:
         )
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
-        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        allowed_vfolder_types = (
+            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == action.user_uuid)
@@ -179,7 +185,9 @@ class VFolderFileService:
         )
 
     async def rename_file(self, action: RenameFileAction) -> RenameFileActionResult:
-        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        allowed_vfolder_types = (
+            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         async with self._db.begin_readonly_session() as db_session:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)
             vfolder_row = await db_session.scalar(query_vfolder)
@@ -211,7 +219,9 @@ class VFolderFileService:
         return RenameFileActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def delete_files(self, action: DeleteFilesAction) -> DeleteFilesActionResult:
-        allowed_vfolder_types = await self._shared_config.get_vfolder_types()
+        allowed_vfolder_types = (
+            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == action.user_uuid)

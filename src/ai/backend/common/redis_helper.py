@@ -28,7 +28,7 @@ from redis.retry import Retry
 
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import RedisConfig, RedisConnectionInfo, RedisHelperConfig
+from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
@@ -457,14 +457,14 @@ async def read_stream_by_group(
 
 
 def get_redis_object(
-    redis_config: RedisConfig,
+    redis_target: RedisTarget,
     *,
     name: str,
     db: int = 0,
     **kwargs,
 ) -> RedisConnectionInfo:
     redis_helper_config: RedisHelperConfig = cast(
-        RedisHelperConfig, redis_config.get("redis_helper_config")
+        RedisHelperConfig, redis_target.redis_helper_config
     )
     conn_opts = {
         **_default_conn_opts,
@@ -484,7 +484,7 @@ def get_redis_object(
     # for redis-py 5.0+
     # if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
     #     conn_pool_opts["timeout"] = float(connection_ready_timeout)
-    if _sentinel_addresses := redis_config.get("sentinel"):
+    if _sentinel_addresses := redis_target.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
             sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
@@ -493,8 +493,8 @@ def get_redis_object(
         else:
             sentinel_addresses = _sentinel_addresses
 
-        service_name = redis_config.get("service_name")
-        password = redis_config.get("password")
+        service_name = redis_target.get("service_name")
+        password = redis_target.get("password")
         assert service_name is not None, (
             "config/redis/service_name is required when using Redis Sentinel"
         )
@@ -520,11 +520,14 @@ def get_redis_object(
             redis_helper_config=redis_helper_config,
         )
     else:
-        redis_url = redis_config.get("addr")
-        assert redis_url is not None
+        redis_url = redis_target.addr
+        if redis_url is None:
+            raise ValueError("Redis URL is not provided in the configuration.")
+
         url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
             redis_url[1]
-        ).with_password(redis_config.get("password")) / str(db)
+        ).with_password(redis_target.get("password")) / str(db)
+
         return RedisConnectionInfo(
             # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
             client=Redis(

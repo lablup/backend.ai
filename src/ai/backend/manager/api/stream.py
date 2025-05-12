@@ -44,7 +44,7 @@ from etcd_client import GRPCStatusCode, GRPCStatusError
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import KernelTerminatingEvent
+from ai.backend.common.events.kernel import KernelTerminatingEvent
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -67,7 +67,6 @@ from .utils import call_non_bursty, check_api_params
 from .wsproxy import TCPProxy
 
 if TYPE_CHECKING:
-    from ..config import SharedConfig
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -106,7 +105,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             root_ctx.registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"])
+    ws = web.WebSocketResponse(max_msg_size=root_ctx.unified_config.local.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -290,7 +289,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
-    local_config = root_ctx.local_config
+    local_config = root_ctx.unified_config.local
     registry = root_ctx.registry
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
@@ -317,7 +316,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=local_config["manager"]["max-wsmsg-size"])
+    ws = web.WebSocketResponse(max_msg_size=local_config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -603,7 +602,7 @@ async def stream_proxy(
         # TODO: weakref to proxies for graceful shutdown?
         ws = web.WebSocketResponse(
             autoping=False,
-            max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"],
+            max_msg_size=root_ctx.unified_config.local.manager.max_wsmsg_size,
         )
         await ws.prepare(request)
         proxy = proxy_cls(
@@ -690,13 +689,12 @@ async def handle_kernel_terminating(
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
     redis_live = root_ctx.redis_live
-    shared_config: SharedConfig = root_ctx.shared_config
     try:
         while True:
             try:
+                # TODO: Use `no_packet_timeout` from the shared config after resolving type issue.
                 no_packet_timeout: timedelta = tx.TimeDuration().check(
-                    await shared_config.etcd.get("config/idle/app-streaming-packet-timeout")
-                    or "5m",
+                    await root_ctx.etcd.get("config/idle/app-streaming-packet-timeout") or "5m",
                 )
             except GRPCStatusError as e:
                 err_detail = e.args[0]

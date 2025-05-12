@@ -22,8 +22,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
+        unified_config=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -197,11 +196,15 @@ FIXTURES = [
 )
 async def test_batch_load_by_id(
     test_case,
+    mock_etcd_ctx,
+    mock_unified_config_ctx,
     database_fixture,
     create_app_and_client,
 ):
     test_app, _ = await create_app_and_client(
         [
+            mock_etcd_ctx,
+            mock_unified_config_ctx,
             database_ctx,
         ],
         [],
