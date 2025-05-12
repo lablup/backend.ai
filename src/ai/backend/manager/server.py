@@ -372,7 +372,7 @@ async def unified_config_ctx(
         base_local_config.model_dump(by_alias=True), raw_unified_cfg
     )
     local_config = ManagerLocalConfig.model_validate(merged_raw_local_config)
-    shared_config = ManagerSharedConfig(**raw_unified_cfg)
+    shared_config = ManagerSharedConfig.model_validate(raw_unified_cfg)
 
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
