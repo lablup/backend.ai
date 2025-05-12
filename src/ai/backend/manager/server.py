@@ -75,7 +75,6 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
-from ai.backend.manager.config.loader.etcd_loader import EtcdConfigLoader
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
 from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
@@ -362,7 +361,6 @@ async def unified_config_ctx(
         loaders.append(toml_config_loader)
     legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     loaders.append(legacy_etcd_loader)
-    loaders.append(EtcdConfigLoader(root_ctx.etcd))
     unified_config_loader = LoaderChain(loaders)
 
     raw_unified_cfg = await unified_config_loader.load()
