@@ -19,6 +19,7 @@ class MockAction(BaseAction):
     def entity_id(self) -> Optional[str]:
         return self.id
 
+    # TODO: Make this classmethod?
     def entity_type(self) -> str:
         return self.type
 

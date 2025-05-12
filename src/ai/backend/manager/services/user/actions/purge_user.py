@@ -17,7 +17,8 @@ class PurgeUserAction(UserAction):
     def entity_id(self) -> Optional[str]:
         return None
 
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "purge"
 
 

@@ -15,7 +15,9 @@ from ..types import VFolderInvitationInfo
 
 @dataclass
 class VFolderInvitationAction(BaseAction):
-    def entity_type(self):
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
         return "vfolder_invitation"
 
 
@@ -33,7 +35,8 @@ class InviteVFolderAction(VFolderInvitationAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "invite"
 
 
@@ -56,7 +59,8 @@ class AcceptInvitationAction(VFolderInvitationAction):
         return str(self.invitation_id)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "accept"
 
 
@@ -79,7 +83,8 @@ class RejectInvitationAction(VFolderInvitationAction):
         return str(self.invitation_id)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "reject"
 
 
@@ -104,7 +109,8 @@ class UpdateInvitationAction(VFolderInvitationAction):
         return str(self.invitation_id)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "update"
 
 
@@ -126,7 +132,8 @@ class ListInvitationAction(VFolderInvitationAction):
         return str(self.requester_user_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "list"
 
 
@@ -151,7 +158,8 @@ class LeaveInvitedVFolderAction(VFolderInvitationAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "leave"
 
 

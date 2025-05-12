@@ -13,11 +13,13 @@ class ContainerMetricMetadataAction(BaseAction):
         return None
 
     @override
-    def entity_type(self) -> str:
+    @classmethod
+    def entity_type(cls) -> str:
         return "container_metric_metadata"
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "query"
 
 
@@ -44,11 +46,13 @@ class ContainerMetricAction(BaseAction):
         return None
 
     @override
-    def entity_type(self) -> str:
+    @classmethod
+    def entity_type(cls) -> str:
         return "container_metric"
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "query"
 
 

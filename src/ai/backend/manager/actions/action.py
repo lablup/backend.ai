@@ -14,15 +14,18 @@ class BaseAction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def entity_type(self) -> str:
+    @classmethod
+    def entity_type(cls) -> str:
         raise NotImplementedError
 
     @abstractmethod
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         raise NotImplementedError
 
-    def type(self) -> str:
-        return f"{self.entity_type()}:{self.operation_type()}"
+    @classmethod
+    def type(cls) -> str:
+        return f"{cls.entity_type()}:{cls.operation_type()}"
 
 
 @dataclass
@@ -37,11 +40,13 @@ class BaseBatchAction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def entity_type(self) -> str:
+    @classmethod
+    def entity_type(cls) -> str:
         raise NotImplementedError
 
     @abstractmethod
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         raise NotImplementedError
 
 
