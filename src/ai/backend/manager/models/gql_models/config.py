@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Final, Self
 
 import graphene
 
@@ -10,7 +10,7 @@ from ai.backend.manager.models.user import UserRole
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 
-_PREFIX = "ai/backend/config"
+_PREFIX: Final[str] = "ai/backend/config"
 
 
 class AvailableService(graphene.ObjectType):
