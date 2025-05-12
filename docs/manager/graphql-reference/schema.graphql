@@ -335,7 +335,7 @@ type Queries {
   container_utilization_metric_metadata: ContainerUtilizationMetricMetadata
 
   """Added in 25.8.0."""
-  config_schema: AvailableService
+  available_service: AvailableService
 
   """Added in 25.8.0."""
   config(service: String!): Config

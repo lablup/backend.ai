@@ -1174,7 +1174,7 @@ class Queries(graphene.ObjectType):
         description="Added in 25.6.0.",
     )
 
-    config_schema = graphene.Field(
+    available_service = graphene.Field(
         AvailableService,
         description="Added in 25.8.0.",
     )
