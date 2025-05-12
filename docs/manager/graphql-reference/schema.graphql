@@ -2115,6 +2115,9 @@ type Config {
 
   """Configuration to mutate. Added in 25.8.0."""
   configuration: JSONString!
+
+  """JSON schema of the configuration. Added in 25.8.0."""
+  schema: JSONString!
 }
 
 """All available GraphQL mutations."""

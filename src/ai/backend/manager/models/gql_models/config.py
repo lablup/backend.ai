@@ -56,6 +56,11 @@ class Config(graphene.ObjectType):
         required=True,
         description="Configuration to mutate. Added in 25.8.0.",
     )
+    schema = graphene.JSONString(
+        required=False,
+        default_value=None,
+        description="JSON schema of the configuration. Added in 25.8.0.",
+    )
 
     class Meta:
         description = "Added in 25.8.0."
@@ -69,10 +74,12 @@ class Config(graphene.ObjectType):
             ctx.unified_config.shared, paths
         )
 
+        schema = result.model_json_schema() if isinstance(result, BaseModel) else None
         return cls(
             component=component,
             server_id=server_id,
             configuration=_dump_json_str(result),
+            schema=schema,
         )
 
 
