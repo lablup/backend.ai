@@ -23,7 +23,7 @@ from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogNode,
     AuditLogSchema,
 )
-from ai.backend.manager.models.gql_models.config import AvailableService, Config, ModifyEtcdConfigs
+from ai.backend.manager.models.gql_models.config import AvailableService, Config, ModifyConfigs
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -380,7 +380,7 @@ class Mutations(graphene.ObjectType):
     delete_resource_preset = DeleteResourcePreset.Field()
 
     # super-admin only
-    modify_etcd_configs = ModifyEtcdConfigs.Field(description="Added in 25.8.0")
+    modify_configs = ModifyConfigs.Field(description="Added in 25.8.0")
 
     # super-admin only
     create_scaling_group = CreateScalingGroup.Field()

@@ -13,6 +13,21 @@ if TYPE_CHECKING:
 _PREFIX = "ai/backend/config"
 
 
+class AvailableService(graphene.ObjectType):
+    """
+    Added in 25.8.0.
+    """
+
+    service_variants = graphene.List(
+        graphene.String,
+        required=True,
+        description='Possible values of "Config.service". Added in 25.8.0.',
+    )
+
+    async def resolve_component_variants(self, info: graphene.ResolveInfo) -> list[str]:
+        return ["manager", "common"]
+
+
 class Config(graphene.ObjectType):
     """
     Added in 25.8.0.
@@ -60,22 +75,7 @@ class Config(graphene.ObjectType):
         )
 
 
-class AvailableService(graphene.ObjectType):
-    """
-    Added in 25.8.0.
-    """
-
-    service_variants = graphene.List(
-        graphene.String,
-        required=True,
-        description='Possible values of "Config.service". Added in 25.8.0.',
-    )
-
-    async def resolve_component_variants(self, info: graphene.ResolveInfo) -> list[str]:
-        return ["manager", "common"]
-
-
-class ModifyEtcdConfigsInput(graphene.InputObjectType):
+class ModifyConfigsInput(graphene.InputObjectType):
     """
     Added in 25.8.0.
     """
@@ -90,7 +90,7 @@ class ModifyEtcdConfigsInput(graphene.InputObjectType):
     )
 
 
-class ModifyEtcdConfigsPayload(graphene.ObjectType):
+class ModifyConfigsPayload(graphene.ObjectType):
     """
     Added in 25.8.0.
     """
@@ -106,18 +106,18 @@ class ModifyEtcdConfigsPayload(graphene.ObjectType):
     allowed_roles = (UserRole.SUPERADMIN,)
 
 
-class ModifyEtcdConfigs(graphene.Mutation):
+class ModifyConfigs(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
-    Output = ModifyEtcdConfigsPayload
+    Output = ModifyConfigsPayload
 
     class Meta:
         description = "Added in 25.8.0."
 
-    Output = ModifyEtcdConfigsPayload
+    Output = ModifyConfigsPayload
 
     class Arguments:
-        input = ModifyEtcdConfigsInput(required=True, description="Added in 25.8.0.")
+        input = ModifyConfigsInput(required=True, description="Added in 25.8.0.")
 
     @classmethod
     def _get_key(cls, service: str) -> str:
@@ -128,8 +128,8 @@ class ModifyEtcdConfigs(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        input: ModifyEtcdConfigsInput,
-    ) -> ModifyEtcdConfigsPayload:
+        input: ModifyConfigsInput,
+    ) -> ModifyConfigsPayload:
         ctx: GraphQueryContext = info.context
 
         merged_raw_unified_config = deep_merge(
@@ -143,7 +143,7 @@ class ModifyEtcdConfigs(graphene.Mutation):
 
         await ctx.etcd.put_prefix(cls._get_key(input.service), input.configuration)
 
-        return ModifyEtcdConfigsPayload(
+        return ModifyConfigsPayload(
             configuration=input.configuration,
             service=input.service,
         )

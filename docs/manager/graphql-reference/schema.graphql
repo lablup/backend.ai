@@ -2242,10 +2242,10 @@ type Mutations {
   ): DeleteResourcePreset
 
   """Added in 25.8.0"""
-  modify_etcd_configs(
+  modify_configs(
     """Added in 25.8.0."""
-    input: ModifyEtcdConfigsInput!
-  ): ModifyEtcdConfigsPayload
+    input: ModifyConfigsInput!
+  ): ModifyConfigsPayload
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup
@@ -3081,7 +3081,7 @@ type DeleteResourcePreset {
 }
 
 """Added in 25.8.0."""
-type ModifyEtcdConfigsPayload {
+type ModifyConfigsPayload {
   """Service name. Added in 25.8.0."""
   service: String!
 
@@ -3090,7 +3090,7 @@ type ModifyEtcdConfigsPayload {
 }
 
 """Added in 25.8.0."""
-input ModifyEtcdConfigsInput {
+input ModifyConfigsInput {
   """Service name. Added in 25.8.0."""
   service: String!
 
