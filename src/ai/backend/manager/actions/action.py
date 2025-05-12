@@ -13,13 +13,13 @@ class BaseAction(ABC):
     def entity_id(self) -> Optional[str]:
         raise NotImplementedError
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def entity_type(cls) -> str:
         raise NotImplementedError
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def operation_type(cls) -> str:
         raise NotImplementedError
 
@@ -39,13 +39,13 @@ class BaseBatchAction(ABC):
     def entity_ids(self) -> list[str]:
         raise NotImplementedError
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def entity_type(cls) -> str:
         raise NotImplementedError
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def operation_type(cls) -> str:
         raise NotImplementedError
 
