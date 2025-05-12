@@ -83,7 +83,7 @@ class Config(graphene.ObjectType):
         )
 
 
-class EtcdConfigSchema(graphene.ObjectType):
+class ConfigSchema(graphene.ObjectType):
     """
     Added in 25.8.0.
     """

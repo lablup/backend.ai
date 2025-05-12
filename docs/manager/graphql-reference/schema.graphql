@@ -335,7 +335,7 @@ type Queries {
   container_utilization_metric_metadata: ContainerUtilizationMetricMetadata
 
   """Added in 25.8.0."""
-  etcd_config_schema: EtcdConfigSchema
+  config_schema: ConfigSchema
 
   """Added in 25.8.0."""
   config(component: String!, server_id: String!, paths: [String]!): Config
@@ -2100,7 +2100,7 @@ type ContainerUtilizationMetricMetadata {
 }
 
 """Added in 25.8.0."""
-type EtcdConfigSchema {
+type ConfigSchema {
   """Possible values of "Config.component". Added in 25.8.0."""
   component_variants: [String]!
 }
@@ -2117,7 +2117,7 @@ type Config {
   configuration: JSONString!
 
   """JSON schema of the configuration. Added in 25.8.0."""
-  schema: JSONString!
+  schema: JSONString
 }
 
 """All available GraphQL mutations."""

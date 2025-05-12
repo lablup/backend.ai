@@ -23,7 +23,7 @@ from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogNode,
     AuditLogSchema,
 )
-from ai.backend.manager.models.gql_models.config import Config, EtcdConfigSchema, ModifyEtcdConfigs
+from ai.backend.manager.models.gql_models.config import Config, ConfigSchema, ModifyEtcdConfigs
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -1174,8 +1174,8 @@ class Queries(graphene.ObjectType):
         description="Added in 25.6.0.",
     )
 
-    etcd_config_schema = graphene.Field(
-        EtcdConfigSchema,
+    config_schema = graphene.Field(
+        ConfigSchema,
         description="Added in 25.8.0.",
     )
     config = graphene.Field(
