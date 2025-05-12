@@ -2114,7 +2114,7 @@ type Config {
   server_id: String!
 
   """Configuration to mutate. Added in 25.8.0."""
-  configs: JSONString!
+  configuration: JSONString!
 }
 
 """All available GraphQL mutations."""
@@ -3083,7 +3083,7 @@ type DeleteResourcePreset {
 """Added in 25.8.0."""
 type ModifyEtcdConfigsPayload {
   """Configuration to mutate. Added in 25.8.0."""
-  configs: JSONString!
+  configuration: JSONString!
 }
 
 """Added in 25.8.0."""
@@ -3092,7 +3092,7 @@ input ModifyEtcdConfigsInput {
   component: String!
 
   """Configuration to mutate. Added in 25.8.0."""
-  configs: JSONString!
+  configuration: JSONString!
 }
 
 type CreateScalingGroup {

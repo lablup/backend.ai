@@ -52,7 +52,7 @@ class Config(graphene.ObjectType):
         required=True,
         description="Server ID. Added in 25.8.0.",
     )
-    configs = graphene.JSONString(
+    configuration = graphene.JSONString(
         required=True,
         description="Configuration to mutate. Added in 25.8.0.",
     )
@@ -72,7 +72,7 @@ class Config(graphene.ObjectType):
         return cls(
             component=component,
             server_id=server_id,
-            configs=_dump_json_str(result),
+            configuration=_dump_json_str(result),
         )
 
 
@@ -100,7 +100,7 @@ class ModifyEtcdConfigsInput(graphene.InputObjectType):
         required=True,
         description="Component name. Added in 25.8.0.",
     )
-    configs = graphene.JSONString(
+    configuration = graphene.JSONString(
         required=True,
         description="Configuration to mutate. Added in 25.8.0.",
     )
@@ -111,7 +111,7 @@ class ModifyEtcdConfigsPayload(graphene.ObjectType):
     Added in 25.8.0.
     """
 
-    configs = graphene.JSONString(
+    configuration = graphene.JSONString(
         required=True,
         description="Configuration to mutate. Added in 25.8.0.",
     )
@@ -146,14 +146,14 @@ class ModifyEtcdConfigs(graphene.Mutation):
         )
         merged_raw_unified_config = deep_merge(
             merged_raw_unified_config,
-            input.configs,
+            input.configuration,
         )
 
         ctx.unified_config.local = ManagerLocalConfig.model_validate(merged_raw_unified_config)
         ctx.unified_config.shared = ManagerSharedConfig.model_validate(merged_raw_unified_config)
 
-        await ctx.etcd.put_prefix(f"{_PREFIX}/{input.component}", input.configs)
+        await ctx.etcd.put_prefix(f"{_PREFIX}/{input.component}", input.configuration)
 
         return ModifyEtcdConfigsPayload(
-            configs=input.configs,
+            configuration=input.configuration,
         )
