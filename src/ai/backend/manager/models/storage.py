@@ -201,12 +201,9 @@ class StorageSessionManager:
         *args,
         **kwargs,
     ) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientResponse]]:
-        log.warning("vfolder_host_or_proxy_name: {}", vfolder_host_or_proxy_name)
         proxy_name, _ = self.get_proxy_and_volume(vfolder_host_or_proxy_name)
-        log.warning("proxy_name: {}", proxy_name)
         try:
             proxy_info = self._proxies[proxy_name]
-            log.warning("proxy_info: {}", proxy_info)
         except KeyError:
             raise InvalidArgument("There is no such storage proxy", proxy_name)
         headers = kwargs.pop("headers", {})
