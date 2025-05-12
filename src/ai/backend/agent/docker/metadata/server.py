@@ -13,6 +13,7 @@ from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.docker import LabelName
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 from ai.backend.logging import BraceStyleAdapter
@@ -56,13 +57,12 @@ async def container_resolver_middleware(
     else:
         return web.Response(status=HTTPStatus.FORBIDDEN)
     async with closing_async(Docker()) as docker:
-        containers = await docker.containers.list(
-            filters=(
-                '{"label":["'
-                + LabelName.KERNEL_ID.value
-                + '"],"network":["bridge"],"status":["running"]}'
-            )
-        )
+        filters = dump_json_str({
+            "label": [LabelName.KERNEL_ID],
+            "network": ["bridge"],
+            "status": ["running"],
+        })
+        containers = await docker.containers.list(filters=filters)
     target_container = list(
         filter(
             lambda x: x["NetworkSettings"]["Networks"].get("bridge", {}).get("IPAddress")
@@ -76,7 +76,7 @@ async def container_resolver_middleware(
     request["container-ip"] = container_ip
     request["container"] = target_container[0]
     request["kernel"] = request.app["kernel-registry"].get(
-        UUID(target_container[0]["Labels"][LabelName.KERNEL_ID.value])
+        UUID(target_container[0]["Labels"][LabelName.KERNEL_ID])
     )
     return await handler(request)
 
