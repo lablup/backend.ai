@@ -1,6 +1,8 @@
 import asyncio
+import logging
 from typing import Awaitable, Callable, Optional
 
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 
@@ -8,6 +10,8 @@ from .loader.legacy_etcd_loader import LegacyEtcdLoader
 from .shared import ManagerSharedConfig
 
 SharedConfigChangeCallback = Callable[[ManagerSharedConfig], Awaitable[None]]
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ManagerUnifiedConfig:
@@ -42,12 +46,13 @@ class ManagerUnifiedConfig:
 
     async def _run_watcher(self) -> None:
         async for event in self._etcd_watcher.watch():
-            # TODO: Handle all etcd_loader.load() here
-            pass
+            raw_config = await self._loader.load()
+            self._config = ManagerSharedConfig.model_validate(raw_config)
+            log.debug("config reloaded due to etcd event.")
 
     async def init(self) -> None:
-        raw_shared_config = await self._loader.load()
-        self._config = ManagerSharedConfig.model_validate(raw_shared_config)
+        raw_config = await self._loader.load()
+        self._config = ManagerSharedConfig.model_validate(raw_config)
         self._etcd_watcher_task = asyncio.create_task(self._run_watcher())
 
     async def terminate(self) -> None:
