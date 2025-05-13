@@ -20,7 +20,6 @@ from ..models import (
     KernelRow,
     KernelStatus,
     SessionRow,
-    SessionStatus,
 )
 from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper
 
@@ -34,7 +33,7 @@ class KernelSweeper(AbstractSweeper):
             sa.select(KernelRow)
             .join(SessionRow, KernelRow.session_id == SessionRow.id)
             .where(KernelRow.status.not_in({*DEAD_KERNEL_STATUSES, KernelStatus.ERROR}))
-            .where(SessionRow.status.in_({*DEAD_SESSION_STATUSES, SessionStatus.ERROR}))
+            .where(SessionRow.status.in_(DEAD_SESSION_STATUSES))
             .options(
                 noload("*"),
                 load_only(
