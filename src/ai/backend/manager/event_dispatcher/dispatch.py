@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from ai.backend.common.events.bgtask import (
     BgtaskCancelledEvent,
@@ -11,7 +12,11 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.events.reporter import AbstractEventReporter, EventProtocol
 from ai.backend.manager.event_dispatcher.propagator import PropagatorEventDispatcher
+
+from ..models.event_log import EventLogRow
+from ..models.utils import ExtendedAsyncSAEngine
 
 
 def _dispatch_bgtask_events(
@@ -51,3 +56,37 @@ class Dispatchers:
         Dispatch events to the appropriate dispatcher.
         """
         _dispatch_bgtask_events(event_dispatcher, self.propagator_dispatcher)
+
+
+class EventLogger(AbstractEventReporter):
+    def __init__(self, db: ExtendedAsyncSAEngine):
+        self._db = db
+
+    async def on_consumer_start(
+        self,
+        event: EventProtocol,
+    ) -> None:
+        async with self._db.begin_session() as session:
+            event_log = EventLogRow.from_event(event)
+            session.add(event_log)
+            await session.flush()
+
+    async def on_consumer_complete(
+        self,
+        event: EventProtocol,
+        duration: Optional[float] = None,
+    ) -> None:
+        pass
+
+    async def on_subscriber_start(
+        self,
+        event: EventProtocol,
+    ) -> None:
+        pass
+
+    async def on_subscriber_complete(
+        self,
+        event: EventProtocol,
+        duration: Optional[float] = None,
+    ) -> None:
+        pass

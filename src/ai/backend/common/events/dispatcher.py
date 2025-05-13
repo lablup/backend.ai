@@ -35,6 +35,8 @@ from .. import msgpack
 from ..types import (
     AgentId,
 )
+from .reporter import EventProtocol
+from .types import EventDomain
 
 __all__ = (
     "AbstractEvent",
@@ -45,21 +47,6 @@ __all__ = (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class EventDomain(enum.StrEnum):
-    BGTASK = "bgtask"
-    IMAGE = "image"
-    KERNEL = "kernel"
-    MODEL_SERVING = "model_serving"
-    MODEL_ROUTE = "model_route"
-    SCHEDULE = "schedule"
-    IDLE_CHECK = "idle_check"
-    SESSION = "session"
-    AGENT = "agent"
-    VFOLDER = "vfolder"
-    VOLUME = "volume"
-    LOG = "log"
 
 
 class AbstractEvent(ABC):
@@ -119,6 +106,70 @@ EventCallback = Union[
     Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]],
     Callable[[TContext, AgentId, TEvent], None],
 ]
+
+
+class EventReporterProtocol(Protocol):
+    async def on_consumer_start(
+        self,
+        event: EventProtocol,
+    ) -> None:
+        pass
+
+    async def on_consumer_complete(
+        self,
+        event: EventProtocol,
+        duration: Optional[float] = None,
+    ) -> None:
+        pass
+
+    async def on_subscriber_start(
+        self,
+        event: EventProtocol,
+    ) -> None:
+        pass
+
+    async def on_subscriber_complete(
+        self,
+        event: EventProtocol,
+        duration: Optional[float] = None,
+    ) -> None:
+        pass
+
+
+class NopEventReporter:
+    def __init__(self):
+        pass
+
+    async def on_consumer_start(
+        self,
+        event: EventProtocol,
+    ) -> None:
+        pass
+
+    async def on_consumer_complete(
+        self,
+        event: EventProtocol,
+        duration: Optional[float] = None,
+    ) -> None:
+        pass
+
+    async def on_subscriber_start(
+        self,
+        event: EventProtocol,
+    ) -> None:
+        pass
+
+    async def on_subscriber_complete(
+        self,
+        event: EventProtocol,
+        duration: Optional[float] = None,
+    ) -> None:
+        pass
+
+
+class EventHandlerType(enum.Enum):
+    CONSUMER = "CONSUMER"
+    SUBSCRIBER = "SUBSCRIBER"
 
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
@@ -247,6 +298,7 @@ class EventDispatcher:
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
         event_observer: EventObserver = NopEventObserver(),
+        reporter: EventReporterProtocol = NopEventReporter(),
     ) -> None:
         self._log_events = log_events
         self._closed = False
@@ -254,6 +306,7 @@ class EventDispatcher:
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
         self._metric_observer = event_observer
+        self._reporter = reporter
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -288,8 +341,8 @@ class EventDispatcher:
         callback: EventCallback[TContext, TEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
-        name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
     ) -> EventHandler[TContext, TEvent]:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
@@ -367,7 +420,9 @@ class EventDispatcher:
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
-    async def handle(self, evh_type: str, evh: EventHandler, source: AgentId, args: tuple) -> None:
+    async def _handle(
+        self, evh_type: EventHandlerType, evh: EventHandler, source: AgentId, args: tuple
+    ) -> None:
         if evh.args_matcher and not evh.args_matcher(args):
             return
         coalescing_opts = evh.coalescing_opts
@@ -376,16 +431,27 @@ class EventDispatcher:
         event_cls = evh.event_cls
         if self._closed:
             return
+
+        match evh_type:
+            case EventHandlerType.CONSUMER:
+                on_start = self._reporter.on_consumer_start
+                on_complete = self._reporter.on_consumer_complete
+            case EventHandlerType.SUBSCRIBER:
+                on_start = self._reporter.on_subscriber_start
+                on_complete = self._reporter.on_subscriber_complete
         if await coalescing_state.rate_control(coalescing_opts):
             if self._closed:
                 return
             if self._log_events:
-                log.debug("DISPATCH_{}(evh:{})", evh_type, evh.name)
+                log.debug("DISPATCH_{}(evh:{})", str(evh_type), evh.name)
+            event = event_cls.deserialize(args)
+            await on_start(event)
             if asyncio.iscoroutinefunction(cb):
                 # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                await cb(evh.context, source, event_cls.deserialize(args))  # type: ignore
+                await cb(evh.context, source, event)  # type: ignore
             else:
-                cb(evh.context, source, event_cls.deserialize(args))  # type: ignore
+                cb(evh.context, source, event)  # type: ignore
+            await on_complete(event)
 
     async def dispatch_consumers(
         self,
@@ -397,7 +463,7 @@ class EventDispatcher:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
         for consumer in self._consumers[event_name].copy():
             self._consumer_taskgroup.create_task(
-                self.handle("CONSUMER", consumer, source, args),
+                self._handle(EventHandlerType.CONSUMER, consumer, source, args),
             )
             await asyncio.sleep(0)
 
@@ -411,7 +477,7 @@ class EventDispatcher:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
         for subscriber in self._subscribers[event_name].copy():
             self._subscriber_taskgroup.create_task(
-                self.handle("SUBSCRIBER", subscriber, source, args),
+                self._handle(EventHandlerType.SUBSCRIBER, subscriber, source, args),
             )
             await asyncio.sleep(0)
 

@@ -81,7 +81,7 @@ from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
-from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
+from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers, EventLogger
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
@@ -569,10 +569,12 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         source=AGENTID_MANAGER,
         log_events=root_ctx.unified_config.local.debug.log_events,
     )
+    event_logger = EventLogger(root_ctx.db)
     root_ctx.event_dispatcher = EventDispatcher(
         mq,
         log_events=root_ctx.unified_config.local.debug.log_events,
         event_observer=root_ctx.metrics.event,
+        reporter=event_logger,
     )
     dispatchers = Dispatchers(DispatcherArgs(root_ctx.event_hub))
     dispatchers.dispatch(root_ctx.event_dispatcher)
