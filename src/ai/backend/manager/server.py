@@ -77,6 +77,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.bootstrap import BootstrapConfig
+from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
 from ai.backend.manager.config.loader.etcd_loader import (
     EtcdCommonConfigLoader,
     EtcdManagerConfigLoader,
@@ -359,7 +360,7 @@ async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncI
 
 @actxmgr
 async def unified_config_ctx(
-    root_ctx: RootContext, config_path: Optional[Path] = None
+    root_ctx: RootContext, log_level: LogLevel, config_path: Optional[Path] = None
 ) -> AsyncIterator[ManagerUnifiedConfig]:
     loaders: list[AbstractConfigLoader] = []
 
@@ -367,15 +368,27 @@ async def unified_config_ctx(
         toml_config_loader = TomlConfigLoader(config_path, "manager")
         loaders.append(toml_config_loader)
     else:
-        log.warning("No config file path specified. Skipped creating toml file loader...")
+        log.warning("No config file path specified. Skipped loading toml config file...")
 
     legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     loaders.append(legacy_etcd_loader)
     loaders.append(LegacyEtcdVolumesLoader(root_ctx.etcd))
     loaders.append(EtcdCommonConfigLoader(root_ctx.etcd))
     loaders.append(EtcdManagerConfigLoader(root_ctx.etcd))
-    unified_config_loader = LoaderChain(loaders)
 
+    overrides: list[tuple[tuple[str, ...], Any]] = [
+        (("debug", "enabled"), log_level == LogLevel.DEBUG),
+    ]
+    if log_level != LogLevel.NOTSET:
+        overrides += [
+            (("logging", "level"), log_level),
+            (("logging", "pkg-ns", "ai.backend"), log_level),
+            (("logging", "pkg-ns", "aiohttp"), log_level),
+        ]
+
+    loaders.append(ConfigOverrider(overrides))
+
+    unified_config_loader = LoaderChain(loaders)
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
     unified_config = ManagerUnifiedConfig(
@@ -1054,6 +1067,7 @@ class ServerMainArgs:
     bootstrap_cfg: BootstrapConfig
     bootstrap_cfg_path: Path
     log_endpoint: str
+    log_level: LogLevel
 
 
 @actxmgr
@@ -1094,7 +1108,7 @@ async def server_main(
     try:
         async with (
             etcd_ctx(root_ctx, boostrap_config.etcd.to_dataclass()),
-            unified_config_ctx(root_ctx, args.bootstrap_cfg_path),
+            unified_config_ctx(root_ctx, args.log_level, args.bootstrap_cfg_path),
             webapp_plugin_ctx(root_app),
         ):
             ssl_ctx = None
@@ -1182,6 +1196,7 @@ async def server_main_logwrapper(
         bootstrap_cfg=tuple_args[0],
         bootstrap_cfg_path=tuple_args[1],
         log_endpoint=tuple_args[2],
+        log_level=tuple_args[3],
     )
 
     logger = Logger(
@@ -1271,7 +1286,7 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
-                        args=(bootstrap_cfg, discovered_cfg_path, log_endpoint),
+                        args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
                         wait_timeout=5.0,
                     )
                 finally:

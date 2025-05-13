@@ -8,7 +8,7 @@ import sys
 import uuid
 from datetime import datetime
 from functools import partial
-from typing import cast
+from typing import Optional, cast
 
 import click
 from more_itertools import chunked
@@ -18,6 +18,7 @@ from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.config import find_config_file
 from ai.backend.common.validators import TimeDuration
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.models import error_logs
@@ -56,9 +57,9 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: pathlib.Path,
     log_level: LogLevel,
     debug: bool,
+    config_path: Optional[pathlib.Path] = None,
 ) -> None:
     """
     Manager Administration CLI
@@ -66,6 +67,10 @@ def main(
     setproctitle("backend.ai: manager.cli")
     if debug:
         log_level = LogLevel.DEBUG
+
+    if not config_path:
+        config_path = find_config_file("manager")
+
     ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 

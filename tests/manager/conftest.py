@@ -296,7 +296,7 @@ def mock_etcd_ctx(
 def mock_unified_config_ctx(
     local_config,
 ) -> Any:
-    argument_binding_ctx = partial(unified_config_ctx, config_path=None)
+    argument_binding_ctx = partial(unified_config_ctx, log_level=LogLevel.DEBUG, config_path=None)
     update_wrapper(argument_binding_ctx, unified_config_ctx)
     return argument_binding_ctx
 
