@@ -360,7 +360,10 @@ async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncI
 
 @actxmgr
 async def unified_config_ctx(
-    root_ctx: RootContext, log_level: LogLevel, config_path: Optional[Path] = None
+    root_ctx: RootContext,
+    log_level: LogLevel,
+    config_path: Optional[Path] = None,
+    extra_config: Optional[Mapping[str, Any]] = None,
 ) -> AsyncIterator[ManagerUnifiedConfig]:
     loaders: list[AbstractConfigLoader] = []
 
@@ -388,7 +391,7 @@ async def unified_config_ctx(
 
     loaders.append(ConfigOverrider(overrides))
 
-    unified_config_loader = LoaderChain(loaders)
+    unified_config_loader = LoaderChain(loaders, base_config=extra_config)
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
     unified_config = ManagerUnifiedConfig(
@@ -398,7 +401,7 @@ async def unified_config_ctx(
     )
 
     try:
-        await unified_config.load()
+        await unified_config.create()
         root_ctx.unified_config = unified_config
         yield root_ctx.unified_config
     finally:

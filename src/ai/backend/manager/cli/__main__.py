@@ -68,7 +68,7 @@ def main(
     if debug:
         log_level = LogLevel.DEBUG
 
-    if not config_path:
+    if config_path is None:
         config_path = find_config_file("manager")
 
     ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))

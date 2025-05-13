@@ -21,6 +21,7 @@ from .loader.loader_chain import LoaderChain
 from .loader.toml_loader import TomlConfigLoader
 
 
+# TODO: Remove useless config fields from this
 class BootstrapConfig(BaseModel):
     db: DatabaseConfig = Field(
         description="""

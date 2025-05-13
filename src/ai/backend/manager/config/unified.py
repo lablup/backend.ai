@@ -11,10 +11,11 @@ SharedConfigChangeCallback = Callable[[ManagerSharedConfig], Awaitable[None]]
 
 
 class ManagerUnifiedConfig:
-    _config: ManagerSharedConfig
     _loader: LoaderChain
+    _config: Optional[ManagerSharedConfig]
     _etcd_watcher: EtcdConfigWatcher
     _etcd_watcher_task: Optional[asyncio.Task[None]]
+    # TODO: Remove `_legacy_etcd_config_loader` when legacy etcd methods are removed
     _legacy_etcd_config_loader: LegacyEtcdLoader
 
     def __init__(
@@ -23,12 +24,16 @@ class ManagerUnifiedConfig:
         legacy_etcd_config_loader: LegacyEtcdLoader,
         etcd_watcher: EtcdConfigWatcher,
     ) -> None:
+        self._config = None
         self._loader = loader
         self._legacy_etcd_config_loader = legacy_etcd_config_loader
         self._etcd_watcher = etcd_watcher
+        self._etcd_watcher_task = None
 
     @property
     def shared(self) -> ManagerSharedConfig:
+        if self._config is None:
+            raise RuntimeError("Shared config is not initialized")
         return self._config
 
     @property
@@ -40,7 +45,7 @@ class ManagerUnifiedConfig:
             # TODO: Handle all etcd_loader.load() here
             pass
 
-    async def load(self) -> None:
+    async def create(self) -> None:
         raw_shared_config = await self._loader.load()
         self._config = ManagerSharedConfig.model_validate(raw_shared_config)
         self._etcd_watcher_task = asyncio.create_task(self._run_watcher())

@@ -34,8 +34,7 @@ def get_graphquery_context(
     database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ) -> GraphQueryContext:
     unified_config = ManagerUnifiedConfig(
-        local=MagicMock(),  # type: ignore
-        shared=shared_config,
+        loader=MagicMock(),
         legacy_etcd_config_loader=MagicMock(),  # type: ignore
         etcd_watcher=MagicMock(),
     )

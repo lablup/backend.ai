@@ -270,7 +270,7 @@ def bootstrap_config(
 
 @pytest.fixture(scope="session")
 def mock_etcd_ctx(
-    bootstrap_config,
+    bootstrap_config: BootstrapConfig,
 ) -> Any:
     argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
     update_wrapper(argument_binding_ctx, etcd_ctx)
@@ -279,9 +279,12 @@ def mock_etcd_ctx(
 
 @pytest.fixture(scope="session")
 def mock_unified_config_ctx(
-    bootstrap_config,
+    bootstrap_config: BootstrapConfig,
 ) -> Any:
-    argument_binding_ctx = partial(unified_config_ctx, log_level=LogLevel.DEBUG, config_path=None)
+    base_cfg = bootstrap_config.model_dump()
+    argument_binding_ctx = partial(
+        unified_config_ctx, log_level=LogLevel.DEBUG, config_path=None, extra_config=base_cfg
+    )
     update_wrapper(argument_binding_ctx, unified_config_ctx)
     return argument_binding_ctx
 

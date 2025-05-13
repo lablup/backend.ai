@@ -1660,6 +1660,7 @@ class ManagerSharedConfig(BaseModel):
         """,
     )
     etcd: EtcdConfig = Field(
+        default_factory=EtcdConfig,
         description="""
         Etcd configuration settings.
         Used for distributed coordination between manager instances.
@@ -1667,6 +1668,7 @@ class ManagerSharedConfig(BaseModel):
         """,
     )
     manager: ManagerConfig = Field(
+        default_factory=ManagerConfig,
         description="""
         Core manager service configuration.
         Controls how the manager operates, communicates, and scales.
@@ -1689,6 +1691,7 @@ class ManagerSharedConfig(BaseModel):
         """,
     )
     pyroscope: PyroscopeConfig = Field(
+        default_factory=PyroscopeConfig,
         description="""
         Pyroscope profiling configuration.
         Controls integration with the Pyroscope performance profiling tool.
@@ -1696,6 +1699,7 @@ class ManagerSharedConfig(BaseModel):
         """,
     )
     debug: DebugConfig = Field(
+        default_factory=DebugConfig,
         description="""
         Debugging options configuration.
         Controls various debugging features and tools.
@@ -1703,12 +1707,13 @@ class ManagerSharedConfig(BaseModel):
         """,
     )
     reporter: ReporterConfig = Field(
+        default_factory=ReporterConfig,
         description="""
         Reporter configuration.
         Controls how notifications and logs are reported.
         Includes settings for Audit Logs, and Action Monitors, and SMTP reporters.
         Each reporter can be configured with its own settings.
-        """
+        """,
     )
 
     # from legacy shared config
