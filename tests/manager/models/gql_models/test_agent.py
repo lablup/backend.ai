@@ -111,7 +111,7 @@ async def test_scan_gpu_alloc_maps(
     mock_etcd_ctx,
     mock_unified_config_ctx,
     client,
-    local_config,
+    bootstrap_config,
     etcd_fixture,
     database_fixture,
     create_app_and_client,

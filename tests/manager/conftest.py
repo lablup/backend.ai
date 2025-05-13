@@ -188,17 +188,7 @@ def ipc_base_path() -> Path:
 
 
 @pytest.fixture(scope="session")
-def local_config_loader():
-    return MagicMock()
-
-
-@pytest.fixture(scope="session")
-def shared_config_loader():
-    return MagicMock()
-
-
-@pytest.fixture(scope="session")
-def local_config(
+def bootstrap_config(
     test_id,
     ipc_base_path: Path,
     logging_config,
@@ -254,11 +244,6 @@ def local_config(
             "periodic-sync-stats": False,
         },
         "logging": logging_config,
-        "reporter": {
-            "smtp": [],
-            "audit-log": [],
-            "action-monitors": [],
-        },
     })
 
     def _override_if_exists(src: BaseModel, dst: BaseModel, key: str) -> None:
@@ -267,13 +252,13 @@ def local_config(
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = asyncio.run(BootstrapConfig.load_from_file(Path("dummy-manager.toml")))
-        cfg.etcd.addr = fs_local_config.etcd.addr
-        _override_if_exists(fs_local_config.etcd, cfg.etcd, "user")
-        _override_if_exists(fs_local_config.etcd, cfg.etcd, "password")
-        cfg.db.addr = fs_local_config.db.addr
-        _override_if_exists(fs_local_config.db, cfg.db, "user")
-        _override_if_exists(fs_local_config.db, cfg.db, "password")
+        fs_boostrap_config = asyncio.run(BootstrapConfig.load_from_file(Path("dummy-manager.toml")))
+        cfg.etcd.addr = fs_boostrap_config.etcd.addr
+        _override_if_exists(fs_boostrap_config.etcd, cfg.etcd, "user")
+        _override_if_exists(fs_boostrap_config.etcd, cfg.etcd, "password")
+        cfg.db.addr = fs_boostrap_config.db.addr
+        _override_if_exists(fs_boostrap_config.db, cfg.db, "user")
+        _override_if_exists(fs_boostrap_config.db, cfg.db, "password")
     except ConfigurationError:
         pass
     yield cfg
@@ -285,16 +270,16 @@ def local_config(
 
 @pytest.fixture(scope="session")
 def mock_etcd_ctx(
-    local_config,
+    bootstrap_config,
 ) -> Any:
-    argument_binding_ctx = partial(etcd_ctx, etcd_config=local_config.etcd.to_dataclass())
+    argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
     update_wrapper(argument_binding_ctx, etcd_ctx)
     return argument_binding_ctx
 
 
 @pytest.fixture(scope="session")
 def mock_unified_config_ctx(
-    local_config,
+    bootstrap_config,
 ) -> Any:
     argument_binding_ctx = partial(unified_config_ctx, log_level=LogLevel.DEBUG, config_path=None)
     update_wrapper(argument_binding_ctx, unified_config_ctx)
@@ -304,7 +289,7 @@ def mock_unified_config_ctx(
 @pytest.fixture(scope="session")
 def etcd_fixture(
     test_id,
-    local_config,
+    bootstrap_config,
     redis_container,  # noqa: F811
     vfolder_mount,
     vfolder_fsprefix,
@@ -317,7 +302,7 @@ def etcd_fixture(
         config_path=Path.cwd() / "dummy-manager.toml",
         log_level=LogLevel.DEBUG,
     )
-    cli_ctx._local_config = local_config  # override the lazy-loaded config
+    cli_ctx._bootstrap_config = bootstrap_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
             "manager": {"status": "running"},
@@ -368,9 +353,9 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, local_config, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
+async def shared_config(app, bootstrap_config, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    etcd = AsyncEtcd.initialize(bootstrap_config.etcd.to_dataclass())
     root_ctx.etcd = etcd
     etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     raw_shared_config = await etcd_loader.load()
@@ -379,14 +364,14 @@ async def shared_config(app, local_config, etcd_fixture) -> AsyncIterator[Manage
 
 
 @pytest.fixture(scope="session")
-def database(request, local_config, test_db) -> None:
+def database(request, bootstrap_config, test_db) -> None:
     """
     Create a new database for the current test session
     and install the table schema using alembic.
     """
-    db_addr = local_config.db.addr.to_legacy()
-    db_user = local_config.db.user
-    db_pass = local_config.db.password
+    db_addr = bootstrap_config.db.addr.to_legacy()
+    db_user = bootstrap_config.db.user
+    db_pass = bootstrap_config.db.password
 
     # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
@@ -469,7 +454,7 @@ def database(request, local_config, test_db) -> None:
         config_path=Path.cwd() / "dummy-manager.toml",
         log_level=LogLevel.DEBUG,
     )
-    cli_ctx._local_config = local_config  # override the lazy-loaded config
+    cli_ctx._bootstrap_config = bootstrap_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
@@ -486,8 +471,8 @@ def database(request, local_config, test_db) -> None:
 
 
 @pytest.fixture()
-async def database_engine(local_config, database):
-    async with connect_database(local_config.db) as db:
+async def database_engine(bootstrap_config, database):
+    async with connect_database(bootstrap_config.db) as db:
         yield db
 
 
@@ -497,14 +482,14 @@ def extra_fixtures():
 
 
 @pytest.fixture()
-def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterator[None]:
+def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Iterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
     """
-    db_addr = local_config.db.addr.to_legacy()
-    db_user = local_config.db.user
-    db_pass = local_config.db.password
+    db_addr = bootstrap_config.db.addr.to_legacy()
+    db_user = bootstrap_config.db.user
+    db_pass = bootstrap_config.db.password
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
@@ -635,20 +620,20 @@ class Client:
 
 
 @pytest.fixture
-async def app(local_config):
+async def app(bootstrap_config):
     """
     Create an empty application with the test configuration.
     """
     return build_root_app(
         0,
-        local_config,
+        bootstrap_config,
         cleanup_contexts=[],
         subapp_pkgs=[],
     )
 
 
 @pytest.fixture
-async def create_app_and_client(local_config) -> AsyncIterator:
+async def create_app_and_client(bootstrap_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
@@ -675,7 +660,7 @@ async def create_app_and_client(local_config) -> AsyncIterator:
                     _cleanup_ctxs.append(ctx)
         app = build_root_app(
             0,
-            local_config,
+            bootstrap_config,
             cleanup_contexts=_cleanup_ctxs,
             subapp_pkgs=subapp_pkgs,
             scheduler_opts={
@@ -746,7 +731,7 @@ def monitor_keypair():
 
 
 @pytest.fixture
-def get_headers(app, default_keypair, local_config):
+def get_headers(app, default_keypair, bootstrap_config):
     def create_header(
         method,
         url,
@@ -758,7 +743,7 @@ def get_headers(app, default_keypair, local_config):
         keypair=default_keypair,
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
-        hostname = f"127.0.0.1:{local_config.manager.service_addr.port}"
+        hostname = f"127.0.0.1:{bootstrap_config.manager.service_addr.port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -868,14 +853,11 @@ class DummyEtcd:
 @pytest.fixture
 async def registry_ctx(mocker):
     mocked_etcd = DummyEtcd()
-    mock_local_config = MagicMock()
-    mock_shared_config = MagicMock()
     mock_etcd_config_loader = MagicMock()
     mock_etcd_config_loader.update_resource_slots = AsyncMock()
     mock_etcd_config_loader._etcd = mocked_etcd
     mock_unified_config = ManagerUnifiedConfig(
-        local=mock_local_config,
-        shared=mock_shared_config,
+        loader=MagicMock(),
         legacy_etcd_config_loader=mock_etcd_config_loader,
         etcd_watcher=MagicMock(),
     )

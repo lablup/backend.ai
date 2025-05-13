@@ -61,7 +61,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
 
     async def _impl():
         manager_public_key, manager_secret_key = load_certificate(
-            cli_ctx.local_config.manager.rpc_auth_manager_keypair
+            cli_ctx.bootstrap_config.manager.rpc_auth_manager_keypair
         )
         assert manager_secret_key is not None
         alembic_cfg = Config(alembic_config)

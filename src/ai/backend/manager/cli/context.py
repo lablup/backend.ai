@@ -29,20 +29,20 @@ from ai.backend.manager.config.shared import ManagerSharedConfig, RedisConfig
 
 
 class CLIContext:
-    _local_config: Optional[BootstrapConfig]
+    _bootstrap_config: Optional[BootstrapConfig]
     _logger: AbstractLogger
 
     def __init__(self, config_path: Path, log_level: LogLevel) -> None:
         self.config_path = config_path
         self.log_level = log_level
-        self._local_config = None
+        self._bootstrap_config = None
 
     @property
-    def local_config(self) -> BootstrapConfig:
+    def bootstrap_config(self) -> BootstrapConfig:
         # Lazy-load the configuration only when requested.
         try:
-            if self._local_config is None:
-                self._local_config = asyncio.run(
+            if self._bootstrap_config is None:
+                self._bootstrap_config = asyncio.run(
                     BootstrapConfig.load_from_file(self.config_path, self.log_level)
                 )
         except ConfigurationError as e:
@@ -52,7 +52,7 @@ class CLIContext:
             )
             print(pformat(e.invalid_data), file=sys.stderr)
             raise click.Abort()
-        return self._local_config
+        return self._bootstrap_config
 
     def __enter__(self) -> Self:
         # The "start-server" command is injected by ai.backend.cli from the entrypoint
@@ -72,7 +72,7 @@ class CLIContext:
                 # present (e.g., when `mgr gql show` command used in CI without installation as
                 # addressed in #1686).
                 with open(os.devnull, "w") as sink, contextlib.redirect_stderr(sink):
-                    logging_config = self.local_config.logging
+                    logging_config = self.bootstrap_config.logging
             except click.Abort:
                 pass
             self._logger = LocalLogger(logging_config)
@@ -87,7 +87,7 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    local_config = cli_ctx.local_config
+    local_config = cli_ctx.bootstrap_config
     creds = None
     if local_config.etcd.user:
         if not local_config.etcd.password:
@@ -119,7 +119,7 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerSharedConfig]:
     # scope_prefix_map is created inside ConfigServer
 
-    local_config = cli_ctx.local_config
+    local_config = cli_ctx.bootstrap_config
     etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
     etcd_loader = LegacyEtcdLoader(etcd)
     redis_config = await etcd_loader.load()
@@ -141,7 +141,7 @@ class RedisConnectionSet:
 
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
-    local_config = cli_ctx.local_config
+    local_config = cli_ctx.bootstrap_config
 
     etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")

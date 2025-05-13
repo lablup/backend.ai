@@ -180,7 +180,7 @@ async def rescan_images(
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
     ):
         try:
             result = await rescan_images_func(db, registry_or_image, project)

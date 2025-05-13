@@ -135,7 +135,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -246,7 +245,6 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
-    local_config: BootstrapConfig
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
