@@ -179,7 +179,15 @@ from pathlib import Path
 from pprint import pformat
 from typing import Any, Final, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, FilePath, IPvAnyNetwork, field_serializer
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    FilePath,
+    IPvAnyNetwork,
+    field_serializer,
+)
 
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
@@ -393,7 +401,8 @@ class ManagerConfig(BaseModel):
         In production environments, consider using /var/run/backend.ai/ipc instead.
         """,
         examples=["/var/run/backend.ai/ipc"],
-        alias="ipc-base-path",
+        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
+        serialization_alias="ipc-base-path",
     )
     num_proc: int = Field(
         default=_max_num_proc,
@@ -405,7 +414,8 @@ class ManagerConfig(BaseModel):
         For optimal performance, set this to match your CPU core count.
         """,
         examples=[1, 4],
-        alias="num-proc",
+        validation_alias=AliasChoices("num-proc", "num_proc"),
+        serialization_alias="num-proc",
     )
     id: str = Field(
         default=f"i-{socket.gethostname()}",
@@ -443,7 +453,8 @@ class ManagerConfig(BaseModel):
         For private deployments, consider using 127.0.0.1 instead.
         """,
         examples=[{"host": "127.0.0.1", "port": 8080}],
-        alias="service-addr",
+        validate_alias=AliasChoices("service-addr", "service_addr"),
+        serialization_alias="service-addr",
     )
     internal_addr: HostPortPair = Field(
         default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
@@ -451,7 +462,8 @@ class ManagerConfig(BaseModel):
         Set the internal hostname/port to accept internal API requests.
         """,
         examples=[{"host": "127.0.0.1", "port": 18080}],
-        alias="internal-addr",
+        validate_alias=AliasChoices("internal-addr", "internal_addr"),
+        serialization_alias="internal-addr",
     )
     rpc_auth_manager_keypair: FilePath = Field(
         default=Path("fixtures/manager/manager.key_secret"),
@@ -461,7 +473,8 @@ class ManagerConfig(BaseModel):
         In production, should be stored in a secure location with restricted access.
         """,
         examples=["fixtures/manager/manager.key_secret"],
-        alias="rpc-auth-manager-keypair",
+        validation_alias=AliasChoices("rpc-auth-manager-keypair", "rpc_auth_manager_keypair"),
+        serialization_alias="rpc-auth-manager-keypair",
     )
     heartbeat_timeout: float = Field(
         default=40.0,
@@ -472,7 +485,8 @@ class ManagerConfig(BaseModel):
         Should be set higher than the agent's heartbeat interval.
         """,
         examples=[1.0, 40.0],
-        alias="heartbeat-timeout",
+        validation_alias=AliasChoices("heartbeat-timeout", "heartbeat_timeout"),
+        serialization_alias="heartbeat-timeout",
     )
     # TODO: Don't use this. Change to use KMS.
     secret: str = Field(
@@ -493,7 +507,8 @@ class ManagerConfig(BaseModel):
         Requires valid certificate and private key when enabled.
         """,
         examples=[True, False],
-        alias="ssl-enabled",
+        validation_alias=AliasChoices("ssl-enabled", "ssl_enabled"),
+        serialization_alias="ssl-enabled",
     )
     ssl_cert: Optional[FilePath] = Field(
         default=None,
@@ -503,7 +518,8 @@ class ManagerConfig(BaseModel):
         Should be a PEM-formatted certificate file, either self-signed or from a CA.
         """,
         examples=["fixtures/manager/manager.crt"],
-        alias="ssl-cert",
+        validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
+        serialization_alias="ssl-cert",
     )
     ssl_privkey: Optional[str] = Field(
         default=None,
@@ -513,7 +529,8 @@ class ManagerConfig(BaseModel):
         Should be a PEM-formatted private key corresponding to the certificate.
         """,
         examples=["fixtures/manager/manager.key"],
-        alias="ssl-privkey",
+        validation_alias=AliasChoices("ssl-privkey", "ssl_privkey"),
+        serialization_alias="ssl-privkey",
     )
     event_loop: EventLoopType = Field(
         default=EventLoopType.asyncio,
@@ -523,7 +540,8 @@ class ManagerConfig(BaseModel):
         'uvloop' is a faster alternative but may have compatibility issues with some libraries.
         """,
         examples=[item.value for item in EventLoopType],
-        alias="event-loop",
+        validation_alias=AliasChoices("event-loop", "event_loop"),
+        serialization_alias="event-loop",
     )
     distributed_lock: DistributedLockType = Field(
         default=DistributedLockType.pg_advisory,
@@ -536,7 +554,8 @@ class ManagerConfig(BaseModel):
         - etcetra: etcd v3 API-compatible distributed locking
         """,
         examples=[item.value for item in DistributedLockType],
-        alias="distributed-lock",
+        validation_alias=AliasChoices("distributed-lock", "distributed_lock"),
+        serialization_alias="distributed-lock",
     )
     pg_advisory_config: Mapping[str, Any] = Field(
         default=PgAdvisoryLock.default_config,
@@ -545,7 +564,8 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to pg_advisory.
         """,
         examples=[{}],
-        alias="pg-advisory-config",
+        validation_alias=AliasChoices("pg-advisory-config", "pg_advisory_config"),
+        serialization_alias="pg-advisory-config",
     )
     filelock_config: Mapping[str, Any] = Field(
         default=FileLock.default_config,
@@ -554,7 +574,8 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to filelock.
         """,
         examples=[{}],
-        alias="filelock-config",
+        validation_alias=AliasChoices("filelock-config", "filelock_config"),
+        serialization_alias="filelock-config",
     )
     redlock_config: Mapping[str, Any] = Field(
         default=RedisLock.default_config,
@@ -563,7 +584,8 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to redlock.
         """,
         examples=[{"lock_retry_interval": 1.0}],
-        alias="redlock-config",
+        validation_alias=AliasChoices("redlock-config", "redlock_config"),
+        serialization_alias="redlock-config",
     )
     etcdlock_config: Mapping[str, Any] = Field(
         default=EtcdLock.default_config,
@@ -572,7 +594,8 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to etcd.
         """,
         examples=[{}],
-        alias="etcdlock-config",
+        validation_alias=AliasChoices("etcdlock-config", "etcdlock_config"),
+        serialization_alias="etcdlock-config",
     )
     session_schedule_lock_lifetime: float = Field(
         default=30,
@@ -612,7 +635,8 @@ class ManagerConfig(BaseModel):
         Set to /dev/null by default to disable this feature.
         """,
         examples=["/var/run/manager.pid"],
-        alias="pid-file",
+        validation_alias=AliasChoices("pid-file", "pid_file"),
+        serialization_alias="pid-file",
     )
     allowed_plugins: Optional[set[str]] = Field(
         default=None,
@@ -623,7 +647,8 @@ class ManagerConfig(BaseModel):
         Leave as None to load all available plugins except those in disabled_plugins.
         """,
         examples=[["example.plugin.what.you.want"]],
-        alias="allowed-plugins",
+        validation_alias=AliasChoices("allowed-plugins", "allowed_plugins"),
+        serialization_alias="allowed-plugins",
     )
     disabled_plugins: Optional[set[str]] = Field(
         default=None,
@@ -633,7 +658,8 @@ class ManagerConfig(BaseModel):
         Useful for disabling problematic or unwanted plugins without uninstalling them.
         """,
         examples=[["example.plugin.what.you.want"]],
-        alias="disabled-plugins",
+        validation_alias=AliasChoices("disabled-plugins", "disabled_plugins"),
+        serialization_alias="disabled-plugins",
     )
     hide_agents: bool = Field(
         default=False,
@@ -643,7 +669,8 @@ class ManagerConfig(BaseModel):
         Useful for security in multi-tenant environments.
         """,
         examples=[True, False],
-        alias="hide-agents",
+        validation_alias=AliasChoices("hide-agents", "hide_agents"),
+        serialization_alias="hide-agents",
     )
     agent_selection_resource_priority: list[str] = Field(
         default=["cuda", "rocm", "tpu", "cpu", "mem"],
@@ -653,7 +680,10 @@ class ManagerConfig(BaseModel):
         Default prioritizes GPU resources (CUDA, ROCm) over CPU and memory.
         """,
         examples=[["cuda", "rocm", "tpu", "cpu", "mem"]],
-        alias="agent-selection-resource-priority",
+        validation_alias=AliasChoices(
+            "agent-selection-resource-priority", "agent_selection_resource_priority"
+        ),
+        serialization_alias="agent-selection-resource-priority",
     )
     importer_image: str = Field(
         default="lablup/importer:manylinux2010",
@@ -663,7 +693,8 @@ class ManagerConfig(BaseModel):
         Should be compatible with the Backend.AI environment.
         """,
         examples=["lablup/importer:manylinux2010"],
-        alias="importer-image",
+        validation_alias=AliasChoices("importer-image", "importer_image"),
+        serialization_alias="importer-image",
     )
     max_wsmsg_size: int = Field(
         default=16 * (2**20),  # default: 16 MiB
@@ -674,7 +705,8 @@ class ManagerConfig(BaseModel):
         Increase for applications that need to transfer larger data chunks.
         """,
         examples=[16 * (2**20), 32 * (2**20)],
-        alias="max-wsmsg-size",
+        validation_alias=AliasChoices("max-wsmsg-size", "max_wsmsg_size"),
+        serialization_alias="max-wsmsg-size",
     )
     aiomonitor_port: Optional[int] = Field(
         default=None,
@@ -685,7 +717,8 @@ class ManagerConfig(BaseModel):
         Use `aiomonitor_termui_port` instead.
         """,
         examples=[38100, 38200],
-        alias="aiomonitor-port",
+        validation_alias=AliasChoices("aiomonitor-port", "aiomonitor_port"),
+        serialization_alias="aiomonitor-port",
     )
     aiomonitor_termui_port: int = Field(
         default=38100,
@@ -697,7 +730,8 @@ class ManagerConfig(BaseModel):
         Should be a port that's not used by other services.
         """,
         examples=[38100, 38200],
-        alias="aiomonitor-termui-port",
+        validation_alias=AliasChoices("aiomonitor-termui-port", "aiomonitor_termui_port"),
+        serialization_alias="aiomonitor-termui-port",
     )
     aiomonitor_webui_port: int = Field(
         default=39100,
@@ -709,7 +743,8 @@ class ManagerConfig(BaseModel):
         Should be a port that's not used by other services.
         """,
         examples=[39100, 39200],
-        alias="aiomonitor-webui-port",
+        validation_alias=AliasChoices("aiomonitor-webui-port", "aiomonitor_webui_port"),
+        serialization_alias="aiomonitor-webui-port",
     )
     use_experimental_redis_event_dispatcher: bool = Field(
         default=False,
@@ -719,7 +754,10 @@ class ManagerConfig(BaseModel):
         Not recommended for production use unless specifically needed.
         """,
         examples=[True, False],
-        alias="use-experimental-redis-event-dispatcher",
+        validation_alias=AliasChoices(
+            "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
+        ),
+        serialization_alias="use-experimental-redis-event-dispatcher",
     )
     status_update_interval: Optional[float] = Field(
         default=None,
@@ -730,7 +768,8 @@ class ManagerConfig(BaseModel):
         Smaller values provide more real-time information but increase overhead.
         """,
         examples=[60.0, 120.0],
-        alias="status-update-interval",
+        validation_alias=AliasChoices("status-update-interval", "status_update_interval"),
+        serialization_alias="status-update-interval",
     )
     status_lifetime: Optional[int] = Field(
         default=None,
@@ -741,7 +780,8 @@ class ManagerConfig(BaseModel):
         Should be greater than the status_update_interval.
         """,
         examples=[60, 120],
-        alias="status-lifetime",
+        validation_alias=AliasChoices("status-lifetime", "status_lifetime"),
+        serialization_alias="status-lifetime",
     )
     public_metrics_port: Optional[int] = Field(
         default=None,
@@ -753,7 +793,8 @@ class ManagerConfig(BaseModel):
         Leave as None to disable public metrics exposure.
         """,
         examples=[8080, 9090],
-        alias="public-metrics-port",
+        validation_alias=AliasChoices("public-metrics-port", "public_metrics_port"),
+        serialization_alias="public-metrics-port",
     )
 
     @property
@@ -777,7 +818,8 @@ class DockerRegistryConfig(BaseModel):
         Disabling this is not recommended except for testing with self-signed certificates.
         """,
         examples=[True, False],
-        alias="ssl-verify",
+        validation_alias=AliasChoices("ssl-verify", "ssl_verify"),
+        serialization_alias="ssl-verify",
     )
 
 
@@ -799,7 +841,8 @@ class PyroscopeConfig(BaseModel):
         Required if Pyroscope is enabled.
         """,
         examples=["backendai-half-manager"],
-        alias="app-name",
+        validation_alias=AliasChoices("app-name", "app_name"),
+        serialization_alias="app-name",
     )
     server_addr: Optional[str] = Field(
         default=None,
@@ -809,7 +852,8 @@ class PyroscopeConfig(BaseModel):
         Required if Pyroscope is enabled.
         """,
         examples=["http://localhost:4040"],
-        alias="server-addr",
+        validation_alias=AliasChoices("server-addr", "server_addr"),
+        serialization_alias="server-addr",
     )
     sample_rate: Optional[int] = Field(
         default=None,
@@ -819,7 +863,8 @@ class PyroscopeConfig(BaseModel):
         Balance based on your performance monitoring needs.
         """,
         examples=[10, 100, 1000],
-        alias="sample-rate",
+        validation_alias=AliasChoices("sample-rate", "sample_rate"),
+        serialization_alias="sample-rate",
     )
 
 
@@ -894,7 +939,8 @@ class SMTPReporterConfig(BaseModel):
         Higher values may improve performance but increase resource usage.
         """,
         examples=[5, 10],
-        alias="max-workers",
+        validation_alias=AliasChoices("max-workers", "max_workers"),
+        serialization_alias="max-workers",
     )
     template: str = Field(
         default=_default_smtp_template,
@@ -915,6 +961,8 @@ class SMTPReporterConfig(BaseModel):
         """,
         examples=["ALL", "ON_ERROR"],
         alias="trigger-policy",
+        validation_alias=AliasChoices("trigger-policy", "trigger_policy"),
+        serialization_alias="trigger-policy",
     )
 
 
@@ -934,7 +982,8 @@ class ActionMonitorsConfig(BaseModel):
         List of action types to subscribe to for monitoring.
         """,
         examples=[["session.create_from_params", "session.create_cluster"]],
-        alias="subscribed-actions",
+        validation_alias=AliasChoices("subscribed-actions", "subscribed_actions"),
+        serialization_alias="subscribed-actions",
     )
     reporter: str = Field(
         description="""
@@ -960,7 +1009,8 @@ class ReporterConfig(BaseModel):
         Audit log reporter configuration.
         Controls how audit logs are reported.
         """,
-        alias="audit-log",
+        validation_alias=AliasChoices("audit-log", "audit_log"),
+        serialization_alias="audit-log",
     )
     action_monitors: list[ActionMonitorsConfig] = Field(
         default=[],
@@ -968,7 +1018,8 @@ class ReporterConfig(BaseModel):
         Action monitors configuration.
         Each reporter can be configured to subscribe to specific actions.
         """,
-        alias="action-monitors",
+        validation_alias=AliasChoices("action-monitors", "action_monitors"),
+        serialization_alias="action-monitors",
     )
 
 
@@ -999,7 +1050,10 @@ class DebugConfig(BaseModel):
         Useful for debugging complex async issues, but adds overhead.
         """,
         examples=[True, False],
-        alias="enhanced-aiomonitor-task-info",
+        validation_alias=AliasChoices(
+            "enhanced-aiomonitor-task-info", "enhanced_aiomonitor_task_info"
+        ),
+        serialization_alias="enhanced-aiomonitor-task-info",
     )
     log_events: bool = Field(
         default=False,
@@ -1009,7 +1063,8 @@ class DebugConfig(BaseModel):
         Very verbose, but useful for debugging event-related issues.
         """,
         examples=[True, False],
-        alias="log-events",
+        validation_alias=AliasChoices("log-events", "log_events"),
+        serialization_alias="log-events",
     )
     log_scheduler_ticks: bool = Field(
         default=False,
@@ -1019,7 +1074,8 @@ class DebugConfig(BaseModel):
         Useful for debugging scheduling issues, but generates many log entries.
         """,
         examples=[True, False],
-        alias="log-scheduler-ticks",
+        validation_alias=AliasChoices("log-scheduler-ticks", "log_scheduler_ticks"),
+        serialization_alias="log-scheduler-ticks",
     )
     periodic_sync_stats: bool = Field(
         default=False,
@@ -1029,7 +1085,8 @@ class DebugConfig(BaseModel):
         Helpful for monitoring system behavior over time.
         """,
         examples=[True, False],
-        alias="periodic-sync-stats",
+        validation_alias=AliasChoices("periodic-sync-stats", "periodic_sync_stats"),
+        serialization_alias="periodic-sync-stats",
     )
 
 
