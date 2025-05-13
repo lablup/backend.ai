@@ -6,9 +6,6 @@ from typing import (
     Optional,
 )
 
-from pydantic import BaseModel, Field
-
-from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.models.vfolder import (
     QuotaScopeID,
     VFolderOperationStatus,
@@ -91,14 +88,3 @@ class FileInfo:
             "created": self.created,
             "modified": self.modified,
         }
-
-
-class ServiceEnvironmentConfigInfo(BaseModel):
-    image: str
-    architecture: str
-
-
-class ServiceConfigInfo(BaseModel):
-    runtime_variant: RuntimeVariant
-    environment: ServiceEnvironmentConfigInfo
-    resource_limits: dict[str, Any] = Field(default_factory=dict)
