@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pprint import pformat, pprint
-from typing import Optional
+from typing import Any, Optional
 
 import click
 import sqlalchemy as sa
@@ -32,7 +32,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
         db.begin_readonly_session() as session,
         redis_ctx(cli_ctx) as redis_conn_set,
     ):
-        displayed_items = []
+        displayed_items: list[tuple[Any, ...]] = []
         try:
             # Idea: Add `--include-deleted` option to include deleted images?
             items = await ImageRow.list(session)
