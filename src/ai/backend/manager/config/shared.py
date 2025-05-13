@@ -941,7 +941,7 @@ class SMTPReporterConfig(BaseModel):
         Recommended for production environments to protect sensitive information.
         """,
         examples=[True, False],
-        validate_alias=AliasChoices("use-tls", "use_tls"),
+        validation_alias=AliasChoices("use-tls", "use_tls"),
         serialization_alias="use-tls",
     )
     max_workers: int = Field(
