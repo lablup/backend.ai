@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from graphene import Schema
@@ -30,14 +30,19 @@ def client() -> Client:
     return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
 
 
-def get_graphquery_context(
+async def get_graphquery_context(
     database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ) -> GraphQueryContext:
+    mock_loader = MagicMock()
+    mock_loader.load = AsyncMock()
+    mock_loader.load.return_value = shared_config.model_dump()
+
     unified_config = ManagerUnifiedConfig(
-        loader=MagicMock(),
+        loader=mock_loader,
         legacy_etcd_config_loader=MagicMock(),  # type: ignore
         etcd_watcher=MagicMock(),
     )
+    await unified_config.init()
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
@@ -67,7 +72,7 @@ def get_graphquery_context(
 async def test_create_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ):
-    context = get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, shared_config)
 
     query = """
             mutation CreateContainerRegistryNode($type: ContainerRegistryTypeField!, $registry_name: String!, $url: String!, $project: String!, $username: String!, $password: String!, $ssl_verify: Boolean!, $is_global: Boolean!) {
@@ -117,7 +122,7 @@ async def test_create_container_registry(
 async def test_modify_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ):
-    context = get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, shared_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -137,6 +142,7 @@ async def test_modify_container_registry(
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
+    print("response!!#W!#", response)
 
     target_container_registries = list(
         filter(
@@ -201,7 +207,7 @@ async def test_modify_container_registry(
 async def test_modify_container_registry_allows_empty_string(
     client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ):
-    context = get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, shared_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -266,7 +272,7 @@ async def test_modify_container_registry_allows_empty_string(
 async def test_modify_container_registry_allows_null_for_unset(
     client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ):
-    context = get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, shared_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -331,7 +337,7 @@ async def test_modify_container_registry_allows_null_for_unset(
 async def test_delete_container_registry(
     client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
 ):
-    context = get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, shared_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {

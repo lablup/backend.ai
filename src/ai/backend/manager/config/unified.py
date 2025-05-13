@@ -21,14 +21,14 @@ class ManagerUnifiedConfig:
     def __init__(
         self,
         loader: LoaderChain,
-        legacy_etcd_config_loader: LegacyEtcdLoader,
         etcd_watcher: EtcdConfigWatcher,
+        legacy_etcd_config_loader: LegacyEtcdLoader,
     ) -> None:
-        self._config = None
         self._loader = loader
-        self._legacy_etcd_config_loader = legacy_etcd_config_loader
+        self._config = None
         self._etcd_watcher = etcd_watcher
         self._etcd_watcher_task = None
+        self._legacy_etcd_config_loader = legacy_etcd_config_loader
 
     @property
     def shared(self) -> ManagerSharedConfig:
@@ -45,12 +45,12 @@ class ManagerUnifiedConfig:
             # TODO: Handle all etcd_loader.load() here
             pass
 
-    async def create(self) -> None:
+    async def init(self) -> None:
         raw_shared_config = await self._loader.load()
         self._config = ManagerSharedConfig.model_validate(raw_shared_config)
         self._etcd_watcher_task = asyncio.create_task(self._run_watcher())
 
-    async def stop(self) -> None:
+    async def terminate(self) -> None:
         if self._etcd_watcher_task:
             self._etcd_watcher_task.cancel()
             try:

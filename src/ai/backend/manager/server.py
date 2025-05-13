@@ -401,11 +401,11 @@ async def unified_config_ctx(
     )
 
     try:
-        await unified_config.create()
+        await unified_config.init()
         root_ctx.unified_config = unified_config
         yield root_ctx.unified_config
     finally:
-        await unified_config.stop()
+        await unified_config.terminate()
 
 
 @actxmgr

@@ -356,18 +356,21 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, bootstrap_config, etcd_fixture) -> AsyncIterator[ManagerSharedConfig]:
+async def shared_config(
+    app, bootstrap_config: BootstrapConfig, etcd_fixture
+) -> AsyncIterator[ManagerSharedConfig]:
     root_ctx: RootContext = app["_root.context"]
     etcd = AsyncEtcd.initialize(bootstrap_config.etcd.to_dataclass())
     root_ctx.etcd = etcd
     etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
     raw_shared_config = await etcd_loader.load()
-    shared_config = ManagerSharedConfig(**raw_shared_config)
+    merged_config = {**bootstrap_config.model_dump(), **raw_shared_config}
+    shared_config = ManagerSharedConfig(**merged_config)
     yield shared_config
 
 
 @pytest.fixture(scope="session")
-def database(request, bootstrap_config, test_db) -> None:
+def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
     """
     Create a new database for the current test session
     and install the table schema using alembic.
@@ -859,11 +862,20 @@ async def registry_ctx(mocker):
     mock_etcd_config_loader = MagicMock()
     mock_etcd_config_loader.update_resource_slots = AsyncMock()
     mock_etcd_config_loader._etcd = mocked_etcd
+
+    mock_loader = MagicMock()
+    mock_loader.load = AsyncMock(
+        return_value={
+            "db": {"name": "test_db", "user": "postgres", "password": "develove"},
+            "logging": {},
+        }
+    )
     mock_unified_config = ManagerUnifiedConfig(
-        loader=MagicMock(),
+        loader=mock_loader,
         legacy_etcd_config_loader=mock_etcd_config_loader,
         etcd_watcher=MagicMock(),
     )
+    await mock_unified_config.init()
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
     mock_dbsess = MagicMock()
