@@ -68,7 +68,7 @@
             "$ref": "#/components/schemas/VFolderPermission",
             "default": "rw"
           },
-          "unmanagedPath": {
+          "unmanaged_path": {
             "anyOf": [
               {
                 "type": "string"
@@ -78,9 +78,9 @@
               }
             ],
             "default": null,
-            "title": "Unmanagedpath"
+            "title": "Unmanaged Path"
           },
-          "group_id_or_name": {
+          "group": {
             "anyOf": [
               {
                 "type": "string"
@@ -90,7 +90,7 @@
               }
             ],
             "default": null,
-            "title": "Group Id Or Name"
+            "title": "Group"
           },
           "cloneable": {
             "default": false,
