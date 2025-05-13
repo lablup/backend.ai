@@ -380,7 +380,7 @@ class Mutations(graphene.ObjectType):
     delete_resource_preset = DeleteResourcePreset.Field()
 
     # super-admin only
-    modify_configs = ModifyConfigs.Field(description="Added in 25.8.0")
+    modify_configs = ModifyConfigs.Field()
 
     # super-admin only
     create_scaling_group = CreateScalingGroup.Field()

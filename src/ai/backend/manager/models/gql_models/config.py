@@ -15,6 +15,7 @@ _PREFIX: Final[str] = "ai/backend/config"
 
 class AvailableService(graphene.ObjectType):
     """
+    Available services for configuration.
     Added in 25.8.0.
     """
 
@@ -30,12 +31,13 @@ class AvailableService(graphene.ObjectType):
 
 class Config(graphene.ObjectType):
     """
+    Configuration data for a specific service.
     Added in 25.8.0.
     """
 
     service = graphene.String(
         required=True,
-        description="Service name. Added in 25.8.0.",
+        description="Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.",
     )
     configuration = graphene.JSONString(
         required=True,
@@ -47,7 +49,7 @@ class Config(graphene.ObjectType):
     )
 
     class Meta:
-        description = "Added in 25.8.0."
+        description = "Configuration data for a specific service. Added in 25.8.0."
 
     @classmethod
     def load(cls, info: graphene.ResolveInfo, service: str) -> Self:
@@ -75,12 +77,13 @@ class Config(graphene.ObjectType):
 
 class ModifyConfigsInput(graphene.InputObjectType):
     """
+    Input data for modifying configuration.
     Added in 25.8.0.
     """
 
     service = graphene.String(
         required=True,
-        description="Service name. Added in 25.8.0.",
+        description="Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.",
     )
     configuration = graphene.JSONString(
         required=True,
@@ -90,12 +93,13 @@ class ModifyConfigsInput(graphene.InputObjectType):
 
 class ModifyConfigsPayload(graphene.ObjectType):
     """
+    Payload for the ModifyConfigs mutation.
     Added in 25.8.0.
     """
 
     service = graphene.String(
         required=True,
-        description="Service name. Added in 25.8.0.",
+        description="Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.",
     )
     configuration = graphene.JSONString(
         required=True,
@@ -110,7 +114,7 @@ class ModifyConfigs(graphene.Mutation):
     Output = ModifyConfigsPayload
 
     class Meta:
-        description = "Added in 25.8.0."
+        description = "Updates configuration for a given service. Added in 25.8.0."
 
     Output = ModifyConfigsPayload
 

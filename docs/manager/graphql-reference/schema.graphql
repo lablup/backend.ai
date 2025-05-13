@@ -2099,15 +2099,20 @@ type ContainerUtilizationMetricMetadata {
   metric_names: [String]
 }
 
-"""Added in 25.8.0."""
+"""
+Available services for configuration.
+Added in 25.8.0.
+"""
 type AvailableService {
   """Possible values of "Config.service". Added in 25.8.0."""
   service_variants: [String]!
 }
 
-"""Added in 25.8.0."""
+"""Configuration data for a specific service. Added in 25.8.0."""
 type Config {
-  """Service name. Added in 25.8.0."""
+  """
+  Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
+  """
   service: String!
 
   """Configuration data. Added in 25.8.0."""
@@ -2241,7 +2246,7 @@ type Mutations {
     name: String = null @deprecated(reason: "Deprecated since 25.4.0.")
   ): DeleteResourcePreset
 
-  """Added in 25.8.0"""
+  """Updates configuration for a given service. Added in 25.8.0."""
   modify_configs(
     """Added in 25.8.0."""
     input: ModifyConfigsInput!
@@ -3080,18 +3085,28 @@ type DeleteResourcePreset {
   msg: String
 }
 
-"""Added in 25.8.0."""
+"""
+Payload for the ModifyConfigs mutation.
+Added in 25.8.0.
+"""
 type ModifyConfigsPayload {
-  """Service name. Added in 25.8.0."""
+  """
+  Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
+  """
   service: String!
 
   """Configuration data to mutate. Added in 25.8.0."""
   configuration: JSONString!
 }
 
-"""Added in 25.8.0."""
+"""
+Input data for modifying configuration.
+Added in 25.8.0.
+"""
 input ModifyConfigsInput {
-  """Service name. Added in 25.8.0."""
+  """
+  Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
+  """
   service: String!
 
   """Configuration data to mutate. Added in 25.8.0."""
