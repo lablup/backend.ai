@@ -1,47 +1,46 @@
 import asyncio
-from dataclasses import dataclass
 import enum
 import logging
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, FrozenSet, Literal, Mapping, Optional, Sequence
+from typing import Any, FrozenSet, Mapping, Optional, Sequence
 
 import zmq
 
 from ai.backend.agent.agent import KernelObjectType
-from ai.backend.agent.kernel import AbstractCodeRunner, NextResult
+from ai.backend.agent.backends.code_runner import CodeRunner, ExecResultType, NextResult
+from ai.backend.agent.kernel import AbstractCodeRunner
 from ai.backend.agent.resources import AbstractComputePlugin, KernelResourceSpec, Mount
-from ai.backend.agent.types import AgentEventData, KernelOwnershipData, MountInfo
-from ai.backend.common.docker import ImageRef
+from ai.backend.agent.types import AgentEventData, MountInfo
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.kernel import KernelLifecycleEventReason, KernelTerminatedEvent
+from ai.backend.common.events.session import SessionFailureEvent, SessionSuccessEvent
 from ai.backend.common.types import (
     ClusterInfo,
-    ClusterSSHPortMapping,
     CommitStatus,
-    ContainerId,
     DeviceId,
-    KernelCreationConfig,
     KernelId,
     MountPermission,
     MountTypes,
+    SessionId,
     SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-@dataclass
-class StartServiceResult:
-    ...
-
 
 @dataclass
-class StartModelServiceResult:
-    ...
+class StartServiceResult: ...
 
-       
+
+@dataclass
+class StartModelServiceResult: ...
+
+
 class AbstractKernel(ABC):
     @abstractmethod
     async def create_code_runner(
@@ -62,7 +61,7 @@ class AbstractKernel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_logs(self) -> str:
+    async def get_logs(self) -> dict[str, str]:
         raise NotImplementedError
 
     @abstractmethod
@@ -74,7 +73,9 @@ class AbstractKernel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def start_model_service(self, model_service: Mapping[str, Any]) -> StartModelServiceResult:
+    async def start_model_service(
+        self, model_service: Mapping[str, Any]
+    ) -> StartModelServiceResult:
         raise NotImplementedError
 
     @abstractmethod
@@ -171,20 +172,20 @@ class ExecutionMode(enum.StrEnum):
     INPUT = "input"
     CONTINUE = "continue"
 
+
 class KernelWrapper:
     _kernel: AbstractKernel
-    _runner: AbstractCodeRunner
+    _runner: CodeRunner
     _tasks: set[asyncio.Task[None]] = set()
 
-    def __init__(self, kernel: AbstractKernel, runner: AbstractCodeRunner):
+    def __init__(self, kernel: AbstractKernel, runner: CodeRunner):
         self._kernel = kernel
         self._runner = runner
         self._tasks = set()
 
-    
     async def ping(self):
         return await self._runner.ping()
-    
+
     def kernel(self) -> AbstractKernel:
         return self._kernel
 
@@ -335,54 +336,3 @@ class AbstractKernelCreationContext(ABC):
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         raise NotImplementedError
-
-
-class AbstractKernelFactory(ABC):
-    @abstractmethod
-    async def init_kernel_context(
-        self,
-        ownership_data: KernelOwnershipData,
-        kernel_image: ImageRef,
-        kernel_config: KernelCreationConfig,
-        *,
-        restarting: bool = False,
-        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
-    ) -> AbstractKernelCreationContext:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def destroy_kernel(
-        self,
-        kernel_id: KernelId,
-        container_id: Optional[ContainerId],
-    ) -> None:
-        """
-        Initiate destruction of the kernel.
-
-        Things to do:
-        * Send SIGTERM to the kernel's main process.
-        * Send SIGKILL if it's not terminated within a few seconds.
-        """
-
-    @abstractmethod
-    async def clean_kernel(
-        self,
-        kernel_id: KernelId,
-        container_id: Optional[ContainerId],
-        restarting: bool,
-    ) -> None:
-        """
-        Clean up kernel-related book-keepers when the underlying
-        implementation detects an event that the kernel has terminated.
-
-        Things to do:
-        * Call :meth:`self.collect_logs()` to store the container's console outputs.
-        * Delete the underlying kernel resource (e.g., container)
-        * Release host-specific resources used for the kernel (e.g., scratch spaces)
-
-        This method is intended to be called asynchronously by the implementation-specific
-        event monitoring routine.
-
-        The ``container_id`` may be ``None`` if the container has already gone away.
-        In such cases, skip container-specific cleanups.
-        """

@@ -494,6 +494,11 @@ class SocketPair:
                 self.output_sock.recreate_socket()
                 await self.input_sock.socket.send_multipart(msg_parts)
             else:
+                log.error(
+                    "Unexpected error while sending message to socket (addr: {}, err: {})",
+                    self.input_sock.addr,
+                    repr(e),
+                )
                 raise
 
     async def recv_multipart(self) -> list[bytes]:

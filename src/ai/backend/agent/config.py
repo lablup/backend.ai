@@ -3,17 +3,17 @@ import os
 from typing import Any
 
 import trafaret as t
+from trafaret.dataerror import DataError as TrafaretDataError
 
+from ai.backend.agent.backends.type import AgentBackendType
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceGroupType
 from ai.backend.logging.utils import BraceStyleAdapter
-from trafaret.dataerror import DataError as TrafaretDataError
 
 from .affinity_map import AffinityPolicy
 from .stats import StatModes
-from .types import AgentBackend
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -39,7 +39,7 @@ _default_pyroscope_config: dict[str, Any] = {
 agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
-            tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
+            tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackendType),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
             t.Key("service-addr", default=("0.0.0.0", 6003)): tx.HostPortPair,
             t.Key("ssl-enabled", default=False): t.Bool,
@@ -223,6 +223,7 @@ container_etcd_config_iv = t.Dict({
     t.Key("kernel-gid", optional=True): t.ToInt,
 }).allow_extra("*")
 
+
 async def read_agent_config(etcd: AsyncEtcd, local_config: dict[str, Any]) -> None:
     # Fill up Redis configs from etcd.
     local_config["redis"] = config.redis_config_iv.check(
@@ -235,9 +236,7 @@ async def read_agent_config(etcd: AsyncEtcd, local_config: dict[str, Any]) -> No
         await etcd.get_prefix("volumes"),
     )
     if local_config["vfolder"]["mount"] is None:
-        log.info(
-            "assuming use of storage-proxy since vfolder mount path is not configured in etcd"
-        )
+        log.info("assuming use of storage-proxy since vfolder mount path is not configured in etcd")
     else:
         log.info("configured vfolder mount base: {0}", local_config["vfolder"]["mount"])
         log.info("configured vfolder fs prefix: {0}", local_config["vfolder"]["fsprefix"])
@@ -248,6 +247,7 @@ async def read_agent_config(etcd: AsyncEtcd, local_config: dict[str, Any]) -> No
     )
     for k, v in agent_etcd_config.items():
         local_config["agent"][k] = v
+
 
 async def read_agent_config_container(etcd: AsyncEtcd, local_config: dict[str, Any]) -> None:
     # Fill up global container configurations from etcd.

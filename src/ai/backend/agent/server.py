@@ -127,7 +127,6 @@ deeplearning_sample_volume = VolumeInfo(
 agent_instance: AgentRPCServer
 
 
-
 def collect_error(meth: Callable) -> Callable:
     @functools.wraps(meth)
     async def _inner(self: AgentRPCServer, *args, **kwargs):

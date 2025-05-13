@@ -1,18 +1,14 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from decimal import Decimal
 from typing import Mapping
 
-from ai.backend.agent.resources import AbstractComputePlugin
-from ai.backend.common.types import CIStrEnum, DeviceName, SlotName
+from ai.backend.common.types import DeviceName, SlotName
+
+from ...resources import AbstractComputePlugin
+from ..backend import AbstractBackend
 
 
-class BackendType(CIStrEnum):
-    DOCKER = "docker"
-    KUBERNETES = "kubernetes"
-    DUMMY = "dummy"
-
-
-class AbstractBackend(ABC):
+class DummyBackend(AbstractBackend):
     @abstractmethod
     async def load_resources(
         self,
