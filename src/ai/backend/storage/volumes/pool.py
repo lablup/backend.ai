@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
 
 from ..exception import InvalidVolumeError

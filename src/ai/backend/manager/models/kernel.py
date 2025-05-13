@@ -5,7 +5,7 @@ import logging
 import uuid
 from collections.abc import Container, Mapping
 from contextlib import asynccontextmanager as actxmgr
-from datetime import datetime
+from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -17,7 +17,7 @@ from typing import (
 )
 
 import sqlalchemy as sa
-from dateutil.tz import tzfile, tzutc
+from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
@@ -143,6 +143,7 @@ RESOURCE_USAGE_KERNEL_STATUSES = (
 DEAD_KERNEL_STATUSES = (
     KernelStatus.CANCELLED,
     KernelStatus.TERMINATED,
+    KernelStatus.ERROR,
 )
 
 LIVE_STATUS = (KernelStatus.RUNNING,)
@@ -558,7 +559,7 @@ class KernelRow(Base):
             return str(self.terminated_at - self.created_at)
         return None
 
-    def get_used_days(self, local_tz: tzfile) -> Optional[int]:
+    def get_used_days(self, local_tz: tzinfo) -> Optional[int]:
         if self.terminated_at is not None:
             return (
                 self.terminated_at.astimezone(local_tz).toordinal()

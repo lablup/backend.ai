@@ -15,7 +15,7 @@ from ai.backend.common.metrics.types import (
 )
 from ai.backend.common.types import HostPortPair
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
 from .actions.container import (
     ContainerMetricAction,
@@ -83,11 +83,11 @@ class ContainerUtilizationMetricService:
     _metric_query_endpoint: yarl.URL
     _range_vector_timewindow: str  # 1m by default
 
-    def __init__(self, shared_config: SharedConfig) -> None:
-        metric_config = shared_config.data["metric"]
-        metric_query_addr: HostPortPair = metric_config["address"]
+    def __init__(self, unified_config: ManagerUnifiedConfig) -> None:
+        metric_config = unified_config.shared.metric
+        metric_query_addr: HostPortPair = metric_config.address.to_legacy()
         self._metric_query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
-        self._range_vector_timewindow = cast(str, metric_config["timewindow"])
+        self._range_vector_timewindow = cast(str, metric_config.timewindow)
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:
         endpoint = self._metric_query_endpoint / "label" / label_name / "values"

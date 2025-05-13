@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, AsyncContextManager
+from typing import TYPE_CHECKING, Any, AsyncContextManager
 
 from ai.backend.common.lock import AbstractDistributedLock
 
 from .defs import LockID
-from .models.utils import ExtendedAsyncSAEngine
+
+if TYPE_CHECKING:
+    from .models.utils import ExtendedAsyncSAEngine
 
 
 class PgAdvisoryLock(AbstractDistributedLock):

@@ -48,6 +48,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.types import MountOptionModel, UserScope
@@ -76,7 +77,6 @@ from .user import UserRow
 from .vfolder import VFolderRow, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
-    from ai.backend.manager.config import SharedConfig
     from ai.backend.manager.services.model_serving.types import EndpointTokenData
 
     from .gql import GraphQueryContext
@@ -768,7 +768,7 @@ class ModelServicePredicateChecker:
     @staticmethod
     async def check_extra_mounts(
         conn: AsyncConnection,
-        shared_config: "SharedConfig",
+        shared_config_loader: LegacyEtcdLoader,
         storage_manager: StorageSessionManager,
         model_id: UUID,
         model_mount_destination: str,
@@ -806,7 +806,7 @@ class ModelServicePredicateChecker:
             requested_mount_map,
             requested_mount_options,
         )
-        allowed_vfolder_types = await shared_config.get_vfolder_types()
+        allowed_vfolder_types = await shared_config_loader.get_vfolder_types()
         vfolder_mounts = await prepare_vfolder_mounts(
             conn,
             storage_manager,

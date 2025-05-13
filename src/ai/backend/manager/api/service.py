@@ -542,7 +542,9 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         owner_role = (await conn.execute(query)).scalar()
         assert owner_role
 
-        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+        allowed_vfolder_types = (
+            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        )
         try:
             extra_vf_conds = vfolders.c.id == uuid.UUID(params.config.model)
             matched_vfolders = await query_accessible_vfolders(
@@ -583,7 +585,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 
         vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
             conn,
-            root_ctx.shared_config,
+            root_ctx.unified_config.legacy_etcd_config_loader,
             root_ctx.storage_manager,
             model_id,
             params.config.model_mount_destination,

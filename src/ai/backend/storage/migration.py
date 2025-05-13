@@ -21,12 +21,12 @@ import yarl
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
-from ai.backend.common.events import (
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AGENTID_STORAGE, EtcdRedisConfig
+from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
 from .config import load_local_config, load_shared_config
@@ -230,10 +230,10 @@ async def check_and_upgrade(
     redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(redis_config)
-    stream_redis_config = etcd_redis_config.get_override_config(RedisRole.STREAM)
+    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
+    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
-        stream_redis_config,
+        stream_redis_target,
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
     )

@@ -1,4 +1,4 @@
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
 from .container_metric import ContainerUtilizationMetricService
 
@@ -6,5 +6,5 @@ from .container_metric import ContainerUtilizationMetricService
 class UtilizationMetricService:
     container: ContainerUtilizationMetricService
 
-    def __init__(self, shared_config: SharedConfig) -> None:
-        self.container = ContainerUtilizationMetricService(shared_config)
+    def __init__(self, unified_config: ManagerUnifiedConfig) -> None:
+        self.container = ContainerUtilizationMetricService(unified_config)

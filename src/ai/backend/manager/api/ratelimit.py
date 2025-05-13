@@ -11,7 +11,7 @@ from aiotools import apartial
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
-from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
+from ai.backend.common.types import RedisConnectionInfo, RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter
 
 from ..errors.exceptions import RateLimitExceeded
@@ -93,11 +93,11 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
-    etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-        root_ctx.shared_config.data["redis"]
+    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+        root_ctx.unified_config.shared.redis.model_dump()
     )
     app_ctx.redis_rlim = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),
+        redis_profile_target.profile_target(RedisRole.RATE_LIMIT),
         name="ratelimit",
         db=REDIS_RATE_LIMIT_DB,
     )
