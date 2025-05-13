@@ -371,8 +371,12 @@ class CreateRequestModel(BaseModel):
     )
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
-    unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
+    unmanaged_path: str | None = Field(
+        validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
+        default=None,
+    )
     group_id_or_name: str | None = Field(
+        validation_alias=AliasChoices("group", "groupId", "group_id", "group_id_or_name"),
         default=None,
     )
     cloneable: bool = Field(
