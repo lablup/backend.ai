@@ -14,7 +14,8 @@ class DeleteDomainAction(DomainAction):
         return None
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "delete"
 
 

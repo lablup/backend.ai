@@ -26,7 +26,8 @@ class PurgeImageByIdAction(ImageAction):
         return str(self.image_id)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "purge_by_id"
 
 
