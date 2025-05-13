@@ -229,3 +229,24 @@ class DoSyncKernelLogsEvent(BaseKernelEvent):
     @classmethod
     def event_name(cls) -> str:
         return "do_sync_kernel_logs"
+
+
+@dataclass
+class KernelHeartbeatEvent(BaseKernelEvent):
+    timestamp: float
+
+    @override
+    def serialize(self) -> tuple:
+        return (
+            str(self.kernel_id),
+            self.timestamp,
+        )
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple):
+        return cls(kernel_id=KernelId(uuid.UUID(value[0])), timestamp=value[1])
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "kernel_heartbeat"

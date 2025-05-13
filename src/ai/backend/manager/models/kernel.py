@@ -521,6 +521,13 @@ class KernelRow(Base):
     # Resource metrics measured upon termination
     num_queries = sa.Column("num_queries", sa.BigInteger(), default=0)
     last_stat = sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null())
+    last_seen = sa.Column(
+        "last_seen",
+        sa.DateTime(timezone=True),
+        nullable=True,
+        default=sa.null(),
+        server_default=sa.null(),
+    )
 
     __table_args__ = (
         # indexing
