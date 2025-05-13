@@ -18,7 +18,6 @@ from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.config import find_config_file
 from ai.backend.common.validators import TimeDuration
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.models import error_logs
@@ -68,10 +67,7 @@ def main(
     if debug:
         log_level = LogLevel.DEBUG
 
-    if config_path is None:
-        config_path = find_config_file("manager")
-
-    ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
+    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=log_level))
 
 
 @main.command(

@@ -12,6 +12,7 @@ import attrs
 import click
 
 from ai.backend.common import redis_helper
+from ai.backend.common.config import find_config_file
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
@@ -32,7 +33,7 @@ class CLIContext:
     _bootstrap_config: Optional[BootstrapConfig]
     _logger: AbstractLogger
 
-    def __init__(self, config_path: Path, log_level: LogLevel) -> None:
+    def __init__(self, log_level: LogLevel, config_path: Optional[Path] = None) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._bootstrap_config = None
@@ -42,6 +43,9 @@ class CLIContext:
         # Lazy-load the configuration only when requested.
         try:
             if self._bootstrap_config is None:
+                if self.config_path is None:
+                    self.config_path = find_config_file("manager")
+
                 self._bootstrap_config = asyncio.run(
                     BootstrapConfig.load_from_file(self.config_path, self.log_level)
                 )
