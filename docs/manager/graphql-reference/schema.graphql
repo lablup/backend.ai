@@ -2110,11 +2110,11 @@ type Config {
   """Service name. Added in 25.8.0."""
   service: String!
 
-  """Configuration to mutate. Added in 25.8.0."""
+  """Configuration data. Added in 25.8.0."""
   configuration: JSONString!
 
   """JSON schema of the configuration. Added in 25.8.0."""
-  schema: JSONString
+  schema: JSONString!
 }
 
 """All available GraphQL mutations."""
@@ -3085,7 +3085,7 @@ type ModifyConfigsPayload {
   """Service name. Added in 25.8.0."""
   service: String!
 
-  """Configuration to mutate. Added in 25.8.0."""
+  """Configuration data to mutate. Added in 25.8.0."""
   configuration: JSONString!
 }
 

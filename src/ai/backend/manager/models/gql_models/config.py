@@ -39,11 +39,10 @@ class Config(graphene.ObjectType):
     )
     configuration = graphene.JSONString(
         required=True,
-        description="Configuration to mutate. Added in 25.8.0.",
+        description="Configuration data. Added in 25.8.0.",
     )
     schema = graphene.JSONString(
-        required=False,
-        default_value=None,
+        required=True,
         description="JSON schema of the configuration. Added in 25.8.0.",
     )
 
@@ -53,7 +52,6 @@ class Config(graphene.ObjectType):
     @classmethod
     def load(cls, info: graphene.ResolveInfo, service: str) -> Self:
         ctx: GraphQueryContext = info.context
-        unified_config_schema = None
 
         def _fallback(x):
             return str(x)
@@ -101,7 +99,7 @@ class ModifyConfigsPayload(graphene.ObjectType):
     )
     configuration = graphene.JSONString(
         required=True,
-        description="Configuration to mutate. Added in 25.8.0.",
+        description="Configuration data to mutate. Added in 25.8.0.",
     )
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -120,7 +118,7 @@ class ModifyConfigs(graphene.Mutation):
         input = ModifyConfigsInput(required=True, description="Added in 25.8.0.")
 
     @classmethod
-    def _get_key(cls, service: str) -> str:
+    def _get_etcd_prefix_key(cls, service: str) -> str:
         return f"{_PREFIX}/{service}"
 
     @classmethod
@@ -141,7 +139,7 @@ class ModifyConfigs(graphene.Mutation):
         ctx.unified_config.local = ManagerLocalConfig.model_validate(merged_raw_unified_config)
         ctx.unified_config.shared = ManagerSharedConfig.model_validate(merged_raw_unified_config)
 
-        await ctx.etcd.put_prefix(cls._get_key(input.service), input.configuration)
+        await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(input.service), input.configuration)
 
         return ModifyConfigsPayload(
             configuration=input.configuration,
