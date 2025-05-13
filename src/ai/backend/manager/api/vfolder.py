@@ -41,6 +41,7 @@ from pydantic import (
     AliasChoices,
     BaseModel,
     Field,
+    computed_field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
@@ -374,13 +375,27 @@ class CreateRequestModel(BaseModel):
         validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
         default=None,
     )
-    group: str | uuid.UUID | None = Field(
-        validation_alias=AliasChoices("group", "groupId", "group_id"),
+    group_id_or_name: str | None = Field(
+        validation_alias=AliasChoices("group", "groupId", "group_id", "group_id_or_name"),
         default=None,
     )
     cloneable: bool = Field(
         default=False,
     )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def parsed_group_id_or_name(self) -> str | uuid.UUID | None:
+        group_id_or_name: str | uuid.UUID | None
+        match self.group_id_or_name:
+            case str():
+                try:
+                    group_id_or_name = uuid.UUID(self.group_id_or_name)
+                except ValueError:
+                    group_id_or_name = self.group_id_or_name
+            case _:
+                group_id_or_name = self.group_id_or_name
+        return group_id_or_name
 
 
 @auth_required
@@ -394,7 +409,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params.group
+    group_id_or_name = params.parsed_group_id_or_name
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -423,7 +438,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     if params.name.startswith(".") and params.name != ".local":
-        if params.group is not None:
+        if group_id_or_name is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     group_uuid: uuid.UUID | None = None
