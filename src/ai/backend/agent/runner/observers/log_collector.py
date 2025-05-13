@@ -7,4 +7,4 @@ class LogCollectorObserver(AbstractObserver):
     """
 
     def __init__(self):
-        self.stats = {}
+        ...

@@ -6,6 +6,7 @@ class AbstractObserver(ABC):
     Abstract base class for observers.
     """
 
+    @property
     @abstractmethod
     def name(self) -> str:
         """

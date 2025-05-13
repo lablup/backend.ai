@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 
 class AbstractResource(ABC):
+    @property
     @abstractmethod
     def name(self) -> str:
         """

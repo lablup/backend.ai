@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
 
+from ai.backend.common.exception import BackendAIError, ErrorCode, ErrorDetail, ErrorDomain, ErrorOperation
+
 from ..common.types import DeviceId, SlotName
 
 
@@ -36,6 +38,39 @@ class InvalidResourceArgument(ResourceError):
 class NotMultipleOfQuantum(InvalidResourceArgument):
     pass
 
+class KernelAlreadyExistsError(BackendAIError):
+    """
+    Error raised when a kernel already exists in the agent.
+    """
+
+    def __init__(self, kernel_id: str):
+        super().__init__(f"Kernel {kernel_id} already exists.")
+        self.kernel_id = kernel_id
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            ErrorDomain.KERNEL,
+            ErrorOperation.CREATE,
+            ErrorDetail.ALREADY_EXISTS,
+        )
+
+class KernelNotFoundError(BackendAIError):
+    """
+    Error raised when a kernel is not found in the agent.
+    """
+
+    def __init__(self, kernel_id: str):
+        super().__init__(f"Kernel {kernel_id} not found.")
+        self.kernel_id = kernel_id
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            ErrorDomain.KERNEL,
+            ErrorOperation.READ,
+            ErrorDetail.NOT_FOUND,
+        )
 
 @dataclass
 class InsufficientResource(ResourceError):

@@ -104,7 +104,6 @@ from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, N
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
-from ..server import get_extra_volumes
 from ..types import (
     AgentEventData,
     Container,
@@ -113,6 +112,7 @@ from ..types import (
     LifecycleEvent,
     MountInfo,
     Port,
+    VolumeInfo,
 )
 from ..utils import (
     closing_async,
@@ -147,7 +147,50 @@ known_glibc_distros: Final[dict[float, str]] = {
 }
 
 
-def container_from_docker_container(src: DockerContainer) -> Container:
+_deeplearning_image_keys = {
+    "tensorflow",
+    "caffe",
+    "keras",
+    "torch",
+    "mxnet",
+    "theano",
+}
+
+_deeplearning_sample_volume = VolumeInfo(
+    "deeplearning-samples",
+    "/home/work/samples",
+    "ro",
+)
+
+async def _get_extra_volumes(docker, lang):
+    avail_volumes = (await docker.volumes.list())["Volumes"]
+    if not avail_volumes:
+        return []
+    avail_volume_names = set(v["Name"] for v in avail_volumes)
+
+    # deeplearning specialization
+    # TODO: extract as config
+    volume_list = []
+    for k in _deeplearning_image_keys:
+        if k in lang:
+            volume_list.append(_deeplearning_sample_volume)
+            break
+
+    # Mount only actually existing volumes
+    mount_list = []
+    for vol in volume_list:
+        if vol.name in avail_volume_names:
+            mount_list.append(vol)
+        else:
+            log.info(
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
+                vol.name,
+                lang,
+            )
+    return mount_list
+
+
+def _container_from_docker_container(src: DockerContainer) -> Container:
     ports = []
     for private_port, host_ports in src["NetworkSettings"]["Ports"].items():
         private_port = int(private_port.split("/")[0])
@@ -512,7 +555,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # extra mounts
         async with closing_async(Docker()) as docker:
-            extra_mount_list = await get_extra_volumes(docker, self.image_ref.short)
+            extra_mount_list = await _get_extra_volumes(docker, self.image_ref.short)
         mounts.extend(
             Mount(MountTypes.VOLUME, v.name, v.container_path, v.mode) for v in extra_mount_list
         )
@@ -1459,7 +1502,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 result.append(
                                     (
                                         kernel_id,
-                                        container_from_docker_container(container),
+                                        _container_from_docker_container(container),
                                     ),
                                 )
                     except asyncio.CancelledError:

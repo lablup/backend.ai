@@ -14,6 +14,7 @@ python_sources(
         "src/ai/backend/agent/backends/kubernetes:src",
         "src/ai/backend/agent/docker:src",  # not auto-inferred
         "src/ai/backend/agent/dummy:src",  # not auto-inferred
+        "src/ai/backend/agent/event_dispatcher:src",
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
         "src/ai/backend/agent/runner:src",
         "src/ai/backend/agent/runner/observers:src",

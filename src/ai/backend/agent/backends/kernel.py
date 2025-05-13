@@ -1,10 +1,17 @@
+import asyncio
+from dataclasses import dataclass
+import enum
+import logging
 import os
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, FrozenSet, Mapping, Optional, Sequence
+from typing import Any, FrozenSet, Literal, Mapping, Optional, Sequence
+
+import zmq
 
 from ai.backend.agent.agent import KernelObjectType
+from ai.backend.agent.kernel import AbstractCodeRunner, NextResult
 from ai.backend.agent.resources import AbstractComputePlugin, KernelResourceSpec, Mount
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData, MountInfo
 from ai.backend.common.docker import ImageRef
@@ -21,18 +28,20 @@ from ai.backend.common.types import (
     MountTypes,
     SlotName,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+@dataclass
+class StartServiceResult:
+    ...
 
 
-class AbstractCodeRunner(ABC):
-    @abstractmethod
-    async def get_repl_in_addr(self) -> str:
-        raise NotImplementedError
+@dataclass
+class StartModelServiceResult:
+    ...
 
-    @abstractmethod
-    async def get_repl_out_addr(self) -> str:
-        raise NotImplementedError
-
-
+       
 class AbstractKernel(ABC):
     @abstractmethod
     async def create_code_runner(
@@ -49,31 +58,31 @@ class AbstractKernel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts):
+    async def get_completions(self, text: str, opts: Mapping[str, Any]):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_logs(self):
+    async def get_logs(self) -> str:
         raise NotImplementedError
 
     @abstractmethod
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service, opts):
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> StartServiceResult:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_model_service(self, model_service):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> StartModelServiceResult:
         raise NotImplementedError
 
     @abstractmethod
-    async def shutdown_service(self, service):
+    async def shutdown_service(self, service: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, subdir) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
@@ -151,6 +160,73 @@ class AbstractKernel(ABC):
         """
         pass
 
+
+class ExecutionMode(enum.StrEnum):
+    """
+    Execution mode for the kernel.
+    """
+
+    BATCH = "batch"
+    QUERY = "query"
+    INPUT = "input"
+    CONTINUE = "continue"
+
+class KernelWrapper:
+    _kernel: AbstractKernel
+    _runner: AbstractCodeRunner
+    _tasks: set[asyncio.Task[None]] = set()
+
+    def __init__(self, kernel: AbstractKernel, runner: AbstractCodeRunner):
+        self._kernel = kernel
+        self._runner = runner
+        self._tasks = set()
+
+    
+    async def ping(self):
+        return await self._runner.ping()
+    
+    def kernel(self) -> AbstractKernel:
+        return self._kernel
+
+    async def execute(
+        self,
+        run_id: Optional[str],
+        mode: ExecutionMode,
+        text: str,
+        *,
+        opts: Mapping[str, Any],
+        api_version: int,
+        flush_timeout: float,
+    ) -> NextResult:
+        myself = asyncio.current_task()
+        if myself is None:
+            raise RuntimeError("Cannot execute outside of an asyncio task")
+        self._tasks.add(myself)
+        try:
+            await self._runner.attach_output_queue(run_id)
+            try:
+                match mode:
+                    case ExecutionMode.BATCH:
+                        await self._runner.feed_batch(opts)
+                    case ExecutionMode.QUERY:
+                        await self._runner.feed_code(text)
+                    case ExecutionMode.INPUT:
+                        await self._runner.feed_input(text)
+                    case ExecutionMode.CONTINUE:
+                        pass
+            except zmq.ZMQError:
+                # cancel the operation by myself
+                # since the peer is gone.
+                raise asyncio.CancelledError
+            return await self._runner.get_next_result(
+                api_ver=api_version,
+                flush_timeout=flush_timeout,
+            )
+        except asyncio.CancelledError:
+            await self._runner.close()
+            raise
+        finally:
+            self._tasks.remove(myself)
 
 class AbstractKernelCreationContext(ABC):
     @abstractmethod

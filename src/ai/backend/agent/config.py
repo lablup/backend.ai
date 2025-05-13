@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any
 
@@ -5,11 +6,16 @@ import trafaret as t
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceGroupType
+from ai.backend.logging.utils import BraceStyleAdapter
+from trafaret.dataerror import DataError as TrafaretDataError
 
 from .affinity_map import AffinityPolicy
 from .stats import StatModes
 from .types import AgentBackend
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 coredump_defaults = {
     "enabled": False,
@@ -216,3 +222,42 @@ container_etcd_config_iv = t.Dict({
     t.Key("kernel-uid", optional=True): t.ToInt,
     t.Key("kernel-gid", optional=True): t.ToInt,
 }).allow_extra("*")
+
+async def read_agent_config(etcd: AsyncEtcd, local_config: dict[str, Any]) -> None:
+    # Fill up Redis configs from etcd.
+    local_config["redis"] = config.redis_config_iv.check(
+        await etcd.get_prefix("config/redis"),
+    )
+    log.info("configured redis: {0}", local_config["redis"])
+
+    # Fill up vfolder configs from etcd.
+    local_config["vfolder"] = config.vfolder_config_iv.check(
+        await etcd.get_prefix("volumes"),
+    )
+    if local_config["vfolder"]["mount"] is None:
+        log.info(
+            "assuming use of storage-proxy since vfolder mount path is not configured in etcd"
+        )
+    else:
+        log.info("configured vfolder mount base: {0}", local_config["vfolder"]["mount"])
+        log.info("configured vfolder fs prefix: {0}", local_config["vfolder"]["fsprefix"])
+
+    # Fill up shared agent configurations from etcd.
+    agent_etcd_config = agent_etcd_config_iv.check(
+        await etcd.get_prefix("config/agent"),
+    )
+    for k, v in agent_etcd_config.items():
+        local_config["agent"][k] = v
+
+async def read_agent_config_container(etcd: AsyncEtcd, local_config: dict[str, Any]) -> None:
+    # Fill up global container configurations from etcd.
+    try:
+        container_etcd_config = container_etcd_config_iv.check(
+            await etcd.get_prefix("config/container"),
+        )
+    except TrafaretDataError as etrafa:
+        log.warning("etcd: container-config error: {}".format(etrafa))
+        container_etcd_config = {}
+    for k, v in container_etcd_config.items():
+        local_config["container"][k] = v
+        log.info("etcd: container-config: {}={}".format(k, v))

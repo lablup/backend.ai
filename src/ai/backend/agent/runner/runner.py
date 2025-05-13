@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Sequence
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -10,10 +11,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class Runner:
-    _resources: list[AbstractResource]
+    _resources: Sequence[AbstractResource]
     _closed_event: asyncio.Event
 
-    def __init__(self, resources: list[AbstractResource]):
+    def __init__(self, resources: Sequence[AbstractResource]):
         self._resources = resources
         self._closed_event = asyncio.Event()
 
@@ -24,7 +25,7 @@ class Runner:
         """
         if self._closed_event.is_set():
             raise RuntimeError("Runner is already closed.")
-        log.info("Starting observer: {}", observer.name())
+        log.info("Starting observer: {}", observer.name)
         asyncio.create_task(self._run_observer(observer))
 
     async def _run_observer(self, observer: AbstractObserver) -> None:
@@ -40,7 +41,7 @@ class Runner:
         await observer.cleanup()
         log.info(
             "Observer closed: {}",
-            observer.name(),
+            observer.name,
         )
 
     async def _setup(self) -> None:
@@ -49,7 +50,7 @@ class Runner:
                 await resource.setup()
                 log.info(
                     "Resource setup: {}",
-                    resource.name(),
+                    resource.name,
                 )
             except Exception as e:
                 log.error(
@@ -64,7 +65,7 @@ class Runner:
                 await resource.release()
                 log.info(
                     "Resource released: {}",
-                    resource.name(),
+                    resource.name,
                 )
             except Exception as e:
                 log.error(
