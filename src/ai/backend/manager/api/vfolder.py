@@ -621,7 +621,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         host: perms for host, perms in allowed_hosts.items() if host in all_hosts
     })
 
-    default_host = root_ctx.unified_config.shared.volumes.default_host
+    default_host = root_ctx.unified_config.config.volumes.default_host
     if default_host not in allowed_hosts:
         default_host = None
 
@@ -680,7 +680,7 @@ async def list_all_hosts(request: web.Request) -> web.Response:
     )
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
     all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
-    default_host = root_ctx.unified_config.shared.volumes.default_host
+    default_host = root_ctx.unified_config.config.volumes.default_host
     if default_host not in all_hosts:
         default_host = None
     resp = {

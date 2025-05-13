@@ -190,7 +190,7 @@ class Image(graphene.ObjectType):
         installed_agents: List[str],
     ) -> Image:
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else ctx.unified_config.shared.manager.hide_agents
+        hide_agents = False if is_superadmin else ctx.unified_config.config.manager.hide_agents
         image_ref = row.image_ref
         version, ptag_set = image_ref.tag_set
         ret = cls(

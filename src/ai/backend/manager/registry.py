@@ -284,7 +284,7 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
-        self.rpc_keepalive_timeout = int(unified_config.shared.network.rpc.keepalive_timeout)
+        self.rpc_keepalive_timeout = int(unified_config.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
@@ -1479,7 +1479,7 @@ class AgentRegistry:
     ) -> None:
         if not bindings:
             return
-        auto_pull = self.unified_config.shared.docker.image.auto_pull.value
+        auto_pull = self.unified_config.config.docker.image.auto_pull.value
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
             if binding.agent_alloc_ctx.agent_id is None:
@@ -1573,7 +1573,7 @@ class AgentRegistry:
                 result = await db_sess.execute(query)
                 resource_policy = result.scalars().first()
                 idle_timeout = cast(int, resource_policy.idle_timeout)
-                auto_pull = self.unified_config.shared.docker.image.auto_pull.value
+                auto_pull = self.unified_config.config.docker.image.auto_pull.value
 
                 # Aggregate image registry information
                 image_refs: set[ImageRef] = set()
@@ -1636,7 +1636,7 @@ class AgentRegistry:
                     }
                 elif ClusterMode(scheduled_session.cluster_mode) == ClusterMode.MULTI_NODE:
                     # Create overlay network for multi-node sessions
-                    driver = self.unified_config.shared.network.inter_container.default_driver
+                    driver = self.unified_config.config.network.inter_container.default_driver
                     if driver is None:
                         raise ValueError("No inter-container network driver is configured.")
 
@@ -2730,11 +2730,11 @@ class AgentRegistry:
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
                     raise ValueError("network_id should not be None!")
-                if self.unified_config.shared.network.inter_container.default_driver is None:
+                if self.unified_config.config.network.inter_container.default_driver is None:
                     raise ValueError("No inter-container network driver is configured.")
 
                 network_plugin = self.network_plugin_ctx.plugins[
-                    self.unified_config.shared.network.inter_container.default_driver
+                    self.unified_config.config.network.inter_container.default_driver
                 ]
                 try:
                     await network_plugin.destroy_network(network_ref_name)

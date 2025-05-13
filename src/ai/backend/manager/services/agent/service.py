@@ -66,7 +66,7 @@ class AgentService:
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
         :return token: agent watcher token ("insecure" if not set in config server)
         """
-        token = self._unified_config.shared.watcher.token
+        token = self._unified_config.config.watcher.token
         if token is None:
             token = "insecure"
         agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")

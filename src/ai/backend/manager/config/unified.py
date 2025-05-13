@@ -31,7 +31,7 @@ class ManagerUnifiedConfig:
         self._legacy_etcd_config_loader = legacy_etcd_config_loader
 
     @property
-    def shared(self) -> ManagerSharedConfig:
+    def config(self) -> ManagerSharedConfig:
         if self._config is None:
             raise RuntimeError("Shared config is not initialized")
         return self._config

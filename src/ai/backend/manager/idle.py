@@ -211,7 +211,7 @@ class IdleCheckerHost:
         self._event_producer = event_producer
         self._lock_factory = lock_factory
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self._unified_config.shared.redis.model_dump()
+            self._unified_config.config.redis.model_dump()
         )
         self._redis_live = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.LIVE),
@@ -236,7 +236,7 @@ class IdleCheckerHost:
 
     async def start(self) -> None:
         self._frozen = True
-        raw_config = self._unified_config.shared.idle.checkers
+        raw_config = self._unified_config.config.idle.checkers
         await self._grace_period_checker.populate_config(
             raw_config.get(self._grace_period_checker.name) or {}
         )
@@ -1279,7 +1279,7 @@ async def init_idle_checkers(
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default
-    enabled_checkers = unified_config.shared.idle.enabled
+    enabled_checkers = unified_config.config.idle.enabled
     if enabled_checkers:
         for checker_name in enabled_checkers.split(","):
             checker_name = checker_name.strip()

@@ -59,7 +59,7 @@ async def bgtask_fixture(
     yield root_ctx.background_task_manager, producer, dispatcher
 
     etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.unified_config.shared.redis.model_dump()
+        root_ctx.unified_config.config.redis.model_dump()
     )
     stream_redis_config = etcd_redis_config.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(

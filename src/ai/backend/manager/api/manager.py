@@ -123,7 +123,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(Optional[float], root_ctx.unified_config.shared.manager.status_update_interval)
+    interval = cast(Optional[float], root_ctx.unified_config.config.manager.status_update_interval)
     if interval is None:
         # Do not run bgtask if interval is not set
         return
@@ -144,7 +144,7 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
     try:
         status = await root_ctx.unified_config.legacy_etcd_config_loader.get_manager_status()
         # etcd_info = await root_ctx.shared_config.get_manager_nodes_info()
-        configs = root_ctx.unified_config.shared.manager
+        configs = root_ctx.unified_config.config.manager
 
         async with root_ctx.db.begin() as conn:
             query = (
@@ -299,7 +299,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 @superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    manager_id = root_ctx.unified_config.shared.manager.id
+    manager_id = root_ctx.unified_config.config.manager.id
 
     scheduler_status = {}
     for event in SchedulerEvent:

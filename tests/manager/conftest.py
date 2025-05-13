@@ -683,12 +683,12 @@ async def create_app_and_client(bootstrap_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            root_ctx.unified_config.shared.manager.service_addr.host,
-            root_ctx.unified_config.shared.manager.service_addr.port,
+            root_ctx.unified_config.config.manager.service_addr.host,
+            root_ctx.unified_config.config.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.unified_config.shared.manager.service_addr.port
+        port = root_ctx.unified_config.config.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client

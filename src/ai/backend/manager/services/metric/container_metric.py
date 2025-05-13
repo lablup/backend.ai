@@ -84,7 +84,7 @@ class ContainerUtilizationMetricService:
     _range_vector_timewindow: str  # 1m by default
 
     def __init__(self, unified_config: ManagerUnifiedConfig) -> None:
-        metric_config = unified_config.shared.metric
+        metric_config = unified_config.config.metric
         metric_query_addr: HostPortPair = metric_config.address.to_legacy()
         self._metric_query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
         self._range_vector_timewindow = cast(str, metric_config.timewindow)
