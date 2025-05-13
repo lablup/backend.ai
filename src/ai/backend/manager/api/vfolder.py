@@ -438,7 +438,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     if params.name.startswith(".") and params.name != ".local":
-        if params.group is not None:
+        if group_id_or_name is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     group_uuid: uuid.UUID | None = None
