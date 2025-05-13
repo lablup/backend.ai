@@ -197,14 +197,14 @@ FIXTURES = [
 async def test_batch_load_by_id(
     test_case,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
 ):
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
         ],
         [],

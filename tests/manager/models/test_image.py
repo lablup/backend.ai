@@ -181,7 +181,7 @@ async def test_image_rescan_on_docker_registry(
     test_case,
     etcd_fixture,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     extra_fixtures,
     database_fixture,
     create_app_and_client,
@@ -190,7 +190,7 @@ async def test_image_rescan_on_docker_registry(
         [
             event_hub_ctx,
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -339,7 +339,7 @@ async def test_image_rescan_on_cr_backend_ai(
     client: Client,
     etcd_fixture,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
 ):
@@ -347,7 +347,7 @@ async def test_image_rescan_on_cr_backend_ai(
         [
             event_hub_ctx,
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,

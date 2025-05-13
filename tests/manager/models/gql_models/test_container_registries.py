@@ -84,14 +84,14 @@ async def test_harbor_create_project_quota(
     client: Client,
     test_case,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
 ):
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             services_ctx,
         ],
@@ -182,14 +182,14 @@ async def test_harbor_update_project_quota(
     client: Client,
     test_case,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
 ):
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             services_ctx,
         ],
@@ -280,14 +280,14 @@ async def test_harbor_delete_project_quota(
     client: Client,
     test_case,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
 ):
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             services_ctx,
         ],

@@ -19,11 +19,11 @@ from ai.backend.manager.idle import (
 )
 from ai.backend.manager.server import (
     background_task_ctx,
+    config_provider_ctx,
     database_ctx,
     distributed_lock_ctx,
     event_dispatcher_ctx,
     redis_ctx,
-    unified_config_ctx,
 )
 
 
@@ -87,7 +87,7 @@ async def new_user_grace_period_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            unified_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -136,7 +136,7 @@ async def network_timeout_idle_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            unified_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -387,7 +387,7 @@ async def session_lifetime_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            unified_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -610,7 +610,7 @@ async def utilization_idle_checker__utilization(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            unified_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -694,7 +694,7 @@ async def utilization_idle_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            unified_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,

@@ -83,7 +83,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app, etcd_ctx, unified_config_ctx
+from ai.backend.manager.server import build_root_app, config_provider_ctx, etcd_ctx
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -278,14 +278,14 @@ def mock_etcd_ctx(
 
 
 @pytest.fixture(scope="session")
-def mock_unified_config_ctx(
+def mock_config_provider_ctx(
     bootstrap_config: BootstrapConfig,
 ) -> Any:
     base_cfg = bootstrap_config.model_dump()
     argument_binding_ctx = partial(
-        unified_config_ctx, log_level=LogLevel.DEBUG, config_path=None, extra_config=base_cfg
+        config_provider_ctx, log_level=LogLevel.DEBUG, config_path=None, extra_config=base_cfg
     )
-    update_wrapper(argument_binding_ctx, unified_config_ctx)
+    update_wrapper(argument_binding_ctx, config_provider_ctx)
     return argument_binding_ctx
 
 

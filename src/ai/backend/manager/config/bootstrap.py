@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 from pprint import pformat
 from typing import Any, Self
@@ -74,8 +73,8 @@ class BootstrapConfig(BaseModel):
         """
         Load configuration from a config file.
 
-        All configurations are loaded by a single LoaderChain in unified_config_ctx.
-        But BootstrapConfig must be loaded before unified_config_ctx is invoked since some configurations are required for the manager boot process.
+        All configurations are loaded by a single LoaderChain in config_provider_ctx.
+        But BootstrapConfig must be loaded before config_provider_ctx is invoked since some configurations are required for the manager boot process.
         """
 
         overrides: list[tuple[tuple[str, ...], Any]] = [
@@ -100,8 +99,8 @@ class BootstrapConfig(BaseModel):
 
         cfg = cls.model_validate(raw_cfg)
 
-        if cfg.debug.enabled:
-            print("== Manager configuration ==", file=sys.stderr)
-            print(pformat(cfg), file=sys.stderr)
+        # if cfg.debug.enabled:
+        #     print("== Manager configuration ==", file=sys.stderr)
+        #     print(pformat(cfg), file=sys.stderr)
 
         return cfg

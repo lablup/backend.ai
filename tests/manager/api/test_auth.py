@@ -93,7 +93,7 @@ def test_check_date():
 @pytest.mark.asyncio
 async def test_authorize(
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -104,7 +104,7 @@ async def test_authorize(
         [
             event_hub_ctx,
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             database_ctx,

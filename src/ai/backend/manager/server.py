@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from pprint import pformat
 from typing import (
     Any,
     AsyncIterator,
@@ -360,7 +361,7 @@ async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncI
 
 
 @actxmgr
-async def unified_config_ctx(
+async def config_provider_ctx(
     root_ctx: RootContext,
     log_level: LogLevel,
     config_path: Optional[Path] = None,
@@ -404,6 +405,10 @@ async def unified_config_ctx(
     try:
         await config_provider.init()
         root_ctx.config_provider = config_provider
+
+        if config_provider.config.debug.enabled:
+            print("== Manager configuration ==", file=sys.stderr)
+            print(pformat(config_provider.config), file=sys.stderr)
         yield root_ctx.config_provider
     finally:
         await config_provider.terminate()
@@ -1112,7 +1117,7 @@ async def server_main(
     try:
         async with (
             etcd_ctx(root_ctx, boostrap_config.etcd.to_dataclass()),
-            unified_config_ctx(root_ctx, args.log_level, args.bootstrap_cfg_path),
+            config_provider_ctx(root_ctx, args.log_level, args.bootstrap_cfg_path),
             webapp_plugin_ctx(root_app),
         ):
             ssl_ctx = None

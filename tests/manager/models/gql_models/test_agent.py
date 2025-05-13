@@ -109,7 +109,7 @@ EXTRA_FIXTURES = {
 async def test_scan_gpu_alloc_maps(
     mock_agent_responses,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     client,
     bootstrap_config,
     etcd_fixture,
@@ -122,7 +122,7 @@ async def test_scan_gpu_alloc_maps(
         [
             event_hub_ctx,
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             redis_ctx,
             monitoring_ctx,

@@ -545,8 +545,8 @@ def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
 
 
-async def vacuum_db(local_config: BootstrapConfig, vacuum_full: bool = False) -> None:
-    async with connect_database(local_config.db, isolation_level="AUTOCOMMIT") as db:
+async def vacuum_db(bootstrap_config: BootstrapConfig, vacuum_full: bool = False) -> None:
+    async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
         async with db.begin() as conn:
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")

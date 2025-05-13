@@ -455,7 +455,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 async def test_associate_container_registry_with_group(
     client: Client,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     extra_fixtures,
     test_case,
@@ -464,7 +464,7 @@ async def test_associate_container_registry_with_group(
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
         ],
         [],
@@ -527,7 +527,7 @@ async def test_associate_container_registry_with_group(
 async def test_disassociate_container_registry_with_group(
     client: Client,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     extra_fixtures,
     test_case,
@@ -536,7 +536,7 @@ async def test_disassociate_container_registry_with_group(
     test_app, _ = await create_app_and_client(
         [
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
         ],
         [],

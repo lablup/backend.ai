@@ -1781,7 +1781,7 @@ class ManagerUnifiedConfig(BaseModel):
         """,
     )
 
-    # from legacy shared config
+    # From legacy shared config
     system: SystemConfig = Field(
         default_factory=SystemConfig,
         description="""
