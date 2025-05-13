@@ -8,6 +8,7 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -174,7 +175,7 @@ class ProcessorArgs:
 
 
 @dataclass
-class Processors:
+class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     domain: DomainProcessors
     group: GroupProcessors
@@ -248,3 +249,9 @@ class Processors:
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
         )
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            *cls.agent.supported_actions(),
+        ]
