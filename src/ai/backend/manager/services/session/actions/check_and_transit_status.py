@@ -20,7 +20,8 @@ class CheckAndTransitStatusAction(SessionAction):
         return None
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "check_and_transit_status"
 
 
@@ -47,7 +48,8 @@ class CheckAndTransitStatusBatchAction(SessionBatchAction):
         return [str(session_id) for session_id in self.session_ids]
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "check_and_transit_status_multi"
 
 

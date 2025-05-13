@@ -18,7 +18,8 @@ class CreateProjectResourcePolicyAction(ProjectResourcePolicyAction):
         return None
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "create"
 
 
