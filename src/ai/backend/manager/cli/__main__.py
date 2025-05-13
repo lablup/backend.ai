@@ -242,7 +242,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
     async def _clear_redis_history():
         try:
-            async with connect_database(cli_ctx.local_config) as db:
+            async with connect_database(cli_ctx.local_config.db) as db:
                 async with db.begin_readonly() as conn:
                     query = (
                         sa.select([kernels.c.id])
@@ -302,7 +302,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             log.exception("Unexpected error while cleaning up redis history")
 
     async def _clear_terminated_sessions():
-        async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+        async with connect_database(cli_ctx.local_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
                 result = (
@@ -331,7 +331,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         )
 
     async def _clear_old_error_logs():
-        async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+        async with connect_database(cli_ctx.local_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old error logs...")
                 result = await conn.execute(

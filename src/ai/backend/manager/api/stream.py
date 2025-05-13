@@ -105,7 +105,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             root_ctx.registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=root_ctx.unified_config.local.manager.max_wsmsg_size)
+    ws = web.WebSocketResponse(max_msg_size=root_ctx.unified_config.shared.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -289,7 +289,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
-    local_config = root_ctx.unified_config.local
+    config = root_ctx.unified_config.shared
     registry = root_ctx.registry
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
@@ -316,7 +316,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=local_config.manager.max_wsmsg_size)
+    ws = web.WebSocketResponse(max_msg_size=config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -602,7 +602,7 @@ async def stream_proxy(
         # TODO: weakref to proxies for graceful shutdown?
         ws = web.WebSocketResponse(
             autoping=False,
-            max_msg_size=root_ctx.unified_config.local.manager.max_wsmsg_size,
+            max_msg_size=root_ctx.unified_config.shared.manager.max_wsmsg_size,
         )
         await ws.prepare(request)
         proxy = proxy_cls(

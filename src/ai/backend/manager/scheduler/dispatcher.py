@@ -403,7 +403,7 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
-        manager_id = self.unified_config.local.manager.id
+        manager_id = self.unified_config.shared.manager.id
         redis_key = f"manager.{manager_id}.schedule"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -428,7 +428,7 @@ class SchedulerDispatcher(aobject):
             known_slot_types=known_slot_types,
         )
 
-        lock_lifetime = self.unified_config.local.manager.session_schedule_lock_lifetime
+        lock_lifetime = self.unified_config.shared.manager.session_schedule_lock_lifetime
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
@@ -537,7 +537,7 @@ class SchedulerDispatcher(aobject):
         }
 
         agent_selection_resource_priority = (
-            self.unified_config.local.manager.agent_selection_resource_priority
+            self.unified_config.shared.manager.agent_selection_resource_priority
         )
 
         return load_agent_selector(
@@ -981,7 +981,7 @@ class SchedulerDispatcher(aobject):
                 log_fmt + "unexpected-error, during agent allocation",
                 *log_args,
             )
-            exc_data = convert_to_status_data(e, self.unified_config.local.debug.enabled)
+            exc_data = convert_to_status_data(e, self.unified_config.shared.debug.enabled)
 
             async def _update_generic_failure() -> None:
                 async with self.db.begin_session() as kernel_db_sess:
@@ -1210,7 +1210,7 @@ class SchedulerDispatcher(aobject):
                         log_fmt + "unexpected-error, during agent allocation",
                         *log_args,
                     )
-                    exc_data = convert_to_status_data(e, self.unified_config.local.debug.enabled)
+                    exc_data = convert_to_status_data(e, self.unified_config.shared.debug.enabled)
 
                     async def _update_generic_failure() -> None:
                         async with self.db.begin_session() as kernel_db_sess:
@@ -1307,7 +1307,7 @@ class SchedulerDispatcher(aobject):
         Let event handlers transit session and kernel status from
         `ImagePullStartedEvent` and `ImagePullFinishedEvent` events.
         """
-        manager_id = self.unified_config.local.manager.id
+        manager_id = self.unified_config.shared.manager.id
         redis_key = f"manager.{manager_id}.check_precondition"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1326,7 +1326,7 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        lock_lifetime = self.unified_config.local.manager.session_check_precondition_lock_lifetime
+        lock_lifetime = self.unified_config.shared.manager.session_check_precondition_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
@@ -1402,7 +1402,7 @@ class SchedulerDispatcher(aobject):
 
         Session status transition: PREPARED -> CREATING
         """
-        manager_id = self.unified_config.local.manager.id
+        manager_id = self.unified_config.shared.manager.id
         redis_key = f"manager.{manager_id}.start"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1421,7 +1421,7 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        lock_lifetime = self.unified_config.local.manager.session_start_lock_lifetime
+        lock_lifetime = self.unified_config.shared.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
@@ -1653,7 +1653,7 @@ class SchedulerDispatcher(aobject):
     ) -> None:
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by invoking this method
-        manager_id = self.unified_config.local.manager.id
+        manager_id = self.unified_config.shared.manager.id
         redis_key = f"manager.{manager_id}.scale_services"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1876,7 +1876,7 @@ class SchedulerDispatcher(aobject):
             assert len(session.kernels) > 0
             await self.registry.start_session(sched_ctx, session)
         except (asyncio.CancelledError, Exception) as e:
-            status_data = convert_to_status_data(e, self.unified_config.local.debug.enabled)
+            status_data = convert_to_status_data(e, self.unified_config.shared.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
             #       SCHEDULED and retry within some limit using status_data.

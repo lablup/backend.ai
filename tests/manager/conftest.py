@@ -51,8 +51,8 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
+from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -206,14 +206,14 @@ def local_config(
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
     test_db,
-) -> Iterator[ManagerLocalConfig]:
+) -> Iterator[BootstrapConfig]:
     etcd_addr = etcd_container[1]
     postgres_addr = postgres_container[1]
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
     # Establish a self-contained config.
-    cfg = ManagerLocalConfig.model_validate({
+    cfg = BootstrapConfig.model_validate({
         "etcd": {
             "namespace": test_id,
             "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
@@ -267,7 +267,7 @@ def local_config(
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = asyncio.run(ManagerLocalConfig.load_from_file())
+        fs_local_config = asyncio.run(BootstrapConfig.load_from_file(Path("dummy-manager.toml")))
         cfg.etcd.addr = fs_local_config.etcd.addr
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "user")
         _override_if_exists(fs_local_config.etcd, cfg.etcd, "password")
@@ -296,7 +296,7 @@ def mock_etcd_ctx(
 def mock_unified_config_ctx(
     local_config,
 ) -> Any:
-    argument_binding_ctx = partial(unified_config_ctx, base_local_config=local_config)
+    argument_binding_ctx = partial(unified_config_ctx, config_path=None)
     update_wrapper(argument_binding_ctx, unified_config_ctx)
     return argument_binding_ctx
 
@@ -487,7 +487,7 @@ def database(request, local_config, test_db) -> None:
 
 @pytest.fixture()
 async def database_engine(local_config, database):
-    async with connect_database(local_config) as db:
+    async with connect_database(local_config.db) as db:
         yield db
 
 
@@ -692,12 +692,12 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            root_ctx.unified_config.local.manager.service_addr.host,
-            root_ctx.unified_config.local.manager.service_addr.port,
+            root_ctx.unified_config.shared.manager.service_addr.host,
+            root_ctx.unified_config.shared.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.unified_config.local.manager.service_addr.port
+        port = root_ctx.unified_config.shared.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client

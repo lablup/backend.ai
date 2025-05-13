@@ -1,41 +1,48 @@
 import asyncio
 from typing import Awaitable, Callable, Optional
 
+from ai.backend.manager.config.loader.loader_chain import LoaderChain
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 
 from .loader.legacy_etcd_loader import LegacyEtcdLoader
-from .local import ManagerLocalConfig
 from .shared import ManagerSharedConfig
 
 SharedConfigChangeCallback = Callable[[ManagerSharedConfig], Awaitable[None]]
 
 
 class ManagerUnifiedConfig:
-    local: ManagerLocalConfig
-    shared: ManagerSharedConfig
-    legacy_etcd_config_loader: LegacyEtcdLoader
-    etcd_watcher: EtcdConfigWatcher
-
+    _config: ManagerSharedConfig
+    _loader: LoaderChain
+    _etcd_watcher: EtcdConfigWatcher
     _etcd_watcher_task: Optional[asyncio.Task[None]]
+    _legacy_etcd_config_loader: LegacyEtcdLoader
 
     def __init__(
         self,
-        local: ManagerLocalConfig,
-        shared: ManagerSharedConfig,
+        loader: LoaderChain,
         legacy_etcd_config_loader: LegacyEtcdLoader,
         etcd_watcher: EtcdConfigWatcher,
     ) -> None:
-        self.local = local
-        self.shared = shared
-        self.legacy_etcd_config_loader = legacy_etcd_config_loader
-        self.etcd_watcher = etcd_watcher
+        self._loader = loader
+        self._legacy_etcd_config_loader = legacy_etcd_config_loader
+        self._etcd_watcher = etcd_watcher
+
+    @property
+    def shared(self) -> ManagerSharedConfig:
+        return self._config
+
+    @property
+    def legacy_etcd_config_loader(self) -> LegacyEtcdLoader:
+        return self._legacy_etcd_config_loader
 
     async def _run_watcher(self) -> None:
-        async for event in self.etcd_watcher.watch():
+        async for event in self._etcd_watcher.watch():
             # TODO: Handle all etcd_loader.load() here
             pass
 
-    def start(self) -> None:
+    async def load(self) -> None:
+        raw_shared_config = await self._loader.load()
+        self._config = ManagerSharedConfig.model_validate(raw_shared_config)
         self._etcd_watcher_task = asyncio.create_task(self._run_watcher())
 
     async def stop(self) -> None:

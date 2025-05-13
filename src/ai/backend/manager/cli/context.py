@@ -23,13 +23,13 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import RedisConnectionInfo, RedisProfileTarget
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
+from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.config.local import ManagerLocalConfig
 from ai.backend.manager.config.shared import ManagerSharedConfig, RedisConfig
 
 
 class CLIContext:
-    _local_config: Optional[ManagerLocalConfig]
+    _local_config: Optional[BootstrapConfig]
     _logger: AbstractLogger
 
     def __init__(self, config_path: Path, log_level: LogLevel) -> None:
@@ -38,12 +38,12 @@ class CLIContext:
         self._local_config = None
 
     @property
-    def local_config(self) -> ManagerLocalConfig:
+    def local_config(self) -> BootstrapConfig:
         # Lazy-load the configuration only when requested.
         try:
             if self._local_config is None:
                 self._local_config = asyncio.run(
-                    ManagerLocalConfig.load_from_file(self.config_path, self.log_level)
+                    BootstrapConfig.load_from_file(self.config_path, self.log_level)
                 )
         except ConfigurationError as e:
             print(
