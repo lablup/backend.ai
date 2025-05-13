@@ -453,7 +453,7 @@ class ManagerConfig(BaseModel):
         For private deployments, consider using 127.0.0.1 instead.
         """,
         examples=[{"host": "127.0.0.1", "port": 8080}],
-        validate_alias=AliasChoices("service-addr", "service_addr"),
+        validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
     internal_addr: HostPortPair = Field(
@@ -462,7 +462,7 @@ class ManagerConfig(BaseModel):
         Set the internal hostname/port to accept internal API requests.
         """,
         examples=[{"host": "127.0.0.1", "port": 18080}],
-        validate_alias=AliasChoices("internal-addr", "internal_addr"),
+        validation_alias=AliasChoices("internal-addr", "internal_addr"),
         serialization_alias="internal-addr",
     )
     rpc_auth_manager_keypair: FilePath = Field(
