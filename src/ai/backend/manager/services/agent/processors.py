@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage
@@ -46,6 +48,7 @@ class AgentProcessors(AbstractProcessorPackage):
         self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
 
+    @override
     @classmethod
     def supported_actions(cls) -> list[str]:
         return [

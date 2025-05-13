@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage
@@ -84,6 +86,7 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.generate_token = ActionProcessor(service.generate_token, action_monitors)
         self.modify_endpoint = ActionProcessor(service.modify_endpoint, action_monitors)
 
+    @override
     @classmethod
     def supported_actions(cls) -> list[str]:
         return [

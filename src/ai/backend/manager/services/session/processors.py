@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage
@@ -182,6 +184,7 @@ class SessionProcessors(AbstractProcessorPackage):
             service.check_and_transit_status, action_monitors
         )
 
+    @override
     @classmethod
     def supported_actions(cls) -> list[str]:
         return [

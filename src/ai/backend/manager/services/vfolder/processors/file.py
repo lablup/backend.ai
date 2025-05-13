@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage
@@ -35,6 +37,7 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         self.delete_files = ActionProcessor(service.delete_files, action_monitors)
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
 
+    @override
     @classmethod
     def supported_actions(cls) -> list[str]:
         return [

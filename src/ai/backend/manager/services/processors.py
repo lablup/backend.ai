@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd
@@ -250,6 +250,7 @@ class Processors(AbstractProcessorPackage):
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
         )
 
+    @override
     @classmethod
     def supported_actions(cls) -> list[str]:
         return [
