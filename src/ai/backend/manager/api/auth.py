@@ -25,7 +25,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.shared import AuthConfig
+from ai.backend.manager.config.unified import AuthConfig
 
 from ..errors.exceptions import (
     AuthorizationFailed,

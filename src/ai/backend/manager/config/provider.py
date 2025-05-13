@@ -7,7 +7,7 @@ from ai.backend.manager.config.loader.loader_chain import LoaderChain
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 
 from .loader.legacy_etcd_loader import LegacyEtcdLoader
-from .shared import ManagerUnifiedConfig
+from .unified import ManagerUnifiedConfig
 
 SharedConfigChangeCallback = Callable[[ManagerUnifiedConfig], Awaitable[None]]
 

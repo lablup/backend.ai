@@ -54,7 +54,7 @@ from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.shared import ManagerUnifiedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,

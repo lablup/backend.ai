@@ -6,7 +6,7 @@ from typing import Any, Self
 from pydantic import BaseModel, Field
 
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.config.shared import (
+from ai.backend.manager.config.unified import (
     DatabaseConfig,
     DebugConfig,
     EtcdConfig,

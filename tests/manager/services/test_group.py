@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.config.shared import ManagerUnifiedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

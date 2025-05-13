@@ -6,7 +6,7 @@ from graphene.test import Client
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.shared import ManagerUnifiedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
