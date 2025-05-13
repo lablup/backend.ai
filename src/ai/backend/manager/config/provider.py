@@ -14,7 +14,7 @@ SharedConfigChangeCallback = Callable[[ManagerSharedConfig], Awaitable[None]]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ManagerUnifiedConfig:
+class ManagerConfigProvider:
     _loader: LoaderChain
     _config: Optional[ManagerSharedConfig]
     _etcd_watcher: EtcdConfigWatcher

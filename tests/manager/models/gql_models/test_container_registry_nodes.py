@@ -5,8 +5,8 @@ from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.shared import ManagerSharedConfig
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -37,16 +37,16 @@ async def get_graphquery_context(
     mock_loader.load = AsyncMock()
     mock_loader.load.return_value = shared_config.model_dump()
 
-    unified_config = ManagerUnifiedConfig(
+    config_provider = ManagerConfigProvider(
         loader=mock_loader,
         legacy_etcd_config_loader=MagicMock(),  # type: ignore
         etcd_watcher=MagicMock(),
     )
-    await unified_config.init()
+    await config_provider.init()
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        unified_config=unified_config,
+        config_provider=config_provider,
         etcd=MagicMock(),  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",

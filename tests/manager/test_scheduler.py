@@ -619,7 +619,7 @@ async def test_manually_assign_agent_available(
     mock_etcd = DummyEtcd()
 
     dispatcher = SchedulerDispatcher(
-        unified_config=mock_unified_config,
+        config_provider=mock_unified_config,
         etcd=mock_etcd,  # type: ignore
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,

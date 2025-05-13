@@ -21,7 +21,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config_legacy import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.errors.exceptions import ObjectNotFound, StorageProxyError
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
@@ -107,19 +107,19 @@ async def _check_vfolder_status(
 
 class VFolderService:
     _db: ExtendedAsyncSAEngine
-    _unified_config: ManagerUnifiedConfig
+    _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
-        unified_config: ManagerUnifiedConfig,
+        config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
         background_task_manager: BackgroundTaskManager,
     ) -> None:
         self._db = db
-        self._unified_config = unified_config
+        self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._background_task_manager = background_task_manager
 
@@ -133,7 +133,7 @@ class VFolderService:
         unmanaged_path = action.unmanaged_path
         # Resolve host for the new virtual folder.
         if not folder_host:
-            folder_host = self._unified_config.config.volumes.default_host
+            folder_host = self._config_provider.config.volumes.default_host
             if not folder_host:
                 raise VFolderInvalidParameter(
                     "You must specify the vfolder host because the default host is not configured."
@@ -146,7 +146,7 @@ class VFolderService:
                 # Assign ghost host to unmanaged vfolder
 
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
 
         if action.name.startswith(".") and action.name != ".local":
@@ -407,7 +407,7 @@ class VFolderService:
     ) -> UpdateVFolderAttributeActionResult:
         modifier = action.modifier
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
 
         async def _update(db_session: AsyncSession) -> None:
@@ -448,7 +448,7 @@ class VFolderService:
 
     async def get(self, action: GetVFolderAction) -> GetVFolderActionResult:
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
@@ -514,7 +514,7 @@ class VFolderService:
 
     async def list(self, action: ListVFolderAction) -> ListVFolderActionResult:
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         async with self._db.begin_session() as db_session:
             requester_user_row = await db_session.scalar(
@@ -564,7 +564,7 @@ class VFolderService:
     ) -> MoveToTrashVFolderActionResult:
         # Only the effective folder owner can delete the folder.
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         async with self._db.connect() as db_conn:
             async with self._db.begin_session(db_conn) as db_session:
@@ -623,7 +623,7 @@ class VFolderService:
         self, action: RestoreVFolderFromTrashAction
     ) -> RestoreVFolderFromTrashActionResult:
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
 
         async with self._db.begin_session() as db_session:
@@ -661,7 +661,7 @@ class VFolderService:
         self, action: DeleteForeverVFolderAction
     ) -> DeleteForeverVFolderActionResult:
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
 
         async with self._db.begin_session() as db_session:
@@ -697,7 +697,7 @@ class VFolderService:
         self, action: ForceDeleteVFolderAction
     ) -> ForceDeleteVFolderActionResult:
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
 
         async with self._db.begin_session() as db_session:
@@ -728,7 +728,7 @@ class VFolderService:
 
     async def clone(self, action: CloneVFolderAction) -> CloneVFolderActionResult:
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         if "user" not in allowed_vfolder_types:
             raise VFolderInvalidParameter("user vfolder cannot be created in this host")
@@ -781,7 +781,7 @@ class VFolderService:
                         raise VFolderInvalidParameter("VFolder name conflicts with your dotfile.")
 
             if not target_folder_host:
-                target_folder_host = self._unified_config.config.volumes.default_host
+                target_folder_host = self._config_provider.config.volumes.default_host
                 if not target_folder_host:
                     raise VFolderInvalidParameter(
                         "You must specify the vfolder host because the default host is not configured."

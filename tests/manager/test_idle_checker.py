@@ -113,7 +113,7 @@ async def new_user_grace_period_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -174,7 +174,7 @@ async def network_timeout_idle_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -227,7 +227,7 @@ async def network_timeout_idle_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -284,7 +284,7 @@ async def network_timeout_idle_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -346,7 +346,7 @@ async def network_timeout_idle_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -421,7 +421,7 @@ async def session_lifetime_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -468,7 +468,7 @@ async def session_lifetime_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -520,7 +520,7 @@ async def session_lifetime_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -574,7 +574,7 @@ async def session_lifetime_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -662,7 +662,7 @@ async def utilization_idle_checker__utilization(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -761,7 +761,7 @@ async def utilization_idle_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -845,7 +845,7 @@ async def utilization_idle_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
@@ -929,7 +929,7 @@ async def utilization_idle_checker(
     await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.unified_config,
+        root_ctx.config_provider,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,

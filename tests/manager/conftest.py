@@ -53,8 +53,8 @@ from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.shared import ManagerSharedConfig
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -683,12 +683,12 @@ async def create_app_and_client(bootstrap_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            root_ctx.unified_config.config.manager.service_addr.host,
-            root_ctx.unified_config.config.manager.service_addr.port,
+            root_ctx.config_provider.config.manager.service_addr.host,
+            root_ctx.config_provider.config.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.unified_config.config.manager.service_addr.port
+        port = root_ctx.config_provider.config.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client
@@ -870,7 +870,7 @@ async def registry_ctx(mocker):
             "logging": {},
         }
     )
-    mock_unified_config = ManagerUnifiedConfig(
+    mock_unified_config = ManagerConfigProvider(
         loader=mock_loader,
         legacy_etcd_config_loader=mock_etcd_config_loader,
         etcd_watcher=MagicMock(),
@@ -908,7 +908,7 @@ async def registry_ctx(mocker):
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
-        unified_config=mock_unified_config,
+        config_provider=mock_unified_config,
         db=mock_db,
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,

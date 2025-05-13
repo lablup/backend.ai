@@ -1719,7 +1719,6 @@ class ResourceSlotsConfig(BaseModel):
     )
 
 
-# TODO: Need to rethink if we need to separate shared manager configs
 class ManagerSharedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(

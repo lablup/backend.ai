@@ -135,7 +135,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
@@ -252,7 +252,7 @@ class AgentRegistry:
 
     def __init__(
         self,
-        unified_config: ManagerUnifiedConfig,
+        config_provider: ManagerConfigProvider,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
         redis_stat: RedisConnectionInfo,
@@ -269,7 +269,7 @@ class AgentRegistry:
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
     ) -> None:
-        self.unified_config = unified_config
+        self.config_provider = config_provider
         self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
@@ -284,7 +284,7 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
-        self.rpc_keepalive_timeout = int(unified_config.config.network.rpc.keepalive_timeout)
+        self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
@@ -507,7 +507,7 @@ class AgentRegistry:
 
         if _resources := config["resources"]:
             available_resource_slots = (
-                await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+                await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
             )
             try:
                 ResourceSlot.from_user_input(_resources, available_resource_slots)
@@ -1027,7 +1027,7 @@ class AgentRegistry:
                 session_enqueue_configs["creation_config"].get("mount_options") or {}
             )
             allowed_vfolder_types = (
-                await self.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+                await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -1183,10 +1183,10 @@ class AgentRegistry:
                 )
                 image_row = await ImageRow.resolve(session, [image_ref])
             image_min_slots, image_max_slots = await image_row.get_slot_ranges(
-                self.unified_config.legacy_etcd_config_loader
+                self.config_provider.legacy_etcd_config_loader
             )
             known_slot_types = (
-                await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+                await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
             )
 
             labels = cast(dict, image_row.labels)
@@ -1479,7 +1479,7 @@ class AgentRegistry:
     ) -> None:
         if not bindings:
             return
-        auto_pull = self.unified_config.config.docker.image.auto_pull.value
+        auto_pull = self.config_provider.config.docker.image.auto_pull.value
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
             if binding.agent_alloc_ctx.agent_id is None:
@@ -1573,7 +1573,7 @@ class AgentRegistry:
                 result = await db_sess.execute(query)
                 resource_policy = result.scalars().first()
                 idle_timeout = cast(int, resource_policy.idle_timeout)
-                auto_pull = self.unified_config.config.docker.image.auto_pull.value
+                auto_pull = self.config_provider.config.docker.image.auto_pull.value
 
                 # Aggregate image registry information
                 image_refs: set[ImageRef] = set()
@@ -1636,7 +1636,7 @@ class AgentRegistry:
                     }
                 elif ClusterMode(scheduled_session.cluster_mode) == ClusterMode.MULTI_NODE:
                     # Create overlay network for multi-node sessions
-                    driver = self.unified_config.config.network.inter_container.default_driver
+                    driver = self.config_provider.config.network.inter_container.default_driver
                     if driver is None:
                         raise ValueError("No inter-container network driver is configured.")
 
@@ -1962,7 +1962,7 @@ class AgentRegistry:
         }
 
     async def get_user_occupancy(self, user_id, *, db_sess=None):
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -1984,7 +1984,7 @@ class AgentRegistry:
         return await execute_with_retry(_query)
 
     async def get_keypair_occupancy(self, access_key, *, db_sess=None):
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2011,7 +2011,7 @@ class AgentRegistry:
 
     async def get_domain_occupancy(self, domain_name, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2039,7 +2039,7 @@ class AgentRegistry:
 
     async def get_group_occupancy(self, group_id, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2730,11 +2730,11 @@ class AgentRegistry:
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
                     raise ValueError("network_id should not be None!")
-                if self.unified_config.config.network.inter_container.default_driver is None:
+                if self.config_provider.config.network.inter_container.default_driver is None:
                     raise ValueError("No inter-container network driver is configured.")
 
                 network_plugin = self.network_plugin_ctx.plugins[
-                    self.unified_config.config.network.inter_container.default_driver
+                    self.config_provider.config.network.inter_container.default_driver
                 ]
                 try:
                     await network_plugin.destroy_network(network_ref_name)
@@ -3080,7 +3080,7 @@ class AgentRegistry:
                     if row is None or row["status"] is None:
                         # new agent detected!
                         log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.unified_config.legacy_etcd_config_loader.update_resource_slots(
+                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
                             slot_key_and_units
                         )
                         self.agent_cache.update(
@@ -3138,17 +3138,15 @@ class AgentRegistry:
                                 agent_info["public_key"],
                             )
                         if updates:
-                            await (
-                                self.unified_config.legacy_etcd_config_loader.update_resource_slots(
-                                    slot_key_and_units
-                                )
+                            await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
+                                slot_key_and_units
                             )
                             update_query = (
                                 sa.update(agents).values(updates).where(agents.c.id == agent_id)
                             )
                             await conn.execute(update_query)
                     elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.unified_config.legacy_etcd_config_loader.update_resource_slots(
+                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
                             slot_key_and_units
                         )
                         instance_rejoin = True
