@@ -10,8 +10,7 @@ class OperationStatus(enum.StrEnum):
 
 
 class AbstractProcessorPackage(ABC):
-    @classmethod
     @abstractmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         """Get the list of action types that this processors can handle."""
         raise NotImplementedError

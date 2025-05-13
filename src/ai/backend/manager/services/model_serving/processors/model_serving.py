@@ -87,8 +87,7 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.modify_endpoint = ActionProcessor(service.modify_endpoint, action_monitors)
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             CreateModelServiceAction.type(),
             ListModelServiceAction.type(),

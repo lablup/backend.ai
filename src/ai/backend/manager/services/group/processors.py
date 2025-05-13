@@ -47,8 +47,7 @@ class GroupProcessors(AbstractProcessorPackage):
         self.usage_per_period = ActionProcessor(group_service.usage_per_period, action_monitors)
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             CreateGroupAction.type(),
             ModifyGroupAction.type(),

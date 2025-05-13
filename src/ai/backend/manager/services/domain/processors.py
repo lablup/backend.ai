@@ -48,8 +48,7 @@ class DomainProcessors(AbstractProcessorPackage):
         self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             CreateDomainNodeAction.type(),
             ModifyDomainNodeAction.type(),

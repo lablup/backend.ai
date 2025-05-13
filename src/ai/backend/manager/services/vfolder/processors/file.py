@@ -38,8 +38,7 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             CreateUploadSessionAction.type(),
             CreateDownloadSessionAction.type(),

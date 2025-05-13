@@ -251,24 +251,23 @@ class Processors(AbstractProcessorPackage):
         )
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
-            *cls.agent.supported_actions(),
-            *cls.domain.supported_actions(),
-            *cls.group.supported_actions(),
-            *cls.user.supported_actions(),
-            *cls.image.supported_actions(),
-            *cls.container_registry.supported_actions(),
-            *cls.vfolder.supported_actions(),
-            *cls.vfolder_file.supported_actions(),
-            *cls.vfolder_invite.supported_actions(),
-            *cls.session.supported_actions(),
-            *cls.keypair_resource_policy.supported_actions(),
-            *cls.user_resource_policy.supported_actions(),
-            *cls.project_resource_policy.supported_actions(),
-            *cls.resource_preset.supported_actions(),
-            *cls.utilization_metric.supported_actions(),
-            *cls.model_serving.supported_actions(),
-            *cls.model_serving_auto_scaling.supported_actions(),
+            *self.agent.supported_actions(),
+            *self.domain.supported_actions(),
+            *self.group.supported_actions(),
+            *self.user.supported_actions(),
+            *self.image.supported_actions(),
+            *self.container_registry.supported_actions(),
+            *self.vfolder.supported_actions(),
+            *self.vfolder_file.supported_actions(),
+            *self.vfolder_invite.supported_actions(),
+            *self.session.supported_actions(),
+            *self.keypair_resource_policy.supported_actions(),
+            *self.user_resource_policy.supported_actions(),
+            *self.project_resource_policy.supported_actions(),
+            *self.resource_preset.supported_actions(),
+            *self.utilization_metric.supported_actions(),
+            *self.model_serving.supported_actions(),
+            *self.model_serving_auto_scaling.supported_actions(),
         ]

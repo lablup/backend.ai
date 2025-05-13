@@ -51,8 +51,7 @@ class ModelServingAutoScalingProcessors(AbstractProcessorPackage):
         )
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             ScaleServiceReplicasAction.type(),
             CreateEndpointAutoScalingRuleAction.type(),

@@ -60,8 +60,7 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_task_logs = ActionProcessor(service.get_task_logs, action_monitors)
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             CreateVFolderAction.type(),
             GetVFolderAction.type(),

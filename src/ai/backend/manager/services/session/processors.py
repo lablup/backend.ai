@@ -185,8 +185,7 @@ class SessionProcessors(AbstractProcessorPackage):
         )
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             CommitSessionAction.type(),
             CompleteAction.type(),

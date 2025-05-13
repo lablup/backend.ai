@@ -47,8 +47,7 @@ class UserProcessors(AbstractProcessorPackage):
         self.admin_month_stats = ActionProcessor(user_service.admin_month_stats, action_monitors)
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             CreateUserAction.type(),
             ModifyUserAction.type(),

@@ -49,8 +49,7 @@ class AgentProcessors(AbstractProcessorPackage):
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
 
     @override
-    @classmethod
-    def supported_actions(cls) -> list[str]:
+    def supported_actions(self) -> list[str]:
         return [
             SyncAgentRegistryAction.type(),
             GetWatcherStatusAction.type(),
