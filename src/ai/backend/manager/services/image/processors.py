@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -54,7 +55,7 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 from .service import ImageService
 
 
-class ImageProcessors:
+class ImageProcessors(AbstractProcessorPackage):
     forget_image: ActionProcessor[ForgetImageAction, ForgetImageActionResult]
     forget_image_by_id: ActionProcessor[ForgetImageByIdAction, ForgetImageByIdActionResult]
     purge_image_by_id: ActionProcessor[PurgeImageByIdAction, PurgeImageByIdActionResult]
@@ -92,3 +93,20 @@ class ImageProcessors:
         self.clear_image_custom_resource_limit = ActionProcessor(
             service.clear_image_custom_resource_limit, action_monitors
         )
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            ForgetImageAction.type(),
+            ForgetImageByIdAction.type(),
+            PurgeImageByIdAction.type(),
+            AliasImageAction.type(),
+            DealiasImageAction.type(),
+            ModifyImageAction.type(),
+            PreloadImageAction.type(),
+            UnloadImageAction.type(),
+            UntagImageFromRegistryAction.type(),
+            ScanImageAction.type(),
+            PurgeImagesAction.type(),
+            ClearImageCustomResourceLimitAction.type(),
+        ]

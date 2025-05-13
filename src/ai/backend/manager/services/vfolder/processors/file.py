@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 
 from ..actions.file import (
     CreateDownloadSessionAction,
@@ -18,7 +19,7 @@ from ..actions.file import (
 from ..services.file import VFolderFileService
 
 
-class VFolderFileProcessors:
+class VFolderFileProcessors(AbstractProcessorPackage):
     upload_file: ActionProcessor[CreateUploadSessionAction, CreateUploadSessionActionResult]
     download_file: ActionProcessor[CreateDownloadSessionAction, CreateDownloadSessionActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
@@ -33,3 +34,14 @@ class VFolderFileProcessors:
         self.rename_file = ActionProcessor(service.rename_file, action_monitors)
         self.delete_files = ActionProcessor(service.delete_files, action_monitors)
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            CreateUploadSessionAction.type(),
+            CreateDownloadSessionAction.type(),
+            ListFilesAction.type(),
+            RenameFileAction.type(),
+            DeleteFilesAction.type(),
+            MkdirAction.type(),
+        ]

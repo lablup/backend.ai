@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -107,7 +108,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
 from ai.backend.manager.services.session.service import SessionService
 
 
-class SessionProcessors:
+class SessionProcessors(AbstractProcessorPackage):
     commit_session: ActionProcessor[CommitSessionAction, CommitSessionActionResult]
     complete: ActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: ActionProcessor[
@@ -180,3 +181,34 @@ class SessionProcessors:
         self.check_and_transit_status = ActionProcessor(
             service.check_and_transit_status, action_monitors
         )
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            CommitSessionAction.type(),
+            CompleteAction.type(),
+            ConvertSessionToImageAction.type(),
+            CreateClusterAction.type(),
+            CreateFromParamsAction.type(),
+            CreateFromTemplateAction.type(),
+            DestroySessionAction.type(),
+            DownloadFileAction.type(),
+            DownloadFilesAction.type(),
+            ExecuteSessionAction.type(),
+            GetAbusingReportAction.type(),
+            GetCommitStatusAction.type(),
+            GetContainerLogsAction.type(),
+            GetDependencyGraphAction.type(),
+            GetDirectAccessInfoAction.type(),
+            GetSessionInfoAction.type(),
+            InterruptSessionAction.type(),
+            ListFilesAction.type(),
+            MatchSessionsAction.type(),
+            RenameSessionAction.type(),
+            RestartSessionAction.type(),
+            ShutdownServiceAction.type(),
+            StartServiceAction.type(),
+            UploadFilesAction.type(),
+            ModifySessionAction.type(),
+            CheckAndTransitStatusAction.type(),
+        ]

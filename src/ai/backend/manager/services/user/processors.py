@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -27,7 +28,7 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
 from ai.backend.manager.services.user.service import UserService
 
 
-class UserProcessors:
+class UserProcessors(AbstractProcessorPackage):
     create_user: ActionProcessor[CreateUserAction, CreateUserActionResult]
     modify_user: ActionProcessor[ModifyUserAction, ModifyUserActionResult]
     delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
@@ -42,3 +43,14 @@ class UserProcessors:
         self.purge_user = ActionProcessor(user_service.purge_user, action_monitors)
         self.user_month_stats = ActionProcessor(user_service.user_month_stats, action_monitors)
         self.admin_month_stats = ActionProcessor(user_service.admin_month_stats, action_monitors)
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            CreateUserAction.type(),
+            ModifyUserAction.type(),
+            DeleteUserAction.type(),
+            PurgeUserAction.type(),
+            UserMonthStatsAction.type(),
+            AdminMonthStatsAction.type(),
+        ]

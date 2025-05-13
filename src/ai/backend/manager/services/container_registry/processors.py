@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -23,7 +24,7 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
 
-class ContainerRegistryProcessors:
+class ContainerRegistryProcessors(AbstractProcessorPackage):
     rescan_images: ActionProcessor[RescanImagesAction, RescanImagesActionResult]
     clear_images: ActionProcessor[ClearImagesAction, ClearImagesActionResult]
     load_container_registries: ActionProcessor[
@@ -50,3 +51,13 @@ class ContainerRegistryProcessors:
         self.get_container_registries = ActionProcessor(
             service.get_container_registries, action_monitors
         )
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            RescanImagesAction.type(),
+            ClearImagesAction.type(),
+            LoadContainerRegistriesAction.type(),
+            LoadAllContainerRegistriesAction.type(),
+            GetContainerRegistriesAction.type(),
+        ]

@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -51,7 +52,7 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 
 
-class ModelServingProcessors:
+class ModelServingProcessors(AbstractProcessorPackage):
     create_model_service: ActionProcessor[CreateModelServiceAction, CreateModelServiceActionResult]
     list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
     delete_model_service: ActionProcessor[DeleteModelServiceAction, DeleteModelServiceActionResult]
@@ -82,3 +83,20 @@ class ModelServingProcessors:
         self.delete_route = ActionProcessor(service.delete_route, action_monitors)
         self.generate_token = ActionProcessor(service.generate_token, action_monitors)
         self.modify_endpoint = ActionProcessor(service.modify_endpoint, action_monitors)
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            CreateModelServiceAction.type(),
+            ListModelServiceAction.type(),
+            DeleteModelServiceAction.type(),
+            DryRunModelServiceAction.type(),
+            GetModelServiceInfoAction.type(),
+            ListErrorsAction.type(),
+            ClearErrorAction.type(),
+            ForceSyncAction.type(),
+            UpdateRouteAction.type(),
+            DeleteRouteAction.type(),
+            GenerateTokenAction.type(),
+            ModifyEndpointAction.type(),
+        ]

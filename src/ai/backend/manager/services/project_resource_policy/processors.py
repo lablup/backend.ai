@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
     CreateProjectResourcePolicyActionResult,
@@ -15,7 +16,7 @@ from ai.backend.manager.services.project_resource_policy.actions.modify_project_
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
 
 
-class ProjectResourcePolicyProcessors:
+class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
     create_project_resource_policy: ActionProcessor[
         CreateProjectResourcePolicyAction, CreateProjectResourcePolicyActionResult
     ]
@@ -38,3 +39,11 @@ class ProjectResourcePolicyProcessors:
         self.delete_project_resource_policy = ActionProcessor(
             service.delete_project_resource_policy, action_monitors
         )
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            CreateProjectResourcePolicyAction.type(),
+            ModifyProjectResourcePolicyAction.type(),
+            DeleteProjectResourcePolicyAction.type(),
+        ]

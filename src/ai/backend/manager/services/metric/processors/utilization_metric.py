@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
     ContainerMetricActionResult,
@@ -10,7 +11,7 @@ from ai.backend.manager.services.metric.actions.container import (
 from ..root_service import UtilizationMetricService
 
 
-class UtilizationMetricProcessors(ActionProcessor):
+class UtilizationMetricProcessors(AbstractProcessorPackage):
     query_container: ActionProcessor[ContainerMetricAction, ContainerMetricActionResult]
     query_container_metadata: ActionProcessor[
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
@@ -23,3 +24,10 @@ class UtilizationMetricProcessors(ActionProcessor):
         self.query_container_metadata = ActionProcessor(
             service.container.query_metadata, action_monitors
         )
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            ContainerMetricAction.type(),
+            ContainerMetricMetadataAction.type(),
+        ]

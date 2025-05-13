@@ -254,4 +254,20 @@ class Processors(AbstractProcessorPackage):
     def supported_actions(cls) -> list[str]:
         return [
             *cls.agent.supported_actions(),
+            *cls.domain.supported_actions(),
+            *cls.group.supported_actions(),
+            *cls.user.supported_actions(),
+            *cls.image.supported_actions(),
+            *cls.container_registry.supported_actions(),
+            *cls.vfolder.supported_actions(),
+            *cls.vfolder_file.supported_actions(),
+            *cls.vfolder_invite.supported_actions(),
+            *cls.session.supported_actions(),
+            *cls.keypair_resource_policy.supported_actions(),
+            *cls.user_resource_policy.supported_actions(),
+            *cls.project_resource_policy.supported_actions(),
+            *cls.resource_preset.supported_actions(),
+            *cls.utilization_metric.supported_actions(),
+            *cls.model_serving.supported_actions(),
+            *cls.model_serving_auto_scaling.supported_actions(),
         ]

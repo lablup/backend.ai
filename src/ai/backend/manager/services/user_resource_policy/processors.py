@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
     CreateUserResourcePolicyActionResult,
@@ -15,7 +16,7 @@ from ai.backend.manager.services.user_resource_policy.actions.modify_user_resour
 from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 
 
-class UserResourcePolicyProcessors:
+class UserResourcePolicyProcessors(AbstractProcessorPackage):
     create_user_resource_policy: ActionProcessor[
         CreateUserResourcePolicyAction, CreateUserResourcePolicyActionResult
     ]
@@ -38,3 +39,11 @@ class UserResourcePolicyProcessors:
         self.delete_user_resource_policy = ActionProcessor(
             service.delete_user_resource_policy, action_monitors
         )
+
+    @classmethod
+    def supported_actions(cls) -> list[str]:
+        return [
+            CreateUserResourcePolicyAction.type(),
+            ModifyUserResourcePolicyAction.type(),
+            DeleteUserResourcePolicyAction.type(),
+        ]
