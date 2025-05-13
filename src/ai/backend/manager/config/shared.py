@@ -284,7 +284,8 @@ class DatabaseConfig(BaseModel):
         Should be tuned based on expected load and database server capacity.
         """,
         examples=[1, 8],
-        alias="pool-size",
+        validation_alias=AliasChoices("pool-size", "pool_size"),
+        serialization_alias="pool-size",
     )
     pool_recycle: float = Field(
         default=-1,
@@ -295,7 +296,8 @@ class DatabaseConfig(BaseModel):
         Useful to handle cases where database connections are closed by the server after inactivity.
         """,
         examples=[-1, 50],
-        alias="pool-recycle",
+        validation_alias=AliasChoices("pool-recycle", "pool_recycle"),
+        serialization_alias="pool-recycle",
     )
     pool_pre_ping: bool = Field(
         default=False,
@@ -305,7 +307,8 @@ class DatabaseConfig(BaseModel):
         Adds a small overhead but improves reliability.
         """,
         examples=[True, False],
-        alias="pool-pre-ping",
+        validation_alias=AliasChoices("pool-pre-ping", "pool_pre_ping"),
+        serialization_alias="pool-pre-ping",
     )
     max_overflow: int = Field(
         default=64,
@@ -316,7 +319,8 @@ class DatabaseConfig(BaseModel):
         These connections are created temporarily when pool_size is insufficient.
         """,
         examples=[-1, 64],
-        alias="max-overflow",
+        validation_alias=AliasChoices("max-overflow", "max_overflow"),
+        serialization_alias="max-overflow",
     )
     lock_conn_timeout: float = Field(
         default=0,
@@ -327,7 +331,8 @@ class DatabaseConfig(BaseModel):
         If connections cannot be acquired within this time, an exception is raised.
         """,
         examples=[0, 30],
-        alias="lock-conn-timeout",
+        validation_alias=AliasChoices("lock-conn-timeout", "lock_conn_timeout"),
+        serialization_alias="lock-conn-timeout",
     )
 
 
@@ -605,7 +610,10 @@ class ManagerConfig(BaseModel):
         Prevents deadlocks in case a manager fails during scheduling.
         """,
         examples=[30.0, 60.0],
-        # Don't use alias for compatibility with the legacy config
+        validation_alias=AliasChoices(
+            "session-schedule-lock-lifetime", "session_schedule_lock_lifetime"
+        ),
+        serialization_alias="session_schedule_lock_lifetime",
     )
     session_check_precondition_lock_lifetime: float = Field(
         default=30,
@@ -615,7 +623,11 @@ class ManagerConfig(BaseModel):
         Should be balanced to prevent both deadlocks and race conditions.
         """,
         examples=[30.0, 60.0],
-        # Don't use alias for compatibility with the legacy config
+        validation_alias=AliasChoices(
+            "session-check-precondition-lock-lifetime",
+            "session_check_precondition_lock_lifetime",
+        ),
+        serialization_alias="session_check_precondition_lock_lifetime",
     )
     session_start_lock_lifetime: float = Field(
         default=30,
@@ -625,7 +637,8 @@ class ManagerConfig(BaseModel):
         Longer values are safer but may block other managers longer on failure.
         """,
         examples=[30.0, 60.0],
-        # Don't use alias for compatibility with the legacy config
+        validation_alias=AliasChoices("session-start-lock-lifetime", "session_start_lock_lifetime"),
+        serialization_alias="session_start_lock_lifetime",
     )
     pid_file: Path = Field(
         default=Path(os.devnull),
@@ -928,7 +941,8 @@ class SMTPReporterConfig(BaseModel):
         Recommended for production environments to protect sensitive information.
         """,
         examples=[True, False],
-        alias="use-tls",
+        validate_alias=AliasChoices("use-tls", "use_tls"),
+        serialization_alias="use-tls",
     )
     max_workers: int = Field(
         default=5,
@@ -960,7 +974,6 @@ class SMTPReporterConfig(BaseModel):
         Choose based on your notification needs.
         """,
         examples=["ALL", "ON_ERROR"],
-        alias="trigger-policy",
         validation_alias=AliasChoices("trigger-policy", "trigger_policy"),
         serialization_alias="trigger-policy",
     )
