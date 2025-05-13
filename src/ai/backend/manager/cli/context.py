@@ -91,25 +91,25 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    local_config = cli_ctx.bootstrap_config
+    etcd_config = cli_ctx.bootstrap_config.etcd
     creds = None
-    if local_config.etcd.user:
-        if not local_config.etcd.password:
+    if etcd_config.user:
+        if not etcd_config.password:
             raise ConfigurationError({
                 "etcd": "password is required when user is set",
             })
 
         creds = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
+            "user": etcd_config.user,
+            "password": etcd_config.password,
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         # TODO: provide a way to specify other scope prefixes
     }
     etcd = AsyncEtcd(
-        local_config.etcd.addr.to_legacy(),
-        local_config.etcd.namespace,
+        etcd_config.addr.to_legacy(),
+        etcd_config.namespace,
         scope_prefix_map,
         credentials=creds,
     )
@@ -123,8 +123,7 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]:
     # scope_prefix_map is created inside ConfigServer
 
-    local_config = cli_ctx.bootstrap_config
-    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    etcd = AsyncEtcd.initialize(cli_ctx.bootstrap_config.etcd.to_dataclass())
     etcd_loader = LegacyEtcdLoader(etcd)
     redis_config = await etcd_loader.load()
     unified_config = ManagerUnifiedConfig(**redis_config)
@@ -145,9 +144,7 @@ class RedisConnectionSet:
 
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
-    local_config = cli_ctx.bootstrap_config
-
-    etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
+    etcd = AsyncEtcd.initialize(cli_ctx.bootstrap_config.etcd.to_dataclass())
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
     raw_redis_config = await loader.load()
     redis_config = RedisConfig(**raw_redis_config)

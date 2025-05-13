@@ -109,7 +109,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
-    local_config = cli_ctx.bootstrap_config
+    db_config = cli_ctx.bootstrap_config.db
     if psql_help:
         psql_args = ["--help"]
     if not container_name:
@@ -129,10 +129,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         # Use the host-provided psql command
         cmd = [
             "psql",
-            (
-                f"postgres://{local_config.db.user}:{local_config.db.password}"
-                f"@{local_config.db.addr}/{local_config.db.name}"
-            ),
+            (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
             *psql_args,
         ]
         subprocess.run(cmd)
@@ -147,9 +144,9 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         container_name,
         "psql",
         "-U",
-        local_config.db.user,
+        db_config.user,
         "-d",
-        local_config.db.name,
+        db_config.name,
         *psql_args,
     ]
     subprocess.run(cmd)

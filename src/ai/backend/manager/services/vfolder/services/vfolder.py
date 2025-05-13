@@ -21,8 +21,8 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.config.constant import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config_legacy import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.errors.exceptions import ObjectNotFound, StorageProxyError
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType

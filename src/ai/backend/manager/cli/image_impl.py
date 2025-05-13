@@ -25,10 +25,10 @@ from .context import CLIContext, redis_ctx
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def list_images(cli_ctx, short, installed_only):
+async def list_images(cli_ctx: CLIContext, short, installed_only):
     # Connect to postgreSQL DB
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
         redis_ctx(cli_ctx) as redis_conn_set,
     ):
@@ -87,9 +87,9 @@ async def list_images(cli_ctx, short, installed_only):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def inspect_image(cli_ctx, canonical_or_alias, architecture):
+async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:
@@ -109,7 +109,7 @@ async def inspect_image(cli_ctx, canonical_or_alias, architecture):
 
 async def forget_image(cli_ctx, canonical_or_alias, architecture):
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -127,9 +127,9 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def purge_image(cli_ctx, canonical_or_alias, architecture):
+async def purge_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -149,14 +149,14 @@ async def purge_image(cli_ctx, canonical_or_alias, architecture):
 
 
 async def set_image_resource_limit(
-    cli_ctx,
+    cli_ctx: CLIContext,
     canonical_or_alias,
     slot_type,
     range_value,
     architecture,
 ):
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -190,9 +190,9 @@ async def rescan_images(
             log.exception(f"Unknown error occurred. Error: {e}")
 
 
-async def alias(cli_ctx, alias, target, architecture):
+async def alias(cli_ctx: CLIContext, alias, target, architecture):
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -209,9 +209,9 @@ async def alias(cli_ctx, alias, target, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def dealias(cli_ctx, alias):
+async def dealias(cli_ctx: CLIContext, alias):
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         alias_row = await session.scalar(
@@ -223,9 +223,9 @@ async def dealias(cli_ctx, alias):
         await session.delete(alias_row)
 
 
-async def validate_image_alias(cli_ctx, alias: str) -> None:
+async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:
@@ -252,10 +252,10 @@ def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
 
 
 async def validate_image_canonical(
-    cli_ctx, canonical: str, current: bool, architecture: Optional[str] = None
+    cli_ctx: CLIContext, canonical: str, current: bool, architecture: Optional[str] = None
 ) -> None:
     async with (
-        connect_database(cli_ctx.local_config.db) as db,
+        connect_database(cli_ctx.bootstrap_config.db) as db,
         db.begin_readonly_session() as session,
     ):
         try:

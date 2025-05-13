@@ -177,7 +177,7 @@ from datetime import datetime, timezone
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Final, Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import (
     AliasChoices,
@@ -208,10 +208,6 @@ from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
-DEFAULT_INFLIGHT_CHUNKS: Final = 8
-
 
 _default_smtp_template = """
 Action type: {{ action_type }}
