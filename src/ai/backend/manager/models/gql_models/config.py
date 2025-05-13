@@ -84,7 +84,7 @@ class ModifyConfigsInput(graphene.InputObjectType):
     )
     configuration = graphene.JSONString(
         required=True,
-        description="Configuration to mutate. Added in 25.8.0.",
+        description="Configuration data to mutate. Added in 25.8.0.",
     )
 
 

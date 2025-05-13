@@ -3094,7 +3094,7 @@ input ModifyConfigsInput {
   """Service name. Added in 25.8.0."""
   service: String!
 
-  """Configuration to mutate. Added in 25.8.0."""
+  """Configuration data to mutate. Added in 25.8.0."""
   configuration: JSONString!
 }
 
