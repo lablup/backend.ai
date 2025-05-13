@@ -27,7 +27,9 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.services.vfolder.actions.file import FetchServiceConfigAction
+from ai.backend.manager.services.model_service.actions.fetch_service_config import (
+    FetchServiceConfigAction,
+)
 
 from ...defs import (
     DEFAULT_CHUNK_SIZE,
@@ -119,8 +121,6 @@ class VirtualFolderNode(graphene.ObjectType):
         VFolderPermissionValueField,
         description=f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}.",
     )
-
-    service_config = graphene.JSONString(description="Added in 25.7.0.")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", uuid.UUID),
@@ -397,21 +397,6 @@ class VirtualFolderNode(graphene.ObjectType):
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def resolve_service_config(self, info: graphene.ResolveInfo) -> str:
-        graph_ctx: GraphQueryContext = info.context
-
-        action_result = (
-            await graph_ctx.processors.vfolder_file.fetch_service_config.wait_for_complete(
-                FetchServiceConfigAction(
-                    vfolder_uuid=self.row_id,
-                    quota_scope_id=self.quota_scope_id,
-                    host=self.host,
-                    unmanaged_path=self.unmanaged_path,
-                )
-            )
-        )
-        return json.dumps(action_result.result.model_dump())
-
 
 class VirtualFolderConnection(Connection):
     class Meta:
@@ -454,6 +439,10 @@ class ModelCard(graphene.ObjectType):
         )
     )
     error_msg = graphene.String(description="Added in 24.03.8.")
+    service_config = graphene.JSONString(
+        description="Added in 25.7.0.",
+        endpoint_id=graphene.Argument(graphene.String, required=True),
+    )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("vfolders_id", uuid.UUID),
@@ -528,6 +517,22 @@ class ModelCard(graphene.ObjectType):
             return dtparse(self.modified_at)
         except (TypeError, ParserError):
             return self.modified_at
+
+    async def resolve_service_config(self, info: graphene.ResolveInfo, arg) -> str:
+        print("arg", arg)
+        graph_ctx: GraphQueryContext = info.context
+
+        action_result = (
+            await graph_ctx.processors.model_service.fetch_service_config.wait_for_complete(
+                FetchServiceConfigAction(
+                    vfolder_uuid=self.row_id,
+                    quota_scope_id=self.vfolder_node.quota_scope_id,
+                    host=self.vfolder_node.host,
+                    unmanaged_path=self.vfolder_node.unmanaged_path,
+                )
+            )
+        )
+        return json.dumps(action_result.result.model_dump())
 
     @classmethod
     def parse_model(

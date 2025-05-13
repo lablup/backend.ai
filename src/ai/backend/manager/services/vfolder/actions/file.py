@@ -10,7 +10,7 @@ from typing import (
 from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
 
-from ..types import FileInfo, ServiceConfigInfo
+from ..types import FileInfo
 from .base import VFolderAction
 
 
@@ -184,32 +184,6 @@ class MkdirActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
     results: ResultSet
     storage_resp_status: int
-
-    @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.vfolder_uuid)
-
-
-@dataclass
-class FetchServiceConfigAction(VFolderAction):
-    vfolder_uuid: uuid.UUID
-    quota_scope_id: str
-    host: str
-    unmanaged_path: str
-
-    @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.vfolder_uuid)
-
-    @override
-    def operation_type(self) -> str:
-        return "fetch_service_config"
-
-
-@dataclass
-class FetchServiceConfigActionResult(BaseActionResult):
-    vfolder_uuid: uuid.UUID
-    result: ServiceConfigInfo
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -11,8 +11,6 @@ from ..actions.file import (
     CreateUploadSessionActionResult,
     DeleteFilesAction,
     DeleteFilesActionResult,
-    FetchServiceConfigAction,
-    FetchServiceConfigActionResult,
     ListFilesAction,
     ListFilesActionResult,
     MkdirAction,
@@ -30,7 +28,6 @@ class VFolderFileProcessors(AbstractProcessorPackage):
     rename_file: ActionProcessor[RenameFileAction, RenameFileActionResult]
     delete_files: ActionProcessor[DeleteFilesAction, DeleteFilesActionResult]
     mkdir: ActionProcessor[MkdirAction, MkdirActionResult]
-    fetch_service_config: ActionProcessor[FetchServiceConfigAction, FetchServiceConfigActionResult]
 
     def __init__(self, service: VFolderFileService, action_monitors: list[ActionMonitor]) -> None:
         self.upload_file = ActionProcessor(service.upload_file, action_monitors)
@@ -39,4 +36,3 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         self.rename_file = ActionProcessor(service.rename_file, action_monitors)
         self.delete_files = ActionProcessor(service.delete_files, action_monitors)
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
-        self.fetch_service_config = ActionProcessor(service.fetch_service_config, action_monitors)

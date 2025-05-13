@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-import json
 import logging
 import os.path
 import uuid
@@ -1564,7 +1563,6 @@ class VirtualFolder(graphene.ObjectType):
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
     status = graphene.String()
-    service_config = graphene.JSONString(description="Added in 25.7.0.")
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow | None) -> Optional[Self]:
@@ -1715,23 +1713,6 @@ class VirtualFolder(graphene.ObjectType):
         "status": ("vfolders_status", None),
         "cur_size": ("vfolders_cur_size", None),
     }
-
-    async def resolve_service_config(self, info: graphene.ResolveInfo) -> str:
-        from ai.backend.manager.services.vfolder.actions.file import FetchServiceConfigAction
-
-        graph_ctx: GraphQueryContext = info.context
-
-        action_result = (
-            await graph_ctx.processors.vfolder_file.fetch_service_config.wait_for_complete(
-                FetchServiceConfigAction(
-                    vfolder_uuid=self.id,
-                    quota_scope_id=self.quota_scope_id,
-                    host=self.host,
-                    unmanaged_path=self.unmanaged_path,
-                )
-            )
-        )
-        return json.dumps(action_result.result.model_dump())
 
     @classmethod
     async def load_count(

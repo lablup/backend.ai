@@ -1200,9 +1200,6 @@ type VirtualFolder implements Item {
   cur_size: BigInt
   cloneable: Boolean
   status: String
-
-  """Added in 25.7.0."""
-  service_config: JSONString
 }
 
 type ComputeSession implements Item {
@@ -1457,9 +1454,6 @@ type VirtualFolderNode implements Node {
   Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
   """
   permissions: [VFolderPermissionValueField]
-
-  """Added in 25.7.0."""
-  service_config: JSONString
 }
 
 """
@@ -1943,6 +1937,9 @@ type ModelCard implements Node {
 
   """Added in 24.03.8."""
   error_msg: String
+
+  """Added in 25.7.0."""
+  service_config(endpoint_id: String!): JSONString
 }
 
 """Added in 24.03.4"""
