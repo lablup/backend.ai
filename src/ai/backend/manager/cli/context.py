@@ -26,7 +26,7 @@ from ai.backend.common.types import RedisConnectionInfo, RedisProfileTarget
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.config.shared import ManagerSharedConfig, RedisConfig
+from ai.backend.manager.config.shared import ManagerUnifiedConfig, RedisConfig
 
 
 class CLIContext:
@@ -120,17 +120,17 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 
 
 @contextlib.asynccontextmanager
-async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerSharedConfig]:
+async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]:
     # scope_prefix_map is created inside ConfigServer
 
     local_config = cli_ctx.bootstrap_config
     etcd = AsyncEtcd.initialize(local_config.etcd.to_dataclass())
     etcd_loader = LegacyEtcdLoader(etcd)
     redis_config = await etcd_loader.load()
-    shared_config = ManagerSharedConfig(**redis_config)
+    unified_config = ManagerUnifiedConfig(**redis_config)
 
     try:
-        yield shared_config
+        yield unified_config
     finally:
         await etcd_loader.close()
 

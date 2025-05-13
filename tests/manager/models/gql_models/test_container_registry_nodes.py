@@ -6,7 +6,7 @@ from graphene.test import Client
 
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.shared import ManagerUnifiedConfig
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -31,11 +31,11 @@ def client() -> Client:
 
 
 async def get_graphquery_context(
-    database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
+    database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ) -> GraphQueryContext:
     mock_loader = MagicMock()
     mock_loader.load = AsyncMock()
-    mock_loader.load.return_value = shared_config.model_dump()
+    mock_loader.load.return_value = unified_config.model_dump()
 
     config_provider = ManagerConfigProvider(
         loader=mock_loader,
@@ -70,9 +70,9 @@ async def get_graphquery_context(
 @pytest.mark.dependency()
 @pytest.mark.asyncio
 async def test_create_container_registry(
-    client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):
-    context = await get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
             mutation CreateContainerRegistryNode($type: ContainerRegistryTypeField!, $registry_name: String!, $url: String!, $project: String!, $username: String!, $password: String!, $ssl_verify: Boolean!, $is_global: Boolean!) {
@@ -120,9 +120,9 @@ async def test_create_container_registry(
 @pytest.mark.dependency(depends=["test_create_container_registry"])
 @pytest.mark.asyncio
 async def test_modify_container_registry(
-    client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):
-    context = await get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -205,9 +205,9 @@ async def test_modify_container_registry(
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
-    client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):
-    context = await get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -270,9 +270,9 @@ async def test_modify_container_registry_allows_empty_string(
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
-    client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):
-    context = await get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -335,9 +335,9 @@ async def test_modify_container_registry_allows_null_for_unset(
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
 @pytest.mark.asyncio
 async def test_delete_container_registry(
-    client: Client, database_engine: ExtendedAsyncSAEngine, shared_config: ManagerSharedConfig
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):
-    context = await get_graphquery_context(database_engine, shared_config)
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {

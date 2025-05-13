@@ -1719,7 +1719,7 @@ class ResourceSlotsConfig(BaseModel):
     )
 
 
-class ManagerSharedConfig(BaseModel):
+class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
         description="""

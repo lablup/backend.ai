@@ -187,14 +187,14 @@ def load_agent_selector(
     sgroup_opts: ScalingGroupOpts,
     selector_config: Mapping[str, Any],
     agent_selection_resource_priority: list[str],
-    shared_config_loader: LegacyEtcdLoader,
+    legacy_etcd_loader: LegacyEtcdLoader,
 ) -> AbstractAgentSelector[AbstractResourceGroupState]:
     def create_agent_selector(
         selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
     ) -> AbstractAgentSelector[T_ResourceGroupState]:
         # An extra inner function to parametrize the generic type arguments
         state_cls = selector_cls.get_state_cls()
-        state_store = DefaultResourceGroupStateStore(state_cls, shared_config_loader)
+        state_store = DefaultResourceGroupStateStore(state_cls, legacy_etcd_loader)
         return selector_cls(
             sgroup_opts,
             selector_config,
