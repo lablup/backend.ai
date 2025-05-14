@@ -3017,6 +3017,7 @@ class Queries(graphene.ObjectType):
         return AvailableServiceNode()
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_service_config(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3025,6 +3026,7 @@ class Queries(graphene.ObjectType):
         return await ServiceConfigNode.load(info, service)
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_service_configs(
         root: Any,
         info: graphene.ResolveInfo,
