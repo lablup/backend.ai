@@ -1184,7 +1184,7 @@ class Queries(graphene.ObjectType):
         AvailableServiceNode,
         description="Added in 25.8.0.",
     )
-    available_services = graphene.Field(
+    available_services = PaginatedConnectionField(
         AvailableServiceConnection,
         description="Added in 25.8.0.",
     )

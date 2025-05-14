@@ -338,7 +338,7 @@ type Queries {
   available_service: AvailableServiceNode
 
   """Added in 25.8.0."""
-  available_services: AvailableServiceConnection
+  available_services(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AvailableServiceConnection
 
   """Added in 25.8.0."""
   service_config(service: String!): ServiceConfigNode
