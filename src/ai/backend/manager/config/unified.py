@@ -265,7 +265,8 @@ class DatabaseConfig(BaseModel):
         """,
         examples=["postgres"],
     )
-    password: str = Field(
+    password: Optional[str] = Field(
+        default=None,
         description="""
         Password for authenticating with the database.
         Can be a direct password string or an environment variable name.
@@ -366,8 +367,8 @@ class EtcdConfig(BaseModel):
         """,
         examples=[{"host": "127.0.0.1", "port": 2379}],
     )
-    user: Optional[str] = Field(
-        default=None,
+    user: str = Field(
+        default="ETCD_USER",
         description="""
         Username for authenticating with etcd.
         Optional if etcd doesn't require authentication.
@@ -1720,6 +1721,7 @@ class ResourceSlotsConfig(BaseModel):
 class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
+        default_factory=DatabaseConfig,
         description="""
         Database configuration settings.
         Defines how the manager connects to its PostgreSQL database.

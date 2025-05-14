@@ -330,6 +330,9 @@ async def connect_database(
 
     username = db_config.user
     password = db_config.password
+    if password is None:
+        raise RuntimeError("Password is required for database connection")
+
     address = db_config.addr.to_legacy()
     dbname = db_config.name
     url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
