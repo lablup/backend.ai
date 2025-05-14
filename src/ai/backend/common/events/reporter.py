@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Protocol
+from dataclasses import dataclass
+from typing import Optional, Protocol, Self
 
 from .types import EventDomain
 
@@ -17,33 +18,20 @@ class EventProtocol(Protocol):
         pass
 
 
+@dataclass
+class EventReportArgs:
+    duration: Optional[float] = None
+
+    @classmethod
+    def nop(cls) -> Self:
+        return cls()
+
+
 class AbstractEventReporter(ABC):
     @abstractmethod
-    async def on_consumer_start(
+    async def report(
         self,
         event: EventProtocol,
-    ) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def on_consumer_complete(
-        self,
-        event: EventProtocol,
-        duration: Optional[float] = None,
-    ) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def on_subscriber_start(
-        self,
-        event: EventProtocol,
-    ) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def on_subscriber_complete(
-        self,
-        event: EventProtocol,
-        duration: Optional[float] = None,
+        arg: EventReportArgs = EventReportArgs.nop(),
     ) -> None:
         raise NotImplementedError

@@ -78,6 +78,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
 from .defs import DEFAULT_ROLE, LockID
+from .event_dispatcher.dispatch import EventLogger
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -603,22 +604,26 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
     idle_timeout: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
+    _db: SAEngine
 
     def __init__(
         self,
         event_dispatcher: EventDispatcher,
         redis_live: RedisConnectionInfo,
         redis_stat: RedisConnectionInfo,
+        db: SAEngine,
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
-        d = self._event_dispatcher
-        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
-        self._evhandlers = [
-            d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
-            d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
-            d.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
-            d.consume(ExecutionCancelledEvent, None, self._execution_exited_cb),  # type: ignore
-        ]
+        self._db = db
+        self._event_dispatcher.subscribe(SessionStartedEvent, None, self._session_started_cb)  # type: ignore
+
+        with self._event_dispatcher.with_reporters([EventLogger(self._db)]) as evd:
+            self._evhandlers = [
+                evd.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
+                evd.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
+                evd.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
+                evd.consume(ExecutionCancelledEvent, None, self._execution_exited_cb),  # type: ignore
+            ]
 
     async def aclose(self) -> None:
         for _evh in self._evhandlers:
