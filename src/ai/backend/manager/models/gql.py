@@ -23,7 +23,13 @@ from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogNode,
     AuditLogSchema,
 )
-from ai.backend.manager.models.gql_models.config import AvailableService, Config, ModifyConfigs
+from ai.backend.manager.models.gql_models.config import (
+    AvailableServiceConnection,
+    AvailableServiceNode,
+    ModifyServiceConfigNode,
+    ServiceConfigConnection,
+    ServiceConfigNode,
+)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -380,7 +386,7 @@ class Mutations(graphene.ObjectType):
     delete_resource_preset = DeleteResourcePreset.Field()
 
     # super-admin only
-    modify_configs = ModifyConfigs.Field()
+    modify_service_config = ModifyServiceConfigNode.Field()
 
     # super-admin only
     create_scaling_group = CreateScalingGroup.Field()
@@ -1175,12 +1181,21 @@ class Queries(graphene.ObjectType):
     )
 
     available_service = graphene.Field(
-        AvailableService,
+        AvailableServiceNode,
         description="Added in 25.8.0.",
     )
-    config = graphene.Field(
-        Config,
+    available_services = graphene.Field(
+        AvailableServiceConnection,
+        description="Added in 25.8.0.",
+    )
+    service_config = graphene.Field(
+        ServiceConfigNode,
         service=graphene.String(required=True),
+        description="Added in 25.8.0.",
+    )
+    service_configs = PaginatedConnectionField(
+        ServiceConfigConnection,
+        services=graphene.List(graphene.String, required=True),
         description="Added in 25.8.0.",
     )
 
@@ -2993,6 +3008,40 @@ class Queries(graphene.ObjectType):
             last,
         )
 
+    @staticmethod
+    async def resolve_service_config(
+        root: Any,
+        info: graphene.ResolveInfo,
+        service: str,
+    ) -> ServiceConfigNode:
+        return await ServiceConfigNode.load(info, service)
+
+    @staticmethod
+    async def resolve_service_configs(
+        root: Any,
+        info: graphene.ResolveInfo,
+        services: list[str],
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ServiceConfigNode.get_connection(
+            info,
+            services,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
     async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3122,8 +3171,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         service: str,
-    ) -> Config:
-        return Config.load(info, service)
+    ) -> ServiceConfigNode:
+        return await ServiceConfigNode.load(info, service)
 
 
 class GQLMutationPrivilegeCheckMiddleware:

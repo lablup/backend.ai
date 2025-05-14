@@ -335,10 +335,16 @@ type Queries {
   container_utilization_metric_metadata: ContainerUtilizationMetricMetadata
 
   """Added in 25.8.0."""
-  available_service: AvailableService
+  available_service: AvailableServiceNode
 
   """Added in 25.8.0."""
-  config(service: String!): Config
+  available_services: AvailableServiceConnection
+
+  """Added in 25.8.0."""
+  service_config(service: String!): ServiceConfigNode
+
+  """Added in 25.8.0."""
+  service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection
 }
 
 """
@@ -2099,17 +2105,43 @@ type ContainerUtilizationMetricMetadata {
   metric_names: [String]
 }
 
-"""
-Available services for configuration.
-Added in 25.8.0.
-"""
-type AvailableService {
+"""Available services for configuration. Added in 25.8.0."""
+type AvailableServiceNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
   """Possible values of "Config.service". Added in 25.8.0."""
   service_variants: [String]!
 }
 
+"""Added in 25.8.0."""
+type AvailableServiceConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AvailableServiceEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.8.0. A Relay edge containing a `AvailableService` and its cursor.
+"""
+type AvailableServiceEdge {
+  """The item at the end of the edge"""
+  node: AvailableServiceNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 """Configuration data for a specific service. Added in 25.8.0."""
-type Config {
+type ServiceConfigNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
   """
   Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
   """
@@ -2120,6 +2152,29 @@ type Config {
 
   """JSON schema of the configuration. Added in 25.8.0."""
   schema: JSONString!
+}
+
+"""Added in 25.8.0."""
+type ServiceConfigConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ServiceConfigEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.8.0. A Relay edge containing a `ServiceConfig` and its cursor.
+"""
+type ServiceConfigEdge {
+  """The item at the end of the edge"""
+  node: ServiceConfigNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 """All available GraphQL mutations."""
@@ -2247,10 +2302,10 @@ type Mutations {
   ): DeleteResourcePreset
 
   """Updates configuration for a given service. Added in 25.8.0."""
-  modify_configs(
+  modify_service_config(
     """Added in 25.8.0."""
-    input: ModifyConfigsInput!
-  ): ModifyConfigsPayload
+    input: ModifyServiceConfigNodeInput!
+  ): ModifyServiceConfigNodePayload
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup
@@ -3086,30 +3141,25 @@ type DeleteResourcePreset {
 }
 
 """
-Payload for the ModifyConfigs mutation.
+Payload for the ModifyServiceConfigNode mutation.
 Added in 25.8.0.
 """
-type ModifyConfigsPayload {
-  """
-  Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
-  """
-  service: String!
-
-  """Configuration data to mutate. Added in 25.8.0."""
-  configuration: JSONString!
+type ModifyServiceConfigNodePayload {
+  """ServiceConfiguration Node. Added in 25.8.0."""
+  service_config: ServiceConfigNode!
 }
 
 """
 Input data for modifying configuration.
 Added in 25.8.0.
 """
-input ModifyConfigsInput {
+input ModifyServiceConfigNodeInput {
   """
   Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
   """
   service: String!
 
-  """Configuration data to mutate. Added in 25.8.0."""
+  """Service configuration data to mutate. Added in 25.8.0."""
   configuration: JSONString!
 }
 
