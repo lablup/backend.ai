@@ -257,8 +257,8 @@ class DatabaseConfig(BaseModel):
         """,
         examples=["backend"],
     )
-    user: Optional[str] = Field(
-        default=None,
+    user: str = Field(
+        default="DB_USER",
         description="""
         Username for authenticating with the database.
         This user must have sufficient privileges for all database operations.
