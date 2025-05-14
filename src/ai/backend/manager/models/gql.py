@@ -3009,6 +3009,14 @@ class Queries(graphene.ObjectType):
         )
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_available_service(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> AuditLogSchema:
+        return AvailableServiceNode()
+
+    @staticmethod
     async def resolve_service_config(
         root: Any,
         info: graphene.ResolveInfo,
@@ -3164,15 +3172,6 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
     ) -> ContainerUtilizationMetricMetadata:
         return await ContainerUtilizationMetricMetadata.get_object(info)
-
-    @staticmethod
-    @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_config(
-        root: Any,
-        info: graphene.ResolveInfo,
-        service: str,
-    ) -> ServiceConfigNode:
-        return await ServiceConfigNode.load(info, service)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
