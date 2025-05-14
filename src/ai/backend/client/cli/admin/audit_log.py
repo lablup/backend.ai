@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Literal
+from typing import Literal, Optional
 
 import click
 
@@ -26,10 +26,13 @@ def audit_log():
     "--entity-type",
     "-e",
     metavar="ENTITY",
+    default=None,
     help="Entity type to filter action types when schema_type is action_type.",
 )
 def dump_schema(
-    cli_ctx: CLIContext, schema_type: Literal["entity_type", "action_type"], entity_type: str | None
+    cli_ctx: CLIContext,
+    schema_type: Literal["entity_type", "action_type"],
+    entity_type: Optional[str],
 ) -> None:
     """
     Dump audit_log schema for the specified type.
