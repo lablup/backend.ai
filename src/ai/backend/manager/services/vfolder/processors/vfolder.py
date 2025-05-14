@@ -1,5 +1,8 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 
 from ..actions.base import (
     CloneVFolderAction,
@@ -26,7 +29,7 @@ from ..actions.base import (
 from ..services.vfolder import VFolderService
 
 
-class VFolderProcessors:
+class VFolderProcessors(AbstractProcessorPackage):
     create_vfolder: ActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: ActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ActionProcessor[ListVFolderAction, ListVFolderActionResult]
@@ -55,3 +58,18 @@ class VFolderProcessors:
         self.force_delete_vfolder = ActionProcessor(service.force_delete, action_monitors)
         self.clone_vfolder = ActionProcessor(service.clone, action_monitors)
         self.get_task_logs = ActionProcessor(service.get_task_logs, action_monitors)
+
+    @override
+    def supported_actions(self) -> list[str]:
+        return [
+            CreateVFolderAction.type(),
+            GetVFolderAction.type(),
+            ListVFolderAction.type(),
+            UpdateVFolderAttributeAction.type(),
+            MoveToTrashVFolderAction.type(),
+            RestoreVFolderFromTrashAction.type(),
+            DeleteForeverVFolderAction.type(),
+            ForceDeleteVFolderAction.type(),
+            CloneVFolderAction.type(),
+            GetTaskLogsAction.type(),
+        ]

@@ -5,5 +5,6 @@ from ai.backend.manager.actions.action import BaseAction
 
 class GroupAction(BaseAction):
     @override
-    def entity_type(self) -> str:
+    @classmethod
+    def entity_type(cls) -> str:
         return "group"

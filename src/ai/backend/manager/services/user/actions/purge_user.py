@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.user.actions.base import UserAction
@@ -17,7 +17,9 @@ class PurgeUserAction(UserAction):
     def entity_id(self) -> Optional[str]:
         return None
 
-    def operation_type(self) -> str:
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
         return "purge"
 
 
