@@ -365,6 +365,10 @@ type AuditLogSchema {
   action_type_variants: [ActionType]
 }
 
+"""
+Possible values of audit log action types.
+Added in 25.8.0.
+"""
 type ActionType {
   """Entity type of the AuditLog"""
   entity_type: String!
