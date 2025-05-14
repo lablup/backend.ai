@@ -1,5 +1,8 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -28,7 +31,7 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 from .service import DomainService
 
 
-class DomainProcessors:
+class DomainProcessors(AbstractProcessorPackage):
     create_domain_node: ActionProcessor[CreateDomainNodeAction, CreateDomainNodeActionResult]
     modify_domain_node: ActionProcessor[ModifyDomainNodeAction, ModifyDomainNodeActionResult]
     create_domain: ActionProcessor[CreateDomainAction, CreateDomainActionResult]
@@ -43,3 +46,14 @@ class DomainProcessors:
         self.modify_domain = ActionProcessor(service.modify_domain, action_monitors)
         self.delete_domain = ActionProcessor(service.delete_domain, action_monitors)
         self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
+
+    @override
+    def supported_actions(self) -> list[str]:
+        return [
+            CreateDomainNodeAction.type(),
+            ModifyDomainNodeAction.type(),
+            CreateDomainAction.type(),
+            ModifyDomainAction.type(),
+            DeleteDomainAction.type(),
+            PurgeDomainAction.type(),
+        ]

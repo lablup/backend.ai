@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd
@@ -8,6 +8,7 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import AbstractProcessorPackage
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -174,7 +175,7 @@ class ProcessorArgs:
 
 
 @dataclass
-class Processors:
+class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     domain: DomainProcessors
     group: GroupProcessors
@@ -248,3 +249,25 @@ class Processors:
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
         )
+
+    @override
+    def supported_actions(self) -> list[str]:
+        return [
+            *self.agent.supported_actions(),
+            *self.domain.supported_actions(),
+            *self.group.supported_actions(),
+            *self.user.supported_actions(),
+            *self.image.supported_actions(),
+            *self.container_registry.supported_actions(),
+            *self.vfolder.supported_actions(),
+            *self.vfolder_file.supported_actions(),
+            *self.vfolder_invite.supported_actions(),
+            *self.session.supported_actions(),
+            *self.keypair_resource_policy.supported_actions(),
+            *self.user_resource_policy.supported_actions(),
+            *self.project_resource_policy.supported_actions(),
+            *self.resource_preset.supported_actions(),
+            *self.utilization_metric.supported_actions(),
+            *self.model_serving.supported_actions(),
+            *self.model_serving_auto_scaling.supported_actions(),
+        ]
