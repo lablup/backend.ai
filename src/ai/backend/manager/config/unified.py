@@ -1751,7 +1751,7 @@ class ManagerUnifiedConfig(BaseModel):
         alias="docker-registry",
     )
     logging: Any = Field(
-        default={},
+        default_factory=lambda: {},
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
