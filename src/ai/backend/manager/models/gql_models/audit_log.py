@@ -25,6 +25,13 @@ if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
 
+class ActionType(graphene.ObjectType):
+    entity_type: str = graphene.String(required=True, description="Entity type of the AuditLog")
+    action_types: list[str] = graphene.List(
+        graphene.String, required=True, description="Action types of the AuditLog"
+    )
+
+
 class AuditLogSchema(graphene.ObjectType):
     """
     A schema that contains metadata related to the AuditLogNode.
@@ -39,12 +46,29 @@ class AuditLogSchema(graphene.ObjectType):
     status_variants = graphene.List(
         graphene.String, description='Possible values of "AuditLogNode.status"'
     )
+    action_type_variants = graphene.List(
+        ActionType, description="Possible values of audit log action types, Added in 25.8.0"
+    )
 
     async def resolve_entity_type_variants(self, info: graphene.ResolveInfo) -> list[str]:
         return list(AuditLogEntityType.__members__.values())
 
     async def resolve_status_variants(self, info: graphene.ResolveInfo) -> list[str]:
         return list(OperationStatus.__members__.values())
+
+    async def resolve_action_type_variants(self, info: graphene.ResolveInfo) -> list[ActionType]:
+        ctx: GraphQueryContext = info.context
+        actions = ctx.processors.supported_actions()
+        result = []
+        for action in actions:
+            entity_type, action_name = action.split(":")
+            result.append(
+                ActionType(
+                    entity_type=entity_type,
+                    action_types=[action_name],
+                )
+            )
+        return result
 
 
 class AuditLogNode(graphene.ObjectType):

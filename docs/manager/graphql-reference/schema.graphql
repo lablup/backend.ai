@@ -360,6 +360,17 @@ type AuditLogSchema {
   Possible values of "AuditLogNode.status"
   """
   status_variants: [String]
+
+  """Possible values of audit log action types, Added in 25.8.0"""
+  action_type_variants: [ActionType]
+}
+
+type ActionType {
+  """Entity type of the AuditLog"""
+  entity_type: String!
+
+  """Action types of the AuditLog"""
+  action_types: [String]!
 }
 
 """Added in 25.6.0."""
