@@ -26,6 +26,11 @@ if TYPE_CHECKING:
 
 
 class ActionType(graphene.ObjectType):
+    """
+    Possible values of audit log action types.
+    Added in 25.8.0.
+    """
+
     entity_type: str = graphene.String(required=True, description="Entity type of the AuditLog")
     action_types: list[str] = graphene.List(
         graphene.String, required=True, description="Action types of the AuditLog"
@@ -59,16 +64,18 @@ class AuditLogSchema(graphene.ObjectType):
     async def resolve_action_type_variants(self, info: graphene.ResolveInfo) -> list[ActionType]:
         ctx: GraphQueryContext = info.context
         actions = ctx.processors.supported_actions()
-        result = []
+
+        grouped_actions: dict[str, set[str]] = {}
         for action in actions:
-            entity_type, action_name = action.split(":")
-            result.append(
-                ActionType(
-                    entity_type=entity_type,
-                    action_types=[action_name],
-                )
-            )
-        return result
+            entity_type, action_type = action.split(":")
+            if entity_type not in grouped_actions:
+                grouped_actions[entity_type] = set()
+            grouped_actions[entity_type].add(action_type)
+
+        return [
+            ActionType(entity_type=entity_type, action_types=list(action_types))
+            for entity_type, action_types in grouped_actions.items()
+        ]
 
 
 class AuditLogNode(graphene.ObjectType):
