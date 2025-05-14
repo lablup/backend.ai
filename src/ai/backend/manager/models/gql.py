@@ -23,7 +23,7 @@ from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogNode,
     AuditLogSchema,
 )
-from ai.backend.manager.models.gql_models.config import (
+from ai.backend.manager.models.gql_models.service_config import (
     AvailableServiceConnection,
     AvailableServiceNode,
     ModifyServiceConfigNode,
