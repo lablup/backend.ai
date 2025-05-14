@@ -418,7 +418,8 @@ class EventDispatcher:
                 duration=time.perf_counter() - start,
                 exception=e,
             )
-            log.exception(f"EventDispatcher.{evh_type}(): unexpected-error")
+            log.exception(f"EventDispatcher.{evh_type}(): unexpected-error, {repr(e)}")
+            raise
         except BaseException as e:
             self._metric_observer.observe_event_failure(
                 event_type=event_type,
@@ -466,12 +467,16 @@ class EventDispatcher:
             async def done() -> None:
                 await self._msg_queue.done(msg.msg_id)
 
-            await self.dispatch_consumers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
-                [done],
-            )
+            try:
+                await self.dispatch_consumers(
+                    decoded_event_name,
+                    AgentId(msg.payload[b"source"].decode()),
+                    msgpack.unpackb(msg.payload[b"args"]),
+                    [done],
+                )
+            except Exception:
+                # Exception is already handled in handle() method.
+                pass
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
@@ -479,11 +484,15 @@ class EventDispatcher:
             if self._closed:
                 return
             decoded_event_name = msg.payload[b"name"].decode()
-            await self.dispatch_subscribers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
-            )
+            try:
+                await self.dispatch_subscribers(
+                    decoded_event_name,
+                    AgentId(msg.payload[b"source"].decode()),
+                    msgpack.unpackb(msg.payload[b"args"]),
+                )
+            except Exception:
+                # Exception is already handled in handle() method.
+                pass
 
 
 class EventProducer:
