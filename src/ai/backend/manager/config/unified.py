@@ -247,6 +247,7 @@ class DatabaseConfig(BaseModel):
         examples=[{"host": "127.0.0.1", "port": 5432}],
     )
     name: str = Field(
+        default="DB_NAME",
         min_length=2,
         max_length=64,
         description="""
@@ -257,6 +258,7 @@ class DatabaseConfig(BaseModel):
         examples=["backend"],
     )
     user: str = Field(
+        default="DB_USER",
         description="""
         Username for authenticating with the database.
         This user must have sufficient privileges for all database operations.
@@ -1749,6 +1751,7 @@ class ManagerUnifiedConfig(BaseModel):
         alias="docker-registry",
     )
     logging: Any = Field(
+        default={},
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
