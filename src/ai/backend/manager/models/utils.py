@@ -328,13 +328,17 @@ async def connect_database(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
+    addr = db_config.addr
     username = db_config.user
     password = db_config.password
+    dbname = db_config.name
+
+    if addr is None:
+        raise RuntimeError("address is required for database connection")
     if password is None:
         raise RuntimeError("password is required for database connection")
 
-    address = db_config.addr.to_legacy()
-    dbname = db_config.name
+    address = addr.to_legacy()
     url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
 
     version_check_db = create_async_engine(url)

@@ -375,6 +375,9 @@ def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
     Create a new database for the current test session
     and install the table schema using alembic.
     """
+    if bootstrap_config.db.addr is None:
+        raise ConfigurationError({"db": "address should be set"})
+
     db_addr = bootstrap_config.db.addr.to_legacy()
     db_user = bootstrap_config.db.user
     db_pass = bootstrap_config.db.password
