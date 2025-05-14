@@ -1,4 +1,4 @@
-from ai.backend.common.data.audit_log.types import ActionType, AuditLogSchemaResponseModel
+from ai.backend.common.data.audit_log.types import ActionTypeVariant, AuditLogSchemaResponseModel
 
 from ..session import api_session
 from ..utils import dedent as _d
@@ -35,7 +35,7 @@ class AuditLog(BaseFunction):
         action_types = []
         for variant in data["action_type_variants"]:
             action_types.append(
-                ActionType(
+                ActionTypeVariant(
                     entity_type=variant["entity_type"],
                     action_types=variant["action_types"],
                 )
@@ -43,5 +43,5 @@ class AuditLog(BaseFunction):
         return AuditLogSchemaResponseModel(
             status_variants=data["status_variants"],
             entity_type_variants=data["entity_type_variants"],
-            action_types=action_types,
+            action_type_variants=action_types,
         )

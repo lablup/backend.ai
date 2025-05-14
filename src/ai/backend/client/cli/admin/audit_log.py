@@ -64,7 +64,7 @@ def dump_schema(
                     print("\n".join(resp.entity_type_variants))
                 case "action_type":
                     result = []
-                    for variant in resp.action_types:
+                    for variant in resp.action_type_variants:
                         if entity_type and variant.entity_type != entity_type:
                             continue
                         for action_type in variant.action_types:
