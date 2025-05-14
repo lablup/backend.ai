@@ -35,12 +35,18 @@ def dump_schema(
     Dump audit_log schema for the specified type.
 
     Examples:
-        # List entity types
-        backend ai audit-log dump-schema entity_type
-        # List all action types
-        backend ai audit-log dump-schema action_type
-        # List action types for a specific entity
-        backend ai audit-log dump-schema action_type --entity-type session
+
+    * Listing entity types:
+
+        > backend.ai admin audit-log dump-schema entity_type
+
+    * Listing all action types:
+
+        > backend.ai admin audit-log dump-schema action_type
+
+    * Listing action types for a specific entity:
+
+        > backend.ai admin audit-log dump-schema action_type --entity-type session
     """
     if entity_type and schema_type != "action_type":
         raise click.UsageError(
