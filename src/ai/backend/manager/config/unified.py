@@ -239,6 +239,7 @@ class DatabaseConfig(BaseModel):
         examples=["postgresql"],
     )
     addr: HostPortPair = Field(
+        # TODO: Replace this default with placeholder?
         default_factory=lambda: HostPortPair(host="127.0.0.1", port=5432),
         description="""
         Network address and port of the database server.
@@ -350,7 +351,7 @@ class DistributedLockType(enum.StrEnum):
 
 class EtcdConfig(BaseModel):
     namespace: str = Field(
-        default="backend",
+        default="ETCD_NAMESPACE",
         description="""
         Namespace prefix for etcd keys used by Backend.AI.
         Allows multiple Backend.AI clusters to share the same etcd cluster.
@@ -470,7 +471,7 @@ class ManagerConfig(BaseModel):
         serialization_alias="internal-addr",
     )
     rpc_auth_manager_keypair: FilePath = Field(
-        default=Path("fixtures/manager/manager.key_secret"),
+        default=Path("/some/path/to/manager.key_secret"),
         description="""
         Path to the keypair file used for RPC authentication.
         This file contains key pairs used for secure communication between manager components.
@@ -990,6 +991,7 @@ class AuditLogConfig(BaseModel):
 
 class ActionMonitorsConfig(BaseModel):
     subscribed_actions: list[str] = Field(
+        default=[],
         description="""
         List of action types to subscribe to for monitoring.
         """,
@@ -998,6 +1000,7 @@ class ActionMonitorsConfig(BaseModel):
         serialization_alias="subscribed-actions",
     )
     reporter: str = Field(
+        default="audit_log",
         description="""
         Name of the reporter to use for sending notifications.
         This should match the name of a configured reporter.
