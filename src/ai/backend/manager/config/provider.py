@@ -37,7 +37,7 @@ class ManagerConfigProvider:
     @property
     def config(self) -> ManagerUnifiedConfig:
         if self._config is None:
-            raise RuntimeError("Shared config is not initialized")
+            raise RuntimeError("ConfigProvider is not initialized")
         return self._config
 
     @property

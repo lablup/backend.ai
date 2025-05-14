@@ -98,9 +98,4 @@ class BootstrapConfig(BaseModel):
         raw_cfg = await cfg_loader.load()
 
         cfg = cls.model_validate(raw_cfg)
-
-        # if cfg.debug.enabled:
-        #     print("== Manager configuration ==", file=sys.stderr)
-        #     print(pformat(cfg), file=sys.stderr)
-
         return cfg
