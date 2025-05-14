@@ -296,7 +296,7 @@ class AsyncEtcd(AbstractKVStore):
         credentials = None
         if etcd_user:
             if etcd_password is None:
-                raise RuntimeError("etcd user is set, but etcd password is not set")
+                raise RuntimeError("etcd user is set, but password is not set")
 
             credentials = {
                 "user": etcd_user,

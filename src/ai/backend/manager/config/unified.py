@@ -257,8 +257,8 @@ class DatabaseConfig(BaseModel):
         """,
         examples=["backend"],
     )
-    user: str = Field(
-        default="DB_USER",
+    user: Optional[str] = Field(
+        default=None,
         description="""
         Username for authenticating with the database.
         This user must have sufficient privileges for all database operations.
@@ -367,8 +367,8 @@ class EtcdConfig(BaseModel):
         """,
         examples=[{"host": "127.0.0.1", "port": 2379}],
     )
-    user: str = Field(
-        default="ETCD_USER",
+    user: Optional[str] = Field(
+        default=None,
         description="""
         Username for authenticating with etcd.
         Optional if etcd doesn't require authentication.
