@@ -1,4 +1,4 @@
-from ai.backend.common.data.audit_log.types import ActionTypeVariant, AuditLogSchemaResponseModel
+from ai.backend.common.dto.manager.response import ActionTypeVariant, AuditLogSchemaResponseModel
 
 from ..session import api_session
 from ..utils import dedent as _d
