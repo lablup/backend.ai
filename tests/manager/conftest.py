@@ -870,7 +870,7 @@ async def registry_ctx(mocker):
             "logging": {},
         }
     )
-    mock_unified_config = await ManagerConfigProvider.create(
+    mock_config_provider = await ManagerConfigProvider.create(
         loader=mock_loader,
         etcd_watcher=MagicMock(),
         legacy_etcd_config_loader=mock_etcd_config_loader,
@@ -907,7 +907,7 @@ async def registry_ctx(mocker):
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
-        config_provider=mock_unified_config,
+        config_provider=mock_config_provider,
         db=mock_db,
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,
@@ -929,7 +929,7 @@ async def registry_ctx(mocker):
             mock_dbconn,
             mock_dbsess,
             mock_dbresult,
-            mock_unified_config,
+            mock_config_provider,
             mock_event_dispatcher,
             mock_event_producer,
         )

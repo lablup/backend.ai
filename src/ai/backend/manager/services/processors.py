@@ -109,7 +109,7 @@ class Services:
         )
         domain_service = DomainService(args.db)
         group_service = GroupService(
-            args.db, args.storage_manager, args.config_provider.config, args.redis_stat
+            args.db, args.storage_manager, args.config_provider, args.redis_stat
         )
         user_service = UserService(args.db, args.storage_manager, args.redis_stat)
         image_service = ImageService(args.db, args.agent_registry)
