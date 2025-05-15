@@ -333,8 +333,6 @@ async def connect_database(
     password = db_config.password
     dbname = db_config.name
 
-    if addr is None:
-        raise RuntimeError("address is required for database connection")
     if password is None:
         raise RuntimeError("password is required for database connection")
 

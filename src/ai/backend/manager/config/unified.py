@@ -238,8 +238,8 @@ class DatabaseConfig(BaseModel):
         """,
         examples=["postgresql"],
     )
-    addr: Optional[HostPortPair] = Field(
-        default=None,
+    addr: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=5432),
         description="""
         Network address and port of the database server.
         Default is the standard PostgreSQL port on localhost.
