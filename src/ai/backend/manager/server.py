@@ -475,12 +475,14 @@ def _make_action_reporters(
     action_monitor_configs = root_ctx.local_config["reporter"]["action-monitors"]
     for action_monitor_conf in action_monitor_configs:
         reporter_name: str = action_monitor_conf["reporter"]
-        reporter = reporters[reporter_name]
-        action_types: list[str] = action_monitor_conf["subscribed-actions"]
-        for action_type in action_types:
-            monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
-            monitors.append(reporter)
-            action_monitors[action_type] = monitors
+        try:
+            reporter = reporters[reporter_name]
+        except KeyError:
+            log.warning(f'Invalid Reporter: "{reporter_name}"')
+            continue
+
+        for action_type in action_monitor_conf["subscribed-actions"]:
+            action_monitors.setdefault(action_type, []).append(reporter)
 
     return action_monitors
 
