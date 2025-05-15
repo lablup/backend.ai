@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import timedelta
 from typing import TYPE_CHECKING, Mapping, Optional, Self, cast
 
@@ -25,9 +26,9 @@ if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
 
-class ActionTypeVariant(graphene.ObjectType):
+class ActionSpecVariant(graphene.ObjectType):
     """
-    Possible values of audit log action types.
+    Possible values of audit log action specs.
     Added in 25.8.0.
     """
 
@@ -51,8 +52,8 @@ class AuditLogSchema(graphene.ObjectType):
     status_variants = graphene.List(
         graphene.String, description='Possible values of "AuditLogNode.status"'
     )
-    action_type_variants = graphene.List(
-        ActionTypeVariant, description="Possible values of audit log action types, Added in 25.8.0"
+    action_spec_variants = graphene.List(
+        ActionSpecVariant, description="Possible values of audit log action types, Added in 25.8.0"
     )
 
     async def resolve_entity_type_variants(self, info: graphene.ResolveInfo) -> list[str]:
@@ -61,21 +62,21 @@ class AuditLogSchema(graphene.ObjectType):
     async def resolve_status_variants(self, info: graphene.ResolveInfo) -> list[str]:
         return list(OperationStatus.__members__.values())
 
-    async def resolve_action_type_variants(
+    async def resolve_action_spec_variants(
         self, info: graphene.ResolveInfo
-    ) -> list[ActionTypeVariant]:
+    ) -> list[ActionSpecVariant]:
         ctx: GraphQueryContext = info.context
-        actions = ctx.processors.supported_actions()
+        action_specs = ctx.processors.supported_actions()
 
-        grouped_actions: dict[str, set[str]] = {}
-        for action in actions:
-            entity_type, action_type = action.split(":")
-            if entity_type not in grouped_actions:
-                grouped_actions[entity_type] = set()
-            grouped_actions[entity_type].add(action_type)
+        grouped_actions: dict[str, set[str]] = defaultdict(set)
+        for spec in action_specs:
+            grouped_actions[spec.entity_type].add(spec.type())
 
         return [
-            ActionTypeVariant(entity_type=entity_type, action_types=list(action_types))
+            ActionSpecVariant(
+                entity_type=entity_type,
+                action_types=action_types,
+            )
             for entity_type, action_types in grouped_actions.items()
         ]
 

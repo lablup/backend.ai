@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 
 from ..actions.invite import (
     AcceptInvitationAction,
@@ -40,12 +40,12 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
         self.leave_invited_vfolder = ActionProcessor(service.leave_invited_vfolder, action_monitors)
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            InviteVFolderAction.type(),
-            AcceptInvitationAction.type(),
-            RejectInvitationAction.type(),
-            UpdateInvitationAction.type(),
-            ListInvitationAction.type(),
-            LeaveInvitedVFolderAction.type(),
+            InviteVFolderAction.spec(),
+            AcceptInvitationAction.spec(),
+            RejectInvitationAction.spec(),
+            UpdateInvitationAction.spec(),
+            ListInvitationAction.spec(),
+            LeaveInvitedVFolderAction.spec(),
         ]
