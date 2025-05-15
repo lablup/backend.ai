@@ -202,8 +202,6 @@ async def push_background_task_events(
                     event=user_event.event_name(),
                     retry=user_event.retry_count(),
                 )
-                # TODO: How to properly terminate a propagator?
-                # await propagator.close()
             await resp.send(dump_json_str({}), event="server_close")
         finally:
             root_ctx.event_hub.unregister_event_propagator(propagator.id())
