@@ -69,8 +69,7 @@ class UserBgtaskDoneEvent(UserEvent):
 class UserBgtaskPartialSuccessEvent(UserEvent):
     task_id: str
     message: str
-    current_progress: float
-    total_progress: float
+    errors: list[str]
 
     @override
     def event_name(self) -> Optional[str]:
@@ -89,8 +88,6 @@ class UserBgtaskPartialSuccessEvent(UserEvent):
 class UserBgtaskCancelledEvent(UserEvent):
     task_id: str
     message: str
-    current_progress: float
-    total_progress: float
 
     @override
     def event_name(self) -> Optional[str]:
@@ -109,8 +106,6 @@ class UserBgtaskCancelledEvent(UserEvent):
 class UserBgtaskFailedEvent(UserEvent):
     task_id: str
     message: str
-    current_progress: float
-    total_progress: float
 
     @override
     def event_name(self) -> Optional[str]:

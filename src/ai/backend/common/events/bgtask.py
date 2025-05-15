@@ -182,8 +182,6 @@ class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
         return UserBgtaskCancelledEvent(
             task_id=str(self.task_id),
             message=str(self.message),
-            current_progress=0,
-            total_progress=0,
         )
 
 
@@ -203,8 +201,6 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
         return UserBgtaskFailedEvent(
             task_id=str(self.task_id),
             message=str(self.message),
-            current_progress=0,
-            total_progress=0,
         )
 
 
@@ -244,6 +240,5 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
         return UserBgtaskPartialSuccessEvent(
             task_id=str(self.task_id),
             message=str(self.message),
-            current_progress=0,
-            total_progress=0,
+            errors=self.errors,
         )
