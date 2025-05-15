@@ -10,7 +10,6 @@ from ai.backend.common.events.user_event.user_bgtask_event import (
     UserBgtaskCancelledEvent,
     UserBgtaskDoneEvent,
     UserBgtaskFailedEvent,
-    UserBgtaskPartialSuccessEvent,
     UserBgtaskUpdatedEvent,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -235,8 +234,8 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
 
     @override
     def user_event(self) -> Optional[UserEvent]:
-        return UserBgtaskPartialSuccessEvent(
+        # TODO: When client side is ready, we can change this to `UserBgtaskPartialSuccessEvent`
+        return UserBgtaskDoneEvent(
             task_id=str(self.task_id),
             message=str(self.message),
-            errors=self.errors,
         )

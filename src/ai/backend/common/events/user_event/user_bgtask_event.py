@@ -71,7 +71,7 @@ class UserBgtaskPartialSuccessEvent(UserEvent):
 
     @override
     def event_name(self) -> Optional[str]:
-        return "bgtask_partial_success"
+        return "bgtask_done"
 
     @override
     def retry_count(self) -> Optional[int]:
