@@ -29,6 +29,7 @@ class AuditLogSchema(graphene.ObjectType):
     """
     A schema that contains metadata related to the AuditLogNode.
     It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
+
     Added in 25.6.0.
     """
 
