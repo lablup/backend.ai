@@ -873,12 +873,11 @@ async def registry_ctx(mocker):
             "logging": {},
         }
     )
-    mock_unified_config = ManagerConfigProvider(
+    mock_unified_config = await ManagerConfigProvider.create(
         loader=mock_loader,
-        legacy_etcd_config_loader=mock_etcd_config_loader,
         etcd_watcher=MagicMock(),
+        legacy_etcd_config_loader=mock_etcd_config_loader,
     )
-    await mock_unified_config.init()
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
     mock_dbsess = MagicMock()

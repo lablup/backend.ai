@@ -37,12 +37,11 @@ async def get_graphquery_context(
     mock_loader.load = AsyncMock()
     mock_loader.load.return_value = unified_config.model_dump()
 
-    config_provider = ManagerConfigProvider(
+    config_provider = await ManagerConfigProvider.create(
         loader=mock_loader,
-        legacy_etcd_config_loader=MagicMock(),  # type: ignore
         etcd_watcher=MagicMock(),
+        legacy_etcd_config_loader=MagicMock(),  # type: ignore
     )
-    await config_provider.init()
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore

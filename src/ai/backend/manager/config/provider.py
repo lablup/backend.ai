@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Self
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.loader.loader_chain import LoaderChain
@@ -16,28 +16,38 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ManagerConfigProvider:
     _loader: LoaderChain
-    _config: Optional[ManagerUnifiedConfig]
+    _config: ManagerUnifiedConfig
     _etcd_watcher: EtcdConfigWatcher
-    _etcd_watcher_task: Optional[asyncio.Task[None]]
+    _etcd_watcher_task: asyncio.Task[None]
     # TODO: Remove `_legacy_etcd_config_loader` when legacy etcd methods are removed
     _legacy_etcd_config_loader: LegacyEtcdLoader
 
     def __init__(
         self,
         loader: LoaderChain,
+        config: ManagerUnifiedConfig,
         etcd_watcher: EtcdConfigWatcher,
         legacy_etcd_config_loader: LegacyEtcdLoader,
     ) -> None:
         self._loader = loader
-        self._config = None
+        self._config = config
         self._etcd_watcher = etcd_watcher
-        self._etcd_watcher_task = None
         self._legacy_etcd_config_loader = legacy_etcd_config_loader
+        self._etcd_watcher_task = asyncio.create_task(self._run_watcher())
+
+    @classmethod
+    async def create(
+        cls,
+        loader: LoaderChain,
+        etcd_watcher: EtcdConfigWatcher,
+        legacy_etcd_config_loader: LegacyEtcdLoader,
+    ) -> Self:
+        raw_config = await loader.load()
+        config = ManagerUnifiedConfig.model_validate(raw_config)
+        return cls(loader, config, etcd_watcher, legacy_etcd_config_loader)
 
     @property
     def config(self) -> ManagerUnifiedConfig:
-        if self._config is None:
-            raise RuntimeError("ConfigProvider is not initialized")
         return self._config
 
     @property
@@ -50,11 +60,6 @@ class ManagerConfigProvider:
             self._config = ManagerUnifiedConfig.model_validate(raw_config)
             log.debug("config reloaded due to etcd event.")
 
-    async def init(self) -> None:
-        raw_config = await self._loader.load()
-        self._config = ManagerUnifiedConfig.model_validate(raw_config)
-        self._etcd_watcher_task = asyncio.create_task(self._run_watcher())
-
     async def terminate(self) -> None:
         if self._etcd_watcher_task:
             self._etcd_watcher_task.cancel()
@@ -62,5 +67,3 @@ class ManagerConfigProvider:
                 await self._etcd_watcher_task
             except asyncio.CancelledError:
                 pass
-            finally:
-                self._etcd_watcher_task = None

@@ -393,14 +393,12 @@ async def config_provider_ctx(
     unified_config_loader = LoaderChain(loaders, base_config=extra_config)
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
-    config_provider = ManagerConfigProvider(
-        loader=unified_config_loader,
-        legacy_etcd_config_loader=legacy_etcd_loader,
-        etcd_watcher=etcd_watcher,
-    )
-
     try:
-        await config_provider.init()
+        config_provider = await ManagerConfigProvider.create(
+            unified_config_loader,
+            etcd_watcher,
+            legacy_etcd_loader,
+        )
         root_ctx.config_provider = config_provider
 
         if config_provider.config.debug.enabled:
