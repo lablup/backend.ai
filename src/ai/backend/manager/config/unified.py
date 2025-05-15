@@ -1266,7 +1266,8 @@ class SingleRedisConfig(BaseModel):
         Identifies which service to monitor for failover.
         """,
         examples=[None, "mymaster", "backend-ai"],
-        alias="service-name",
+        validation_alias=AliasChoices("service_name", "service-name"),
+        serialization_alias="service-name",
     )
     password: Optional[str] = Field(
         default=None,
@@ -1284,7 +1285,8 @@ class SingleRedisConfig(BaseModel):
         Controls timeouts and reconnection behavior.
         Adjust based on network conditions and reliability requirements.
         """,
-        alias="redis-helper-config",
+        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
+        serialization_alias="redis-helper-config",
     )
 
     @field_serializer("addr")
@@ -1380,7 +1382,6 @@ class PluginsConfig(BaseModel):
         Can implement various selection strategies based on load, resource availability, etc.
         """,
         examples=[{}],
-        alias="agent-selector",
         validation_alias=AliasChoices("agent_selector", "agent-selector"),
         serialization_alias="agent-selector",
     )
@@ -1796,7 +1797,8 @@ class ManagerUnifiedConfig(BaseModel):
         Deprecated: Docker registry configuration.
         Contains settings for connecting to Docker registries.
         """,
-        alias="docker-registry",
+        validation_alias=AliasChoices("docker_registry", "docker-registry"),
+        serialization_alias="docker-registry",
     )
     logging: Any = Field(
         default_factory=lambda: {},
