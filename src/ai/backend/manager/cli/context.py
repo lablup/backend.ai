@@ -38,8 +38,7 @@ class CLIContext:
         self.log_level = log_level
         self._bootstrap_config = None
 
-    @property
-    def bootstrap_config(self) -> BootstrapConfig:
+    def get_bootstrap_config(self) -> BootstrapConfig:
         # Lazy-load the configuration only when requested.
         try:
             if self._bootstrap_config is None:
@@ -76,7 +75,7 @@ class CLIContext:
                 # present (e.g., when `mgr gql show` command used in CI without installation as
                 # addressed in #1686).
                 with open(os.devnull, "w") as sink, contextlib.redirect_stderr(sink):
-                    logging_config = self.bootstrap_config.logging
+                    logging_config = self.get_bootstrap_config().logging
             except click.Abort:
                 pass
             self._logger = LocalLogger(logging_config)
@@ -91,7 +90,7 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    etcd_config = cli_ctx.bootstrap_config.etcd
+    etcd_config = cli_ctx.get_bootstrap_config().etcd
     creds = None
     if etcd_config.user:
         if not etcd_config.password:
@@ -123,7 +122,7 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]:
     # scope_prefix_map is created inside ConfigServer
 
-    etcd = AsyncEtcd.initialize(cli_ctx.bootstrap_config.etcd.to_dataclass())
+    etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
     etcd_loader = LegacyEtcdLoader(etcd)
     redis_config = await etcd_loader.load()
     unified_config = ManagerUnifiedConfig(**redis_config)
@@ -144,7 +143,7 @@ class RedisConnectionSet:
 
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
-    etcd = AsyncEtcd.initialize(cli_ctx.bootstrap_config.etcd.to_dataclass())
+    etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
     raw_redis_config = await loader.load()
     redis_config = RedisConfig(**raw_redis_config)

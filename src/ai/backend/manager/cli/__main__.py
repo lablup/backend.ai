@@ -109,7 +109,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
-    db_config = cli_ctx.bootstrap_config.db
+    db_config = cli_ctx.get_bootstrap_config().db
     if psql_help:
         psql_args = ["--help"]
     if not container_name:
@@ -240,7 +240,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
     async def _clear_redis_history():
         try:
-            async with connect_database(cli_ctx.bootstrap_config.db) as db:
+            async with connect_database(cli_ctx.get_bootstrap_config().db) as db:
                 async with db.begin_readonly() as conn:
                     query = (
                         sa.select([kernels.c.id])
@@ -301,7 +301,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
     async def _clear_terminated_sessions():
         async with connect_database(
-            cli_ctx.bootstrap_config.db, isolation_level="AUTOCOMMIT"
+            cli_ctx.get_bootstrap_config().db, isolation_level="AUTOCOMMIT"
         ) as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
@@ -332,7 +332,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
     async def _clear_old_error_logs():
         async with connect_database(
-            cli_ctx.bootstrap_config.db, isolation_level="AUTOCOMMIT"
+            cli_ctx.get_bootstrap_config().db, isolation_level="AUTOCOMMIT"
         ) as db:
             async with db.begin() as conn:
                 log.info("Deleting old error logs...")
@@ -350,7 +350,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     asyncio.run(_clear_redis_history())
     asyncio.run(_clear_terminated_sessions())
     asyncio.run(_clear_old_error_logs())
-    asyncio.run(vacuum_db(cli_ctx.bootstrap_config, vacuum_full))
+    asyncio.run(vacuum_db(cli_ctx.get_bootstrap_config, vacuum_full))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
