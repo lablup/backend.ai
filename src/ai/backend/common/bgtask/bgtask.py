@@ -220,20 +220,24 @@ class BackgroundTaskManager:
         status = task_info["status"]
         if status != "started":
             # It is an already finished task!
-            event_cls: type[BgtaskEvents]
             if status == "failed":
-                event_cls = BgtaskFailedEvent
+                yield (
+                    BgtaskFailedEvent(task_id, message=task_info["msg"]),
+                    {
+                        "status": task_info["status"],
+                        "current_progress": task_info["current"],
+                        "total_progress": task_info["total"],
+                    },
+                )
             else:
-                event_cls = BgtaskDoneEvent
-
-            yield (
-                event_cls(task_id, message=task_info["msg"]),
-                {
-                    "status": task_info["status"],
-                    "current_progress": task_info["current"],
-                    "total_progress": task_info["total"],
-                },
-            )
+                yield (
+                    BgtaskDoneEvent(task_id, message=task_info["msg"]),
+                    {
+                        "status": task_info["status"],
+                        "current_progress": task_info["current"],
+                        "total_progress": task_info["total"],
+                    },
+                )
             return
 
         # It is an ongoing task.
