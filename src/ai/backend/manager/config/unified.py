@@ -470,7 +470,7 @@ class ManagerConfig(BaseModel):
         serialization_alias="internal-addr",
     )
     rpc_auth_manager_keypair: FilePath = Field(
-        default=Path("/some/path/to/manager.key_secret"),
+        default=Path("fixtures/manager/manager.key_secret"),
         description="""
         Path to the keypair file used for RPC authentication.
         This file contains key pairs used for secure communication between manager components.
@@ -994,12 +994,11 @@ class ActionMonitorsConfig(BaseModel):
         description="""
         List of action types to subscribe to for monitoring.
         """,
-        examples=[["session.create_from_params", "session.create_cluster"]],
+        examples=[["session:create_from_params", "session:create_cluster"]],
         validation_alias=AliasChoices("subscribed-actions", "subscribed_actions"),
         serialization_alias="subscribed-actions",
     )
     reporter: str = Field(
-        default="audit_log",
         description="""
         Name of the reporter to use for sending notifications.
         This should match the name of a configured reporter.
@@ -1018,7 +1017,9 @@ class ReporterConfig(BaseModel):
         """,
     )
     audit_log: list[AuditLogConfig] = Field(
-        default=[],
+        default=[
+            AuditLogConfig(name="audit_log"),
+        ],
         description="""
         Audit log reporter configuration.
         Controls how audit logs are reported.
@@ -1027,7 +1028,7 @@ class ReporterConfig(BaseModel):
         serialization_alias="audit-log",
     )
     action_monitors: list[ActionMonitorsConfig] = Field(
-        default=[],
+        default=[ActionMonitorsConfig(subscribed_actions=[], reporter="audit_log")],
         description="""
         Action monitors configuration.
         Each reporter can be configured to subscribe to specific actions.
