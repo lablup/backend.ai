@@ -249,7 +249,6 @@ class BaseSession(metaclass=abc.ABCMeta):
         "System",
         "Manager",
         "Admin",
-        "AuditLog",
         "Agent",
         "ContainerRegistry",
         "AgentWatcher",
@@ -299,7 +298,6 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.acl import Permission
         from .func.admin import Admin
         from .func.agent import Agent, AgentWatcher
-        from .func.audit_log import AuditLog
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.container_registry import ContainerRegistry
@@ -330,7 +328,6 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Admin = Admin
         self.Agent = Agent
         self.AgentWatcher = AgentWatcher
-        self.AuditLog = AuditLog
         self.Storage = Storage
         self.Auth = Auth
         self.BackgroundTask = BackgroundTask
