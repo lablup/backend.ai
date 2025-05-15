@@ -104,7 +104,7 @@ class ResourcePresetService:
         modifier = action.modifier
 
         if preset_id is None and name is None:
-            raise InvalidAPIParameters("One of (`id` or `name`) parameter should be not null")
+            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
 
         if resource_slots := modifier.resource_slots.optional_value():
             if not resource_slots.has_intrinsic_slots():
@@ -144,7 +144,7 @@ class ResourcePresetService:
         preset_id = action.id
 
         if preset_id is None and name is None:
-            raise InvalidAPIParameters("One of (`id` or `name`) parameter should be not null")
+            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
 
         async with self._db.begin_session() as db_sess:
             if preset_id is not None:
