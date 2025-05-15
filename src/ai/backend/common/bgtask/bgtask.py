@@ -213,6 +213,7 @@ class BackgroundTaskManager:
             # The task ID is invalid or represents a task completed more than timeout.
             raise BgtaskNotFoundError("No such background task.")
 
+        task_info_dict["status"] = BgtaskStatus(task_info_dict["status"])
         task_info = _BgTaskInfo(**task_info_dict)
         if not task_info.status.finished():
             return None
