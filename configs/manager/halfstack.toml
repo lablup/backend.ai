@@ -84,22 +84,3 @@ certfile = ""
 
 [debug]
 enabled = false
-
-
-[reporter]
-
-[[reporter.audit-log]]
-name = "audit_log"
-
-[[reporter.action-monitors]]
-subscribed-actions = [
-    "session:create_from_params",
-    "session:create_from_template",
-    "session:create_cluster",
-    "session:commit",
-    "session:convert_to_image",
-    "session:destroy",
-    "session:destroy_multi",
-    "container_registry:rescan"
-]
-reporter = "audit_log"
