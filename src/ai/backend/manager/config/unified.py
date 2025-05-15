@@ -1135,7 +1135,8 @@ class APIConfig(BaseModel):
         Important for browser-based clients connecting to the API.
         """,
         examples=["*", "https://example.com"],
-        alias="allow-origins",
+        validation_alias=AliasChoices("allow_origins", "allow-origins"),
+        serialization_alias="allow-origins",
     )
     allow_graphql_schema_introspection: bool = Field(
         default=False,
@@ -1145,7 +1146,10 @@ class APIConfig(BaseModel):
         When disabled, GraphQL tools like GraphiQL won't be able to explore the schema.
         """,
         examples=[True, False],
-        alias="allow-graphql-schema-introspection",
+        validation_alias=AliasChoices(
+            "allow_graphql_schema_introspection", "allow-graphql-schema-introspection"
+        ),
+        serialization_alias="allow-graphql-schema-introspection",
     )
     allow_openapi_schema_introspection: bool = Field(
         default=False,
@@ -1155,7 +1159,10 @@ class APIConfig(BaseModel):
         When disabled, Swagger UI and similar tools won't work.
         """,
         examples=[True, False],
-        alias="allow-openapi-schema-introspection",
+        validation_alias=AliasChoices(
+            "allow_openapi_schema_introspection", "allow-openapi-schema-introspection"
+        ),
+        serialization_alias="allow-openapi-schema-introspection",
     )
     max_gql_query_depth: Optional[int] = Field(
         default=None,
@@ -1166,7 +1173,8 @@ class APIConfig(BaseModel):
         Set to None to disable the limit.
         """,
         examples=[None, 10, 15],
-        alias="max-gql-query-depth",
+        validation_alias=AliasChoices("max_gql_query_depth", "max-gql-query-depth"),
+        serialization_alias="max-gql-query-depth",
     )
     max_gql_connection_page_size: Optional[int] = Field(
         default=None,
@@ -1177,7 +1185,10 @@ class APIConfig(BaseModel):
         Set to None to use the default page size.
         """,
         examples=[None, 100, 500],
-        alias="max-gql-connection-page-size",
+        validation_alias=AliasChoices(
+            "max_gql_connection_page_size", "max-gql-connection-page-size"
+        ),
+        serialization_alias="max-gql-connection-page-size",
     )
     resources: Optional[ResourcesConfig] = Field(
         default=None,
@@ -1198,6 +1209,8 @@ class RedisHelperConfig(BaseModel):
         Increase for slow or congested networks.
         """,
         examples=[5.0, 10.0],
+        validation_alias=AliasChoices("socket_timeout", "socket-timeout"),
+        serialization_alias="socket_timeout",
     )
     socket_connect_timeout: float = Field(
         default=2.0,
@@ -1207,6 +1220,8 @@ class RedisHelperConfig(BaseModel):
         Shorter values fail faster but may be too aggressive for some networks.
         """,
         examples=[2.0, 5.0],
+        validation_alias=AliasChoices("socket_connect_timeout", "socket-connect-timeout"),
+        serialization_alias="socket_connect_timeout",
     )
     reconnect_poll_timeout: float = Field(
         default=0.3,
@@ -1216,6 +1231,8 @@ class RedisHelperConfig(BaseModel):
         Lower values reconnect faster but may increase network load.
         """,
         examples=[0.3, 1.0],
+        validation_alias=AliasChoices("reconnect_poll_timeout", "reconnect-poll-timeout"),
+        serialization_alias="reconnect_poll_timeout",
     )
 
 
@@ -1249,7 +1266,8 @@ class SingleRedisConfig(BaseModel):
         Identifies which service to monitor for failover.
         """,
         examples=[None, "mymaster", "backend-ai"],
-        alias="service-name",
+        validation_alias=AliasChoices("service_name", "service-name"),
+        serialization_alias="service-name",
     )
     password: Optional[str] = Field(
         default=None,
@@ -1267,7 +1285,8 @@ class SingleRedisConfig(BaseModel):
         Controls timeouts and reconnection behavior.
         Adjust based on network conditions and reliability requirements.
         """,
-        alias="redis-helper-config",
+        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
+        serialization_alias="redis-helper-config",
     )
 
     @field_serializer("addr")
@@ -1321,6 +1340,8 @@ class DockerImageConfig(BaseModel):
         'none': Never pull automatically (manual control)
         """,
         examples=[item.value for item in DockerImageAutoPullPolicy],
+        validation_alias=AliasChoices("auto_pull", "auto-pull"),
+        serialization_alias="auto_pull",
     )
 
 
@@ -1361,7 +1382,8 @@ class PluginsConfig(BaseModel):
         Can implement various selection strategies based on load, resource availability, etc.
         """,
         examples=[{}],
-        alias="agent-selector",
+        validation_alias=AliasChoices("agent_selector", "agent-selector"),
+        serialization_alias="agent-selector",
     )
     network: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
@@ -1381,7 +1403,8 @@ class InterContainerNetworkConfig(BaseModel):
         Container communication performance depends on this setting.
         """,
         examples=["overlay", None],
-        alias="default-driver",
+        validation_alias=AliasChoices("default_driver", "default-driver"),
+        serialization_alias="default-driver",
     )
     # TODO: Write description
     enabled: bool = Field(
@@ -1426,7 +1449,8 @@ class RpcConfig(BaseModel):
         description="""
         """,
         examples=[60.0, 120.0],
-        alias="keepalive-timeout",
+        validation_alias=AliasChoices("keepalive_timeout", "keepalive-timeout"),
+        serialization_alias="keepalive-timeout",
     )
 
 
@@ -1437,7 +1461,8 @@ class NetworkConfig(BaseModel):
         Settings for networks between containers.
         Controls how containers communicate with each other.
         """,
-        alias="inter-container",
+        validation_alias=AliasChoices("inter_container", "inter-container"),
+        serialization_alias="inter-container",
     )
     subnet: SubnetNetworkConfig = Field(
         default_factory=SubnetNetworkConfig,
@@ -1471,7 +1496,8 @@ class WatcherConfig(BaseModel):
         Increase for handling large files or slow storage systems.
         """,
         examples=[60.0, 120.0],
-        alias="file-io-timeout",
+        validation_alias=AliasChoices("file_io_timeout", "file-io-timeout"),
+        serialization_alias="file-io-timeout",
     )
 
 
@@ -1484,6 +1510,8 @@ class AuthConfig(BaseModel):
         Set to None to disable password expiration.
         """,
         examples=[None, "90d", "180d"],
+        validation_alias=AliasChoices("max_password_age", "max-password-age"),
+        serialization_alias="max_password_age",
     )
 
 
@@ -1525,7 +1553,8 @@ class SessionConfig(BaseModel):
         Configuration for detecting and handling hung sessions.
         Controls how the system detects and recovers from session failures.
         """,
-        alias="hang-tolerance",
+        validation_alias=AliasChoices("hang_tolerance", "hang-tolerance"),
+        serialization_alias="hang-tolerance",
     )
 
 
@@ -1569,6 +1598,10 @@ class IdleCheckerConfig(BaseModel):
         Controls how long the system waits before considering a connection idle.
         """,
         examples=["5m", "10m"],
+        validation_alias=AliasChoices(
+            "app_streaming_packet_timeout", "app-streaming-packet-timeout"
+        ),
+        serialization_alias="app_streaming_packet_timeout",
     )
     checkers: dict[str, Any] = Field(
         default_factory=dict,
@@ -1631,6 +1664,8 @@ class VolumeProxyConfig(BaseModel):
         Should include protocol, host and port.
         """,
         examples=["http://localhost:6021", "https://proxy1.example.com:6021"],
+        validation_alias=AliasChoices("client_api", "client-api"),
+        serialization_alias="client_api",
     )
     manager_api: str = Field(
         description="""
@@ -1639,6 +1674,8 @@ class VolumeProxyConfig(BaseModel):
         Should include protocol, host and port.
         """,
         examples=["http://localhost:6022", "https://proxy1.example.com:6022"],
+        validation_alias=AliasChoices("manager_api", "manager-api"),
+        serialization_alias="manager_api",
     )
     secret: str = Field(
         description="""
@@ -1656,6 +1693,8 @@ class VolumeProxyConfig(BaseModel):
         Can be disabled for testing with self-signed certificates.
         """,
         examples=[True, False],
+        validation_alias=AliasChoices("ssl_verify", "ssl-verify"),
+        serialization_alias="ssl_verify",
     )
     sftp_scaling_groups: Optional[CommaSeparatedStrList] = Field(
         default=None,
@@ -1664,6 +1703,8 @@ class VolumeProxyConfig(BaseModel):
         Controls which scaling groups can create SFTP sessions for this volume.
         """,
         examples=[None, ["group-1", "group-2"]],
+        validation_alias=AliasChoices("sftp_scaling_groups", "sftp-scaling-groups"),
+        serialization_alias="sftp_scaling_groups",
     )
 
 
@@ -1685,6 +1726,8 @@ class VolumesConfig(BaseModel):
         Used when user doesn't explicitly specify a host.
         """,
         examples=["localhost:6021", "local:default", "nas:main-volume"],
+        validation_alias=AliasChoices("default_host", "default-host"),
+        serialization_alias="default_host",
     )
     exposed_volume_info: CommaSeparatedStrList = Field(
         default=CommaSeparatedStrList(["percentage"]),
@@ -1693,6 +1736,8 @@ class VolumesConfig(BaseModel):
         Options include "percentage" for disk usage percentage.
         """,
         examples=[["percentage"], ["percentage", "bytes"]],
+        validation_alias=AliasChoices("exposed_volume_info", "exposed-volume-info"),
+        serialization_alias="exposed_volume_info",
     )
     proxies: dict[str, VolumeProxyConfig] = Field(
         default_factory=dict,
@@ -1752,7 +1797,8 @@ class ManagerUnifiedConfig(BaseModel):
         Deprecated: Docker registry configuration.
         Contains settings for connecting to Docker registries.
         """,
-        alias="docker-registry",
+        validation_alias=AliasChoices("docker_registry", "docker-registry"),
+        serialization_alias="docker-registry",
     )
     logging: Any = Field(
         default_factory=lambda: {},
