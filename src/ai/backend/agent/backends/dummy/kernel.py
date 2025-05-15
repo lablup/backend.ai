@@ -6,7 +6,7 @@ from ai.backend.agent.backends.code_runner import AbstractCodeRunner, NopCodeRun
 from ai.backend.agent.backends.kernel import AbstractKernel
 from ai.backend.agent.types import AgentEventData
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.types import CommitStatus
+from ai.backend.common.types import CommitStatus, KernelId
 
 
 class DummyKernel(AbstractKernel):
@@ -28,19 +28,13 @@ class DummyKernel(AbstractKernel):
         return NopCodeRunner()
 
     @override
-    async def check_status(self):
-        delay = self._dummy_kernel_cfg["delay"]["check-status"]
-        await asyncio.sleep(delay)
-        return {}
-
-    @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]):
         delay = self._dummy_kernel_cfg["delay"]["get-completions"]
         await asyncio.sleep(delay)
         return {"status": "finished", "completions": []}
 
     @override
-    async def get_logs(self) -> dict[str, str]:
+    async def get_logs(self) -> Mapping[str, str]:
         delay = self._dummy_kernel_cfg["delay"]["get-logs"]
         await asyncio.sleep(delay)
         return {"logs": "my logs"}
@@ -68,7 +62,7 @@ class DummyKernel(AbstractKernel):
         await asyncio.sleep(delay)
 
     @override
-    async def check_duplicate_commit(self, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         if self._is_commiting:
             return CommitStatus.ONGOING
         return CommitStatus.READY

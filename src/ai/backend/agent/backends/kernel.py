@@ -41,15 +41,11 @@ class AbstractKernel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_status(self):
-        raise NotImplementedError
-
-    @abstractmethod
     async def get_completions(self, text: str, opts: Mapping[str, Any]):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_logs(self) -> dict[str, str]:
+    async def get_logs(self) -> Mapping[str, str]:
         raise NotImplementedError
 
     @abstractmethod
@@ -69,7 +65,7 @@ class AbstractKernel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
@@ -180,6 +176,9 @@ class KernelWrapper:
 
     def kernel(self) -> AbstractKernel:
         return self._kernel
+
+    async def check_status(self) -> Optional[Mapping[str, float]]:
+        return await self._code_runner.feed_and_get_status()
 
     async def execute(
         self,

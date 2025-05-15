@@ -5,7 +5,7 @@ from ai.backend.agent.backends.code_runner import AbstractCodeRunner
 from ai.backend.agent.backends.kernel import AbstractKernel
 from ai.backend.agent.types import AgentEventData
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.types import CommitStatus
+from ai.backend.common.types import CommitStatus, KernelId
 
 
 class KubernetesKernel(AbstractKernel):
@@ -20,15 +20,11 @@ class KubernetesKernel(AbstractKernel):
         raise NotImplementedError
 
     @override
-    async def check_status(self):
-        raise NotImplementedError
-
-    @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]):
         raise NotImplementedError
 
     @override
-    async def get_logs(self) -> dict[str, str]:
+    async def get_logs(self) -> Mapping[str, str]:
         raise NotImplementedError
 
     @override
@@ -48,7 +44,7 @@ class KubernetesKernel(AbstractKernel):
         raise NotImplementedError
 
     @override
-    async def check_duplicate_commit(self, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         raise NotImplementedError
 
     @override

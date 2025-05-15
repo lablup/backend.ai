@@ -13,12 +13,8 @@ class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
     def __init__(self, args: ImageRegistryArgs): ...
     @override
     async def scan_images(self) -> ScanImagesResult:
-        """
-        Scan the available kernel images/templates and update ``self.images``.
-        This is called periodically to keep the image list up-to-date and allow
-        manual image addition and deletions by admins.
-        """
-        raise NotImplementedError
+        # Retrieving image label from registry api is not possible
+        return ScanImagesResult(scanned_images={}, removed_images={})
 
     @override
     async def push_image(
@@ -28,10 +24,8 @@ class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
         *,
         timeout: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
-        """
-        Push the given image to the given registry.
-        """
-        raise NotImplementedError
+        # TODO: Add support for appropriate image pulling mechanism on K8s
+        pass
 
     @override
     async def pull_image(
@@ -41,28 +35,23 @@ class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
         *,
         timeout: float | None,
     ) -> None:
-        """
-        Pull the given image from the given registry.
-        """
-        raise NotImplementedError
+        # TODO: Add support for appropriate image pulling mechanism on K8s
+        pass
 
     @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
-        """
-        Purge the given images from the agent.
-        """
-        raise NotImplementedError
+        # TODO: Add support for appropriate image purging mechanism on K8s
+        return PurgeImagesResp([])
 
     @override
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
-        """
-        Check the availability of the image and return a boolean flag that indicates whether
-        the agent should try pulling the image from a registry.
-        """
-        raise NotImplementedError
+        # TODO: Add support for appropriate image checking mechanism on K8s
+        # Just mark all images as 'pulled' since we can't manually initiate image pull on each kube node
+        return True
 
     @override
     async def extract_image_command(self, image: str) -> str | None:
-        raise NotImplementedError
+        # TODO: Add support for appropriate image command extraction mechanism on K8s
+        return None

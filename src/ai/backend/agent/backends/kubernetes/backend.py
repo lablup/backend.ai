@@ -51,6 +51,7 @@ class KubernetesBackend(AbstractBackend):
         It may raise :exc:`NotImplementedError` and then the manager
         will cancel creation of the session.
         """
+        raise NotImplementedError
 
     @override
     async def destroy_local_network(self, network_name: str) -> None:
@@ -59,3 +60,4 @@ class KubernetesBackend(AbstractBackend):
 
         This is called by the manager after kernel destruction.
         """
+        raise NotImplementedError

@@ -2,6 +2,9 @@ import logging
 from decimal import Decimal
 from typing import Any, Mapping, override
 
+from aiodocker import Docker
+from aiotools import closing_async
+
 from ai.backend.agent.agent import ComputerContext
 from ai.backend.agent.backends.backend import AbstractBackend
 from ai.backend.agent.backends.type import BackendArgs
@@ -47,19 +50,17 @@ class DockerBackend(AbstractBackend):
 
     @override
     async def create_local_network(self, network_name: str) -> None:
-        """
-        Create a local bridge network for a single-node multicontainer session, where containers in the
-        same agent can connect to each other using cluster hostnames without explicit port mapping.
-
-        This is called by the manager before kernel creation.
-        It may raise :exc:`NotImplementedError` and then the manager
-        will cancel creation of the session.
-        """
+        async with closing_async(Docker()) as docker:
+            await docker.networks.create({
+                "Name": network_name,
+                "Driver": "bridge",
+                "Labels": {
+                    "ai.backend.cluster-network": "1",
+                },
+            })
 
     @override
     async def destroy_local_network(self, network_name: str) -> None:
-        """
-        Destroy a local bridge network used for a single-node multi-container session.
-
-        This is called by the manager after kernel destruction.
-        """
+        async with closing_async(Docker()) as docker:
+            network = await docker.networks.get(network_name)
+            await network.delete()

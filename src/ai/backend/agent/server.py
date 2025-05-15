@@ -378,7 +378,7 @@ class AgentRPCHandler:
         await kernel.kernel().get_completions(text, opts)
 
     @collect_error
-    async def get_logs(self, kernel_id: str) -> dict[str, str]:
+    async def get_logs(self, kernel_id: str) -> Mapping[str, str]:
         log.info("rpc::get_logs(k:{0})", kernel_id)
         kernel = await self._agent.get_kernel(KernelId(UUID(kernel_id)))
         return await kernel.kernel().get_logs()
@@ -474,8 +474,9 @@ class AgentRPCHandler:
     ) -> dict[str, Any]:
         # Only this function logs debug since web sends request at short intervals
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
-        kernel = await self._agent.get_kernel(KernelId(UUID(kernel_id)))
-        status = await kernel.kernel().check_duplicate_commit(subdir)
+        kernel_uuid = KernelId(UUID(kernel_id))
+        kernel = await self._agent.get_kernel(kernel_uuid)
+        status = await kernel.kernel().check_duplicate_commit(kernel_uuid, subdir)
         return {
             "kernel": kernel_id,
             "status": status.value,

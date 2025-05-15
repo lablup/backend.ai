@@ -319,7 +319,7 @@ class AbstractCodeRunner(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def ping(self) -> dict[str, float] | None:
+    async def ping(self) -> Optional[Mapping[str, float]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -351,7 +351,7 @@ class AbstractCodeRunner(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def feed_and_get_status(self) -> dict[str, float] | None:
+    async def feed_and_get_status(self) -> Optional[Mapping[str, float]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -422,7 +422,7 @@ class NopCodeRunner(AbstractCodeRunner):
     async def close(self) -> None:
         pass
 
-    async def ping(self) -> dict[str, float] | None:
+    async def ping(self) -> Optional[Mapping[str, float]]:
         return None
 
     async def ping_status(self) -> None:
@@ -443,7 +443,7 @@ class NopCodeRunner(AbstractCodeRunner):
     async def feed_interrupt(self) -> None:
         pass
 
-    async def feed_and_get_status(self) -> Optional[dict[str, float]]:
+    async def feed_and_get_status(self) -> Optional[Mapping[str, float]]:
         return None
 
     async def feed_and_get_completion(self, code_text, opts):
@@ -548,7 +548,7 @@ class CodeRunner(AbstractCodeRunner):
         except Exception as e:
             log.exception("AbstractCodeRunner.close(): unexpected error: {}", repr(e))
 
-    async def ping(self) -> dict[str, float] | None:
+    async def ping(self) -> Optional[Mapping[str, float]]:
         try:
             return await self.feed_and_get_status()
         except Exception as e:
@@ -614,7 +614,7 @@ class CodeRunner(AbstractCodeRunner):
     async def feed_interrupt(self) -> None:
         await self._sockets.send_multipart([b"interrupt", b""])
 
-    async def feed_and_get_status(self) -> dict[str, float] | None:
+    async def feed_and_get_status(self) -> Optional[Mapping[str, float]]:
         await self._sockets.send_multipart([b"status", b""])
         try:
             result = await self._status_queue.get()
