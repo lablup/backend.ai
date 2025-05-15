@@ -347,7 +347,6 @@ interface Node {
 """
 A schema that contains metadata related to the AuditLogNode.
 It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
-
 Added in 25.6.0.
 """
 type AuditLogSchema {
@@ -360,21 +359,6 @@ type AuditLogSchema {
   Possible values of "AuditLogNode.status"
   """
   status_variants: [String]
-
-  """Possible values of audit log action types, Added in 25.8.0"""
-  action_type_variants: [ActionTypeVariant]
-}
-
-"""
-Possible values of audit log action types.
-Added in 25.8.0.
-"""
-type ActionTypeVariant {
-  """Entity type of the AuditLog"""
-  entity_type: String!
-
-  """Action types of the AuditLog"""
-  action_types: [String]!
 }
 
 """Added in 25.6.0."""

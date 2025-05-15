@@ -11,7 +11,6 @@ def admin():
 from . import (  # noqa
     acl,
     agent,
-    audit_log,
     domain,
     etcd,
     group,
