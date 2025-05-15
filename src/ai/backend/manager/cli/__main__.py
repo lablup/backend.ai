@@ -350,7 +350,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     asyncio.run(_clear_redis_history())
     asyncio.run(_clear_terminated_sessions())
     asyncio.run(_clear_old_error_logs())
-    asyncio.run(vacuum_db(cli_ctx.get_bootstrap_config, vacuum_full))
+    asyncio.run(vacuum_db(cli_ctx.get_bootstrap_config(), vacuum_full))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
