@@ -538,13 +538,12 @@ def _make_action_reporters(
         reporter_name: str = action_monitor_conf.reporter
         try:
             reporter = reporters[reporter_name]
-            action_types: list[str] = action_monitor_conf.subscribed_actions
-            for action_type in action_types:
-                monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
-                monitors.append(reporter)
-                action_monitors[action_type] = monitors
         except KeyError:
-            log.warning("Reporter not found: {}", reporter_name)
+            log.warning(f'Invalid Reporter: "{reporter_name}"')
+            continue
+
+        for action_type in action_monitor_conf.subscribed_actions:
+            action_monitors.setdefault(action_type, []).append(reporter)
 
     return action_monitors
 
