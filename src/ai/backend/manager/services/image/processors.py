@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -97,18 +97,18 @@ class ImageProcessors(AbstractProcessorPackage):
         )
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            ForgetImageAction.type(),
-            ForgetImageByIdAction.type(),
-            PurgeImageByIdAction.type(),
-            AliasImageAction.type(),
-            DealiasImageAction.type(),
-            ModifyImageAction.type(),
-            PreloadImageAction.type(),
-            UnloadImageAction.type(),
-            UntagImageFromRegistryAction.type(),
-            ScanImageAction.type(),
-            PurgeImagesAction.type(),
-            ClearImageCustomResourceLimitAction.type(),
+            ForgetImageAction.spec(),
+            ForgetImageByIdAction.spec(),
+            PurgeImageByIdAction.spec(),
+            AliasImageAction.spec(),
+            DealiasImageAction.spec(),
+            ModifyImageAction.spec(),
+            PreloadImageAction.spec(),
+            UnloadImageAction.spec(),
+            UntagImageFromRegistryAction.spec(),
+            ScanImageAction.spec(),
+            PurgeImagesAction.spec(),
+            ClearImageCustomResourceLimitAction.spec(),
         ]
