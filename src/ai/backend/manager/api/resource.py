@@ -261,11 +261,11 @@ async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     :return token: agent watcher token ("insecure" if not set in config server)
     """
     root_ctx: RootContext = request.app["_root.context"]
-    token = root_ctx.shared_config["watcher"]["token"]
+    token = root_ctx.unified_config.shared.watcher.token
     if token is None:
         token = "insecure"
-    agent_ip = await root_ctx.shared_config.etcd.get(f"nodes/agents/{agent_id}/ip")
-    raw_watcher_port = await root_ctx.shared_config.etcd.get(
+    agent_ip = await root_ctx.etcd.get(f"nodes/agents/{agent_id}/ip")
+    raw_watcher_port = await root_ctx.etcd.get(
         f"nodes/agents/{agent_id}/watcher_port",
     )
     watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)

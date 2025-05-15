@@ -4,20 +4,22 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import BackgroundTaskManager
-    from ai.backend.common.events import EventDispatcher, EventProducer
+    from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+    from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
 
     from ..agent_cache import AgentRPCCache
-    from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
@@ -38,13 +40,13 @@ class RootContext(BaseContext):
     distributed_lock_factory: DistributedLockFactory
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
+    etcd: AsyncEtcd
     redis_live: RedisConnectionInfo
     redis_stat: RedisConnectionInfo
     redis_image: RedisConnectionInfo
     redis_stream: RedisConnectionInfo
     redis_lock: RedisConnectionInfo
-    shared_config: SharedConfig
-    local_config: LocalConfig
+    unified_config: ManagerUnifiedConfig
     cors_options: CORSOptions
 
     webapp_plugin_ctx: WebappPluginContext
@@ -62,6 +64,7 @@ class RootContext(BaseContext):
     background_task_manager: BackgroundTaskManager
     metrics: CommonMetricRegistry
     processors: Processors
+    event_hub: EventHub
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
         super().__init__(**kwargs)

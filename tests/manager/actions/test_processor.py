@@ -1,12 +1,16 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Final, Optional
 
 import pytest
 from tenacity import BaseAction
 
+from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.action import BaseActionResult, BaseActionResultMeta, ProcessResult
 from ai.backend.manager.actions.processor import ActionProcessor
+
+_MOCK_ACTION_TYPE: Final[str] = "test"
+_MOCK_OPERATION_TYPE: Final[str] = "create"
 
 
 @dataclass
@@ -18,11 +22,13 @@ class MockAction(BaseAction):
     def entity_id(self) -> Optional[str]:
         return self.id
 
-    def entity_type(self) -> str:
-        return self.type
+    @classmethod
+    def entity_type(cls) -> str:
+        return _MOCK_ACTION_TYPE
 
-    def operation_type(self) -> str:
-        return self.operation
+    @classmethod
+    def operation_type(cls) -> str:
+        return _MOCK_OPERATION_TYPE
 
 
 @dataclass
@@ -86,8 +92,12 @@ async def mock_exception_processor_func(action: MockAction) -> MockActionResult:
 
 async def test_processor_success():
     monitor = MockActionMonitor(
-        expected_prepare_action=MockAction(id="1", type="test", operation="create"),
-        expected_done_action=MockAction(id="1", type="test", operation="create"),
+        expected_prepare_action=MockAction(
+            id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
+        ),
+        expected_done_action=MockAction(
+            id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
+        ),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
                 action_id=None,
@@ -96,6 +106,7 @@ async def test_processor_success():
                 started_at=None,
                 ended_at=None,
                 duration=0.0,
+                error_code=None,
             ),
             result=MockActionResult(id="1"),
         ),
@@ -103,7 +114,7 @@ async def test_processor_success():
     processor = ActionProcessor[MockAction, MockActionResult](
         func=mock_action_processor_func, monitors=[monitor]
     )
-    action = MockAction(id="1", type="test", operation="create")
+    action = MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
     result = await processor.wait_for_complete(action)
 
     assert result.entity_id() == "1"
@@ -111,8 +122,12 @@ async def test_processor_success():
 
 async def test_processor_exception():
     monitor = MockActionMonitor(
-        expected_prepare_action=MockAction(id="1", type="test", operation="create"),
-        expected_done_action=MockAction(id="1", type="test", operation="create"),
+        expected_prepare_action=MockAction(
+            id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
+        ),
+        expected_done_action=MockAction(
+            id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE
+        ),
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
                 action_id=None,
@@ -121,6 +136,7 @@ async def test_processor_exception():
                 started_at=None,
                 ended_at=None,
                 duration=0.0,
+                error_code=ErrorCode.default(),
             ),
             result=None,
         ),
@@ -128,7 +144,7 @@ async def test_processor_exception():
     processor = ActionProcessor[MockAction, MockActionResult](
         func=mock_exception_processor_func, monitors=[monitor]
     )
-    action = MockAction(id="1", type="test", operation="create")
+    action = MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
 
     with pytest.raises(MockException):
         await processor.wait_for_complete(action)

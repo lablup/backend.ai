@@ -35,11 +35,15 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events import (
-    DoStartSessionEvent,
-    DoUpdateSessionStatusEvent,
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
+)
+from ai.backend.common.events.schedule import (
+    DoStartSessionEvent,
+)
+from ai.backend.common.events.session import (
+    DoUpdateSessionStatusEvent,
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
@@ -181,13 +185,6 @@ LEADING_SESSION_STATUSES = tuple(
 DEAD_SESSION_STATUSES = frozenset([
     SessionStatus.CANCELLED,
     SessionStatus.TERMINATED,
-    SessionStatus.ERROR,
-])
-
-DEAD_KERNEL_STATUSES = frozenset([
-    KernelStatus.CANCELLED,
-    KernelStatus.TERMINATED,
-    KernelStatus.ERROR,
 ])
 
 # statuses to consider when calculating current resource usage

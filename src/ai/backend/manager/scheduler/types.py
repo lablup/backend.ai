@@ -31,7 +31,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 
 from ..models import AgentRow, KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
@@ -305,9 +305,11 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
 
     base_key: Final[str] = "resource-group-states"
 
-    def __init__(self, state_cls: type[T_ResourceGroupState], shared_config: SharedConfig) -> None:
+    def __init__(
+        self, state_cls: type[T_ResourceGroupState], legacy_etcd_config_loader: LegacyEtcdLoader
+    ) -> None:
         super().__init__(state_cls)
-        self.shared_config = shared_config
+        self.legacy_etcd_config_loader = legacy_etcd_config_loader
 
     @override
     async def load(
@@ -319,7 +321,7 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
             "{}: load resource group state for {}", type(self).__qualname__, resource_group_name
         )
         if (
-            raw_agent_selector_state := await self.shared_config.get_raw(
+            raw_agent_selector_state := await self.legacy_etcd_config_loader.get_raw(
                 f"{self.base_key}/{resource_group_name}/{state_name}",
             )
         ) is not None:
@@ -336,7 +338,7 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         log.debug(
             "{}: store resource group state for {}", type(self).__qualname__, resource_group_name
         )
-        await self.shared_config.etcd.put(
+        await self.legacy_etcd_config_loader._etcd.put(
             f"{self.base_key}/{resource_group_name}/{state_name}",
             state_value.model_dump_json(),
         )
@@ -350,7 +352,7 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         log.debug(
             "{}: reset resource group state for {}", type(self).__qualname__, resource_group_name
         )
-        await self.shared_config.etcd.delete_prefix(
+        await self.legacy_etcd_config_loader._etcd.delete_prefix(
             f"{self.base_key}/{resource_group_name}/{state_name}",
         )
 

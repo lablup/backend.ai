@@ -25,7 +25,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -190,7 +190,7 @@ class Image(graphene.ObjectType):
         installed_agents: List[str],
     ) -> Image:
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
+        hide_agents = False if is_superadmin else ctx.unified_config.local.manager.hide_agents
         image_ref = row.image_ref
         version, ptag_set = image_ref.tag_set
         ret = cls(

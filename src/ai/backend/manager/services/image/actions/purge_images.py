@@ -20,7 +20,8 @@ class PurgeImageAction(ImageAction):
         return None
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "purge"
 
 
@@ -59,7 +60,8 @@ class PurgeImagesAction(ImageAction):
         return None
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "purge_multi"
 
 

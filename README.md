@@ -276,6 +276,23 @@ Python Version Compatibility
 | 21.03.x / 21.09.x       | 3.8.x          |                    |
 
 
+### Building Packages
+
+Backend.AI supports building two types of packages:
+
+1. Python wheels (.whl)
+2. SCIE (Self-Contained Installable Executables)
+
+To build:
+
+```bash
+# Build wheels or SCIE packages
+./scripts/build-wheel.sh
+./scripts/build-scies.sh
+```
+
+All built packages will be placed in the `dist/` directory.
+
 License
 -------
 

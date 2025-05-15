@@ -5,6 +5,8 @@ from typing import Optional, Self
 import psutil
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
+from ai.backend.common.exception import BackendAIError, ErrorCode
+
 
 class APIMetricObserver:
     _instance: Optional[Self] = None
@@ -16,12 +18,12 @@ class APIMetricObserver:
         self._request_count = Counter(
             name="backendai_api_request_count",
             documentation="Total number of API requests",
-            labelnames=["method", "endpoint", "status_code"],
+            labelnames=["method", "endpoint", "domain", "operation", "error_detail", "status_code"],
         )
         self._request_duration_sec = Histogram(
             name="backendai_api_request_duration_sec",
             documentation="Duration of API requests in milliseconds",
-            labelnames=["method", "endpoint", "status_code"],
+            labelnames=["method", "endpoint", "domain", "operation", "error_detail", "status_code"],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -31,24 +33,54 @@ class APIMetricObserver:
             cls._instance = cls()
         return cls._instance
 
-    def _inc_request_total(self, *, method: str, endpoint: str, status_code: int) -> None:
-        self._request_count.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+    def _inc_request_total(
+        self, *, method: str, endpoint: str, error_code: Optional[ErrorCode], status_code: int
+    ) -> None:
+        self._request_count.labels(
+            method=method,
+            endpoint=endpoint,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
+            status_code=status_code,
+        ).inc()
 
     def _observe_request_duration(
-        self, *, method: str, endpoint: str, status_code: int, duration: float
+        self,
+        *,
+        method: str,
+        endpoint: str,
+        error_code: Optional[ErrorCode],
+        status_code: int,
+        duration: float,
     ) -> None:
         self._request_duration_sec.labels(
             method=method,
             endpoint=endpoint,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
             status_code=status_code,
         ).observe(duration)
 
     def observe_request(
-        self, *, method: str, endpoint: str, status_code: int, duration: float
+        self,
+        *,
+        method: str,
+        endpoint: str,
+        error_code: Optional[ErrorCode],
+        status_code: int,
+        duration: float,
     ) -> None:
-        self._inc_request_total(method=method, endpoint=endpoint, status_code=status_code)
+        self._inc_request_total(
+            method=method, endpoint=endpoint, error_code=error_code, status_code=status_code
+        )
         self._observe_request_duration(
-            method=method, endpoint=endpoint, status_code=status_code, duration=duration
+            method=method,
+            endpoint=endpoint,
+            status_code=status_code,
+            error_code=error_code,
+            duration=duration,
         )
 
 
@@ -62,12 +94,30 @@ class GraphQLMetricObserver:
         self._request_count = Counter(
             name="backendai_graphql_request_count",
             documentation="Total number of API requests",
-            labelnames=["operation_type", "field_name", "parent_type", "operation_name", "success"],
+            labelnames=[
+                "operation_type",
+                "field_name",
+                "parent_type",
+                "operation_name",
+                "domain",
+                "operation",
+                "error_detail",
+                "success",
+            ],
         )
         self._request_duration_sec = Histogram(
             name="backendai_graphql_request_duration_sec",
             documentation="Duration of API requests in milliseconds",
-            labelnames=["operation_type", "field_name", "parent_type", "operation_name", "success"],
+            labelnames=[
+                "operation_type",
+                "field_name",
+                "parent_type",
+                "operation_name",
+                "domain",
+                "operation",
+                "error_detail",
+                "success",
+            ],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -84,6 +134,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
+        error_code: Optional[ErrorCode],
         success: bool,
     ) -> None:
         self._request_count.labels(
@@ -91,6 +142,9 @@ class GraphQLMetricObserver:
             field_name=field_name,
             parent_type=parent_type,
             operation_name=operation_name,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
             success=success,
         ).inc()
 
@@ -101,6 +155,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
+        error_code: Optional[ErrorCode],
         success: bool,
         duration: float,
     ) -> None:
@@ -109,6 +164,9 @@ class GraphQLMetricObserver:
             field_name=field_name,
             parent_type=parent_type,
             operation_name=operation_name,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
             success=success,
         ).observe(duration)
 
@@ -119,6 +177,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
+        error_code: Optional[ErrorCode],
         success: bool,
         duration: float,
     ) -> None:
@@ -127,6 +186,7 @@ class GraphQLMetricObserver:
             field_name=field_name,
             parent_type=parent_type,
             operation_name=operation_name,
+            error_code=error_code,
             success=success,
         )
         self._observe_request_duration(
@@ -134,6 +194,7 @@ class GraphQLMetricObserver:
             field_name=field_name,
             parent_type=parent_type,
             operation_name=operation_name,
+            error_code=error_code,
             success=success,
             duration=duration,
         )
@@ -155,12 +216,12 @@ class EventMetricObserver:
         self._event_failure_count = Counter(
             name="backendai_event_failure_count",
             documentation="Number of failed events",
-            labelnames=["event_type", "exception"],
+            labelnames=["event_type", "exception", "domain", "operation", "error_detail"],
         )
         self._event_processing_time_sec = Histogram(
             name="backendai_event_processing_time_sec",
             documentation="Processing time of events in seconds",
-            labelnames=["event_type", "status"],
+            labelnames=["event_type", "status", "domain", "operation", "error_detail"],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -172,9 +233,13 @@ class EventMetricObserver:
 
     def observe_event_success(self, *, event_type: str, duration: float) -> None:
         self._event_count.labels(event_type=event_type).inc()
-        self._event_processing_time_sec.labels(event_type=event_type, status="success").observe(
-            duration
-        )
+        self._event_processing_time_sec.labels(
+            event_type=event_type,
+            status="success",
+            domain="",
+            operation="",
+            error_detail="",
+        ).observe(duration)
 
     def observe_event_failure(
         self,
@@ -183,12 +248,27 @@ class EventMetricObserver:
         duration: float,
         exception: BaseException,
     ) -> None:
+        error_code: ErrorCode
+        if isinstance(exception, BackendAIError):
+            error_code = exception.error_code()
+        else:
+            error_code = ErrorCode.default()
         exception_name = exception.__class__.__name__
-        self._event_failure_count.labels(event_type=event_type, exeception=exception_name).inc()
+        self._event_failure_count.labels(
+            event_type=event_type,
+            exeception=exception_name,
+            domain=error_code.domain,
+            operation=error_code.operation,
+            error_detail=error_code.error_detail,
+        ).inc()
         self._event_count.labels(event_type=event_type).inc()
-        self._event_processing_time_sec.labels(event_type=event_type, status="failure").observe(
-            duration
-        )
+        self._event_processing_time_sec.labels(
+            event_type=event_type,
+            status="failure",
+            domain=error_code.domain,
+            operation=error_code.operation,
+            error_detail=error_code.error_detail,
+        ).observe(duration)
 
 
 class BgTaskMetricObserver:
@@ -207,12 +287,12 @@ class BgTaskMetricObserver:
         self._bgtask_done_count = Counter(
             name="backendai_bgtask_done_count",
             documentation="Number of completed background tasks",
-            labelnames=["task_name", "status"],
+            labelnames=["task_name", "status", "domain", "operation", "error_detail"],
         )
         self._bgtask_processing_time = Histogram(
             name="backendai_bgtask_processing_time_sec",
             documentation="Processing time of background tasks in seconds",
-            labelnames=["task_name", "status"],
+            labelnames=["task_name", "status", "domain", "operation", "error_detail"],
             buckets=[0.1, 1, 10, 30, 60, 300, 600],
         )
 
@@ -225,10 +305,24 @@ class BgTaskMetricObserver:
     def observe_bgtask_started(self, *, task_name: str) -> None:
         self._bgtask_count.labels(task_name=task_name).inc()
 
-    def observe_bgtask_done(self, *, task_name: str, status: str, duration: float) -> None:
+    def observe_bgtask_done(
+        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+    ) -> None:
         self._bgtask_count.labels(task_name=task_name).dec()
-        self._bgtask_processing_time.labels(task_name=task_name, status=status).observe(duration)
-        self._bgtask_done_count.labels(task_name=task_name, status=status).inc()
+        self._bgtask_processing_time.labels(
+            task_name=task_name,
+            status=status,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
+        ).observe(duration)
+        self._bgtask_done_count.labels(
+            task_name=task_name,
+            status=status,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
+        ).inc()
 
 
 class ActionMetricObserver:
@@ -241,12 +335,26 @@ class ActionMetricObserver:
         self._action_count = Counter(
             name="backendai_action_count",
             documentation="Total number of actions",
-            labelnames=["entity_type", "operation_type", "status"],
+            labelnames=[
+                "entity_type",
+                "operation_type",
+                "status",
+                "domain",
+                "operation",
+                "error_detail",
+            ],
         )
         self._action_duration_sec = Histogram(
             name="backendai_action_duration_sec",
             documentation="Duration of actions in seconds",
-            labelnames=["entity_type", "operation_type", "status"],
+            labelnames=[
+                "entity_type",
+                "operation_type",
+                "status",
+                "domain",
+                "operation",
+                "error_detail",
+            ],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -263,12 +371,23 @@ class ActionMetricObserver:
         operation_type: str,
         status: str,
         duration: float,
+        error_code: Optional[ErrorCode],
     ) -> None:
         self._action_count.labels(
-            entity_type=entity_type, operation_type=operation_type, status=status
+            entity_type=entity_type,
+            operation_type=operation_type,
+            status=status,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
         ).inc()
         self._action_duration_sec.labels(
-            entity_type=entity_type, operation_type=operation_type, status=status
+            entity_type=entity_type,
+            operation_type=operation_type,
+            status=status,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
         ).observe(duration)
 
 

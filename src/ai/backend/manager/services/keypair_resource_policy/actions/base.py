@@ -7,12 +7,14 @@ from ai.backend.manager.actions.action import BaseAction, BaseBatchAction
 @dataclass
 class KeypairResourcePolicyAction(BaseAction):
     @override
-    def entity_type(self):
+    @classmethod
+    def entity_type(cls) -> str:
         return "keypair_resource_policy"
 
 
 @dataclass
 class KeypairResourcePolicyBatchAction(BaseBatchAction):
     @override
-    def entity_type(self):
+    @classmethod
+    def entity_type(cls) -> str:
         return "keypair_resource_policy"

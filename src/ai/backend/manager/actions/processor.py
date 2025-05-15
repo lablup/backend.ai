@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
+from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
 
 from .action import (
@@ -32,6 +33,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         status = OperationStatus.UNKNOWN
         description: str = "unknown"
         result: Optional[TActionResult] = None
+        error_code: Optional[ErrorCode] = None
 
         action_id = uuid.uuid4()
         action_trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
@@ -41,9 +43,15 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             result = await self._func(action)
             status = OperationStatus.SUCCESS
             description = "Success"
+        except BackendAIError as e:
+            status = OperationStatus.ERROR
+            description = str(e)
+            error_code = e.error_code()
+            raise
         except BaseException as e:
             status = OperationStatus.ERROR
             description = str(e)
+            error_code = ErrorCode.default()
             raise
         finally:
             ended_at = datetime.now()
@@ -55,6 +63,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
                 started_at=started_at,
                 ended_at=ended_at,
                 duration=duration,
+                error_code=error_code,
             )
             process_result = ProcessResult(meta=meta, result=result)
             for monitor in reversed(self._monitors):

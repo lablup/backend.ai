@@ -18,8 +18,9 @@ class PrometheusMonitor(ActionMonitor):
     @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
         self._observer.observe_action(
-            entity_type=action.entity_type(),
-            operation_type=action.operation_type(),
+            entity_type=action.__class__.entity_type(),
+            operation_type=action.__class__.operation_type(),
             status=result.meta.status,
             duration=result.meta.duration.total_seconds(),
+            error_code=result.meta.error_code,
         )

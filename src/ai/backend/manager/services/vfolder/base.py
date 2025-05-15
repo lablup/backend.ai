@@ -7,5 +7,6 @@ from ai.backend.manager.actions.action import BaseAction
 @dataclass
 class VFolderAction(BaseAction):
     @override
-    def entity_type(self):
+    @classmethod
+    def entity_type(cls) -> str:
         return "vfolder"

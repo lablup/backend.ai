@@ -15,7 +15,8 @@ class WatcherAgentStartAction(AgentAction):
         return str(self.agent_id)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "watcher_agent_start"
 
 

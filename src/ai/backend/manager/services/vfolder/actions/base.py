@@ -22,7 +22,9 @@ from ..types import VFolderBaseInfo, VFolderOwnershipInfo, VFolderUsageInfo
 
 
 class VFolderAction(BaseAction):
-    def entity_type(self):
+    @override
+    @classmethod
+    def entity_type(cls) -> str:
         return "vfolder"
 
 
@@ -48,7 +50,9 @@ class CreateVFolderAction(VFolderAction):
     def entity_id(self) -> Optional[str]:
         return None
 
-    def operation_type(self) -> str:
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
         return "create"
 
 
@@ -98,7 +102,8 @@ class UpdateVFolderAttributeAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "update"
 
 
@@ -121,7 +126,8 @@ class GetVFolderAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "get"
 
 
@@ -146,7 +152,8 @@ class ListVFolderAction(VFolderAction):
         return str(self.user_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "list"
 
 
@@ -172,7 +179,8 @@ class MoveToTrashVFolderAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "move_to_trash"
 
 
@@ -196,7 +204,8 @@ class RestoreVFolderFromTrashAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "restore"
 
 
@@ -220,7 +229,8 @@ class DeleteForeverVFolderAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "delete_forever"
 
 
@@ -248,7 +258,8 @@ class ForceDeleteVFolderAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "force_delete"
 
 
@@ -277,7 +288,8 @@ class CloneVFolderAction(VFolderAction):
         return str(self.source_vfolder_uuid)
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "clone"
 
 
@@ -318,7 +330,8 @@ class GetTaskLogsAction(VFolderAction):
         return None
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "get_task_logs"
 
 
