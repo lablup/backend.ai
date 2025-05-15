@@ -6,8 +6,7 @@ import graphene
 
 from ai.backend.common.utils import deep_merge
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.shared import ManagerSharedConfig
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.gql_relay import AsyncNode
 from ai.backend.manager.models.user import UserRole
 
@@ -80,20 +79,15 @@ class ServiceConfigNode(graphene.ObjectType):
         def _fallback(x):
             return str(x)
 
-        merged_raw_unified_config = deep_merge(
-            ctx.unified_config.local.model_dump(mode="json", by_alias=True, fallback=_fallback),
-            ctx.unified_config.shared.model_dump(mode="json", by_alias=True, fallback=_fallback),
+        unified_config = (
+            ctx.config_provider.config.model_dump(mode="json", by_alias=True, fallback=_fallback),
         )
-
-        unified_config_schema = deep_merge(
-            ctx.unified_config.local.model_json_schema(mode="serialization"),
-            ctx.unified_config.shared.model_json_schema(mode="serialization"),
-        )
+        unified_config_schema = ctx.config_provider.config.model_json_schema(mode="serialization")
 
         return cls(
             id=service,
             service=service,
-            configuration=merged_raw_unified_config,
+            configuration=unified_config,
             schema=unified_config_schema,
         )
 
@@ -197,13 +191,11 @@ class ModifyServiceConfigNode(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         merged_raw_unified_config = deep_merge(
-            ctx.unified_config.local.model_dump(by_alias=True),
-            ctx.unified_config.shared.model_dump(by_alias=True),
+            ctx.config_provider.config.model_dump(by_alias=True),
             input.configuration,
         )
 
-        ctx.unified_config.local = ManagerLocalConfig.model_validate(merged_raw_unified_config)
-        ctx.unified_config.shared = ManagerSharedConfig.model_validate(merged_raw_unified_config)
+        ctx.config_provider.config = ManagerUnifiedConfig.model_validate(merged_raw_unified_config)
 
         await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(input.service), input.configuration)
 
