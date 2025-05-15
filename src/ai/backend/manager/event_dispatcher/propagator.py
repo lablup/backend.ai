@@ -1,6 +1,7 @@
 from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.types import AgentId
+from ai.backend.manager.errors.exceptions import InternalServerError
 
 
 class PropagatorEventDispatcher:
@@ -26,5 +27,5 @@ class PropagatorEventDispatcher:
         await self._event_hub.propagate_event(event)
         domain_id = event.domain_id()
         if domain_id is None:
-            raise AssertionError("Event domain ID is None")
+            raise InternalServerError("Event domain ID is None")
         await self._event_hub.close_by_alias(event.event_domain(), domain_id)
