@@ -14,7 +14,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.domain import domains
@@ -62,18 +62,18 @@ def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
 
 class ResourcePresetService:
     _db: ExtendedAsyncSAEngine
-    _unified_config: ManagerUnifiedConfig
+    _unified_config: ManagerConfigProvider
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
-        unified_config: ManagerUnifiedConfig,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
-        self._unified_config = unified_config
+        self._config_provider = config_provider
 
     async def create_preset(
         self, action: CreateResourcePresetAction

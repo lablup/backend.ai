@@ -9,7 +9,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -68,7 +68,7 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 class ServiceArgs:
     db: ExtendedAsyncSAEngine
     etcd: AsyncEtcd
-    unified_config: ManagerUnifiedConfig
+    config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
     background_task_manager: BackgroundTaskManager
@@ -105,22 +105,22 @@ class Services:
             args.db,
             args.etcd,
             args.agent_registry,
-            args.unified_config,
+            args.config_provider,
         )
         domain_service = DomainService(args.db)
         group_service = GroupService(
-            args.db, args.storage_manager, args.unified_config.shared, args.redis_stat
+            args.db, args.storage_manager, args.config_provider.config, args.redis_stat
         )
         user_service = UserService(args.db, args.storage_manager, args.redis_stat)
         image_service = ImageService(args.db, args.agent_registry)
         container_registry_service = ContainerRegistryService(args.db)
         vfolder_service = VFolderService(
-            args.db, args.unified_config, args.storage_manager, args.background_task_manager
+            args.db, args.config_provider, args.storage_manager, args.background_task_manager
         )
         vfolder_file_service = VFolderFileService(
-            args.db, args.unified_config, args.storage_manager
+            args.db, args.config_provider, args.storage_manager
         )
-        vfolder_invite_service = VFolderInviteService(args.db, args.unified_config)
+        vfolder_invite_service = VFolderInviteService(args.db, args.config_provider)
         session_service = SessionService(
             SessionServiceArgs(
                 db=args.db,
@@ -135,16 +135,16 @@ class Services:
         user_resource_policy_service = UserResourcePolicyService(args.db)
         project_resource_policy_service = ProjectResourcePolicyService(args.db)
         resource_preset_service = ResourcePresetService(
-            args.db, args.agent_registry, args.unified_config
+            args.db, args.agent_registry, args.config_provider
         )
-        utilization_metric_service = UtilizationMetricService(args.unified_config)
+        utilization_metric_service = UtilizationMetricService(args.config_provider)
         model_serving_service = ModelServingService(
             db=args.db,
             agent_registry=args.agent_registry,
             background_task_manager=args.background_task_manager,
             event_dispatcher=args.event_dispatcher,
             storage_manager=args.storage_manager,
-            unified_config=args.unified_config,
+            config_provider=args.config_provider,
         )
         model_serving_auto_scaling = AutoScalingService(args.db)
 
