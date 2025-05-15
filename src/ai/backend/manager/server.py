@@ -536,12 +536,15 @@ def _make_action_reporters(
     action_monitor_configs = root_ctx.config_provider.config.reporter.action_monitors
     for action_monitor_conf in action_monitor_configs:
         reporter_name: str = action_monitor_conf.reporter
-        reporter = reporters[reporter_name]
-        action_types: list[str] = action_monitor_conf.subscribed_actions
-        for action_type in action_types:
-            monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
-            monitors.append(reporter)
-            action_monitors[action_type] = monitors
+        try:
+            reporter = reporters[reporter_name]
+            action_types: list[str] = action_monitor_conf.subscribed_actions
+            for action_type in action_types:
+                monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
+                monitors.append(reporter)
+                action_monitors[action_type] = monitors
+        except KeyError:
+            log.warning("Reporter not found: {}", reporter_name)
 
     return action_monitors
 
