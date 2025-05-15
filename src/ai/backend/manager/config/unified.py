@@ -978,16 +978,6 @@ class SMTPReporterConfig(BaseModel):
     )
 
 
-class AuditLogConfig(BaseModel):
-    name: str = Field(
-        description="""
-        Name of the audit log reporter.
-        Used to identify this reporter in the system.
-        """,
-        examples=["audit_log"],
-    )
-
-
 class ActionMonitorsConfig(BaseModel):
     subscribed_actions: list[str] = Field(
         default=[],
@@ -1016,19 +1006,8 @@ class ReporterConfig(BaseModel):
         Includes settings for SMTP server, authentication, and email templates.
         """,
     )
-    audit_log: list[AuditLogConfig] = Field(
-        default=[
-            AuditLogConfig(name="audit_log"),
-        ],
-        description="""
-        Audit log reporter configuration.
-        Controls how audit logs are reported.
-        """,
-        validation_alias=AliasChoices("audit-log", "audit_log"),
-        serialization_alias="audit-log",
-    )
     action_monitors: list[ActionMonitorsConfig] = Field(
-        default=[ActionMonitorsConfig(subscribed_actions=[], reporter="audit_log")],
+        default=[],
         description="""
         Action monitors configuration.
         Each reporter can be configured to subscribe to specific actions.
