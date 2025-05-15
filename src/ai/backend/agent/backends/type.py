@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+from typing import Any, Mapping
 
 from ai.backend.agent.backends.docker.image_registry import DockerAgentImageRegistry
 from ai.backend.agent.backends.dummy.image_registry import DummyAgentImageRegistry
 from ai.backend.agent.backends.image_registry import AbstractAgentImageRegistry
 from ai.backend.agent.backends.kubernetes.image_registry import KubernetesAgentImageRegistry
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import CIStrEnum
 
 from .backend import AbstractBackend
@@ -13,7 +15,9 @@ from .kubernetes.backend import KubernetesBackend
 
 
 @dataclass
-class BackendArgs: ...
+class BackendArgs:
+    etcd: AsyncEtcd
+    local_config: Mapping[str, Any]
 
 
 @dataclass

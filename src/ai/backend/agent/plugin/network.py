@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Generic, Iterable, Mapping, Set, TypeVar
 
-from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.backends.kernel import AbstractKernel
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 

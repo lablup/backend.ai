@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Mapping
 
+from ai.backend.agent.agent import ComputerContext
 from ai.backend.agent.resources import AbstractComputePlugin
 from ai.backend.common.types import DeviceName, SlotName
 
@@ -18,7 +19,7 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     async def scan_available_resources(
-        self,
+        self, computers: Mapping[DeviceName, ComputerContext]
     ) -> Mapping[SlotName, Decimal]:
         """
         Scan and define the amount of available resource slots in this node.

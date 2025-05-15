@@ -12,7 +12,6 @@ from ai.backend.agent.backends.image_registry import AbstractAgentImageRegistry
 from ai.backend.agent.exception import KernelAlreadyExistsError, KernelNotFoundError
 from ai.backend.agent.resources import AbstractComputeDevice, AbstractComputePlugin
 from ai.backend.agent.types import KernelOwnershipData
-from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.agent import (
@@ -21,14 +20,13 @@ from ai.backend.common.events.agent import (
     AgentTerminatedEvent,
 )
 from ai.backend.common.events.dispatcher import AbstractEvent, EventProducer
-from ai.backend.common.events.kernel import KernelStartedEvent, KernelTerminatedEvent
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AgentId,
     ClusterInfo,
     DeviceName,
     HardwareMetadata,
     KernelCreationConfig,
-    KernelCreationResult,
     KernelId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -127,7 +125,19 @@ class Agent:
         *,
         restarting: bool = False,
         throttle_sema: Optional[asyncio.Semaphore] = None,
-    ) -> KernelCreationResult: ...
+    ) -> Mapping[str, Any]:
+        raise NotImplementedError
+
+    async def restart_kernel(
+        self,
+        ownership_data: KernelOwnershipData,
+        kernel_image: ImageRef,
+        kernel_config: KernelCreationConfig,
+    ) -> Mapping[str, Any]:
+        """
+        Restart a kernel.
+        """
+        raise NotImplementedError
 
     async def get_kernel(
         self,
@@ -207,9 +217,9 @@ class Agent:
         """
         all_kernels = await self._kernel_registry.get_all()
         for kernel_obj in all_kernels.values():
-            await kernel_obj.close(stop_signal)
+            await kernel_obj.close(KernelLifecycleEventReason.AGENT_TERMINATION)
 
-        # Notify the gateway.
+        # Notify the gateway.4
         await self.produce_event(AgentTerminatedEvent(reason="shutdown"))
 
         # Shut down the event dispatcher and Redis connection pools.

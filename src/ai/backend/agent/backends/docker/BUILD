@@ -1,1 +1,15 @@
-python_sources(name="src")
+python_sources(
+    name="src",
+    dependencies=[
+        ":resources",
+    ],
+)
+
+resources(
+    name="resources",
+    sources=[
+        "*.txt",
+        "*.tar.gz",
+        "*.bin",
+    ],
+)

@@ -3,7 +3,6 @@ import enum
 import logging
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional, Sequence
@@ -11,13 +10,11 @@ from typing import Any, FrozenSet, Mapping, Optional, Sequence
 import zmq
 
 from ai.backend.agent.agent import KernelObjectType
-from ai.backend.agent.backends.code_runner import CodeRunner, ExecResultType, NextResult
-from ai.backend.agent.kernel import AbstractCodeRunner
+from ai.backend.agent.backends.code_runner import AbstractCodeRunner, NextResult
 from ai.backend.agent.resources import AbstractComputePlugin, KernelResourceSpec, Mount
 from ai.backend.agent.types import AgentEventData, MountInfo
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.kernel import KernelLifecycleEventReason, KernelTerminatedEvent
-from ai.backend.common.events.session import SessionFailureEvent, SessionSuccessEvent
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
@@ -25,20 +22,11 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
-    SessionId,
     SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class StartServiceResult: ...
-
-
-@dataclass
-class StartModelServiceResult: ...
 
 
 class AbstractKernel(ABC):
@@ -69,13 +57,11 @@ class AbstractKernel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service: str, opts: Mapping[str, Any]) -> StartServiceResult:
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> Mapping[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_model_service(
-        self, model_service: Mapping[str, Any]
-    ) -> StartModelServiceResult:
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> Mapping[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
@@ -174,17 +160,23 @@ class ExecutionMode(enum.StrEnum):
 
 
 class KernelWrapper:
+    _id: KernelId
     _kernel: AbstractKernel
-    _runner: CodeRunner
+    _code_runner: AbstractCodeRunner
     _tasks: set[asyncio.Task[None]] = set()
 
-    def __init__(self, kernel: AbstractKernel, runner: CodeRunner):
+    def __init__(self, id: KernelId, kernel: AbstractKernel, runner: AbstractCodeRunner):
+        self._id = id
         self._kernel = kernel
-        self._runner = runner
+        self._code_runner = runner
         self._tasks = set()
 
+    @property
+    def id(self) -> KernelId:
+        return self._id
+
     async def ping(self):
-        return await self._runner.ping()
+        return await self._code_runner.ping()
 
     def kernel(self) -> AbstractKernel:
         return self._kernel
@@ -204,30 +196,44 @@ class KernelWrapper:
             raise RuntimeError("Cannot execute outside of an asyncio task")
         self._tasks.add(myself)
         try:
-            await self._runner.attach_output_queue(run_id)
+            await self._code_runner.attach_output_queue(run_id)
             try:
                 match mode:
                     case ExecutionMode.BATCH:
-                        await self._runner.feed_batch(opts)
+                        await self._code_runner.feed_batch(opts)
                     case ExecutionMode.QUERY:
-                        await self._runner.feed_code(text)
+                        await self._code_runner.feed_code(text)
                     case ExecutionMode.INPUT:
-                        await self._runner.feed_input(text)
+                        await self._code_runner.feed_input(text)
                     case ExecutionMode.CONTINUE:
                         pass
             except zmq.ZMQError:
                 # cancel the operation by myself
                 # since the peer is gone.
                 raise asyncio.CancelledError
-            return await self._runner.get_next_result(
+            return await self._code_runner.get_next_result(
                 api_ver=api_version,
                 flush_timeout=flush_timeout,
             )
         except asyncio.CancelledError:
-            await self._runner.close()
+            await self._code_runner.close()
             raise
         finally:
             self._tasks.remove(myself)
+
+    async def close(self, reason: KernelLifecycleEventReason) -> None:
+        """
+        Destroy the kernel and release all resources.
+        """
+        await self._kernel.close()
+        await self._code_runner.close()
+        for task in self._tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
 
 class AbstractKernelCreationContext(ABC):
     @abstractmethod

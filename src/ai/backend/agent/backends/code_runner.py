@@ -5,6 +5,7 @@ import io
 import logging
 import math
 import secrets
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import (
     Mapping,
@@ -70,19 +71,6 @@ outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
 ])
 
 
-class ClientFeatures(StringSetFlag):
-    INPUT = "input"
-    CONTINUATION = "continuation"
-
-
-# TODO: use Python 3.7 contextvars for per-client feature selection
-DEFAULT_CLIENT_FEATURES = frozenset({
-    ClientFeatures.INPUT.value,
-    ClientFeatures.CONTINUATION.value,
-})
-DEFATUL_API_VERSION: Final[int] = 4
-
-
 class RunEvent(Exception):
     data: Any
 
@@ -111,6 +99,19 @@ class ExecTimeout(RunEvent):
     pass
 
 
+class ClientFeatures(StringSetFlag):
+    INPUT = "input"
+    CONTINUATION = "continuation"
+
+
+# TODO: use Python 3.7 contextvars for per-client feature selection
+DEFAULT_CLIENT_FEATURES = frozenset({
+    ClientFeatures.INPUT.value,
+    ClientFeatures.CONTINUATION.value,
+})
+DEFATUL_API_VERSION: Final[int] = 4
+
+
 class ExecResultType(enum.StrEnum):
     CONTINUED = "continued"
     CLEAN_FINISHED = "clean-finished"
@@ -120,9 +121,18 @@ class ExecResultType(enum.StrEnum):
     WAITING_INPUT = "waiting-input"
 
 
+class ExecMessageType(enum.StrEnum):
+    STDOUT = "stdout"
+    STDERR = "stderr"
+    MEDIA = "media"
+    HTML = "html"
+    LOG = "log"
+    COMPLETION = "completion"
+
+
 @dataclass
 class ResultRecord:
-    msg_type: ExecResultType
+    msg_type: ExecResultType | str
     data: Optional[str] = None
 
 
@@ -190,45 +200,45 @@ class RobustSocket:
 
 
 class SocketPair:
-    input_sock: RobustSocket
-    output_sock: RobustSocket
+    _input_sock: RobustSocket
+    _output_sock: RobustSocket
 
     def __init__(self, input_sock: RobustSocket, output_sock: RobustSocket):
-        self.input_sock = input_sock
-        self.output_sock = output_sock
+        self._input_sock = input_sock
+        self._output_sock = output_sock
 
     async def send_multipart(self, msg_parts: Sequence[bytes]) -> None:
         try:
-            await self.input_sock.socket.send_multipart(msg_parts)
+            await self._input_sock.socket.send_multipart(msg_parts)
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.warning(
-                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {repr(e)})"
+                    f"Socket invalid, recreating socket (addr: {self._input_sock.addr}, err: {repr(e)})"
                 )
-                self.input_sock.recreate_socket()
-                self.output_sock.recreate_socket()
-                await self.input_sock.socket.send_multipart(msg_parts)
+                self._input_sock.recreate_socket()
+                self._output_sock.recreate_socket()
+                await self._input_sock.socket.send_multipart(msg_parts)
             else:
                 log.error(
                     "Unexpected error while sending message to socket (addr: {}, err: {})",
-                    self.input_sock.addr,
+                    self._input_sock.addr,
                     repr(e),
                 )
                 raise
 
     async def recv_multipart(self) -> list[bytes]:
         try:
-            return await self.output_sock.socket.recv_multipart()
+            return await self._output_sock.socket.recv_multipart()
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
-                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {repr(e)})")
+                log.exception(f"Socket invalid (addr: {self._output_sock.addr}, err: {repr(e)})")
                 raise InvalidSocket
             else:
                 raise
 
     def close(self) -> None:
-        self.input_sock.close()
-        self.output_sock.close()
+        self._input_sock.close()
+        self._output_sock.close()
 
 
 def _aggregate_console_v1(result: NextResult, records: Sequence[ResultRecord]) -> None:
@@ -300,7 +310,177 @@ def _aggregate_console(result: NextResult, records: Sequence[ResultRecord], api_
     raise AssertionError("Unrecognized API version")
 
 
-class CodeRunner:
+class AbstractCodeRunner(ABC):
+    @abstractmethod
+    async def close(self) -> None:
+        """
+        Close the code runner.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def ping(self) -> dict[str, float] | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def ping_status(self):
+        """
+        This is to keep the REPL in/out port mapping in the Linux
+        kernel's NAT table alive.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_batch(self, opts: Mapping[str, Any]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_code(self, text: str) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_input(self, text: str) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_event(self, evdata: AgentEventData) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_interrupt(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_and_get_status(self) -> dict[str, float] | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_and_get_completion(self, code_text, opts):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_start_model_service(self, model_info):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_start_service(self, service_info):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_shutdown_service(self, service_name: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def feed_service_apps(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def watchdog(self, exec_timeout: float) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
+        # Context: per API request
+        raise NotImplementedError
+
+    @abstractmethod
+    async def attach_output_queue(self, run_id: Optional[str]) -> None:
+        # Context: per API request
+        raise NotImplementedError
+
+    @abstractmethod
+    def resume_output_queue(self) -> None:
+        """
+        Use this to conclude get_next_result() when the execution should be
+        continued from the client.
+
+        At that time, we need to reuse the current run ID and its output queue.
+        We don't change self.output_queue here so that we can continue to read
+        outputs while the client sends the continuation request.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def next_output_queue(self) -> None:
+        """
+        Use this to conclude get_next_result() when we have finished a "run".
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def read_output(self) -> None:
+        """
+        Read the output from the kernel and put it into the output queue.
+        """
+        raise NotImplementedError
+
+
+class NopCodeRunner(AbstractCodeRunner):
+    def __init__(self) -> None:
+        pass
+
+    async def close(self) -> None:
+        pass
+
+    async def ping(self) -> dict[str, float] | None:
+        return None
+
+    async def ping_status(self) -> None:
+        pass
+
+    async def feed_batch(self, opts: Mapping[str, Any]) -> None:
+        pass
+
+    async def feed_code(self, text: str) -> None:
+        pass
+
+    async def feed_input(self, text: str) -> None:
+        pass
+
+    async def feed_event(self, evdata: AgentEventData) -> None:
+        pass
+
+    async def feed_interrupt(self) -> None:
+        pass
+
+    async def feed_and_get_status(self) -> Optional[dict[str, float]]:
+        return None
+
+    async def feed_and_get_completion(self, code_text, opts):
+        return []
+
+    async def feed_start_model_service(self, model_info):
+        return {}
+
+    async def feed_start_service(self, service_info):
+        return {}
+
+    async def feed_shutdown_service(self, service_name: str):
+        pass
+
+    async def feed_service_apps(self):
+        return {}
+
+    async def watchdog(self, exec_timeout: float) -> None:
+        pass
+
+    async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
+        raise NotImplementedError("NopCodeRunner does not support get_next_result()")
+
+    async def attach_output_queue(self, run_id: Optional[str]) -> None:
+        pass
+
+    def resume_output_queue(self) -> None:
+        pass
+
+    def next_output_queue(self) -> None:
+        pass
+
+    async def read_output(self) -> None:
+        pass
+
+
+class CodeRunner(AbstractCodeRunner):
     _kernel_id: KernelId
     _session_id: SessionId
     _event_producer: EventProducer
@@ -391,7 +571,7 @@ class CodeRunner:
         except Exception as e:
             log.error("AbstractCodeRunner.ping_status(): unexpected error ({})", repr(e))
 
-    async def feed_batch(self, opts):
+    async def feed_batch(self, opts: Mapping[str, Any]) -> None:
         sock = self._sockets
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
@@ -415,15 +595,15 @@ class CodeRunner:
             exec_cmd.encode("utf8"),
         ])
 
-    async def feed_code(self, text: str):
+    async def feed_code(self, text: str) -> None:
         sock = self._sockets
         await sock.send_multipart([b"code", text.encode("utf8")])
 
-    async def feed_input(self, text: str):
+    async def feed_input(self, text: str) -> None:
         sock = self._sockets
         await sock.send_multipart([b"input", text.encode("utf8")])
 
-    async def feed_event(self, evdata: AgentEventData):
+    async def feed_event(self, evdata: AgentEventData) -> None:
         sock = self._sockets
         data = {
             "type": evdata.type,
@@ -431,13 +611,11 @@ class CodeRunner:
         }
         await sock.send_multipart([b"event", dump_json(data)])
 
-    async def feed_interrupt(self):
-        sock = self._sockets
-        await sock.send_multipart([b"interrupt", b""])
+    async def feed_interrupt(self) -> None:
+        await self._sockets.send_multipart([b"interrupt", b""])
 
     async def feed_and_get_status(self) -> dict[str, float] | None:
-        sock = self._sockets
-        await sock.send_multipart([b"status", b""])
+        await self._sockets.send_multipart([b"status", b""])
         try:
             result = await self._status_queue.get()
             self._status_queue.task_done()
@@ -446,12 +624,11 @@ class CodeRunner:
             return None
 
     async def feed_and_get_completion(self, code_text, opts):
-        sock = self._sockets
         payload = {
             "code": code_text,
         }
         payload.update(opts)
-        await sock.send_multipart([
+        await self._sockets.send_multipart([
             b"complete",
             dump_json(payload),
         ])
@@ -463,8 +640,7 @@ class CodeRunner:
             return []
 
     async def feed_start_model_service(self, model_info):
-        sock = self._sockets
-        await sock.send_multipart([
+        await self._sockets.send_multipart([
             b"start-model-service",
             dump_json(model_info),
         ])
@@ -485,8 +661,7 @@ class CodeRunner:
             return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
-        sock = self._sockets
-        await sock.send_multipart([
+        await self._sockets.send_multipart([
             b"start-service",
             dump_json(service_info),
         ])
@@ -767,7 +942,7 @@ class CodeRunner:
             except InvalidSocket as e:
                 log.error(
                     "Socket invalid, recreating socket (addr: {}, err: {})",
-                    self._sockets.input_sock.addr,
+                    self._sockets._input_sock.addr,
                     repr(e),
                 )
                 break

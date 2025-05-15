@@ -22,7 +22,7 @@ class NodeStatCollectorObserver(AbstractObserver):
         """
         Observe the state of the system.
         """
-        await self._stat_ctx.collect_node_stat()
+        # await self._stat_ctx.collect_node_stat()
 
     def observe_interval(self) -> float:
         """

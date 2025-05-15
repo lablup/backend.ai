@@ -1,7 +1,8 @@
-from abc import abstractmethod
+from typing import override
 
 from ai.backend.agent.agent import ScanImagesResult
 from ai.backend.agent.backends.image_registry import AbstractAgentImageRegistry
+from ai.backend.agent.backends.type import ImageRegistryArgs
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.agent.rpc_request import PurgeImagesReq
@@ -9,7 +10,8 @@ from ai.backend.common.types import AutoPullBehavior, ImageRegistry, Sentinel
 
 
 class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
-    @abstractmethod
+    def __init__(self, args: ImageRegistryArgs): ...
+    @override
     async def scan_images(self) -> ScanImagesResult:
         """
         Scan the available kernel images/templates and update ``self.images``.
@@ -18,7 +20,7 @@ class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @override
     async def push_image(
         self,
         image_ref: ImageRef,
@@ -31,7 +33,7 @@ class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @override
     async def pull_image(
         self,
         image_ref: ImageRef,
@@ -44,14 +46,14 @@ class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         """
         Purge the given images from the agent.
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @override
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
@@ -61,6 +63,6 @@ class KubernetesAgentImageRegistry(AbstractAgentImageRegistry):
         """
         raise NotImplementedError
 
-    @abstractmethod
+    @override
     async def extract_image_command(self, image: str) -> str | None:
         raise NotImplementedError
