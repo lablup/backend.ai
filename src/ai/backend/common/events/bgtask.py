@@ -5,6 +5,7 @@ from typing import Optional, override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
+from ai.backend.common.events.user_event.user_bgtask_event import UserBgtaskUpdatedEvent
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.exception import UnreachableError
 
@@ -21,10 +22,6 @@ class BaseBgtaskEvent(AbstractEvent, ABC):
     @override
     def domain_id(self) -> Optional[str]:
         return str(self.task_id)
-
-    @override
-    def user_event(self) -> Optional[UserEvent]:
-        return None
 
     @abstractmethod
     def status(self) -> BgtaskStatus:
@@ -62,6 +59,15 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
     @override
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.STARTED
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return UserBgtaskUpdatedEvent(
+            task_id=str(self.task_id),
+            message=self.message,
+            current_progress=self.current_progress,
+            total_progress=self.total_progress,
+        )
 
 
 @dataclass

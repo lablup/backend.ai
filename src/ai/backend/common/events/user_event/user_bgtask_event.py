@@ -23,3 +23,23 @@ class UserBgTaskEvent(UserEvent):  # TODO: Need to separate UserPartialSuccessEv
     @override
     def user_event_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class UserBgtaskUpdatedEvent(UserEvent):
+    task_id: str
+    message: str
+    current_progress: float
+    total_progress: float
+
+    @override
+    def event_name(self) -> Optional[str]:
+        return "bgtask_updated"
+
+    @override
+    def retry_count(self) -> Optional[int]:
+        return 5
+
+    @override
+    def user_event_mapping(self) -> Mapping[str, Any]:
+        return asdict(self)
