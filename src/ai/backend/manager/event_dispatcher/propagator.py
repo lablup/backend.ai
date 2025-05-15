@@ -16,3 +16,15 @@ class PropagatorEventDispatcher:
         event: AbstractEvent,
     ) -> None:
         await self._event_hub.propagate_event(event)
+
+    async def propagate_event_with_close(
+        self,
+        context: None,
+        source: AgentId,
+        event: AbstractEvent,
+    ) -> None:
+        await self._event_hub.propagate_event(event)
+        domain_id = event.domain_id()
+        if domain_id is None:
+            raise AssertionError("Event domain ID is None")
+        await self._event_hub.close_by_alias(event.event_domain(), domain_id)
