@@ -62,7 +62,7 @@ def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
 
 class ResourcePresetService:
     _db: ExtendedAsyncSAEngine
-    _unified_config: ManagerConfigProvider
+    _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
 
     def __init__(
@@ -194,7 +194,9 @@ class ResourcePresetService:
         resource_policy = action.resource_policy
         domain_name = action.domain_name
 
-        known_slot_types = await self._unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
 
         async with self._db.begin_readonly() as conn:
             # Check keypair resource limit.
@@ -353,7 +355,7 @@ class ResourcePresetService:
 
             # Return group resource status as NaN if not allowed.
             group_resource_visibility = (
-                await self._unified_config.legacy_etcd_config_loader.get_raw(
+                await self._config_provider.legacy_etcd_config_loader.get_raw(
                     "config/api/resources/group_resource_visibility"
                 )
             )
