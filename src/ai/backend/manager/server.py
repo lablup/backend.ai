@@ -196,9 +196,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 PUBLIC_INTERFACES: Final = [
     "pidx",
     "background_task_manager",
-    # TODO: Remove this?
-    "local_config",
-    "shared_config",
     "db",
     "registry",
     "redis_live",

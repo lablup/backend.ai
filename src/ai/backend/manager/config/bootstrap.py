@@ -74,7 +74,7 @@ class BootstrapConfig(BaseModel):
         Load configuration from a config file.
 
         All configurations are loaded by a single LoaderChain in config_provider_ctx.
-        But BootstrapConfig must be loaded before config_provider_ctx is invoked since some configurations are required for the manager boot process.
+        But BootstrapConfig must be loaded before config_provider_ctx is invoked since they are required for the manager boot process.
         """
 
         overrides: list[tuple[tuple[str, ...], Any]] = [
