@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -179,7 +180,7 @@ async def push_background_task_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    task_id = params["task_id"]
+    task_id: uuid.UUID = params["task_id"]
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     async with sse_response(request) as resp:
@@ -201,6 +202,7 @@ async def push_background_task_events(
                     event=user_event.event_name(),
                     retry=user_event.retry_count(),
                 )
+                await propagator.close()
             await resp.send(dump_json_str({}), event="server_close")
         finally:
             root_ctx.event_hub.unregister_event_propagator(propagator.id())
