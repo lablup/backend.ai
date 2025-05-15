@@ -121,8 +121,6 @@ class BgtaskDoneEvent(BaseBgtaskDoneEvent):
         return UserBgtaskDoneEvent(
             task_id=str(self.task_id),
             message=str(self.message),
-            current_progress=0,
-            total_progress=0,
         )
 
 

@@ -49,8 +49,6 @@ class UserBgtaskUpdatedEvent(UserEvent):
 class UserBgtaskDoneEvent(UserEvent):
     task_id: str
     message: str
-    current_progress: float
-    total_progress: float
 
     @override
     def event_name(self) -> Optional[str]:
