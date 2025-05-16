@@ -254,3 +254,7 @@ class KernelHeartbeatEvent(BaseKernelEvent):
     @override
     def event_name(cls) -> str:
         return "kernel_heartbeat"
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
