@@ -30,7 +30,7 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.queue import AbstractMessageQueue, MessageId
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import msgpack
@@ -49,9 +49,9 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class EventHandlerType(enum.StrEnum):
-    CONSUMER = enum.auto()
-    SUBSCRIBER = enum.auto()
+class _EventHandlerType(enum.StrEnum):
+    CONSUMER = "consumer"
+    SUBSCRIBER = "subscriber"
 
 
 class EventDomain(enum.StrEnum):
@@ -134,7 +134,7 @@ class EventHandler(Generic[TContext, TEvent]):
     name: str
     context: TContext
     callback: EventCallback[TContext, TEvent]
-    handler_type: EventHandlerType
+    handler_type: _EventHandlerType
     coalescing_opts: Optional[CoalescingOptions]
     coalescing_state: CoalescingState
     args_matcher: Callable[[tuple], bool] | None
@@ -235,7 +235,9 @@ class EventDispatcher:
     Subscriber example: enqueuing events to the queues for event streaming API handlers
     """
 
-    _consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
+    _consumers: defaultdict[
+        str, set[EventHandler[Any, AbstractEvent]]
+    ]  # TODO: set only one consumer handler for one event
     _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
 
@@ -246,6 +248,9 @@ class EventDispatcher:
 
     _log_events: bool
     _metric_observer: EventObserver
+
+    _msg_id_consumed_count: defaultdict[MessageId, int]
+    _msg_id_consumed_count_lock: asyncio.Lock
 
     def __init__(
         self,
@@ -262,6 +267,8 @@ class EventDispatcher:
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
         self._metric_observer = event_observer
+        self._msg_id_consumed_count = defaultdict(int)
+        self._msg_id_consumed_count_lock = asyncio.Lock()
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -315,7 +322,7 @@ class EventDispatcher:
             name,
             context,
             callback,
-            EventHandlerType.CONSUMER,
+            _EventHandlerType.CONSUMER,
             coalescing_opts,
             CoalescingState(),
             args_matcher,
@@ -357,7 +364,7 @@ class EventDispatcher:
             name,
             context,
             callback,
-            EventHandlerType.SUBSCRIBER,
+            _EventHandlerType.SUBSCRIBER,
             coalescing_opts,
             CoalescingState(),
             args_matcher,
@@ -377,7 +384,7 @@ class EventDispatcher:
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
-    async def handle(
+    async def _handle(
         self,
         evh: EventHandler,
         source: AgentId,
@@ -439,7 +446,7 @@ class EventDispatcher:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
         for consumer in self._consumers[event_name].copy():
             self._consumer_taskgroup.create_task(
-                self.handle(consumer, source, args, post_callbacks),
+                self._handle(consumer, source, args, post_callbacks),
             )
             await asyncio.sleep(0)
 
@@ -453,7 +460,7 @@ class EventDispatcher:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
         for subscriber in self._subscribers[event_name].copy():
             self._subscriber_taskgroup.create_task(
-                self.handle(subscriber, source, args),
+                self._handle(subscriber, source, args),
             )
             await asyncio.sleep(0)
 
@@ -465,6 +472,14 @@ class EventDispatcher:
             decoded_event_name = msg.payload[b"name"].decode()
 
             async def done() -> None:
+                # To ensure that all consumer handlers are called.
+                # Basically there should be only one consumer handler for one event.
+                handler_count = len(self._subscribers[decoded_event_name])
+                async with self._msg_id_consumed_count_lock:
+                    self._msg_id_consumed_count[msg.msg_id] += 1
+                    if self._msg_id_consumed_count[msg.msg_id] < handler_count:
+                        return
+                # All consumer handlers are called.
                 await self._msg_queue.done(msg.msg_id)
 
             try:
