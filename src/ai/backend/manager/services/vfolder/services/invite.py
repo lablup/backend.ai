@@ -10,7 +10,7 @@ from sqlalchemy.orm import contains_eager
 from ai.backend.common.types import (
     VFolderHostPermission,
 )
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
@@ -57,11 +57,11 @@ from ..types import VFolderInvitationInfo
 
 class VFolderInviteService:
     _db: ExtendedAsyncSAEngine
-    _unified_config: ManagerUnifiedConfig
+    _config_provider: ManagerConfigProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, config_provider: ManagerConfigProvider) -> None:
         self._db = db
-        self._unified_config = unified_config
+        self._config_provider = config_provider
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         async with self._db.begin_readonly_session() as db_session:
@@ -81,7 +81,7 @@ class VFolderInviteService:
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
 
         allowed_vfolder_types = (
-            await self._unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         async with self._db.begin_session() as db_session:
             query_vfolder = sa.select(VFolderRow).where(VFolderRow.id == action.vfolder_uuid)

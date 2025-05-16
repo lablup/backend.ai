@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -87,18 +87,18 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.modify_endpoint = ActionProcessor(service.modify_endpoint, action_monitors)
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            CreateModelServiceAction.type(),
-            ListModelServiceAction.type(),
-            DeleteModelServiceAction.type(),
-            DryRunModelServiceAction.type(),
-            GetModelServiceInfoAction.type(),
-            ListErrorsAction.type(),
-            ClearErrorAction.type(),
-            ForceSyncAction.type(),
-            UpdateRouteAction.type(),
-            DeleteRouteAction.type(),
-            GenerateTokenAction.type(),
-            ModifyEndpointAction.type(),
+            CreateModelServiceAction.spec(),
+            ListModelServiceAction.spec(),
+            DeleteModelServiceAction.spec(),
+            DryRunModelServiceAction.spec(),
+            GetModelServiceInfoAction.spec(),
+            ListErrorsAction.spec(),
+            ClearErrorAction.spec(),
+            ForceSyncAction.spec(),
+            UpdateRouteAction.spec(),
+            DeleteRouteAction.spec(),
+            GenerateTokenAction.spec(),
+            ModifyEndpointAction.spec(),
         ]

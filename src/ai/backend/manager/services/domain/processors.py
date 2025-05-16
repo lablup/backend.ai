@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -48,12 +48,12 @@ class DomainProcessors(AbstractProcessorPackage):
         self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            CreateDomainNodeAction.type(),
-            ModifyDomainNodeAction.type(),
-            CreateDomainAction.type(),
-            ModifyDomainAction.type(),
-            DeleteDomainAction.type(),
-            PurgeDomainAction.type(),
+            CreateDomainNodeAction.spec(),
+            ModifyDomainNodeAction.spec(),
+            CreateDomainAction.spec(),
+            ModifyDomainAction.spec(),
+            DeleteDomainAction.spec(),
+            PurgeDomainAction.spec(),
         ]
