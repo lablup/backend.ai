@@ -19,7 +19,7 @@ class ReporterMonitor(ActionMonitor):
     async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
         message = StartedActionMessage(
             action_id=meta.action_id,
-            action_type=action.type(),
+            action_type=action.__class__.spec().type(),
             entity_id=action.entity_id(),
             entity_type=action.__class__.entity_type(),
             request_id=current_request_id(),
@@ -36,7 +36,7 @@ class ReporterMonitor(ActionMonitor):
 
         message = FinishedActionMessage(
             action_id=result.meta.action_id,
-            action_type=action.type(),
+            action_type=action.__class__.spec().type(),
             entity_id=entity_id,
             request_id=current_request_id() or _BLANK_ID,
             entity_type=action.__class__.entity_type(),

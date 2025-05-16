@@ -1,5 +1,8 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 
 from ..actions.file import (
     CreateDownloadSessionAction,
@@ -18,7 +21,7 @@ from ..actions.file import (
 from ..services.file import VFolderFileService
 
 
-class VFolderFileProcessors:
+class VFolderFileProcessors(AbstractProcessorPackage):
     upload_file: ActionProcessor[CreateUploadSessionAction, CreateUploadSessionActionResult]
     download_file: ActionProcessor[CreateDownloadSessionAction, CreateDownloadSessionActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
@@ -33,3 +36,14 @@ class VFolderFileProcessors:
         self.rename_file = ActionProcessor(service.rename_file, action_monitors)
         self.delete_files = ActionProcessor(service.delete_files, action_monitors)
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            CreateUploadSessionAction.spec(),
+            CreateDownloadSessionAction.spec(),
+            ListFilesAction.spec(),
+            RenameFileAction.spec(),
+            DeleteFilesAction.spec(),
+            MkdirAction.spec(),
+        ]

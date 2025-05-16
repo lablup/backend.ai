@@ -8,7 +8,7 @@ import sys
 import uuid
 from datetime import datetime
 from functools import partial
-from typing import cast
+from typing import Optional, cast
 
 import click
 from more_itertools import chunked
@@ -56,9 +56,9 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: pathlib.Path,
     log_level: LogLevel,
     debug: bool,
+    config_path: Optional[pathlib.Path] = None,
 ) -> None:
     """
     Manager Administration CLI
@@ -66,7 +66,8 @@ def main(
     setproctitle("backend.ai: manager.cli")
     if debug:
         log_level = LogLevel.DEBUG
-    ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
+
+    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=log_level))
 
 
 @main.command(
@@ -108,7 +109,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
-    local_config = cli_ctx.local_config
+    db_config = cli_ctx.get_bootstrap_config().db
     if psql_help:
         psql_args = ["--help"]
     if not container_name:
@@ -128,10 +129,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         # Use the host-provided psql command
         cmd = [
             "psql",
-            (
-                f"postgres://{local_config.db.user}:{local_config.db.password}"
-                f"@{local_config.db.addr}/{local_config.db.name}"
-            ),
+            (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
             *psql_args,
         ]
         subprocess.run(cmd)
@@ -146,9 +144,9 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         container_name,
         "psql",
         "-U",
-        local_config.db.user,
+        db_config.user,
         "-d",
-        local_config.db.name,
+        db_config.name,
         *psql_args,
     ]
     subprocess.run(cmd)
@@ -242,7 +240,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
     async def _clear_redis_history():
         try:
-            async with connect_database(cli_ctx.local_config) as db:
+            async with connect_database(cli_ctx.get_bootstrap_config().db) as db:
                 async with db.begin_readonly() as conn:
                     query = (
                         sa.select([kernels.c.id])
@@ -302,7 +300,9 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             log.exception("Unexpected error while cleaning up redis history")
 
     async def _clear_terminated_sessions():
-        async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+        async with connect_database(
+            cli_ctx.get_bootstrap_config().db, isolation_level="AUTOCOMMIT"
+        ) as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
                 result = (
@@ -331,7 +331,9 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         )
 
     async def _clear_old_error_logs():
-        async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+        async with connect_database(
+            cli_ctx.get_bootstrap_config().db, isolation_level="AUTOCOMMIT"
+        ) as db:
             async with db.begin() as conn:
                 log.info("Deleting old error logs...")
                 result = await conn.execute(
@@ -348,7 +350,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     asyncio.run(_clear_redis_history())
     asyncio.run(_clear_terminated_sessions())
     asyncio.run(_clear_old_error_logs())
-    asyncio.run(vacuum_db(cli_ctx.local_config, vacuum_full))
+    asyncio.run(vacuum_db(cli_ctx.get_bootstrap_config(), vacuum_full))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
