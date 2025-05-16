@@ -13,7 +13,6 @@ from collections.abc import MutableMapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from functools import partial
-from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
 from typing import Any, AsyncIterator, Mapping, Optional, cast
@@ -31,7 +30,10 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import RedisRole
-from ai.backend.common.dto.manager.auth.field import AuthResponseData, RedirectAuthResponseData
+from ai.backend.common.dto.manager.auth.field import (
+    AuthSuccessResponseData,
+    RequireTOTPRegistrationResponseData,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
@@ -386,12 +388,17 @@ async def login_handler(request: web.Request) -> web.Response:
                 creds["username"], creds["password"], extra_args=extra_args
             )
             match auth_result.data:
-                case AuthResponseData():
+                case AuthSuccessResponseData():
                     token = auth_result.data
-                case RedirectAuthResponseData():
-                    return web.json_response(
-                        status=HTTPStatus.MOVED_PERMANENTLY, data=auth_result.data.to_dict()
-                    )
+                case RequireTOTPRegistrationResponseData():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-registration",
+                        "title": "Require TOTP Registration",
+                        "details": "The user must register TOTP.",
+                        "totp_registration_token": auth_result.data.token,
+                    }
+                    return web.json_response(result)
             stored_token = {
                 "type": "keypair",
                 "access_key": token.access_key,
@@ -540,12 +547,17 @@ async def token_login_handler(request: web.Request) -> web.Response:
                 "fake-email", "fake-pwd", extra_args=extra_args
             )
             match auth_result.data:
-                case AuthResponseData():
+                case AuthSuccessResponseData():
                     token = auth_result.data
-                case RedirectAuthResponseData():
-                    return web.json_response(
-                        status=HTTPStatus.MOVED_PERMANENTLY, data=auth_result.data.to_dict()
-                    )
+                case RequireTOTPRegistrationResponseData():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-registration",
+                        "title": "Require TOTP Registration",
+                        "details": "The user must register TOTP.",
+                        "totp_registration_token": auth_result.data.token,
+                    }
+                    return web.json_response(result)
             stored_token = {
                 "type": "keypair",
                 "access_key": token.access_key,

@@ -203,6 +203,7 @@ class ErrorDetail(enum.StrEnum):
     # Unauthorized means the user is not authenticated.
     # This means the user is not logged in or the token is invalid.
     UNAUTHORIZED = "unauthorized"
+    INCOMPLETE_USER_PROFILE = "incomplete-user-profile"
 
     # Server Error
     INTERNAL_ERROR = (

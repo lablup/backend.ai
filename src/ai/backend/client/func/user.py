@@ -117,7 +117,7 @@ class User(BaseFunction):
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return AuthResponse(status=resp.status, data=data["data"])
+            return AuthResponse(http_status=resp.status, data=data["data"])
 
     @api_function
     @classmethod

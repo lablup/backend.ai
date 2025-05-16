@@ -8,15 +8,14 @@ class AuthTokenTypes(enum.Enum):
     JWT = "jwt"
 
 
-class AuthResponseData(BaseModel):
+class AuthSuccessResponseData(BaseModel):
     access_key: str
     secret_key: str
     role: str
     status: str
 
 
-class RedirectAuthResponseData(BaseModel):
-    redirect_url: str
+class RequireTOTPRegistrationResponseData(BaseModel):
     token: str
 
     def to_dict(self) -> dict[str, str]:
@@ -24,6 +23,6 @@ class RedirectAuthResponseData(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    status: int
-    data: AuthResponseData | RedirectAuthResponseData
+    http_status: int
+    data: AuthSuccessResponseData | RequireTOTPRegistrationResponseData
     type: AuthTokenTypes = AuthTokenTypes.KEYPAIR
