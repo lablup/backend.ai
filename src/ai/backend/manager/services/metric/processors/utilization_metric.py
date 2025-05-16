@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
     ContainerMetricActionResult,
@@ -28,8 +28,8 @@ class UtilizationMetricProcessors(AbstractProcessorPackage):
         )
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            ContainerMetricAction.type(),
-            ContainerMetricMetadataAction.type(),
+            ContainerMetricAction.spec(),
+            ContainerMetricMetadataAction.spec(),
         ]

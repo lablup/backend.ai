@@ -152,3 +152,17 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
     async def get_allowed_origins(self):
         return await self._etcd.get("config/api/allow-origins")
+
+
+class LegacyEtcdVolumesLoader(AbstractConfigLoader):
+    _etcd: AsyncEtcd
+    _config_prefix: str = "volumes"
+
+    def __init__(self, etcd: AsyncEtcd) -> None:
+        super().__init__()
+        self._etcd = etcd
+
+    @override
+    async def load(self) -> Mapping[str, Any]:
+        raw_cfg = await self._etcd.get_prefix(self._config_prefix)
+        return {"volumes": raw_cfg}

@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -185,32 +185,32 @@ class SessionProcessors(AbstractProcessorPackage):
         )
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            CommitSessionAction.type(),
-            CompleteAction.type(),
-            ConvertSessionToImageAction.type(),
-            CreateClusterAction.type(),
-            CreateFromParamsAction.type(),
-            CreateFromTemplateAction.type(),
-            DestroySessionAction.type(),
-            DownloadFileAction.type(),
-            DownloadFilesAction.type(),
-            ExecuteSessionAction.type(),
-            GetAbusingReportAction.type(),
-            GetCommitStatusAction.type(),
-            GetContainerLogsAction.type(),
-            GetDependencyGraphAction.type(),
-            GetDirectAccessInfoAction.type(),
-            GetSessionInfoAction.type(),
-            InterruptSessionAction.type(),
-            ListFilesAction.type(),
-            MatchSessionsAction.type(),
-            RenameSessionAction.type(),
-            RestartSessionAction.type(),
-            ShutdownServiceAction.type(),
-            StartServiceAction.type(),
-            UploadFilesAction.type(),
-            ModifySessionAction.type(),
-            CheckAndTransitStatusAction.type(),
+            CommitSessionAction.spec(),
+            CompleteAction.spec(),
+            ConvertSessionToImageAction.spec(),
+            CreateClusterAction.spec(),
+            CreateFromParamsAction.spec(),
+            CreateFromTemplateAction.spec(),
+            DestroySessionAction.spec(),
+            DownloadFileAction.spec(),
+            DownloadFilesAction.spec(),
+            ExecuteSessionAction.spec(),
+            GetAbusingReportAction.spec(),
+            GetCommitStatusAction.spec(),
+            GetContainerLogsAction.spec(),
+            GetDependencyGraphAction.spec(),
+            GetDirectAccessInfoAction.spec(),
+            GetSessionInfoAction.spec(),
+            InterruptSessionAction.spec(),
+            ListFilesAction.spec(),
+            MatchSessionsAction.spec(),
+            RenameSessionAction.spec(),
+            RestartSessionAction.spec(),
+            ShutdownServiceAction.spec(),
+            StartServiceAction.spec(),
+            UploadFilesAction.spec(),
+            ModifySessionAction.spec(),
+            CheckAndTransitStatusAction.spec(),
         ]
