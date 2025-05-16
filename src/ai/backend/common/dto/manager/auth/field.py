@@ -1,6 +1,7 @@
 import enum
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 class AuthTokenTypes(enum.Enum):
@@ -14,15 +15,26 @@ class AuthSuccessResponseData(BaseModel):
     role: str
     status: str
 
+    def to_dict(self) -> dict[str, str]:
+        return self.model_dump(mode="json")
+
 
 class RequireTOTPRegistrationResponseData(BaseModel):
     token: str
 
     def to_dict(self) -> dict[str, str]:
-        return self.model_dump()
+        return self.model_dump(mode="json")
 
 
 class AuthResponse(BaseModel):
-    http_status: int
     data: AuthSuccessResponseData | RequireTOTPRegistrationResponseData
     type: AuthTokenTypes = AuthTokenTypes.KEYPAIR
+
+    @classmethod
+    def from_auth_response(cls, response: dict[str, Any]) -> "AuthResponse":
+        data: AuthSuccessResponseData | RequireTOTPRegistrationResponseData
+        try:
+            data = AuthSuccessResponseData(**response)
+        except ValidationError:
+            data = RequireTOTPRegistrationResponseData(**response)
+        return AuthResponse(data=data)
