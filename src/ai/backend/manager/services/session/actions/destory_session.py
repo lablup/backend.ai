@@ -22,9 +22,11 @@ class DestroySessionAction(SessionAction):
         return None
 
     @override
-    def operation_type(self):
-        if self.recursive:
-            return "destory_multi"
+    @classmethod
+    def operation_type(cls) -> str:
+        # TODO: Handle this
+        # if self.recursive:
+        #     return "destory_multi"
         return "destory"
 
 

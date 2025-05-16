@@ -1,5 +1,8 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -107,7 +110,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
 from ai.backend.manager.services.session.service import SessionService
 
 
-class SessionProcessors:
+class SessionProcessors(AbstractProcessorPackage):
     commit_session: ActionProcessor[CommitSessionAction, CommitSessionActionResult]
     complete: ActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: ActionProcessor[
@@ -180,3 +183,34 @@ class SessionProcessors:
         self.check_and_transit_status = ActionProcessor(
             service.check_and_transit_status, action_monitors
         )
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            CommitSessionAction.spec(),
+            CompleteAction.spec(),
+            ConvertSessionToImageAction.spec(),
+            CreateClusterAction.spec(),
+            CreateFromParamsAction.spec(),
+            CreateFromTemplateAction.spec(),
+            DestroySessionAction.spec(),
+            DownloadFileAction.spec(),
+            DownloadFilesAction.spec(),
+            ExecuteSessionAction.spec(),
+            GetAbusingReportAction.spec(),
+            GetCommitStatusAction.spec(),
+            GetContainerLogsAction.spec(),
+            GetDependencyGraphAction.spec(),
+            GetDirectAccessInfoAction.spec(),
+            GetSessionInfoAction.spec(),
+            InterruptSessionAction.spec(),
+            ListFilesAction.spec(),
+            MatchSessionsAction.spec(),
+            RenameSessionAction.spec(),
+            RestartSessionAction.spec(),
+            ShutdownServiceAction.spec(),
+            StartServiceAction.spec(),
+            UploadFilesAction.spec(),
+            ModifySessionAction.spec(),
+            CheckAndTransitStatusAction.spec(),
+        ]

@@ -1,5 +1,8 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -27,7 +30,7 @@ from ai.backend.manager.services.group.actions.usage_per_period import (
 from ai.backend.manager.services.group.service import GroupService
 
 
-class GroupProcessors:
+class GroupProcessors(AbstractProcessorPackage):
     create_group: ActionProcessor[CreateGroupAction, CreateGroupActionResult]
     modify_group: ActionProcessor[ModifyGroupAction, ModifyGroupActionResult]
     delete_group: ActionProcessor[DeleteGroupAction, DeleteGroupActionResult]
@@ -42,3 +45,14 @@ class GroupProcessors:
         self.purge_group = ActionProcessor(group_service.purge_group, action_monitors)
         self.usage_per_month = ActionProcessor(group_service.usage_per_month, action_monitors)
         self.usage_per_period = ActionProcessor(group_service.usage_per_period, action_monitors)
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            CreateGroupAction.spec(),
+            ModifyGroupAction.spec(),
+            DeleteGroupAction.spec(),
+            PurgeGroupAction.spec(),
+            UsagePerMonthAction.spec(),
+            UsagePerPeriodAction.spec(),
+        ]

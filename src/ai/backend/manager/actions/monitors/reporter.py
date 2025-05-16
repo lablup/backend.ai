@@ -19,11 +19,11 @@ class ReporterMonitor(ActionMonitor):
     async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
         message = StartedActionMessage(
             action_id=meta.action_id,
-            action_type=action.type(),
+            action_type=action.__class__.spec().type(),
             entity_id=action.entity_id(),
-            entity_type=action.entity_type(),
+            entity_type=action.__class__.entity_type(),
             request_id=current_request_id(),
-            operation_type=action.operation_type(),
+            operation_type=action.__class__.operation_type(),
             created_at=meta.started_at,
         )
         await self._reporter_hub.report_started(message)
@@ -36,11 +36,11 @@ class ReporterMonitor(ActionMonitor):
 
         message = FinishedActionMessage(
             action_id=result.meta.action_id,
-            action_type=action.type(),
+            action_type=action.__class__.spec().type(),
             entity_id=entity_id,
             request_id=current_request_id() or _BLANK_ID,
-            entity_type=action.entity_type(),
-            operation_type=action.operation_type(),
+            entity_type=action.__class__.entity_type(),
+            operation_type=action.__class__.operation_type(),
             status=result.meta.status,
             description=result.meta.description,
             created_at=result.meta.started_at,

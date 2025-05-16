@@ -1,5 +1,8 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -19,7 +22,7 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 
 
-class ModelServingAutoScalingProcessors:
+class ModelServingAutoScalingProcessors(AbstractProcessorPackage):
     scale_service_replicas: ActionProcessor[
         ScaleServiceReplicasAction, ScaleServiceReplicasActionResult
     ]
@@ -46,3 +49,12 @@ class ModelServingAutoScalingProcessors:
         self.modify_endpoint_auto_scaling_rule = ActionProcessor(
             service.modify_endpoint_auto_scaling_rule, action_monitors
         )
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            ScaleServiceReplicasAction.spec(),
+            CreateEndpointAutoScalingRuleAction.spec(),
+            DeleteEndpointAutoScalingRuleAction.spec(),
+            ModifyEndpointAutoScalingRuleAction.spec(),
+        ]

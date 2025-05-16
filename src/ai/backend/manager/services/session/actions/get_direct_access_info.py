@@ -17,7 +17,8 @@ class GetDirectAccessInfoAction(SessionAction):
         return None
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "get_direct_access_info"
 
 

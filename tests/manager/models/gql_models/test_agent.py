@@ -38,7 +38,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        unified_config=None,  # type: ignore
+        config_provider=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -109,9 +109,9 @@ EXTRA_FIXTURES = {
 async def test_scan_gpu_alloc_maps(
     mock_agent_responses,
     mock_etcd_ctx,
-    mock_unified_config_ctx,
+    mock_config_provider_ctx,
     client,
-    local_config,
+    bootstrap_config,
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -122,7 +122,7 @@ async def test_scan_gpu_alloc_maps(
         [
             event_hub_ctx,
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             redis_ctx,
             monitoring_ctx,

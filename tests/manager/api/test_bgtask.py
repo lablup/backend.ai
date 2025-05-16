@@ -39,13 +39,13 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 
 @pytest.fixture
 async def bgtask_fixture(
-    etcd_fixture, mock_etcd_ctx, mock_unified_config_ctx, create_app_and_client
+    etcd_fixture, mock_etcd_ctx, mock_config_provider_ctx, create_app_and_client
 ) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
         [
             event_hub_ctx,
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -59,7 +59,7 @@ async def bgtask_fixture(
     yield root_ctx.background_task_manager, producer, dispatcher
 
     etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.unified_config.shared.redis.model_dump()
+        root_ctx.config_provider.config.redis.model_dump()
     )
     stream_redis_config = etcd_redis_config.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(

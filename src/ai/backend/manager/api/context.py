@@ -7,7 +7,7 @@ import attrs
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -46,7 +46,7 @@ class RootContext(BaseContext):
     redis_image: RedisConnectionInfo
     redis_stream: RedisConnectionInfo
     redis_lock: RedisConnectionInfo
-    unified_config: ManagerUnifiedConfig
+    config_provider: ManagerConfigProvider
     cors_options: CORSOptions
 
     webapp_plugin_ctx: WebappPluginContext
