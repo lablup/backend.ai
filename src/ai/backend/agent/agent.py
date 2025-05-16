@@ -129,6 +129,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.common.runner import LoopRunner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -180,6 +181,7 @@ from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, match_distro_data
+from .probe import AgentProbe
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -681,6 +683,7 @@ class AbstractAgent(
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
     _metric_registry: CommonMetricRegistry
+    _probe_runner: LoopRunner
 
     def __init__(
         self,
@@ -844,6 +847,9 @@ class AbstractAgent(
         self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
+        self._probe_runner = self._init_probe_runner_obj()
+        await self._probe_runner.run()
+
         # Notify the gateway.
         await self.produce_event(AgentStartedEvent(reason="self-started"))
 
@@ -884,6 +890,7 @@ class AbstractAgent(
         It must call this super method in an appropriate order, only once.
         """
         await cancel_tasks(self._ongoing_exec_batch_tasks)
+        await self._probe_runner.close()
 
         async with self.registry_lock:
             # Close all pending kernel runners.
@@ -1422,6 +1429,17 @@ class AbstractAgent(
                             kernel_id,
                         )
 
+    def get_kernel_registry(self) -> Mapping[KernelId, AbstractKernel]:
+        return self.kernel_registry
+
+    def _init_probe_runner_obj(self) -> LoopRunner:
+        probe = AgentProbe(
+            self.enumerate_containers,
+            self.get_kernel_registry,
+            self.event_producer,
+        )
+        return LoopRunner.with_nop_resource_ctx(11.0, [probe])
+
     async def sync_container_lifecycles(self, interval: float) -> None:
         """
         Periodically synchronize the alive/known container sets,
@@ -1789,9 +1807,11 @@ class AbstractAgent(
             pass
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
+            kernel_obj._event_producer = self.event_producer
             if kernel_obj.runner is not None:
                 kernel_obj.runner.event_producer = self.event_producer
                 await kernel_obj.runner.__ainit__()
+            await kernel_obj.init_probe_runner()
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,

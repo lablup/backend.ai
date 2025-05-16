@@ -3,12 +3,13 @@ import enum
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
+from typing import Any, Awaitable, Callable, Mapping, Optional, Self, Sequence
 
 import attrs
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
+from ai.backend.common.docker import LabelName
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, ContainerId, KernelId, MountTypes, SessionId
 
@@ -55,6 +56,10 @@ class ContainerStatus(enum.StrEnum):
     DEAD = "dead"
     REMOVING = "removing"
 
+    @classmethod
+    def all(cls) -> frozenset[Self]:
+        return frozenset(cls)
+
 
 @attrs.define(auto_attribs=True, slots=True)
 class Container:
@@ -64,6 +69,22 @@ class Container:
     labels: Mapping[str, str]
     ports: Sequence[Port]
     backend_obj: Any  # used to keep the backend-specific data
+
+    @property
+    def kernel_id(self) -> Optional[KernelId]:
+        raw_kernel_id = self.labels.get(LabelName.KERNEL_ID.value)
+        try:
+            return KernelId(uuid.UUID(raw_kernel_id))
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def session_id(self) -> Optional[SessionId]:
+        _session_id = self.labels.get(LabelName.SESSION_ID.value)
+        try:
+            return SessionId(uuid.UUID(_session_id))
+        except (TypeError, ValueError):
+            return None
 
 
 class KernelLifecycleStatus(enum.StrEnum):

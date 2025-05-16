@@ -64,6 +64,8 @@ from ai.backend.common.events.agent import (
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DanglingContainerDetected,
+    DanglingKernelDetected,
     DoAgentResourceCheckEvent,
 )
 from ai.backend.common.events.image import (
@@ -390,6 +392,16 @@ class AgentRegistry:
             DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
         )
         evd.consume(DoAgentResourceCheckEvent, self, handle_check_agent_resource)
+
+        evd.consume(
+            DanglingKernelDetected, self, handle_dangling_kernel, name="api.session.dangling-kernel"
+        )
+        evd.consume(
+            DanglingContainerDetected,
+            self,
+            handle_dangling_container,
+            name="api.session.dangling-container",
+        )
 
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)
@@ -4402,6 +4414,20 @@ async def handle_check_agent_resource(
         if not row:
             raise InstanceNotFound(source)
         log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
+
+
+async def handle_dangling_kernel(
+    context: AgentRegistry, source: AgentId, event: DanglingKernelDetected
+) -> None:
+    # TODO: Impl dangling kernel handler
+    pass
+
+
+async def handle_dangling_container(
+    context: AgentRegistry, source: AgentId, event: DanglingContainerDetected
+) -> None:
+    # TODO: Impl dangling container handler
+    pass
 
 
 async def check_scaling_group(
