@@ -9,7 +9,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.config.shared import ManagerSharedConfig
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -41,7 +40,7 @@ from .test_utils import TestScenario
 def service_mock_args():
     return {
         "storage_manager": MagicMock(spec=StorageSessionManager),
-        "shared_config": MagicMock(spec=ManagerSharedConfig),
+        "config_provider": MagicMock(),
         "redis_stat": MagicMock(spec=RedisConnectionInfo),
     }
 
@@ -58,7 +57,7 @@ def processors(
     group_service = GroupService(
         db=database_engine,
         storage_manager=service_mock_args["storage_manager"],
-        shared_config=service_mock_args["shared_config"],
+        config_provider=service_mock_args["config_provider"],
         redis_stat=service_mock_args["redis_stat"],
     )
     return GroupProcessors(group_service, [mock_action_monitor])

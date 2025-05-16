@@ -768,7 +768,7 @@ class ModelServicePredicateChecker:
     @staticmethod
     async def check_extra_mounts(
         conn: AsyncConnection,
-        shared_config_loader: LegacyEtcdLoader,
+        legacy_etcd_loader: LegacyEtcdLoader,
         storage_manager: StorageSessionManager,
         model_id: UUID,
         model_mount_destination: str,
@@ -806,7 +806,7 @@ class ModelServicePredicateChecker:
             requested_mount_map,
             requested_mount_options,
         )
-        allowed_vfolder_types = await shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
         vfolder_mounts = await prepare_vfolder_mounts(
             conn,
             storage_manager,
