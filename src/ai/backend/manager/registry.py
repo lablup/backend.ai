@@ -18,7 +18,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from typing import (
@@ -56,7 +56,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.agent import (
@@ -75,6 +75,7 @@ from ai.backend.common.events.kernel import (
     DoSyncKernelLogsEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelHeartbeatEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -352,6 +353,12 @@ class AgentRegistry:
             self,
             handle_kernel_termination_lifecycle,
             name="api.session.kterm",
+        )
+        evd.consume(
+            KernelHeartbeatEvent,
+            self,
+            handle_kernel_heartbeat,
+            name="api.session.kheartbeat",
         )
         evd.consume(
             ModelServiceStatusEvent,
@@ -3585,6 +3592,12 @@ class AgentRegistry:
         await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
+    async def mark_kernel_heartbeat(self, kernel_id: KernelId) -> None:
+        last_seen = datetime.now(timezone.utc)
+        async with self.db.begin_session() as db_session:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            kernel_row.last_seen = last_seen
+
     async def _get_user_email(
         self,
         kernel: KernelRow,
@@ -3618,7 +3631,7 @@ class AgentRegistry:
         session: SessionRow,
         new_image_ref: ImageRef,
         *,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str | LabelName, str] = {},
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
@@ -3915,6 +3928,14 @@ async def handle_kernel_termination_lifecycle(
                 await context.mark_kernel_terminated(
                     db_conn, kernel_id, session_id, reason, exit_code
                 )
+
+
+async def handle_kernel_heartbeat(
+    context: AgentRegistry,
+    source: AgentId,
+    event: KernelHeartbeatEvent,
+) -> None:
+    await context.mark_kernel_heartbeat(event.kernel_id)
 
 
 async def handle_session_creation_lifecycle(
