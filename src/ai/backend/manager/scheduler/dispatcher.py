@@ -101,6 +101,7 @@ from ..errors.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
+from ..event_dispatcher.dispatch import EventLogger
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -317,19 +318,20 @@ class SchedulerDispatcher(aobject):
             "max_batch_size": 32,
         }
         # coalescing_opts = None
-        evd = self.registry.event_dispatcher
-        evd.consume(
-            SessionEnqueuedEvent, None, self.schedule, coalescing_opts, name="dispatcher.enq"
-        )
-        evd.consume(
-            SessionTerminatedEvent, None, self.schedule, coalescing_opts, name="dispatcher.term"
-        )
-        evd.consume(AgentStartedEvent, None, self.schedule)
-        evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
-        evd.consume(DoStartSessionEvent, None, self.start)
-        evd.consume(DoCheckPrecondEvent, None, self.check_precond)
-        evd.consume(DoScaleEvent, None, self.scale_services)
-        evd.consume(DoUpdateSessionStatusEvent, None, self.update_session_status)
+        with self.registry.event_dispatcher.with_reporters([EventLogger(self.db)]) as evd:
+            # Log consumed events
+            evd.consume(
+                SessionEnqueuedEvent, None, self.schedule, coalescing_opts, name="dispatcher.enq"
+            )
+            evd.consume(
+                SessionTerminatedEvent, None, self.schedule, coalescing_opts, name="dispatcher.term"
+            )
+            evd.consume(AgentStartedEvent, None, self.schedule)
+            evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
+            evd.consume(DoStartSessionEvent, None, self.start)
+            evd.consume(DoCheckPrecondEvent, None, self.check_precond)
+            evd.consume(DoScaleEvent, None, self.scale_services)
+            evd.consume(DoUpdateSessionStatusEvent, None, self.update_session_status)
         self.schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,

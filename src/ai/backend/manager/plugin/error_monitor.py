@@ -9,6 +9,7 @@ from ai.backend.common.events.agent import AgentErrorEvent
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.event_dispatcher.dispatch import EventLogger
 
 from ..models import error_logs
 
@@ -31,7 +32,8 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             self.enabled = True
         root_ctx: RootContext = context["_root.context"]  # type: ignore
         self.event_dispatcher = root_ctx.event_dispatcher
-        self._evh = self.event_dispatcher.consume(AgentErrorEvent, None, self.handle_agent_error)
+        with root_ctx.event_dispatcher.with_reporters([EventLogger(root_ctx.db)]) as evd:
+            self._evh = evd.consume(AgentErrorEvent, None, self.handle_agent_error)
         self.db = root_ctx.db
 
     async def cleanup(self) -> None:
