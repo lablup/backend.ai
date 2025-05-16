@@ -423,9 +423,9 @@ class SessionService:
                     kern_features: list[str]
                     if existing_row:
                         kern_features = existing_row.labels.get(
-                            LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE
+                            LabelName.FEATURES, DEFAULT_KERNEL_FEATURE
                         ).split()
-                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID.value]
+                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID]
                         log.debug("reusing existing customized image ID {}", customized_image_id)
                     else:
                         kern_features = [DEFAULT_KERNEL_FEATURE]
@@ -444,15 +444,15 @@ class SessionService:
                     is_local=base_image_ref.is_local,
                 )
 
-                image_labels = {
-                    LabelName.CUSTOMIZED_OWNER.value: f"{image_visibility.value}:{image_owner_id}",
-                    LabelName.CUSTOMIZED_NAME.value: image_name,
-                    LabelName.CUSTOMIZED_ID.value: customized_image_id,
-                    LabelName.FEATURES.value: " ".join(kern_features),
+                image_labels: dict[str | LabelName, str] = {
+                    LabelName.CUSTOMIZED_OWNER: f"{image_visibility.value}:{image_owner_id}",
+                    LabelName.CUSTOMIZED_NAME: image_name,
+                    LabelName.CUSTOMIZED_ID: customized_image_id,
+                    LabelName.FEATURES: " ".join(kern_features),
                 }
                 match image_visibility:
                     case CustomizedImageVisibilityScope.USER:
-                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL.value] = action.user_email
+                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = action.user_email
 
                 # commit image with new tag set
                 resp = await self._agent_registry.commit_session(

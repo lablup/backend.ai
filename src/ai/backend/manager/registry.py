@@ -56,7 +56,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.agent import (
@@ -3618,7 +3618,7 @@ class AgentRegistry:
         session: SessionRow,
         new_image_ref: ImageRef,
         *,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str | LabelName, str] = {},
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
