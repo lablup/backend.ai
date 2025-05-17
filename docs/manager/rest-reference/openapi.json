@@ -3853,7 +3853,7 @@
         "description": "\nDelete `delete-pending` vfolders in storage proxy\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/folders/{name}/force": {
+    "/folders/{folder_id}/force": {
       "delete": {
         "operationId": "folders.force_delete",
         "tags": [
@@ -3871,7 +3871,7 @@
         ],
         "parameters": [
           {
-            "name": "name",
+            "name": "folder_id",
             "in": "path",
             "required": true,
             "schema": {
