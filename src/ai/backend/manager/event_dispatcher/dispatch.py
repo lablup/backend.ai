@@ -22,14 +22,14 @@ def _dispatch_bgtask_events(
     Register event dispatchers for background task events.
     """
     event_dispatcher.subscribe(BgtaskUpdatedEvent, None, dispatcher.propagate_event)
-    event_dispatcher.subscribe(BgtaskDoneEvent, None, dispatcher.propagate_event)
+    event_dispatcher.subscribe(BgtaskDoneEvent, None, dispatcher.propagate_event_with_close)
     event_dispatcher.subscribe(
         BgtaskPartialSuccessEvent,
         None,
-        dispatcher.propagate_event,
+        dispatcher.propagate_event_with_close,
     )
-    event_dispatcher.subscribe(BgtaskCancelledEvent, None, dispatcher.propagate_event)
-    event_dispatcher.subscribe(BgtaskFailedEvent, None, dispatcher.propagate_event)
+    event_dispatcher.subscribe(BgtaskCancelledEvent, None, dispatcher.propagate_event_with_close)
+    event_dispatcher.subscribe(BgtaskFailedEvent, None, dispatcher.propagate_event_with_close)
 
 
 @dataclass

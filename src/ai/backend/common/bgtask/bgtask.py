@@ -14,6 +14,7 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    Self,
     TypeAlias,
     Union,
 )
@@ -28,7 +29,6 @@ from ai.backend.logging import BraceStyleAdapter
 from .. import redis_helper
 from ..events.bgtask import (
     BaseBgtaskEvent,
-    BgtaskAlreadyDoneEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
@@ -56,7 +56,7 @@ _MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
 
 @dataclass
-class _BgTaskInfo:
+class BgTaskInfo:
     status: BgtaskStatus
     msg: str
     started_at: str
@@ -65,7 +65,7 @@ class _BgTaskInfo:
     total: str = "0"
 
     @classmethod
-    def started(cls, msg: str = "") -> _BgTaskInfo:
+    def started(cls, msg: str = "") -> Self:
         now = str(time.time())
         return cls(
             status=BgtaskStatus.STARTED,
@@ -77,7 +77,7 @@ class _BgTaskInfo:
         )
 
     @classmethod
-    def finished(cls, status: BgtaskStatus, msg: str = "") -> _BgTaskInfo:
+    def finished(cls, status: BgtaskStatus, msg: str = "") -> Self:
         now = str(time.time())
         return cls(
             status=status,
@@ -199,10 +199,10 @@ class BackgroundTaskManager:
         self._metric_observer = bgtask_observer
         self._dict_lock = asyncio.Lock()
 
-    async def fetch_last_finished_event(
+    async def fetch_bgtask_info(
         self,
         task_id: uuid.UUID,
-    ) -> Optional[BaseBgtaskEvent]:
+    ) -> BgTaskInfo:
         tracker_key = _tracker_id(task_id)
         task_info_dict = await redis_helper.execute(
             self._redis_client,
@@ -213,17 +213,9 @@ class BackgroundTaskManager:
             # The task ID is invalid or represents a task completed more than timeout.
             raise BgtaskNotFoundError("No such background task.")
 
-        task_info = _BgTaskInfo(**task_info_dict)
-        if not task_info.status.finished():
-            return None
-
-        return BgtaskAlreadyDoneEvent(
-            task_id=task_id,
-            message=task_info.msg,
-            task_status=task_info.status,
-            current=task_info.current,
-            total=task_info.total,
-        )
+        task_info_dict["status"] = BgtaskStatus(task_info_dict["status"])
+        task_info = BgTaskInfo(**task_info_dict)
+        return task_info
 
     async def start(
         self,
@@ -258,11 +250,11 @@ class BackgroundTaskManager:
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
-            task_info: _BgTaskInfo
+            task_info: BgTaskInfo
             if status.finished():
-                task_info = _BgTaskInfo.finished(status=status, msg=msg)
+                task_info = BgTaskInfo.finished(status=status, msg=msg)
             else:
-                task_info = _BgTaskInfo.started(msg=msg)
+                task_info = BgTaskInfo.started(msg=msg)
             mapping = task_info.to_dict()
             pipe.hset(tracker_key, mapping=mapping)
             pipe.expire(tracker_key, _MAX_BGTASK_ARCHIVE_PERIOD)
