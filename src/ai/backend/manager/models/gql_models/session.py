@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
+from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.kernel import KernelRow
@@ -339,6 +340,65 @@ class ComputeSessionNode(graphene.ObjectType):
             service_ports=row.main_kernel.service_ports,
             # statistics
             num_queries=row.num_queries,
+        )
+        result.permissions = [] if permissions is None else permissions
+        return result
+
+    @classmethod
+    def from_dataclass(
+        cls,
+        ctx: GraphQueryContext,
+        session_data: SessionData,
+        *,
+        permissions: Optional[Iterable[ComputeSessionPermission]] = None,
+    ) -> Self:
+        status_history = session_data.status_history or {}
+        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        if not session_data.vfolder_mounts:
+            vfolder_mounts = []
+        else:
+            vfolder_mounts = [vf.vfid.folder_id for vf in session_data.vfolder_mounts]
+
+        result = cls(
+            # identity
+            id=session_data.id,  # auto-converted to Relay global ID
+            row_id=session_data.id,
+            tag=session_data.tag,
+            name=session_data.name,
+            type=session_data.session_type,
+            cluster_template=None,
+            cluster_mode=session_data.cluster_mode,
+            cluster_size=session_data.cluster_size,
+            priority=session_data.priority,
+            # ownership
+            domain_name=session_data.domain_name,
+            project_id=session_data.group_id,
+            user_id=session_data.user_uuid,
+            access_key=session_data.access_key,
+            # status
+            status=session_data.status.name,
+            # status_changed=row.status_changed,  # FIXME: generated attribute
+            status_info=session_data.status_info,
+            status_data=session_data.status_data,
+            status_history=status_history,
+            created_at=session_data.created_at,
+            starts_at=session_data.starts_at,
+            terminated_at=session_data.terminated_at,
+            scheduled_at=datetime.fromisoformat(raw_scheduled_at)
+            if raw_scheduled_at is not None
+            else None,
+            startup_command=session_data.startup_command,
+            result=session_data.result.name,
+            # resources
+            agent_ids=session_data.agent_ids,
+            scaling_group=session_data.scaling_group_name,
+            vfolder_mounts=vfolder_mounts,
+            occupied_slots=session_data.occupying_slots,
+            requested_slots=session_data.requested_slots,
+            image_references=session_data.images,
+            service_ports=session_data.service_ports,
+            # statistics
+            num_queries=session_data.num_queries,
         )
         result.permissions = [] if permissions is None else permissions
         return result
@@ -708,7 +768,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         )
 
         return ModifyComputeSession(
-            ComputeSessionNode.from_row(graph_ctx, result.session_row),
+            ComputeSessionNode.from_dataclass(graph_ctx, result.session_data),
             input.get("client_mutation_id"),
         )
 

@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import hashlib
 import hmac
 import json
@@ -33,6 +34,7 @@ import aiohttp
 import asyncpg
 import pytest
 import sqlalchemy as sa
+import yarl
 from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import BaseModel
@@ -503,8 +505,22 @@ def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Ite
     extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
     extra_fixture_file_path = Path(extra_fixture_file.name)
 
+    def fixture_json_encoder(obj: Any):
+        if isinstance(obj, Mapping):
+            return dict(obj)
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return str(obj)
+        if isinstance(obj, enum.Enum) or isinstance(obj, enum.StrEnum):
+            return obj.value
+        if isinstance(obj, yarl.URL):
+            return str(obj)
+
+        raise TypeError(f'Fixture type "{type(obj)}" not serializable')
+
     with open(extra_fixture_file_path, "w") as f:
-        json.dump(extra_fixtures, f)
+        json.dump(extra_fixtures, f, default=fixture_json_encoder)
 
     fixture_paths = [
         build_root / "fixtures" / "manager" / "example-users.json",
@@ -549,6 +565,7 @@ def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Ite
                 await conn.execute((vfolders.delete()))
                 await conn.execute((kernels.delete()))
                 await conn.execute((agents.delete()))
+                await conn.execute((SessionRow.__table__.delete()))
                 await conn.execute((keypairs.delete()))
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
