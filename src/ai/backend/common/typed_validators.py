@@ -311,13 +311,17 @@ class AutoDirectoryPath(DirectoryPath):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        def ensure_exists(value: Any) -> Path:
-            p = Path(value)
+        def ensure_exists_and_resolve(value: Any) -> Path:
+            p = Path(value).expanduser()
+
+            if not p.is_absolute():
+                p = Path.cwd() / p
+
             p.mkdir(parents=True, exist_ok=True)
-            return p
+            return p.resolve()
 
         return core_schema.chain_schema([
-            core_schema.no_info_plain_validator_function(ensure_exists),
+            core_schema.no_info_plain_validator_function(ensure_exists_and_resolve),
             handler(DirectoryPath),
         ])
 
