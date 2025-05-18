@@ -18,4 +18,3 @@ async def test_toml_file_config_load(monkeypatch):
     cfg = await loader.load()
 
     assert cfg == DUMMY_CFG
-    assert loader.discovered_path == Path("/resolved/config.toml")

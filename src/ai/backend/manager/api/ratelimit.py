@@ -94,7 +94,7 @@ async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.unified_config.shared.redis.model_dump()
+        root_ctx.config_provider.config.redis.model_dump()
     )
     app_ctx.redis_rlim = redis_helper.get_redis_object(
         redis_profile_target.profile_target(RedisRole.RATE_LIMIT),

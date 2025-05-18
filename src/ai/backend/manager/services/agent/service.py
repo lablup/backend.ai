@@ -10,7 +10,7 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -45,7 +45,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AgentService:
     _db: ExtendedAsyncSAEngine
     _etcd: AsyncEtcd
-    _unified_config: ManagerUnifiedConfig
+    _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
 
     def __init__(
@@ -53,12 +53,12 @@ class AgentService:
         db: ExtendedAsyncSAEngine,
         etcd: AsyncEtcd,
         agent_registry: AgentRegistry,
-        unified_config: ManagerUnifiedConfig,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._db = db
         self._etcd = etcd
         self._agent_registry = agent_registry
-        self._unified_config = unified_config
+        self._config_provider = config_provider
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
         """
@@ -66,7 +66,7 @@ class AgentService:
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
         :return token: agent watcher token ("insecure" if not set in config server)
         """
-        token = self._unified_config.shared.watcher.token
+        token = self._config_provider.config.watcher.token
         if token is None:
             token = "insecure"
         agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")

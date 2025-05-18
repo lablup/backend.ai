@@ -180,7 +180,7 @@ async def push_background_task_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    task_id = uuid.UUID(params["task_id"])
+    task_id: uuid.UUID = params["task_id"]
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     async with sse_response(request) as resp:

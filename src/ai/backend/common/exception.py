@@ -1,10 +1,11 @@
 import enum
-import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Self
 
 from aiohttp import web
+
+from .json import dump_json
 
 
 class ConfigurationError(Exception):
@@ -295,7 +296,7 @@ class BackendAIError(web.HTTPError, ABC):
         if extra_data is not None:
             body["data"] = extra_data
         self.body_dict = body
-        self.body = json.dumps(body).encode()
+        self.body = dump_json(body)
 
     def __str__(self):
         lines = []

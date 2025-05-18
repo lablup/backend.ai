@@ -1,3 +1,9 @@
+from typing import Final
+
+DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
+DEFAULT_INFLIGHT_CHUNKS: Final = 8
+
+
 MANAGER_LOCAL_CFG_OVERRIDE_ENVS: list[tuple[tuple[str, ...], str]] = [
     (("etcd", "namespace"), "BACKEND_NAMESPACE"),
     (("etcd", "addr"), "BACKEND_ETCD_ADDR"),
