@@ -18,7 +18,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from typing import (
@@ -75,6 +75,7 @@ from ai.backend.common.events.kernel import (
     DoSyncKernelLogsEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelHeartbeatEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -352,6 +353,12 @@ class AgentRegistry:
             self,
             handle_kernel_termination_lifecycle,
             name="api.session.kterm",
+        )
+        evd.consume(
+            KernelHeartbeatEvent,
+            self,
+            handle_kernel_heartbeat,
+            name="api.session.kheartbeat",
         )
         evd.consume(
             ModelServiceStatusEvent,
@@ -3585,6 +3592,12 @@ class AgentRegistry:
         await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
+    async def mark_kernel_heartbeat(self, kernel_id: KernelId) -> None:
+        last_seen = datetime.now(timezone.utc)
+        async with self.db.begin_session() as db_session:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            kernel_row.last_seen = last_seen
+
     async def _get_user_email(
         self,
         kernel: KernelRow,
@@ -3915,6 +3928,14 @@ async def handle_kernel_termination_lifecycle(
                 await context.mark_kernel_terminated(
                     db_conn, kernel_id, session_id, reason, exit_code
                 )
+
+
+async def handle_kernel_heartbeat(
+    context: AgentRegistry,
+    source: AgentId,
+    event: KernelHeartbeatEvent,
+) -> None:
+    await context.mark_kernel_heartbeat(event.kernel_id)
 
 
 async def handle_session_creation_lifecycle(
