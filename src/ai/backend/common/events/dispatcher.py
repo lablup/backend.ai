@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import enum
 import logging
 import secrets
@@ -13,7 +12,6 @@ from typing import (
     Any,
     Callable,
     Coroutine,
-    Generator,
     Generic,
     Optional,
     Protocol,
@@ -218,6 +216,78 @@ class NopEventObserver:
         pass
 
 
+class EventDispatcherWrapper:
+    _event_dispatcher: EventDispatcher
+
+    _start_reporters: list[EventReporterProtocol]
+    _complete_reporters: list[EventReporterProtocol]
+
+    def __init__(
+        self,
+        event_dispatcher: EventDispatcher,
+        start_reporters: Sequence[EventReporterProtocol] = tuple(),
+        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
+    ) -> None:
+        self._event_dispatcher = event_dispatcher
+        self._start_reporters = list(start_reporters)
+        self._complete_reporters = list(complete_reporters)
+
+    def extend_reporters(
+        self,
+        start_reporters: Sequence[EventReporterProtocol] = tuple(),
+        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
+    ) -> EventDispatcherWrapper:
+        return EventDispatcherWrapper(
+            event_dispatcher=self._event_dispatcher,
+            start_reporters=self._start_reporters + list(start_reporters),
+            complete_reporters=self._complete_reporters + list(complete_reporters),
+        )
+
+    def consume(
+        self,
+        event_cls: Type[TEvent],
+        context: TContext,
+        callback: EventCallback[TContext, TEvent],
+        coalescing_opts: Optional[CoalescingOptions] = None,
+        *,
+        name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
+    ) -> EventHandler[TContext, TEvent]:
+        return self._event_dispatcher.consume(
+            event_cls,
+            context,
+            callback,
+            coalescing_opts=coalescing_opts,
+            name=name,
+            args_matcher=args_matcher,
+            start_reporters=tuple(self._start_reporters),
+            complete_reporters=tuple(self._complete_reporters),
+        )
+
+    def subscribe(
+        self,
+        event_cls: Type[TEvent],
+        context: TContext,
+        callback: EventCallback[TContext, TEvent],
+        coalescing_opts: Optional[CoalescingOptions] = None,
+        *,
+        name: Optional[str] = None,
+        override_event_name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
+    ) -> EventHandler[TContext, TEvent]:
+        return self._event_dispatcher.subscribe(
+            event_cls,
+            context,
+            callback,
+            coalescing_opts=coalescing_opts,
+            name=name,
+            override_event_name=override_event_name,
+            args_matcher=args_matcher,
+            start_reporters=tuple(self._start_reporters),
+            complete_reporters=tuple(self._complete_reporters),
+        )
+
+
 class EventDispatcher:
     """
     We have two types of event handlers: consumer and subscriber.
@@ -245,9 +315,6 @@ class EventDispatcher:
     _log_events: bool
     _metric_observer: EventObserver
 
-    _start_reporters: list[EventReporterProtocol]
-    _complete_reporters: list[EventReporterProtocol]
-
     def __init__(
         self,
         message_queue: AbstractMessageQueue,
@@ -263,8 +330,6 @@ class EventDispatcher:
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
         self._metric_observer = event_observer
-        self._start_reporters = []
-        self._complete_reporters = []
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -292,21 +357,16 @@ class EventDispatcher:
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
 
-    @contextlib.contextmanager
     def with_reporters(
         self,
         start_reporters: Sequence[EventReporterProtocol] = tuple(),
         complete_reporters: Sequence[EventReporterProtocol] = tuple(),
-    ) -> Generator[Self]:
-        if start_reporters:
-            self._start_reporters = list(start_reporters)
-        if complete_reporters:
-            self._complete_reporters = list(complete_reporters)
-        try:
-            yield self
-        finally:
-            self._start_reporters = []
-            self._complete_reporters = []
+    ) -> EventDispatcherWrapper:
+        return EventDispatcherWrapper(
+            event_dispatcher=self,
+            start_reporters=list(start_reporters),
+            complete_reporters=list(complete_reporters),
+        )
 
     def consume(
         self,
@@ -317,6 +377,8 @@ class EventDispatcher:
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
+        start_reporters: Sequence[EventReporterProtocol] = tuple(),
+        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
     ) -> EventHandler[TContext, TEvent]:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
@@ -337,8 +399,8 @@ class EventDispatcher:
             coalescing_opts,
             CoalescingState(),
             args_matcher,
-            event_start_reporters=tuple(self._start_reporters),
-            event_complete_reporters=tuple(self._complete_reporters),
+            event_start_reporters=tuple(start_reporters),
+            event_complete_reporters=tuple(complete_reporters),
         )
         self._consumers[event_cls.event_name()].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
@@ -361,6 +423,8 @@ class EventDispatcher:
         name: Optional[str] = None,
         override_event_name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
+        start_reporters: Sequence[EventReporterProtocol] = tuple(),
+        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
     ) -> EventHandler[TContext, TEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
@@ -380,8 +444,8 @@ class EventDispatcher:
             coalescing_opts,
             CoalescingState(),
             args_matcher,
-            event_start_reporters=tuple(self._start_reporters),
-            event_complete_reporters=tuple(self._complete_reporters),
+            event_start_reporters=tuple(start_reporters),
+            event_complete_reporters=tuple(complete_reporters),
         )
         override_event_name = override_event_name or event_cls.event_name()
         self._subscribers[override_event_name].add(cast(EventHandler[Any, AbstractEvent], handler))

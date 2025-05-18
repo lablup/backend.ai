@@ -78,7 +78,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 
 from .defs import DEFAULT_ROLE, LockID
-from .event_dispatcher.dispatch import EventLogger
+from .event_dispatcher.reporters import EventLogger
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -617,13 +617,13 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         self._db = db
         self._event_dispatcher.subscribe(SessionStartedEvent, None, self._session_started_cb)  # type: ignore
 
-        with self._event_dispatcher.with_reporters([EventLogger(self._db)]) as evd:
-            self._evhandlers = [
-                evd.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
-                evd.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
-                evd.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
-                evd.consume(ExecutionCancelledEvent, None, self._execution_exited_cb),  # type: ignore
-            ]
+        evd = self._event_dispatcher.with_reporters([EventLogger(self._db)])
+        self._evhandlers = [
+            evd.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
+            evd.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
+            evd.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
+            evd.consume(ExecutionCancelledEvent, None, self._execution_exited_cb),  # type: ignore
+        ]
 
     async def aclose(self) -> None:
         for _evh in self._evhandlers:
