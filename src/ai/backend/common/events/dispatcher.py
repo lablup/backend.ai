@@ -8,6 +8,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import (
     Any,
     Awaitable,
@@ -220,6 +221,12 @@ class NopEventObserver:
         pass
 
 
+@dataclass
+class _MessageProcessingState:
+    lock: asyncio.Lock = asyncio.Lock()
+    count: int = 0
+
+
 class EventDispatcher:
     """
     We have two types of event handlers: consumer and subscriber.
@@ -249,8 +256,7 @@ class EventDispatcher:
     _log_events: bool
     _metric_observer: EventObserver
 
-    _msg_id_consumed_count: defaultdict[MessageId, int]
-    _msg_id_consumed_count_lock: asyncio.Lock
+    _consumer_message_states: defaultdict[MessageId, _MessageProcessingState]
 
     def __init__(
         self,
@@ -267,8 +273,7 @@ class EventDispatcher:
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
         self._metric_observer = event_observer
-        self._msg_id_consumed_count = defaultdict(int)
-        self._msg_id_consumed_count_lock = asyncio.Lock()
+        self._consumer_message_states = defaultdict(lambda: _MessageProcessingState())
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -474,13 +479,15 @@ class EventDispatcher:
             async def done() -> None:
                 # To ensure that all consumer handlers are called.
                 # Basically there should be only one consumer handler for one event.
-                handler_count = len(self._subscribers[decoded_event_name])
-                async with self._msg_id_consumed_count_lock:
-                    self._msg_id_consumed_count[msg.msg_id] += 1
-                    if self._msg_id_consumed_count[msg.msg_id] < handler_count:
+                handler_count = len(self._consumers[decoded_event_name])  # Updated to use consumers
+                state = self._consumer_message_states[msg.msg_id]
+                async with state.lock:
+                    state.count += 1
+                    if state.count < handler_count:
                         return
                 # All consumer handlers are called.
                 await self._msg_queue.done(msg.msg_id)
+                del self._consumer_message_states[msg.msg_id]
 
             try:
                 await self.dispatch_consumers(
