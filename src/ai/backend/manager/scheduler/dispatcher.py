@@ -319,12 +319,16 @@ class SchedulerDispatcher(aobject):
         # coalescing_opts = None
         evd = self.registry.event_dispatcher
         evd.consume(
-            SessionEnqueuedEvent, None, self.schedule, coalescing_opts, name="dispatcher.enq"
+            SessionEnqueuedEvent,
+            None,
+            self.schedule,
+            coalescing_opts,
+            name="dispatcher.schedule/enqueue",
         )
         evd.consume(
             SessionTerminatedEvent, None, self.schedule, coalescing_opts, name="dispatcher.term"
         )
-        evd.consume(AgentStartedEvent, None, self.schedule)
+        evd.consume(AgentStartedEvent, None, self.schedule, name="dispatcher.schedule")
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
         evd.consume(DoStartSessionEvent, None, self.start)
         evd.consume(DoCheckPrecondEvent, None, self.check_precond)

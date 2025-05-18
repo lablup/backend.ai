@@ -8,10 +8,8 @@ import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import (
     Any,
-    Awaitable,
     Callable,
     Coroutine,
     Generic,
@@ -221,10 +219,32 @@ class NopEventObserver:
         pass
 
 
-@dataclass
-class _MessageProcessingState:
-    lock: asyncio.Lock = asyncio.Lock()
-    count: int = 0
+class _ConsumerPostCallback:
+    def __init__(
+        self,
+        msg_id: MessageId,
+        msg_queue: AbstractMessageQueue,
+        remaining_handler_cnt: int,
+    ) -> None:
+        self._msg_id = msg_id
+        self._msg_queue = msg_queue
+        self._remaining_handler_cnt = remaining_handler_cnt
+        self._lock = asyncio.Lock()
+
+    async def done(self) -> None:
+        # To ensure that all consumer handlers are called.
+        # Basically there should be only one consumer handler for one event.
+        async with self._lock:
+            self._remaining_handler_cnt -= 1
+            if self._remaining_handler_cnt > 0:
+                return
+        # All consumer handlers are called.
+        await self._msg_queue.done(self._msg_id)
+
+
+class PostCallback(Protocol):
+    async def done(self) -> None:
+        pass
 
 
 class EventDispatcher:
@@ -256,8 +276,6 @@ class EventDispatcher:
     _log_events: bool
     _metric_observer: EventObserver
 
-    _consumer_message_states: defaultdict[MessageId, _MessageProcessingState]
-
     def __init__(
         self,
         message_queue: AbstractMessageQueue,
@@ -273,7 +291,6 @@ class EventDispatcher:
         self._subscribers = defaultdict(set)
         self._msg_queue = message_queue
         self._metric_observer = event_observer
-        self._consumer_message_states = defaultdict(lambda: _MessageProcessingState())
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -394,7 +411,7 @@ class EventDispatcher:
         evh: EventHandler,
         source: AgentId,
         args: tuple,
-        post_callbacks: Sequence[Callable[..., Awaitable[None]]] = tuple(),
+        post_callbacks: Sequence[PostCallback] = tuple(),
     ) -> None:
         if evh.args_matcher and not evh.args_matcher(args):
             return
@@ -419,7 +436,7 @@ class EventDispatcher:
                 else:
                     cb(evh.context, source, event_cls.deserialize(args))  # type: ignore
                 for post_callback in post_callbacks:
-                    await post_callback()
+                    await post_callback.done()
                 self._metric_observer.observe_event_success(
                     event_type=event_type,
                     duration=time.perf_counter() - start,
@@ -445,7 +462,7 @@ class EventDispatcher:
         event_name: str,
         source: AgentId,
         args: tuple,
-        post_callbacks: Sequence[Callable[..., Awaitable[None]]] = tuple(),
+        post_callbacks: Sequence[PostCallback] = tuple(),
     ) -> None:
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
@@ -475,26 +492,18 @@ class EventDispatcher:
             if self._closed:
                 return
             decoded_event_name = msg.payload[b"name"].decode()
-
-            async def done() -> None:
-                # To ensure that all consumer handlers are called.
-                # Basically there should be only one consumer handler for one event.
-                handler_count = len(self._consumers[decoded_event_name])  # Updated to use consumers
-                state = self._consumer_message_states[msg.msg_id]
-                async with state.lock:
-                    state.count += 1
-                    if state.count < handler_count:
-                        return
-                # All consumer handlers are called.
-                await self._msg_queue.done(msg.msg_id)
-                del self._consumer_message_states[msg.msg_id]
+            post_callback = _ConsumerPostCallback(
+                msg.msg_id,
+                self._msg_queue,
+                len(self._consumers[decoded_event_name]),
+            )
 
             try:
                 await self.dispatch_consumers(
                     decoded_event_name,
                     AgentId(msg.payload[b"source"].decode()),
                     msgpack.unpackb(msg.payload[b"args"]),
-                    [done],
+                    [post_callback],
                 )
             except Exception:
                 # Exception is already handled in handle() method.
