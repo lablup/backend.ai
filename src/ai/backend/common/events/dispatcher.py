@@ -498,16 +498,12 @@ class EventDispatcher:
                 len(self._consumers[decoded_event_name]),
             )
 
-            try:
-                await self.dispatch_consumers(
-                    decoded_event_name,
-                    AgentId(msg.payload[b"source"].decode()),
-                    msgpack.unpackb(msg.payload[b"args"]),
-                    [post_callback],
-                )
-            except Exception:
-                # Exception is already handled in handle() method.
-                pass
+            await self.dispatch_consumers(
+                decoded_event_name,
+                AgentId(msg.payload[b"source"].decode()),
+                msgpack.unpackb(msg.payload[b"args"]),
+                [post_callback],
+            )
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
@@ -515,15 +511,11 @@ class EventDispatcher:
             if self._closed:
                 return
             decoded_event_name = msg.payload[b"name"].decode()
-            try:
-                await self.dispatch_subscribers(
-                    decoded_event_name,
-                    AgentId(msg.payload[b"source"].decode()),
-                    msgpack.unpackb(msg.payload[b"args"]),
-                )
-            except Exception:
-                # Exception is already handled in handle() method.
-                pass
+            await self.dispatch_subscribers(
+                decoded_event_name,
+                AgentId(msg.payload[b"source"].decode()),
+                msgpack.unpackb(msg.payload[b"args"]),
+            )
 
 
 class EventProducer:
