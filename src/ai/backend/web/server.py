@@ -394,8 +394,8 @@ async def login_handler(request: web.Request) -> web.Response:
                     result["authenticated"] = False
                     result["data"] = {
                         "type": "https://api.backend.ai/probs/require-totp-registration",
-                        "title": "Require TOTP Registration",
-                        "details": "The user must register TOTP.",
+                        "title": "TOTP key registration required",
+                        "details": "TOTP key registration required.",
                         "totp_registration_token": auth_result.token,
                     }
                     return web.json_response(result)
