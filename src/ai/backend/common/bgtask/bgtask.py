@@ -23,7 +23,14 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
 from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.exception import BackendAIError, BgtaskNotFoundError, ErrorCode, ErrorDetail
+from ai.backend.common.exception import (
+    BackendAIError,
+    BgtaskNotFoundError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import redis_helper
@@ -306,7 +313,11 @@ class BackgroundTaskManager:
             msg = bgtask_result_event.message or msg
         except asyncio.CancelledError:
             status = BgtaskStatus.CANCELLED
-            error_code = ErrorCode.default().with_detail(ErrorDetail.CANCELED)
+            error_code = ErrorCode(
+                domain=ErrorDomain.BGTASK,
+                operation=ErrorOperation.EXECUTE,
+                error_detail=ErrorDetail.CANCELED,
+            )
             return BgtaskCancelledEvent(task_id, "")
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
@@ -315,7 +326,11 @@ class BackgroundTaskManager:
             return BgtaskFailedEvent(task_id, repr(e))
         except Exception as e:
             status = BgtaskStatus.FAILED
-            error_code = ErrorCode.default()
+            error_code = ErrorCode(
+                domain=ErrorDomain.BGTASK,
+                operation=ErrorOperation.EXECUTE,
+                error_detail=ErrorDetail.INTERNAL_ERROR,
+            )
             log.error("Task {} ({}): unhandled error", task_id, task_name)
             return BgtaskFailedEvent(task_id, repr(e))
         finally:
