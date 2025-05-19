@@ -1858,7 +1858,7 @@ async def delete_from_trash_bin(
 async def force_delete(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
-    piece = request.match_info["name"]
+    piece = request.match_info["folder_id"]
     try:
         folder_id = uuid.UUID(piece)
     except ValueError:
@@ -2816,7 +2816,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/purge", purge))
     cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
     cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
-    cors.add(add_route("DELETE", r"/{name}/force", force_delete))
+    cors.add(add_route("DELETE", r"/{folder_id}/force", force_delete))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
