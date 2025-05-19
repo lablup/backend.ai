@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Final, Optional, Self
 
 import graphene
 
+from ai.backend.common.lock import EtcdLock
 from ai.backend.common.utils import deep_merge
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
@@ -190,15 +191,19 @@ class ModifyServiceConfigNode(graphene.Mutation):
     ) -> ModifyServiceConfigNodePayload:
         ctx: GraphQueryContext = info.context
 
-        merged_raw_unified_config = deep_merge(
-            ctx.config_provider.config.model_dump(by_alias=True),
-            input.configuration,
-        )
+        ETCD_LOCK_KEY = f"{_PREFIX}/lock/modify_service_config"
 
-        new_config = ManagerUnifiedConfig.model_validate(merged_raw_unified_config)
-        ctx.config_provider.reload(new_config)
+        # Acquire etcd lock to prevent concurrent modifications
+        async with EtcdLock(ETCD_LOCK_KEY, ctx.etcd, timeout=20, lifetime=20) as _:
+            merged_raw_unified_config = deep_merge(
+                ctx.config_provider.config.model_dump(by_alias=True),
+                input.configuration,
+            )
 
-        await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(input.service), input.configuration)
+            new_config = ManagerUnifiedConfig.model_validate(merged_raw_unified_config)
+            ctx.config_provider.reload(new_config)
+
+            await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(input.service), input.configuration)
 
         return ModifyServiceConfigNodePayload(
             service_config=ServiceConfigNode.load(info, input.service),
