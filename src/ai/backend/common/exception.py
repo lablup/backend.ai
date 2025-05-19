@@ -261,6 +261,17 @@ class ErrorCode:
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
+    def with_detail(self, error_detail: ErrorDetail) -> "ErrorCode":
+        """
+        Returns a new error code with the specified error detail.
+        This is used when the error detail is not specified.
+        """
+        return ErrorCode(
+            domain=self.domain,
+            operation=self.operation,
+            error_detail=error_detail,
+        )
+
     def __str__(self) -> str:
         return f"{self.domain}_{self.operation}_{self.error_detail}"
 

@@ -23,7 +23,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
 from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.exception import BackendAIError, BgtaskNotFoundError, ErrorCode
+from ai.backend.common.exception import BackendAIError, BgtaskNotFoundError, ErrorCode, ErrorDetail
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import redis_helper
@@ -306,7 +306,7 @@ class BackgroundTaskManager:
             msg = bgtask_result_event.message or msg
         except asyncio.CancelledError:
             status = BgtaskStatus.CANCELLED
-            error_code = ErrorCode.default()
+            error_code = ErrorCode.default().with_detail(ErrorDetail.CANCELED)
             return BgtaskCancelledEvent(task_id, "")
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
