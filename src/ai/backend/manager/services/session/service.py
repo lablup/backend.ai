@@ -40,7 +40,6 @@ from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
-    DispatchResult,
     ImageAlias,
     ImageRegistry,
     SessionId,
@@ -366,7 +365,7 @@ class SessionService:
 
         base_image_ref = image_row.image_ref
 
-        async def _commit_and_upload(reporter: ProgressReporter) -> DispatchResult:
+        async def _commit_and_upload(reporter: ProgressReporter) -> None:
             reporter.total_progress = 3
             await reporter.update(message="Commit started")
             try:
@@ -532,8 +531,6 @@ class SessionService:
             except BackendAIError:
                 log.exception("CONVERT_SESSION_TO_IMAGE: exception")
                 raise
-
-            return DispatchResult.success(None)
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
 
