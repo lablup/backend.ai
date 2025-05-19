@@ -40,6 +40,7 @@ from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
+    DispatchResult,
     ImageAlias,
     ImageRegistry,
     SessionId,
@@ -365,7 +366,7 @@ class SessionService:
 
         base_image_ref = image_row.image_ref
 
-        async def _commit_and_upload(reporter: ProgressReporter) -> None:
+        async def _commit_and_upload(reporter: ProgressReporter) -> DispatchResult:
             reporter.total_progress = 3
             await reporter.update(message="Commit started")
             try:
@@ -471,10 +472,8 @@ class SessionService:
                             log.warning("unexpected event: {}", event)
                             continue
                         match event.status():
-                            case (
-                                BgtaskStatus.DONE,
-                                BgtaskStatus.PARTIAL_SUCCESS,
-                            ):  # TODO: PARTIAL_SUCCESS should be handled
+                            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
+                                # TODO: PARTIAL_SUCCESS should be handled
                                 await reporter.update(increment=1, message="Committed image")
                                 break
                             case BgtaskStatus.FAILED:
@@ -510,7 +509,7 @@ class SessionService:
                                 log.warning("unexpected event: {}", event)
                                 continue
                             match event.status():
-                                case BgtaskStatus.DONE, BgtaskStatus.PARTIAL_SUCCESS:
+                                case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
                                     break
                                 case BgtaskStatus.FAILED:
                                     raise BgtaskFailedError(extra_msg=event.message)
@@ -534,7 +533,12 @@ class SessionService:
                 log.exception("CONVERT_SESSION_TO_IMAGE: exception")
                 raise
 
+            return DispatchResult.success(None)
+
         task_id = await self._background_task_manager.start(_commit_and_upload)
+        propagator = BgtaskPropagator(self._background_task_manager)
+        self._event_hub.register_event_propagator(propagator, [(EventDomain.BGTASK, str(task_id))])
+
         return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
 
     async def create_cluster(self, action: CreateClusterAction) -> CreateClusterActionResult:

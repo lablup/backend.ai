@@ -1,3 +1,4 @@
+import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -6,7 +7,6 @@ from typing import Optional, override
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
 from ai.backend.common.events.user_event.user_bgtask_event import (
-    UserBgtaskAlreadyDoneEvent,
     UserBgtaskCancelledEvent,
     UserBgtaskDoneEvent,
     UserBgtaskFailedEvent,
@@ -14,6 +14,9 @@ from ai.backend.common.events.user_event.user_bgtask_event import (
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 @dataclass
@@ -155,12 +158,30 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
 
     @override
     def user_event(self) -> Optional[UserEvent]:
-        return UserBgtaskAlreadyDoneEvent(
-            task_id=str(self.task_id),
-            message=str(self.message),
-            current_progress=float(self.current),
-            total_progress=float(self.total),
-        )
+        match self.task_status:
+            case BgtaskStatus.DONE:
+                return UserBgtaskDoneEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case BgtaskStatus.CANCELLED:
+                return UserBgtaskCancelledEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case BgtaskStatus.FAILED:
+                return UserBgtaskFailedEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case BgtaskStatus.PARTIAL_SUCCESS:
+                return UserBgtaskDoneEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case _:
+                log.exception("unknown task status {}", self.task_status)
+                raise UnreachableError(f"Unknown task status {self.task_status}")
 
 
 @dataclass
