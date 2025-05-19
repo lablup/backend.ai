@@ -536,8 +536,6 @@ class SessionService:
             return DispatchResult.success(None)
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
-        propagator = BgtaskPropagator(self._background_task_manager)
-        self._event_hub.register_event_propagator(propagator, [(EventDomain.BGTASK, str(task_id))])
 
         return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
 
