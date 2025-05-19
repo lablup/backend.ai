@@ -6,6 +6,7 @@ import attrs
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -65,6 +66,7 @@ class RootContext(BaseContext):
     metrics: CommonMetricRegistry
     processors: Processors
     event_hub: EventHub
+    message_queue: AbstractMessageQueue
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
         super().__init__(**kwargs)

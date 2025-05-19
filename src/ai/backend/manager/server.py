@@ -595,23 +595,34 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    mq = _make_message_queue(root_ctx)
+async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.message_queue = _make_message_queue(root_ctx)
+    yield
+    await root_ctx.message_queue.close()
+
+
+@actxmgr
+async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_producer = EventProducer(
-        mq,
+        root_ctx.message_queue,
         source=AGENTID_MANAGER,
         log_events=root_ctx.config_provider.config.debug.log_events,
     )
-    root_ctx.event_dispatcher = EventDispatcher(
-        mq,
-        log_events=root_ctx.config_provider.config.debug.log_events,
-        event_observer=root_ctx.metrics.event,
-    )
-    dispatchers = Dispatchers(DispatcherArgs(root_ctx.event_hub))
-    dispatchers.dispatch(root_ctx.event_dispatcher)
     yield
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
+
+
+@actxmgr
+async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.event_dispatcher = EventDispatcher(
+        root_ctx.message_queue,
+        log_events=root_ctx.config_provider.config.debug.log_events,
+        event_observer=root_ctx.metrics.event,
+    )
+    dispatchers = Dispatchers(DispatcherArgs(root_ctx.event_hub, root_ctx.registry, root_ctx.db))
+    dispatchers.dispatch(root_ctx.event_dispatcher)
+    yield
     await root_ctx.event_dispatcher.close()
 
 
@@ -733,7 +744,6 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_live,
         root_ctx.redis_image,
         root_ctx.redis_stream,
-        root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
@@ -984,13 +994,15 @@ def build_root_app(
             database_ctx,
             services_ctx,
             distributed_lock_ctx,
-            event_dispatcher_ctx,
-            idle_checker_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
             storage_manager_ctx,
-            network_plugin_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
+            network_plugin_ctx,
             agent_registry_ctx,
+            event_dispatcher_ctx,
+            idle_checker_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,
