@@ -394,12 +394,19 @@ class AgentRegistry:
             handle_session_termination_lifecycle,
             name="api.session.sterm",
         )
-        evd.consume(SessionEnqueuedEvent, self, invoke_session_callback)
+        evd.consume(
+            SessionEnqueuedEvent,
+            self,
+            invoke_session_callback,
+            name="registry.invoke_sesion_callback",
+        )
         evd.consume(SessionScheduledEvent, self, invoke_session_callback)
         evd.consume(SessionPreparingEvent, self, invoke_session_callback)
         evd.consume(SessionSuccessEvent, self, handle_batch_result)
         evd.consume(SessionFailureEvent, self, handle_batch_result)
-        evd.consume(AgentStartedEvent, self, handle_agent_lifecycle)
+        evd.consume(
+            AgentStartedEvent, self, handle_agent_lifecycle, name="registry.handle_agent_lifecycle"
+        )
         evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
         evd.consume(AgentImagesRemoveEvent, self, handle_agent_images_remove)
