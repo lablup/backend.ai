@@ -2,10 +2,7 @@ from typing import Self
 
 import sqlalchemy as sa
 
-from ai.backend.common.events.dispatcher import (
-    EventDomain,
-)
-from ai.backend.common.events.reporter import EventProtocol
+from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
 
 from .base import (
     Base,
@@ -37,7 +34,7 @@ class EventLogRow(Base):
     duration = sa.Column("duration", sa.Interval, nullable=True)
 
     @classmethod
-    def from_event(cls, event: EventProtocol) -> Self:
+    def from_event(cls, event: AbstractEvent) -> Self:
         event_name = event.event_name()
         event_domain = event.event_domain()
         event_domain_id = event.domain_id()

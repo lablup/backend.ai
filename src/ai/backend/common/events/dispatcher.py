@@ -21,6 +21,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    override,
 )
 
 import attrs
@@ -36,7 +37,7 @@ from .. import msgpack
 from ..types import (
     AgentId,
 )
-from .reporter import EventProtocol, EventReportArgs
+from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
 from .types import EventDomain
 
 __all__ = (
@@ -114,15 +115,6 @@ EventCallback = Union[
 ]
 
 
-class EventReporterProtocol(Protocol):
-    async def report(
-        self,
-        event: EventProtocol,
-        arg: EventReportArgs = EventReportArgs.nop(),
-    ) -> None:
-        pass
-
-
 class EventHandlerType(enum.Enum):
     CONSUMER = "CONSUMER"
     SUBSCRIBER = "SUBSCRIBER"
@@ -138,8 +130,8 @@ class EventHandler(Generic[TContext, TEvent]):
     coalescing_opts: Optional[CoalescingOptions]
     coalescing_state: CoalescingState
     args_matcher: Callable[[tuple], bool] | None
-    event_start_reporters: tuple[EventReporterProtocol, ...] = attrs.field(factory=tuple)
-    event_complete_reporters: tuple[EventReporterProtocol, ...] = attrs.field(factory=tuple)
+    event_start_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
+    event_complete_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
 
 
 class CoalescingOptions(TypedDict):
@@ -250,33 +242,72 @@ class PostCallback(Protocol):
         pass
 
 
-class EventDispatcherWrapper:
+class EventDispatcherGroup(ABC):
+    @abstractmethod
+    def with_reporters(
+        self,
+        start_reporters: Sequence[AbstractEventReporter] = tuple(),
+        complete_reporters: Sequence[AbstractEventReporter] = tuple(),
+    ) -> EventDispatcherGroup:
+        raise NotImplementedError
+
+    @abstractmethod
+    def consume(
+        self,
+        event_cls: Type[TEvent],
+        context: TContext,
+        callback: EventCallback[TContext, TEvent],
+        coalescing_opts: Optional[CoalescingOptions] = None,
+        *,
+        name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
+    ) -> EventHandler[TContext, TEvent]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def subscribe(
+        self,
+        event_cls: Type[TEvent],
+        context: TContext,
+        callback: EventCallback[TContext, TEvent],
+        coalescing_opts: Optional[CoalescingOptions] = None,
+        *,
+        name: Optional[str] = None,
+        override_event_name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
+    ) -> EventHandler[TContext, TEvent]:
+        raise NotImplementedError
+
+
+class _EventDispatcherWrapper(EventDispatcherGroup):
     _event_dispatcher: EventDispatcher
 
-    _start_reporters: list[EventReporterProtocol]
-    _complete_reporters: list[EventReporterProtocol]
+    _start_reporters: list[AbstractEventReporter]
+    _complete_reporters: list[AbstractEventReporter]
 
     def __init__(
         self,
         event_dispatcher: EventDispatcher,
-        start_reporters: Sequence[EventReporterProtocol] = tuple(),
-        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
+        start_reporters: Sequence[AbstractEventReporter] = tuple(),
+        complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> None:
         self._event_dispatcher = event_dispatcher
         self._start_reporters = list(start_reporters)
         self._complete_reporters = list(complete_reporters)
 
-    def extend_reporters(
+    @override
+    def with_reporters(
         self,
-        start_reporters: Sequence[EventReporterProtocol] = tuple(),
-        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
-    ) -> EventDispatcherWrapper:
-        return EventDispatcherWrapper(
+        start_reporters: Sequence[AbstractEventReporter] = tuple(),
+        complete_reporters: Sequence[AbstractEventReporter] = tuple(),
+    ) -> _EventDispatcherWrapper:
+        return _EventDispatcherWrapper(
             event_dispatcher=self._event_dispatcher,
             start_reporters=self._start_reporters + list(start_reporters),
             complete_reporters=self._complete_reporters + list(complete_reporters),
         )
 
+    @override
     def consume(
         self,
         event_cls: Type[TEvent],
@@ -298,6 +329,7 @@ class EventDispatcherWrapper:
             complete_reporters=tuple(self._complete_reporters),
         )
 
+    @override
     def subscribe(
         self,
         event_cls: Type[TEvent],
@@ -322,7 +354,7 @@ class EventDispatcherWrapper:
         )
 
 
-class EventDispatcher:
+class EventDispatcher(EventDispatcherGroup):
     """
     We have two types of event handlers: consumer and subscriber.
 
@@ -393,17 +425,19 @@ class EventDispatcher:
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
 
+    @override
     def with_reporters(
         self,
-        start_reporters: Sequence[EventReporterProtocol] = tuple(),
-        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
-    ) -> EventDispatcherWrapper:
-        return EventDispatcherWrapper(
+        start_reporters: Sequence[AbstractEventReporter] = tuple(),
+        complete_reporters: Sequence[AbstractEventReporter] = tuple(),
+    ) -> EventDispatcherGroup:
+        return _EventDispatcherWrapper(
             event_dispatcher=self,
             start_reporters=list(start_reporters),
             complete_reporters=list(complete_reporters),
         )
 
+    @override
     def consume(
         self,
         event_cls: Type[TEvent],
@@ -413,8 +447,8 @@ class EventDispatcher:
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-        start_reporters: Sequence[EventReporterProtocol] = tuple(),
-        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
+        start_reporters: Sequence[AbstractEventReporter] = tuple(),
+        complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TEvent]:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
@@ -450,6 +484,7 @@ class EventDispatcher:
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
+    @override
     def subscribe(
         self,
         event_cls: Type[TEvent],
@@ -460,8 +495,8 @@ class EventDispatcher:
         name: Optional[str] = None,
         override_event_name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-        start_reporters: Sequence[EventReporterProtocol] = tuple(),
-        complete_reporters: Sequence[EventReporterProtocol] = tuple(),
+        start_reporters: Sequence[AbstractEventReporter] = tuple(),
+        complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
@@ -519,6 +554,8 @@ class EventDispatcher:
         event_type = event_cls.event_name()
         event = event_cls.deserialize(args)
         start = time.perf_counter()
+        for start_reporter in evh.event_start_reporters:
+            await start_reporter.prepare_event_report(event, PrepareEventReportArgs())
         try:
             if await coalescing_state.rate_control(coalescing_opts):
                 if self._closed:
@@ -551,8 +588,9 @@ class EventDispatcher:
                 exception=e,
             )
             raise
+        duration = time.perf_counter() - start
         for complete in evh.event_complete_reporters:
-            await complete.report(event)
+            await complete.complete_event_report(event, CompleteEventReportArgs(duration))
 
     async def dispatch_consumers(
         self,

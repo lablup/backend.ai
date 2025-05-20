@@ -1,37 +1,32 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Protocol, Self
 
-from .types import EventDomain
-
-
-class EventProtocol(Protocol):
-    @classmethod
-    def event_domain(self) -> EventDomain:
-        pass
-
-    @classmethod
-    def event_name(cls) -> str:
-        pass
-
-    def domain_id(self) -> Optional[str]:
-        pass
+from .dispatcher import AbstractEvent
 
 
 @dataclass
-class EventReportArgs:
-    duration: Optional[float] = None
+class PrepareEventReportArgs:
+    pass
 
-    @classmethod
-    def nop(cls) -> Self:
-        return cls()
+
+@dataclass
+class CompleteEventReportArgs:
+    duration: float
 
 
 class AbstractEventReporter(ABC):
     @abstractmethod
-    async def report(
+    async def prepare_event_report(
         self,
-        event: EventProtocol,
-        arg: EventReportArgs = EventReportArgs.nop(),
+        event: AbstractEvent,
+        arg: PrepareEventReportArgs,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def complete_event_report(
+        self,
+        event: AbstractEvent,
+        arg: CompleteEventReportArgs,
     ) -> None:
         raise NotImplementedError
