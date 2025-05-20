@@ -23,10 +23,17 @@ from ai.backend.common.events.dispatcher import (
 from ai.backend.common.types import AgentId, RedisProfileTarget
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
+    agent_registry_ctx,
     background_task_ctx,
     event_dispatcher_ctx,
     event_hub_ctx,
+    event_producer_ctx,
+    hook_plugin_ctx,
+    message_queue_ctx,
+    monitoring_ctx,
+    network_plugin_ctx,
     redis_ctx,
+    storage_manager_ctx,
 )
 
 
@@ -47,6 +54,13 @@ async def bgtask_fixture(
             mock_etcd_ctx,
             mock_config_provider_ctx,
             redis_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
+            storage_manager_ctx,
+            monitoring_ctx,
+            network_plugin_ctx,
+            hook_plugin_ctx,
+            agent_registry_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
         ],

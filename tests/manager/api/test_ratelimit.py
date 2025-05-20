@@ -4,12 +4,17 @@ import pytest
 
 import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.manager.server import (
+    agent_registry_ctx,
     database_ctx,
     event_dispatcher_ctx,
     event_hub_ctx,
+    event_producer_ctx,
     hook_plugin_ctx,
+    message_queue_ctx,
     monitoring_ctx,
+    network_plugin_ctx,
     redis_ctx,
+    storage_manager_ctx,
 )
 
 
@@ -27,10 +32,15 @@ async def test_check_rlim_for_anonymous_query(
             mock_etcd_ctx,
             mock_config_provider_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
             database_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
+            storage_manager_ctx,
             monitoring_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
+            agent_registry_ctx,
+            event_dispatcher_ctx,
         ],
         [".auth", ".ratelimit"],
     )
@@ -56,10 +66,15 @@ async def test_check_rlim_for_authorized_query(
             mock_etcd_ctx,
             mock_config_provider_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
             database_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
+            storage_manager_ctx,
             monitoring_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
+            agent_registry_ctx,
+            event_dispatcher_ctx,
         ],
         [".auth", ".ratelimit"],
     )
