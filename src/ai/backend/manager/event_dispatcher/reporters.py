@@ -18,14 +18,14 @@ class EventLogger(AbstractEventReporter):
         event: AbstractEvent,
         arg: PrepareEventReportArgs,
     ) -> None:
-        return
+        async with self._db.begin_session() as session:
+            event_log = EventLogRow.from_event(event)
+            session.add(event_log)
+            await session.flush()
 
     async def complete_event_report(
         self,
         event: AbstractEvent,
         arg: CompleteEventReportArgs,
     ) -> None:
-        async with self._db.begin_session() as session:
-            event_log = EventLogRow.from_event(event)
-            session.add(event_log)
-            await session.flush()
+        return
