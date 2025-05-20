@@ -2,11 +2,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Sequence, cast
 
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 from ..service_discovery import ServiceDiscovery, ServiceMetadata
 
-_DEFAULT_PREFIX = "/ai/backend/service_discovery"
+_DEFAULT_PREFIX = "ai/backend/service_discovery"
 
 
 @dataclass
@@ -30,7 +30,7 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         """
 
         prefix = self._service_prefix(service.service_group, service.id)
-        await self._etcd.put_prefix(prefix, service.to_dict())
+        await self._etcd.put_prefix(prefix, service.to_dict(), scope=ConfigScopes.GLOBAL)
 
     async def unregister(self, service_group: str, service_id: uuid.UUID) -> None:
         """
@@ -39,7 +39,9 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         :param service_id: UUID of the service.
         """
 
-        await self._etcd.delete_prefix(self._service_prefix(service_group, service_id))
+        await self._etcd.delete_prefix(
+            self._service_prefix(service_group, service_id), scope=ConfigScopes.GLOBAL
+        )
 
     async def heartbeat(self, service_group: str, service_id: uuid.UUID) -> None:
         """
@@ -49,14 +51,14 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         """
 
         prefix = self._service_prefix(service_group, service_id)
-        raw_service_info = await self._etcd.get_prefix(prefix)
+        raw_service_info = await self._etcd.get_prefix(prefix, scope=ConfigScopes.GLOBAL)
         if not raw_service_info:
             raise ValueError(f"Service with ID {service_id} not found.")
 
         service_dict = cast(dict[str, Any], raw_service_info)
         service = ServiceMetadata.from_dict(service_dict)
         service.health_status.update_heartbeat()
-        await self._etcd.put_prefix(prefix, service.to_dict())
+        await self._etcd.put_prefix(prefix, service.to_dict(), scope=ConfigScopes.GLOBAL)
 
     async def discover(self) -> Sequence[ServiceMetadata]:
         """
@@ -64,7 +66,7 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         :return: List of service metadata.
         """
 
-        raw_service_groups = await self._etcd.get_prefix(self._prefix)
+        raw_service_groups = await self._etcd.get_prefix(self._prefix, scope=ConfigScopes.GLOBAL)
         services = []
         if not raw_service_groups:
             raise ValueError("No service groups found.")
@@ -82,7 +84,9 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         """
 
         service_group_prefix = self._service_group_prefix(service_group)
-        raw_service_configs = await self._etcd.get_prefix(service_group_prefix)
+        raw_service_configs = await self._etcd.get_prefix(
+            service_group_prefix, scope=ConfigScopes.GLOBAL
+        )
         if not raw_service_configs:
             raise ValueError(f"No services found in group {service_group}.")
         service_configs = cast(dict[str, dict[str, Any]], raw_service_configs)
@@ -99,7 +103,7 @@ class ETCDServiceDiscovery(ServiceDiscovery):
         """
 
         service_prefix = self._service_prefix(service_group, service_id)
-        raw_service_config = await self._etcd.get_prefix(service_prefix)
+        raw_service_config = await self._etcd.get_prefix(service_prefix, scope=ConfigScopes.GLOBAL)
         if not raw_service_config:
             raise ValueError(f"Service with ID {service_id} not found.")
         service_config = cast(dict[str, Any], raw_service_config)

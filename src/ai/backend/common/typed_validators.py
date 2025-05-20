@@ -287,6 +287,10 @@ class HostPortPair(BaseModel):
     def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
 
+    @property
+    def address(self) -> str:
+        return f"{self.host}:{self.port}"
+
 
 def _parse_to_tzinfo(value: Any) -> tzinfo:
     if isinstance(value, tzinfo):
