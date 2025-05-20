@@ -465,7 +465,6 @@ class ManagerConfig(BaseModel):
         description="""
         Address and port to announce to other components.
         This is used for service discovery and should be accessible by other components.
-        Default is the same as addr.
         """,
         examples=[{"host": "127.0.0.1", "port": 5432}],
         alias="announce-addr",
@@ -474,8 +473,7 @@ class ManagerConfig(BaseModel):
         default_factory=lambda: HostPortPair(host="host.docker.internal", port=18080),
         description="""
         Address and port to announce for internal API requests.
-        This is used for communication between manager components.
-        Default is the same as internal_addr.
+        This is used for service discovery and should be accessible by other components.
         """,
         examples=[{"host": "127.0.0.1", "port": 18080}],
         alias="announce-internal-addr",
