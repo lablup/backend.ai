@@ -68,6 +68,15 @@ from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
+from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
+    ETCDServiceDiscovery,
+    ETCDServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
 from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
@@ -592,6 +601,28 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_hub = EventHub()
     yield
     await root_ctx.event_hub.shutdown()
+
+
+@actxmgr
+async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(root_ctx.etcd))
+    loop = ServiceDiscoveryLoop(
+        etcd_discovery,
+        ServiceMetadata(
+            display_name=f"manager-{root_ctx.config_provider.config.manager.id}",
+            service_group="manager",
+            version=__version__,
+            endpoint=ServiceEndpoint(
+                address=root_ctx.config_provider.config.manager.announce_addr.address,
+                port=root_ctx.config_provider.config.manager.announce_addr.port,
+                protocol="http",
+                prometheus_address=root_ctx.config_provider.config.manager.announce_internal_addr.address,
+            ),
+        ),
+    )
+    loop.start()
+    yield
+    loop.close()
 
 
 @actxmgr

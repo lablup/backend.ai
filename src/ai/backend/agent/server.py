@@ -75,6 +75,15 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
+    ETCDServiceDiscovery,
+    ETCDServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
@@ -1214,12 +1223,28 @@ async def server_main(
     )
     agent_instance = agent
     monitor.console_locals["agent"] = agent
-
     app = build_root_server()
     runner = web.AppRunner(app)
     await runner.setup()
     service_addr = local_config["agent"]["service-addr"]
+    announce_addr = local_config["agent"]["announce-addr"]
     ssl_ctx = None
+    etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
+    sd_loop = ServiceDiscoveryLoop(
+        etcd_discovery,
+        ServiceMetadata(
+            display_name=f"agent-{local_config['agent']['id']}",
+            service_group="agent",
+            version=VERSION,
+            endpoint=ServiceEndpoint(
+                address=service_addr,
+                port=service_addr.port,
+                protocol="http",
+                prometheus_address=announce_addr,
+            ),
+        ),
+    )
+    sd_loop.start()
     if local_config["agent"]["ssl-enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(
@@ -1245,6 +1270,7 @@ async def server_main(
     finally:
         if aiomon_started:
             monitor.close()
+        sd_loop.close()
 
 
 @click.group(invoke_without_command=True)

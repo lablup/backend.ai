@@ -32,6 +32,15 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
+    ETCDServiceDiscovery,
+    ETCDServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
 from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget, safe_print_redis_target
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -247,6 +256,23 @@ async def server_main(
                 os.setuid(uid)
                 log.info("Changed process uid:gid to {}:{}", uid, gid)
             log.info("Started service.")
+            announce_addr = local_config["api"]["manager"]["announce-addr"]
+            etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
+            sd_loop = ServiceDiscoveryLoop(
+                etcd_discovery,
+                ServiceMetadata(
+                    display_name=f"agent-{local_config['agent']['id']}",
+                    service_group="agent",
+                    version=VERSION,
+                    endpoint=ServiceEndpoint(
+                        address=manager_service_addr,
+                        port=manager_service_addr.port,
+                        protocol="http",
+                        prometheus_address=announce_addr,
+                    ),
+                ),
+            )
+            sd_loop.start()
             try:
                 yield
             finally:
@@ -257,6 +283,7 @@ async def server_main(
                 await event_dispatcher.close()
                 if watcher_client is not None:
                     await watcher_client.close()
+                sd_loop.close()
     finally:
         if aiomon_started:
             m.close()

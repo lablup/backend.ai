@@ -460,6 +460,26 @@ class ManagerConfig(BaseModel):
         validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
+    announce_addr: HostPortPair = Field(
+        default_factory=lambda: HostPortPair(host="127.0.0.1", port=5432),
+        description="""
+        Address and port to announce to other components.
+        This is used for service discovery and should be accessible by other components.
+        Default is the same as addr.
+        """,
+        examples=[{"host": "127.0.0.1", "port": 5432}],
+        alias="announce-addr",
+    )
+    announce_internal_addr: HostPortPair = Field(
+        default_factory=lambda: HostPortPair(host="127.0.0.1", port=18080),
+        description="""
+        Address and port to announce for internal API requests.
+        This is used for communication between manager components.
+        Default is the same as internal_addr.
+        """,
+        examples=[{"host": "127.0.0.1", "port": 18080}],
+        alias="announce-internal-addr",
+    )
     internal_addr: HostPortPair = Field(
         default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
         description="""

@@ -60,7 +60,7 @@ class ServiceMetadata(BaseModel):
     Metadata for a service.
     """
 
-    id: uuid.UUID
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
     display_name: str
     service_group: str
     version: str
@@ -176,7 +176,7 @@ class ServiceDiscoveryLoop:
             self._sweep_unhealthy_services_loop()
         )
 
-    async def close(self) -> None:
+    def close(self) -> None:
         """
         Close the service discovery loop.
         """

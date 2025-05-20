@@ -189,7 +189,7 @@ async def test_etcd_discovery_loop_heartbeat(
         default_service_metadata.health_status.last_heartbeat
         < updated_service_meta.health_status.last_heartbeat
     )
-    await loop.close()
+    loop.close()
 
 
 async def test_etcd_discovery_loop_with_unhealthy_metadata(
@@ -201,8 +201,8 @@ async def test_etcd_discovery_loop_with_unhealthy_metadata(
         service=unhealthy_service_metadata,
     )
 
-    loop = ServiceDiscoveryLoop(etcd_discovery, default_service_metadata)
-    loop.start()
+    sd_loop = ServiceDiscoveryLoop(etcd_discovery, default_service_metadata)
+    sd_loop.start()
 
     await asyncio.sleep(5)
 
@@ -211,4 +211,4 @@ async def test_etcd_discovery_loop_with_unhealthy_metadata(
             service_group=unhealthy_service_metadata.service_group,
             service_id=unhealthy_service_metadata.id,
         )
-    await loop.close()
+    sd_loop.close()
