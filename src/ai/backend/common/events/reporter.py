@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from .dispatcher import AbstractEvent
+from .types import AbstractEvent
 
 
 @dataclass

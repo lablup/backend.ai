@@ -24,27 +24,6 @@ class ImageEventHandler:
         self._registry = registry
         self._db = db
 
-    # def dispatch(self, event_dispatcher: EventDispatcher) -> None:
-    #     evd = event_dispatcher.with_reporters([EventLogger(self._db)])
-    #     evd.consume(
-    #         ImagePullStartedEvent,
-    #         None,
-    #         self._handle_image_pull_started,
-    #         name="api.session.ipullst",
-    #     )
-    #     evd.consume(
-    #         ImagePullFinishedEvent,
-    #         None,
-    #         self._handle_image_pull_finished,
-    #         name="api.session.ipullfin",
-    #     )
-    #     evd.consume(
-    #         ImagePullFailedEvent,
-    #         None,
-    #         self._handle_image_pull_failed,
-    #         name="api.session.ipullfail",
-    #     )
-
     async def _handle_image_pull_started(
         self,
         context: None,

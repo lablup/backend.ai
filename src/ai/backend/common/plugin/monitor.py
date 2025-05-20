@@ -4,6 +4,8 @@ import enum
 from abc import ABCMeta, abstractmethod
 from typing import Any, Mapping, Optional, Union
 
+from ..events.dispatcher import AbstractEvent
+from ..types import AgentId
 from . import AbstractPlugin, BasePluginContext
 
 __all__ = (
@@ -61,6 +63,15 @@ class AbstractErrorReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
     async def capture_message(self, message: str) -> None:
         pass
 
+    @abstractmethod
+    async def handle_error_event(
+        self,
+        context: None,
+        source: AgentId,
+        event: AbstractEvent,
+    ) -> None:
+        return
+
 
 class StatsPluginContext(BasePluginContext[AbstractStatReporterPlugin]):
     plugin_group = "backendai_stats_monitor_v20"
@@ -89,3 +100,12 @@ class ErrorPluginContext(BasePluginContext[AbstractErrorReporterPlugin]):
     async def capture_message(self, message: str) -> None:
         for plugin_instance in self.plugins.values():
             await plugin_instance.capture_message(message)
+
+    async def handle_error_event(
+        self,
+        context: None,
+        source: AgentId,
+        event: AbstractEvent,
+    ) -> None:
+        for plugin_instance in self.plugins.values():
+            await plugin_instance.handle_error_event(context, source, event)

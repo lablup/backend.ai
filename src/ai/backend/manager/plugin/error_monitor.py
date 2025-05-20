@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Mapping, Optional, override
 
 from ai.backend.common.events.agent import AgentErrorEvent
+from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
-from ai.backend.manager.event_dispatcher.reporters import EventLogger
 
 from ..models import error_logs
 
@@ -31,14 +31,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         else:
             self.enabled = True
         root_ctx: RootContext = context["_root.context"]  # type: ignore
-        self.event_dispatcher = root_ctx.event_dispatcher
-        evd = root_ctx.event_dispatcher.with_reporters([EventLogger(root_ctx.db)])
-        self._evh = evd.consume(AgentErrorEvent, None, self.handle_agent_error)
         self.db = root_ctx.db
-
-    async def cleanup(self) -> None:
-        if self.enabled:
-            self.event_dispatcher.unconsume(self._evh)
 
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
@@ -93,12 +86,15 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             message,
         )
 
-    async def handle_agent_error(
+    @override
+    async def handle_error_event(
         self,
         context: None,
         source: AgentId,
-        event: AgentErrorEvent,
+        event: AbstractEvent,
     ) -> None:
+        if not isinstance(event, AgentErrorEvent):
+            return
         if not self.enabled:
             return
         async with self.db.begin() as conn:

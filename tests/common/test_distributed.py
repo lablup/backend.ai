@@ -21,10 +21,12 @@ from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import (
-    AbstractEvent,
     EventDispatcher,
-    EventDomain,
     EventProducer,
+)
+from ai.backend.common.events.types import (
+    AbstractEvent,
+    EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.lock import (

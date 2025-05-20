@@ -35,56 +35,6 @@ class KernelEventHandler:
         self._registry = registry
         self._db = db
 
-    # def dispatch(self, event_dispatcher: EventDispatcher) -> None:
-    #     evd = event_dispatcher.with_reporters([EventLogger(self._db)])
-    #     evd.consume(
-    #         KernelPreparingEvent,
-    #         None,
-    #         self._handle_kernel_preparing,
-    #         name="api.session.kprep",
-    #     )
-    #     evd.consume(KernelPullingEvent, None, self._handle_kernel_pulling, name="api.session.kpull")
-    #     evd.consume(
-    #         KernelCreatingEvent,
-    #         None,
-    #         self._handle_kernel_creating,
-    #         name="api.session.kcreat",
-    #     )
-    #     evd.consume(
-    #         KernelStartedEvent,
-    #         None,
-    #         self._handle_kernel_started,
-    #         name="api.session.kstart",
-    #     )
-    #     evd.consume(
-    #         KernelCancelledEvent,
-    #         None,
-    #         self._handle_kernel_cancelled,
-    #         name="api.session.kstart",
-    #     )
-    #     evd.consume(
-    #         KernelTerminatingEvent,
-    #         None,
-    #         self._handle_kernel_terminating,
-    #         name="api.session.kterming",
-    #     )
-    #     evd.consume(
-    #         KernelTerminatedEvent,
-    #         None,
-    #         self._handle_kernel_terminated,
-    #         name="api.session.kterm",
-    #     )
-    #     evd.consume(
-    #         KernelHeartbeatEvent,
-    #         None,
-    #         self._handle_kernel_heartbeat,
-    #         name="api.session.kheartbeat",
-    #     )
-    #     # action-trigerring events
-    #     evd.consume(
-    #         DoSyncKernelLogsEvent, None, self._handle_kernel_log, name="api.session.syncklog"
-    #     )
-
     async def _handle_kernel_log(
         self,
         context: None,

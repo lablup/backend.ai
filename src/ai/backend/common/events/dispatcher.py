@@ -15,7 +15,6 @@ from typing import (
     Generic,
     Optional,
     Protocol,
-    Self,
     Type,
     TypedDict,
     TypeVar,
@@ -29,7 +28,6 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.queue import AbstractMessageQueue, MessageId
 from ai.backend.logging import BraceStyleAdapter
 
@@ -38,10 +36,9 @@ from ..types import (
     AgentId,
 )
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
-from .types import EventDomain
+from .types import AbstractEvent
 
 __all__ = (
-    "AbstractEvent",
     "EventCallback",
     "EventDispatcher",
     "EventHandler",
@@ -54,55 +51,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class _EventHandlerType(enum.StrEnum):
     CONSUMER = "consumer"
     SUBSCRIBER = "subscriber"
-
-
-class AbstractEvent(ABC):
-    @abstractmethod
-    def serialize(self) -> tuple[bytes, ...]:
-        """
-        Return a msgpack-serializable tuple.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def deserialize(cls, value: tuple[bytes, ...]) -> Self:
-        """
-        Construct the event args from a tuple deserialized from msgpack.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def event_domain(self) -> EventDomain:
-        """
-        Return the event domain.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def event_name(cls) -> str:
-        """
-        Return the event name.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def domain_id(self) -> Optional[str]:
-        """
-        Return the domain ID.
-        It's used to identify the event domain in the event hub.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def user_event(self) -> Optional[UserEvent]:
-        """
-        Return the event as a UserEvent.
-        If user event is not supported, return None.
-        """
-        raise NotImplementedError
 
 
 TEvent = TypeVar("TEvent", bound="AbstractEvent")

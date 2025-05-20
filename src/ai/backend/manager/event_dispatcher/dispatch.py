@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from ai.backend.common.events.agent import (
+    AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
@@ -47,6 +48,7 @@ from ai.backend.common.events.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
+from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.manager.event_dispatcher.propagator import PropagatorEventDispatcher
 from ai.backend.manager.registry import AgentRegistry
 
@@ -66,6 +68,7 @@ class DispatcherArgs:
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
+    error_monitor_ctx: ErrorPluginContext  # TODO:
 
 
 class Dispatchers:
@@ -83,6 +86,7 @@ class Dispatchers:
         Initialize the Dispatchers with the given arguments.
         """
         self._db = args.db
+        self._error_monitor_ctx = args.error_monitor_ctx
         self._propagator_dispatcher = PropagatorEventDispatcher(args.event_hub)
         self._agent_event_handler = AgentEventHandler(args.agent_registry, args.db)
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
@@ -97,6 +101,7 @@ class Dispatchers:
         """
         dispatch_bgtask_events(event_dispatcher, self._propagator_dispatcher)
         self._dispatch_agent_events(event_dispatcher)
+        self._dispatch_error_monitor_events(event_dispatcher)
         self._dispatch_image_events(event_dispatcher)
         self._dispatch_kernel_events(event_dispatcher)
         self._dispatch_model_serving_events(event_dispatcher)
@@ -118,6 +123,17 @@ class Dispatchers:
         # action-trigerring events
         evd.consume(
             DoAgentResourceCheckEvent, None, self._agent_event_handler._handle_check_agent_resource
+        )
+
+    def _dispatch_error_monitor_events(self, event_dispatcher: EventDispatcher) -> None:
+        evd = event_dispatcher.with_reporters([
+            EventLogger(self._db),
+        ])
+        evd.consume(
+            AgentErrorEvent,
+            None,
+            self._error_monitor_ctx.handle_error_event,
+            name="api.session.agent.error",
         )
 
     def _dispatch_image_events(self, event_dispatcher: EventDispatcher) -> None:
