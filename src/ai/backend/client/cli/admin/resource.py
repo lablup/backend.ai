@@ -140,53 +140,30 @@ def usage_per_month(month: str, groups: Sequence[str]) -> None:
 @click.argument("end_date")
 def usage_per_period(group: str, start_date: str, end_date: str) -> None:
     with Session() as session:
-        item = session.Resource.usage_per_period(group, start_date, end_date)
-        if "g_id" in item:
-            print("Group:", item["g_name"] + " (" + item["g_id"] + ")")
+        items = session.Resource.usage_per_period(group, start_date, end_date)
+        for item in items:
+            print("Project:", item["project_name"] + " (" + item["project_id"] + ")")
             print("  Domain:", item["domain_name"])
             print(
-                "  Total Allocated:",
-                item["g_smp"],
-                "core(s)",
-                "/",
-                item["g_mem_allocated"],
-                "mem (bytes)",
-            )
-            print(
                 "  Total CPU / Memory Used:",
-                item["g_cpu_used"],
+                item["total_usage"]["cpu_used"],
                 "(s)",
                 "/",
-                item["g_mem_used"],
+                item["total_usage"]["mem_used"],
                 "(bytes)",
             )
             print(
-                "  Total I/O Read / Write:", item["g_io_read"], "/", item["g_io_write"], "(bytes)"
+                "  Total I/O Read / Write:",
+                item["total_usage"]["io_read"],
+                "/",
+                item["total_usage"]["io_write"],
+                "(bytes)",
             )
-            print("  GPU Devices:", item["g_device_type"])
-            print("  Containers (" + str(len(item["c_infos"])) + "):")
-            for cinfo in item["c_infos"]:
-                print("    Identity:", cinfo["name"], "/", cinfo["access_key"])
-                print("    Image:", cinfo["image_name"])
-                print(
-                    "    Duration:",
-                    cinfo["used_days"],
-                    "day(s)",
-                    "(" + cinfo["created_at"] + " ~ " + cinfo["terminated_at"] + ")",
-                )
-                print(
-                    "    Allocated:",
-                    cinfo["smp"],
-                    "core(s)",
-                    "/",
-                    cinfo["mem_allocated"],
-                    "mem (bytes)",
-                )
-                print("    CPU / Memory Used:", cinfo["io_read"], "/", cinfo["io_write"], "(bytes)")
-                print("    I/O Read / Write:", cinfo["io_read"], "/", cinfo["io_write"], "(bytes)")
-                print("    NFS mounted:", cinfo["nfs"])
-                print("    GPU Device:", cinfo["device_type"])
-                print("    ----------------------------------------")
-            print()
-        else:
-            print("No usage information during the period.")
+            print("  GPU Devices:", item["total_usage"]["device_type"])
+            print(
+                "  Total GPU Allocated / GPU Memory Allocated:",
+                item["total_usage"].get("gpu_allocated"),
+                "/",
+                item["total_usage"].get("gpu_mem_allocated"),
+                "(bytes)",
+            )
