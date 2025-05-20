@@ -7,6 +7,7 @@ import attrs
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
@@ -65,6 +66,7 @@ class RootContext(BaseContext):
     metrics: CommonMetricRegistry
     processors: Processors
     event_hub: EventHub
+    service_discovery: ServiceDiscovery
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
         super().__init__(**kwargs)

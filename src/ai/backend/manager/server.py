@@ -35,7 +35,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
-from aiohttp.typedefs import Middleware
+from aiohttp.typedefs import Handler, Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -605,9 +605,9 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(root_ctx.etcd))
+    root_ctx.service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(root_ctx.etcd))
     loop = ServiceDiscoveryLoop(
-        etcd_discovery,
+        root_ctx.service_discovery,
         ServiceMetadata(
             display_name=f"manager-{root_ctx.config_provider.config.manager.id}",
             service_group="manager",
@@ -1027,6 +1027,7 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
+            service_discovery_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
@@ -1072,10 +1073,38 @@ def build_root_app(
     return app
 
 
-def build_internal_app() -> web.Application:
+def build_prometheus_service_discovery_handler(
+    root_ctx: RootContext,
+) -> Handler:
+    async def _handler(request: web.Request) -> web.Response:
+        services = await root_ctx.service_discovery.discover()
+        resp = []
+        for service in services:
+            resp.append({
+                "targets": [f"{service.endpoint.prometheus_address}"],
+                "labels": {
+                    "service_id": service.id,
+                    "service_group": service.service_group,
+                    "display_name": service.display_name,
+                    "version": service.version,
+                },
+            })
+
+        return web.json_response(
+            resp,
+            status=200,
+        )
+
+    return _handler
+
+
+def build_internal_app(root_ctx: RootContext) -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    app.router.add_route(
+        "GET", r"/metrics/service_discovery", build_prometheus_service_discovery_handler(root_ctx)
+    )
     return app
 
 
@@ -1112,8 +1141,8 @@ async def server_main(
     boostrap_config = args.bootstrap_cfg
 
     root_app = build_root_app(pidx, boostrap_config, subapp_pkgs=global_subapp_pkgs)
-    internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
+    internal_app = build_internal_app(root_ctx)
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
