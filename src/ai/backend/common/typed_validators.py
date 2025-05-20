@@ -288,7 +288,7 @@ class HostPortPair(BaseModel):
 
     @property
     def address(self) -> str:
-        return self.host + (f":{self.port}" if self.port else "")
+        return f"{self.host}:{self.port}"
 
 
 def _parse_to_tzinfo(value: Any) -> tzinfo:
