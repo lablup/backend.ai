@@ -1244,7 +1244,6 @@ async def server_main(
             ),
         ),
     )
-    sd_loop.start()
     if local_config["agent"]["ssl-enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(

@@ -280,7 +280,6 @@ async def server_main(
                     ),
                 ),
             )
-            sd_loop.start()
             try:
                 yield
             finally:

@@ -621,7 +621,6 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             ),
         ),
     )
-    loop.start()
     yield
     loop.close()
 

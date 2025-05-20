@@ -178,7 +178,6 @@ async def test_etcd_discovery_loop_heartbeat(
     default_service_metadata: ServiceMetadata,
 ) -> None:
     loop = ServiceDiscoveryLoop(etcd_discovery, default_service_metadata)
-    loop.start()
 
     await asyncio.sleep(5)
     updated_service_meta: ServiceMetadata = await etcd_discovery.get_service(
@@ -202,7 +201,6 @@ async def test_etcd_discovery_loop_with_unhealthy_metadata(
     )
 
     sd_loop = ServiceDiscoveryLoop(etcd_discovery, default_service_metadata)
-    sd_loop.start()
 
     await asyncio.sleep(5)
 
