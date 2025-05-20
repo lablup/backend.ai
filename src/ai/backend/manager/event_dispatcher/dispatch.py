@@ -112,17 +112,17 @@ class Dispatchers:
         self,
         event_dispatcher: EventDispatcher,
     ) -> None:
+        # action-trigerring events
+        event_dispatcher.consume(
+            DoAgentResourceCheckEvent, None, self._agent_event_handler._handle_check_agent_resource
+        )
+
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(AgentStartedEvent, None, self._agent_event_handler._handle_agent_started)
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler._handle_agent_terminated)
         evd.consume(AgentHeartbeatEvent, None, self._agent_event_handler._handle_agent_heartbeat)
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler._handle_agent_images_remove
-        )
-
-        # action-trigerring events
-        evd.consume(
-            DoAgentResourceCheckEvent, None, self._agent_event_handler._handle_check_agent_resource
         )
 
     def _dispatch_error_monitor_events(self, event_dispatcher: EventDispatcher) -> None:
@@ -158,6 +158,14 @@ class Dispatchers:
         )
 
     def _dispatch_kernel_events(self, event_dispatcher: EventDispatcher) -> None:
+        # action-trigerring events
+        event_dispatcher.consume(
+            DoSyncKernelLogsEvent,
+            None,
+            self._kernel_event_handler._handle_kernel_log,
+            name="api.session.syncklog",
+        )
+
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
             KernelPreparingEvent,
@@ -207,26 +215,26 @@ class Dispatchers:
             self._kernel_event_handler._handle_kernel_heartbeat,
             name="api.session.kheartbeat",
         )
-        # action-trigerring events
-        evd.consume(
-            DoSyncKernelLogsEvent,
-            None,
-            self._kernel_event_handler._handle_kernel_log,
-            name="api.session.syncklog",
-        )
 
     def _dispatch_model_serving_events(self, event_dispatcher: EventDispatcher) -> None:
-        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
-        evd.consume(
+        event_dispatcher.consume(
             ModelServiceStatusEvent,
             None,
             self._model_serving_event_handler._handle_model_service_status_update,
         )
-        evd.consume(
+        event_dispatcher.consume(
             RouteCreatedEvent, None, self._model_serving_event_handler._handle_route_creation
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:
+        # action-trigerring events
+        event_dispatcher.consume(
+            DoTerminateSessionEvent,
+            None,
+            self._session_event_handler._handle_destroy_session,
+            name="api.session.doterm",
+        )
+
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
             SessionStartedEvent,
@@ -263,12 +271,6 @@ class Dispatchers:
         )
         evd.consume(SessionSuccessEvent, None, self._session_event_handler._handle_batch_result)
         evd.consume(SessionFailureEvent, None, self._session_event_handler._handle_batch_result)
-        evd.consume(
-            DoTerminateSessionEvent,
-            None,
-            self._session_event_handler._handle_destroy_session,
-            name="api.session.doterm",
-        )
 
     def _dispatch_vfolder_events(self, event_dispatcher: EventDispatcher) -> None:
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])

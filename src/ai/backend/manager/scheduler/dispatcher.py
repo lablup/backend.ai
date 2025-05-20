@@ -101,7 +101,6 @@ from ..errors.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..event_dispatcher.reporters import EventLogger
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -317,8 +316,7 @@ class SchedulerDispatcher(aobject):
             "max_wait": 0.5,
             "max_batch_size": 32,
         }
-        # coalescing_opts = None
-        evd = self.event_dispatcher.with_reporters([EventLogger(self.db)])
+        evd = self.event_dispatcher
         evd.consume(
             SessionEnqueuedEvent,
             None,
