@@ -1314,7 +1314,7 @@ class EventDispatcher:
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
-    async def handle(
+    async def _handle(
         self, evh: EventHandler, source: AgentId, args: tuple, msg_id: Optional[MessageId] = None
     ) -> None:
         if evh.args_matcher and not evh.args_matcher(args):
@@ -1324,9 +1324,9 @@ class EventDispatcher:
         cb = evh.callback
         evh_type = evh.handler_type
         event_cls = evh.event_cls
+        event_type: str = event_cls.name
         if self._closed:
             return
-        event_type = event_cls.event_name()
         start = time.perf_counter()
         try:
             if await coalescing_state.rate_control(coalescing_opts):
@@ -1372,7 +1372,7 @@ class EventDispatcher:
             log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
         for consumer in self._consumers[event_name].copy():
             self._consumer_taskgroup.create_task(
-                self.handle(consumer, source, args, msg_id),
+                self._handle(consumer, source, args, msg_id),
             )
             await asyncio.sleep(0)
 
@@ -1386,7 +1386,7 @@ class EventDispatcher:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
         for subscriber in self._subscribers[event_name].copy():
             self._subscriber_taskgroup.create_task(
-                self.handle(subscriber, source, args),
+                self._handle(subscriber, source, args),
             )
             await asyncio.sleep(0)
 
@@ -1400,7 +1400,7 @@ class EventDispatcher:
                 decoded_event_name,
                 AgentId(msg.payload[b"source"].decode()),
                 msgpack.unpackb(msg.payload[b"args"]),
-                msg.id,
+                msg.msg_id,
             )
 
     @preserve_termination_log
@@ -1408,35 +1408,12 @@ class EventDispatcher:
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:
                 return
-            event_type = "unknown"
-            start = time.perf_counter()
-            try:
-                decoded_event_name = msg.payload[b"name"].decode()
-                if decoded_event_name and isinstance(decoded_event_name, str):
-                    event_type = decoded_event_name
-                await self.dispatch_subscribers(
-                    decoded_event_name,
-                    AgentId(msg.payload[b"source"].decode()),
-                    msgpack.unpackb(msg.payload[b"args"]),
-                )
-                self._metric_observer.observe_event_success(
-                    event_type=event_type,
-                    duration=time.perf_counter() - start,
-                )
-            except Exception as e:
-                self._metric_observer.observe_event_failure(
-                    event_type=event_type,
-                    duration=time.perf_counter() - start,
-                    exception=e,
-                )
-                log.exception("EventDispatcher.subscribe(): unexpected-error")
-            except BaseException as e:
-                self._metric_observer.observe_event_failure(
-                    event_type=event_type,
-                    duration=time.perf_counter() - start,
-                    exception=e,
-                )
-                raise
+            decoded_event_name = msg.payload[b"name"].decode()
+            await self.dispatch_subscribers(
+                decoded_event_name,
+                AgentId(msg.payload[b"source"].decode()),
+                msgpack.unpackb(msg.payload[b"args"]),
+            )
 
 
 class EventProducer:
