@@ -26,7 +26,6 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..defs import LockID
-from ..event_dispatcher.reporters import EventLogger
 from ..models import UserRole, error_logs, groups
 from ..models import association_groups_users as agus
 from .auth import auth_required
@@ -267,8 +266,7 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["logs.context"]
-    evd = root_ctx.event_dispatcher.with_reporters([EventLogger(root_ctx.db)])
-    app_ctx.log_cleanup_timer_evh = evd.consume(
+    app_ctx.log_cleanup_timer_evh = root_ctx.event_dispatcher.consume(
         DoLogCleanupEvent,
         app,
         log_cleanup_task,

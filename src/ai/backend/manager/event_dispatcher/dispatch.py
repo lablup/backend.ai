@@ -116,11 +116,14 @@ class Dispatchers:
         event_dispatcher.consume(
             DoAgentResourceCheckEvent, None, self._agent_event_handler._handle_check_agent_resource
         )
+        # heartbeat events
+        event_dispatcher.consume(
+            AgentHeartbeatEvent, None, self._agent_event_handler._handle_agent_heartbeat
+        )
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(AgentStartedEvent, None, self._agent_event_handler._handle_agent_started)
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler._handle_agent_terminated)
-        evd.consume(AgentHeartbeatEvent, None, self._agent_event_handler._handle_agent_heartbeat)
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler._handle_agent_images_remove
         )
