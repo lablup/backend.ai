@@ -114,7 +114,8 @@ class EventHub:
             RuntimeError: If the propagator is already closed.
         """
         if (alias_domain, alias_id) not in self._key_alias:
-            raise ValueError(f"Alias {alias_domain}:{alias_id} not found.")
+            log.debug("Propagator not registered with alias {}:{}", alias_domain, alias_id)
+            return
 
         propagator_set = self._key_alias[(alias_domain, alias_id)]
         for propagator_id in propagator_set:

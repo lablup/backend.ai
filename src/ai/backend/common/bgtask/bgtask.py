@@ -23,12 +23,19 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
 from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.exception import BackendAIError, BgtaskNotFoundError, ErrorCode
+from ai.backend.common.exception import (
+    BackendAIError,
+    BgtaskNotFoundError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import redis_helper
 from ..events.bgtask import (
-    BaseBgtaskEvent,
+    BaseBgtaskDoneEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
@@ -264,7 +271,7 @@ class BackgroundTaskManager:
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult | str | None
-    ) -> BaseBgtaskEvent:
+    ) -> BaseBgtaskDoneEvent:
         # legacy
         if bgtask_result is None or isinstance(bgtask_result, str):
             return BgtaskDoneEvent(task_id, bgtask_result)
@@ -282,7 +289,7 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         **kwargs,
-    ) -> BaseBgtaskEvent:
+    ) -> BaseBgtaskDoneEvent:
         reporter = ProgressReporter(self._redis_client, self._event_producer, task_id)
         bgtask_result = await func(reporter, **kwargs)
         return self._convert_bgtask_to_event(task_id, bgtask_result)
@@ -293,46 +300,48 @@ class BackgroundTaskManager:
         task_id: uuid.UUID,
         task_name: Optional[str],
         **kwargs,
-    ) -> BaseBgtaskEvent:
+    ) -> BaseBgtaskDoneEvent:
         self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
         start_time = time.perf_counter()
-
+        task_name = task_name or func.__name__
+        status = BgtaskStatus.STARTED
+        error_code: Optional[ErrorCode] = None
+        msg = "no message"
         try:
             bgtask_result_event = await self._run_bgtask(func, task_id, **kwargs)
+            status = bgtask_result_event.status()
+            msg = bgtask_result_event.message or msg
         except asyncio.CancelledError:
+            status = BgtaskStatus.CANCELLED
+            error_code = ErrorCode(
+                domain=ErrorDomain.BGTASK,
+                operation=ErrorOperation.EXECUTE,
+                error_detail=ErrorDetail.CANCELED,
+            )
             return BgtaskCancelledEvent(task_id, "")
         except BackendAIError as e:
-            duration = time.perf_counter() - start_time
-            self._metric_observer.observe_bgtask_done(
-                task_name=task_name or func.__name__,
-                status="bgtask_failed",
-                duration=duration,
-                error_code=e.error_code(),
-            )
-            log.exception("Task %s (%s): BackendAIError: %s", task_id, task_name, e)
+            status = BgtaskStatus.FAILED
+            error_code = e.error_code()
+            log.error("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
             return BgtaskFailedEvent(task_id, repr(e))
         except Exception as e:
+            status = BgtaskStatus.FAILED
+            error_code = ErrorCode(
+                domain=ErrorDomain.BGTASK,
+                operation=ErrorOperation.EXECUTE,
+                error_detail=ErrorDetail.INTERNAL_ERROR,
+            )
+            log.error("Task {} ({}): unhandled error", task_id, task_name)
+            return BgtaskFailedEvent(task_id, repr(e))
+        finally:
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(
-                task_name=task_name or func.__name__,
-                status="bgtask_failed",
+                task_name=task_name,
+                status=status,
                 duration=duration,
-                error_code=ErrorCode.default(),
+                error_code=error_code,
             )
-            log.exception("Task %s (%s): unhandled error", task_id, task_name)
-            return BgtaskFailedEvent(task_id, repr(e))
-
-        duration = time.perf_counter() - start_time
-        self._metric_observer.observe_bgtask_done(
-            task_name=task_name or func.__name__,
-            status=bgtask_result_event.event_name(),
-            duration=duration,
-            error_code=None,
-        )
-
-        msg = getattr(bgtask_result_event, "msg", "") or ""
-        task_status = bgtask_result_event.status()
-        await self._update_bgtask_status(task_id, task_status, msg=msg)
+            await self._update_bgtask_status(task_id, status, msg=msg)
 
         return bgtask_result_event
 
