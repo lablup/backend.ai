@@ -71,10 +71,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.reporters.audit_log import AuditLogReporter
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
@@ -459,11 +459,6 @@ def _make_registered_reporters(
         trigger_policy = SMTPTriggerPolicy[smtp_conf["trigger-policy"]]
         reporters[smtp_conf["name"]] = SMTPReporter(smtp_args, trigger_policy)
 
-    audit_log_configs = root_ctx.local_config["reporter"]["audit-log"]
-    for audit_log_conf in audit_log_configs:
-        reporters[audit_log_conf["name"]] = AuditLogReporter(
-            root_ctx.db,
-        )
     return reporters
 
 
@@ -475,12 +470,14 @@ def _make_action_reporters(
     action_monitor_configs = root_ctx.local_config["reporter"]["action-monitors"]
     for action_monitor_conf in action_monitor_configs:
         reporter_name: str = action_monitor_conf["reporter"]
-        reporter = reporters[reporter_name]
-        action_types: list[str] = action_monitor_conf["subscribed-actions"]
-        for action_type in action_types:
-            monitors: list[AbstractReporter] = action_monitors.get(action_type, [])
-            monitors.append(reporter)
-            action_monitors[action_type] = monitors
+        try:
+            reporter = reporters[reporter_name]
+        except KeyError:
+            log.warning(f'Invalid Reporter: "{reporter_name}"')
+            continue
+
+        for action_type in action_monitor_conf["subscribed-actions"]:
+            action_monitors.setdefault(action_type, []).append(reporter)
 
     return action_monitors
 
@@ -496,6 +493,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
+    audit_log_monitor = AuditLogMonitor(root_ctx.db)
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -509,7 +507,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
             )
         ),
-        [reporter_monitor, prometheus_monitor],
+        [reporter_monitor, prometheus_monitor, audit_log_monitor],
     )
     yield
 
