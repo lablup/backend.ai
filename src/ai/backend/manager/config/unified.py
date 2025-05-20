@@ -471,7 +471,7 @@ class ManagerConfig(BaseModel):
         alias="announce-addr",
     )
     announce_internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=18080),
+        default_factory=lambda: HostPortPair(host="host.docker.internal", port=18080),
         description="""
         Address and port to announce for internal API requests.
         This is used for communication between manager components.

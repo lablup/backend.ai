@@ -102,7 +102,7 @@ local_config_iv = (
                             ),
                             t.Key("announce-addr", default=("127.0.0.1", 6022)): tx.HostPortPair,
                             t.Key(
-                                "announce-internal-addr", default=("127.0.0.1", 16023)
+                                "announce-internal-addr", default=("host.docker.internal", 6023)
                             ): tx.HostPortPair,
                             t.Key("internal-addr", default=("127.0.0.1", 16023)): tx.HostPortPair(
                                 allow_blank_host=True,

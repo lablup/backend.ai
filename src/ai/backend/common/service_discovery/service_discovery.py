@@ -207,6 +207,12 @@ class ServiceDiscoveryLoop:
             await asyncio.sleep(_DEFAULT_SWEEP_INTERVAL)
 
     async def _run_service_loop(self) -> None:
+        log.info(
+            "Registering service {} with ID {} in group {}",
+            self._metadata.display_name,
+            self._metadata.id,
+            self._metadata.service_group,
+        )
         await self._service_discovery.register(self._metadata)
         while not self._closed:
             try:

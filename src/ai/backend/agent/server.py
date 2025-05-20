@@ -1227,7 +1227,7 @@ async def server_main(
     runner = web.AppRunner(app)
     await runner.setup()
     service_addr = local_config["agent"]["service-addr"]
-    announce_addr = local_config["agent"]["announce-addr"]
+    announce_addr: HostPortPair = local_config["agent"]["announce-addr"]
     ssl_ctx = None
     etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
     sd_loop = ServiceDiscoveryLoop(
@@ -1237,10 +1237,10 @@ async def server_main(
             service_group="agent",
             version=VERSION,
             endpoint=ServiceEndpoint(
-                address=service_addr,
-                port=service_addr.port,
+                address=str(announce_addr),
+                port=announce_addr.port,
                 protocol="http",
-                prometheus_address=announce_addr,
+                prometheus_address=str(announce_addr),
             ),
         ),
     )

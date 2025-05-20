@@ -41,7 +41,12 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceEndpoint,
     ServiceMetadata,
 )
-from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget, safe_print_redis_target
+from ai.backend.common.types import (
+    AGENTID_STORAGE,
+    HostPortPair,
+    RedisProfileTarget,
+    safe_print_redis_target,
+)
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -218,7 +223,7 @@ async def server_main(
             await manager_api_runner.setup()
             await internal_api_runner.setup()
             client_service_addr = local_config["api"]["client"]["service-addr"]
-            manager_service_addr = local_config["api"]["manager"]["service-addr"]
+            manager_service_addr: HostPortPair = local_config["api"]["manager"]["service-addr"]
             internal_addr = local_config["api"]["manager"]["internal-addr"]
             client_api_site = web.TCPSite(
                 client_api_runner,
@@ -256,19 +261,22 @@ async def server_main(
                 os.setuid(uid)
                 log.info("Changed process uid:gid to {}:{}", uid, gid)
             log.info("Started service.")
-            announce_addr = local_config["api"]["manager"]["announce-addr"]
+            announce_addr: HostPortPair = local_config["api"]["manager"]["announce-addr"]
+            announce_internal_addr: HostPortPair = local_config["api"]["manager"][
+                "announce-internal-addr"
+            ]
             etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
             sd_loop = ServiceDiscoveryLoop(
                 etcd_discovery,
                 ServiceMetadata(
-                    display_name=f"agent-{local_config['agent']['id']}",
-                    service_group="agent",
+                    display_name=f"storage-{local_config['storage-proxy']['node-id']}",
+                    service_group="storage-proxy",
                     version=VERSION,
                     endpoint=ServiceEndpoint(
-                        address=manager_service_addr,
-                        port=manager_service_addr.port,
+                        address=str(announce_addr),
+                        port=announce_addr.port,
                         protocol="http",
-                        prometheus_address=announce_addr,
+                        prometheus_address=str(announce_internal_addr),
                     ),
                 ),
             )

@@ -55,6 +55,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -1093,6 +1094,7 @@ def build_prometheus_service_discovery_handler(
         return web.json_response(
             resp,
             status=200,
+            dumps=dump_json_str,
         )
 
     return _handler
