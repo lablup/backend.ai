@@ -123,7 +123,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "increase(backendai_api_request_count_total{job=\"$jobs\"}[5m])",
+                    "expr": "increase(backendai_api_request_count_total{service_group=\"$services\"}[5m])",
                     "legendFormat": "{{method}} : {{endpoint}} / {{status_code}}",
                     "range": true,
                     "refId": "A"
@@ -219,7 +219,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum(increase(backendai_api_request_count_total{job=\"$jobs\", status_code=~\"4..|500\"}[5m])) by (method, endpoint, status_code)",
+                    "expr": "sum(increase(backendai_api_request_count_total{service_group=\"$services\", status_code=~\"4..|500\"}[5m])) by (method, endpoint, status_code)",
                     "legendFormat": "{{method}} : {{endpoint}} / {{status_code}}",
                     "range": true,
                     "refId": "A"
@@ -316,7 +316,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (method, endpoint) (increase(backendai_api_request_duration_sec_sum{job=\"$jobs\"}[5m])) \n/\nsum by (method, endpoint) (increase(backendai_api_request_duration_sec_count{job=\"$jobs\"}[5m]))",
+                    "expr": "sum by (method, endpoint) (increase(backendai_api_request_duration_sec_sum{service_group=\"$services\"}[5m])) \n/\nsum by (method, endpoint) (increase(backendai_api_request_duration_sec_count{service_group=\"$services\"}[5m]))",
                     "legendFormat": "{{method}} : {{endpoint}}",
                     "range": true,
                     "refId": "A"
@@ -413,7 +413,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.95, sum(backendai_api_request_duration_sec_bucket{job=\"$jobs\"}) by (le, method, endpoint))",
+                    "expr": "histogram_quantile(0.95, sum(backendai_api_request_duration_sec_bucket{service_group=\"$services\"}) by (le, method, endpoint))",
                     "legendFormat": "P95 {{method}} : {{endpoint}}",
                     "range": true,
                     "refId": "A"
@@ -424,7 +424,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.90, sum(backendai_api_request_duration_sec_bucket{job=\"$jobs\"}) by (le, method, endpoint))",
+                    "expr": "histogram_quantile(0.90, sum(backendai_api_request_duration_sec_bucket{service_group=\"$services\"}) by (le, method, endpoint))",
                     "hide": false,
                     "legendFormat": "P90 {{method}} : {{endpoint}}",
                     "range": true,
@@ -522,7 +522,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "increase(backendai_graphql_request_count_total{job=\"$jobs\", success=\"True\"}[5m])",
+                    "expr": "increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"True\"}[5m])",
                     "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
                     "range": true,
                     "refId": "A"
@@ -533,7 +533,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "increase(backendai_graphql_request_count_total{job=\"$jobs\", success=\"False\"}[5m])",
+                    "expr": "increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"False\"}[5m])",
                     "hide": false,
                     "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Failed",
                     "range": true,
@@ -630,7 +630,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum(increase(backendai_graphql_request_count_total{job=\"$jobs\", success=\"False\"}[5m])) by (parent_type, operation_type, operation_name, field_name)",
+                    "expr": "sum(increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"False\"}[5m])) by (parent_type, operation_type, operation_name, field_name)",
                     "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
                     "range": true,
                     "refId": "A"
@@ -727,7 +727,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{job=\"$jobs\", success=\"True\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{job=\"$jobs\", success=\"True\"}[5m]))",
+                    "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"True\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"True\"}[5m]))",
                     "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
                     "range": true,
                     "refId": "A"
@@ -738,7 +738,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{job=\"$jobs\", success=\"False\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{job=\"$jobs\", success=\"False\"}[5m]))",
+                    "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"False\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"False\"}[5m]))",
                     "hide": false,
                     "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
                     "range": true,
@@ -836,7 +836,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.95, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "expr": "histogram_quantile(0.95, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
                     "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
                     "range": true,
                     "refId": "A"
@@ -847,7 +847,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
                     "hide": false,
                     "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
                     "range": true,
@@ -859,7 +859,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
                     "hide": false,
                     "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
                     "range": true,
@@ -871,7 +871,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{job=\"$jobs\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+                    "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
                     "hide": false,
                     "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
                     "range": true,
@@ -969,7 +969,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum(increase(backendai_event_count_total{job=\"$jobs\"}[5m])) by (event_type)",
+                    "expr": "sum(increase(backendai_event_count_total{service_group=\"$services\"}[5m])) by (event_type)",
                     "legendFormat": "{{event_type}}",
                     "range": true,
                     "refId": "A"
@@ -1066,7 +1066,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum(increase(backendai_event_failure_count{job=\"$jobs\"}[5m])) by (event_type)",
+                    "expr": "sum(increase(backendai_event_failure_count{service_group=\"$services\"}[5m])) by (event_type)",
                     "legendFormat": "{{event_type}}",
                     "range": true,
                     "refId": "A"
@@ -1123,8 +1123,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1163,7 +1162,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (event_type) (increase(backendai_event_processing_time_sec_sum{job=\"$jobs\"}[5m])) \n/\nsum by (event_type) (increase(backendai_event_processing_time_sec_count{job=\"$jobs\"}[5m]))",
+                    "expr": "sum by (event_type) (increase(backendai_event_processing_time_sec_sum{service_group=\"$services\"}[5m])) \n/\nsum by (event_type) (increase(backendai_event_processing_time_sec_count{service_group=\"$services\"}[5m]))",
                     "legendFormat": "{{event_type}}",
                     "range": true,
                     "refId": "A"
@@ -1220,8 +1219,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1260,7 +1258,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.95, sum(backendai_event_processing_time_sec_bucket{job=\"$jobs\"}) by (le, event_type))",
+                    "expr": "histogram_quantile(0.95, sum(backendai_event_processing_time_sec_bucket{service_group=\"$services\"}) by (le, event_type))",
                     "legendFormat": "P95 {{event_type}}",
                     "range": true,
                     "refId": "A"
@@ -1271,7 +1269,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.90, sum(backendai_event_processing_time_sec_bucket{job=\"$jobs\"}) by (le, event_type))",
+                    "expr": "histogram_quantile(0.90, sum(backendai_event_processing_time_sec_bucket{service_group=\"$services\"}) by (le, event_type))",
                     "hide": false,
                     "legendFormat": "P90 {{event_type}}",
                     "range": true,
@@ -1329,8 +1327,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1369,7 +1366,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum(backendai_bgtask_count{job=\"$jobs\"}) by (task_name)",
+                    "expr": "sum(backendai_bgtask_count{service_group=\"$services\"}) by (task_name)",
                     "legendFormat": "{{task_name}}",
                     "range": true,
                     "refId": "A"
@@ -1426,8 +1423,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1466,7 +1462,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum(increase(backendai_bgtask_done_count_total{job=\"$jobs\"}[5m])) by (task_name, status)",
+                    "expr": "sum(increase(backendai_bgtask_done_count_total{service_group=\"$services\"}[5m])) by (task_name, status)",
                     "legendFormat": "{{task_name}} / {{status}}",
                     "range": true,
                     "refId": "A"
@@ -1523,8 +1519,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1563,7 +1558,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (task_name, status) (increase(backendai_bgtask_processing_time_sec_sum{job=\"$jobs\"}[5m])) \n/\nsum by (task_name, status) (increase(backendai_bgtask_processing_time_sec_count{job=\"$jobs\"}[5m]))",
+                    "expr": "sum by (task_name, status) (increase(backendai_bgtask_processing_time_sec_sum{service_group=\"$services\"}[5m])) \n/\nsum by (task_name, status) (increase(backendai_bgtask_processing_time_sec_count{service_group=\"$services\"}[5m]))",
                     "legendFormat": "{{task_name}} / {{status}}",
                     "range": true,
                     "refId": "A"
@@ -1620,8 +1615,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1660,7 +1654,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.95, sum(backendai_bgtask_processing_time_sec_bucket{job=\"$jobs\"}) by (le, task_name, status))",
+                    "expr": "histogram_quantile(0.95, sum(backendai_bgtask_processing_time_sec_bucket{service_group=\"$services\"}) by (le, task_name, status))",
                     "legendFormat": "P95 {{task_name}} / {{status}}",
                     "range": true,
                     "refId": "A"
@@ -1671,7 +1665,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.90, sum(backendai_bgtask_processing_time_sec_bucket{job=\"$jobs\"}) by (le, task_name, status))",
+                    "expr": "histogram_quantile(0.90, sum(backendai_bgtask_processing_time_sec_bucket{service_group=\"$services\"}) by (le, task_name, status))",
                     "hide": false,
                     "legendFormat": "P90 {{task_name}} / {{status}}",
                     "range": true,
@@ -1729,8 +1723,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1746,9 +1739,9 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 57
+                "y": 65
             },
-            "id": 20,
+            "id": 24,
             "options": {
                 "legend": {
                     "calcs": [],
@@ -1769,7 +1762,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "increase(backendai_sweep_session_count_total{job=\"$jobs\"}[5m])",
+                    "expr": "increase(backendai_sweep_session_count_total{service_group=\"$services\"}[5m])",
                     "legendFormat": "{{status}} / {{success}}",
                     "range": true,
                     "refId": "A"
@@ -1826,8 +1819,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1843,9 +1835,9 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 57
+                "y": 65
             },
-            "id": 21,
+            "id": 25,
             "options": {
                 "legend": {
                     "calcs": [],
@@ -1866,7 +1858,7 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "increase(backendai_sweep_kernel_count_total{job=\"$jobs\"}[5m])",
+                    "expr": "increase(backendai_sweep_kernel_count_total{service_group=\"$services\"}[5m])",
                     "legendFormat": "{{success}}",
                     "range": true,
                     "refId": "A"
@@ -1923,8 +1915,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -1940,7 +1931,7 @@
                 "h": 8,
                 "w": 24,
                 "x": 0,
-                "y": 65
+                "y": 73
             },
             "id": 14,
             "options": {
@@ -1963,8 +1954,8 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "backendai_async_task_count{job=\"$jobs\"}",
-                    "legendFormat": "{{job}}",
+                    "expr": "backendai_async_task_count{service_group=\"$services\"}",
+                    "legendFormat": "{{service_group}}",
                     "range": true,
                     "refId": "A"
                 }
@@ -1985,7 +1976,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 73
+                "y": 81
             },
             "id": 19,
             "options": {},
@@ -1997,7 +1988,7 @@
                         "uid": "PF9B21A99B3AC1886"
                     },
                     "groupBy": [],
-                    "labelSelector": "{service_name=\"$jobs\"}",
+                    "labelSelector": "{service_name=~\".*$services\"}",
                     "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
                     "queryType": "profile",
                     "refId": "A",
@@ -2070,7 +2061,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 83
+                "y": 91
             },
             "id": 18,
             "options": {
@@ -2093,7 +2084,7 @@
                         "uid": "PF9B21A99B3AC1886"
                     },
                     "groupBy": [],
-                    "labelSelector": "{service_name=\"$jobs\"}",
+                    "labelSelector": "{service_name=~\".*$services\"}",
                     "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
                     "queryType": "metrics",
                     "refId": "A",
@@ -2167,7 +2158,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 83
+                "y": 91
             },
             "id": 15,
             "options": {
@@ -2190,8 +2181,8 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "backendai_cpu_usage_percent{job=\"$jobs\"}",
-                    "legendFormat": "{{job}}",
+                    "expr": "backendai_cpu_usage_percent{service_group=\"$services\"}",
+                    "legendFormat": "{{service_group}}",
                     "range": true,
                     "refId": "A"
                 }
@@ -2263,7 +2254,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 91
+                "y": 99
             },
             "id": 16,
             "options": {
@@ -2286,8 +2277,8 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "backendai_memory_used_rss{job=\"$jobs\"}",
-                    "legendFormat": "{{job}}",
+                    "expr": "backendai_memory_used_rss{service_group=\"$services\"}",
+                    "legendFormat": "{{service_group}}",
                     "range": true,
                     "refId": "A"
                 }
@@ -2359,7 +2350,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 91
+                "y": 99
             },
             "id": 17,
             "options": {
@@ -2382,8 +2373,8 @@
                         "uid": "be3td1qwoaxhcc"
                     },
                     "editorMode": "code",
-                    "expr": "backendai_memory_used_vms{job=\"$jobs\"}",
-                    "legendFormat": "{{job}}",
+                    "expr": "backendai_memory_used_vms{service_group=\"$services\"}",
+                    "legendFormat": "{{service_group}}",
                     "range": true,
                     "refId": "A"
                 }
@@ -2400,17 +2391,17 @@
         "list": [
             {
                 "current": {
-                    "text": "All",
-                    "value": "$__all"
+                    "text": "agent",
+                    "value": "agent"
                 },
-                "definition": "label_values(up{job!=\"backendai-half-prometheus\"},job)",
+                "definition": "label_values(up,service_group)",
                 "description": "",
                 "includeAll": true,
-                "name": "jobs",
+                "name": "services",
                 "options": [],
                 "query": {
                     "qryType": 1,
-                    "query": "label_values(up{job!=\"backendai-half-prometheus\"},job)",
+                    "query": "label_values(up,service_group)",
                     "refId": "PrometheusVariableQueryEditor-VariableQuery"
                 },
                 "refresh": 1,

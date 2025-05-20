@@ -13,24 +13,8 @@ rule_files:
   # - "second_rules.yml"
 # Scrape configurations
 scrape_configs:
-  # Prometheus itself
-  # - metrics_path defaults to "/metrics"
-  # - scheme defaults to "http".
-  - job_name: backendai-half-prometheus
-    static_configs:
-      - targets: ['backendai-half-prometheus:9090']
-  - job_name: backendai-half-manager
-    static_configs:
-      - targets: ['host.docker.internal:18080']
-  - job_name: backendai-half-account-manager
-    static_configs:
-      - targets: ['host.docker.internal:18088']
-  - job_name: backendai-half-storage-proxy
-    static_configs:
-      - targets: ['host.docker.internal:16023']
-  - job_name: backendai-half-wsproxy
-    static_configs:
-      - targets: ['host.docker.internal:15050']
-  - job_name: backendai-half-agent
-    static_configs:
-      - targets: ['host.docker.internal:6003']
+  - job_name: 'http-sd'
+    scheme: 'http'
+    http_sd_configs:
+      - url: 'http://host.docker.internal:18080/metrics/service_discovery' 
+        refresh_interval: "60s"
