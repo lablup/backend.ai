@@ -2891,7 +2891,7 @@ class AbstractAgent(
     async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
-    async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
+    async def accept_file(self, kernel_id: KernelId, filename: str, filedata: bytes):
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
 
     async def download_file(self, kernel_id: KernelId, filepath: str):
