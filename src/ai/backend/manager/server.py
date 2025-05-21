@@ -321,7 +321,7 @@ async def exception_middleware(
         else:
             raise InvalidAPIParameters()
     except BackendError as ex:
-        if ex.status_code == 500:
+        if ex.status_code / 100 == 5:
             log.warning("Internal server error raised inside handlers")
         await error_monitor.capture_exception()
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")

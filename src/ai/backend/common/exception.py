@@ -179,6 +179,7 @@ class ErrorOperation(enum.StrEnum):
     PARSING = "parsing"
     EXECUTE = "execute"
     SETUP = "setup"
+    GRANT = "grant"
 
 
 class ErrorDetail(enum.StrEnum):

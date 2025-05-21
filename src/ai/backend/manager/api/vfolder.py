@@ -1412,6 +1412,8 @@ async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Resp
             sa.select(UserRow).where(UserRow.email.in_(invitee_emails))
         )
         user_uuids = [row.uuid for row in user_rows]
+    if not user_uuids:
+        raise VFolderNotFound("No users found with the provided emails.")
     result = await root_ctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
         InviteVFolderAction(
             keypair_resource_policy=request["keypair"]["resource_policy"],
