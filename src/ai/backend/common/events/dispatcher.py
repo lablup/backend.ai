@@ -323,8 +323,8 @@ class EventDispatcher(EventDispatcherGroup):
     _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
 
-    _consumer_loop_task: asyncio.Task
-    _subscriber_loop_task: asyncio.Task
+    _consumer_loop_task: Optional[asyncio.Task]
+    _subscriber_loop_task: Optional[asyncio.Task]
     _consumer_taskgroup: PersistentTaskGroup
     _subscriber_taskgroup: PersistentTaskGroup
 
@@ -354,6 +354,12 @@ class EventDispatcher(EventDispatcherGroup):
             name="subscriber_taskgroup",
             exception_handler=subscriber_exception_handler,
         )
+        self._consumer_loop_task = None
+        self._subscriber_loop_task = None
+
+    async def start(self) -> None:
+        if self._closed:
+            return
         self._consumer_loop_task = asyncio.create_task(self._consume_loop())
         self._subscriber_loop_task = asyncio.create_task(self._subscribe_loop())
 
@@ -363,12 +369,14 @@ class EventDispatcher(EventDispatcherGroup):
             cancelled_tasks = []
             await self._consumer_taskgroup.shutdown()
             await self._subscriber_taskgroup.shutdown()
-            if not self._consumer_loop_task.done():
-                self._consumer_loop_task.cancel()
-                cancelled_tasks.append(self._consumer_loop_task)
-            if not self._subscriber_loop_task.done():
-                self._subscriber_loop_task.cancel()
-                cancelled_tasks.append(self._subscriber_loop_task)
+
+            def cancel_task(task: Optional[asyncio.Task]) -> None:
+                if task is not None and not task.done():
+                    task.cancel()
+                    cancelled_tasks.append(task)
+
+            cancel_task(self._consumer_loop_task)
+            cancel_task(self._subscriber_loop_task)
             await asyncio.gather(*cancelled_tasks, return_exceptions=True)
         except Exception:
             log.exception("unexpected error while closing event dispatcher")
