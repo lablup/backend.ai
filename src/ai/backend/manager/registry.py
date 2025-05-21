@@ -221,7 +221,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
-    from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+    from ai.backend.common.events.dispatcher import EventProducer
 
     from .agent_cache import AgentRPCCache
     from .models.storage import StorageSessionManager
@@ -260,7 +260,6 @@ class AgentRegistry:
         redis_live: RedisConnectionInfo,
         redis_image: RedisConnectionInfo,
         redis_stream: RedisConnectionInfo,
-        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
@@ -278,7 +277,6 @@ class AgentRegistry:
         self.redis_live = redis_live
         self.redis_image = redis_image
         self.redis_stream = redis_stream
-        self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
@@ -291,7 +289,6 @@ class AgentRegistry:
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
             redis_stat,
-            event_dispatcher,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -303,107 +300,6 @@ class AgentRegistry:
         self.pending_waits = set()
         self.database_ptask_group = aiotools.PersistentTaskGroup()
         self.webhook_ptask_group = aiotools.PersistentTaskGroup()
-
-        # passive events
-        evd = self.event_dispatcher
-        evd.consume(
-            KernelPreparingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kprep"
-        )
-        evd.consume(
-            KernelPullingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kpull"
-        )
-        evd.consume(
-            ImagePullStartedEvent, self, handle_image_pull_started, name="api.session.ipullst"
-        )
-        evd.consume(
-            ImagePullFinishedEvent, self, handle_image_pull_finished, name="api.session.ipullfin"
-        )
-        evd.consume(
-            ImagePullFailedEvent, self, handle_image_pull_failed, name="api.session.ipullfail"
-        )
-        evd.consume(
-            KernelCreatingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kcreat"
-        )
-        evd.consume(
-            KernelStartedEvent, self, handle_kernel_creation_lifecycle, name="api.session.kstart"
-        )
-        evd.consume(
-            KernelCancelledEvent, self, handle_kernel_creation_lifecycle, name="api.session.kstart"
-        )
-        evd.subscribe(
-            SessionStartedEvent,
-            self,
-            handle_session_creation_lifecycle,
-            name="api.session.sstart",
-        )
-        evd.subscribe(
-            SessionCancelledEvent,
-            self,
-            handle_session_creation_lifecycle,
-            name="api.session.scancel",
-        )
-        evd.consume(
-            KernelTerminatingEvent,
-            self,
-            handle_kernel_termination_lifecycle,
-            name="api.session.kterming",
-        )
-        evd.consume(
-            KernelTerminatedEvent,
-            self,
-            handle_kernel_termination_lifecycle,
-            name="api.session.kterm",
-        )
-        evd.consume(
-            KernelHeartbeatEvent,
-            self,
-            handle_kernel_heartbeat,
-            name="api.session.kheartbeat",
-        )
-        evd.consume(
-            ModelServiceStatusEvent,
-            self,
-            handle_model_service_status_update,
-        )
-        evd.consume(
-            SessionTerminatingEvent,
-            self,
-            handle_session_termination_lifecycle,
-            name="api.session.sterming",
-        )
-        evd.consume(
-            SessionTerminatedEvent,
-            self,
-            handle_session_termination_lifecycle,
-            name="api.session.sterm",
-        )
-        evd.consume(
-            SessionEnqueuedEvent,
-            self,
-            invoke_session_callback,
-            name="registry.invoke_sesion_callback",
-        )
-        evd.consume(SessionScheduledEvent, self, invoke_session_callback)
-        evd.consume(SessionPreparingEvent, self, invoke_session_callback)
-        evd.consume(SessionSuccessEvent, self, handle_batch_result)
-        evd.consume(SessionFailureEvent, self, handle_batch_result)
-        evd.consume(
-            AgentStartedEvent, self, handle_agent_lifecycle, name="registry.handle_agent_lifecycle"
-        )
-        evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
-        evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
-        evd.consume(AgentImagesRemoveEvent, self, handle_agent_images_remove)
-        evd.consume(RouteCreatedEvent, self, handle_route_creation)
-
-        evd.consume(VFolderDeletionSuccessEvent, self, handle_vfolder_deletion_success)
-        evd.consume(VFolderDeletionFailureEvent, self, handle_vfolder_deletion_failure)
-
-        # action-trigerring events
-        evd.consume(DoSyncKernelLogsEvent, self, handle_kernel_log, name="api.session.syncklog")
-        evd.consume(
-            DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
-        )
-        evd.consume(DoAgentResourceCheckEvent, self, handle_check_agent_resource)
 
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)

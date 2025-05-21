@@ -6,7 +6,9 @@ import attrs
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -55,6 +57,7 @@ class RootContext(BaseContext):
     storage_manager: StorageSessionManager
     hook_plugin_ctx: HookPluginContext
     network_plugin_ctx: NetworkPluginContext
+    event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     services_ctx: ServicesContext
 
     registry: AgentRegistry
@@ -66,6 +69,7 @@ class RootContext(BaseContext):
     metrics: CommonMetricRegistry
     processors: Processors
     event_hub: EventHub
+    message_queue: AbstractMessageQueue
     service_discovery: ServiceDiscovery
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:

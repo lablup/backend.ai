@@ -851,6 +851,7 @@ class AbstractAgent(
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
+        await self.event_dispatcher.start()
 
     def _make_message_queue(
         self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
