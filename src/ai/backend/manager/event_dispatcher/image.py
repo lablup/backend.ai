@@ -24,7 +24,7 @@ class ImageEventHandler:
         self._registry = registry
         self._db = db
 
-    async def _handle_image_pull_started(
+    async def handle_image_pull_started(
         self,
         context: None,
         agent_id: AgentId,
@@ -37,7 +37,7 @@ class ImageEventHandler:
                 ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn
             )
 
-    async def _handle_image_pull_finished(
+    async def handle_image_pull_finished(
         self, context: None, agent_id: AgentId, ev: ImagePullFinishedEvent
     ) -> None:
         dt = datetime.fromtimestamp(ev.timestamp)
@@ -47,7 +47,7 @@ class ImageEventHandler:
                 ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn
             )
 
-    async def _handle_image_pull_failed(
+    async def handle_image_pull_failed(
         self,
         context: None,
         agent_id: AgentId,

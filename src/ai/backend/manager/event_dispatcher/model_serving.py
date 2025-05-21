@@ -41,7 +41,7 @@ class ModelServingEventHandler:
         self._registry = registry
         self._db = db
 
-    async def _handle_model_service_status_update(
+    async def handle_model_service_status_update(
         self,
         context: None,
         source: AgentId,
@@ -94,7 +94,7 @@ class ModelServingEventHandler:
 
         await execute_with_retry(_update)
 
-    async def _handle_route_creation(
+    async def handle_route_creation(
         self,
         context: None,
         source: AgentId,

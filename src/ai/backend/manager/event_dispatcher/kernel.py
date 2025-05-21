@@ -35,7 +35,7 @@ class KernelEventHandler:
         self._registry = registry
         self._db = db
 
-    async def _handle_kernel_log(
+    async def handle_kernel_log(
         self,
         context: None,
         source: AgentId,
@@ -88,7 +88,7 @@ class KernelEventHandler:
         finally:
             log_buffer.close()
 
-    async def _handle_kernel_creation_lifecycle(
+    async def handle_kernel_creation_lifecycle(
         self,
         context: None,
         source: AgentId,
@@ -136,7 +136,7 @@ class KernelEventHandler:
             case KernelCancelledEvent():
                 log.warning(f"Kernel cancelled, {event.reason = }")
 
-    async def _handle_kernel_preparing(
+    async def handle_kernel_preparing(
         self,
         context: None,
         source: AgentId,
@@ -149,7 +149,7 @@ class KernelEventHandler:
         )
         # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
 
-    async def _handle_kernel_pulling(
+    async def handle_kernel_pulling(
         self,
         context: None,
         source: AgentId,
@@ -165,7 +165,7 @@ class KernelEventHandler:
                 db_conn, event.kernel_id, event.session_id, event.reason
             )
 
-    async def _handle_kernel_creating(
+    async def handle_kernel_creating(
         self,
         context: None,
         source: AgentId,
@@ -181,7 +181,7 @@ class KernelEventHandler:
                 db_conn, event.kernel_id, event.session_id, event.reason
             )
 
-    async def _handle_kernel_started(
+    async def handle_kernel_started(
         self,
         context: None,
         source: AgentId,
@@ -197,7 +197,7 @@ class KernelEventHandler:
                 db_conn, event.kernel_id, event.session_id, event.reason, event.creation_info
             )
 
-    async def _handle_kernel_cancelled(
+    async def handle_kernel_cancelled(
         self,
         context: None,
         source: AgentId,
@@ -209,7 +209,7 @@ class KernelEventHandler:
             event.kernel_id,
         )
 
-    async def _handle_kernel_terminating(
+    async def handle_kernel_terminating(
         self,
         context: None,
         source: AgentId,
@@ -218,7 +218,7 @@ class KernelEventHandler:
         # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
         pass
 
-    async def _handle_kernel_terminated(
+    async def handle_kernel_terminated(
         self,
         context: None,
         source: AgentId,
@@ -229,7 +229,7 @@ class KernelEventHandler:
                 db_conn, event.kernel_id, event.session_id, event.reason, event.exit_code
             )
 
-    async def _handle_kernel_heartbeat(
+    async def handle_kernel_heartbeat(
         self,
         context: None,
         source: AgentId,

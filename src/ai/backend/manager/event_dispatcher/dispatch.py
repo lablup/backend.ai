@@ -114,18 +114,18 @@ class Dispatchers:
     ) -> None:
         # action-trigerring events
         event_dispatcher.consume(
-            DoAgentResourceCheckEvent, None, self._agent_event_handler._handle_check_agent_resource
+            DoAgentResourceCheckEvent, None, self._agent_event_handler.handle_check_agent_resource
         )
         # heartbeat events
         event_dispatcher.consume(
-            AgentHeartbeatEvent, None, self._agent_event_handler._handle_agent_heartbeat
+            AgentHeartbeatEvent, None, self._agent_event_handler.handle_agent_heartbeat
         )
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
-        evd.consume(AgentStartedEvent, None, self._agent_event_handler._handle_agent_started)
-        evd.consume(AgentTerminatedEvent, None, self._agent_event_handler._handle_agent_terminated)
+        evd.consume(AgentStartedEvent, None, self._agent_event_handler.handle_agent_started)
+        evd.consume(AgentTerminatedEvent, None, self._agent_event_handler.handle_agent_terminated)
         evd.consume(
-            AgentImagesRemoveEvent, None, self._agent_event_handler._handle_agent_images_remove
+            AgentImagesRemoveEvent, None, self._agent_event_handler.handle_agent_images_remove
         )
 
     def _dispatch_error_monitor_events(self, event_dispatcher: EventDispatcher) -> None:
@@ -144,19 +144,19 @@ class Dispatchers:
         evd.consume(
             ImagePullStartedEvent,
             None,
-            self._image_event_handler._handle_image_pull_started,
+            self._image_event_handler.handle_image_pull_started,
             name="api.session.ipullst",
         )
         evd.consume(
             ImagePullFinishedEvent,
             None,
-            self._image_event_handler._handle_image_pull_finished,
+            self._image_event_handler.handle_image_pull_finished,
             name="api.session.ipullfin",
         )
         evd.consume(
             ImagePullFailedEvent,
             None,
-            self._image_event_handler._handle_image_pull_failed,
+            self._image_event_handler.handle_image_pull_failed,
             name="api.session.ipullfail",
         )
 
@@ -165,7 +165,7 @@ class Dispatchers:
         event_dispatcher.consume(
             DoSyncKernelLogsEvent,
             None,
-            self._kernel_event_handler._handle_kernel_log,
+            self._kernel_event_handler.handle_kernel_log,
             name="api.session.syncklog",
         )
 
@@ -173,49 +173,49 @@ class Dispatchers:
         evd.consume(
             KernelPreparingEvent,
             None,
-            self._kernel_event_handler._handle_kernel_preparing,
+            self._kernel_event_handler.handle_kernel_preparing,
             name="api.session.kprep",
         )
         evd.consume(
             KernelPullingEvent,
             None,
-            self._kernel_event_handler._handle_kernel_pulling,
+            self._kernel_event_handler.handle_kernel_pulling,
             name="api.session.kpull",
         )
         evd.consume(
             KernelCreatingEvent,
             None,
-            self._kernel_event_handler._handle_kernel_creating,
+            self._kernel_event_handler.handle_kernel_creating,
             name="api.session.kcreat",
         )
         evd.consume(
             KernelStartedEvent,
             None,
-            self._kernel_event_handler._handle_kernel_started,
+            self._kernel_event_handler.handle_kernel_started,
             name="api.session.kstart",
         )
         evd.consume(
             KernelCancelledEvent,
             None,
-            self._kernel_event_handler._handle_kernel_cancelled,
+            self._kernel_event_handler.handle_kernel_cancelled,
             name="api.session.kstart",
         )
         evd.consume(
             KernelTerminatingEvent,
             None,
-            self._kernel_event_handler._handle_kernel_terminating,
+            self._kernel_event_handler.handle_kernel_terminating,
             name="api.session.kterming",
         )
         evd.consume(
             KernelTerminatedEvent,
             None,
-            self._kernel_event_handler._handle_kernel_terminated,
+            self._kernel_event_handler.handle_kernel_terminated,
             name="api.session.kterm",
         )
         evd.consume(
             KernelHeartbeatEvent,
             None,
-            self._kernel_event_handler._handle_kernel_heartbeat,
+            self._kernel_event_handler.handle_kernel_heartbeat,
             name="api.session.kheartbeat",
         )
 
@@ -223,10 +223,10 @@ class Dispatchers:
         event_dispatcher.consume(
             ModelServiceStatusEvent,
             None,
-            self._model_serving_event_handler._handle_model_service_status_update,
+            self._model_serving_event_handler.handle_model_service_status_update,
         )
         event_dispatcher.consume(
-            RouteCreatedEvent, None, self._model_serving_event_handler._handle_route_creation
+            RouteCreatedEvent, None, self._model_serving_event_handler.handle_route_creation
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:
@@ -234,7 +234,7 @@ class Dispatchers:
         event_dispatcher.consume(
             DoTerminateSessionEvent,
             None,
-            self._session_event_handler._handle_destroy_session,
+            self._session_event_handler.handle_destroy_session,
             name="api.session.doterm",
         )
 
@@ -242,48 +242,46 @@ class Dispatchers:
         evd.consume(
             SessionStartedEvent,
             None,
-            self._session_event_handler._handle_session_started,
+            self._session_event_handler.handle_session_started,
             name="api.session.sstart",
         )
         evd.consume(
             SessionCancelledEvent,
             None,
-            self._session_event_handler._handle_session_cancelled,
+            self._session_event_handler.handle_session_cancelled,
             name="api.session.scancel",
         )
         evd.consume(
             SessionTerminatingEvent,
             None,
-            self._session_event_handler._handle_session_terminating,
+            self._session_event_handler.handle_session_terminating,
             name="api.session.sterming",
         )
         evd.consume(
             SessionTerminatedEvent,
             None,
-            self._session_event_handler._handle_session_terminated,
+            self._session_event_handler.handle_session_terminated,
             name="api.session.sterm",
         )
+        evd.consume(SessionEnqueuedEvent, None, self._session_event_handler.invoke_session_callback)
         evd.consume(
-            SessionEnqueuedEvent, None, self._session_event_handler._invoke_session_callback
+            SessionScheduledEvent, None, self._session_event_handler.invoke_session_callback
         )
         evd.consume(
-            SessionScheduledEvent, None, self._session_event_handler._invoke_session_callback
+            SessionPreparingEvent, None, self._session_event_handler.invoke_session_callback
         )
-        evd.consume(
-            SessionPreparingEvent, None, self._session_event_handler._invoke_session_callback
-        )
-        evd.consume(SessionSuccessEvent, None, self._session_event_handler._handle_batch_result)
-        evd.consume(SessionFailureEvent, None, self._session_event_handler._handle_batch_result)
+        evd.consume(SessionSuccessEvent, None, self._session_event_handler.handle_batch_result)
+        evd.consume(SessionFailureEvent, None, self._session_event_handler.handle_batch_result)
 
     def _dispatch_vfolder_events(self, event_dispatcher: EventDispatcher) -> None:
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
             VFolderDeletionSuccessEvent,
             None,
-            self._vfolder_event_handler._handle_vfolder_deletion_success,
+            self._vfolder_event_handler.handle_vfolder_deletion_success,
         )
         evd.consume(
             VFolderDeletionFailureEvent,
             None,
-            self._vfolder_event_handler._handle_vfolder_deletion_failure,
+            self._vfolder_event_handler.handle_vfolder_deletion_failure,
         )

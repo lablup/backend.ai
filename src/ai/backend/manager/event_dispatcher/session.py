@@ -49,7 +49,19 @@ class SessionEventHandler:
         self._registry = registry
         self._db = db
 
-    async def _handle_session_started(
+    async def _handle_started_or_cancelled(
+        self, context: None, source: AgentId, event: SessionStartedEvent | SessionCancelledEvent
+    ) -> None:
+        if event.creation_id not in self._registry.session_creation_tracker:
+            return
+        if tracker := self._registry.session_creation_tracker.get(event.creation_id):
+            tracker.set()
+
+        await self.invoke_session_callback(None, source, event)
+        if event.creation_id in self._registry.session_creation_tracker:
+            del self._registry.session_creation_tracker[event.creation_id]
+
+    async def handle_session_started(
         self,
         context: None,
         source: AgentId,
@@ -62,7 +74,7 @@ class SessionEventHandler:
         log.info("handle_session_started: ev:{} s:{}", event.event_name(), event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
 
-    async def _handle_session_cancelled(
+    async def handle_session_cancelled(
         self,
         context: None,
         source: AgentId,
@@ -75,7 +87,7 @@ class SessionEventHandler:
         log.info("handle_session_cancelled: ev:{} s:{}", event.event_name(), event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
 
-    async def _handle_session_terminating(
+    async def handle_session_terminating(
         self,
         context: None,
         source: AgentId,
@@ -85,18 +97,18 @@ class SessionEventHandler:
         Update the database according to the session-level lifecycle events
         published by the manager.
         """
-        await self._invoke_session_callback(None, source, event)
+        await self.invoke_session_callback(None, source, event)
 
-    async def _handle_session_terminated(
+    async def handle_session_terminated(
         self,
         context: None,
         source: AgentId,
         event: SessionTerminatedEvent,
     ) -> None:
         await self._registry.clean_session(event.session_id)
-        await self._invoke_session_callback(None, source, event)
+        await self.invoke_session_callback(None, source, event)
 
-    async def _handle_destroy_session(
+    async def handle_destroy_session(
         self,
         context: None,
         source: AgentId,
@@ -112,7 +124,7 @@ class SessionEventHandler:
             reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
         )
 
-    async def _handle_batch_result(
+    async def handle_batch_result(
         self,
         context: None,
         source: AgentId,
@@ -123,9 +135,13 @@ class SessionEventHandler:
         """
         match event:
             case SessionSuccessEvent(session_id=session_id, reason=reason, exit_code=exit_code):
-                await SessionRow.set_session_result(self._db, session_id, True, exit_code)
+                await SessionRow.set_session_result(
+                    self._db, session_id, success=True, exit_code=exit_code
+                )
             case SessionFailureEvent(session_id=session_id, reason=reason, exit_code=exit_code):
-                await SessionRow.set_session_result(self._db, session_id, False, exit_code)
+                await SessionRow.set_session_result(
+                    self._db, session_id, success=False, exit_code=exit_code
+                )
         async with self._db.begin_session() as db_sess:
             try:
                 session = await SessionRow.get_session(
@@ -140,21 +156,9 @@ class SessionEventHandler:
             reason=reason,
         )
 
-        await self._invoke_session_callback(None, source, event)
+        await self.invoke_session_callback(None, source, event)
 
-    async def _handle_started_or_cancelled(
-        self, context: None, source: AgentId, event: SessionStartedEvent | SessionCancelledEvent
-    ):
-        if event.creation_id not in self._registry.session_creation_tracker:
-            return
-        if tracker := self._registry.session_creation_tracker.get(event.creation_id):
-            tracker.set()
-
-        await self._invoke_session_callback(None, source, event)
-        if event.creation_id in self._registry.session_creation_tracker:
-            del self._registry.session_creation_tracker[event.creation_id]
-
-    async def _invoke_session_callback(
+    async def invoke_session_callback(
         self,
         context: None,
         source: AgentId,

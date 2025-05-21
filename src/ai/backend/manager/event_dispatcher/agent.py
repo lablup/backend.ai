@@ -29,7 +29,7 @@ class AgentEventHandler:
         self._registry = registry
         self._db = db
 
-    async def _handle_agent_started(
+    async def handle_agent_started(
         self,
         context: None,
         source: AgentId,
@@ -43,7 +43,7 @@ class AgentEventHandler:
             },
         )
 
-    async def _handle_agent_terminated(
+    async def handle_agent_terminated(
         self,
         context: None,
         source: AgentId,
@@ -66,7 +66,7 @@ class AgentEventHandler:
             await self._registry.mark_agent_terminated(source, AgentStatus.TERMINATED)
             self._registry.agent_cache.discard(source)
 
-    async def _handle_agent_heartbeat(
+    async def handle_agent_heartbeat(
         self,
         context: None,
         source: AgentId,
@@ -74,7 +74,7 @@ class AgentEventHandler:
     ) -> None:
         await self._registry.handle_heartbeat(source, event.agent_info)
 
-    async def _handle_agent_images_remove(
+    async def handle_agent_images_remove(
         self,
         context: None,
         source: AgentId,
@@ -82,7 +82,7 @@ class AgentEventHandler:
     ) -> None:
         await self._registry.handle_agent_images_remove(source, event.image_canonicals)
 
-    async def _handle_check_agent_resource(
+    async def handle_check_agent_resource(
         self, context: None, source: AgentId, event: DoAgentResourceCheckEvent
     ) -> None:
         async with self._db.begin_readonly() as conn:

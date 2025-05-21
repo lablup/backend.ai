@@ -21,7 +21,7 @@ class VFolderEventHandler:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def _handle_vfolder_deletion_success(
+    async def handle_vfolder_deletion_success(
         self,
         context: None,
         source: AgentId,
@@ -31,7 +31,7 @@ class VFolderEventHandler:
             self._db, [event.vfid.folder_id], VFolderOperationStatus.DELETE_COMPLETE, do_log=True
         )
 
-    async def _handle_vfolder_deletion_failure(
+    async def handle_vfolder_deletion_failure(
         self,
         context: None,
         source: AgentId,
