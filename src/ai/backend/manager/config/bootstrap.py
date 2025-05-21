@@ -23,6 +23,7 @@ from .loader.toml_loader import TomlConfigLoader
 # TODO: Remove useless config fields from this
 class BootstrapConfig(BaseModel):
     db: DatabaseConfig = Field(
+        default_factory=DatabaseConfig,
         description="""
         Database configuration settings.
         Defines how the manager connects to its PostgreSQL database.
@@ -30,6 +31,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     etcd: EtcdConfig = Field(
+        default_factory=EtcdConfig,
         description="""
         Etcd configuration settings.
         Used for distributed coordination between manager instances.
@@ -37,6 +39,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     manager: ManagerConfig = Field(
+        default_factory=ManagerConfig,
         description="""
         Core manager service configuration.
         Controls how the manager operates, communicates, and scales.
@@ -44,6 +47,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     logging: Any = Field(
+        default_factory=lambda: {},
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
@@ -51,6 +55,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     pyroscope: PyroscopeConfig = Field(
+        default_factory=PyroscopeConfig,
         description="""
         Pyroscope profiling configuration.
         Controls integration with the Pyroscope performance profiling tool.
@@ -58,6 +63,7 @@ class BootstrapConfig(BaseModel):
         """,
     )
     debug: DebugConfig = Field(
+        default_factory=DebugConfig,
         description="""
         Debugging options configuration.
         Controls various debugging features and tools.
