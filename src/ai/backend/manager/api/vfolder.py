@@ -1966,7 +1966,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE, allow_privileged_access=True)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE, allow_privileged_access=False)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
