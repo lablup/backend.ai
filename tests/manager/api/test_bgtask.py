@@ -22,7 +22,6 @@ from ai.backend.common.types import AgentId, EtcdRedisConfig
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
     background_task_ctx,
-    event_dispatcher_ctx,
     redis_ctx,
     shared_config_ctx,
 )
@@ -36,9 +35,11 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 
 
 @pytest.fixture
-async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[BgtaskFixture]:
+async def bgtask_fixture(
+    etcd_fixture, event_dispatcher_test_ctx, create_app_and_client
+) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
-        [shared_config_ctx, redis_ctx, event_dispatcher_ctx, background_task_ctx],
+        [shared_config_ctx, redis_ctx, event_dispatcher_test_ctx, background_task_ctx],
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]

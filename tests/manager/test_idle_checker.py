@@ -21,7 +21,6 @@ from ai.backend.manager.server import (
     background_task_ctx,
     database_ctx,
     distributed_lock_ctx,
-    event_dispatcher_ctx,
     redis_ctx,
     shared_config_ctx,
 )
@@ -83,13 +82,14 @@ def remaining_time_calculation() -> None:
 async def new_user_grace_period_checker(
     etcd_fixture,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             background_task_ctx,
             database_ctx,
             distributed_lock_ctx,
@@ -131,6 +131,7 @@ async def new_user_grace_period_checker(
 async def network_timeout_idle_checker(
     etcd_fixture,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
     mocker,
 ) -> None:
@@ -138,7 +139,7 @@ async def network_timeout_idle_checker(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             background_task_ctx,
             database_ctx,
             distributed_lock_ctx,
@@ -382,6 +383,7 @@ async def network_timeout_idle_checker(
 async def session_lifetime_checker(
     etcd_fixture,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
     mocker,
 ) -> None:
@@ -389,7 +391,7 @@ async def session_lifetime_checker(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             background_task_ctx,
             database_ctx,
             distributed_lock_ctx,
@@ -605,6 +607,7 @@ async def session_lifetime_checker(
 async def utilization_idle_checker__utilization(
     etcd_fixture,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
     mocker,
 ) -> None:
@@ -612,7 +615,7 @@ async def utilization_idle_checker__utilization(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             background_task_ctx,
             database_ctx,
             distributed_lock_ctx,
@@ -689,6 +692,7 @@ async def utilization_idle_checker__utilization(
 async def utilization_idle_checker(
     etcd_fixture,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
     mocker,
 ) -> None:
@@ -696,7 +700,7 @@ async def utilization_idle_checker(
         [
             shared_config_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             background_task_ctx,
             database_ctx,
             distributed_lock_ctx,

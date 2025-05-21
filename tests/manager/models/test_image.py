@@ -28,7 +28,6 @@ from ai.backend.manager.server import (
     background_task_ctx,
     database_ctx,
     distributed_lock_ctx,
-    event_dispatcher_ctx,
     hook_plugin_ctx,
     idle_checker_ctx,
     monitoring_ctx,
@@ -180,6 +179,7 @@ async def test_image_rescan_on_docker_registry(
     etcd_fixture,
     extra_fixtures,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
 ):
     app, _ = await create_app_and_client(
@@ -189,7 +189,7 @@ async def test_image_rescan_on_docker_registry(
             monitoring_ctx,
             hook_plugin_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             services_ctx,
             network_plugin_ctx,
             storage_manager_ctx,
@@ -333,6 +333,7 @@ async def test_image_rescan_on_cr_backend_ai(
     client: Client,
     etcd_fixture,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
 ):
     app, _ = await create_app_and_client(
@@ -342,7 +343,7 @@ async def test_image_rescan_on_cr_backend_ai(
             monitoring_ctx,
             hook_plugin_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             services_ctx,
             network_plugin_ctx,
             storage_manager_ctx,

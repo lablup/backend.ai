@@ -116,6 +116,7 @@ async def run_timer(
         source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
+    await event_dispatcher.start()
 
     timer = GlobalTimer(
         lock_factory(),
@@ -172,6 +173,7 @@ def etcd_timer_node_process(
             source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
+        await event_dispatcher.start()
 
         etcd_lock: AbstractDistributedLock
         match etcd_client:
@@ -254,6 +256,7 @@ class TimerNode(threading.Thread):
             source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
+        await event_dispatcher.start()
 
         timer = GlobalTimer(
             self.lock_factory(),
@@ -467,6 +470,7 @@ async def test_global_timer_join_leave(
         source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
+    await event_dispatcher.start()
 
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))

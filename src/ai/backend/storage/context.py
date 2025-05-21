@@ -186,6 +186,7 @@ class RootContext:
             StorageClientWebappPluginContext(self.etcd, self.local_config),
             self.client_api_app,
         )
+        await self.event_dispatcher.start()
 
     async def init_storage_plugin(self) -> None:
         plugin_ctx = StoragePluginContext(self.etcd, self.local_config)
