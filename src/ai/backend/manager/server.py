@@ -537,6 +537,12 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.event_dispatcher.close()
 
 
+@actxmgr
+async def event_dispatcher_start_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    await root_ctx.event_dispatcher.start()
+    yield
+
+
 def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
@@ -905,6 +911,7 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
+            event_dispatcher_start_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:

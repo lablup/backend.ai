@@ -84,6 +84,7 @@ async def test_dispatch(redis_container) -> None:
 
     dispatcher.subscribe(DummyEvent, app, acb)
     dispatcher.subscribe(DummyEvent, app, scb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
     # Dispatch the event
@@ -147,6 +148,7 @@ async def test_error_on_dispatch(redis_container) -> None:
 
     dispatcher.subscribe(DummyEvent, app, scb)
     dispatcher.subscribe(DummyEvent, app, acb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
     await producer.produce_event(DummyEvent(0), source_override=AgentId("i-test"))

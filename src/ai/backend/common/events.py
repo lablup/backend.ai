@@ -1176,8 +1176,8 @@ class EventDispatcher:
     _subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     _msg_queue: AbstractMessageQueue
 
-    _consumer_loop_task: asyncio.Task
-    _subscriber_loop_task: asyncio.Task
+    _consumer_loop_task: Optional[asyncio.Task]
+    _subscriber_loop_task: Optional[asyncio.Task]
     _consumer_taskgroup: PersistentTaskGroup
     _subscriber_taskgroup: PersistentTaskGroup
 
@@ -1207,6 +1207,10 @@ class EventDispatcher:
             name="subscriber_taskgroup",
             exception_handler=subscriber_exception_handler,
         )
+        self._consumer_loop_task = None
+        self._subscriber_loop_task = None
+
+    async def start(self) -> None:
         self._consumer_loop_task = asyncio.create_task(self._consume_loop())
         self._subscriber_loop_task = asyncio.create_task(self._subscribe_loop())
 
@@ -1216,12 +1220,14 @@ class EventDispatcher:
             cancelled_tasks = []
             await self._consumer_taskgroup.shutdown()
             await self._subscriber_taskgroup.shutdown()
-            if not self._consumer_loop_task.done():
-                self._consumer_loop_task.cancel()
-                cancelled_tasks.append(self._consumer_loop_task)
-            if not self._subscriber_loop_task.done():
-                self._subscriber_loop_task.cancel()
-                cancelled_tasks.append(self._subscriber_loop_task)
+            if self._consumer_loop_task is not None:
+                if not self._consumer_loop_task.done():
+                    self._consumer_loop_task.cancel()
+                    cancelled_tasks.append(self._consumer_loop_task)
+            if self._subscriber_loop_task is not None:
+                if not self._subscriber_loop_task.done():
+                    self._subscriber_loop_task.cancel()
+                    cancelled_tasks.append(self._subscriber_loop_task)
             await asyncio.gather(*cancelled_tasks, return_exceptions=True)
         except Exception:
             log.exception("unexpected error while closing event dispatcher")

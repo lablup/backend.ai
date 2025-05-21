@@ -255,6 +255,7 @@ async def check_and_upgrade(
         redis_mq,
         log_events=local_config["debug"]["log-events"],
     )
+    await event_dispatcher.start()
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
