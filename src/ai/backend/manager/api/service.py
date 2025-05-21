@@ -2,17 +2,11 @@ import asyncio
 import logging
 import secrets
 import uuid
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Self,
-    Sequence,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 import aiohttp
 import aiohttp_cors
@@ -308,7 +302,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         default={},
     )
 
-    environ: dict[str, str] | None = Field(
+    environ: Optional[dict[str, str]] = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
     )
@@ -1237,7 +1231,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "services"
     app["api_versions"] = (4, 5)
