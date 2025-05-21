@@ -55,6 +55,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.exception import ErrorCode
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -303,6 +304,31 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     return resp
 
 
+def _debug_error_response(
+    e: Exception,
+) -> web.StreamResponse:
+    error_type = ""
+    error_title = ""
+    status_code = 500
+    error_code = ErrorCode.default()
+    if isinstance(e, BackendError):
+        error_type = e.error_type
+        error_title = e.error_title
+        status_code = e.status_code
+        error_code = e.error_code()
+
+    return web.json_response(
+        {
+            "type": error_type,
+            "title": error_title,
+            "error_code": str(error_code),
+            "msg": traceback.format_exc(),
+        },
+        status=status_code,
+        dumps=dump_json_str,
+    )
+
+
 @web.middleware
 async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
@@ -322,13 +348,15 @@ async def exception_middleware(
         else:
             raise InvalidAPIParameters()
     except BackendError as ex:
-        if ex.status_code == 500:
+        if ex.status_code // 100 == 5:
             log.warning("Internal server error raised inside handlers")
         await error_monitor.capture_exception()
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
         await stats_monitor.report_metric(
             INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
         )
+        if root_ctx.config_provider.config.debug.enabled:
+            return _debug_error_response(ex)
         raise
     except web.HTTPException as ex:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
@@ -353,7 +381,7 @@ async def exception_middleware(
         await error_monitor.capture_exception()
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.config_provider.config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
+            return _debug_error_response(e)
         else:
             raise InternalServerError()
     else:
