@@ -4284,7 +4284,7 @@ async def handle_route_creation(
                 ],
             )
 
-            environ = {**endpoint.environ}
+            environ = dict(endpoint.environ or {})
             if "BACKEND_MODEL_NAME" not in environ:
                 environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
 
