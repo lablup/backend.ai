@@ -48,7 +48,7 @@ from ai.backend.common.events.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
-from ai.backend.common.plugin.monitor import ErrorPluginContext
+from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.event_dispatcher.propagator import PropagatorEventDispatcher
 from ai.backend.manager.registry import AgentRegistry
 
@@ -68,7 +68,7 @@ class DispatcherArgs:
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
-    error_monitor_ctx: ErrorPluginContext  # TODO:
+    event_dispatcher_plugin_ctx: EventDispatcherPluginContext
 
 
 class Dispatchers:
@@ -86,7 +86,7 @@ class Dispatchers:
         Initialize the Dispatchers with the given arguments.
         """
         self._db = args.db
-        self._error_monitor_ctx = args.error_monitor_ctx
+        self._event_dispatcher_plugin_ctx = args.event_dispatcher_plugin_ctx
         self._propagator_dispatcher = PropagatorEventDispatcher(args.event_hub)
         self._agent_event_handler = AgentEventHandler(args.agent_registry, args.db)
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
@@ -135,8 +135,8 @@ class Dispatchers:
         evd.consume(
             AgentErrorEvent,
             None,
-            self._error_monitor_ctx.handle_error_event,
-            name="api.session.agent.error",
+            self._event_dispatcher_plugin_ctx.handle_event,
+            name="agent.error",
         )
 
     def _dispatch_image_events(self, event_dispatcher: EventDispatcher) -> None:

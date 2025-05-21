@@ -67,6 +67,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -652,9 +653,12 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         event_observer=root_ctx.metrics.event,
     )
     dispatchers = Dispatchers(
-        DispatcherArgs(root_ctx.event_hub, root_ctx.registry, root_ctx.db, root_ctx.error_monitor)
+        DispatcherArgs(
+            root_ctx.event_hub, root_ctx.registry, root_ctx.db, root_ctx.event_dispatcher_plugin_ctx
+        )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
+    await root_ctx.event_dispatcher.start()
     yield
     await root_ctx.event_dispatcher.close()
 
@@ -752,6 +756,22 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     if hook_result.status != PASSED:
         raise RuntimeError("Could not activate the manager instance.")
+    yield
+    await ctx.cleanup()
+
+
+@actxmgr
+async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    ctx = EventDispatcherPluginContext(
+        root_ctx.etcd,
+        root_ctx.config_provider.config.model_dump(),
+    )
+    root_ctx.event_dispatcher_plugin_ctx = ctx
+    await ctx.init(
+        context=root_ctx,
+        allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
+        blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
+    )
     yield
     await ctx.cleanup()
 
@@ -1033,6 +1053,7 @@ def build_root_app(
             hook_plugin_ctx,
             monitoring_ctx,
             network_plugin_ctx,
+            event_dispatcher_plugin_ctx,
             agent_registry_ctx,
             event_dispatcher_ctx,
             idle_checker_ctx,

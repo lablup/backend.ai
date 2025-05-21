@@ -94,6 +94,9 @@ python_distribution(
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
         },
+        "backendai_event_dispatcher_v20": {
+            "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorEventDispatcher",
+        },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
         },
