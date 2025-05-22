@@ -285,7 +285,7 @@ from .vfolder import (
 )
 
 
-def is_legacy_mutation(mutation_cls: Any) -> bool:
+def _is_legacy_mutation(mutation_cls: Any) -> bool:
     """
     Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
     """
@@ -3196,7 +3196,7 @@ class GQLMutationPrivilegeCheckMiddleware:
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                if is_legacy_mutation(mutation_cls):
+                if _is_legacy_mutation(mutation_cls):
                     return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
                 raise PermissionDeniedError()
         return next(root, info, **args)
