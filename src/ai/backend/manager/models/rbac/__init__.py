@@ -109,7 +109,7 @@ async def _calculate_role_in_scope_for_suadmin(
                 return _EMPTY_FSET
             result = frozenset([PredefinedRole.ADMIN])
             if project_row.users:
-                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
+                result = frozenset([PredefinedRole.OWNER])
             return result
         case UserScope(user_id):
             if ctx.user_id == user_id:
@@ -215,7 +215,7 @@ async def _calculate_role_in_scope_for_admin(
             else:
                 return _EMPTY_FSET
             if project_row.users:
-                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
+                result = frozenset([PredefinedRole.OWNER])
             return result
         case UserScope(user_id, domain_name):
             if ctx.user_id == user_id:
