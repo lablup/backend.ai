@@ -31,7 +31,6 @@ from ai.backend.manager.models.gql_models.service_config import (
     ServiceConfigConnection,
     ServiceConfigNode,
 )
-from ai.backend.manager.models.utils import is_legacy_mutation
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -284,6 +283,14 @@ from .vfolder import (
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
 )
+
+
+def is_legacy_mutation(mutation_cls: Any) -> bool:
+    """
+    Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
+    """
+    fields = getattr(mutation_cls, "_meta").fields
+    return {"ok", "msg"}.issubset(fields)
 
 
 @attrs.define(auto_attribs=True, slots=True)
