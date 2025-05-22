@@ -26,6 +26,10 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.errors.exceptions import (
+    TooManyVFoldersFound,
+    VFolderNotFound,
+)
 
 from ...defs import (
     DEFAULT_CHUNK_SIZE,
@@ -60,6 +64,7 @@ from ..vfolder import (
     VirtualFolder,
     get_permission_ctx,
     is_unmanaged,
+    query_accessible_vfolders,
 )
 
 if TYPE_CHECKING:
@@ -217,6 +222,58 @@ class VirtualFolderNode(graphene.ObjectType):
         return result
 
     @classmethod
+    def from_entry(
+        cls,
+        entry: Mapping[str, Any],
+    ) -> Self:
+        permissions = {VFolderRBACPermission.READ_ATTRIBUTE}
+        all_mount_perms = {
+            VFolderRBACPermission.MOUNT_RO,
+            VFolderRBACPermission.MOUNT_RW,
+            VFolderRBACPermission.MOUNT_WD,
+        }
+        owner_perms = {perm for perm in VFolderRBACPermission if perm not in all_mount_perms}
+        if entry["is_owner"]:
+            permissions |= owner_perms
+
+        def legacy_perm_to_mount_perm(legacy_perm: VFolderPermission) -> set[VFolderRBACPermission]:
+            match legacy_perm:
+                case VFolderPermission.READ_ONLY:
+                    return {VFolderRBACPermission.MOUNT_RO}
+                case VFolderPermission.READ_WRITE:
+                    return {VFolderRBACPermission.MOUNT_RO, VFolderRBACPermission.MOUNT_RW}
+                case VFolderPermission.RW_DELETE:
+                    return all_mount_perms
+                case VFolderPermission.OWNER_PERM:
+                    return all_mount_perms
+
+        permissions |= legacy_perm_to_mount_perm(entry["permission"])
+        return cls(
+            id=entry["id"],
+            row_id=entry["id"],
+            name=entry["name"],
+            host=entry["host"],
+            quota_scope_id=entry["quota_scope_id"],
+            user=entry["user"],
+            user_email=entry["user_email"],
+            group=entry["group"],
+            group_name=entry["group_name"],
+            creator=entry["creator"],
+            unmanaged_path=entry["unmanaged_path"],
+            usage_mode=entry["usage_mode"],
+            permission=entry["permission"],
+            ownership_type=entry["ownership_type"],
+            max_files=entry["max_files"],
+            max_size=entry["max_size"],  # in B
+            created_at=entry["created_at"],
+            last_used=entry["last_used"],
+            cloneable=entry["cloneable"],
+            status=entry["status"],
+            cur_size=entry["cur_size"],
+            permissions=permissions,
+        )
+
+    @classmethod
     async def batch_load_by_id(
         cls,
         graph_ctx: GraphQueryContext,
@@ -244,28 +301,20 @@ class VirtualFolderNode(graphene.ObjectType):
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
     ) -> Optional[Self]:
         graph_ctx: GraphQueryContext = info.context
+        user = graph_ctx.user
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(VFolderRow).options(
-            joinedload(VFolderRow.user_row),
-            joinedload(VFolderRow.group_row),
-        )
-        async with graph_ctx.db.connect() as db_conn:
-            user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+        async with graph_ctx.db.begin_readonly() as db_connection:
+            entries = await query_accessible_vfolders(
+                db_connection,
+                user["uuid"],
+                extra_vf_conds=(VFolderRow.id == uuid.UUID(vfolder_row_id)),
             )
-            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
-            cond = permission_ctx.query_condition
-            if cond is None:
-                return None
-            query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
-            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                vfolder_row = await db_session.scalar(query)
-        return cls.from_row(
-            graph_ctx,
-            vfolder_row,
-            permissions=await permission_ctx.calculate_final_permission(vfolder_row),
-        )
+        if len(entries) > 1:
+            raise TooManyVFoldersFound(entries)
+        if not entries:
+            raise VFolderNotFound
+        entry = entries[0]
+        return cls.from_entry(entry)
 
     @classmethod
     async def get_connection(
