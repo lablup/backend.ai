@@ -103,7 +103,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 while True:
                     if len(items) == 0:
                         if not sys.stdout.isatty():
-                            pass
+                            break
                         else:
                             raise NoItems
                     if is_scalar:
