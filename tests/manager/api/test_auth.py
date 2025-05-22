@@ -10,12 +10,18 @@ from dateutil.tz import gettz, tzutc
 from ai.backend.manager.api.auth import _extract_auth_params, check_date
 from ai.backend.manager.errors.exceptions import InvalidAuthParameters
 from ai.backend.manager.server import (
+    agent_registry_ctx,
     database_ctx,
     event_dispatcher_ctx,
+    event_dispatcher_plugin_ctx,
     event_hub_ctx,
+    event_producer_ctx,
     hook_plugin_ctx,
+    message_queue_ctx,
     monitoring_ctx,
+    network_plugin_ctx,
     redis_ctx,
+    storage_manager_ctx,
 )
 
 
@@ -106,10 +112,16 @@ async def test_authorize(
             mock_etcd_ctx,
             mock_config_provider_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
             database_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
+            storage_manager_ctx,
             monitoring_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
+            event_dispatcher_plugin_ctx,
+            agent_registry_ctx,
+            event_dispatcher_ctx,
         ],
         [".auth"],
     )

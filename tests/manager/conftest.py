@@ -913,7 +913,6 @@ async def registry_ctx(mocker):
         redis_live=mock_redis_live,
         redis_image=mock_redis_image,
         redis_stream=mock_redis_stream,
-        event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,

@@ -55,6 +55,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.exception import ErrorCode
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -67,6 +68,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -302,6 +304,31 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     return resp
 
 
+def _debug_error_response(
+    e: Exception,
+) -> web.StreamResponse:
+    error_type = ""
+    error_title = ""
+    status_code = 500
+    error_code = ErrorCode.default()
+    if isinstance(e, BackendError):
+        error_type = e.error_type
+        error_title = e.error_title
+        status_code = e.status_code
+        error_code = e.error_code()
+
+    return web.json_response(
+        {
+            "type": error_type,
+            "title": error_title,
+            "error_code": str(error_code),
+            "msg": traceback.format_exc(),
+        },
+        status=status_code,
+        dumps=dump_json_str,
+    )
+
+
 @web.middleware
 async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
@@ -321,13 +348,15 @@ async def exception_middleware(
         else:
             raise InvalidAPIParameters()
     except BackendError as ex:
-        if ex.status_code == 500:
+        if ex.status_code // 100 == 5:
             log.warning("Internal server error raised inside handlers")
         await error_monitor.capture_exception()
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
         await stats_monitor.report_metric(
             INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
         )
+        if root_ctx.config_provider.config.debug.enabled:
+            return _debug_error_response(ex)
         raise
     except web.HTTPException as ex:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
@@ -352,7 +381,7 @@ async def exception_middleware(
         await error_monitor.capture_exception()
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
         if root_ctx.config_provider.config.debug.enabled:
-            raise InternalServerError(traceback.format_exc())
+            return _debug_error_response(e)
         else:
             raise InternalServerError()
     else:
@@ -626,23 +655,39 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    mq = _make_message_queue(root_ctx)
+async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.message_queue = _make_message_queue(root_ctx)
+    yield
+    await root_ctx.message_queue.close()
+
+
+@actxmgr
+async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_producer = EventProducer(
-        mq,
+        root_ctx.message_queue,
         source=AGENTID_MANAGER,
         log_events=root_ctx.config_provider.config.debug.log_events,
     )
-    root_ctx.event_dispatcher = EventDispatcher(
-        mq,
-        log_events=root_ctx.config_provider.config.debug.log_events,
-        event_observer=root_ctx.metrics.event,
-    )
-    dispatchers = Dispatchers(DispatcherArgs(root_ctx.event_hub))
-    dispatchers.dispatch(root_ctx.event_dispatcher)
     yield
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
+
+
+@actxmgr
+async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.event_dispatcher = EventDispatcher(
+        root_ctx.message_queue,
+        log_events=root_ctx.config_provider.config.debug.log_events,
+        event_observer=root_ctx.metrics.event,
+    )
+    dispatchers = Dispatchers(
+        DispatcherArgs(
+            root_ctx.event_hub, root_ctx.registry, root_ctx.db, root_ctx.event_dispatcher_plugin_ctx
+        )
+    )
+    dispatchers.dispatch(root_ctx.event_dispatcher)
+    await root_ctx.event_dispatcher.start()
+    yield
     await root_ctx.event_dispatcher.close()
 
 
@@ -744,6 +789,22 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    ctx = EventDispatcherPluginContext(
+        root_ctx.etcd,
+        root_ctx.config_provider.config.model_dump(),
+    )
+    root_ctx.event_dispatcher_plugin_ctx = ctx
+    await ctx.init(
+        context=root_ctx,
+        allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
+        blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
+    )
+    yield
+    await ctx.cleanup()
+
+
+@actxmgr
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from zmq.auth.certs import load_certificate
 
@@ -764,7 +825,6 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_live,
         root_ctx.redis_image,
         root_ctx.redis_stream,
-        root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
@@ -1015,13 +1075,16 @@ def build_root_app(
             database_ctx,
             services_ctx,
             distributed_lock_ctx,
-            event_dispatcher_ctx,
-            idle_checker_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
             storage_manager_ctx,
-            network_plugin_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
+            network_plugin_ctx,
+            event_dispatcher_plugin_ctx,
             agent_registry_ctx,
+            event_dispatcher_ctx,
+            idle_checker_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,

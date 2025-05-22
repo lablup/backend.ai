@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Self, override
 
-from ai.backend.common.events.dispatcher import (
+from ai.backend.common.events.types import (
     AbstractEvent,
     EventDomain,
 )
