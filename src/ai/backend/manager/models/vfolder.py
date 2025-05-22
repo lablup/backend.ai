@@ -169,8 +169,6 @@ class VFolderOwnershipType(CIStrEnum):
 
 
 class VFolderPermission(enum.StrEnum):
-    # TODO: Replace this class with VFolderRBACPermission
-    # Or rename this class to VFolderMountPermission
     """
     Permissions for a virtual folder given to a specific access key.
     RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
