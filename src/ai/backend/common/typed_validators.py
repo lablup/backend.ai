@@ -3,10 +3,10 @@ import ipaddress
 import os
 import pwd
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Optional, Sequence, TypeAlias, TypeVar
+from typing import Annotated, Any, ClassVar, Final, Optional, TypeAlias, TypeVar
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -167,8 +167,10 @@ TimeDuration = Annotated[
 NaiveTimeDuration = Annotated[TVariousDelta, _NaiveTimeDurationPydanticAnnotation]
 """Time duration validator which also accepts negative value"""
 
-
-SESSION_NAME_MATCHER = re.compile(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII)
+SESSION_NAME_MAX_LENGTH: Final[int] = 24
+SESSION_NAME_MATCHER = re.compile(
+    r"^(?=.{4,%d}$)\w[\w.-]*\w$" % (SESSION_NAME_MAX_LENGTH,), re.ASCII
+)
 
 
 def session_name_validator(s: str) -> str:
