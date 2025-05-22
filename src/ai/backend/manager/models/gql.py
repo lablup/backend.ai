@@ -15,6 +15,7 @@ from graphql.type import GraphQLField
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
+    PermissionDeniedError,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -282,6 +283,14 @@ from .vfolder import (
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
 )
+
+
+def _is_legacy_mutation(mutation_cls: Any) -> bool:
+    """
+    Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
+    """
+    fields = getattr(mutation_cls, "_meta").fields
+    return {"ok", "msg"}.issubset(fields)
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -3187,7 +3196,9 @@ class GQLMutationPrivilegeCheckMiddleware:
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                if _is_legacy_mutation(mutation_cls):
+                    return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                raise PermissionDeniedError()
         return next(root, info, **args)
 
 
