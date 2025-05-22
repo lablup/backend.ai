@@ -563,5 +563,4 @@ def is_legacy_mutation(mutation_cls: Any) -> bool:
     Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
     """
     fields = getattr(mutation_cls, "_meta").fields
-    print("fields!", fields)
     return {"ok", "msg"}.issubset(fields)
