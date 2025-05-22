@@ -175,12 +175,15 @@ class ConsoleOutputHandler(BaseOutputHandler):
         else:
             if page_size is None:
                 page_size = 20
-            for line in tabulate_items(
-                infinite_fetch(page_size),
-                fields,
-                tablefmt="plain" if plain else "simple",
-            ):
-                print(line, end="")
+            try:
+                for line in tabulate_items(
+                    infinite_fetch(page_size),
+                    fields,
+                    tablefmt="plain" if plain else "simple",
+                ):
+                    print(line, end="")
+            except NoItems:
+                print("No matching items.")
 
     def print_mutation_result(
         self,
