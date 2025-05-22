@@ -94,7 +94,6 @@ from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
-    PredefinedRole,
     ProjectScope,
     ScopeType,
     StorageHost,
@@ -2559,21 +2558,9 @@ class VFolderPermissionContextBuilder(
     async def build_ctx_in_project_scope(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> VFolderPermissionContext:
-        from .group import AssocGroupUserRow
-
         permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
-        user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
-        permission_ctx.merge(user_perm_ctx)
-        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
-        if PredefinedRole.ADMIN in roles:
-            project_query = sa.select(AssocGroupUserRow).where(
-                AssocGroupUserRow.group_id == scope.project_id
-            )
-            for row in await self.db_session.scalars(project_query):
-                project_user_perm_ctx = await self._build_at_user_scope_non_recursively(
-                    ctx, row.user_id
-                )
-                permission_ctx.merge(project_user_perm_ctx)
+        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        permission_ctx.merge(_user_perm_ctx)
         return permission_ctx
 
     @override
