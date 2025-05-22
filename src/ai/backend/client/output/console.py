@@ -102,7 +102,10 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 page_size = get_preferred_page_size()
                 while True:
                     if len(items) == 0:
-                        raise NoItems
+                        if not sys.stdout.isatty():
+                            pass
+                        else:
+                            raise NoItems
                     if is_scalar:
                         yield from map(
                             lambda v: {fields[0].field_name: v},
@@ -151,11 +154,15 @@ class ConsoleOutputHandler(BaseOutputHandler):
             current_offset = initial_page_offset
             while True:
                 result = fetch_func(current_offset, _page_size)
-                if result.total_count == 0:
-                    raise NoItems
-                current_offset += len(result.items)
                 if not fields:
                     fields.extend(result.fields)
+
+                if result.total_count == 0:
+                    if not sys.stdout.isatty():
+                        break
+                    else:
+                        raise NoItems
+                current_offset += len(result.items)
                 yield from result.items
                 if current_offset >= result.total_count:
                     break
