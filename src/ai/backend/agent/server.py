@@ -189,7 +189,7 @@ class RPCFunctionRegistry:
         meth: Callable[..., Coroutine[None, None, Any]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
-        @_collect_metrics(self._metric_observer)
+        @_collect_metrics(self._metric_observer, meth.__name__)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
                 if request.body is None:
@@ -227,7 +227,7 @@ class RPCFunctionRegistryV2:
         meth: Callable[..., Coroutine[None, None, AbstractAgentResp]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
-        @_collect_metrics(self._metric_observer)
+        @_collect_metrics(self._metric_observer, meth.__name__)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
                 if request.body is None:
@@ -253,7 +253,7 @@ class RPCFunctionRegistryV2:
         return _inner
 
 
-def _collect_metrics(observer: RPCMetricObserver) -> Callable:
+def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable:
     def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
         async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
@@ -262,14 +262,14 @@ def _collect_metrics(observer: RPCMetricObserver) -> Callable:
                 res = await meth(self, *args, **kwargs)
                 duration = time.perf_counter() - start_time
                 observer.observe_rpc_request_success(
-                    method=meth.__name__,
+                    method=method_name,
                     duration=duration,
                 )
                 return res
             except BaseException as e:
                 duration = time.perf_counter() - start_time
                 observer.observe_rpc_request_failure(
-                    method=meth.__name__,
+                    method=method_name,
                     duration=duration,
                     exception=e,
                 )
