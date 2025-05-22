@@ -15,6 +15,7 @@ from graphql.type import GraphQLField
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
+    PermissionDeniedError,
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -30,6 +31,7 @@ from ai.backend.manager.models.gql_models.service_config import (
     ServiceConfigConnection,
     ServiceConfigNode,
 )
+from ai.backend.manager.models.utils import is_legacy_mutation
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
@@ -3187,7 +3189,9 @@ class GQLMutationPrivilegeCheckMiddleware:
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                if is_legacy_mutation(mutation_cls):
+                    return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                raise PermissionDeniedError()
         return next(root, info, **args)
 
 

@@ -556,3 +556,12 @@ async def vacuum_db(bootstrap_config: BootstrapConfig, vacuum_full: bool = False
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             await conn.exec_driver_sql(vacuum_sql)
+
+
+def is_legacy_mutation(mutation_cls: Any) -> bool:
+    """
+    Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
+    """
+    fields = getattr(mutation_cls, "_meta").fields
+    print("fields!", fields)
+    return {"ok", "msg"}.issubset(fields)
