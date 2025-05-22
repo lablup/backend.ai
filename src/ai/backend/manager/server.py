@@ -87,6 +87,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import (
+    OpenTelemetrySpec,
+    initialize_opentelemetry,
+)
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
@@ -636,7 +640,7 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(root_ctx.etcd))
-    loop = ServiceDiscoveryLoop(
+    root_ctx.sd_loop = ServiceDiscoveryLoop(
         root_ctx.service_discovery,
         ServiceMetadata(
             display_name=f"manager-{root_ctx.config_provider.config.manager.id}",
@@ -650,8 +654,17 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             ),
         ),
     )
+    meta = root_ctx.sd_loop.metadata
+    initialize_opentelemetry(
+        OpenTelemetrySpec(
+            service_id=meta.id,
+            service_name=meta.service_group,
+            service_version=meta.version,
+            endpoint="http://127.",
+        )
+    )
     yield
-    loop.close()
+    root_ctx.sd_loop.close()
 
 
 @actxmgr

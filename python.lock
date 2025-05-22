@@ -2230,79 +2230,79 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "330246da5c5c33fd7cb25e87e17eabdb1f03678e652ea0c46861f4318fc56c29",
-              "url": "https://files.pythonhosted.org/packages/19/a0/d16e9ceab7fa83223b4513ab82dd6b5a3566d333ea69c88fc06e8227e1e1/hiredis-3.1.1-cp313-cp313-musllinux_1_2_x86_64.whl"
+              "hash": "2fe9cd710e08fba4e16e0174de8535207711d5dae827290a96bada0ba82caa6c",
+              "url": "https://files.pythonhosted.org/packages/b9/85/82177a92ab94bb3a3ff2258bab6ca476b1e657757144f96d9e7d4d5e8a37/hiredis-3.2.0-cp313-cp313-musllinux_1_2_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4bf5711a5bdbc284c406c8e9dd9154b4d93a54ba758f417c8b8c01133997059c",
-              "url": "https://files.pythonhosted.org/packages/25/2a/e05816b03c151cb246c7ec9a35b840cdb3b27f89253224cfa7878633d79f/hiredis-3.1.1-cp313-cp313-musllinux_1_2_aarch64.whl"
+              "hash": "010bdd4211161e8e9af96c9bfaf10576422f194ab4babda9c0bbe06af3370b55",
+              "url": "https://files.pythonhosted.org/packages/1b/f0/9b8b14fdfc683c01a5a0a563798d767c4f6151b270ef4052cf55136d9f04/hiredis-3.2.0-cp313-cp313-musllinux_1_2_ppc64le.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a9524a1f651e2d45eaf33865a0f412a0d1117f49661f09d8243a98c3d3f961a2",
-              "url": "https://files.pythonhosted.org/packages/29/76/8af1c24bd69d0c910281ddfeb603686220cdcb7e37d9df2eb39aaf31f5b0/hiredis-3.1.1-cp313-cp313-macosx_10_15_x86_64.whl"
+              "hash": "889e8820e27aa3c8e92aa62fcce0e050985cf19a27bb0d5fabbbed1cf73aca8e",
+              "url": "https://files.pythonhosted.org/packages/24/c9/5085131f1739143fad09708fc229866f6f45a1b8c137e8104ac4be2330db/hiredis-3.2.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "f22759efdb02f5e95884b1ad986574be86c7dd2ac4b05fe8e2b93826c6e680b3",
-              "url": "https://files.pythonhosted.org/packages/3e/93/7c9f61e8bd145f5933669c0d48ba8ed248b6ed2988beae039695378828b4/hiredis-3.1.1-cp313-cp313-macosx_10_15_universal2.whl"
+              "hash": "9ba96a42aa5399b1cde7ac9a25dd3a9b610490d2e003e463b805d7b5c06dadec",
+              "url": "https://files.pythonhosted.org/packages/3e/a5/7f0027345364632c6b76a5b79ae7bf21f6a90dcf94e05c9bbb7ddc417951/hiredis-3.2.0-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dba00f102b4414a6b33f3aa0ab6192d78c515fc4939a14d9c87461262047883f",
-              "url": "https://files.pythonhosted.org/packages/46/e8/6993c834c783fd3d384943cea224e2c1e5cf37ab0895b0d89fa7f9acb339/hiredis-3.1.1-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "d60bb0cbbfd4c2e00460b3fdc6451847eb4b1baa7923469f86e06483152b7313",
+              "url": "https://files.pythonhosted.org/packages/45/f1/341c4699b4abfef64d6efa5cb0e024e7937014ea18cbd93667be4198d292/hiredis-3.2.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "17e5ad9ed8d8913bdac6d567c9cf0c4f259e7950c3b318fe636ebb7383d3f16b",
-              "url": "https://files.pythonhosted.org/packages/47/a1/e85364f88b463cc4fd8c20c6f83977abeb8b7d0803f26b870231e9437e5c/hiredis-3.1.1-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
+              "hash": "b6fadcd4f4c637eabdaa13e3f7c1ce4ae78e2d38d073d927f7ec19bc2fa554a3",
+              "url": "https://files.pythonhosted.org/packages/51/b5/f9a1199eed8dc40617637a38810a1802c9b8a8ddc3b3bb66429f9f9f71f5/hiredis-3.2.0-cp313-cp313-musllinux_1_2_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "63f22cd7b441cbe13d24087b338e4e6a8f454f333cf35a6ed27ef13a60ca8b0b",
-              "url": "https://files.pythonhosted.org/packages/49/6f/a1b4749fa7d980f4d11e7f6da42658520fb9a92538844b2012427ad9aa06/hiredis-3.1.1.tar.gz"
+              "hash": "b91e7664095d5b439b6a4c5e4987d8fdef84f3f18a3af3775ed80b3e62d7a3d4",
+              "url": "https://files.pythonhosted.org/packages/51/d3/c711a942f9e9b097b491f3c7d458bfed2bf06c31b45a23ba0ca0454cc1f6/hiredis-3.2.0-cp313-cp313-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "64cd1f6b5cf2904e64445c3a5e765fcbf30c5a0f132051a3c8d4bd24fa2fa3fa",
-              "url": "https://files.pythonhosted.org/packages/69/c6/196ea580a2deed300c392cf42e3dc94c0204b76f468ac462bbcefd9b259a/hiredis-3.1.1-cp313-cp313-musllinux_1_2_s390x.whl"
+              "hash": "aefcca2fac9ff510d781dd9c3e76f30d800ca4f0eaf4cd06fa8022687ec96edc",
+              "url": "https://files.pythonhosted.org/packages/53/2d/23a20ccf42957e69ab818ffc166a6f260b77932c48d5e2d546295d5ea680/hiredis-3.2.0-cp313-cp313-macosx_10_15_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4614cc774bff82c2ed62f13facb732c03a8dc0c5e75cc276af61b5089c434898",
-              "url": "https://files.pythonhosted.org/packages/70/09/28b3a318e3e05060d814185855eacc0265ddfca8044c4ff7febe0f67e3ec/hiredis-3.1.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "71ae603ffe05fb0e3455340377c32048b67a97af6cf610aa375eabec1d802610",
+              "url": "https://files.pythonhosted.org/packages/69/eb/7cae619d8f950301143f137a7ce0f627f208efeb6066319a0726b0b8d7e3/hiredis-3.2.0-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "434614076066704efae38a538a6e1dcea9678c3de030a6ec2fe72d475e2594de",
-              "url": "https://files.pythonhosted.org/packages/cc/9a/1c7cab2e92b8be240cedc859f8b870a0eb28bc0b93e1bed5ef94e284bfa6/hiredis-3.1.1-cp313-cp313-musllinux_1_2_i686.whl"
+              "hash": "54e569167049818e886dd42799fb4181d778ad19a49bbc1a6d1a3d5fd774b7e8",
+              "url": "https://files.pythonhosted.org/packages/96/0a/b33fc490f023a73aea94943591c6f07733d705dce45ac196689b4d8d0065/hiredis-3.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "56f2587e35a4f3f214d6f843e000af45422ebd81721a12add13108c1c4789332",
-              "url": "https://files.pythonhosted.org/packages/cd/48/00570c3e57767bb0935a862d22fd0300c5c491832648938dd7a1548bfc81/hiredis-3.1.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "d334b2d911471eaf4578a5bfbe23dde88c621d20a9e97f90e352cffbf91509d9",
+              "url": "https://files.pythonhosted.org/packages/bc/5d/51f8e1ddc931f0be869feb28ee008480a12bc2ea3392cef11240360777ab/hiredis-3.2.0-cp313-cp313-musllinux_1_2_s390x.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7db1567a8aef8594c81ad67ff597b8ac86aa1ead585b8e8b51d33e234b817d68",
-              "url": "https://files.pythonhosted.org/packages/d6/b4/b3654be50623bb8036058600b128596bd04e15b5566d5d1b16d90c09e1ee/hiredis-3.1.1-cp313-cp313-musllinux_1_2_ppc64le.whl"
+              "hash": "573bbc4649e18f2076f4ae410eeed400024eaa26abfd5fb13fe593c6f1c0b034",
+              "url": "https://files.pythonhosted.org/packages/d2/70/18a127d05f4045457d8a655aec17238d37a09b7841d30d0dac2c992b304b/hiredis-3.2.0-cp313-cp313-musllinux_1_2_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0e6c9c6eb9929ca220002b28ce0976b1a90bb95ffcf08e6e2c51956d37a2318a",
-              "url": "https://files.pythonhosted.org/packages/f6/a7/4d4dc0f420dafdd50bd7b22238da6ffd2e57de007b0f108da3c0936935c7/hiredis-3.1.1-cp313-cp313-macosx_11_0_arm64.whl"
+              "hash": "cd2b4fce991b07e4ce72426dd359647d4c640b7febc94d00628fccf105b6b766",
+              "url": "https://files.pythonhosted.org/packages/f4/11/caa79b5f80f4ebab11a2d72f41fd7df9002a73f293ec227393bc51bc02bd/hiredis-3.2.0-cp313-cp313-macosx_10_15_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "340f3e9c33ae71e235a63770e339743254c91aba7b55d75a1ab6679e0d502aea",
-              "url": "https://files.pythonhosted.org/packages/f7/cb/d7bd0a4387199aa206de2253ce1398547677c6a6895eee2e7e71625321c2/hiredis-3.1.1-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl"
+              "hash": "6b31b32429d74bd0fc253b9dffc2929aa0dca8c8c5e3c7d6c09c5fec42fa6542",
+              "url": "https://files.pythonhosted.org/packages/f6/f0/934159edc9cbac82e9adc2a5f4f008ca20f1d4aaaaed08cd8d90214ad97b/hiredis-3.2.0-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl"
             }
           ],
           "project_name": "hiredis",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "3.1.1"
+          "version": "3.2.0"
         },
         {
           "artifacts": [

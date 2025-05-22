@@ -8,3 +8,19 @@ datasources:
     type: grafana-pyroscope-datasource
     access: proxy
     url: http://backendai-half-pyroscope:4040
+  - name: backendai-half-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    version: 1
+    editable: true
+  - name: backendai-half-tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:14268
+    uid: tempo_ds
+    jsonData:
+      httpMethod: GET
+      maxAnies: 200
+    version: 1
+    editable: true
