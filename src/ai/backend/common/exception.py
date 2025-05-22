@@ -458,3 +458,16 @@ class UnreachableError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.UNREACHABLE,
         )
+
+
+class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/permission-denied"
+    error_title = "Permission Denied."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )

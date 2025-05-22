@@ -101,11 +101,11 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         operation_name=params["operation_name"],
         context_value=gql_ctx,
         middleware=[
-            GQLLoggingMiddleware(),
-            GQLExceptionMiddleware(),
-            GQLMetricMiddleware(),
-            GQLMutationUnfrozenRequiredMiddleware(),
             GQLMutationPrivilegeCheckMiddleware(),
+            GQLMutationUnfrozenRequiredMiddleware(),
+            GQLMetricMiddleware(),
+            GQLExceptionMiddleware(),
+            GQLLoggingMiddleware(),
         ],
     )
 
