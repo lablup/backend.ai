@@ -642,7 +642,7 @@ In this case, we recommend to do it as follows:
 
       $ pants --tag=wheel package src/ai/backend/client:dist
 
-   This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``.
+   This will generate ``dist/backend_ai_client-{VERSION}-py3-none-any.whl``.
 
 2. Run ``pip install -U {MONOREPO_PATH}/dist/{WHEEL_FILE}`` in the target environment.
 
