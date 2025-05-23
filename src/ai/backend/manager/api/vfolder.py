@@ -41,6 +41,7 @@ from pydantic import (
     AliasChoices,
     BaseModel,
     Field,
+    computed_field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
@@ -374,13 +375,27 @@ class CreateRequestModel(BaseModel):
         validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
         default=None,
     )
-    group: str | uuid.UUID | None = Field(
-        validation_alias=AliasChoices("group", "groupId", "group_id"),
+    group_id_or_name: str | None = Field(
+        validation_alias=AliasChoices("group", "groupId", "group_id", "group_id_or_name"),
         default=None,
     )
     cloneable: bool = Field(
         default=False,
     )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def parsed_group_id_or_name(self) -> str | uuid.UUID | None:
+        group_id_or_name: str | uuid.UUID | None
+        match self.group_id_or_name:
+            case str():
+                try:
+                    group_id_or_name = uuid.UUID(self.group_id_or_name)
+                except ValueError:
+                    group_id_or_name = self.group_id_or_name
+            case _:
+                group_id_or_name = self.group_id_or_name
+        return group_id_or_name
 
 
 @auth_required
@@ -394,7 +409,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params.group
+    group_id_or_name = params.parsed_group_id_or_name
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -423,7 +438,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     if params.name.startswith(".") and params.name != ".local":
-        if params.group is not None:
+        if group_id_or_name is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     group_uuid: uuid.UUID | None = None
@@ -853,24 +868,42 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     if default_host not in allowed_hosts:
         default_host = None
 
+    volumes = [
+        (proxy_name, volume_data)
+        for proxy_name, volume_data in all_volumes
+        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+    ]
+
+    fetch_exposed_volume_fields_tasks = [
+        fetch_exposed_volume_fields(
+            storage_manager=root_ctx.storage_manager,
+            redis_connection=root_ctx.redis_stat,
+            proxy_name=proxy_name,
+            volume_name=volume_data["name"],
+        )
+        for proxy_name, volume_data in volumes
+    ]
+    get_sftp_scaling_groups_tasks = [
+        root_ctx.storage_manager.get_sftp_scaling_groups(proxy_name)
+        for proxy_name, volume_data in volumes
+    ]
+
+    fetch_exposed_volume_fields_results, get_sftp_scaling_groups_results = await asyncio.gather(
+        asyncio.gather(*fetch_exposed_volume_fields_tasks),
+        asyncio.gather(*get_sftp_scaling_groups_tasks),
+    )
+
     volume_info = {
         f"{proxy_name}:{volume_data['name']}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
-            "usage": await fetch_exposed_volume_fields(
-                storage_manager=root_ctx.storage_manager,
-                redis_connection=root_ctx.redis_stat,
-                proxy_name=proxy_name,
-                volume_name=volume_data["name"],
-            ),
-            "sftp_scaling_groups": await root_ctx.storage_manager.get_sftp_scaling_groups(
-                proxy_name
-            ),
+            "usage": usage,
+            "sftp_scaling_groups": sftp_scaling_groups,
         }
-        for proxy_name, volume_data in all_volumes
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
+            volumes, fetch_exposed_volume_fields_results, get_sftp_scaling_groups_results
+        )
     }
-
     resp = {
         "default": default_host,
         "allowed": sorted(allowed_hosts),
@@ -1211,7 +1244,7 @@ class RenameRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_params_api_handler(RenameRequestModel)
+@pydantic_params_api_handler(RenameRequestModel)  # type: ignore  # FIXME: remove after vfolder refactoring
 @with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
 @with_vfolder_status_checked(VFolderStatusSet.READABLE)
 async def rename_vfolder(

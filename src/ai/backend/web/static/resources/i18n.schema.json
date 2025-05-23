@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/recursiveSchema",
+  "definitions": {
+    "recursiveSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "patternProperties": {
+        "^[0-9A-Z].*$": {
+          "type": "string"
+        },
+        "^[a-z].*$": {
+          "$ref": "#/definitions/recursiveSchema"
+        }
+      }
+    }
+  }
+}

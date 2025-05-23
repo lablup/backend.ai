@@ -156,7 +156,7 @@ jobs:
   check-alembic-migrations:
     if: |
       (
-        contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+        contains(github.event.pull_request.labels.*.name, 'comp:manager')
         || (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
@@ -180,6 +180,36 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Check for multiple heads
       run: python scripts/check-multiple-alembic-heads.py
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: ./actions/init-pants
+      with:
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Prepare DB
+      run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Prepare the alembic configuration file
+      run: cp configs/manager/halfstack.alembic.ini alembic.ini
+    - name: Prepare database schema
+      run: ./backend.ai mgr schema oneshot
+    - name: Try creating alembic migration
+      id: create-revision
+      run: |
+        output=$(./py -m alembic revision --autogenerate)
+        revision_file=$(echo "$output" | grep -oP '(?<=Generating ).*\.py')
+        echo "REVISION_FILE=$revision_file" >> $GITHUB_OUTPUT
+    - name: Verify that revision is empty
+      run: python scripts/check-alembic-revision.py ${{ steps.create-revision.outputs.REVISION_FILE }}
 
 
   typecheck:
@@ -429,16 +459,16 @@ jobs:
         MACOS_PTAG=macosx_11_0_x86_64
         pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
-          mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
-             "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
+          mv "dist/backend_ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
+             "dist/backend_ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         # Build arm64 wheels
         MANYLINUX_PTAG=manylinux2014_aarch64
         MACOS_PTAG=macosx_11_0_arm64
         pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
-          mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
-             "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
+          mv "dist/backend_ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
+             "dist/backend_ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
     - name: Upload wheels
@@ -650,7 +680,7 @@ jobs:
         pip install conda-pack
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
-        pip install dist/backend.ai_client-${{ env.PKGVER }}-py3-none-any.whl dist/backend.ai_cli-${{ env.PKGVER }}-py3-none-any.whl dist/backend.ai_common-${{ env.PKGVER }}-py3-none-any.whl dist/backend.ai_plugin-${{ env.PKGVER }}-py3-none-any.whl
+        pip install dist/backend_ai_client-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_cli-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_common-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_plugin-${{ env.PKGVER }}-py3-none-any.whl
         conda-pack -o backend.ai-client-${{ github.ref_name }}-windows-conda.zip
     - name: Upload conda-pack to GitHub release
       run: |

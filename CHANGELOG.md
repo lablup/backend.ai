@@ -16,6 +16,84 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.8 (2025-05-23)
+
+### Features
+* Sort vfolder list fields in compute session GQL objects ([#3751](https://github.com/lablup/backend.ai/issues/3751))
+* Add kernel bootstrap timeout config ([#3880](https://github.com/lablup/backend.ai/issues/3880))
+* Improve performance of vfolder `list_host()` API handler through task parallel execution. ([#3935](https://github.com/lablup/backend.ai/issues/3935))
+* Enhance session status transition management ([#4029](https://github.com/lablup/backend.ai/issues/4029))
+
+### Fixes
+* Fix compute session rename API handler to query DB correctly ([#3746](https://github.com/lablup/backend.ai/issues/3746))
+* Let Auth API handler check all keypairs owned by user ([#3780](https://github.com/lablup/backend.ai/issues/3780))
+* Add `service_ports` field resolver to GQL ComputeSessionNode type ([#3782](https://github.com/lablup/backend.ai/issues/3782))
+* Fix the GQL VirtualFolderNode resolver to accept a filter argument ([#3799](https://github.com/lablup/backend.ai/issues/3799))
+* Fix a DB migration script that fails when the system has a default domain with a name other than 'default' ([#3816](https://github.com/lablup/backend.ai/issues/3816))
+* Broken image rescanning on `HarborRegistry_v1` due to type error of credential value. ([#3821](https://github.com/lablup/backend.ai/issues/3821))
+* Fix wrong alembic migration scripts ([#3829](https://github.com/lablup/backend.ai/issues/3829))
+* Fix `description` field in user update CLI command, ensuring it is properly omitted when not provided ([#3831](https://github.com/lablup/backend.ai/issues/3831))
+* Add missing vfolder mount permission mapping in new RBAC implementation ([#3851](https://github.com/lablup/backend.ai/issues/3851))
+* Aggregate multi-kernel session utilization in idle checker ([#3861](https://github.com/lablup/backend.ai/issues/3861))
+* Fix rescan only the latest tag in `HarborRegistryV2`. ([#3871](https://github.com/lablup/backend.ai/issues/3871))
+* Retry zmq socket connections from kernel ([#3880](https://github.com/lablup/backend.ai/issues/3880))
+* Fix intermittent image rescan DB serialization error due to parallel DB access of `rescan_single_registry()` calls. ([#3883](https://github.com/lablup/backend.ai/issues/3883))
+* Properly handle zero-value unknown resource limits when creating session. ([#3925](https://github.com/lablup/backend.ai/issues/3925))
+* Fix wrong error message logging when `model_path` does not exist. ([#3990](https://github.com/lablup/backend.ai/issues/3990))
+* Fix a potential race condition error in the kernel runner's OOM logger ([#4008](https://github.com/lablup/backend.ai/issues/4008))
+* Fix `modify_compute_session` GQL mutation error caused by missing kernel loading option. ([#4032](https://github.com/lablup/backend.ai/issues/4032))
+* Add missing newline at end of customized dotfiles. ([#4047](https://github.com/lablup/backend.ai/issues/4047))
+* Fix image rescanning wrong exception handling logic. ([#4057](https://github.com/lablup/backend.ai/issues/4057))
+* Remove wrong `Accept` header from Image rescanning logic. ([#4066](https://github.com/lablup/backend.ai/issues/4066))
+* Fix wrong project-id parsing when creating project vfolders ([#4144](https://github.com/lablup/backend.ai/issues/4144))
+* Fix broken single image rescan on `HarborRegistryV2`. ([#4161](https://github.com/lablup/backend.ai/issues/4161))
+* Fix Broken `UntagImageFromRegistry` GQL mutation. ([#4177](https://github.com/lablup/backend.ai/issues/4177))
+* Fix wrong `Accept` header handling in image rescanning. ([#4191](https://github.com/lablup/backend.ai/issues/4191))
+* Change pyzmq version on python-kernel, compatible with python 3.13 ([#4405](https://github.com/lablup/backend.ai/issues/4405))
+* Fix issue preventing users from uploading files to compute sessions ([#4457](https://github.com/lablup/backend.ai/issues/4457))
+
+
+## 24.09.7 (2025-02-18)
+
+### Features
+* Add configurable setup for kernel initialization polling ([#3657](https://github.com/lablup/backend.ai/issues/3657))
+* Make security policy configurable ([#3680](https://github.com/lablup/backend.ai/issues/3680))
+* Make CSP configurable ([#3682](https://github.com/lablup/backend.ai/issues/3682))
+
+### Fixes
+* Handle cancel and timeout when creating kernels ([#3648](https://github.com/lablup/backend.ai/issues/3648))
+* Correct the number of concurrent SFTP sessions queried from DB ([#3654](https://github.com/lablup/backend.ai/issues/3654))
+
+
+## 24.09.6 (2025-02-07)
+
+### Features
+* Update SDK to retrieve and use IDs for VFolder API operations instead of names ([#3471](https://github.com/lablup/backend.ai/issues/3471))
+
+### Fixes
+* Add reject middleware for web security ([#2937](https://github.com/lablup/backend.ai/issues/2937))
+* Refactor container registries' projects traversal logic of the image rescanning. ([#2979](https://github.com/lablup/backend.ai/issues/2979))
+* Fix regression of outdated `vfolder` GQL resolver. ([#3047](https://github.com/lablup/backend.ai/issues/3047))
+* Fix image without metadata label not working ([#3341](https://github.com/lablup/backend.ai/issues/3341))
+* Enforce VFolder name length restriction through the API schema, not by the DB column constraint ([#3363](https://github.com/lablup/backend.ai/issues/3363))
+* Fix password based SSH login not working on sessions based on certain images ([#3387](https://github.com/lablup/backend.ai/issues/3387))
+* Fix purge API to allow deletion of owner-deleted VFolders by directly retrieving VFolders using the folder ID ([#3388](https://github.com/lablup/backend.ai/issues/3388))
+* Fix formatting errors when logging exceptions raised from the current local process that did not pass our custom serialization step ([#3410](https://github.com/lablup/backend.ai/issues/3410))
+* Fix scanning and loading container images with no labels at all (`null` in the image manifests) ([#3411](https://github.com/lablup/backend.ai/issues/3411))
+* Fix missing CPU architecture name lookup in `LocalRegistry` to directly scan and load container images from the local Docker daemon in dev setups ([#3420](https://github.com/lablup/backend.ai/issues/3420))
+* Utilization idle checker computes kernel resource usages correctly ([#3442](https://github.com/lablup/backend.ai/issues/3442))
+* Fix a mis-implementation that has prevented using UUIDs to indicate an exact vfolder when invoking the vfolder REST API ([#3451](https://github.com/lablup/backend.ai/issues/3451))
+* Fix GQL `vfolder_mounts` field resolver of `compute_session` type ([#3461](https://github.com/lablup/backend.ai/issues/3461))
+* Raise exception if multiple VFolders exist in decorator ([#3465](https://github.com/lablup/backend.ai/issues/3465))
+* Fix empty tag image scan error in docker registry. ([#3513](https://github.com/lablup/backend.ai/issues/3513))
+* Fix Broken CSS by allowing `unsafe-inline` content security policy. ([#3572](https://github.com/lablup/backend.ai/issues/3572))
+* Check intrinsic time files exist before mount ([#3583](https://github.com/lablup/backend.ai/issues/3583))
+* Remove foreign key constraint from `EndpointRow.image` column. ([#3599](https://github.com/lablup/backend.ai/issues/3599))
+
+### Documentation Updates
+* Deprecate non relay container registry GQL explicitly. ([#3231](https://github.com/lablup/backend.ai/issues/3231))
+
+
 ## 24.09.5 (2025-01-04)
 
 ### Features

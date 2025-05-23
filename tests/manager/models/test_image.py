@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Callable
 
 import attr
 import pytest
@@ -9,7 +10,12 @@ from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.events import (
+    BgtaskCancelledEvent,
+    BgtaskDoneEvent,
+    BgtaskFailedEvent,
+    EventDispatcher,
+)
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -24,6 +30,7 @@ from ai.backend.manager.server import (
     redis_ctx,
     shared_config_ctx,
 )
+from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
 
 @pytest.fixture(scope="module")
@@ -55,7 +62,7 @@ def get_graphquery_context(
     )
 
 
-FIXTURES_REGISTRIES = [
+FIXTURES_DOCKER_REGISTRIES = [
     {
         "container_registries": [
             {
@@ -64,23 +71,42 @@ FIXTURES_REGISTRIES = [
                 "type": "docker",
                 "project": "lablup",
                 "registry_name": "mock_registry",
-            }
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000001",
+                "url": "http://mock_registry",
+                "type": "docker",
+                "project": "other",
+                "registry_name": "mock_registry",
+            },
         ]
     }
 ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.timeout(60)
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_REGISTRIES)
+@pytest.mark.timeout(20)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_DOCKER_REGISTRIES)
 @pytest.mark.parametrize(
     "test_case",
     [
         {
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
-                "get_catalog": {"repositories": ["lablup/python"]},
-                "get_tags": {"tags": ["latest"]},
+                "get_catalog": {
+                    "repositories": [
+                        "lablup/python",
+                        "other/dangling-image1",
+                        "other/dangling-image2",
+                        "other/python",
+                    ]
+                },
+                "get_tags": mock_aioresponses_sequential_payloads([
+                    {"tags": ["latest"]},
+                    {"tags": []},  # dangling image should be skipped
+                    {"tags": None},  # dangling image should be skipped
+                    {"tags": ["latest"]},
+                ]),
                 "get_manifest": {
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -95,11 +121,17 @@ FIXTURES_REGISTRIES = [
                     "architecture": "amd64",
                     "os": "linux",
                 },
-            }
+            },
+            "expected_result": {
+                "images": {("lablup/python", "latest"), ("other/python", "latest")},
+            },
         }
     ],
+    ids=[
+        "Rescan images for all projects",
+    ],
 )
-async def test_image_rescan(
+async def test_image_rescan_on_docker_registry(
     client: Client,
     test_case,
     etcd_fixture,
@@ -134,7 +166,23 @@ async def test_image_rescan(
         done_handler_ctx.update(**update_body)
         done_event.set()
 
+    async def fail_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskFailedEvent,
+    ) -> None:
+        assert False, "Background task failed"
+
+    async def cancel_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskCancelledEvent,
+    ) -> None:
+        assert False, "Background task was cancelled"
+
     dispatcher.subscribe(BgtaskDoneEvent, app, done_sub)
+    dispatcher.subscribe(BgtaskFailedEvent, app, fail_sub)
+    dispatcher.subscribe(BgtaskCancelledEvent, app, cancel_sub)
 
     mock_dockerhub_responses = test_case["mock_dockerhub_responses"]
 
@@ -145,7 +193,7 @@ async def test_image_rescan(
         mocked.get(
             f"{registry_url}/v2/",
             status=200,
-            payload=mock_dockerhub_responses["get_tags"],
+            payload=mock_dockerhub_responses["get_token"],
             repeat=True,
         )
 
@@ -154,36 +202,43 @@ async def test_image_rescan(
             f"{registry_url}/v2/_catalog?n=30",
             status=200,
             payload=mock_dockerhub_responses["get_catalog"],
-        )
-
-        # tags
-        mocked.get(
-            f"{registry_url}/v2/lablup/python/tags/list?n=10",
-            status=200,
-            payload=mock_dockerhub_responses["get_tags"],
-        )
-
-        # manifest
-        mocked.get(
-            f"{registry_url}/v2/lablup/python/manifests/latest",
-            status=200,
-            payload=mock_dockerhub_responses["get_manifest"],
-            headers={
-                "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
-            },
-        )
-
-        config_data = mock_dockerhub_responses["get_manifest"]["config"]
-        image_digest = config_data["digest"]
-
-        # config blob (JSON)
-        mocked.get(
-            f"{registry_url}/v2/lablup/python/blobs/{image_digest}",
-            status=200,
-            body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
-            payload=mock_dockerhub_responses["get_config"],
             repeat=True,
         )
+
+        repositories = mock_dockerhub_responses["get_catalog"]["repositories"]
+
+        for repo in repositories:
+            # tags
+            mock_value = mock_dockerhub_responses["get_tags"]
+            params = {
+                "status": 200,
+                "callback" if isinstance(mock_value, Callable) else "payload": mock_value,
+            }
+
+            mocked.get(f"{registry_url}/v2/{repo}/tags/list?n=10", **params)
+
+            # manifest
+            mocked.get(
+                f"{registry_url}/v2/{repo}/manifests/latest",
+                status=200,
+                payload=mock_dockerhub_responses["get_manifest"],
+                headers={
+                    "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
+                },
+                repeat=True,
+            )
+
+            config_data = mock_dockerhub_responses["get_manifest"]["config"]
+            image_digest = config_data["digest"]
+
+            # config blob (JSON)
+            mocked.get(
+                f"{registry_url}/v2/{repo}/blobs/{image_digest}",
+                status=200,
+                body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
+                payload=mock_dockerhub_responses["get_config"],
+                repeat=True,
+            )
 
     with aioresponses() as mocked:
         setup_dockerhub_mocking(mocked)
@@ -211,9 +266,7 @@ async def test_image_rescan(
         assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_images"]["task_id"]
 
         async with root_ctx.db.begin_readonly_session() as db_session:
-            target_registry_id = extra_fixtures["container_registries"][0]["id"]
-            res = await db_session.execute(
-                sa.select(sa.exists().where(ImageRow.registry_id == target_registry_id))
-            )
-            image_row_populated = res.scalar()
-            assert image_row_populated
+            res = await db_session.execute(sa.select(ImageRow.image, ImageRow.tag))
+            populated_img_names = res.fetchall()
+            print("populated_img_names!!", populated_img_names)
+            assert set(populated_img_names) == test_case["expected_result"]["images"]

@@ -31,7 +31,7 @@ def user() -> None:
 @click.option("-e", "--email", type=str, default=None, help="Email of a user to display.")
 def info(ctx: CLIContext, email: str) -> None:
     """
-    Show the information about the given user by email. If email is not give,
+    Show the information about the given user by email. If email is not given,
     requester's information will be displayed.
     """
     fields = [
@@ -40,6 +40,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["role"],
         user_fields["email"],
         user_fields["full_name"],
+        user_fields["description"],
         user_fields["need_password_change"],
         user_fields["status"],
         user_fields["status_info"],
@@ -394,7 +395,9 @@ def add(
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
-@click.option("--description", type=str, default="", help="Description of the user.")
+@click.option(
+    "--description", type=OptionalType(str), default=undefined, help="Description of the user."
+)
 @click.option(
     "--sudo-session-enabled",
     type=OptionalType(BoolExprType),

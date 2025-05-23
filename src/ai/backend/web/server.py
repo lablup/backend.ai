@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, Tuple, cast
+from typing import Any, AsyncIterator, Mapping, Optional, Tuple, cast
 
 import aiohttp_cors
 import aiotools
@@ -37,6 +37,7 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -603,8 +604,16 @@ async def server_main(
     args: Tuple[Any, ...],
 ) -> AsyncIterator[None]:
     config = args[0]
-    app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
+    app = web.Application(
+        middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
+    )
     app["config"] = config
+    request_policy_config: list[str] = config["security"]["request_policies"]
+    response_policy_config: list[str] = config["security"]["response_policies"]
+    csp_policy_config: Optional[Mapping[str, Optional[list[str]]]] = config["security"]["csp"]
+    app["security_policy"] = SecurityPolicy.from_config(
+        request_policy_config, response_policy_config, csp_policy_config
+    )
     j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",

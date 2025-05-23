@@ -1,5 +1,8 @@
+from typing import Any, Callable
 from unittest import mock
 from unittest.mock import AsyncMock
+
+from aioresponses import CallbackResult
 
 
 def mock_corofunc(return_value):
@@ -155,3 +158,26 @@ class AsyncContextCoroutineMock(AsyncMock):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
+
+
+def mock_aioresponses_sequential_payloads(
+    mock_responses: list[Any],
+) -> Callable[..., CallbackResult]:
+    """
+    Creates a callback function for aioresponses that sequentially returns mock responses.
+    On each invocation, the callback function returns the next mock response from the 'mock_value' list.
+    If the number of calls exceeds the length of 'mock_value', it raises an Exception to indicate that no more responses are available.
+    """
+    cb_call_counter = 0
+
+    def _callback(*args, **kwargs) -> CallbackResult:
+        nonlocal cb_call_counter
+
+        if cb_call_counter >= len(mock_responses):
+            raise Exception("No more mock responses left")
+
+        data = mock_responses[cb_call_counter]
+        cb_call_counter += 1
+        return CallbackResult(status=200, payload=data)
+
+    return _callback

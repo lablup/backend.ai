@@ -378,22 +378,26 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             )
         # /etc/localtime and /etc/timezone mounts
         if sys.platform.startswith("linux"):
-            mounts.append(
-                Mount(
-                    type=MountTypes.BIND,
-                    source=Path("/etc/localtime"),
-                    target=Path("/etc/localtime"),
-                    permission=MountPermission.READ_ONLY,
+            localtime_file = Path("/etc/localtime")
+            timezone_file = Path("/etc/timezone")
+            if localtime_file.exists():
+                mounts.append(
+                    Mount(
+                        type=MountTypes.BIND,
+                        source=localtime_file,
+                        target=localtime_file,
+                        permission=MountPermission.READ_ONLY,
+                    )
                 )
-            )
-            mounts.append(
-                Mount(
-                    type=MountTypes.BIND,
-                    source=Path("/etc/timezone"),
-                    target=Path("/etc/timezone"),
-                    permission=MountPermission.READ_ONLY,
+            if timezone_file.exists():
+                mounts.append(
+                    Mount(
+                        type=MountTypes.BIND,
+                        source=timezone_file,
+                        target=timezone_file,
+                        permission=MountPermission.READ_ONLY,
+                    )
                 )
-            )
         # lxcfs mounts
         lxcfs_root = Path("/var/lib/lxcfs")
         if lxcfs_root.is_dir():
@@ -726,7 +730,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
+
+            dotfile_content = dotfile["data"]
+            if not dotfile_content.endswith("\n"):
+                dotfile_content += "\n"
+            await loop.run_in_executor(None, file_path.write_text, dotfile_content)
 
             tmp = Path(file_path)
             while tmp != self.work_dir:
@@ -1484,7 +1492,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            await docker.images.push(image_ref.canonical, auth=auth_config)
+            result = await docker.images.push(image_ref.canonical, auth=auth_config)
+
+            if not result:
+                raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
+            elif error := result[-1].get("error"):
+                raise RuntimeError(f"Failed to push image: {error}")
 
     async def pull_image(
         self,
@@ -1505,7 +1518,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
+            result = await docker.images.pull(
+                image_ref.canonical, auth=auth_config, timeout=timeout
+            )
+
+            if not result:
+                raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
+            elif error := result[-1].get("error"):
+                raise RuntimeError(f"Failed to pull image: {error}")
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

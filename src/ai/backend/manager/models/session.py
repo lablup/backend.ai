@@ -37,6 +37,7 @@ from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
+    DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
     SessionStartedEvent,
@@ -163,6 +164,14 @@ class SessionStatus(enum.Enum):
     TERMINATED = 41
     ERROR = 42
     CANCELLED = 43
+
+    @classmethod
+    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
+        return {
+            cls.PREPARING,
+            cls.PULLING,
+            cls.TERMINATING,
+        }
 
 
 FOLLOWING_SESSION_STATUSES = (
@@ -793,6 +802,11 @@ class SessionRow(Base):
     )
 
     @property
+    def vfolders_sorted_by_id(self) -> list[VFolderMount]:
+        # TODO: Remove this after ComputeSessionNode and ComputeSession deprecates vfolder_mounts field
+        return sorted(self.vfolder_mounts, key=lambda row: row.vfid.folder_id)
+
+    @property
     def main_kernel(self) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)
         if len(kerns) > 1:
@@ -1360,8 +1374,9 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
+        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
 
-    async def get_status_updatable_sessions(self) -> list[SessionId]:
+    async def get_status_updatable_sessions(self) -> set[SessionId]:
         pop_all_session_id_script = textwrap.dedent("""
         local key = KEYS[1]
         local count = redis.call('SCARD', key)
@@ -1381,7 +1396,7 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
-            return []
+            raw_result = []
         raw_result = cast(list[bytes], raw_result)
         result: list[SessionId] = []
         for raw_session_id in raw_result:
@@ -1390,7 +1405,14 @@ class SessionLifecycleManager:
             except (ValueError, SyntaxError):
                 log.warning(f"Cannot parse session id, skip. (id:{raw_session_id})")
                 continue
-        return result
+
+        async with self.db.begin_readonly_session() as db_session:
+            session_query = sa.select(SessionRow).where(
+                SessionRow.status.in_(SessionStatus.kernel_awaiting_statuses())
+            )
+            session_rows = await db_session.scalars(session_query)
+            session_ids = [row.id for row in session_rows]
+        return {*result, *session_ids}
 
     async def deregister_status_updatable_session(
         self,
@@ -1559,6 +1581,14 @@ class ComputeSession(graphene.ObjectType):
         row = row.SessionRow
         status_history = row.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        # TODO: Deprecate 'mounts' and replace it with a list of VirtualFolderNodes
+        mounts_set: set[str] = set()
+        mounts: list[str] = []
+        vfolder_mounts = cast(list[VFolderMount], row.vfolders_sorted_by_id)
+        for mount in vfolder_mounts:
+            if mount.name not in mounts_set:
+                mounts.append(mount.name)
+                mounts_set.add(mount.name)
         return {
             # identity
             "id": row.id,
@@ -1605,8 +1635,9 @@ class ComputeSession(graphene.ObjectType):
             "agents": row.agent_ids,  # for backward compatibility
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
-            "mounts": [mount.name for mount in row.vfolder_mounts],
-            "vfolder_mounts": row.vfolder_mounts,
+            # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
+            "mounts": mounts,
+            "vfolder_mounts": [vf.vfid.folder_id for vf in vfolder_mounts],
             "occupying_slots": row.occupying_slots.to_json(),
             "occupied_slots": row.occupying_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),

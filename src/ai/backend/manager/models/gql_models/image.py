@@ -587,6 +587,8 @@ class UntagImageFromRegistry(graphene.Mutation):
             query = sa.select(ContainerRegistryRow).where(
                 ContainerRegistryRow.registry_name == image_row.image_ref.registry
             )
+            if image_row.image_ref.project:
+                query = query.where(ContainerRegistryRow.project == image_row.image_ref.project)
 
             registry_info = (await session.execute(query)).scalar()
 

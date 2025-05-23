@@ -259,9 +259,11 @@ class ComputeSessionNode(graphene.ObjectType):
             # resources
             agent_ids=row.agent_ids,
             scaling_group=row.scaling_group_name,
-            vfolder_mounts=row.vfolder_mounts,
+            # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
+            vfolder_mounts=[vf.vfid.folder_id for vf in row.vfolders_sorted_by_id],
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
+            service_ports=row.main_kernel.service_ports,
             # statistics
             num_queries=row.num_queries,
         )
@@ -579,6 +581,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
             )
             _stmt = (
                 sa.select(SessionRow)
+                .options(selectinload(SessionRow.kernels))
                 .from_statement(_update_stmt)
                 .execution_options(populate_existing=True)
             )

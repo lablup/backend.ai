@@ -102,7 +102,7 @@ class ErrorStatusInfo(TypedDict):
 
 
 def convert_to_status_data(
-    e: Exception,
+    e: BaseException,
     is_debug: bool = False,
     *,
     src: str | None = None,
@@ -151,3 +151,11 @@ class ContainerRegistryProjectEmpty(RuntimeError):
         super().__init__(
             f"{type} container registry requires project value, but {project} is provided"
         )
+
+
+class ScanImageError(RuntimeError):
+    pass
+
+
+class ScanTagError(RuntimeError):
+    pass
