@@ -390,6 +390,29 @@ async def login_handler(request: web.Request) -> web.Response:
             match auth_result:
                 case AuthSuccessResponse():
                     token = auth_result
+                    stored_token = {
+                        "type": "keypair",
+                        "access_key": token.access_key,
+                        "secret_key": token.secret_key,
+                        "role": token.role,
+                        "status": token.status,
+                    }
+                    public_return = {
+                        "access_key": token.access_key,
+                        "role": token.role,
+                        "status": token.status,
+                    }
+                    session["authenticated"] = True
+                    session["token"] = stored_token  # store full token
+                    result["authenticated"] = True
+                    result["data"] = public_return  # store public info from token
+                    login_fail_count = 0
+                    await _set_login_history(last_login_attempt, login_fail_count)
+                    log.info(
+                        "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                        creds["username"],
+                        client_ip,
+                    )
                 case RequireTOTPRegistrationResponse():
                     result["authenticated"] = False
                     result["data"] = {
@@ -399,29 +422,6 @@ async def login_handler(request: web.Request) -> web.Response:
                         "totp_registration_token": auth_result.token,
                     }
                     return web.json_response(result)
-            stored_token = {
-                "type": "keypair",
-                "access_key": token.access_key,
-                "secret_key": token.secret_key,
-                "role": token.role,
-                "status": token.status,
-            }
-            public_return = {
-                "access_key": token.access_key,
-                "role": token.role,
-                "status": token.status,
-            }
-            session["authenticated"] = True
-            session["token"] = stored_token  # store full token
-            result["authenticated"] = True
-            result["data"] = public_return  # store public info from token
-            login_fail_count = 0
-            await _set_login_history(last_login_attempt, login_fail_count)
-            log.info(
-                "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
-                creds["username"],
-                client_ip,
-            )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
