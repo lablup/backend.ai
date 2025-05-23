@@ -105,3 +105,8 @@ enabled = false
 path = "./coredumps"
 backup-count = 10
 size-limit = "64M"
+
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "http://127.0.0.1:4317"

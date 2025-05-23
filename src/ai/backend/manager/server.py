@@ -87,10 +87,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import (
-    OpenTelemetrySpec,
-    initialize_opentelemetry,
-)
+from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
@@ -654,15 +651,17 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             ),
         ),
     )
-    meta = root_ctx.sd_loop.metadata
-    initialize_opentelemetry(
-        OpenTelemetrySpec(
+
+    if root_ctx.config_provider.config.otel.enabled:
+        meta = root_ctx.sd_loop.metadata
+        otel_spec = OpenTelemetrySpec(
             service_id=meta.id,
             service_name=meta.service_group,
             service_version=meta.version,
-            endpoint="http://127.",
+            log_level=root_ctx.config_provider.config.otel.log_level,
+            endpoint=root_ctx.config_provider.config.otel.endpoint,
         )
-    )
+        BraceStyleAdapter.apply_otel(otel_spec)
     yield
     root_ctx.sd_loop.close()
 

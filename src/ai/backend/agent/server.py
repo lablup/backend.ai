@@ -100,6 +100,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
 from .config import (
@@ -1244,6 +1245,17 @@ async def server_main(
             ),
         ),
     )
+    if local_config["otel"]["enabled"]:
+        meta = sd_loop.metadata
+        otel_spec = OpenTelemetrySpec(
+            service_id=meta.id,
+            service_name=meta.service_group,
+            service_version=meta.version,
+            log_level=local_config["otel"]["log-level"],
+            endpoint=local_config["otel"]["endpoint"],
+        )
+        BraceStyleAdapter.apply_otel(otel_spec)
+
     if local_config["agent"]["ssl-enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(
