@@ -114,7 +114,7 @@ type Queries {
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "x86_64"
+    architecture: String = "aarch64"
   ): Image
   images(
     """
@@ -2254,7 +2254,7 @@ type Mutations {
   ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage
 
   """Added in 25.6.0"""
   clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload
@@ -2263,14 +2263,14 @@ type Mutations {
   forget_image_by_id(image_id: String!): ForgetImageById
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
   purge_image_by_id(image_id: String!): PurgeImageById
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
-  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
+  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
 
@@ -2842,7 +2842,7 @@ type ClearImageCustomResourceLimitPayload {
 """Added in 25.6.0."""
 input ClearImageCustomResourceLimitKey {
   image_canonical: String!
-  architecture: String! = "x86_64"
+  architecture: String! = "aarch64"
 }
 
 """Added in 24.03.0."""
