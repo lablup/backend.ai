@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.6 (2025-05-23)
+
+### Features
+* Add VFolder force-delete API to Python client SDK ([#4353](https://github.com/lablup/backend.ai/issues/4353))
+
+### Fixes
+* Add missing `KernelStatus.ERROR` to dead kernel status set ([#4371](https://github.com/lablup/backend.ai/issues/4371))
+* Revert addition of `SessionStatus.ERROR` and `KernelStatus.ERROR` to dead status sets ([#4384](https://github.com/lablup/backend.ai/issues/4384))
+* Fix event handling observer to report success or failure after handling completes ([#4392](https://github.com/lablup/backend.ai/issues/4392))
+* Change pyzmq version on python-kernel, compatible with python 3.13 ([#4405](https://github.com/lablup/backend.ai/issues/4405))
+* Fix `vfolder ls` CLI command which referred deprecated response schema fields. ([#4425](https://github.com/lablup/backend.ai/issues/4425))
+* Fix `backend.ai admin resource usage-per-period` CLI command. ([#4429](https://github.com/lablup/backend.ai/issues/4429))
+* Fixed a loophole where consume could be missing at event dispatcher startup time ([#4444](https://github.com/lablup/backend.ai/issues/4444))
+* Fix issue preventing admins from leaving invited vfolders ([#4446](https://github.com/lablup/backend.ai/issues/4446))
+* Fixed session environment variable init during route creation when `endpoint.environ` is `None` ([#4447](https://github.com/lablup/backend.ai/issues/4447))
+* Fix issue preventing users from uploading files to compute sessions ([#4457](https://github.com/lablup/backend.ai/issues/4457))
+
+### Miscellaneous
+* Remove subscribed_actions config, and change AuditLogReporter to AuditLogMonitor. ([#4400](https://github.com/lablup/backend.ai/issues/4400))
+
+
 ## 25.6.5 (2025-05-07)
 
 ### Fixes
