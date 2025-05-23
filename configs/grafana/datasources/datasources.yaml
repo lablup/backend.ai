@@ -8,3 +8,11 @@ datasources:
     type: grafana-pyroscope-datasource
     access: proxy
     url: http://backendai-half-pyroscope:4040
+  - name: backendai-half-loki
+    type: loki
+    access: proxy
+    url: http://backendai-half-loki:3100
+  - name: backendai-half-tempo
+    type: tempo
+    access: proxy
+    url: http://backendai-half-tempo:3200
