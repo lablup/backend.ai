@@ -11,16 +11,8 @@ datasources:
   - name: backendai-half-loki
     type: loki
     access: proxy
-    url: http://loki:3100
-    version: 1
-    editable: true
+    url: http://backendai-half-loki:3100
   - name: backendai-half-tempo
     type: tempo
     access: proxy
-    url: http://tempo:14268
-    uid: tempo_ds
-    jsonData:
-      httpMethod: GET
-      maxAnies: 200
-    version: 1
-    editable: true
+    url: http://backendai-half-tempo:3200
