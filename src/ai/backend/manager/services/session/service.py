@@ -24,11 +24,11 @@ from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFea
 from ai.backend.common.events.bgtask import (
     BaseBgtaskDoneEvent,
 )
-from ai.backend.common.events.dispatcher import (
-    EventDomain,
-)
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.types import (
+    EventDomain,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     BgtaskCancelledError,

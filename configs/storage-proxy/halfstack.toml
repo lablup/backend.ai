@@ -8,7 +8,7 @@ password = ""				    # env: BACKEND_ETCD_PASSWORD
 [storage-proxy]
 # An identifier of this storage proxy, which must be unique in a cluster.
 node-id = "i-storage-proxy-local"
-num-proc = 4
+num-proc = 1
 # pid-file = "./storage-proxy.pid"
 event-loop = "uvloop"
 

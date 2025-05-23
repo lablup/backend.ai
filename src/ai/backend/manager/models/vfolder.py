@@ -169,6 +169,8 @@ class VFolderOwnershipType(CIStrEnum):
 
 
 class VFolderPermission(enum.StrEnum):
+    # TODO: Replace this class with VFolderRBACPermission
+    # Or rename this class to VFolderMountPermission
     """
     Permissions for a virtual folder given to a specific access key.
     RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
@@ -2333,11 +2335,7 @@ WhereClauseType: TypeAlias = (
 OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     perm for perm in VFolderRBACPermission
 ])
-ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.UPDATE_ATTRIBUTE,
-    VFolderRBACPermission.DELETE_VFOLDER,
-])
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
 MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,

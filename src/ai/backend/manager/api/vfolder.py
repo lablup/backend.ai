@@ -1412,6 +1412,8 @@ async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Resp
             sa.select(UserRow).where(UserRow.email.in_(invitee_emails))
         )
         user_uuids = [row.uuid for row in user_rows]
+    if not user_uuids:
+        raise VFolderNotFound("No users found with the provided emails.")
     result = await root_ctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
         InviteVFolderAction(
             keypair_resource_policy=request["keypair"]["resource_policy"],
@@ -1966,7 +1968,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE, allow_privileged_access=True)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE, allow_privileged_access=False)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({

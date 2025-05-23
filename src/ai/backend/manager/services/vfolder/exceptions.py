@@ -51,6 +51,19 @@ class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
         )
 
 
+class VFolderGrantAlreadyExists(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/vfolder-already-exists"
+    error_title = "Virtual folder already exists."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.GRANT,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
 class VFolderInvalidParameter(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameter"
     error_title = "Invalid parameter."

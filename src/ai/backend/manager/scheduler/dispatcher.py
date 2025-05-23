@@ -316,8 +316,7 @@ class SchedulerDispatcher(aobject):
             "max_wait": 0.5,
             "max_batch_size": 32,
         }
-        # coalescing_opts = None
-        evd = self.registry.event_dispatcher
+        evd = self.event_dispatcher
         evd.consume(
             SessionEnqueuedEvent,
             None,

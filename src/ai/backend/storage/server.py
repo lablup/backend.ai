@@ -280,6 +280,7 @@ async def server_main(
                     ),
                 ),
             )
+            await event_dispatcher.start()
             try:
                 yield
             finally:

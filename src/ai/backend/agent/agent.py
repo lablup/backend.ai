@@ -851,6 +851,7 @@ class AbstractAgent(
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
+        await self.event_dispatcher.start()
 
     def _make_message_queue(
         self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
@@ -2890,7 +2891,7 @@ class AbstractAgent(
     async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
-    async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
+    async def accept_file(self, kernel_id: KernelId, filename: str, filedata: bytes):
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
 
     async def download_file(self, kernel_id: KernelId, filepath: str):

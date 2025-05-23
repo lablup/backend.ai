@@ -78,6 +78,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 
 from .defs import DEFAULT_ROLE, LockID
+from .event_dispatcher.reporters import EventLogger
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -603,21 +604,25 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
     idle_timeout: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
+    _db: SAEngine
 
     def __init__(
         self,
         event_dispatcher: EventDispatcher,
         redis_live: RedisConnectionInfo,
         redis_stat: RedisConnectionInfo,
+        db: SAEngine,
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
-        d = self._event_dispatcher
-        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
+        self._db = db
+        self._event_dispatcher.subscribe(SessionStartedEvent, None, self._session_started_cb)  # type: ignore
+
+        evd = self._event_dispatcher.with_reporters([EventLogger(self._db)])
         self._evhandlers = [
-            d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
-            d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
-            d.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
-            d.consume(ExecutionCancelledEvent, None, self._execution_exited_cb),  # type: ignore
+            evd.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
+            evd.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
+            evd.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
+            evd.consume(ExecutionCancelledEvent, None, self._execution_exited_cb),  # type: ignore
         ]
 
     async def aclose(self) -> None:

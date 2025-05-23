@@ -6,6 +6,7 @@ from faker import Faker
 from typing_extensions import deprecated
 
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
 
 from ..exceptions import BackendClientError
 from ..output.fields import service_fields
@@ -146,7 +147,7 @@ class Service(BaseFunction):
         """
         if service_name is None:
             faker = Faker()
-            service_name = f"bai-serve-{faker.user_name()}"
+            service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
 
         extra_mount_body = {}
         if extra_mounts:
@@ -269,7 +270,7 @@ class Service(BaseFunction):
         """
         if service_name is None:
             faker = Faker()
-            service_name = f"bai-serve-{faker.user_name()}"
+            service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
 
         rqst = Request("POST", "/services/_/try")
         rqst.set_json({
