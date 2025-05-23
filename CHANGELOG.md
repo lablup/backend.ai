@@ -16,6 +16,13 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.9 (2025-05-23)
+
+### Fixes
+* Fix silent failure of `DockerAgent.push_image()`, `DockerAgent.pull_image()`. ([#2572](https://github.com/lablup/backend.ai/issues/2572))
+* Filter vfolders by status before initiating a vfolder deletion task ([#3446](https://github.com/lablup/backend.ai/issues/3446))
+
+
 ## 24.09.8 (2025-05-23)
 
 ### Features
