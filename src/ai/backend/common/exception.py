@@ -150,6 +150,7 @@ class ErrorDomain(enum.StrEnum):
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
     MODEL_SERVICE = "model-service"
+    RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
     AGENT = "agent"
     PERMISSION = "permission"
@@ -178,6 +179,7 @@ class ErrorOperation(enum.StrEnum):
     PARSING = "parsing"
     EXECUTE = "execute"
     SETUP = "setup"
+    GRANT = "grant"
 
 
 class ErrorDetail(enum.StrEnum):
@@ -368,6 +370,19 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class ResourcePresetConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-resource"
+    error_title = "Duplicate Resource Preset"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_PRESET,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class MiddlewareParamParsingFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Middleware parameter parsing failed."
@@ -443,4 +458,17 @@ class UnreachableError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.UNREACHABLE,
+        )
+
+
+class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/permission-denied"
+    error_title = "Permission Denied."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
         )

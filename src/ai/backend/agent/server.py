@@ -75,6 +75,15 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
+    ETCDServiceDiscovery,
+    ETCDServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
@@ -91,6 +100,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
 from .config import (
@@ -180,7 +190,7 @@ class RPCFunctionRegistry:
         meth: Callable[..., Coroutine[None, None, Any]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
-        @_collect_metrics(self._metric_observer)
+        @_collect_metrics(self._metric_observer, meth.__name__)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
                 if request.body is None:
@@ -218,7 +228,7 @@ class RPCFunctionRegistryV2:
         meth: Callable[..., Coroutine[None, None, AbstractAgentResp]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
-        @_collect_metrics(self._metric_observer)
+        @_collect_metrics(self._metric_observer, meth.__name__)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
                 if request.body is None:
@@ -244,7 +254,7 @@ class RPCFunctionRegistryV2:
         return _inner
 
 
-def _collect_metrics(observer: RPCMetricObserver) -> Callable:
+def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable:
     def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
         async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
@@ -253,14 +263,14 @@ def _collect_metrics(observer: RPCMetricObserver) -> Callable:
                 res = await meth(self, *args, **kwargs)
                 duration = time.perf_counter() - start_time
                 observer.observe_rpc_request_success(
-                    method=meth.__name__,
+                    method=method_name,
                     duration=duration,
                 )
                 return res
             except BaseException as e:
                 duration = time.perf_counter() - start_time
                 observer.observe_rpc_request_failure(
-                    method=meth.__name__,
+                    method=method_name,
                     duration=duration,
                     exception=e,
                 )
@@ -1214,12 +1224,38 @@ async def server_main(
     )
     agent_instance = agent
     monitor.console_locals["agent"] = agent
-
     app = build_root_server()
     runner = web.AppRunner(app)
     await runner.setup()
     service_addr = local_config["agent"]["service-addr"]
+    announce_addr: HostPortPair = local_config["agent"]["announce-addr"]
     ssl_ctx = None
+    etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
+    sd_loop = ServiceDiscoveryLoop(
+        etcd_discovery,
+        ServiceMetadata(
+            display_name=f"agent-{local_config['agent']['id']}",
+            service_group="agent",
+            version=VERSION,
+            endpoint=ServiceEndpoint(
+                address=str(announce_addr),
+                port=announce_addr.port,
+                protocol="http",
+                prometheus_address=str(announce_addr),
+            ),
+        ),
+    )
+    if local_config["otel"]["enabled"]:
+        meta = sd_loop.metadata
+        otel_spec = OpenTelemetrySpec(
+            service_id=meta.id,
+            service_name=meta.service_group,
+            service_version=meta.version,
+            log_level=local_config["otel"]["log-level"],
+            endpoint=local_config["otel"]["endpoint"],
+        )
+        BraceStyleAdapter.apply_otel(otel_spec)
+
     if local_config["agent"]["ssl-enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(
@@ -1245,6 +1281,7 @@ async def server_main(
     finally:
         if aiomon_started:
             monitor.close()
+        sd_loop.close()
 
 
 @click.group(invoke_without_command=True)

@@ -3,7 +3,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Self, override
 
-from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import ContainerId, KernelId, SessionId
 

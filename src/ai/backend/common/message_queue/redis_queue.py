@@ -142,7 +142,6 @@ class RedisQueue(AbstractMessageQueue):
             command_timeout=autoclaim_idle_timeout / 1000,
         )
         if reply[0] == b"0-0":
-            log.debug("No messages to claim")
             return autoclaim_start_id, False
         autoclaim_start_id = reply[0]
         for msg_id, msg_data in reply[1]:
@@ -179,7 +178,7 @@ class RedisQueue(AbstractMessageQueue):
                 self._consumer_id,
                 {self._stream_key: ">"},
                 count=1,
-                block=1000,
+                block=30_000,
             ),
         )
         if not reply:
@@ -210,7 +209,7 @@ class RedisQueue(AbstractMessageQueue):
             lambda r: r.xread(
                 {self._stream_key: last_msg_id},
                 count=1,
-                block=1000,
+                block=30_000,
             ),
         )
         if not reply:

@@ -24,11 +24,11 @@ from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFea
 from ai.backend.common.events.bgtask import (
     BaseBgtaskDoneEvent,
 )
-from ai.backend.common.events.dispatcher import (
-    EventDomain,
-)
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.types import (
+    EventDomain,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     BgtaskCancelledError,
@@ -471,10 +471,8 @@ class SessionService:
                             log.warning("unexpected event: {}", event)
                             continue
                         match event.status():
-                            case (
-                                BgtaskStatus.DONE,
-                                BgtaskStatus.PARTIAL_SUCCESS,
-                            ):  # TODO: PARTIAL_SUCCESS should be handled
+                            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
+                                # TODO: PARTIAL_SUCCESS should be handled
                                 await reporter.update(increment=1, message="Committed image")
                                 break
                             case BgtaskStatus.FAILED:
@@ -510,7 +508,7 @@ class SessionService:
                                 log.warning("unexpected event: {}", event)
                                 continue
                             match event.status():
-                                case BgtaskStatus.DONE, BgtaskStatus.PARTIAL_SUCCESS:
+                                case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
                                     break
                                 case BgtaskStatus.FAILED:
                                     raise BgtaskFailedError(extra_msg=event.message)
@@ -535,6 +533,7 @@ class SessionService:
                 raise
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
+
         return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
 
     async def create_cluster(self, action: CreateClusterAction) -> CreateClusterActionResult:

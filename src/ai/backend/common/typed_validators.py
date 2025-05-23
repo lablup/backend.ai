@@ -3,10 +3,10 @@ import ipaddress
 import os
 import pwd
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Optional, Sequence, TypeAlias, TypeVar
+from typing import Annotated, Any, ClassVar, Final, Optional, TypeAlias, TypeVar
 
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
@@ -20,6 +20,7 @@ from pydantic import (
     PlainValidator,
     TypeAdapter,
     ValidationError,
+    WithJsonSchema,
     model_validator,
 )
 from pydantic.json_schema import JsonSchemaValue
@@ -166,8 +167,10 @@ TimeDuration = Annotated[
 NaiveTimeDuration = Annotated[TVariousDelta, _NaiveTimeDurationPydanticAnnotation]
 """Time duration validator which also accepts negative value"""
 
-
-SESSION_NAME_MATCHER = re.compile(r"^(?=.{4,24}$)\w[\w.-]*\w$", re.ASCII)
+SESSION_NAME_MAX_LENGTH: Final[int] = 24
+SESSION_NAME_MATCHER = re.compile(
+    r"^(?=.{4,%d}$)\w[\w.-]*\w$" % (SESSION_NAME_MAX_LENGTH,), re.ASCII
+)
 
 
 def session_name_validator(s: str) -> str:
@@ -286,6 +289,10 @@ class HostPortPair(BaseModel):
     def to_legacy(self) -> LegacyHostPortPair:
         return LegacyHostPortPair(host=self.host, port=self.port)
 
+    @property
+    def address(self) -> str:
+        return f"{self.host}:{self.port}"
+
 
 def _parse_to_tzinfo(value: Any) -> tzinfo:
     if isinstance(value, tzinfo):
@@ -301,6 +308,12 @@ def _parse_to_tzinfo(value: Any) -> tzinfo:
 TimeZone = Annotated[
     tzinfo,
     PlainValidator(_parse_to_tzinfo),
+    WithJsonSchema(
+        core_schema.json_or_python_schema(
+            json_schema=core_schema.str_schema(),
+            python_schema=core_schema.str_schema(),
+        ),
+    ),
 ]
 
 
@@ -324,6 +337,14 @@ class AutoDirectoryPath(DirectoryPath):
             core_schema.no_info_plain_validator_function(ensure_exists_and_resolve),
             handler(DirectoryPath),
         ])
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
+        )
 
 
 class UserID(int):
@@ -370,6 +391,14 @@ class UserID(int):
 
         return core_schema.no_info_plain_validator_function(_validate)
 
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
+        )
+
 
 class GroupID(int):
     _default_gid: Optional[int] = None
@@ -415,6 +444,14 @@ class GroupID(int):
 
         return core_schema.no_info_plain_validator_function(_validate)
 
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
+        )
+
 
 TItem = TypeVar("TItem")
 
@@ -454,6 +491,14 @@ class DelimiterSeparatedList(list[TItem]):
         return core_schema.with_info_plain_validator_function(
             _validate,
             serialization=core_schema.plain_serializer_function_ser_schema(_serialize),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(
+            core_schema.str_schema(),
         )
 
 

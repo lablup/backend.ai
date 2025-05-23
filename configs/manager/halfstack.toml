@@ -84,3 +84,8 @@ certfile = ""
 
 [debug]
 enabled = false
+
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "http://127.0.0.1:4317"

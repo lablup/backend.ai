@@ -21,10 +21,12 @@ from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import (
-    AbstractEvent,
     EventDispatcher,
-    EventDomain,
     EventProducer,
+)
+from ai.backend.common.events.types import (
+    AbstractEvent,
+    EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.lock import (
@@ -133,6 +135,7 @@ async def run_timer(
         source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
+    await event_dispatcher.start()
 
     timer = GlobalTimer(
         lock_factory(),
@@ -189,6 +192,7 @@ def etcd_timer_node_process(
             source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
+        await event_dispatcher.start()
 
         etcd_lock: AbstractDistributedLock
         match etcd_client:
@@ -271,6 +275,7 @@ class TimerNode(threading.Thread):
             source=AgentId(node_id),
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
+        await event_dispatcher.start()
 
         timer = GlobalTimer(
             self.lock_factory(),
@@ -484,6 +489,7 @@ async def test_global_timer_join_leave(
         source=AgentId(node_id),
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
+    await event_dispatcher.start()
 
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))

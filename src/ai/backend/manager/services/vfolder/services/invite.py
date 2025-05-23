@@ -44,6 +44,7 @@ from ..exceptions import (
     InsufficientPrivilege,
     InternalServerError,
     VFolderAlreadyExists,
+    VFolderGrantAlreadyExists,
     VFolderInvalidParameter,
     VFolderNotFound,
 )
@@ -116,7 +117,7 @@ class VFolderInviteService:
             )
             count = await db_session.scalar(count_query)
             if count > 0:
-                raise VFolderAlreadyExists(
+                raise VFolderGrantAlreadyExists(
                     "Invitation to this VFolder already sent out to target user"
                 )
 
