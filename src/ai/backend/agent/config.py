@@ -30,6 +30,12 @@ _default_pyroscope_config: dict[str, Any] = {
     "sample-rate": None,
 }
 
+_default_otel_config: dict[str, Any] = {
+    "enabled": False,
+    "log-level": "INFO",
+    "endpoint": "http://127.0.0.1:4317",
+}
+
 agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
@@ -131,6 +137,13 @@ agent_local_config_iv = (
                 AffinityPolicy,
                 use_name=True,
             ),
+        }).allow_extra("*"),
+        t.Key("otel", default=_default_otel_config): t.Dict({
+            t.Key("enabled", default=_default_otel_config["enabled"]): t.ToBool,
+            t.Key("log-level", default=_default_otel_config["log-level"]): t.Enum(
+                "CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"
+            ),
+            t.Key("endpoint", default=_default_otel_config["endpoint"]): t.String,
         }).allow_extra("*"),
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,

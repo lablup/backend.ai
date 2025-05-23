@@ -167,6 +167,10 @@ class ServiceDiscoveryLoop:
             self._sweep_unhealthy_services_loop()
         )
 
+    @property
+    def metadata(self) -> ServiceMetadata:
+        return self._metadata
+
     def close(self) -> None:
         """
         Close the service discovery loop.
