@@ -187,6 +187,7 @@ from pydantic import (
     FilePath,
     IPvAnyNetwork,
     field_serializer,
+    field_validator,
 )
 
 from ai.backend.common.data.config.types import EtcdConfigData
@@ -1286,6 +1287,21 @@ class SingleRedisConfig(BaseModel):
         validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
         serialization_alias="redis-helper-config",
     )
+
+    @field_validator("sentinel", mode="before")
+    @classmethod
+    def _parse_sentinel(
+        cls, v: Optional[str | list[HostPortPairModel]]
+    ) -> Optional[list[HostPortPairModel]]:
+        if v is None or isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            entries: list[HostPortPairModel] = []
+            for part in v.split(","):
+                host, port = part.strip().split(":")
+                entries.append(HostPortPairModel(host=host, port=int(port)))
+            return entries
+        raise TypeError("sentinel must be list or 'host:port,host:port' string")
 
     @field_serializer("addr")
     def _serialize_addr(self, addr: Optional[HostPortPairModel], _info) -> Optional[str]:
