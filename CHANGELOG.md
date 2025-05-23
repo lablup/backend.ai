@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.8.1 (2025-05-23)
+
+### Fixes
+* Fixed client SDK method `Service.create()` signature to comply with `NewServiceRequestModel` schema ([#4449](https://github.com/lablup/backend.ai/issues/4449))
+
+
 ## 25.8.0 (2025-05-23)
 
 ### Features
