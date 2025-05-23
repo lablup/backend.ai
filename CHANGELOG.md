@@ -16,6 +16,13 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.7 (2025-05-23)
+
+### Fixes
+* Fixed client SDK method `Service.create()` signature to comply with `NewServiceRequestModel` schema ([#4449](https://github.com/lablup/backend.ai/issues/4449))
+* Fixed `Service.create()` in client SDK to truncate the default generated session name to the maximum allowed length ([#4450](https://github.com/lablup/backend.ai/issues/4450))
+
+
 ## 25.6.6 (2025-05-23)
 
 ### Features
