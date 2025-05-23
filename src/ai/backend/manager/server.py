@@ -433,6 +433,7 @@ async def config_provider_ctx(
     unified_config_loader = LoaderChain(loaders, base_config=extra_config)
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
+    config_provider: Optional[ManagerConfigProvider] = None
     try:
         config_provider = await ManagerConfigProvider.create(
             unified_config_loader,
@@ -446,7 +447,8 @@ async def config_provider_ctx(
             print(pformat(config_provider.config), file=sys.stderr)
         yield root_ctx.config_provider
     finally:
-        await config_provider.terminate()
+        if config_provider:
+            await config_provider.terminate()
 
 
 @actxmgr
