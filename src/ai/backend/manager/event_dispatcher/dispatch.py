@@ -16,6 +16,7 @@ from ai.backend.common.events.bgtask import (
     BgtaskUpdatedEvent,
 )
 from ai.backend.common.events.dispatcher import (
+    CoalescingOptions,
     EventDispatcher,
 )
 from ai.backend.common.events.hub.hub import EventHub
@@ -39,8 +40,15 @@ from ai.backend.common.events.model_serving import (
     ModelServiceStatusEvent,
     RouteCreatedEvent,
 )
+from ai.backend.common.events.schedule import (
+    DoCheckPrecondEvent,
+    DoScaleEvent,
+    DoScheduleEvent,
+    DoStartSessionEvent,
+)
 from ai.backend.common.events.session import (
     DoTerminateSessionEvent,
+    DoUpdateSessionStatusEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -57,7 +65,9 @@ from ai.backend.common.events.vfolder import (
 )
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
+from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 
 from ..models.utils import ExtendedAsyncSAEngine
 from .handlers.agent import AgentEventHandler
@@ -71,6 +81,7 @@ from .reporters import EventLogger
 
 @dataclass
 class DispatcherArgs:
+    scheduler_dispatcher: SchedulerDispatcher
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
@@ -83,6 +94,7 @@ class Dispatchers:
     _agent_event_handler: AgentEventHandler
     _image_event_handler: ImageEventHandler
     _kernel_event_handler: KernelEventHandler
+    _schedule_event_handler: ScheduleEventHandler
     _model_serving_event_handler: ModelServingEventHandler
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
@@ -97,6 +109,7 @@ class Dispatchers:
         self._agent_event_handler = AgentEventHandler(args.agent_registry, args.db)
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
         self._kernel_event_handler = KernelEventHandler(args.agent_registry, args.db)
+        self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(args.agent_registry, args.db)
         self._vfolder_event_handler = VFolderEventHandler(args.db)
@@ -110,6 +123,7 @@ class Dispatchers:
         self._dispatch_error_monitor_events(event_dispatcher)
         self._dispatch_image_events(event_dispatcher)
         self._dispatch_kernel_events(event_dispatcher)
+        self._dispatch_schedule_events(event_dispatcher)
         self._dispatch_model_serving_events(event_dispatcher)
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
@@ -256,6 +270,47 @@ class Dispatchers:
         )
         event_dispatcher.consume(
             RouteCreatedEvent, None, self._model_serving_event_handler.handle_route_creation
+        )
+
+    def _dispatch_schedule_events(self, event_dispatcher: EventDispatcher) -> None:
+        coalescing_opts: CoalescingOptions = {
+            "max_wait": 0.5,
+            "max_batch_size": 32,
+        }
+        event_dispatcher.consume(
+            SessionEnqueuedEvent,
+            None,
+            self._schedule_event_handler.handle_session_enqueued,
+            coalescing_opts,
+            name="dispatcher.schedule/enqueue",
+        )
+        event_dispatcher.consume(
+            SessionTerminatedEvent,
+            None,
+            self._schedule_event_handler.handle_session_terminated,
+            coalescing_opts,
+            name="dispatcher.term",
+        )
+        event_dispatcher.consume(
+            AgentStartedEvent,
+            None,
+            self._schedule_event_handler.handle_agent_started,
+            name="dispatcher.schedule",
+        )
+        event_dispatcher.consume(
+            DoScheduleEvent, None, self._schedule_event_handler.handle_do_schedule, coalescing_opts
+        )
+        event_dispatcher.consume(
+            DoStartSessionEvent, None, self._schedule_event_handler.handle_do_start_session
+        )
+        event_dispatcher.consume(
+            DoCheckPrecondEvent, None, self._schedule_event_handler.handle_do_check_precond
+        )
+        event_dispatcher.consume(DoScaleEvent, None, self._schedule_event_handler.handle_do_scale)
+        event_dispatcher.consume(
+            DoUpdateSessionStatusEvent,
+            None,
+            self._schedule_event_handler.handle_do_update_session_status,
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:
