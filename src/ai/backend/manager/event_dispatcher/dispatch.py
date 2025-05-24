@@ -8,6 +8,13 @@ from ai.backend.common.events.agent import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
+from ai.backend.common.events.bgtask import (
+    BgtaskCancelledEvent,
+    BgtaskDoneEvent,
+    BgtaskFailedEvent,
+    BgtaskPartialSuccessEvent,
+    BgtaskUpdatedEvent,
+)
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
@@ -49,18 +56,17 @@ from ai.backend.common.events.vfolder import (
     VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
-from ai.backend.manager.event_dispatcher.propagator import PropagatorEventDispatcher
+from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.registry import AgentRegistry
 
 from ..models.utils import ExtendedAsyncSAEngine
-from .agent import AgentEventHandler
-from .bgtask import dispatch_bgtask_events
-from .image import ImageEventHandler
-from .kernel import KernelEventHandler
-from .model_serving import ModelServingEventHandler
+from .handlers.agent import AgentEventHandler
+from .handlers.image import ImageEventHandler
+from .handlers.kernel import KernelEventHandler
+from .handlers.model_serving import ModelServingEventHandler
+from .handlers.session import SessionEventHandler
+from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
-from .session import SessionEventHandler
-from .vfolder import VFolderEventHandler
 
 
 @dataclass
@@ -73,7 +79,7 @@ class DispatcherArgs:
 
 class Dispatchers:
     _db: ExtendedAsyncSAEngine
-    _propagator_dispatcher: PropagatorEventDispatcher
+    _propagator_handler: PropagatorEventHandler
     _agent_event_handler: AgentEventHandler
     _image_event_handler: ImageEventHandler
     _kernel_event_handler: KernelEventHandler
@@ -87,7 +93,7 @@ class Dispatchers:
         """
         self._db = args.db
         self._event_dispatcher_plugin_ctx = args.event_dispatcher_plugin_ctx
-        self._propagator_dispatcher = PropagatorEventDispatcher(args.event_hub)
+        self._propagator_handler = PropagatorEventHandler(args.event_hub)
         self._agent_event_handler = AgentEventHandler(args.agent_registry, args.db)
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
         self._kernel_event_handler = KernelEventHandler(args.agent_registry, args.db)
@@ -99,7 +105,7 @@ class Dispatchers:
         """
         Dispatch events to the appropriate dispatcher.
         """
-        dispatch_bgtask_events(event_dispatcher, self._propagator_dispatcher)
+        self._dispatch_bgtask_events(event_dispatcher)
         self._dispatch_agent_events(event_dispatcher)
         self._dispatch_error_monitor_events(event_dispatcher)
         self._dispatch_image_events(event_dispatcher)
@@ -107,6 +113,29 @@ class Dispatchers:
         self._dispatch_model_serving_events(event_dispatcher)
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
+
+    def _dispatch_bgtask_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        """
+        Register event dispatchers for background task events.
+        """
+        event_dispatcher.subscribe(
+            BgtaskUpdatedEvent, None, self._propagator_handler.propagate_event
+        )
+        event_dispatcher.subscribe(BgtaskDoneEvent, None, self._propagator_handler.propagate_event)
+        event_dispatcher.subscribe(
+            BgtaskPartialSuccessEvent,
+            None,
+            self._propagator_handler.propagate_event,
+        )
+        event_dispatcher.subscribe(
+            BgtaskCancelledEvent, None, self._propagator_handler.propagate_event
+        )
+        event_dispatcher.subscribe(
+            BgtaskFailedEvent, None, self._propagator_handler.propagate_event
+        )
 
     def _dispatch_agent_events(
         self,
