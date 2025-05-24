@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import functools
 import logging
 import pprint
 import textwrap
@@ -598,6 +599,8 @@ def allocate(
     alloc_order: Sequence[DeviceName],
     affinity_map: AffinityMap,
     affinity_policy: AffinityPolicy,
+    *,
+    allow_fractional_resource_fragmentation: bool = True,
 ) -> None:
     """
     Updates the allocation maps of the given computer contexts by allocating the given resource spec.
@@ -632,7 +635,14 @@ def allocate(
                 if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
             }
             try:
-                resource_spec.allocations[dev_name] = computer_ctx.alloc_map.allocate(
+                if isinstance(computer_ctx.alloc_map, FractionAllocMap):
+                    allocate_fn = functools.partial(
+                        computer_ctx.alloc_map.allocate,
+                        allow_resource_fragmentation=allow_fractional_resource_fragmentation,
+                    )
+                else:
+                    allocate_fn = computer_ctx.alloc_map.allocate
+                resource_spec.allocations[dev_name] = allocate_fn(
                     device_specific_slots,
                     affinity_hint=affinity_hint,
                     context_tag=dev_name,

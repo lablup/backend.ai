@@ -177,6 +177,7 @@ from .models import (
     NetworkType,
     RouteStatus,
     RoutingRow,
+    ScalingGroupRow,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
@@ -998,7 +999,9 @@ class AgentRegistry:
                 f"{resource_policy['max_containers_per_session']} containers.",
             )
 
-        async with self.db.begin_readonly() as conn:
+        async with self.db.begin_readonly_session() as sess:
+            conn = await sess.connection()
+            assert conn
             checked_scaling_group = await check_scaling_group(
                 conn,
                 scaling_group,
@@ -1015,13 +1018,11 @@ class AgentRegistry:
                     f"falling back to {checked_scaling_group}",
                 )
 
-            use_host_network_query = (
-                sa.select([scaling_groups.c.use_host_network])
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name == checked_scaling_group)
+            scaling_group_query = sa.select(ScalingGroupRow).where(
+                ScalingGroupRow.name == checked_scaling_group
             )
-            use_host_network_result = await conn.execute(use_host_network_query)
-            use_host_network = use_host_network_result.scalar()
+            scaling_group_query_result = await sess.execute(scaling_group_query)
+            scaling_group_row: ScalingGroupRow = scaling_group_query_result.scalar()
             # Translate mounts/mount_map/mount_options into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
@@ -1157,13 +1158,13 @@ class AgentRegistry:
             "stdin_port": 0,
             "stdout_port": 0,
             "preopen_ports": sa.bindparam("preopen_ports"),
-            "use_host_network": use_host_network,
+            "use_host_network": scaling_group_row.use_host_network,
         }
 
         if network:
             session_data["network_type"] = NetworkType.PERSISTENT
             session_data["network_id"] = str(network.id)
-        elif use_host_network:
+        elif scaling_group_row.use_host_network:
             session_data["network_type"] = NetworkType.HOST
         else:
             session_data["network_type"] = NetworkType.VOLATILE
@@ -1238,6 +1239,16 @@ class AgentRegistry:
                     f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
                 )
                 shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
+            allow_fractional_resource_fragmentation = resource_opts.get(
+                "allow_fractional_resource_fragmentation"
+            )
+            if allow_fractional_resource_fragmentation is None:
+                allow_fractional_resource_fragmentation = (
+                    scaling_group_row.scheduler_opts.allow_fractional_resource_fragmentation
+                )
+            resource_opts["allow_fractional_resource_fragmentation"] = (
+                allow_fractional_resource_fragmentation
+            )
             resource_opts["shmem"] = shmem
             image_min_slots = copy.deepcopy(image_min_slots)
             image_min_slots["mem"] += shmem
