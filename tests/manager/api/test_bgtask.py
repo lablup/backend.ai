@@ -26,7 +26,6 @@ from ai.backend.manager.server import (
     agent_registry_ctx,
     background_task_ctx,
     database_ctx,
-    event_dispatcher_ctx,
     event_dispatcher_plugin_ctx,
     event_hub_ctx,
     event_producer_ctx,
@@ -48,7 +47,12 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 
 @pytest.fixture
 async def bgtask_fixture(
-    etcd_fixture, mock_etcd_ctx, mock_config_provider_ctx, database_fixture, create_app_and_client
+    etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
+    event_dispatcher_test_ctx,
+    database_fixture,
+    create_app_and_client,
 ) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
         [
@@ -65,7 +69,7 @@ async def bgtask_fixture(
             hook_plugin_ctx,
             event_dispatcher_plugin_ctx,
             agent_registry_ctx,
-            event_dispatcher_ctx,
+            event_dispatcher_test_ctx,
             background_task_ctx,
         ],
         [".events"],

@@ -16,8 +16,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import InstanceNotFound
 from ai.backend.manager.registry import AgentRegistry
 
-from ..models.agent import AgentStatus, agents
-from ..models.utils import (
+from ...models.agent import AgentStatus, agents
+from ...models.utils import (
     ExtendedAsyncSAEngine,
 )
 

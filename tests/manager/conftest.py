@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -275,6 +276,25 @@ def mock_etcd_ctx(
     argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
     update_wrapper(argument_binding_ctx, etcd_ctx)
     return argument_binding_ctx
+
+
+@pytest.fixture
+def event_dispatcher_test_ctx():
+    # TODO: Remove this fixture when the root context is refactored
+    from contextlib import asynccontextmanager as actxmgr
+
+    @actxmgr
+    async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+        root_ctx.event_dispatcher = EventDispatcher(
+            root_ctx.message_queue,
+            log_events=root_ctx.config_provider.config.debug.log_events,
+            event_observer=root_ctx.metrics.event,
+        )
+        await root_ctx.event_dispatcher.start()
+        yield
+        await root_ctx.event_dispatcher.close()
+
+    return event_dispatcher_ctx
 
 
 @pytest.fixture(scope="session")

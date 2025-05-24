@@ -15,6 +15,7 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
 
@@ -65,6 +66,7 @@ class RootContext(BaseContext):
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache
+    scheduler_dispatcher: SchedulerDispatcher
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext

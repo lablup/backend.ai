@@ -12,7 +12,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.registry import AgentRegistry
 
-from ..models.utils import (
+from ...models.utils import (
     ExtendedAsyncSAEngine,
 )
 

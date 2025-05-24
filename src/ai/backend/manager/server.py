@@ -696,7 +696,11 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers = Dispatchers(
         DispatcherArgs(
-            root_ctx.event_hub, root_ctx.registry, root_ctx.db, root_ctx.event_dispatcher_plugin_ctx
+            root_ctx.scheduler_dispatcher,
+            root_ctx.event_hub,
+            root_ctx.registry,
+            root_ctx.db,
+            root_ctx.event_dispatcher_plugin_ctx,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -856,16 +860,15 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
-    sched_dispatcher = await SchedulerDispatcher.new(
+    root_ctx.scheduler_dispatcher = await SchedulerDispatcher.new(
         root_ctx.config_provider,
         root_ctx.etcd,
-        root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
         root_ctx.registry,
     )
     yield
-    await sched_dispatcher.close()
+    await root_ctx.scheduler_dispatcher.close()
 
 
 @actxmgr
