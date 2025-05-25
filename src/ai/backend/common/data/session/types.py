@@ -1,6 +1,6 @@
-import enum
+from enum import StrEnum
 
 
-class CustomizedImageVisibilityScope(str, enum.Enum):
+class CustomizedImageVisibilityScope(StrEnum):
     USER = "user"
     PROJECT = "project"
