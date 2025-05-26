@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import json
 import logging
-from typing import TYPE_CHECKING
+import sys
+from typing import TYPE_CHECKING, Literal
 
 import click
 import redis
@@ -35,12 +38,20 @@ async def _ping(redis_conn: RedisConnectionInfo) -> None:
 
 @cli.command()
 @click.option("--manager-id", help="ID of manager to check status.")
+@click.option(
+    "-f",
+    "--format",
+    type=click.Choice(["plain", "csv", "json"]),
+    help="Output format type.",
+    default="plain",
+)
 @click.argument("scheduler_name", required=False)
 @click.pass_obj
 def last_execution_time(
     cli_ctx: CLIContext,
     scheduler_name: str | None,
     *,
+    format: Literal["plain"] | Literal["csv"] | Literal["json"] = "plain",
     manager_id: str | None = None,
 ) -> None:
     """Queries manager's scheduler execution footprint from Redis. When scheduler name is not specified, this command will return informations of all schedulers in store."""
@@ -66,7 +77,8 @@ def last_execution_time(
                         pipe.hgetall(k)
                     return pipe
 
-                results = await redis_helper.execute(redis_conn_set.live, _pipeline)
+                schedulers = [key.decode().split(".")[-1] for key in keys]
+                encoded_results = await redis_helper.execute(redis_conn_set.live, _pipeline)
             else:
                 redis_key = f"manager.{_manager_id}.{scheduler_name}"
                 exists = await redis_helper.execute(
@@ -79,10 +91,50 @@ def last_execution_time(
                         manager_id,
                     )
                     return
-                results = [
+                schedulers = [scheduler_name]
+                encoded_results = [
                     await redis_helper.execute(redis_conn_set.live, lambda r: r.hgetall(redis_key))
                 ]
-            for resp in results:
-                print(tabulate([(k.decode(), v.decode()) for k, v in resp.items()]))
+            results = [
+                {k.decode(): v.decode() for k, v in resp.items()} for resp in encoded_results
+            ]
+            match format:
+                case "plain":
+                    for scheduler, resp in zip(schedulers, results):
+                        print(
+                            tabulate([("scheduler", scheduler)] + [(k, v) for k, v in resp.items()])
+                        )
+                case "csv":
+                    writer = csv.DictWriter(
+                        sys.stdout,
+                        fieldnames=[
+                            "scheduler",
+                            "trigger_event",
+                            "execution_time",
+                            "finish_time",
+                            "extras",
+                        ],
+                    )
+                    for scheduler, resp in zip(schedulers, results):
+                        row = {
+                            "scheduler": scheduler,
+                            "trigger_event": resp["trigger_event"],
+                            "execution_time": resp["execution_time"],
+                            "finish_time": resp["finish_time"],
+                        }
+                        extras = [f"{k}={v}" for k, v in resp.items() if k not in row]
+                        row["extras"] = ";".join(extras)
+                        writer.writerow(row)
+                case "json":
+                    print(
+                        json.dumps(
+                            [
+                                {"scheduler": scheduler, **resp}
+                                for scheduler, resp in zip(schedulers, results)
+                            ],
+                            ensure_ascii=False,
+                            indent=2,
+                        )
+                    )
 
     asyncio.run(_impl())
