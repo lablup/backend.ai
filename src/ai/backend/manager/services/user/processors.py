@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -47,12 +47,12 @@ class UserProcessors(AbstractProcessorPackage):
         self.admin_month_stats = ActionProcessor(user_service.admin_month_stats, action_monitors)
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            CreateUserAction.type(),
-            ModifyUserAction.type(),
-            DeleteUserAction.type(),
-            PurgeUserAction.type(),
-            UserMonthStatsAction.type(),
-            AdminMonthStatsAction.type(),
+            CreateUserAction.spec(),
+            ModifyUserAction.spec(),
+            DeleteUserAction.spec(),
+            PurgeUserAction.spec(),
+            UserMonthStatsAction.spec(),
+            AdminMonthStatsAction.spec(),
         ]

@@ -10,12 +10,14 @@ import pytest
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events.dispatcher import (
-    AbstractEvent,
     CoalescingOptions,
     CoalescingState,
     EventDispatcher,
-    EventDomain,
     EventProducer,
+)
+from ai.backend.common.events.types import (
+    AbstractEvent,
+    EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -98,6 +100,7 @@ async def test_dispatch(redis_container) -> None:
 
     dispatcher.subscribe(DummyEvent, app, acb)
     dispatcher.subscribe(DummyEvent, app, scb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
     # Dispatch the event
@@ -161,6 +164,7 @@ async def test_error_on_dispatch(redis_container) -> None:
 
     dispatcher.subscribe(DummyEvent, app, scb)
     dispatcher.subscribe(DummyEvent, app, acb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
     await producer.produce_event(DummyEvent(0), source_override=AgentId("i-test"))

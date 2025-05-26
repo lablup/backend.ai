@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
@@ -49,12 +49,12 @@ class AgentProcessors(AbstractProcessorPackage):
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            SyncAgentRegistryAction.type(),
-            GetWatcherStatusAction.type(),
-            WatcherAgentStartAction.type(),
-            WatcherAgentRestartAction.type(),
-            WatcherAgentStopAction.type(),
-            RecalculateUsageAction.type(),
+            SyncAgentRegistryAction.spec(),
+            GetWatcherStatusAction.spec(),
+            WatcherAgentStartAction.spec(),
+            WatcherAgentRestartAction.spec(),
+            WatcherAgentStopAction.spec(),
+            RecalculateUsageAction.spec(),
         ]

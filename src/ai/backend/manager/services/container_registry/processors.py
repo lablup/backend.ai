@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -55,11 +55,11 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         )
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            RescanImagesAction.type(),
-            ClearImagesAction.type(),
-            LoadContainerRegistriesAction.type(),
-            LoadAllContainerRegistriesAction.type(),
-            GetContainerRegistriesAction.type(),
+            RescanImagesAction.spec(),
+            ClearImagesAction.spec(),
+            LoadContainerRegistriesAction.spec(),
+            LoadAllContainerRegistriesAction.spec(),
+            GetContainerRegistriesAction.spec(),
         ]

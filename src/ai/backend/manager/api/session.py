@@ -567,7 +567,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     if agent_list is not None:
         if (
             request["user"]["role"] != UserRole.SUPERADMIN
-            and root_ctx.unified_config.local.manager.hide_agents
+            and root_ctx.config_provider.config.manager.hide_agents
         ):
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
@@ -947,7 +947,7 @@ async def convert_session_to_image(
 async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
     try:
         now = datetime.now(tzutc())
-        timeout = timedelta(seconds=root_ctx.unified_config.local.manager.heartbeat_timeout)
+        timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
 
         async def _check_impl(r: Redis):
             async for agent_id, prev in r.hscan_iter("agent.last_seen"):

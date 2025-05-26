@@ -3,7 +3,7 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Self, Sequence
+from typing import Any, Self, Sequence
 
 from pydantic import BaseModel, Field
 
@@ -60,12 +60,14 @@ class ServiceMetadata(BaseModel):
     Metadata for a service.
     """
 
-    id: uuid.UUID
-    display_name: str
-    service_group: str
-    version: str
-    endpoint: ServiceEndpoint
-    health_status: HealthStatus = Field(default_factory=HealthStatus)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    display_name: str = Field(..., description="Display name of the service")
+    service_group: str = Field(..., description="Name of the service group (manager, agent, etc.)")
+    version: str = Field(..., description="Version of the service")
+    endpoint: ServiceEndpoint = Field(..., description="Endpoint of the service")
+    health_status: HealthStatus = Field(
+        default_factory=HealthStatus, description="Health status of the service"
+    )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -86,10 +88,10 @@ class ServiceDiscovery(ABC):
     """
 
     @abstractmethod
-    async def register(self, service: ServiceMetadata) -> None:
+    async def register(self, service_meta: ServiceMetadata) -> None:
         """
         Register a service.
-        :param service: Service metadata.
+        :param service_meta: Service metadata.
         """
         raise NotImplementedError
 
@@ -103,11 +105,11 @@ class ServiceDiscovery(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def heartbeat(self, service_group: str, service_id: uuid.UUID) -> None:
+    async def heartbeat(self, service_meta: ServiceMetadata) -> None:
         """
         Send a heartbeat to the service discovery.
-        :param service_group: Name of the service group.
-        :param service_id: UUID of the service.
+        When a service is not ready in the service discovery, it registers it.
+        :param service_meta: Service metadata.
         """
         raise NotImplementedError
 
@@ -149,8 +151,8 @@ class ServiceDiscoveryLoop:
     _metadata: ServiceMetadata
     _interval_seconds: int
     _closed: bool = False
-    _run_service_task: Optional[asyncio.Task[None]]
-    _sweep_unhealthy_services_task: Optional[asyncio.Task[None]]
+    _run_service_task: asyncio.Task[None]
+    _sweep_unhealthy_services_task: asyncio.Task[None]
 
     def __init__(
         self,
@@ -162,31 +164,24 @@ class ServiceDiscoveryLoop:
         self._metadata = metadata
         self._interval_seconds = interval_seconds
         self._closed = False
-        self._run_service_task = None
-        self._sweep_unhealthy_services_task = None
-
-    def start(self) -> None:
-        """
-        Start the service discovery loop.
-        """
-        if self._run_service_task is not None:
-            raise RuntimeError("Service discovery loop is already running.")
         self._run_service_task = asyncio.create_task(self._run_service_loop())
         self._sweep_unhealthy_services_task = asyncio.create_task(
             self._sweep_unhealthy_services_loop()
         )
 
-    async def close(self) -> None:
+    @property
+    def metadata(self) -> ServiceMetadata:
+        return self._metadata
+
+    def close(self) -> None:
         """
         Close the service discovery loop.
         """
         if self._closed:
             return
         self._closed = True
-        if self._run_service_task is not None:
-            self._run_service_task.cancel()
-        if self._sweep_unhealthy_services_task is not None:
-            self._sweep_unhealthy_services_task.cancel()
+        self._run_service_task.cancel()
+        self._sweep_unhealthy_services_task.cancel()
 
     async def _sweep_unhealthy_services_loop(self) -> None:
         """
@@ -207,12 +202,17 @@ class ServiceDiscoveryLoop:
             await asyncio.sleep(_DEFAULT_SWEEP_INTERVAL)
 
     async def _run_service_loop(self) -> None:
+        log.info(
+            "Registering service {} with ID {} in group {}",
+            self._metadata.display_name,
+            self._metadata.id,
+            self._metadata.service_group,
+        )
         await self._service_discovery.register(self._metadata)
         while not self._closed:
             try:
                 await self._service_discovery.heartbeat(
-                    service_group=self._metadata.service_group,
-                    service_id=self._metadata.id,
+                    service_meta=self._metadata,
                 )
             except Exception as e:
                 log.error("Error sending heartbeat: {}", e)

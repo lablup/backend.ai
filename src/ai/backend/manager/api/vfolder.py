@@ -248,7 +248,7 @@ async def resolve_vfolder_rows(
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     allowed_vfolder_types = (
-        await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
     )
     vf_user_cond = None
     vf_group_cond = None
@@ -601,7 +601,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     domain_admin = request["user"]["role"] == UserRole.ADMIN
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = (
-        await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
     )
     async with root_ctx.db.begin() as conn:
         allowed_hosts = VFolderHostPermissionMap()
@@ -621,7 +621,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         host: perms for host, perms in allowed_hosts.items() if host in all_hosts
     })
 
-    default_host = root_ctx.unified_config.shared.volumes.default_host
+    default_host = root_ctx.config_provider.config.volumes.default_host
     if default_host not in allowed_hosts:
         default_host = None
 
@@ -680,7 +680,7 @@ async def list_all_hosts(request: web.Request) -> web.Response:
     )
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
     all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
-    default_host = root_ctx.unified_config.shared.volumes.default_host
+    default_host = root_ctx.config_provider.config.volumes.default_host
     if default_host not in all_hosts:
         default_host = None
     resp = {
@@ -727,7 +727,7 @@ async def list_allowed_types(request: web.Request) -> web.Response:
         request["keypair"]["access_key"],
     )
     allowed_vfolder_types = (
-        await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+        await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
     )
     return web.json_response(allowed_vfolder_types, status=HTTPStatus.OK)
 
@@ -806,7 +806,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         pass
     else:
         allowed_vfolder_types = (
-            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         async with root_ctx.db.begin_readonly() as conn:
             extra_vf_conds = [vfolders.c.id == params["id"]]
@@ -872,7 +872,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
         pass
     else:
         allowed_vfolder_types = (
-            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         async with root_ctx.db.begin_readonly() as conn:
             await ensure_host_permission_allowed(
@@ -1412,6 +1412,8 @@ async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Resp
             sa.select(UserRow).where(UserRow.email.in_(invitee_emails))
         )
         user_uuids = [row.uuid for row in user_rows]
+    if not user_uuids:
+        raise VFolderNotFound("No users found with the provided emails.")
     result = await root_ctx.processors.vfolder_invite.invite_vfolder.wait_for_complete(
         InviteVFolderAction(
             keypair_resource_policy=request["keypair"]["resource_policy"],
@@ -1540,7 +1542,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         from ..models import association_groups_users as agus
 
         allowed_vfolder_types = (
-            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         await ensure_host_permission_allowed(
             conn,
@@ -1644,7 +1646,7 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
         raise VFolderNotFound("Only project folders are directly unsharable.")
     async with root_ctx.db.begin() as conn:
         allowed_vfolder_types = (
-            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         await ensure_host_permission_allowed(
             conn,
@@ -1697,7 +1699,7 @@ async def _delete(
                 raise ModelServiceDependencyNotCleared
         folder_host = vfolder_row["host"]
         allowed_vfolder_types = (
-            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         await ensure_host_permission_allowed(
             db_session.bind,
@@ -1875,7 +1877,7 @@ async def delete_from_trash_bin(
 async def force_delete(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
-    piece = request.match_info["name"]
+    piece = request.match_info["folder_id"]
     try:
         folder_id = uuid.UUID(piece)
     except ValueError:
@@ -1966,7 +1968,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE, allow_privileged_access=True)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE, allow_privileged_access=False)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
@@ -2339,7 +2341,9 @@ async def list_mounts(request: web.Request) -> web.Response:
         "VFOLDER.LIST_MOUNTS(ak:{})",
         access_key,
     )
-    mount_prefix = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw("volumes/_mount")
+    mount_prefix = await root_ctx.config_provider.legacy_etcd_config_loader.get_raw(
+        "volumes/_mount"
+    )
     if mount_prefix is None:
         mount_prefix = "/mnt"
 
@@ -2457,7 +2461,9 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
     log_fmt = "VFOLDER.MOUNT_HOST(ak:{}, name:{}, fs:{}, sg:{})"
     log_args = (access_key, params["name"], params["fs_location"], params["scaling_group"])
     log.info(log_fmt, *log_args)
-    mount_prefix = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw("volumes/_mount")
+    mount_prefix = await root_ctx.config_provider.legacy_etcd_config_loader.get_raw(
+        "volumes/_mount"
+    )
     if mount_prefix is None:
         mount_prefix = "/mnt"
 
@@ -2558,7 +2564,9 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     log_fmt = "VFOLDER.UMOUNT_HOST(ak:{}, name:{}, sg:{})"
     log_args = (access_key, params["name"], params["scaling_group"])
     log.info(log_fmt, *log_args)
-    mount_prefix = await root_ctx.unified_config.legacy_etcd_config_loader.get_raw("volumes/_mount")
+    mount_prefix = await root_ctx.config_provider.legacy_etcd_config_loader.get_raw(
+        "volumes/_mount"
+    )
     if mount_prefix is None:
         mount_prefix = "/mnt"
     mountpoint = Path(mount_prefix) / params["name"]
@@ -2833,7 +2841,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/purge", purge))
     cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
     cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
-    cors.add(add_route("DELETE", r"/{name}/force", force_delete))
+    cors.add(add_route("DELETE", r"/{folder_id}/force", force_delete))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))

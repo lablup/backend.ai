@@ -9,6 +9,7 @@ from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
+from ..pretty import print_done
 from ..types import CLIContext
 from . import admin
 
@@ -391,12 +392,4 @@ def dissociate_scaling_group(ctx: CLIContext, scaling_group, domain):
                 action_name="scaling_group_dissociation",
             )
             sys.exit(ExitCode.FAILURE)
-        ctx.output.print_mutation_result(
-            data,
-            item_name="scaling_group",
-            extra_info={
-                "detail_msg": "Scaling group {} is dissociated from domain {}.".format(
-                    scaling_group, domain
-                ),
-            },
-        )
+        print_done("Scaling group {} is dissociated from domain {}.".format(scaling_group, domain))

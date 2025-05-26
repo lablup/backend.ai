@@ -1,8 +1,8 @@
 import dataclasses
-import enum
 import textwrap
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import (
     Annotated,
     Any,
@@ -25,11 +25,11 @@ from pydantic import AnyUrl, BaseModel, Field
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
 
-class FrontendMode(str, enum.Enum):
+class FrontendMode(StrEnum):
     PORT = "port"
 
 
-class ProxyProtocol(str, enum.Enum):
+class ProxyProtocol(StrEnum):
     HTTP = "http"
     GRPC = "grpc"
     HTTP2 = "h2"
@@ -37,7 +37,7 @@ class ProxyProtocol(str, enum.Enum):
     PREOPEN = "preopen"
 
 
-class AppMode(str, enum.Enum):
+class AppMode(StrEnum):
     INTERACTIVE = "interactive"
     INFERENCE = "inference"
 
@@ -50,12 +50,12 @@ class Slot:
     circuit_id: UUID | None
 
 
-class EventLoopType(str, enum.Enum):
+class EventLoopType(StrEnum):
     UVLOOP = "uvloop"
     ASYNCIO = "asyncio"
 
 
-class DigestModType(str, enum.Enum):
+class DigestModType(StrEnum):
     SHA1 = "sha1"
     SHA224 = "sha224"
     SHA256 = "sha256"

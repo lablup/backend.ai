@@ -1,12 +1,22 @@
+import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.events.dispatcher import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.events.user_event.user_bgtask_event import (
+    UserBgtaskCancelledEvent,
+    UserBgtaskDoneEvent,
+    UserBgtaskFailedEvent,
+    UserBgtaskUpdatedEvent,
+)
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -21,10 +31,6 @@ class BaseBgtaskEvent(AbstractEvent, ABC):
     @override
     def domain_id(self) -> Optional[str]:
         return str(self.task_id)
-
-    @override
-    def user_event(self) -> Optional[UserEvent]:
-        return None
 
     @abstractmethod
     def status(self) -> BgtaskStatus:
@@ -62,6 +68,15 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
     @override
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.STARTED
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return UserBgtaskUpdatedEvent(
+            task_id=str(self.task_id),
+            message=str(self.message),
+            current_progress=self.current_progress,
+            total_progress=self.total_progress,
+        )
 
 
 @dataclass
@@ -103,6 +118,13 @@ class BgtaskDoneEvent(BaseBgtaskDoneEvent):
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.DONE
 
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return UserBgtaskDoneEvent(
+            task_id=str(self.task_id),
+            message=str(self.message),
+        )
+
 
 @dataclass
 class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
@@ -134,6 +156,33 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     def status(self) -> BgtaskStatus:
         return self.task_status
 
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        match self.task_status:
+            case BgtaskStatus.DONE:
+                return UserBgtaskDoneEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case BgtaskStatus.CANCELLED:
+                return UserBgtaskCancelledEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case BgtaskStatus.FAILED:
+                return UserBgtaskFailedEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case BgtaskStatus.PARTIAL_SUCCESS:
+                return UserBgtaskDoneEvent(
+                    task_id=str(self.task_id),
+                    message=str(self.message),
+                )
+            case _:
+                log.exception("unknown task status {}", self.task_status)
+                raise UnreachableError(f"Unknown task status {self.task_status}")
+
 
 @dataclass
 class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
@@ -146,6 +195,13 @@ class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.CANCELLED
 
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return UserBgtaskCancelledEvent(
+            task_id=str(self.task_id),
+            message=str(self.message),
+        )
+
 
 @dataclass
 class BgtaskFailedEvent(BaseBgtaskDoneEvent):
@@ -157,6 +213,13 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
     @override
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.FAILED
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return UserBgtaskFailedEvent(
+            task_id=str(self.task_id),
+            message=str(self.message),
+        )
 
 
 @dataclass
@@ -189,3 +252,11 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
     def status(self) -> BgtaskStatus:
         # TODO: When client side is ready, we can change this to `TaskStatus.PARTIAL_SUCCESS`
         return BgtaskStatus.DONE
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        # TODO: When client side is ready, we can change this to `UserBgtaskPartialSuccessEvent`
+        return UserBgtaskDoneEvent(
+            task_id=str(self.task_id),
+            message=str(self.message),
+        )

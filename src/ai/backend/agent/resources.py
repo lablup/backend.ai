@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import copy
-import functools
 import logging
 import pprint
 import textwrap
@@ -636,17 +635,18 @@ def allocate(
             }
             try:
                 if isinstance(computer_ctx.alloc_map, FractionAllocMap):
-                    allocate_fn = functools.partial(
-                        computer_ctx.alloc_map.allocate,
+                    resource_spec.allocations[dev_name] = computer_ctx.alloc_map.allocate(
+                        device_specific_slots,
+                        affinity_hint=affinity_hint,
+                        context_tag=dev_name,
                         allow_resource_fragmentation=allow_fractional_resource_fragmentation,
                     )
                 else:
-                    allocate_fn = computer_ctx.alloc_map.allocate
-                resource_spec.allocations[dev_name] = allocate_fn(
-                    device_specific_slots,
-                    affinity_hint=affinity_hint,
-                    context_tag=dev_name,
-                )
+                    resource_spec.allocations[dev_name] = computer_ctx.alloc_map.allocate(
+                        device_specific_slots,
+                        affinity_hint=affinity_hint,
+                        context_tag=dev_name,
+                    )
                 log.debug(
                     "allocated {} for device {}",
                     resource_spec.allocations[dev_name],

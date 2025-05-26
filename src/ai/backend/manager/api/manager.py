@@ -71,7 +71,7 @@ def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
-            status = await root_ctx.unified_config.legacy_etcd_config_loader.get_manager_status()
+            status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
             if status not in allowed_status:
                 if status == ManagerStatus.FROZEN:
                     raise ServerFrozen
@@ -105,14 +105,12 @@ class GQLMutationUnfrozenRequiredMiddleware:
 async def detect_status_update(root_ctx: RootContext) -> None:
     try:
         async with aclosing(
-            root_ctx.unified_config.legacy_etcd_config_loader.watch_manager_status()
+            root_ctx.config_provider.legacy_etcd_config_loader.watch_manager_status()
         ) as agen:
             async for ev in agen:
                 if ev.event == "put":
-                    root_ctx.unified_config.legacy_etcd_config_loader.get_manager_status.cache_clear()
-                    updated_status = (
-                        await root_ctx.unified_config.legacy_etcd_config_loader.get_manager_status()
-                    )
+                    root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status.cache_clear()
+                    updated_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
                     log.debug(
                         "Process-{0} detected manager status update: {1}",
                         root_ctx.pidx,
@@ -123,7 +121,7 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(Optional[float], root_ctx.unified_config.local.manager.status_update_interval)
+    interval = cast(Optional[float], root_ctx.config_provider.config.manager.status_update_interval)
     if interval is None:
         # Do not run bgtask if interval is not set
         return
@@ -142,9 +140,9 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     log.info("MANAGER.FETCH_MANAGER_STATUS ()")
     try:
-        status = await root_ctx.unified_config.legacy_etcd_config_loader.get_manager_status()
+        status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
         # etcd_info = await root_ctx.shared_config.get_manager_nodes_info()
-        configs = root_ctx.unified_config.local.manager
+        configs = root_ctx.config_provider.config.manager
 
         async with root_ctx.db.begin() as conn:
             query = (
@@ -205,7 +203,7 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
 
     if force_kill:
         await root_ctx.registry.kill_all_sessions()
-    await root_ctx.unified_config.legacy_etcd_config_loader.update_manager_status(status)
+    await root_ctx.config_provider.legacy_etcd_config_loader.update_manager_status(status)
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
@@ -299,7 +297,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 @superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    manager_id = root_ctx.unified_config.local.manager.id
+    manager_id = root_ctx.config_provider.config.manager.id
 
     scheduler_status = {}
     for event in SchedulerEvent:

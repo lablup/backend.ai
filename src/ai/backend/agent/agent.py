@@ -280,9 +280,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
-        self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
+        self.kspec_version = int(self.image_labels.get(LabelName.KERNEL_SPEC, "1"))
         self.kernel_features = frozenset(
-            self.image_labels.get(LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE).split()
+            self.image_labels.get(LabelName.FEATURES, DEFAULT_KERNEL_FEATURE).split()
         )
         self.ownership_data = ownership_data
         self.session_id = ownership_data.session_id
@@ -851,6 +851,7 @@ class AbstractAgent(
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
+        await self.event_dispatcher.start()
 
     def _make_message_queue(
         self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
@@ -1435,7 +1436,7 @@ class AbstractAgent(
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
         def _get_session_id(container: Container) -> SessionId | None:
-            _session_id = container.labels.get("ai.backend.session-id")
+            _session_id = container.labels.get(LabelName.SESSION_ID)
             try:
                 return SessionId(UUID(_session_id))
             except ValueError:
@@ -1796,9 +1797,9 @@ class AbstractAgent(
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
             ):
-                session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
+                session_id = SessionId(UUID(container.labels[LabelName.SESSION_ID]))
                 if container.status in ACTIVE_STATUS_SET:
-                    kernelspec = int(container.labels.get("ai.backend.kernelspec", "1"))
+                    kernelspec = int(container.labels.get(LabelName.KERNEL_SPEC, "1"))
                     if not (MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC):
                         continue
                     # Consume the port pool.
@@ -2088,7 +2089,7 @@ class AbstractAgent(
                     await ctx.mount_krunner(resource_spec, environ)
 
                 # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
-                label_envs_corecount = image_labels.get("ai.backend.envs.corecount", "")
+                label_envs_corecount = image_labels.get(LabelName.ENVS_CORECOUNT, "")
                 envs_corecount = label_envs_corecount.split(",") if label_envs_corecount else []
                 cpu_core_count = len(resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")])
                 environ.update({k: str(cpu_core_count) for k in envs_corecount if k not in environ})
@@ -2169,8 +2170,8 @@ class AbstractAgent(
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
-                        image_labels.get("ai.backend.service-ports", ""),
-                        image_labels.get("ai.backend.endpoint-ports", ""),
+                        image_labels.get(LabelName.SERVICE_PORTS, ""),
+                        image_labels.get(LabelName.ENDPOINT_PORTS, ""),
                     ):
                         port_map[sport["name"]] = sport
                     for port_no in preopen_ports:
@@ -2220,8 +2221,8 @@ class AbstractAgent(
                         kernel_config,
                     )
 
-                runtime_type = image_labels.get("ai.backend.runtime-type", "app")
-                runtime_path = image_labels.get("ai.backend.runtime-path", None)
+                runtime_type = image_labels.get(LabelName.RUNTIME_TYPE, "app")
+                runtime_path = image_labels.get(LabelName.RUNTIME_PATH, None)
                 cmdargs: list[str] = []
                 krunner_opts: list[str] = []
                 if self.local_config["container"]["sandbox-type"] == "jail":
@@ -2894,7 +2895,7 @@ class AbstractAgent(
     async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
-    async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
+    async def accept_file(self, kernel_id: KernelId, filename: str, filedata: bytes):
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
 
     async def download_file(self, kernel_id: KernelId, filepath: str):

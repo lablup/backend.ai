@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
     CreateKeyPairResourcePolicyActionResult,
@@ -45,9 +45,9 @@ class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
         )
 
     @override
-    def supported_actions(self) -> list[str]:
+    def supported_actions(self) -> list[ActionSpec]:
         return [
-            CreateKeyPairResourcePolicyAction.type(),
-            ModifyKeyPairResourcePolicyAction.type(),
-            DeleteKeyPairResourcePolicyAction.type(),
+            CreateKeyPairResourcePolicyAction.spec(),
+            ModifyKeyPairResourcePolicyAction.spec(),
+            DeleteKeyPairResourcePolicyAction.spec(),
         ]

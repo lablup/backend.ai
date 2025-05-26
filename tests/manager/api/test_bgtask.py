@@ -23,10 +23,18 @@ from ai.backend.common.events.dispatcher import (
 from ai.backend.common.types import AgentId, RedisProfileTarget
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
+    agent_registry_ctx,
     background_task_ctx,
-    event_dispatcher_ctx,
+    database_ctx,
+    event_dispatcher_plugin_ctx,
     event_hub_ctx,
+    event_producer_ctx,
+    hook_plugin_ctx,
+    message_queue_ctx,
+    monitoring_ctx,
+    network_plugin_ctx,
     redis_ctx,
+    storage_manager_ctx,
 )
 
 
@@ -39,15 +47,29 @@ BgtaskFixture: TypeAlias = tuple[BackgroundTaskManager, EventProducer, EventDisp
 
 @pytest.fixture
 async def bgtask_fixture(
-    etcd_fixture, mock_etcd_ctx, mock_unified_config_ctx, create_app_and_client
+    etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
+    event_dispatcher_test_ctx,
+    database_fixture,
+    create_app_and_client,
 ) -> AsyncIterator[BgtaskFixture]:
     app, client = await create_app_and_client(
         [
             event_hub_ctx,
             mock_etcd_ctx,
-            mock_unified_config_ctx,
+            mock_config_provider_ctx,
+            database_ctx,
             redis_ctx,
-            event_dispatcher_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
+            storage_manager_ctx,
+            monitoring_ctx,
+            network_plugin_ctx,
+            hook_plugin_ctx,
+            event_dispatcher_plugin_ctx,
+            agent_registry_ctx,
+            event_dispatcher_test_ctx,
             background_task_ctx,
         ],
         [".events"],
@@ -59,7 +81,7 @@ async def bgtask_fixture(
     yield root_ctx.background_task_manager, producer, dispatcher
 
     etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.unified_config.shared.redis.model_dump()
+        root_ctx.config_provider.config.redis.model_dump()
     )
     stream_redis_config = etcd_redis_config.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(

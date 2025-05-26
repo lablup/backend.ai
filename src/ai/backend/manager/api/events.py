@@ -27,7 +27,6 @@ from sqlalchemy.orm import load_only
 from ai.backend.common import validators as tx
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
-    EventDomain,
 )
 from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
 from ai.backend.common.events.kernel import (
@@ -49,6 +48,7 @@ from ai.backend.common.events.session import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
+from ai.backend.common.events.types import EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
@@ -180,7 +180,7 @@ async def push_background_task_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    task_id = uuid.UUID(params["task_id"])
+    task_id: uuid.UUID = params["task_id"]
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     async with sse_response(request) as resp:

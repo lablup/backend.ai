@@ -4,6 +4,8 @@ import logging
 from collections.abc import Iterable
 from typing import Any, LiteralString
 
+from ai.backend.logging.otel import OpenTelemetrySpec
+
 __all__ = (
     "BraceMessage",
     "BraceStyleAdapter",
@@ -23,14 +25,23 @@ class BraceMessage:
 
 
 class BraceStyleAdapter(logging.LoggerAdapter):
+    _loggers: set[logging.Logger] = set()
+
     def __init__(self, logger, extra=None):
         super().__init__(logger, extra)
+        self._loggers.add(logger)
 
     def log(self, level, msg, *args, **kwargs):
         if self.isEnabledFor(level):
             msg, kwargs = self.process(msg, kwargs)
             kwargs["stacklevel"] = kwargs.get("stacklevel", 1) + 1
             self.logger._log(level, BraceMessage(msg, args), (), **kwargs)
+
+    @classmethod
+    def apply_otel(cls, spec: OpenTelemetrySpec) -> None:
+        from .otel import apply_otel_loggers
+
+        apply_otel_loggers(cls._loggers, spec)
 
 
 def enforce_debug_logging(loggers: Iterable[str]) -> None:

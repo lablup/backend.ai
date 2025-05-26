@@ -937,6 +937,9 @@ class ResourceSlot(UserDict):
     def to_json(self) -> Mapping[str, str]:
         return {k: _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None}
 
+    def has_intrinsic_slots(self) -> bool:
+        return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
+
 
 class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
@@ -1246,7 +1249,7 @@ class KernelCreationConfig(TypedDict):
     main_gid: Optional[int]
     supplementary_gids: list[int]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
-    resource_opts: Mapping[str, str]  # json form of resource options
+    resource_opts: Mapping[str, Any]  # json form of resource options
     environ: Mapping[str, str]
     mounts: Sequence[Mapping[str, Any]]  # list of serialized VFolderMount
     package_directory: Sequence[str]

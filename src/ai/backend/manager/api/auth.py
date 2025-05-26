@@ -25,7 +25,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.shared import AuthConfig
+from ai.backend.manager.config.unified import AuthConfig
 
 from ..errors.exceptions import (
     AuthorizationFailed,
@@ -729,7 +729,7 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         raise AuthorizationFailed("This account needs email verification.")
     if user["status"] in INACTIVE_USER_STATUSES:
         raise AuthorizationFailed("User credential mismatch.")
-    await check_password_age(root_ctx.db, user, root_ctx.unified_config.shared.auth)
+    await check_password_age(root_ctx.db, user, root_ctx.config_provider.config.auth)
     async with root_ctx.db.begin_session() as db_session:
         user_row = await UserRow.query_user_by_uuid(user["uuid"], db_session)
         if user_row is None:
@@ -1029,7 +1029,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
     log.info(log_fmt, *log_args)
 
     if (
-        auth_config := root_ctx.unified_config.shared.auth
+        auth_config := root_ctx.config_provider.config.auth
     ) is None or auth_config.max_password_age is None:
         raise GenericBadRequest("Unsupported function.")
 
