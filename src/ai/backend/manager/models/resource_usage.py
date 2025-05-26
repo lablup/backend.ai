@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, tzinfo
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Mapping, Optional, Sequence
 from uuid import UUID
 
@@ -32,7 +32,7 @@ __all__: Sequence[str] = (
 )
 
 
-class ResourceGroupUnit(str, Enum):
+class ResourceGroupUnit(StrEnum):
     KERNEL = "kernel"
     SESSION = "session"
     PROJECT = "project"
