@@ -331,7 +331,7 @@ class BackgroundTaskManager:
                 operation=ErrorOperation.EXECUTE,
                 error_detail=ErrorDetail.INTERNAL_ERROR,
             )
-            log.error("Task {} ({}): unhandled error", task_id, task_name)
+            log.error("Task {} ({}): unhandled error: {}", task_id, task_name, e)
             return BgtaskFailedEvent(task_id, repr(e))
         finally:
             duration = time.perf_counter() - start_time
