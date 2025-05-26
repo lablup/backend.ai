@@ -61,11 +61,13 @@ class ServiceMetadata(BaseModel):
     """
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
-    display_name: str
-    service_group: str
-    version: str
-    endpoint: ServiceEndpoint
-    health_status: HealthStatus = Field(default_factory=HealthStatus)
+    display_name: str = Field(..., description="Display name of the service")
+    service_group: str = Field(..., description="Name of the service group (manager, agent, etc.)")
+    version: str = Field(..., description="Version of the service")
+    endpoint: ServiceEndpoint = Field(..., description="Endpoint of the service")
+    health_status: HealthStatus = Field(
+        default_factory=HealthStatus, description="Health status of the service"
+    )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -86,10 +88,10 @@ class ServiceDiscovery(ABC):
     """
 
     @abstractmethod
-    async def register(self, service: ServiceMetadata) -> None:
+    async def register(self, service_meta: ServiceMetadata) -> None:
         """
         Register a service.
-        :param service: Service metadata.
+        :param service_meta: Service metadata.
         """
         raise NotImplementedError
 
@@ -103,11 +105,11 @@ class ServiceDiscovery(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def heartbeat(self, service_group: str, service_id: uuid.UUID) -> None:
+    async def heartbeat(self, service_meta: ServiceMetadata) -> None:
         """
         Send a heartbeat to the service discovery.
-        :param service_group: Name of the service group.
-        :param service_id: UUID of the service.
+        When a service is not ready in the service discovery, it registers it.
+        :param service_meta: Service metadata.
         """
         raise NotImplementedError
 
@@ -210,8 +212,7 @@ class ServiceDiscoveryLoop:
         while not self._closed:
             try:
                 await self._service_discovery.heartbeat(
-                    service_group=self._metadata.service_group,
-                    service_id=self._metadata.id,
+                    service_meta=self._metadata,
                 )
             except Exception as e:
                 log.error("Error sending heartbeat: {}", e)
