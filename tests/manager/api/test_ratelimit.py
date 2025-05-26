@@ -6,7 +6,6 @@ import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.manager.server import (
     agent_registry_ctx,
     database_ctx,
-    event_dispatcher_ctx,
     event_dispatcher_plugin_ctx,
     event_hub_ctx,
     event_producer_ctx,
@@ -42,7 +41,6 @@ async def test_check_rlim_for_anonymous_query(
             hook_plugin_ctx,
             event_dispatcher_plugin_ctx,
             agent_registry_ctx,
-            event_dispatcher_ctx,
         ],
         [".auth", ".ratelimit"],
     )
@@ -77,7 +75,6 @@ async def test_check_rlim_for_authorized_query(
             hook_plugin_ctx,
             event_dispatcher_plugin_ctx,
             agent_registry_ctx,
-            event_dispatcher_ctx,
         ],
         [".auth", ".ratelimit"],
     )

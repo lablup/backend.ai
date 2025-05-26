@@ -9,10 +9,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.utils import (
+from ...models.utils import (
     ExtendedAsyncSAEngine,
 )
-from ..models.vfolder import VFolderOperationStatus, update_vfolder_status
+from ...models.vfolder import VFolderOperationStatus, update_vfolder_status
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

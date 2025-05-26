@@ -1604,7 +1604,7 @@ class IdleCheckerConfig(BaseModel):
         Enabled idle checkers.
         Comma-separated list of checker names.
         """,
-        examples=["timeout", "utilization"],
+        examples=["network_timeout", "utilization"],
     )
     app_streaming_packet_timeout: TimeDuration = Field(
         default=_TimeDurationPydanticAnnotation.time_duration_validator("5m"),

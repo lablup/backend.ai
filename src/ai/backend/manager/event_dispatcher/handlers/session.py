@@ -32,10 +32,10 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import SessionNotFound
 from ai.backend.manager.registry import AgentRegistry
 
-from ..models.endpoint import EndpointLifecycle, EndpointRow
-from ..models.routing import RouteStatus, RoutingRow
-from ..models.session import KernelLoadingStrategy, SessionRow
-from ..models.utils import (
+from ...models.endpoint import EndpointLifecycle, EndpointRow
+from ...models.routing import RouteStatus, RoutingRow
+from ...models.session import KernelLoadingStrategy, SessionRow
+from ...models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     is_db_retry_error,
