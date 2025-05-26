@@ -4,7 +4,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.errors.exceptions import InternalServerError
 
 
-class PropagatorEventDispatcher:
+class PropagatorEventHandler:
     _event_hub: EventHub
 
     def __init__(self, event_hub: EventHub) -> None:

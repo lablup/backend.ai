@@ -1,4 +1,3 @@
-import enum
 import os
 import pwd
 import socket
@@ -6,6 +5,7 @@ import sys
 import types
 import typing
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Any
@@ -201,14 +201,14 @@ class GroupID:
         )
 
 
-class LogDriver(str, enum.Enum):
+class LogDriver(StrEnum):
     CONSOLE = "console"
     LOGSTASH = "logstash"
     FILE = "file"
     GRAYLOG = "graylog"
 
 
-class LogstashProtocol(str, enum.Enum):
+class LogstashProtocol(StrEnum):
     ZMQ_PUSH = "zmq.push"
     ZMQ_PUB = "zmq.pub"
     TCP = "tcp"

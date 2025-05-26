@@ -23,6 +23,7 @@ class EventDomain(enum.StrEnum):
     VFOLDER = "vfolder"
     VOLUME = "volume"
     LOG = "log"
+    WORKFLOW = "workflow"
 
 
 class AbstractEvent(ABC):
