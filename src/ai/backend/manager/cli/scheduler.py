@@ -35,25 +35,21 @@ async def _ping(redis_conn: RedisConnectionInfo) -> None:
 
 @cli.command()
 @click.option("--manager-id", help="ID of manager to check status.")
-@click.option(
-    "--all", is_flag=True, help="Lists information of every schedulers under given manager node."
-)
-@click.argument("scheduler_name")
+@click.argument("scheduler_name", required=False)
 @click.pass_obj
 def last_execution_time(
     cli_ctx: CLIContext,
-    scheduler_name: str,
+    scheduler_name: str | None,
     *,
     manager_id: str | None = None,
-    all: bool = False,
 ) -> None:
-    """Queries manager's scheduler execution footprint from Redis"""
+    """Queries manager's scheduler execution footprint from Redis. When scheduler name is not specified, this command will return informations of all schedulers in store."""
 
     async def _impl():
         cfg = cli_ctx.get_bootstrap_config()
         _manager_id = manager_id or cfg.manager.id
         async with redis_ctx(cli_ctx) as redis_conn_set:
-            if all:
+            if not scheduler_name:
                 keys = await redis_helper.execute(
                     redis_conn_set.live, lambda r: r.keys(f"manager.{_manager_id}.*")
                 )
