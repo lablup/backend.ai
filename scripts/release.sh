@@ -25,10 +25,6 @@ pants check ::
 # Update VERSION file
 echo $TARGET_VERSION > VERSION
 
-# Update the documentations
-./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
-./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
-
 # Update the changelog
 LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
 
