@@ -32,7 +32,8 @@ from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.dto.manager.auth.field import (
     AuthSuccessResponse,
-    RequireTOTPRegistrationResponse,
+    RequireTwoFactorAuthResponse,
+    RequireTwoFactorRegistrationResponse,
 )
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import RedisProfileTarget
@@ -413,13 +414,21 @@ async def login_handler(request: web.Request) -> web.Response:
                         creds["username"],
                         client_ip,
                     )
-                case RequireTOTPRegistrationResponse():
+                case RequireTwoFactorRegistrationResponse():
                     result["authenticated"] = False
                     result["data"] = {
                         "type": "https://api.backend.ai/probs/require-totp-registration",
-                        "title": "TOTP key registration required",
-                        "details": "TOTP key registration required.",
-                        "totp_registration_token": auth_result.token,
+                        "title": "Two-Factor Authentication registration required.",
+                        "details": "You must register Two-Factor Authentication.",
+                        "two_factor_registration_token": auth_result.token,
+                    }
+                    return web.json_response(result)
+                case RequireTwoFactorAuthResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-authentication",
+                        "title": "Two-Factor Authentication needed.",
+                        "details": "You must authenticate using Two-Factor Authentication.",
                     }
                     return web.json_response(result)
     except BackendClientError as e:
@@ -549,13 +558,21 @@ async def token_login_handler(request: web.Request) -> web.Response:
             match auth_result:
                 case AuthSuccessResponse():
                     token = auth_result
-                case RequireTOTPRegistrationResponse():
+                case RequireTwoFactorRegistrationResponse():
                     result["authenticated"] = False
                     result["data"] = {
                         "type": "https://api.backend.ai/probs/require-totp-registration",
-                        "title": "Require TOTP Registration",
-                        "details": "The user must register TOTP.",
-                        "totp_registration_token": auth_result.token,
+                        "title": "Two-Factor Authentication registration required.",
+                        "details": "You must register Two-Factor Authentication.",
+                        "two_factor_registration_token": auth_result.token,
+                    }
+                    return web.json_response(result)
+                case RequireTwoFactorAuthResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-authentication",
+                        "title": "Two-Factor Authentication needed.",
+                        "details": "You must authenticate using Two-Factor Authentication.",
                     }
                     return web.json_response(result)
             stored_token = {

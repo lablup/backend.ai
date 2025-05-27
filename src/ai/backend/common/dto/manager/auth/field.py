@@ -13,7 +13,12 @@ class AuthTokenTypes(enum.Enum):
 
 class AuthResponseType(enum.StrEnum):
     SUCCESS = "success"
-    REQUIRE_TOTP = "REQUIRE_TOTP"
+    REQUIRE_TWO_FACTOR_REGISTRATION = "REQUIRE_TWO_FACTOR_REGISTRATION"
+    REQUIRE_TWO_FACOTR_AUTH = "REQUIRE_TWO_FACOTR_AUTH"
+
+
+class TwoFactorType(enum.StrEnum):
+    TOTP = "TOTP"
 
 
 class AuthResponse(BaseModel):
@@ -30,8 +35,10 @@ class AuthResponse(BaseModel):
         match respones_type:
             case AuthResponseType.SUCCESS:
                 return AuthSuccessResponse.model_validate(data)
-            case AuthResponseType.REQUIRE_TOTP:
-                return RequireTOTPRegistrationResponse.model_validate(data)
+            case AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION:
+                return RequireTwoFactorRegistrationResponse.model_validate(data)
+            case AuthResponseType.REQUIRE_TWO_FACOTR_AUTH:
+                return RequireTwoFactorAuthResponse.model_validate(data)
             case _:
                 return AuthSuccessResponse.model_validate(data)
 
@@ -47,11 +54,21 @@ class AuthSuccessResponse(AuthResponse):
         return self.model_dump(mode="json")
 
 
-class RequireTOTPRegistrationResponse(AuthResponse):
+class RequireTwoFactorRegistrationResponse(AuthResponse):
     token: str
+    type: TwoFactorType
 
     def to_dict(self) -> dict[str, str]:
         return self.model_dump(mode="json")
 
 
-AuthAuthResponseType = AuthSuccessResponse | RequireTOTPRegistrationResponse
+class RequireTwoFactorAuthResponse(AuthResponse):
+    type: TwoFactorType
+
+    def to_dict(self) -> dict[str, str]:
+        return self.model_dump(mode="json")
+
+
+AuthAuthResponseType = (
+    AuthSuccessResponse | RequireTwoFactorRegistrationResponse | RequireTwoFactorAuthResponse
+)
