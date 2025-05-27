@@ -41,8 +41,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class GQLLoggingMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
-        graph_ctx: GraphQueryContext = info.context
-        if len(info.path) == 1:
+        if info.path.prev is None:  # indicates the root query
+            graph_ctx = info.context
             log.info(
                 "ADMIN.GQL (ak:{}, {}:{}, op:{})",
                 graph_ctx.access_key,
