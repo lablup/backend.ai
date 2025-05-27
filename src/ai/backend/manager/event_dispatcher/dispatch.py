@@ -389,44 +389,35 @@ class Dispatchers:
         evd = event_dispatcher.with_reporters([
             EventLogger(self._db),
         ])
-
         evd.consume(
             SessionStartedEvent,
             None,
             self._event_dispatcher_plugin_ctx.handle_event,
             name="session_execution.started",
         )
-        (
-            evd.consume(
-                ExecutionStartedEvent,
-                None,
-                self._event_dispatcher_plugin_ctx.handle_event,
-                name="session_execution.started",
-            ),
+        evd.consume(
+            ExecutionStartedEvent,
+            None,
+            self._event_dispatcher_plugin_ctx.handle_event,
+            name="session_execution.started",
         )
-        (
-            evd.consume(
-                ExecutionFinishedEvent,
-                None,
-                self._event_dispatcher_plugin_ctx.handle_event,
-                name="session_execution.finished",
-            ),
+        evd.consume(
+            ExecutionFinishedEvent,
+            None,
+            self._event_dispatcher_plugin_ctx.handle_event,
+            name="session_execution.finished",
         )
-        (
-            evd.consume(
-                ExecutionTimeoutEvent,
-                None,
-                self._event_dispatcher_plugin_ctx.handle_event,
-                name="session_execution.timeout",
-            ),
+        evd.consume(
+            ExecutionTimeoutEvent,
+            None,
+            self._event_dispatcher_plugin_ctx.handle_event,
+            name="session_execution.timeout",
         )
-        (
-            evd.consume(
-                ExecutionCancelledEvent,
-                None,
-                self._event_dispatcher_plugin_ctx.handle_event,
-                name="session_execution.cancelled",
-            ),
+        evd.consume(
+            ExecutionCancelledEvent,
+            None,
+            self._event_dispatcher_plugin_ctx.handle_event,
+            name="session_execution.cancelled",
         )
 
     def _dispatch_idle_check_events(
