@@ -3,8 +3,8 @@ from dataclasses import replace
 import pytest
 
 from ai.backend.common.types import SlotName
-from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.data.image.types import ImageLabelsData, ImageResourcesData
+from ai.backend.manager.errors.exceptions import ImageNotFound
 from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.services.image.actions.modify_image import (
     ImageModifier,
