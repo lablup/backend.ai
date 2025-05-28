@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.manager.api.exceptions import ImageNotFound
+from ai.backend.manager.errors.exceptions import ImageNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
