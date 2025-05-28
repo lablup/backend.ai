@@ -48,6 +48,7 @@ from ai.backend.common.dto.manager.field import (
 )
 from ai.backend.common.types import (
     CIStrEnum,
+    DecimalSize,
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
@@ -2146,7 +2147,13 @@ class VirtualFolderPermissionList(graphene.ObjectType):
 class QuotaDetails(graphene.ObjectType):
     usage_bytes = BigInt(required=False)
     usage_count = BigInt(required=False)
-    hard_limit_bytes = BigInt(required=False)
+    hard_limit_bytes = BigInt(
+        required=False,
+        deprecation_reason="Deprecated since 25.9.0. Use `hard_limit_bytes_as_string` as string instead.",
+    )
+    hard_limit_bytes_as_string = graphene.String(
+        required=False, description="Added in 25.9.0. Quota limit in bytes as string."
+    )
 
 
 class QuotaScope(graphene.ObjectType):
@@ -2185,10 +2192,19 @@ class QuotaScope(graphene.ObjectType):
                 usage_bytes = quota_config["used_bytes"]
                 if usage_bytes is not None and usage_bytes < 0:
                     usage_bytes = None
+                raw_hard_limit_bytes = quota_config["limit_bytes"]
+                if raw_hard_limit_bytes is not None and raw_hard_limit_bytes > 0:
+                    legacy_hard_limit_bytes = raw_hard_limit_bytes
+                    hard_limit_bytes_decimal = DecimalSize(raw_hard_limit_bytes)
+                    hard_limit_bytes = str(hard_limit_bytes_decimal)
+                else:
+                    legacy_hard_limit_bytes = None
+                    hard_limit_bytes = None
                 return QuotaDetails(
                     # FIXME: limit scaning this only for fast scan capable volumes
                     usage_bytes=usage_bytes,
-                    hard_limit_bytes=quota_config["limit_bytes"] or None,
+                    hard_limit_bytes=legacy_hard_limit_bytes,
+                    hard_limit_bytes_as_string=hard_limit_bytes,
                     usage_count=None,  # TODO: Implement
                 )
         except aiohttp.ClientResponseError:
@@ -2220,7 +2236,13 @@ class QuotaScope(graphene.ObjectType):
 
 
 class QuotaScopeInput(graphene.InputObjectType):
-    hard_limit_bytes = BigInt(required=False)
+    hard_limit_bytes = BigInt(
+        required=False,
+        deprecation_reason="Deprecated since 25.9.0. Use `hard_limit_bytes_as_string` as string instead.",
+    )
+    hard_limit_bytes_as_string = graphene.String(
+        required=False, description="Added in 25.9.0. Quota limit in bytes as string."
+    )
 
 
 class SetQuotaScope(graphene.Mutation):
@@ -2249,7 +2271,8 @@ class SetQuotaScope(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
-        if props.hard_limit_bytes is Undefined:
+        quota_scope_hard_limit = props.hard_limit_bytes_as_string
+        if quota_scope_hard_limit is Undefined:
             # Do nothing but just return the quota scope object.
             return cls(
                 QuotaScope(
@@ -2257,12 +2280,12 @@ class SetQuotaScope(graphene.Mutation):
                     storage_host_name=storage_host_name,
                 )
             )
-        max_vfolder_size = props.hard_limit_bytes
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
+        hard_limit_bytes = DecimalSize.from_str(quota_scope_hard_limit)
         request_body = {
             "volume": volume_name,
             "qsid": str(qsid),
-            "options": {"limit_bytes": max_vfolder_size},
+            "options": {"limit_bytes": hard_limit_bytes},
         }
         async with graph_ctx.storage_manager.request(
             proxy_name,
