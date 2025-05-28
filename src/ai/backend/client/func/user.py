@@ -4,8 +4,10 @@ import enum
 import uuid
 from typing import Any, Iterable, Mapping, Sequence, Union
 
+from ai.backend.common.dto.manager.auth.field import AuthResponse, parse_auth_response
+
 from ...cli.types import Undefined, undefined
-from ..auth import AuthToken, AuthTokenTypes
+from ..auth import AuthTokenTypes
 from ..output.fields import user_fields
 from ..output.types import FieldSpec, PaginatedResult
 from ..pagination import fetch_paginated_result
@@ -94,7 +96,7 @@ class User(BaseFunction):
         *,
         extra_args: Mapping[str, Any] = {},
         token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR,
-    ) -> AuthToken:
+    ) -> AuthResponse:
         """
         Authorize the given credentials and get the API authentication token.
         This function can be invoked anonymously; i.e., it does not require
@@ -115,10 +117,7 @@ class User(BaseFunction):
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return AuthToken(
-                type=token_type,
-                content=data["data"],
-            )
+            return parse_auth_response(data["data"])
 
     @api_function
     @classmethod
