@@ -31,8 +31,9 @@ from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.dto.manager.auth.field import (
-    AuthSuccessResponseData,
-    RequireTOTPRegistrationResponseData,
+    AuthSuccessResponse,
+    RequireTwoFactorAuthResponse,
+    RequireTwoFactorRegistrationResponse,
 )
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import RedisProfileTarget
@@ -387,41 +388,49 @@ async def login_handler(request: web.Request) -> web.Response:
             auth_result = await api_session.User.authorize(
                 creds["username"], creds["password"], extra_args=extra_args
             )
-            match auth_result.data:
-                case AuthSuccessResponseData():
-                    token = auth_result.data
-                case RequireTOTPRegistrationResponseData():
+            match auth_result:
+                case AuthSuccessResponse():
+                    token = auth_result
+                    stored_token = {
+                        "type": "keypair",
+                        "access_key": token.access_key,
+                        "secret_key": token.secret_key,
+                        "role": token.role,
+                        "status": token.status,
+                    }
+                    public_return = {
+                        "access_key": token.access_key,
+                        "role": token.role,
+                        "status": token.status,
+                    }
+                    session["authenticated"] = True
+                    session["token"] = stored_token  # store full token
+                    result["authenticated"] = True
+                    result["data"] = public_return  # store public info from token
+                    login_fail_count = 0
+                    await _set_login_history(last_login_attempt, login_fail_count)
+                    log.info(
+                        "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                        creds["username"],
+                        client_ip,
+                    )
+                case RequireTwoFactorRegistrationResponse():
                     result["authenticated"] = False
                     result["data"] = {
                         "type": "https://api.backend.ai/probs/require-totp-registration",
-                        "title": "Require TOTP Registration",
-                        "details": "The user must register TOTP.",
-                        "totp_registration_token": auth_result.data.token,
+                        "title": "Two-Factor Authentication registration required.",
+                        "details": "You must register Two-Factor Authentication.",
+                        "two_factor_registration_token": auth_result.token,
                     }
                     return web.json_response(result)
-            stored_token = {
-                "type": "keypair",
-                "access_key": token.access_key,
-                "secret_key": token.secret_key,
-                "role": token.role,
-                "status": token.status,
-            }
-            public_return = {
-                "access_key": token.access_key,
-                "role": token.role,
-                "status": token.status,
-            }
-            session["authenticated"] = True
-            session["token"] = stored_token  # store full token
-            result["authenticated"] = True
-            result["data"] = public_return  # store public info from token
-            login_fail_count = 0
-            await _set_login_history(last_login_attempt, login_fail_count)
-            log.info(
-                "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
-                creds["username"],
-                client_ip,
-            )
+                case RequireTwoFactorAuthResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-authentication",
+                        "title": "Two-Factor Authentication needed.",
+                        "details": "You must authenticate using Two-Factor Authentication.",
+                    }
+                    return web.json_response(result)
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
@@ -546,16 +555,24 @@ async def token_login_handler(request: web.Request) -> web.Response:
             auth_result = await api_session.User.authorize(
                 "fake-email", "fake-pwd", extra_args=extra_args
             )
-            match auth_result.data:
-                case AuthSuccessResponseData():
-                    token = auth_result.data
-                case RequireTOTPRegistrationResponseData():
+            match auth_result:
+                case AuthSuccessResponse():
+                    token = auth_result
+                case RequireTwoFactorRegistrationResponse():
                     result["authenticated"] = False
                     result["data"] = {
                         "type": "https://api.backend.ai/probs/require-totp-registration",
-                        "title": "Require TOTP Registration",
-                        "details": "The user must register TOTP.",
-                        "totp_registration_token": auth_result.data.token,
+                        "title": "Two-Factor Authentication registration required.",
+                        "details": "You must register Two-Factor Authentication.",
+                        "two_factor_registration_token": auth_result.token,
+                    }
+                    return web.json_response(result)
+                case RequireTwoFactorAuthResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-authentication",
+                        "title": "Two-Factor Authentication needed.",
+                        "details": "You must authenticate using Two-Factor Authentication.",
                     }
                     return web.json_response(result)
             stored_token = {

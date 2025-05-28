@@ -199,12 +199,19 @@ class ErrorDetail(enum.StrEnum):
     # Invalid parameters means the received parameters are invalid.
     # This is different from BAD_REQUEST, which means the request is malformed.
     INVALID_PARAMETERS = "invalid-parameters"
+    # DATA_EXPIRED means the data is expired and cannot be used anymore.
+    # This is different from NOT_FOUND, which means the resource does not exist.
+    # For example, the password is expired or the auth token is expired.
+    DATA_EXPIRED = "data-expired"
     # Forbidden means the user is not allowed to access the resource.
     # This is different from UNAUTHORIZED, which means the user is not authenticated.
     FORBIDDEN = "forbidden"
     # Unauthorized means the user is not authenticated.
     # This means the user is not logged in or the token is invalid.
     UNAUTHORIZED = "unauthorized"
+    # Incomplete user profile means the user profile is not complete.
+    # This means the user has not completed the required fields in the profile.
+    # For example, the user has not completed a 2FA setup or any verification.
     INCOMPLETE_USER_PROFILE = "incomplete-user-profile"
 
     # Server Error
@@ -217,9 +224,6 @@ class ErrorDetail(enum.StrEnum):
     UNREACHABLE = "unreachable"
     # TIMEOUT means the request timed out.
     TASK_TIMEOUT = "task-timeout"
-    # DATA_EXPIRED means the data is expired.
-    # This is different from NOT_FOUND, which means the resource does not exist.
-    DATA_EXPIRED = "data-expired"
     CANCELED = "canceled"
     # Unexpected Error
     NOT_IMPLEMENTED = "not-implemented"

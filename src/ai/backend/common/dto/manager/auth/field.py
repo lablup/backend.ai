@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import enum
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 
 class AuthTokenTypes(enum.Enum):
@@ -9,32 +11,64 @@ class AuthTokenTypes(enum.Enum):
     JWT = "jwt"
 
 
-class AuthSuccessResponseData(BaseModel):
+class AuthResponseType(enum.StrEnum):
+    SUCCESS = "success"
+    REQUIRE_TWO_FACTOR_REGISTRATION = "REQUIRE_TWO_FACTOR_REGISTRATION"
+    REQUIRE_TWO_FACOTR_AUTH = "REQUIRE_TWO_FACOTR_AUTH"
+
+
+class TwoFactorType(enum.StrEnum):
+    TOTP = "TOTP"
+
+
+class AuthResponse(BaseModel):
+    response_type: AuthResponseType
+
+    @classmethod
+    def from_auth_response_data(cls, data: dict[str, Any]) -> AuthAuthResponseType:
+        raw_response_type = data.get("response_type")
+        respones_type = (
+            AuthResponseType(raw_response_type)
+            if raw_response_type is not None
+            else AuthResponseType.SUCCESS
+        )
+        match respones_type:
+            case AuthResponseType.SUCCESS:
+                return AuthSuccessResponse.model_validate(data)
+            case AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION:
+                return RequireTwoFactorRegistrationResponse.model_validate(data)
+            case AuthResponseType.REQUIRE_TWO_FACOTR_AUTH:
+                return RequireTwoFactorAuthResponse.model_validate(data)
+            case _:
+                return AuthSuccessResponse.model_validate(data)
+
+
+class AuthSuccessResponse(AuthResponse):
     access_key: str
     secret_key: str
     role: str
     status: str
-
-    def to_dict(self) -> dict[str, str]:
-        return self.model_dump(mode="json")
-
-
-class RequireTOTPRegistrationResponseData(BaseModel):
-    token: str
-
-    def to_dict(self) -> dict[str, str]:
-        return self.model_dump(mode="json")
-
-
-class AuthResponse(BaseModel):
-    data: AuthSuccessResponseData | RequireTOTPRegistrationResponseData
     type: AuthTokenTypes = AuthTokenTypes.KEYPAIR
 
-    @classmethod
-    def from_auth_response(cls, response: dict[str, Any]) -> "AuthResponse":
-        data: AuthSuccessResponseData | RequireTOTPRegistrationResponseData
-        try:
-            data = AuthSuccessResponseData(**response)
-        except ValidationError:
-            data = RequireTOTPRegistrationResponseData(**response)
-        return AuthResponse(data=data)
+    def to_dict(self) -> dict[str, str]:
+        return self.model_dump(mode="json")
+
+
+class RequireTwoFactorRegistrationResponse(AuthResponse):
+    token: str
+    type: TwoFactorType
+
+    def to_dict(self) -> dict[str, str]:
+        return self.model_dump(mode="json")
+
+
+class RequireTwoFactorAuthResponse(AuthResponse):
+    type: TwoFactorType
+
+    def to_dict(self) -> dict[str, str]:
+        return self.model_dump(mode="json")
+
+
+AuthAuthResponseType = (
+    AuthSuccessResponse | RequireTwoFactorRegistrationResponse | RequireTwoFactorAuthResponse
+)
