@@ -394,5 +394,10 @@ def agent():
     """Command set for agent related operations."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.scheduler:cli")
+def scheduler():
+    """Command set for scheduler related operations."""
+
+
 if __name__ == "__main__":
     main()
