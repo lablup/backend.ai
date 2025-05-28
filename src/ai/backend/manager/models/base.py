@@ -1360,7 +1360,7 @@ async def populate_fixture(
                     for row in rows:
                         if col.name in row:
                             row[col.name] = isoparse(row[col.name])
-                if isinstance(col.type, EnumType):
+                elif isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls[row[col.name]]
