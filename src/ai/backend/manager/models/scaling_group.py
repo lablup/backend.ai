@@ -89,7 +89,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
     enforce_spreading_endpoint_replica: bool = False
 
     allow_fractional_resource_fragmentation: bool = True
-    """If set to false, agent will refuse to start kernel when they are forced to fragment a fractional resource"""
+    """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
 
     def to_json(self) -> dict[str, Any]:
         return {
