@@ -1812,6 +1812,9 @@ type QuotaDetails {
 
   """Added in 25.9.0. Quota limit in bytes as string."""
   hard_limit_bytes_as_string: String
+
+  """Added in 25.9.0. Quota limit in bytes as human readable string."""
+  human_readable_hard_limit_bytes: String
 }
 
 """Deprecated since 24.09.0. use `ContainerRegistryNode` instead"""
