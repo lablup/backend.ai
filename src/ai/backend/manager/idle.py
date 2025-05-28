@@ -4,7 +4,7 @@ import asyncio
 import enum
 import logging
 import math
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections import UserDict, defaultdict
 from collections.abc import (
     Mapping,
@@ -400,7 +400,7 @@ class IdleCheckerHost:
         return ret
 
 
-class _AbstractIdleCheckReporter(ABC):
+class AbstractIdleCheckReporter(ABC):
     remaining_time_type: RemainingTimeType
     name: ClassVar[str] = "base"
     report_key: ClassVar[str] = "base"
@@ -464,7 +464,7 @@ class _AbstractIdleCheckReporter(ABC):
         )
 
 
-class _AbstractIdleChecker(metaclass=ABCMeta):
+class AbstractIdleChecker(ABC):
     @abstractmethod
     def terminate_reason(self) -> KernelLifecycleEventReason:
         raise NotImplementedError
@@ -489,7 +489,7 @@ class _AbstractIdleChecker(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-class NewUserGracePeriodChecker(_AbstractIdleCheckReporter):
+class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
     remaining_time_type: RemainingTimeType = RemainingTimeType.GRACE_PERIOD
     name: ClassVar[str] = "user_grace_period"
     report_key: ClassVar[str] = "user_grace_period"
@@ -568,7 +568,7 @@ class IdleCheckerArgs:
     redis_stat: RedisConnectionInfo
 
 
-class BaseIdleChecker(_AbstractIdleChecker, _AbstractIdleCheckReporter):
+class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
     _event_producer: EventProducer
 
     def __init__(
