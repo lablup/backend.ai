@@ -50,6 +50,9 @@ class ManagerConfigProvider:
     def config(self) -> ManagerUnifiedConfig:
         return self._config
 
+    def reload(self, config: ManagerUnifiedConfig) -> None:
+        self._config = config
+
     @property
     def legacy_etcd_config_loader(self) -> LegacyEtcdLoader:
         return self._legacy_etcd_config_loader

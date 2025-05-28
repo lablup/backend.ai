@@ -2,6 +2,7 @@ import asyncio
 import logging
 import secrets
 import uuid
+from http import HTTPStatus
 from typing import Awaitable, Callable
 
 import aiohttp
@@ -490,7 +491,6 @@ class ModelServingService:
                 raise ModelServiceNotFound
 
         await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
-
         return GetModelServiceInfoActionResult(
             ServiceInfo(
                 endpoint_id=endpoint.id,
@@ -503,7 +503,7 @@ class ModelServingService:
                 active_routes=[
                     RouteInfo(
                         route_id=r.id,
-                        session_id=r.session_id,
+                        session_id=r.session,
                         traffic_ratio=r.traffic_ratio,
                     )
                     for r in endpoint.routings
@@ -634,18 +634,22 @@ class ModelServingService:
             wsproxy_api_token = sgroup["wsproxy_api_token"]
 
         await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
-
         body = {"user_uuid": str(endpoint.session_owner), "exp": action.expires_at}
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",
                 json=body,
                 headers={
+                    "accept": "application/json",
                     "X-BackendAI-Token": wsproxy_api_token,
                 },
             ) as resp:
-                token_json = await resp.json()
-                token = token_json["token"]
+                resp_json = await resp.json()
+                if resp.status != HTTPStatus.OK:
+                    raise EndpointNotFound(
+                        f"Failed to generate token: {resp.status} {resp.reason} {resp_json}"
+                    )
+                token = resp_json["token"]
 
         async with self._db.begin_session() as db_sess:
             token_id = uuid.uuid4()

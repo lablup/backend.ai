@@ -6,6 +6,7 @@ from faker import Faker
 from typing_extensions import deprecated
 
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
 
 from ..exceptions import BackendClientError
 from ..output.fields import service_fields
@@ -90,6 +91,11 @@ class Service(BaseFunction):
         model_id_or_name: str,
         initial_session_count: int,
         *,
+        resources: Mapping[str, str | int],
+        resource_opts: Mapping[str, str | int],
+        domain_name: str,
+        group_name: str,
+        scaling_group: str,
         extra_mounts: Sequence[str] = [],
         extra_mount_map: Mapping[str, str] = {},
         extra_mount_options: Mapping[str, Mapping[str, str]] = {},
@@ -99,19 +105,14 @@ class Service(BaseFunction):
         model_mount_destination: Optional[str] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
-        resources: Optional[Mapping[str, str | int]] = None,
-        resource_opts: Optional[Mapping[str, str | int]] = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
         bootstrap_script: Optional[str] = None,
         tag: Optional[str] = None,
         architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
-        scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
         model_definition_path: Optional[str] = None,
-        expose_to_public=False,
+        expose_to_public: bool = False,
     ) -> dict[str, Any]:
         """
         Creates an inference service.
@@ -146,7 +147,7 @@ class Service(BaseFunction):
         """
         if service_name is None:
             faker = Faker()
-            service_name = f"bai-serve-{faker.user_name()}"
+            service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
 
         extra_mount_body = {}
         if extra_mounts:
@@ -220,24 +221,24 @@ class Service(BaseFunction):
         image: str,
         model_id_or_name: str,
         *,
+        resources: Mapping[str, str | int],
+        resource_opts: Mapping[str, str | int],
+        domain_name: str,
+        group_name: str,
+        scaling_group: str,
         service_name: Optional[str] = None,
         model_version: Optional[str] = None,
         dependencies: Optional[Sequence[str]] = None,
         model_mount_destination: Optional[str] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
-        resources: Optional[Mapping[str, str | int]] = None,
-        resource_opts: Optional[Mapping[str, str | int]] = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
         bootstrap_script: Optional[str] = None,
         tag: Optional[str] = None,
         architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
-        scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
-        expose_to_public=False,
+        expose_to_public: bool = False,
     ) -> dict[str, Any]:
         """
         Tries to start an inference session and terminates immediately.
@@ -269,7 +270,7 @@ class Service(BaseFunction):
         """
         if service_name is None:
             faker = Faker()
-            service_name = f"bai-serve-{faker.user_name()}"
+            service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
 
         rqst = Request("POST", "/services/_/try")
         rqst.set_json({

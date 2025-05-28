@@ -24,11 +24,11 @@ from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFea
 from ai.backend.common.events.bgtask import (
     BaseBgtaskDoneEvent,
 )
-from ai.backend.common.events.dispatcher import (
-    EventDomain,
-)
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.types import (
+    EventDomain,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     BgtaskCancelledError,
@@ -423,9 +423,9 @@ class SessionService:
                     kern_features: list[str]
                     if existing_row:
                         kern_features = existing_row.labels.get(
-                            LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE
+                            LabelName.FEATURES, DEFAULT_KERNEL_FEATURE
                         ).split()
-                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID.value]
+                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID]
                         log.debug("reusing existing customized image ID {}", customized_image_id)
                     else:
                         kern_features = [DEFAULT_KERNEL_FEATURE]
@@ -444,15 +444,15 @@ class SessionService:
                     is_local=base_image_ref.is_local,
                 )
 
-                image_labels = {
-                    LabelName.CUSTOMIZED_OWNER.value: f"{image_visibility.value}:{image_owner_id}",
-                    LabelName.CUSTOMIZED_NAME.value: image_name,
-                    LabelName.CUSTOMIZED_ID.value: customized_image_id,
-                    LabelName.FEATURES.value: " ".join(kern_features),
+                image_labels: dict[str | LabelName, str] = {
+                    LabelName.CUSTOMIZED_OWNER: f"{image_visibility.value}:{image_owner_id}",
+                    LabelName.CUSTOMIZED_NAME: image_name,
+                    LabelName.CUSTOMIZED_ID: customized_image_id,
+                    LabelName.FEATURES: " ".join(kern_features),
                 }
                 match image_visibility:
                     case CustomizedImageVisibilityScope.USER:
-                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL.value] = action.user_email
+                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = action.user_email
 
                 # commit image with new tag set
                 resp = await self._agent_registry.commit_session(
@@ -471,10 +471,8 @@ class SessionService:
                             log.warning("unexpected event: {}", event)
                             continue
                         match event.status():
-                            case (
-                                BgtaskStatus.DONE,
-                                BgtaskStatus.PARTIAL_SUCCESS,
-                            ):  # TODO: PARTIAL_SUCCESS should be handled
+                            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
+                                # TODO: PARTIAL_SUCCESS should be handled
                                 await reporter.update(increment=1, message="Committed image")
                                 break
                             case BgtaskStatus.FAILED:
@@ -510,7 +508,7 @@ class SessionService:
                                 log.warning("unexpected event: {}", event)
                                 continue
                             match event.status():
-                                case BgtaskStatus.DONE, BgtaskStatus.PARTIAL_SUCCESS:
+                                case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
                                     break
                                 case BgtaskStatus.FAILED:
                                     raise BgtaskFailedError(extra_msg=event.message)
@@ -535,6 +533,7 @@ class SessionService:
                 raise
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
+
         return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
 
     async def create_cluster(self, action: CreateClusterAction) -> CreateClusterActionResult:

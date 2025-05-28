@@ -3,9 +3,10 @@ import logging
 import uuid
 from typing import AsyncIterator, Optional, Protocol
 
+from ai.backend.common.bgtask.bgtask import BgTaskInfo
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ...bgtask import BaseBgtaskEvent
+from ...bgtask import BgtaskAlreadyDoneEvent
 from ...dispatcher import AbstractEvent
 from ..hub import EventPropagator
 
@@ -13,13 +14,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class BgtaskLastDoneEventFetcher(Protocol):
-    async def fetch_last_finished_event(
+    async def fetch_bgtask_info(
         self,
         task_id: uuid.UUID,
-    ) -> Optional[BaseBgtaskEvent]:
+    ) -> BgTaskInfo:
         """
-        Fetch the last finished event for a given task ID.
-        This method should be implemented by the class that uses this protocol.
+        Fetch the background task information for a given task ID.
+        This method is used to retrieve the last status of a background task.
         """
         ...
 
@@ -54,13 +55,19 @@ class BgtaskPropagator(EventPropagator):
         If the last event is not None, it yields that event.
         Then, it enters a loop to receive events from the queue until closed.
         """
-        last_event = await self._last_done_event_fetcher.fetch_last_finished_event(task_id)
-        if last_event is not None:
+        bgtask_info = await self._last_done_event_fetcher.fetch_bgtask_info(task_id)
+        if bgtask_info.status.finished():
             log.debug(
-                "Yielding last finished event: {}",
-                last_event,
+                "Yielding already finished event: {}",
+                bgtask_info,
             )
-            yield last_event
+            yield BgtaskAlreadyDoneEvent(
+                task_id=task_id,
+                message=bgtask_info.msg,
+                task_status=bgtask_info.status,
+                current=bgtask_info.current,
+                total=bgtask_info.total,
+            )
             return
         while not self._closed:
             event = await self._queue.get()

@@ -40,12 +40,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.agent import (
-    AgentStartedEvent,
-)
 from ai.backend.common.events.dispatcher import (
-    CoalescingOptions,
-    EventDispatcher,
     EventProducer,
 )
 from ai.backend.common.events.kernel import (
@@ -64,10 +59,8 @@ from ai.backend.common.events.session import (
     DoUpdateSessionStatusEvent,
     SessionCancelledEvent,
     SessionCheckingPrecondEvent,
-    SessionEnqueuedEvent,
     SessionPreparingEvent,
     SessionScheduledEvent,
-    SessionTerminatedEvent,
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import PASSED, HookResult
@@ -270,7 +263,6 @@ class SchedulerDispatcher(aobject):
     db: SAEngine
     etcd: AsyncEtcd
 
-    event_dispatcher: EventDispatcher
     event_producer: EventProducer
     schedule_timer: GlobalTimer
     check_precond_timer: GlobalTimer
@@ -285,14 +277,12 @@ class SchedulerDispatcher(aobject):
         self,
         config_provider: ManagerConfigProvider,
         etcd: AsyncEtcd,
-        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
         registry: AgentRegistry,
     ) -> None:
         self.config_provider = config_provider
         self.etcd = etcd
-        self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.registry = registry
         self.lock_factory = lock_factory
@@ -312,24 +302,6 @@ class SchedulerDispatcher(aobject):
         )
 
     async def __ainit__(self) -> None:
-        coalescing_opts: CoalescingOptions = {
-            "max_wait": 0.5,
-            "max_batch_size": 32,
-        }
-        # coalescing_opts = None
-        evd = self.registry.event_dispatcher
-        evd.consume(
-            SessionEnqueuedEvent, None, self.schedule, coalescing_opts, name="dispatcher.enq"
-        )
-        evd.consume(
-            SessionTerminatedEvent, None, self.schedule, coalescing_opts, name="dispatcher.term"
-        )
-        evd.consume(AgentStartedEvent, None, self.schedule)
-        evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
-        evd.consume(DoStartSessionEvent, None, self.start)
-        evd.consume(DoCheckPrecondEvent, None, self.check_precond)
-        evd.consume(DoScaleEvent, None, self.scale_services)
-        evd.consume(DoUpdateSessionStatusEvent, None, self.update_session_status)
         self.schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,
@@ -388,9 +360,7 @@ class SchedulerDispatcher(aobject):
 
     async def schedule(
         self,
-        context: None,
-        source: AgentId,
-        event: SessionEnqueuedEvent | SessionTerminatedEvent | AgentStartedEvent | DoScheduleEvent,
+        event_name: str,
     ) -> None:
         """
         Trigger the scheduler to scan pending sessions and mark them scheduled if they fulfill
@@ -412,7 +382,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.event_name(),
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1295,9 +1265,7 @@ class SchedulerDispatcher(aobject):
 
     async def check_precond(
         self,
-        context: None,
-        source: AgentId,
-        event: DoCheckPrecondEvent,
+        event_name: str,
     ) -> None:
         """
         Scan the scheduled sessions and perform the agent RPC calls to check and pull required images.
@@ -1316,7 +1284,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.event_name(),
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1393,9 +1361,7 @@ class SchedulerDispatcher(aobject):
 
     async def start(
         self,
-        context: None,
-        source: AgentId,
-        event: DoStartSessionEvent,
+        event_name: str,
     ) -> None:
         """
         Scan the sessions ready to create and perform the agent RPC calls to create kernels.
@@ -1411,7 +1377,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.event_name(),
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1647,9 +1613,7 @@ class SchedulerDispatcher(aobject):
 
     async def scale_services(
         self,
-        context: None,
-        source: AgentId,
-        event: DoScaleEvent,
+        event_name: str,
     ) -> None:
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by invoking this method
@@ -1662,7 +1626,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.event_name(),
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1853,9 +1817,6 @@ class SchedulerDispatcher(aobject):
 
     async def update_session_status(
         self,
-        context: None,
-        source: AgentId,
-        event: DoUpdateSessionStatusEvent,
     ) -> None:
         log.debug("update_session_status(): triggered")
         candidates = await self.registry.session_lifecycle_mgr.get_status_updatable_sessions()

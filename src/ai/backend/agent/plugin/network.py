@@ -1,6 +1,6 @@
-import enum
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Generic, Iterable, Mapping, Set, TypeVar
 
 from ai.backend.agent.kernel import AbstractKernel
@@ -10,7 +10,7 @@ from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 TKernel = TypeVar("TKernel", bound=AbstractKernel)
 
 
-class ContainerNetworkCapability(str, enum.Enum):
+class ContainerNetworkCapability(StrEnum):
     GLOBAL = "global"
     """Referred when the network plugin replaces default bridge network and acts as a default route"""
 

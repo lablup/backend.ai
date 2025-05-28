@@ -70,8 +70,7 @@ def tabulate_items(
             is_first = False
             output_count = 0
             page_size = max(table_height - 1, 10)
-    if output_count > 0:
-        yield from _tabulate_buffer()
+    yield from _tabulate_buffer()
 
 
 def echo_via_pager(
