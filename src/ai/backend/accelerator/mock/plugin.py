@@ -106,7 +106,7 @@ _mock_config_iv = t.Dict({
     t.Key("device_plugin_name"): t.String,
     t.Key("devices"): t.List(
         t.Dict({
-            t.Key("mother_uuid"): tx.UUID,
+            t.Key("mother_uuid"): t.String,
             t.Key("model_name"): t.String,
             t.Key("numa_node"): t.Int[0:],
             t.Key("subproc_count"): t.Int[1:],
