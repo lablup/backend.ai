@@ -81,6 +81,7 @@ from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.model_serving import ModelServingEventHandler
+from .handlers.plugin import PluginEventHandler
 from .handlers.session import SessionEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -113,7 +114,7 @@ class Dispatchers:
         Initialize the Dispatchers with the given arguments.
         """
         self._db = args.db
-        self._event_dispatcher_plugin_ctx = args.event_dispatcher_plugin_ctx
+        self._plugin_event_handler = PluginEventHandler(args.event_dispatcher_plugin_ctx)
         self._propagator_handler = PropagatorEventHandler(args.event_hub)
         self._agent_event_handler = AgentEventHandler(args.agent_registry, args.db)
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
@@ -190,7 +191,7 @@ class Dispatchers:
         evd.consume(
             AgentErrorEvent,
             None,
-            self._event_dispatcher_plugin_ctx.handle_event,
+            self._plugin_event_handler.handle_event,
             name="agent.error",
         )
 
@@ -392,31 +393,31 @@ class Dispatchers:
         evd.consume(
             SessionStartedEvent,
             None,
-            self._event_dispatcher_plugin_ctx.handle_event,
+            self._plugin_event_handler.handle_event,
             name="session_execution.started",
         )
         evd.consume(
             ExecutionStartedEvent,
             None,
-            self._event_dispatcher_plugin_ctx.handle_event,
+            self._plugin_event_handler.handle_event,
             name="session_execution.started",
         )
         evd.consume(
             ExecutionFinishedEvent,
             None,
-            self._event_dispatcher_plugin_ctx.handle_event,
+            self._plugin_event_handler.handle_event,
             name="session_execution.finished",
         )
         evd.consume(
             ExecutionTimeoutEvent,
             None,
-            self._event_dispatcher_plugin_ctx.handle_event,
+            self._plugin_event_handler.handle_event,
             name="session_execution.timeout",
         )
         evd.consume(
             ExecutionCancelledEvent,
             None,
-            self._event_dispatcher_plugin_ctx.handle_event,
+            self._plugin_event_handler.handle_event,
             name="session_execution.cancelled",
         )
 
