@@ -621,7 +621,6 @@ async def test_manually_assign_agent_available(
     dispatcher = SchedulerDispatcher(
         config_provider=mock_config_provider,
         etcd=mock_etcd,  # type: ignore
-        event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,
         registry=registry,

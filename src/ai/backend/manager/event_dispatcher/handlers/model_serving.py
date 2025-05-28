@@ -19,19 +19,19 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import SessionNotFound
 from ai.backend.manager.registry import AgentRegistry
 
-from ..models.endpoint import EndpointRow
-from ..models.image import ImageIdentifier, ImageRow
-from ..models.keypair import KeyPairRow
-from ..models.routing import RouteStatus, RoutingRow
-from ..models.session import KernelLoadingStrategy, SessionRow
-from ..models.user import UserRow
-from ..models.utils import (
+from ...models.endpoint import EndpointRow
+from ...models.image import ImageIdentifier, ImageRow
+from ...models.keypair import KeyPairRow
+from ...models.routing import RouteStatus, RoutingRow
+from ...models.session import KernelLoadingStrategy, SessionRow
+from ...models.user import UserRow
+from ...models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     is_db_retry_error,
 )
-from ..types import UserScope
-from ..utils import query_userinfo
+from ...types import UserScope
+from ...utils import query_userinfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
