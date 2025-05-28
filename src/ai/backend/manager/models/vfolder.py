@@ -2154,6 +2154,10 @@ class QuotaDetails(graphene.ObjectType):
     hard_limit_bytes_as_string = graphene.String(
         required=False, description="Added in 25.9.0. Quota limit in bytes as string."
     )
+    human_readable_hard_limit_bytes = graphene.String(
+        required=False,
+        description="Added in 25.9.0. Quota limit in bytes as human readable string.",
+    )
 
 
 class QuotaScope(graphene.ObjectType):
@@ -2175,6 +2179,16 @@ class QuotaScope(graphene.ObjectType):
     def resolve_id(self, info: graphene.ResolveInfo) -> str:
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
+    def _get_limit_value(self, value: Optional[int]) -> Optional[str]:
+        if value is None or value <= 0:
+            return None
+        return str(value)
+
+    def _get_human_readable_limit_value(self, value: Optional[int]) -> Optional[str]:
+        if value is None or value <= 0:
+            return None
+        return str(DecimalSize(value))
+
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
@@ -2193,18 +2207,16 @@ class QuotaScope(graphene.ObjectType):
                 if usage_bytes is not None and usage_bytes < 0:
                     usage_bytes = None
                 raw_hard_limit_bytes = quota_config["limit_bytes"]
-                if raw_hard_limit_bytes is not None and raw_hard_limit_bytes > 0:
-                    legacy_hard_limit_bytes = raw_hard_limit_bytes
-                    hard_limit_bytes_decimal = DecimalSize(raw_hard_limit_bytes)
-                    hard_limit_bytes = str(hard_limit_bytes_decimal)
-                else:
-                    legacy_hard_limit_bytes = None
-                    hard_limit_bytes = None
+                hard_limit_bytes = self._get_limit_value(raw_hard_limit_bytes)
+                human_readable_hard_limit_bytes = self._get_human_readable_limit_value(
+                    raw_hard_limit_bytes
+                )
                 return QuotaDetails(
                     # FIXME: limit scaning this only for fast scan capable volumes
                     usage_bytes=usage_bytes,
-                    hard_limit_bytes=legacy_hard_limit_bytes,
+                    hard_limit_bytes=raw_hard_limit_bytes or None,
                     hard_limit_bytes_as_string=hard_limit_bytes,
+                    human_readable_hard_limit_bytes=human_readable_hard_limit_bytes,
                     usage_count=None,  # TODO: Implement
                 )
         except aiohttp.ClientResponseError:
