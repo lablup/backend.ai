@@ -4,7 +4,7 @@ import asyncio
 import enum
 import logging
 import math
-from abc import ABCMeta, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, defaultdict
 from collections.abc import (
     Mapping,
@@ -400,7 +400,7 @@ class IdleCheckerHost:
         return ret
 
 
-class _AbstractIdleCheckReporter(metaclass=ABCMeta):
+class _AbstractIdleCheckReporter(ABC):
     remaining_time_type: RemainingTimeType
     name: ClassVar[str] = "base"
     report_key: ClassVar[str] = "base"
@@ -453,11 +453,9 @@ class _AbstractIdleCheckReporter(metaclass=ABCMeta):
         """
         pass
 
-    async def set_remaining_time_report(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId, remaining: float
-    ) -> None:
+    async def set_remaining_time_report(self, session_id: SessionId, remaining: float) -> None:
         await redis_helper.execute(
-            redis_obj,
+            self._redis_live,
             lambda r: r.set(
                 self.get_report_key(session_id),
                 msgpack.packb(remaining),
@@ -750,7 +748,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker, AbstractEventDispatcherPlugin):
             grace_period_end,
         )
         await self.set_remaining_time_report(
-            self._redis_live, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
+            session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
         )
         return remaining >= 0
 
@@ -807,7 +805,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
                 now, kernel_created_at, idle_timeout, grace_period_end
             )
             await self.set_remaining_time_report(
-                self._redis_live, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
+                session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
             )
             return remaining > 0
         return True
@@ -1056,7 +1054,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             db_now, kernel_created_at, time_window, total_initial_grace_period_end
         )
         await self.set_remaining_time_report(
-            self._redis_live, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
+            session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
         )
 
         # Respect initial grace period (no calculation of utilization and no termination of the session)
