@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, TypedDict
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -14,8 +14,12 @@ from sqlalchemy.engine.row import Row
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey, RedisProfileTarget
+from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.models.gql_models.session import ComputeSession
-from ai.backend.manager.models.keypair import generate_keypair, generate_ssh_keypair, keypairs
+from ai.backend.manager.models.keypair import (
+    keypairs,
+    prepare_new_keypair,
+)
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -26,7 +30,6 @@ __all__ = (
     "KeyPair",
     "KeyPairInput",
     "KeyPairList",
-    "KeyPairInputTD",
     "ModifyKeyPairInput",
     "CreateKeyPair",
     "ModifyKeyPair",
@@ -460,12 +463,13 @@ class KeyPairInput(graphene.InputObjectType):
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
-
-class KeyPairInputTD(TypedDict):
-    is_active: bool
-    is_admin: bool
-    resource_policy: str
-    rate_limit: int
+    def to_creator(self) -> KeyPairCreator:
+        return KeyPairCreator(
+            is_active=self.is_active,
+            is_admin=self.is_admin,
+            resource_policy=self.resource_policy,
+            rate_limit=self.rate_limit,
+        )
 
 
 class ModifyKeyPairInput(graphene.InputObjectType):
@@ -498,39 +502,12 @@ class CreateKeyPair(graphene.Mutation):
         from .user import users  # noqa
 
         graph_ctx: GraphQueryContext = info.context
-        data = cls.prepare_new_keypair(
-            user_id,
-            {
-                "is_active": props.is_active,
-                "is_admin": props.is_admin,
-                "resource_policy": props.resource_policy,
-                "rate_limit": props.rate_limit,
-                # props.concurrency_limit is always ignored
-            },
-        )
+        data = prepare_new_keypair(user_id, props.to_creator())
         insert_query = sa.insert(keypairs).values(
             **data,
             user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
         )
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
-
-    @classmethod
-    def prepare_new_keypair(cls, user_email: str, props: KeyPairInputTD) -> Dict[str, Any]:
-        ak, sk = generate_keypair()
-        pubkey, privkey = generate_ssh_keypair()
-        data = {
-            "user_id": user_email,
-            "access_key": ak,
-            "secret_key": sk,
-            "is_active": props["is_active"],
-            "is_admin": props["is_admin"],
-            "resource_policy": props["resource_policy"],
-            "rate_limit": props["rate_limit"],
-            "num_queries": 0,
-            "ssh_public_key": pubkey,
-            "ssh_private_key": privkey,
-        }
-        return data
 
 
 class ModifyKeyPair(graphene.Mutation):

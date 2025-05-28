@@ -21,6 +21,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.exceptions import VFolderOperationFailed
 from ai.backend.manager.models import (
@@ -42,10 +43,9 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.error_logs import error_logs
-from ai.backend.manager.models.gql_models.keypair import CreateKeyPair
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair import KeyPairRow, prepare_new_keypair
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     SessionRow,
@@ -150,15 +150,13 @@ class UserService:
 
             # Create a default keypair for the user.
             email = action.input.email
-            kp_data = CreateKeyPair.prepare_new_keypair(
-                email,
-                {
-                    "is_active": _status == UserStatus.ACTIVE,
-                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                    "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                    "rate_limit": DEFAULT_KEYPAIR_RATE_LIMIT,
-                },
+            keypair_creator = KeyPairCreator(
+                is_active=(_status == UserStatus.ACTIVE),
+                is_admin=user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
+                resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
+                rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
+            kp_data = prepare_new_keypair(email, keypair_creator)
             kp_insert_query = sa.insert(keypairs).values(
                 **kp_data,
                 user=created_user.uuid,
