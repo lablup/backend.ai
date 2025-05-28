@@ -697,7 +697,7 @@ class _BaseSize(int, ABC):
             except (ArithmeticError, IndexError):
                 raise ValueError("Unconvertible value", orig_expr, ending)
             try:
-                size_unit = _SizeUnitPrefix(raw_size_unit)
+                size_unit = _SizeUnitPrefix(raw_size_unit.upper())
                 multiplier = cls._size_unit_map()[size_unit]
             except KeyError:
                 raise ValueError("Unconvertible value", orig_expr)
@@ -780,7 +780,7 @@ class _BaseSize(int, ABC):
         else:
             # use the given scale
             try:
-                size_unit = _SizeUnitPrefix(format_spec.lower())
+                size_unit = _SizeUnitPrefix(format_spec.upper())
                 multiplier = self._size_unit_map()[size_unit]
             except (ValueError, KeyError):
                 raise ValueError("Unsupported scale unit.", format_spec)
