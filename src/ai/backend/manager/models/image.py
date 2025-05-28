@@ -300,7 +300,7 @@ async def rescan_images(
     # TODO: delete images removed from registry?
 
 
-type Resources = dict[SlotName, dict[str, Decimal]]
+type Resources = dict[SlotName, dict[str, Any]]
 
 
 # Defined for avoiding circular import

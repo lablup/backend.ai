@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Self, cast
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Optional, Self, cast
 
 import graphene
 import sqlalchemy as sa
@@ -76,6 +76,28 @@ class ContainerRegistryRow(Base):
         back_populates="container_registry_row",
         primaryjoin="ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)",
     )
+
+    def __init__(
+        self,
+        url: str,
+        registry_name: str,
+        type: ContainerRegistryType,
+        project: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ssl_verify: Optional[bool] = None,
+        is_global: Optional[bool] = None,
+        extra: Optional[dict] = None,
+    ) -> None:
+        self.url = url
+        self.registry_name = registry_name
+        self.type = type
+        self.project = project
+        self.username = username
+        self.password = password
+        self.ssl_verify = ssl_verify
+        self.is_global = is_global
+        self.extra = extra
 
     @classmethod
     async def get(
@@ -154,19 +176,20 @@ class ContainerRegistryRow(Base):
         return result
 
     @classmethod
-    def from_dataclass(cls, image_data: ContainerRegistryData) -> Self:
-        return cls(
-            id=image_data.id,
-            url=image_data.url,
-            registry_name=image_data.registry_name,
-            type=image_data.type,
-            project=image_data.project,
-            username=image_data.username,
-            password=image_data.password,
-            ssl_verify=image_data.ssl_verify,
-            is_global=image_data.is_global,
-            extra=image_data.extra,
+    def from_dataclass(cls, data: ContainerRegistryData) -> Self:
+        instance = cls(
+            url=data.url,
+            registry_name=data.registry_name,
+            type=data.type,
+            project=data.project,
+            username=data.username,
+            password=data.password,
+            ssl_verify=data.ssl_verify,
+            is_global=data.is_global,
+            extra=data.extra,
         )
+        instance.id = data.id
+        return instance
 
     def to_dataclass(self) -> ContainerRegistryData:
         return ContainerRegistryData(
