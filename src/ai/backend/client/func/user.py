@@ -4,7 +4,7 @@ import enum
 import uuid
 from typing import Any, Iterable, Mapping, Sequence, Union
 
-from ai.backend.common.dto.manager.auth.field import AuthResponse
+from ai.backend.common.dto.manager.auth.field import AuthResponse, parse_auth_response
 
 from ...cli.types import Undefined, undefined
 from ..auth import AuthTokenTypes
@@ -117,7 +117,7 @@ class User(BaseFunction):
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return AuthResponse.from_auth_response_data(data["data"])
+            return parse_auth_response(data["data"])
 
     @api_function
     @classmethod

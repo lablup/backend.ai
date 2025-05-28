@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Any
+from typing import Any, Self
 
 from pydantic import BaseModel
 
@@ -25,22 +25,8 @@ class AuthResponse(BaseModel):
     response_type: AuthResponseType
 
     @classmethod
-    def from_auth_response_data(cls, data: dict[str, Any]) -> AuthAuthResponseType:
-        raw_response_type = data.get("response_type")
-        respones_type = (
-            AuthResponseType(raw_response_type)
-            if raw_response_type is not None
-            else AuthResponseType.SUCCESS
-        )
-        match respones_type:
-            case AuthResponseType.SUCCESS:
-                return AuthSuccessResponse.model_validate(data)
-            case AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION:
-                return RequireTwoFactorRegistrationResponse.model_validate(data)
-            case AuthResponseType.REQUIRE_TWO_FACOTR_AUTH:
-                return RequireTwoFactorAuthResponse.model_validate(data)
-            case _:
-                return AuthSuccessResponse.model_validate(data)
+    def parse(cls, data: dict[str, Any]) -> Self:
+        return cls.model_validate(data)
 
 
 class AuthSuccessResponse(AuthResponse):
@@ -69,6 +55,17 @@ class RequireTwoFactorAuthResponse(AuthResponse):
         return self.model_dump(mode="json")
 
 
-AuthAuthResponseType = (
-    AuthSuccessResponse | RequireTwoFactorRegistrationResponse | RequireTwoFactorAuthResponse
-)
+def parse_auth_response(data: dict[str, Any]) -> AuthResponse:
+    raw_response_type = data.get("response_type")
+    respones_type = (
+        AuthResponseType(raw_response_type)
+        if raw_response_type is not None
+        else AuthResponseType.SUCCESS
+    )
+    match respones_type:
+        case AuthResponseType.SUCCESS:
+            return AuthSuccessResponse.model_validate(data)
+        case AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION:
+            return RequireTwoFactorRegistrationResponse.model_validate(data)
+        case AuthResponseType.REQUIRE_TWO_FACOTR_AUTH:
+            return RequireTwoFactorAuthResponse.model_validate(data)
