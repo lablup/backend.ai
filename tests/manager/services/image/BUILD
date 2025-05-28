@@ -1,6 +1,6 @@
 python_test_utils(
     sources=[
-        "fixtures.py",
+        "conftest.py",
     ]
 )
 
