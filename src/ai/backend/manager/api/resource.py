@@ -170,6 +170,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     """
     log.info("USAGE_PER_MONTH (g:[{}], month:{})", ",".join(params["group_ids"]), params["month"])
     root_ctx: RootContext = request.app["_root.context"]
+
     result = await root_ctx.processors.group.usage_per_month.wait_for_complete(
         UsagePerMonthAction(
             group_ids=params["group_ids"],
