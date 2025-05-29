@@ -121,12 +121,12 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             kernel_host = urlparse(compute_session.agent_addr).hostname
         else:
             kernel_host = compute_session.kernel_host
-        stdin_addr = f"tcp://{kernel_host}:{compute_session.stdin_port}"
+        stdin_addr = f"tcp://{kernel_host}:{compute_session.repl_in_port}"
         log.debug("stream_pty({0}): stdin: {1}", stream_key, stdin_addr)
         stdin_sock = app_ctx.zctx.socket(zmq.PUB)
         stdin_sock.connect(stdin_addr)
         stdin_sock.setsockopt(zmq.LINGER, 100)
-        stdout_addr = f"tcp://{kernel_host}:{compute_session.stdout_port}"
+        stdout_addr = f"tcp://{kernel_host}:{compute_session.repl_out_port}"
         log.debug("stream_pty({0}): stdout: {1}", stream_key, stdout_addr)
         stdout_sock = app_ctx.zctx.socket(zmq.SUB)
         stdout_sock.connect(stdout_addr)
@@ -149,7 +149,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                     if data["type"] == "stdin":
                         raw_data = base64.b64decode(data["chars"].encode("ascii"))
                         try:
-                            await socks[0].send_mlutipart([raw_data])
+                            await socks[0].send_multipart([raw_data])
                         except (RuntimeError, zmq.error.ZMQError):
                             # when socks[0] is closed, re-initiate the connection.
                             app_ctx.stream_stdin_socks[stream_key].discard(socks[0])
