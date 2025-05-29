@@ -241,9 +241,6 @@ class KeyPair(BaseFunction):
             "access_key": access_key,
             "input": {
                 "is_active": True,
-                "is_admin": None,
-                "resource_policy": None,
-                "rate_limit": None,
             },
         }
         data = await api_session.get().Admin._query(q, variables)
@@ -269,9 +266,6 @@ class KeyPair(BaseFunction):
             "access_key": access_key,
             "input": {
                 "is_active": False,
-                "is_admin": None,
-                "resource_policy": None,
-                "rate_limit": None,
             },
         }
         data = await api_session.get().Admin._query(q, variables)
