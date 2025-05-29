@@ -137,7 +137,6 @@ class Dispatchers:
         self._dispatch_schedule_events(event_dispatcher)
         self._dispatch_model_serving_events(event_dispatcher)
         self._dispatch_session_events(event_dispatcher)
-        self._dispatch_session_execution_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
 
@@ -369,27 +368,6 @@ class Dispatchers:
         )
         evd.consume(SessionSuccessEvent, None, self._session_event_handler.handle_batch_result)
         evd.consume(SessionFailureEvent, None, self._session_event_handler.handle_batch_result)
-
-    def _dispatch_vfolder_events(self, event_dispatcher: EventDispatcher) -> None:
-        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
-        evd.consume(
-            VFolderDeletionSuccessEvent,
-            None,
-            self._vfolder_event_handler.handle_vfolder_deletion_success,
-        )
-        evd.consume(
-            VFolderDeletionFailureEvent,
-            None,
-            self._vfolder_event_handler.handle_vfolder_deletion_failure,
-        )
-
-    def _dispatch_session_execution_events(
-        self,
-        event_dispatcher: EventDispatcher,
-    ) -> None:
-        evd = event_dispatcher.with_reporters([
-            EventLogger(self._db),
-        ])
         evd.consume(
             SessionStartedEvent,
             None,
@@ -419,6 +397,19 @@ class Dispatchers:
             None,
             self._plugin_event_handler.handle_event,
             name="session_execution.cancelled",
+        )
+
+    def _dispatch_vfolder_events(self, event_dispatcher: EventDispatcher) -> None:
+        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
+        evd.consume(
+            VFolderDeletionSuccessEvent,
+            None,
+            self._vfolder_event_handler.handle_vfolder_deletion_success,
+        )
+        evd.consume(
+            VFolderDeletionFailureEvent,
+            None,
+            self._vfolder_event_handler.handle_vfolder_deletion_failure,
         )
 
     def _dispatch_idle_check_events(
