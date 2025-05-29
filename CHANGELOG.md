@@ -16,6 +16,38 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.9.0rc1 (2025-05-29)
+
+### Features
+* Add Action Tests for `Image`. ([#4048](https://github.com/lablup/backend.ai/issues/4048))
+* Enable TOTP registration for anonymous users ([#4354](https://github.com/lablup/backend.ai/issues/4354))
+* Refactor event dispatcher and handlers directory structure ([#4497](https://github.com/lablup/backend.ai/issues/4497))
+* Add `EventDomain.WORKFLOW` enum value to support workflow-related event categorization ([#4499](https://github.com/lablup/backend.ai/issues/4499))
+* Create new manager CLI command `backend.ai mgr scheduler last-execution-time` to let administrators fetch each manager scheduler's last execution time ([#4507](https://github.com/lablup/backend.ai/issues/4507))
+* Add stage package to support deterministic step-by-step execution ([#4509](https://github.com/lablup/backend.ai/issues/4509))
+* Make resource fragmentation configurable ([#4533](https://github.com/lablup/backend.ai/issues/4533))
+* Add missing `GET /status_history` endpoint to the session REST API ([#4543](https://github.com/lablup/backend.ai/issues/4543))
+
+### Improvements
+* Refactor `keypair_preparation` from a classmethod of the Graphene class to a utility function to decouple logic from GraphQL ([#4510](https://github.com/lablup/backend.ai/issues/4510))
+* Introduce service layer in `auth` APIs to apply audit logs for user login APIs ([#4535](https://github.com/lablup/backend.ai/issues/4535))
+* Improve logging for error handling in various modules ([#4540](https://github.com/lablup/backend.ai/issues/4540))
+
+### Fixes
+* heartbeat register service when service is dead ([#4492](https://github.com/lablup/backend.ai/issues/4492))
+* Fix missing log output of GraphQL top-level query fields by improving graphene's resolver info object usage ([#4505](https://github.com/lablup/backend.ai/issues/4505))
+* Fix Backend.AI agent equipped with mock accelerator refusing to allocate mock accelerator to session after agent restart ([#4532](https://github.com/lablup/backend.ai/issues/4532))
+* Fix broken `list_presets` API, SDK ([#4541](https://github.com/lablup/backend.ai/issues/4541))
+* Fix broken `usage_per_month` method in Resource SDK ([#4546](https://github.com/lablup/backend.ai/issues/4546))
+* Fix broken `Keypair` SDK methods (`activate`, `deactivate`) ([#4547](https://github.com/lablup/backend.ai/issues/4547))
+* Broken `stream_pty` method in Session SDK ([#4548](https://github.com/lablup/backend.ai/issues/4548))
+* Fix missing entity id in processor ([#4550](https://github.com/lablup/backend.ai/issues/4550))
+
+### Miscellaneous
+* Remove outdated Image SDK methods (`get_image_import_form`, `build`) ([#4537](https://github.com/lablup/backend.ai/issues/4537))
+* Remove useless print in `ScalingGroup.list_available` ([#4538](https://github.com/lablup/backend.ai/issues/4538))
+
+
 ## 25.8.1 (2025-05-23)
 
 ### Fixes
