@@ -350,7 +350,7 @@ async def exception_middleware(
             raise InvalidAPIParameters()
     except BackendError as ex:
         if ex.status_code // 100 == 5:
-            log.warning("Internal server error raised inside handlers")
+            log.exception("Internal server error raised inside handlers: {}", ex)
         await error_monitor.capture_exception()
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
         await stats_monitor.report_metric(
@@ -364,6 +364,8 @@ async def exception_middleware(
         await stats_monitor.report_metric(
             INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
         )
+        if ex.status_code // 100 == 4:
+            log.warning("Bad request: {}", ex)
         if ex.status_code == 404:
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
@@ -371,7 +373,8 @@ async def exception_middleware(
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
             )
-        log.warning("Bad request: {0!r}", ex)
+        if ex.status_code // 100 == 5:
+            log.exception("Internal server error raised inside handlers: {}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
