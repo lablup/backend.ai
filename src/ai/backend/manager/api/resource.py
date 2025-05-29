@@ -155,7 +155,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
 @superadmin_required
 @check_api_params(
     t.Dict({
-        tx.MultiKey("group_ids"): t.List(t.String) | t.Null,
+        t.Key("group_ids"): tx.DelimiterSeperatedList[str](t.String) | t.Null,
         t.Key("month"): t.Regexp(r"^\d{6}", re.ASCII),
     }),
     loads=_json_loads,
@@ -170,7 +170,6 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     """
     log.info("USAGE_PER_MONTH (g:[{}], month:{})", ",".join(params["group_ids"]), params["month"])
     root_ctx: RootContext = request.app["_root.context"]
-
     result = await root_ctx.processors.group.usage_per_month.wait_for_complete(
         UsagePerMonthAction(
             group_ids=params["group_ids"],
