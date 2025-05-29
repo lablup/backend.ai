@@ -56,8 +56,12 @@ class ActionProcessor(Generic[TAction, TActionResult]):
         finally:
             ended_at = datetime.now()
             duration = ended_at - started_at
+            entity_id = action.entity_id()
+            if entity_id is None and result is not None:
+                entity_id = result.entity_id()
             meta = BaseActionResultMeta(
                 action_id=action_id,
+                entity_id=entity_id,
                 status=status,
                 description=description,
                 started_at=started_at,
@@ -65,7 +69,7 @@ class ActionProcessor(Generic[TAction, TActionResult]):
                 duration=duration,
                 error_code=error_code,
             )
-            process_result = ProcessResult(meta=meta, result=result)
+            process_result = ProcessResult(meta=meta)
             for monitor in reversed(self._monitors):
                 await monitor.done(action, process_result)
         return result
