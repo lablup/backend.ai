@@ -2059,12 +2059,16 @@ class AbstractAgent(
                 ]
                 async with self.resource_lock:
                     try:
+                        allow_fractional_resource_fragmentation = kernel_config[
+                            "resource_opts"
+                        ].get("allow_fractional_resource_fragmentation", True)
                         allocate(
                             self.computers,
                             resource_spec,
                             alloc_order,
                             self.affinity_map,
                             self.local_config["resource"]["affinity-policy"],
+                            allow_fractional_resource_fragmentation=allow_fractional_resource_fragmentation,
                         )
                     except ResourceError:
                         await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
