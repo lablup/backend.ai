@@ -1003,7 +1003,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         file = action.file
-
         try:
             async with self._db.begin_readonly_session() as db_sess:
                 session = await SessionRow.get_session(
@@ -1033,7 +1032,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         files = action.files
-
         async with self._db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
