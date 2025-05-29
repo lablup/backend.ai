@@ -44,13 +44,13 @@ class MockException(Exception):
 class MockActionMonitor:
     expected_prepare_action: MockAction
     expected_done_action: MockAction
-    expected_done_result: ProcessResult[MockActionResult]
+    expected_done_result: ProcessResult
 
     def __init__(
         self,
         expected_prepare_action: MockAction,
         expected_done_action: MockAction,
-        expected_done_result: ProcessResult[MockActionResult],
+        expected_done_result: ProcessResult,
     ):
         self.expected_prepare_action = expected_prepare_action
         self.expected_done_action = expected_done_action
@@ -59,7 +59,7 @@ class MockActionMonitor:
     async def prepare(self, action: MockAction, _meta: MockActionTriggerMeta) -> None:
         assert action == self.expected_prepare_action
 
-    async def done(self, action: MockAction, result: ProcessResult[MockActionResult]) -> None:
+    async def done(self, action: MockAction, result: ProcessResult) -> None:
         assert action == self.expected_done_action
         # Partially check the result
         assert result.meta.status == self.expected_done_result.meta.status
@@ -68,12 +68,8 @@ class MockActionMonitor:
         assert result.meta.started_at < current_time
         assert result.meta.started_at <= result.meta.ended_at
         assert result.meta.ended_at < current_time
+        assert result.meta.entity_id == self.expected_done_result.meta.entity_id
         assert result.meta.duration.total_seconds() >= 0
-        if self.expected_done_result.result:
-            assert result.result is not None
-            assert result.result.entity_id() == self.expected_done_result.result.entity_id()
-        else:
-            assert result.result is None
 
 
 async def mock_action_processor_func(action: MockAction) -> MockActionResult:
@@ -91,13 +87,13 @@ async def test_processor_success():
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
                 action_id=None,
+                entity_id="1",
                 status="success",
                 description="Success",
                 started_at=None,
                 ended_at=None,
                 duration=0.0,
             ),
-            result=MockActionResult(id="1"),
         ),
     )
     processor = ActionProcessor[MockAction, MockActionResult](
@@ -116,13 +112,13 @@ async def test_processor_exception():
         expected_done_result=ProcessResult(
             meta=BaseActionResultMeta(
                 action_id=None,
+                entity_id="1",
                 status="error",
                 description="Mock exception",
                 started_at=None,
                 ended_at=None,
                 duration=0.0,
             ),
-            result=None,
         ),
     )
     processor = ActionProcessor[MockAction, MockActionResult](
