@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.8rc1 (2025-05-29)
+
+### Improvements
+* Improve logging for error handling ([#4544](https://github.com/lablup/backend.ai/issues/4544))
+
+### Fixes
+* Fix broken `Keypair` SDK methods (`activate`, `deactivate`) ([#4547](https://github.com/lablup/backend.ai/issues/4547))
+* Fix missing entity id in processor ([#4555](https://github.com/lablup/backend.ai/issues/4555))
+
+
 ## 25.6.7 (2025-05-23)
 
 ### Fixes
