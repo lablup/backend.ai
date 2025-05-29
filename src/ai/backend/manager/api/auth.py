@@ -21,6 +21,10 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.dto.manager.auth.field import (
+    AuthResponseType,
+    AuthSuccessResponse,
+)
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
@@ -746,13 +750,17 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
     )
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
+    if hook_result.result is not None and isinstance(hook_result.result, web.StreamResponse):
+        return hook_result.result
+    data = AuthSuccessResponse(
+        response_type=AuthResponseType.SUCCESS,
+        access_key=main_keypair_row.access_key,
+        secret_key=main_keypair_row.secret_key,
+        role=user["role"],
+        status=user["status"],
+    )
     return web.json_response({
-        "data": {
-            "access_key": main_keypair_row.access_key,
-            "secret_key": main_keypair_row.secret_key,
-            "role": user["role"],
-            "status": user["status"],
-        },
+        "data": data.to_dict(),
     })
 
 
