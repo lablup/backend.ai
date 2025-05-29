@@ -124,7 +124,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error("Error while auto claiming messages: {}", e)
+                log.exception("Error while auto claiming messages: {}", e)
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int
