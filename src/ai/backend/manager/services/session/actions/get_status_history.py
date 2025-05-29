@@ -1,9 +1,9 @@
+import uuid
 from dataclasses import dataclass
 from typing import Any, Optional, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.base import SessionAction
 
 
@@ -25,8 +25,8 @@ class GetStatusHistoryAction(SessionAction):
 @dataclass
 class GetStatusHistoryActionResult(BaseActionResult):
     status_history: dict[str, Any]
-    session_row: SessionRow
+    session_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.session_row.id)
+        return str(self.session_id)

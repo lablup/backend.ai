@@ -1378,7 +1378,7 @@ class SessionService:
             )
             result = session_row.status_history
 
-        return GetStatusHistoryActionResult(status_history=result, session_row=session_row)
+        return GetStatusHistoryActionResult(status_history=result, session_id=session_row.id)
 
     async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
         session_name = action.session_name
