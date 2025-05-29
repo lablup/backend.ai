@@ -27,7 +27,7 @@ class AuditLogMonitor(ActionMonitor):
                 entity_type=action.entity_type(),
                 operation=action.operation_type(),
                 created_at=result.meta.started_at,
-                entity_id=action.entity_id() or _BLANK_ID,
+                entity_id=result.meta.entity_id or _BLANK_ID,
                 request_id=current_request_id() or _BLANK_ID,
                 description=result.meta.description,
                 status=result.meta.status,
