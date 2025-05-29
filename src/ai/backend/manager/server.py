@@ -619,6 +619,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 error_monitor=root_ctx.error_monitor,
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
+                hook_plugin_ctx=root_ctx.hook_plugin_ctx,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],

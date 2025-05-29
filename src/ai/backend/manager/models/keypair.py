@@ -203,11 +203,9 @@ def validate_ssh_keypair(
 ) -> tuple[bool, Optional[str]]:
     """
     Validate RSA keypair for SSH/SFTP connection.
-
     Args:
         private_key_value: PEM-encoded private key string (OpenSSL format)
         public_key_value: OpenSSH-encoded public key string
-
     Returns:
         tuple[bool, Optional[str]]:
             Tuple containing a boolean indicating if the keypair is valid,
