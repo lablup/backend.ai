@@ -7430,7 +7430,8 @@
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "List of items separated by a delimiter (default: comma). Items may contain spaces, but not the delimiter."
             },
             "required": false,
             "in": "query"

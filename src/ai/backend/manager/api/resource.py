@@ -155,7 +155,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
 @superadmin_required
 @check_api_params(
     t.Dict({
-        tx.MultiKey("group_ids"): t.List(t.String) | t.Null,
+        t.Key("group_ids"): tx.DelimiterSeperatedList[str](t.String) | t.Null,
         t.Key("month"): t.Regexp(r"^\d{6}", re.ASCII),
     }),
     loads=_json_loads,
