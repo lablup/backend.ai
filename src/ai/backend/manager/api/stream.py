@@ -121,12 +121,12 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             kernel_host = urlparse(compute_session.agent_addr).hostname
         else:
             kernel_host = compute_session.kernel_host
-        stdin_addr = f"tcp://{kernel_host}:{compute_session.stdin_port}"
+        stdin_addr = f"tcp://{kernel_host}:{compute_session.repl_in_port}"
         log.debug("stream_pty({0}): stdin: {1}", stream_key, stdin_addr)
         stdin_sock = app_ctx.zctx.socket(zmq.PUB)
         stdin_sock.connect(stdin_addr)
         stdin_sock.setsockopt(zmq.LINGER, 100)
-        stdout_addr = f"tcp://{kernel_host}:{compute_session.stdout_port}"
+        stdout_addr = f"tcp://{kernel_host}:{compute_session.repl_out_port}"
         log.debug("stream_pty({0}): stdout: {1}", stream_key, stdout_addr)
         stdout_sock = app_ctx.zctx.socket(zmq.SUB)
         stdout_sock.connect(stdout_addr)
