@@ -913,6 +913,9 @@
                 },
                 {
                   "type": "integer"
+                },
+                {
+                  "type": "boolean"
                 }
               ]
             },

@@ -1249,7 +1249,7 @@ class KernelCreationConfig(TypedDict):
     main_gid: Optional[int]
     supplementary_gids: list[int]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
-    resource_opts: Mapping[str, str]  # json form of resource options
+    resource_opts: Mapping[str, Any]  # json form of resource options
     environ: Mapping[str, str]
     mounts: Sequence[Mapping[str, Any]]  # list of serialized VFolderMount
     package_directory: Sequence[str]

@@ -316,7 +316,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         alias="scalingGroup",
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
-    resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
+    resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
 
     def to_dataclass(self) -> ServiceConfig:
         extra_mounts_converted = {}

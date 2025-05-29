@@ -598,6 +598,8 @@ def allocate(
     alloc_order: Sequence[DeviceName],
     affinity_map: AffinityMap,
     affinity_policy: AffinityPolicy,
+    *,
+    allow_fractional_resource_fragmentation: bool = True,
 ) -> None:
     """
     Updates the allocation maps of the given computer contexts by allocating the given resource spec.
@@ -632,11 +634,19 @@ def allocate(
                 if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
             }
             try:
-                resource_spec.allocations[dev_name] = computer_ctx.alloc_map.allocate(
-                    device_specific_slots,
-                    affinity_hint=affinity_hint,
-                    context_tag=dev_name,
-                )
+                if isinstance(computer_ctx.alloc_map, FractionAllocMap):
+                    resource_spec.allocations[dev_name] = computer_ctx.alloc_map.allocate(
+                        device_specific_slots,
+                        affinity_hint=affinity_hint,
+                        context_tag=dev_name,
+                        allow_resource_fragmentation=allow_fractional_resource_fragmentation,
+                    )
+                else:
+                    resource_spec.allocations[dev_name] = computer_ctx.alloc_map.allocate(
+                        device_specific_slots,
+                        affinity_hint=affinity_hint,
+                        context_tag=dev_name,
+                    )
                 log.debug(
                     "allocated {} for device {}",
                     resource_spec.allocations[dev_name],

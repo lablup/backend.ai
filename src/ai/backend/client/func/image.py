@@ -3,7 +3,6 @@ from typing import Optional, Sequence
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
 
-from ..request import Request
 from ..session import api_session
 from ..utils import dedent as _d
 from .base import BaseFunction, api_function
@@ -229,20 +228,3 @@ class Image(BaseFunction):
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["dealias_image"]
-
-    @api_function
-    @classmethod
-    async def get_image_import_form(cls) -> dict:
-        rqst = Request("GET", "/image/import")
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-        return data
-
-    @api_function
-    @classmethod
-    async def build(cls, **kwargs) -> dict:
-        rqst = Request("POST", "/image/import")
-        rqst.set_json(kwargs)
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-        return data

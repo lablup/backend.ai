@@ -161,6 +161,11 @@ class UndefChecker(t.Trafaret):
             return None
 
 
+resource_opts_iv = t.Dict({
+    t.Key("shmem", default=None): t.Null | tx.BinarySize,
+    t.Key("allow_fractional_resource_fragmentation", default=None): t.Null | t.ToBool,
+}).allow_extra("*")
+
 creation_config_v1 = t.Dict({
     t.Key("mounts", default=None): t.Null | t.List(t.String),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
@@ -181,8 +186,7 @@ creation_config_v3 = t.Dict({
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
 })
 creation_config_v3_template = t.Dict({
     t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
@@ -195,7 +199,7 @@ creation_config_v3_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | resource_opts_iv
     ),
 })
 creation_config_v4 = t.Dict({
@@ -205,8 +209,7 @@ creation_config_v4 = t.Dict({
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
     tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
     | t.List(t.Int[1024:65535]),
 })
@@ -224,7 +227,7 @@ creation_config_v4_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | t.Null | resource_opts_iv
     ),
 })
 creation_config_v5 = t.Dict({
@@ -242,8 +245,7 @@ creation_config_v5 = t.Dict({
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
     tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
     | t.List(t.Int[1024:65535]),
     tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
@@ -260,7 +262,7 @@ creation_config_v5_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | t.Null | resource_opts_iv
     ),
 })
 creation_config_v6 = t.Dict({
@@ -278,8 +280,7 @@ creation_config_v6 = t.Dict({
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
     tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
     | t.List(t.Int[1024:65535]),
     tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
@@ -297,7 +298,7 @@ creation_config_v6_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | t.Null | resource_opts_iv
     ),
     tx.AliasedKey(["attach_network", "attachNetwork"], default=undefined): (
         UndefChecker | t.Null | tx.UUID
