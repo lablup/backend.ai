@@ -3,12 +3,14 @@ import logging
 import sqlalchemy as sa
 
 from ai.backend.common.events.agent import (
+    AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
+from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
 )
@@ -25,9 +27,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AgentEventHandler:
-    def __init__(self, registry: AgentRegistry, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        registry: AgentRegistry,
+        db: ExtendedAsyncSAEngine,
+        event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
+    ) -> None:
         self._registry = registry
         self._db = db
+        self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
 
     async def handle_agent_started(
         self,
@@ -96,3 +104,11 @@ class AgentEventHandler:
             if not row:
                 raise InstanceNotFound(source)
             log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
+
+    async def handle_agent_error(
+        self,
+        context: None,
+        source: AgentId,
+        event: AgentErrorEvent,
+    ) -> None:
+        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)

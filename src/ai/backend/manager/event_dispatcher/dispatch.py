@@ -81,7 +81,6 @@ from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.model_serving import ModelServingEventHandler
-from .handlers.plugin import PluginEventHandler
 from .handlers.session import SessionEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -114,14 +113,17 @@ class Dispatchers:
         Initialize the Dispatchers with the given arguments.
         """
         self._db = args.db
-        self._plugin_event_handler = PluginEventHandler(args.event_dispatcher_plugin_ctx)
         self._propagator_handler = PropagatorEventHandler(args.event_hub)
-        self._agent_event_handler = AgentEventHandler(args.agent_registry, args.db)
+        self._agent_event_handler = AgentEventHandler(
+            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
+        )
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
         self._kernel_event_handler = KernelEventHandler(args.agent_registry, args.db)
         self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
-        self._session_event_handler = SessionEventHandler(args.agent_registry, args.db)
+        self._session_event_handler = SessionEventHandler(
+            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
+        )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
 
@@ -131,7 +133,6 @@ class Dispatchers:
         """
         self._dispatch_bgtask_events(event_dispatcher)
         self._dispatch_agent_events(event_dispatcher)
-        self._dispatch_error_monitor_events(event_dispatcher)
         self._dispatch_image_events(event_dispatcher)
         self._dispatch_kernel_events(event_dispatcher)
         self._dispatch_schedule_events(event_dispatcher)
@@ -182,15 +183,10 @@ class Dispatchers:
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler.handle_agent_images_remove
         )
-
-    def _dispatch_error_monitor_events(self, event_dispatcher: EventDispatcher) -> None:
-        evd = event_dispatcher.with_reporters([
-            EventLogger(self._db),
-        ])
         evd.consume(
             AgentErrorEvent,
             None,
-            self._plugin_event_handler.handle_event,
+            self._agent_event_handler.handle_agent_error,
             name="agent.error",
         )
 
@@ -369,33 +365,27 @@ class Dispatchers:
         evd.consume(SessionSuccessEvent, None, self._session_event_handler.handle_batch_result)
         evd.consume(SessionFailureEvent, None, self._session_event_handler.handle_batch_result)
         evd.consume(
-            SessionStartedEvent,
-            None,
-            self._plugin_event_handler.handle_event,
-            name="session_execution.started",
-        )
-        evd.consume(
             ExecutionStartedEvent,
             None,
-            self._plugin_event_handler.handle_event,
+            self._session_event_handler.handle_execution_started,
             name="session_execution.started",
         )
         evd.consume(
             ExecutionFinishedEvent,
             None,
-            self._plugin_event_handler.handle_event,
+            self._session_event_handler.handle_execution_finished,
             name="session_execution.finished",
         )
         evd.consume(
             ExecutionTimeoutEvent,
             None,
-            self._plugin_event_handler.handle_event,
+            self._session_event_handler.handle_execution_timeout,
             name="session_execution.timeout",
         )
         evd.consume(
             ExecutionCancelledEvent,
             None,
-            self._plugin_event_handler.handle_event,
+            self._session_event_handler.handle_execution_cancelled,
             name="session_execution.cancelled",
         )
 

@@ -14,6 +14,10 @@ from ai.backend.common.events.kernel import (
 )
 from ai.backend.common.events.session import (
     DoTerminateSessionEvent,
+    ExecutionCancelledEvent,
+    ExecutionFinishedEvent,
+    ExecutionStartedEvent,
+    ExecutionTimeoutEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -24,6 +28,7 @@ from ai.backend.common.events.session import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
+from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
     SessionTypes,
@@ -45,9 +50,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SessionEventHandler:
-    def __init__(self, registry: AgentRegistry, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        registry: AgentRegistry,
+        db: ExtendedAsyncSAEngine,
+        event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
+    ) -> None:
         self._registry = registry
         self._db = db
+        self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
 
     async def _handle_started_or_cancelled(
         self, context: None, source: AgentId, event: SessionStartedEvent | SessionCancelledEvent
@@ -73,6 +84,7 @@ class SessionEventHandler:
         """
         log.info("handle_session_started: ev:{} s:{}", event.event_name(), event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
+        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
 
     async def handle_session_cancelled(
         self,
@@ -321,6 +333,38 @@ class SessionEventHandler:
         self._registry.webhook_ptask_group.create_task(
             _make_session_callback(data, callback_url),
         )
+
+    async def handle_execution_started(
+        self,
+        context: None,
+        source: AgentId,
+        event: ExecutionStartedEvent,
+    ) -> None:
+        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+
+    async def handle_execution_finished(
+        self,
+        context: None,
+        source: AgentId,
+        event: ExecutionFinishedEvent,
+    ) -> None:
+        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+
+    async def handle_execution_timeout(
+        self,
+        context: None,
+        source: AgentId,
+        event: ExecutionTimeoutEvent,
+    ) -> None:
+        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+
+    async def handle_execution_cancelled(
+        self,
+        context: None,
+        source: AgentId,
+        event: ExecutionCancelledEvent,
+    ) -> None:
+        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
