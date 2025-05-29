@@ -77,6 +77,7 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
 )
 from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
+from ai.backend.manager.services.session.actions.get_status_history import GetStatusHistoryAction
 from ai.backend.manager.services.session.actions.interrupt_session import InterruptSessionAction
 from ai.backend.manager.services.session.actions.list_files import ListFilesAction
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
@@ -1622,6 +1623,33 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     return result.response
 
 
+@server_status_required(READ_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict({
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    })
+)
+async def get_status_history(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
+    log.info(
+        "GET_STATUS_HISTORY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+
+    resp: dict[str, Mapping] = {"result": {}}
+    result = await root_ctx.processors.session.get_status_history.wait_for_complete(
+        GetStatusHistoryAction(
+            session_name=session_name,
+            owner_access_key=request["keypair"]["access_key"],
+        )
+    )
+
+    resp["result"] = result.status_history
+    return web.json_response(resp, status=200)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     agent_lost_checker: asyncio.Task[None]
@@ -1708,6 +1736,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("POST", "/{session_name}/imagify", convert_session_to_image))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
+    cors.add(app.router.add_route("GET", "/{session_name}/status-history", get_status_history))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
     cors.add(app.router.add_route("GET", "/{session_name}/dependency-graph", get_dependency_graph))
     return app, []

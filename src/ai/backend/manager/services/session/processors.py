@@ -71,6 +71,10 @@ from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
 )
+from ai.backend.manager.services.session.actions.get_status_history import (
+    GetStatusHistoryAction,
+    GetStatusHistoryActionResult,
+)
 from ai.backend.manager.services.session.actions.interrupt_session import (
     InterruptSessionAction,
     InterruptSessionActionResult,
@@ -137,6 +141,7 @@ class SessionProcessors(AbstractProcessorPackage):
         GetDirectAccessInfoAction, GetDirectAccessInfoActionResult
     ]
     get_session_info: ActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
+    get_status_history: ActionProcessor[GetStatusHistoryAction, GetStatusHistoryActionResult]
     interrupt: ActionProcessor[InterruptSessionAction, InterruptSessionActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
@@ -171,6 +176,7 @@ class SessionProcessors(AbstractProcessorPackage):
             service.get_direct_access_info, action_monitors
         )
         self.get_session_info = ActionProcessor(service.get_session_info, action_monitors)
+        self.get_status_history = ActionProcessor(service.get_status_history, action_monitors)
         self.interrupt = ActionProcessor(service.interrupt, action_monitors)
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.match_sessions = ActionProcessor(service.match_sessions, action_monitors)
@@ -203,6 +209,7 @@ class SessionProcessors(AbstractProcessorPackage):
             GetDependencyGraphAction.spec(),
             GetDirectAccessInfoAction.spec(),
             GetSessionInfoAction.spec(),
+            GetStatusHistoryAction.spec(),
             InterruptSessionAction.spec(),
             ListFilesAction.spec(),
             MatchSessionsAction.spec(),
