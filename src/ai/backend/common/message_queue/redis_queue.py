@@ -124,7 +124,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error("Error while auto claiming messages: {}", e)
+                log.exception("Error while auto claiming messages: {}", e)
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int
@@ -169,7 +169,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error("Error while reading messages: {}", e)
+                log.exception("Error while reading messages: {}", e)
 
     async def _read_messages(self) -> None:
         reply = await redis_helper.execute(
@@ -202,7 +202,7 @@ class RedisQueue(AbstractMessageQueue):
                 await self._failover_consumer(e)
                 last_msg_id = "$"
             except Exception as e:
-                log.error("Error while reading broadcast messages: {}", e)
+                log.exception("Error while reading broadcast messages: {}", e)
 
     async def _read_broadcast_messages(self, last_msg_id: str) -> str:
         reply = await redis_helper.execute(
@@ -247,7 +247,7 @@ class RedisQueue(AbstractMessageQueue):
                     internal_exception,
                 )
         else:
-            log.error("Error while reading messages: {}", e)
+            log.exception("Error while reading messages: {}", e)
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:

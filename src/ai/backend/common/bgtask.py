@@ -372,14 +372,14 @@ class BackgroundTaskManager:
         try:
             bgtask_result_event = await self._run_bgtask(func, task_id, **kwargs)
         except asyncio.CancelledError:
+            log.warning("Task {} ({}): cancelled", task_id, task_name)
             return BgtaskCancelledEvent(task_id, "")
-
         except Exception as e:
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(
                 task_name=task_name or func.__name__, status="bgtask_failed", duration=duration
             )
-            log.exception("Task %s (%s): unhandled error", task_id, task_name)
+            log.exception("Task {} ({}): unhandled error {}", task_id, task_name, repr(e))
             return BgtaskFailedEvent(task_id, repr(e))
 
         duration = time.perf_counter() - start_time
