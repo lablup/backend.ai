@@ -178,6 +178,7 @@ class ResourcePresetService:
                 )
             query = query.where(query_condition)
             presets = []
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
             async for row in await db_session.stream_scalars(query):
                 row = cast(ResourcePresetRow, row)
                 preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
