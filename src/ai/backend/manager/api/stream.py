@@ -149,7 +149,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                     if data["type"] == "stdin":
                         raw_data = base64.b64decode(data["chars"].encode("ascii"))
                         try:
-                            await socks[0].send_mlutipart([raw_data])
+                            await socks[0].send_multipart([raw_data])
                         except (RuntimeError, zmq.error.ZMQError):
                             # when socks[0] is closed, re-initiate the connection.
                             app_ctx.stream_stdin_socks[stream_key].discard(socks[0])
