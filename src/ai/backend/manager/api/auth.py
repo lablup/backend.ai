@@ -663,7 +663,7 @@ async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     action = AuthorizeAction(
         request=request,
-        type=AuthTokenType.from_str(params["type"]),
+        type=AuthTokenType(params["type"]),
         domain_name=params["domain"],
         email=params["username"],
         password=params["password"],

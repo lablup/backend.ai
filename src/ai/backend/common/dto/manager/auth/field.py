@@ -10,13 +10,6 @@ class AuthTokenType(enum.StrEnum):
     KEYPAIR = "keypair"
     JWT = "jwt"
 
-    @classmethod
-    def from_str(cls, value: str) -> AuthTokenType:
-        try:
-            return cls(value)
-        except ValueError:
-            raise ValueError(f"Invalid AuthTokenType: {value}") from None
-
 
 class AuthResponseType(enum.StrEnum):
     SUCCESS = "success"
