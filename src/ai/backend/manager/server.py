@@ -337,6 +337,8 @@ async def exception_middleware(
     root_ctx: RootContext = request.app["_root.context"]
     error_monitor = root_ctx.error_monitor
     stats_monitor = root_ctx.stats_monitor
+    method = request.method
+    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
@@ -349,8 +351,17 @@ async def exception_middleware(
         else:
             raise InvalidAPIParameters()
     except BackendError as ex:
-        if ex.status_code // 100 == 5:
-            log.exception("Internal server error raised inside handlers: {}", ex)
+        if ex.status_code // 100 == 4:
+            log.warning(
+                "client error raised inside handlers: ({} {}): {}", method, endpoint, repr(ex)
+            )
+        elif ex.status_code // 100 == 5:
+            log.exception(
+                "Internal server error raised inside handlers: ({} {}): {}",
+                method,
+                endpoint,
+                repr(ex),
+            )
         await error_monitor.capture_exception()
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
         await stats_monitor.report_metric(
@@ -365,7 +376,11 @@ async def exception_middleware(
             INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
         )
         if ex.status_code // 100 == 4:
-            log.warning("Bad request: {}", ex)
+            log.warning("client error raised inside handlers: ({} {}): {}", method, endpoint, ex)
+        elif ex.status_code // 100 == 5:
+            log.exception(
+                "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
+            )
         if ex.status_code == 404:
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
@@ -373,8 +388,6 @@ async def exception_middleware(
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
             )
-        if ex.status_code // 100 == 5:
-            log.exception("Internal server error raised inside handlers: {}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
@@ -383,7 +396,9 @@ async def exception_middleware(
         raise e
     except Exception as e:
         await error_monitor.capture_exception()
-        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+        log.exception(
+            "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
+        )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
         else:
