@@ -335,7 +335,7 @@ class BackgroundTaskManager:
                 error_detail=ErrorDetail.INTERNAL_ERROR,
             )
             log.exception("Task {} ({}): unhandled error: {}", task_id, task_name, e)
-            msg = "Internal server error"
+            msg = repr(e)
             return BgtaskFailedEvent(task_id, msg)
         finally:
             duration = time.perf_counter() - start_time

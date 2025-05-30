@@ -185,4 +185,4 @@ async def test_background_task_fail(bgtask_fixture: BgtaskFixture) -> None:
     assert fail_handler_ctx["task_id"] == task_id
     assert fail_handler_ctx["event_name"] == "bgtask_failed"
     assert fail_handler_ctx["message"] is not None
-    assert "Internal server error" in fail_handler_ctx["message"]
+    assert "ZeroDivisionError" in fail_handler_ctx["message"]
