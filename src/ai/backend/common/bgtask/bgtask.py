@@ -319,11 +319,13 @@ class BackgroundTaskManager:
                 error_detail=ErrorDetail.CANCELED,
             )
             log.warning("Task {} ({}): cancelled", task_id, task_name)
+            msg = "Task cancelled"
             return BgtaskCancelledEvent(task_id, "")
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
             error_code = e.error_code()
             log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
+            msg = repr(e)
             return BgtaskFailedEvent(task_id, repr(e))
         except Exception as e:
             status = BgtaskStatus.FAILED
@@ -333,6 +335,7 @@ class BackgroundTaskManager:
                 error_detail=ErrorDetail.INTERNAL_ERROR,
             )
             log.exception("Task {} ({}): unhandled error: {}", task_id, task_name, e)
+            msg = "Internal server error"
             return BgtaskFailedEvent(task_id, repr(e))
         finally:
             duration = time.perf_counter() - start_time
