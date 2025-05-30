@@ -156,6 +156,10 @@ from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
 )
+from ai.backend.manager.services.session.actions.get_status_history import (
+    GetStatusHistoryAction,
+    GetStatusHistoryActionResult,
+)
 from ai.backend.manager.services.session.actions.interrupt_session import (
     InterruptSessionAction,
     InterruptSessionActionResult,
@@ -1003,7 +1007,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         file = action.file
-
         try:
             async with self._db.begin_readonly_session() as db_sess:
                 session = await SessionRow.get_session(
@@ -1033,7 +1036,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         files = action.files
-
         async with self._db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
@@ -1358,6 +1360,23 @@ class SessionService:
         # TODO: factor out policy/image info as a common repository
 
         return GetSessionInfoActionResult(result=resp, session_row=sess)
+
+    async def get_status_history(
+        self, action: GetStatusHistoryAction
+    ) -> GetStatusHistoryActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+
+        async with self._db.begin_readonly_session() as db_sess:
+            session_row = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.NONE,
+            )
+            result = session_row.status_history
+
+        return GetStatusHistoryActionResult(status_history=result, session_id=session_row.id)
 
     async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
         session_name = action.session_name

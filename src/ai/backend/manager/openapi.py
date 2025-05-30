@@ -75,6 +75,15 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Enum):
         enum_values = scheme.variants  # type: ignore[attr-defined]
         return {"type": "string", "enum": enum_values}
+    if isinstance(scheme, tx.DelimiterSeperatedList):
+        return {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "List of items separated by a delimiter (default: comma). "
+                "Items may contain spaces, but not the delimiter."
+            ),
+        }
     if isinstance(scheme, t.Float):
         resp = {"type": "integer"}
         if gte := scheme.gte:  # type: ignore[attr-defined]

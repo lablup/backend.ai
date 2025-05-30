@@ -6,7 +6,7 @@ from typing import Any, Self
 from pydantic import BaseModel
 
 
-class AuthTokenTypes(enum.Enum):
+class AuthTokenType(enum.StrEnum):
     KEYPAIR = "keypair"
     JWT = "jwt"
 
@@ -14,7 +14,7 @@ class AuthTokenTypes(enum.Enum):
 class AuthResponseType(enum.StrEnum):
     SUCCESS = "success"
     REQUIRE_TWO_FACTOR_REGISTRATION = "REQUIRE_TWO_FACTOR_REGISTRATION"
-    REQUIRE_TWO_FACOTR_AUTH = "REQUIRE_TWO_FACOTR_AUTH"
+    REQUIRE_TWO_FACTOR_AUTH = "REQUIRE_TWO_FACTOR_AUTH"
 
 
 class TwoFactorType(enum.StrEnum):
@@ -34,7 +34,7 @@ class AuthSuccessResponse(AuthResponse):
     secret_key: str
     role: str
     status: str
-    type: AuthTokenTypes = AuthTokenTypes.KEYPAIR
+    type: AuthTokenType = AuthTokenType.KEYPAIR
 
     def to_dict(self) -> dict[str, str]:
         return self.model_dump(mode="json")
@@ -67,5 +67,5 @@ def parse_auth_response(data: dict[str, Any]) -> AuthResponse:
             return AuthSuccessResponse.model_validate(data)
         case AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION:
             return RequireTwoFactorRegistrationResponse.model_validate(data)
-        case AuthResponseType.REQUIRE_TWO_FACOTR_AUTH:
+        case AuthResponseType.REQUIRE_TWO_FACTOR_AUTH:
             return RequireTwoFactorAuthResponse.model_validate(data)

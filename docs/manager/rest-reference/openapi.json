@@ -6785,6 +6785,43 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
+    "/session/{session_name}/status-history": {
+      "get": {
+        "operationId": "session.get_status_history",
+        "tags": [
+          "session"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "owner_access_key",
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "in": "query"
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
     "/session/{session_name}/abusing-report": {
       "get": {
         "operationId": "session.get_abusing_report",
@@ -7430,7 +7467,8 @@
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "List of items separated by a delimiter (default: comma). Items may contain spaces, but not the delimiter."
             },
             "required": false,
             "in": "query"
