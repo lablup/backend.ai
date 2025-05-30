@@ -145,6 +145,8 @@ class RedisQueue(AbstractMessageQueue):
             return autoclaim_start_id, False
         autoclaim_start_id = reply[0]
         for msg_id, msg_data in reply[1]:
+            if msg_data is None:
+                continue
             msg = MQMessage(msg_id, msg_data)
             if msg.retry():
                 await self._retry_message(msg)
