@@ -460,7 +460,7 @@ async def config_provider_ctx(
         )
         root_ctx.config_provider = config_provider
 
-        if config_provider.config.debug.enabled:
+        if config_provider.config.debug.enabled and root_ctx.pidx == 0:
             print("== Manager configuration ==", file=sys.stderr)
             print(pformat(config_provider.config), file=sys.stderr)
         yield root_ctx.config_provider
@@ -1360,7 +1360,6 @@ async def server_main_logwrapper(
         log_endpoint=tuple_args[2],
         log_level=tuple_args[3],
     )
-
     logger = Logger(
         args.bootstrap_cfg.logging,
         is_master=False,

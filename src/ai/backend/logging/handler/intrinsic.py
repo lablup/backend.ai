@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import traceback
 from typing import TYPE_CHECKING, Optional, override
 
 import msgpack
+import psutil
 import zmq
 
 if TYPE_CHECKING:
@@ -20,6 +22,8 @@ class RelayHandler(logging.Handler):
         self.endpoint = endpoint
         self.msgpack_options = msgpack_options
         self._zctx = zmq.Context[zmq.Socket]()
+        self._pid = os.getpid()
+        self._process_name = psutil.Process().name()
         # We should use PUSH-PULL socket pairs to avoid
         # lost of synchronization sentinel messages.
         if endpoint:
@@ -54,7 +58,10 @@ class RelayHandler(logging.Handler):
                 "msg": record.getMessage(),
                 "levelno": record.levelno,
                 "levelname": record.levelname,
+                "process": self._pid,
+                "processName": self._process_name,
             }
+            print(self._process_name)
             if record.exc_info:
                 log_body["exc_info"] = traceback.format_exception(*record.exc_info)
         else:
