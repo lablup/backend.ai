@@ -61,7 +61,6 @@ class RelayHandler(logging.Handler):
                 "process": self._pid,
                 "processName": self._process_name,
             }
-            print(self._process_name)
             if record.exc_info:
                 log_body["exc_info"] = traceback.format_exception(*record.exc_info)
         else:
