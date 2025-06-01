@@ -261,7 +261,6 @@ class SessionService:
                 ),
             )
         except BackendAIError:
-            log.exception("COMMIT_SESSION: exception")
             raise
 
         return CommitSessionActionResult(
@@ -297,7 +296,6 @@ class SessionService:
         except AssertionError:
             raise InvalidAPIParameters
         except BackendAIError:
-            log.exception("COMPLETE: exception")
             raise
         return CompleteActionResult(
             session_row=session,
@@ -533,7 +531,6 @@ class SessionService:
                 )
                 await reporter.update(increment=1, message="Completed")
             except BackendAIError:
-                log.exception("CONVERT_SESSION_TO_IMAGE: exception")
                 raise
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
@@ -611,13 +608,11 @@ class SessionService:
         except TooManySessionsMatched:
             raise SessionAlreadyExists
         except BackendAIError:
-            log.exception("GET_OR_CREATE: exception")
             raise
         except UnknownImageReference:
             raise UnknownImageReferenceError("Unknown image reference!")
         except Exception:
             await self._error_monitor.capture_exception()
-            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
 
     async def create_from_params(
@@ -709,11 +704,9 @@ class SessionService:
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
         except BackendAIError:
-            log.exception("GET_OR_CREATE: exception")
             raise
         except Exception:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
 
     async def create_from_template(
@@ -927,11 +920,9 @@ class SessionService:
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
         except BackendAIError:
-            log.exception("GET_OR_CREATE: exception")
             raise
         except Exception:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
@@ -1020,13 +1011,11 @@ class SessionService:
         except asyncio.CancelledError:
             raise
         except BackendAIError:
-            log.exception("DOWNLOAD_SINGLE: exception")
             raise
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_SINGLE: unexpected error!")
             raise InternalServerError
 
         return DownloadFileActionResult(result=result, session_row=session)
@@ -1057,13 +1046,11 @@ class SessionService:
         except asyncio.CancelledError:
             raise
         except BackendAIError:
-            log.exception("DOWNLOAD_FILE: exception")
             raise
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_FILE: unexpected error!")
             raise InternalServerError
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -1172,7 +1159,6 @@ class SessionService:
             log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
             raise InvalidAPIParameters(extra_msg=e.args[0])
         except BackendAIError:
-            log.exception("EXECUTE: exception")
             raise
 
         return ExecuteSessionActionResult(result=resp, session_row=session)
@@ -1193,7 +1179,6 @@ class SessionService:
             kernel = session.main_kernel
             report = await self._agent_registry.get_abusing_report(kernel.id)
         except BackendAIError:
-            log.exception("GET_ABUSING_REPORT: exception")
             raise
         return GetAbusingReportActionResult(result=report, session_row=session)
 
@@ -1211,7 +1196,6 @@ class SessionService:
                 )
             statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
         except BackendAIError:
-            log.exception("GET_COMMIT_STATUS: exception")
             raise
         resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
         return GetCommitStatusActionResult(result=resp, session_row=session)
@@ -1417,11 +1401,9 @@ class SessionService:
         except asyncio.CancelledError:
             raise
         except BackendAIError:
-            log.exception("LIST_FILES: exception")
             raise
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("LIST_FILES: unexpected error!")
             raise InternalServerError
 
         return ListFilesActionResult(result=result, session_row=session)
