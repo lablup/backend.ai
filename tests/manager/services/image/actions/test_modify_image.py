@@ -61,7 +61,7 @@ from ...test_utils import TestScenario
                     accelerators=TriState.update(value="cuda,rocm"),
                     is_local=OptionalState.update(True),
                     size_bytes=OptionalState.update(123),
-                    labels=OptionalState.update({"key1": "value1", "key2": "value2"}),
+                    labels=OptionalState.update({"ai.backend.resource.min.mem": "128m"}),
                     resources=OptionalState.update(
                         {
                             "cpu": {"min": "3", "max": "5"},
@@ -80,7 +80,7 @@ from ...test_utils import TestScenario
                     accelerators="cuda,rocm",
                     is_local=True,
                     size_bytes=123,
-                    labels=ImageLabelsData(label_data={"key1": "value1", "key2": "value2"}),
+                    labels=ImageLabelsData(label_data={"ai.backend.resource.min.mem": "128m"}),
                     resources=ImageResourcesData(
                         resources_data={
                             SlotName("cpu"): {"min": "3", "max": "5"},
