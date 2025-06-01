@@ -672,15 +672,22 @@ class ImageRow(Base):
 
     @property
     def resources(self) -> Resources:
-        custom_resources = self._resources or {}
-        label_resources = self.get_resources_from_labels()  # Set this as default
+        merged = dict(self._resources or {})
 
-        resources = dict(custom_resources)
-        for label_key, value in label_resources.items():
-            if label_key not in resources:
-                resources[label_key] = value
+        for label_key, label_spec in self.get_resources_from_labels().items():
+            merged_spec = label_spec.copy()
+            custom_spec = merged.get(label_key, {})
 
-        return ImageRow._resources.type._schema.check(resources)
+            if "min" in merged_spec and "min" in custom_spec:
+                merged_spec["min"] = max(
+                    merged_spec["min"],
+                    custom_spec["min"],
+                    key=BinarySize.from_str,
+                )
+
+            merged[label_key] = merged_spec
+
+        return ImageRow._resources.type._schema.check(merged)
 
     def get_resources_from_labels(self) -> Resources:
         if self.labels is None:
