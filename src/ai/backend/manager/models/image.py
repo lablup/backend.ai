@@ -51,7 +51,7 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     RescanImagesResult,
 )
-from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
+from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 
 from ..container_registry import get_container_registry_cls
 from ..errors.exceptions import ImageNotFound
@@ -675,25 +675,28 @@ class ImageRow(Base):
         custom_resources = self._resources or {}
         label_resources = self.get_resources_from_labels()
 
-        merged: dict[str, Any] = {}
+        merged_resources: dict[str, Any] = {}
 
-        for label_key in {*custom_resources, *label_resources}:
+        for label_key in {*custom_resources.keys(), *label_resources.keys()}:
             custom_spec = custom_resources.get(label_key, {})
             label_spec = label_resources.get(label_key, {})
 
             merged_spec = dict(custom_spec)
+            for label_spec_key, value in label_spec.items():
+                merged_spec.setdefault(label_spec_key, value)
 
-            for field, value in label_spec.items():
-                if field != "min":
-                    merged_spec.setdefault(field, value)
+            # TODO: Consider other slot types
+            if label_key in INTRINSIC_SLOTS.keys():
+                mins = [m for m in (custom_spec.get("min"), label_spec.get("min")) if m is not None]
+                if mins:
+                    match label_key:
+                        case "cpu":
+                            merged_spec["min"] = max(mins)
+                        case "mem":
+                            merged_spec["min"] = max(mins, key=BinarySize.from_str)
 
-            mins = [m for m in (custom_spec.get("min"), label_spec.get("min")) if m is not None]
-            if mins:
-                merged_spec["min"] = max(mins, key=BinarySize.from_str)
-
-            merged[label_key] = merged_spec
-
-        return ImageRow._resources.type._schema.check(merged)
+            merged_resources[label_key] = merged_spec
+        return ImageRow._resources.type._schema.check(merged_resources)
 
     def get_resources_from_labels(self) -> Resources:
         if self.labels is None:
