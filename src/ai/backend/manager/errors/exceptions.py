@@ -87,8 +87,8 @@ class GenericBadRequest(BackendError, web.HTTPBadRequest):
 
 
 class KernelNotReady(BackendError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/generic-bad-request"
-    error_title = "Bad request."
+    error_type = "https://api.backend.ai/probs/kernel-not-ready"
+    error_title = "Kernel not ready."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
