@@ -308,7 +308,61 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     await root_ctx.shared_config.reload()
     yield
-    await root_ctx.shared_config.close()
+    await root_ctx.etcd.close()
+
+
+@actxmgr
+async def config_provider_ctx(
+    root_ctx: RootContext,
+    log_level: LogLevel,
+    config_path: Optional[Path] = None,
+    extra_config: Optional[Mapping[str, Any]] = None,
+) -> AsyncIterator[ManagerConfigProvider]:
+    loaders: list[AbstractConfigLoader] = []
+
+    if config_path:
+        toml_config_loader = TomlConfigLoader(config_path, "manager")
+        loaders.append(toml_config_loader)
+    else:
+        log.warning("No config file path specified. Skipped loading toml config file...")
+
+    legacy_etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+    loaders.append(legacy_etcd_loader)
+    loaders.append(LegacyEtcdVolumesLoader(root_ctx.etcd))
+    loaders.append(EtcdCommonConfigLoader(root_ctx.etcd))
+    loaders.append(EtcdManagerConfigLoader(root_ctx.etcd))
+
+    overrides: list[tuple[tuple[str, ...], Any]] = [
+        (("debug", "enabled"), log_level == LogLevel.DEBUG),
+    ]
+    if log_level != LogLevel.NOTSET:
+        overrides += [
+            (("logging", "level"), log_level),
+            (("logging", "pkg-ns", "ai.backend"), log_level),
+            (("logging", "pkg-ns", "aiohttp"), log_level),
+        ]
+
+    loaders.append(ConfigOverrider(overrides))
+
+    unified_config_loader = LoaderChain(loaders, base_config=extra_config)
+    etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
+
+    config_provider: Optional[ManagerConfigProvider] = None
+    try:
+        config_provider = await ManagerConfigProvider.create(
+            unified_config_loader,
+            etcd_watcher,
+            legacy_etcd_loader,
+        )
+        root_ctx.config_provider = config_provider
+
+        if config_provider.config.debug.enabled and root_ctx.pidx == 0:
+            print("== Manager configuration ==", file=sys.stderr)
+            print(pformat(config_provider.config), file=sys.stderr)
+        yield root_ctx.config_provider
+    finally:
+        if config_provider:
+            await config_provider.terminate()
 
 
 @actxmgr
@@ -960,7 +1014,12 @@ async def server_main_logwrapper(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
-    log_endpoint = _args[1]
+    args = ServerMainArgs(
+        bootstrap_cfg=tuple_args[0],
+        bootstrap_cfg_path=tuple_args[1],
+        log_endpoint=tuple_args[2],
+        log_level=tuple_args[3],
+    )
     logger = Logger(
         _args[0]["logging"],
         is_master=False,
