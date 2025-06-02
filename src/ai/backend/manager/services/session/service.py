@@ -604,9 +604,9 @@ class SessionService:
             raise SessionAlreadyExists
         except UnknownImageReference:
             raise UnknownImageReferenceError("Unknown image reference!")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception()
-            log.exception("GET_OR_CREATE: unexpected error!")
+            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError
 
     async def create_from_params(
@@ -697,9 +697,9 @@ class SessionService:
             return CreateFromParamsActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!")
+            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError
 
     async def create_from_template(
@@ -912,9 +912,9 @@ class SessionService:
             return CreateFromTemplateActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!")
+            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
@@ -1002,9 +1002,9 @@ class SessionService:
             result = await self._agent_registry.download_single(session, owner_access_key, file)
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_SINGLE: unexpected error!")
+            log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
             raise InternalServerError
 
         return DownloadFileActionResult(result=result, session_row=session)
@@ -1034,9 +1034,9 @@ class SessionService:
             log.debug("file(s) inside container retrieved")
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_FILE: unexpected error!")
+            log.exception("DOWNLOAD_FILE: unexpected error!", e)
             raise InternalServerError
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -1377,9 +1377,9 @@ class SessionService:
             result = await self._agent_registry.list_files(session, path)
             resp.update(result)
             log.debug("container file list for {0} retrieved", path)
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("LIST_FILES: unexpected error!")
+            log.exception("LIST_FILES: unexpected error!", e)
             raise InternalServerError
 
         return ListFilesActionResult(result=result, session_row=session)
