@@ -246,12 +246,14 @@
     "FolderToCopy": "Pasta para copiar",
     "Foldername": "Nome da pasta",
     "Folders": "Pastas",
+    "From": "De",
     "General": "Em geral",
     "Host": "Hospedeiro",
     "HostDetails": "Apresenta informações sobre quotas para o anfitrião de armazenamento selecionado.",
     "InvalidEmail": "Endereço de e -mail inválido",
     "Invited": "convidamos",
     "InvitedFolders": "Pastas convidadas",
+    "InvitedFoldersTooltip": "{{ count }} convites de pastas estão com resposta pendente.",
     "Limit": "Limite",
     "ModelStore": "Loja de modelos",
     "Models": "Modelos",
@@ -414,6 +416,8 @@
       "View": "Visualizar"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Falhou em aceitar convite",
+      "FailedToDeclineInvitation": "Falhou em recusar o convite",
       "FolderSharingNotAvailableToUser": "A partilha de pastas não está disponível para o(s) utilizador(es) solicitado(s):",
       "InvitationError": "O convite falhou. O usuário já pode ter sido convidado.",
       "Invited": "Convidado com sucesso",
@@ -424,7 +428,10 @@
       "NoValidEmails": "Nenhum e-mail válido foi inserido",
       "Shared": "Compartilhou com sucesso a pasta do grupo",
       "SharingError": "O compartilhamento falhou. O usuário pode já estar compartilhado ou não pertencer ao projeto apropriado.",
-      "SuccessfullyLeftSharedFolder": "Deixou com sucesso a pasta compartilhada"
+      "SuccessfullyAcceptedInvitation": "Convite aceito com sucesso",
+      "SuccessfullyDeclinedInvitation": "Com sucesso recusou o convite",
+      "SuccessfullyLeftSharedFolder": "Deixou com sucesso a pasta compartilhada",
+      "UserIsAlreadyInvited": "{{email}} já está convidado"
     },
     "modelStore": {
       "AddedItems": "Itens adicionados",
@@ -469,6 +476,10 @@
       "StatusOfSelectedHost": "Estado do anfitrião selecionado",
       "Used": "utilizado"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Este navegador não suporta notificações.",
+    "PermissionDenied": "Você negou acesso à notificação. \nPara usar alertas, deixe -o nas configurações do navegador."
   },
   "dialog": {
     "ErrorOccurred": "Ocorreu um erro",
@@ -1154,7 +1165,7 @@
     "ResourcePresets": "Predefinições de recursos",
     "Resources": "Recursos",
     "SHMEMShouldBeSmallerThanMemory": "A memória partilhada deve ser mais pequena do que a memória",
-    "SharedMemory": "Memória compartilhada (GB)",
+    "SharedMemory": "Memória compartilhada",
     "Updated": "Predefinição de recurso atualizada"
   },
   "session": {
@@ -1163,6 +1174,7 @@
     "Agents": "Agentes",
     "AllowedClientIps": "IPs de clientes permitidos",
     "AlreadyTerminatingSession": "Já está a terminar a sessão.",
+    "AnotherUserSession": "Esta sessão foi criada por outro usuário",
     "Architecture": "Arquitetura",
     "Arguments": "Argumentos",
     "AverageUsage": "Avg",
@@ -1663,10 +1675,9 @@
       "Last12Hours": "Últimas 12 horas",
       "Last3Hours": "Últimas 3 horas",
       "Last7Days": "Últimos 7 dias",
-      "LastDay": "Último 1 dia"
-    },
-    "timeRanges": {
-      "LastHour": "Última 1 hora"
+      "LastDay": "Último 1 dia",
+      "LastHour": "Última 1 hora",
+      "Today": "Hoje"
     }
   },
   "storageHost": {
@@ -1801,7 +1812,6 @@
     "BootstrapScriptDescription": "O script bootstrap será executado apenas uma vez após a criação da sessão",
     "BootstrapScriptEmpty": "O script está vazio. \nPor favor insira o roteiro.",
     "BootstrapScriptUpdated": "Script de bootstrap atualizado.",
-    "ClassicSessionLauncher": "Lançador de sessão Classic",
     "ClearSSHKeypairInput": "O par de chaves SSH gravado será removido. Você tem certeza que quer continuar?",
     "ConfigFilename": "Nome do arquivo de configuração",
     "CurrentSSHPublicKey": "Chave pública atual:",
@@ -1811,7 +1821,7 @@
     "DescAutomaticUpdateCheck": "Notifique quando uma nova versão do webui for lançada. <br /> Onde a Internet estiver instável ou offline, esta opção será automaticamente desligada. Você pode alternar essa opção para iniciar a verificação automática de atualização novamente.",
     "DescBetaFeatures": "Use recursos beta para Web UI. Os recursos beta <br /> podem ser instáveis. Alguns recursos beta podem não ser adotados como recurso oficial.",
     "DescClassicSessionLauncher": "Use o iniciador de sessão Classic em vez do iniciador de sessão NEO. \nO iniciador de sessão Classic pode não ter os recursos mais recentes.",
-    "DescDesktopNotification": "Ative ou desative a notificação na área de trabalho. <br /> Se ativado, o Backend.AI também usa o sistema de notificação integrado do SO. Desativar esta opção não afeta as notificações na IU da web.",
+    "DescDesktopNotification": "Ativa a notificação da área de trabalho. \n<br /> Se ativado, o back-end.ai também usa o sistema de notificação interno do sistema operacional. \nDesligar essa opção não afeta as notificações na interface da usuário da web. \nDependendo do sistema operacional, as notificações de desktop podem exigir permissões de notificação de ativação nas configurações do sistema.",
     "DescExperimentalDashboard": "Use a página do painel em vez da página de resumo.",
     "DescKeepLoginSessionInformation": "Deixe o aplicativo webui manter as informações atuais da sessão de login na próxima vez. <br /> Se a opção for desligada, as informações de login serão apagadas a cada logout.",
     "DescLanguage": "Definir linguagem de interface. Outros idiomas que não o inglês e o coreano serão fornecidos via tradução da máquina.",

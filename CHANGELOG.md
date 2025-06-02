@@ -16,6 +16,49 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.9.0 (2025-06-02)
+
+### Features
+* Add Action Tests for `Image`. ([#4048](https://github.com/lablup/backend.ai/issues/4048))
+* Enable TOTP registration for anonymous users ([#4354](https://github.com/lablup/backend.ai/issues/4354))
+* Refactor event dispatcher and handlers directory structure ([#4497](https://github.com/lablup/backend.ai/issues/4497))
+* Add `EventDomain.WORKFLOW` enum value to support workflow-related event categorization ([#4499](https://github.com/lablup/backend.ai/issues/4499))
+* Create new manager CLI command `backend.ai mgr scheduler last-execution-time` to let administrators fetch each manager scheduler's last execution time ([#4507](https://github.com/lablup/backend.ai/issues/4507))
+* Add stage package to support deterministic step-by-step execution ([#4509](https://github.com/lablup/backend.ai/issues/4509))
+* Make resource fragmentation configurable ([#4533](https://github.com/lablup/backend.ai/issues/4533))
+* Add missing `GET /status_history` endpoint to the session REST API ([#4543](https://github.com/lablup/backend.ai/issues/4543))
+
+### Improvements
+* Refactor `keypair_preparation` from a classmethod of the Graphene class to a utility function to decouple logic from GraphQL ([#4510](https://github.com/lablup/backend.ai/issues/4510))
+* Introduce service layer in `auth` APIs to apply audit logs for user login APIs ([#4535](https://github.com/lablup/backend.ai/issues/4535))
+* Improve logging for error handling in various modules ([#4540](https://github.com/lablup/backend.ai/issues/4540))
+* Initialize device env vars with/without restart to make session restart successfully ([#4585](https://github.com/lablup/backend.ai/issues/4585))
+
+### Fixes
+* heartbeat register service when service is dead ([#4492](https://github.com/lablup/backend.ai/issues/4492))
+* Fix missing log output of GraphQL top-level query fields by improving graphene's resolver info object usage ([#4505](https://github.com/lablup/backend.ai/issues/4505))
+* Fix Backend.AI agent equipped with mock accelerator refusing to allocate mock accelerator to session after agent restart ([#4532](https://github.com/lablup/backend.ai/issues/4532))
+* Fix broken `list_presets` API, SDK ([#4541](https://github.com/lablup/backend.ai/issues/4541))
+* Fix broken `usage_per_month` method in Resource SDK ([#4546](https://github.com/lablup/backend.ai/issues/4546))
+* Fix broken `Keypair` SDK methods (`activate`, `deactivate`) ([#4547](https://github.com/lablup/backend.ai/issues/4547))
+* Broken `stream_pty` method in Session SDK ([#4548](https://github.com/lablup/backend.ai/issues/4548))
+* Fix missing entity id in processor ([#4550](https://github.com/lablup/backend.ai/issues/4550))
+* Fix wrong idle checker init arguments ([#4557](https://github.com/lablup/backend.ai/issues/4557))
+* Fix broken `Network` SDK implementations to work properly ([#4558](https://github.com/lablup/backend.ai/issues/4558))
+* Skip processing messages with None data in RedisQueue ([#4559](https://github.com/lablup/backend.ai/issues/4559))
+* Add missing `message` field to `BgTaskFailedEvent` to provide information about the occurred error ([#4563](https://github.com/lablup/backend.ai/issues/4563))
+* Fix `AgentWatcher.get_status` SDK API to use query parameter instead of using body ([#4569](https://github.com/lablup/backend.ai/issues/4569))
+* Correct the worker process ID and names in the server log outputs, which had been unintentionally overriden as the main process information ([#4572](https://github.com/lablup/backend.ai/issues/4572))
+* Resolve session creation failure due to incorrect resource label loading ([#4573](https://github.com/lablup/backend.ai/issues/4573))
+* Remove duplicated error logging in Session service ([#4574](https://github.com/lablup/backend.ai/issues/4574))
+* Fix Backend.AI agent to gracefully handle missing `Config.Labels` field in Docker image inspection ([#4576](https://github.com/lablup/backend.ai/issues/4576))
+* Do null-check of kernel service-ports when query direct access info of a compute session ([#4581](https://github.com/lablup/backend.ai/issues/4581))
+
+### Miscellaneous
+* Remove outdated Image SDK methods (`get_image_import_form`, `build`) ([#4537](https://github.com/lablup/backend.ai/issues/4537))
+* Remove useless print in `ScalingGroup.list_available` ([#4538](https://github.com/lablup/backend.ai/issues/4538))
+
+
 ## 25.8.1 (2025-05-23)
 
 ### Fixes

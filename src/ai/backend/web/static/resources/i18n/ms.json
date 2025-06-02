@@ -245,12 +245,14 @@
     "FolderToCopy": "Folder untuk disalin",
     "Foldername": "Nama folder",
     "Folders": "Folder",
+    "From": "Dari",
     "General": "Umum",
     "Host": "Tuan rumah",
     "HostDetails": "Memaparkan maklumat kuota untuk hos storan yang dipilih.",
     "InvalidEmail": "Alamat e -mel tidak sah",
     "Invited": "dijemput",
     "InvitedFolders": "Folder yang dijemput",
+    "InvitedFoldersTooltip": "{{ count }} Jemputan folder sedang menunggu tindak balas.",
     "Limit": "Had",
     "ModelStore": "Kedai Model",
     "Models": "Model",
@@ -413,6 +415,8 @@
       "View": "Pandangan"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Gagal menerima jemputan",
+      "FailedToDeclineInvitation": "Gagal menolak jemputan",
       "FolderSharingNotAvailableToUser": "Perkongsian folder tidak tersedia untuk pengguna yang diminta:",
       "InvitationError": "Jemputan gagal. Pengguna mungkin sudah dijemput.",
       "Invited": "Berjaya dijemput",
@@ -423,7 +427,10 @@
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
       "Shared": "Berjaya berkongsi folder kumpulan",
       "SharingError": "Perkongsian gagal. Pengguna mungkin sudah dikongsi atau tidak tergolong dalam projek yang sesuai.",
-      "SuccessfullyLeftSharedFolder": "Berjaya meninggalkan folder kongsi"
+      "SuccessfullyAcceptedInvitation": "Jemputan yang berjaya diterima",
+      "SuccessfullyDeclinedInvitation": "Berjaya menolak jemputan",
+      "SuccessfullyLeftSharedFolder": "Berjaya meninggalkan folder kongsi",
+      "UserIsAlreadyInvited": "{{email}} sudah dijemput"
     },
     "modelStore": {
       "AddedItems": "Item ditambah",
@@ -468,6 +475,10 @@
       "StatusOfSelectedHost": "Status Hos Terpilih",
       "Used": "digunakan"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Penyemak imbas ini tidak menyokong pemberitahuan.",
+    "PermissionDenied": "Anda telah menafikan akses pemberitahuan. \nUntuk menggunakan makluman, sila berikannya dalam tetapan penyemak imbas anda."
   },
   "dialog": {
     "ErrorOccurred": "Ralat Berlaku",
@@ -1153,7 +1164,7 @@
     "ResourcePresets": "Pratetap Sumber",
     "Resources": "Sumber",
     "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori",
-    "SharedMemory": "Memori bersama (GB)",
+    "SharedMemory": "Memori bersama",
     "Updated": "Pratetap sumber dikemas kini"
   },
   "session": {
@@ -1162,6 +1173,7 @@
     "Agents": "ejen",
     "AllowedClientIps": "IP pelanggan yang dibenarkan",
     "AlreadyTerminatingSession": "Sudah menamatkan sesi.",
+    "AnotherUserSession": "Sesi ini dibuat oleh pengguna lain",
     "Architecture": "Seni bina",
     "Arguments": "Hujah",
     "AverageUsage": "Avg",
@@ -1661,10 +1673,9 @@
       "Last12Hours": "12 jam terakhir",
       "Last3Hours": "3 jam terakhir",
       "Last7Days": "7 hari terakhir",
-      "LastDay": "1 hari terakhir"
-    },
-    "timeRanges": {
-      "LastHour": "1 jam terakhir"
+      "LastDay": "1 hari terakhir",
+      "LastHour": "1 jam terakhir",
+      "Today": "Hari ini"
     }
   },
   "storageHost": {
@@ -1799,7 +1810,6 @@
     "BootstrapScriptDescription": "Skrip Bootstrap akan dilaksanakan sekali sahaja selepas penciptaan sesi",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
     "BootstrapScriptUpdated": "Skrip bootstrap dikemas kini.",
-    "ClassicSessionLauncher": "Pelancar Sesi Classic",
     "ClearSSHKeypairInput": "Pad Kekunci SSH yang ditulis akan dikeluarkan. Adakah anda pasti mahu meneruskan?",
     "ConfigFilename": "Konfigurasi nama fail",
     "CurrentSSHPublicKey": "Kunci awam semasa:",
@@ -1809,7 +1819,7 @@
     "DescAutomaticUpdateCheck": "Beritahu bila versi webui baru dikeluarkan. <br /> Di mana Internet tidak stabil atau di luar talian, pilihan ini akan dimatikan secara automatik. Anda boleh menukar suis ini untuk memulakan pemeriksaan kemas kini automatik sekali lagi.",
     "DescBetaFeatures": "Gunakan ciri beta untuk UI Web. <br /> Ciri-ciri beta mungkin tidak stabil. Beberapa ciri beta mungkin tidak digunakan sebagai ciri rasmi.",
     "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini.",
-    "DescDesktopNotification": "Hidupkan atau matikan pemberitahuan desktop. <br /> Jika dihidupkan, Backend.AI juga menggunakan sistem pemberitahuan terbina dalam OS. Mematikan pilihan ini tidak mempengaruhi pemberitahuan dalam UI web.",
+    "DescDesktopNotification": "Membolehkan pemberitahuan desktop. \n<br /> Jika dihidupkan, backend.ai menggunakan sistem pemberitahuan terbina dalam OS juga. \nMematikan pilihan ini tidak menjejaskan pemberitahuan dalam UI Web. \nBergantung pada sistem operasi, pemberitahuan desktop mungkin memerlukan keizinan pemberitahuan dalam tetapan sistem.",
     "DescExperimentalDashboard": "Gunakan halaman papan pemuka dan bukannya halaman ringkasan.",
     "DescKeepLoginSessionInformation": "Biarkan aplikasi webui menyimpan maklumat sesi log masuk semasa lain kali. <br /> Sekiranya pilihan dimatikan, maklumat log masuk akan dihapus setiap log keluar.",
     "DescLanguage": "Tetapkan bahasa antara muka. Bahasa selain bahasa Inggeris dan Korea akan disediakan melalui terjemahan mesin.",
