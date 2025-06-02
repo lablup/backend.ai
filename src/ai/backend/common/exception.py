@@ -213,6 +213,7 @@ class ErrorDetail(enum.StrEnum):
     # This means the user has not completed the required fields in the profile.
     # For example, the user has not completed a 2FA setup or any verification.
     INCOMPLETE_USER_PROFILE = "incomplete-user-profile"
+    NOT_READY = "not-ready"  # The resource is not ready to be used.
 
     # Server Error
     INTERNAL_ERROR = (
