@@ -296,6 +296,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.computers = computers
         self.restarting = restarting
         self.local_config = local_config
+        self.additional_allowed_syscalls = []
 
     @abstractmethod
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -610,7 +611,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     async def inject_additional_device_env_vars(
         self, resource_spec: KernelResourceSpec, environ: MutableMapping[str, str]
     ) -> None:
-        # Inject ComputeDevice-specific env-varibles
+        # Inject ComputeDevice-specific env-variables
         additional_gid_set: set[int] = set()
         additional_allowed_syscalls_set: set[str] = set()
 
