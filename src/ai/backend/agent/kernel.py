@@ -56,6 +56,7 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     ServicePort,
     SessionId,
+    SessionTypes,
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -178,7 +179,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
-    status: KernelLifecycleStatus
+    state: KernelLifecycleStatus
+    session_type: SessionTypes
 
     _tasks: Set[asyncio.Task]
 
@@ -196,6 +198,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         service_ports: Any,  # TODO: type-annotation
         data: Dict[Any, Any],
         environ: Mapping[str, Any],
+        session_type: SessionTypes = SessionTypes.INTERACTIVE,
     ) -> None:
         self.agent_config = agent_config
         self.ownership_data = ownership_data
@@ -217,6 +220,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
+        self.session_type = session_type
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(

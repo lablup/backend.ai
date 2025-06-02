@@ -102,7 +102,6 @@ from ai.backend.common.events.kernel import (
 )
 from ai.backend.common.events.model_serving import ModelServiceStatusEvent
 from ai.backend.common.events.session import (
-    ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
@@ -179,7 +178,12 @@ from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
-from .kernel import AbstractKernel, match_distro_data
+from .kernel import (
+    AbstractKernel,
+    default_api_version,
+    default_client_features,
+    match_distro_data,
+)
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -1802,6 +1806,18 @@ class AbstractAgent(
             if kernel_obj.runner is not None:
                 kernel_obj.runner.event_producer = self.event_producer
                 await kernel_obj.runner.__ainit__()
+            else:
+                kernel_obj.runner = await kernel_obj.create_code_runner(
+                    self.event_producer,
+                    client_features=default_client_features,
+                    api_version=default_api_version,
+                )
+            if kernel_obj.session_type == SessionTypes.BATCH:
+                await kernel_obj.runner.attach_output_queue("batch-job")
+                await kernel_obj.runner.get_next_result(
+                    api_ver=3,
+                    flush_timeout=1.0,
+                )
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
@@ -1931,9 +1947,10 @@ class AbstractAgent(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
             )
         except asyncio.CancelledError:
-            await self.produce_event(
-                SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
-            )
+            pass
+            # await self.produce_event(
+            #     SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
+            # )
 
     async def create_batch_execution_task(
         self,
@@ -2287,6 +2304,7 @@ class AbstractAgent(
                     service_ports,
                     cluster_info,
                 )
+                kernel_obj.session_type = kernel_config["session_type"]
                 async with self.registry_lock:
                     self.kernel_registry[kernel_id] = kernel_obj
                 try:
@@ -2836,10 +2854,11 @@ class AbstractAgent(
                 run_id, mode, text, opts=opts, flush_timeout=flush_timeout, api_version=api_version
             )
         except asyncio.CancelledError:
-            await self.produce_event(
-                ExecutionCancelledEvent(session_id),
-            )
-            raise
+            pass
+            # await self.produce_event(
+            #     ExecutionCancelledEvent(session_id),
+            # )
+            # raise
         except KeyError:
             # This situation is handled in the lifecycle management subsystem.
             raise RuntimeError(
