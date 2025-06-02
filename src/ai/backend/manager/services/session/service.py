@@ -365,97 +365,135 @@ class SessionService:
         async def _commit_and_upload(reporter: ProgressReporter) -> None:
             reporter.total_progress = 3
             await reporter.update(message="Commit started")
-            try:
-                # remove any existing customized related tag from base canonical
-                filtered_tag_set = [
-                    x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
+            # remove any existing customized related tag from base canonical
+            filtered_tag_set = [
+                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
+            ]
+
+            if base_image_ref.name == "":
+                new_name = base_image_ref.project
+            else:
+                new_name = base_image_ref.name
+
+            new_canonical = (
+                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            )
+
+            async with self._db.begin_readonly_session() as sess:
+                # check if user has passed its limit of customized image count
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(ImageRow)
+                    .where(
+                        (
+                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                            == f"{image_visibility.value}:{image_owner_id}"
+                        )
+                    )
+                    .where(ImageRow.status == ImageStatus.ALIVE)
+                )
+                existing_image_count = await sess.scalar(query)
+
+                customized_image_count_limit = action.max_customized_image_count
+                if customized_image_count_limit <= existing_image_count:
+                    raise QuotaExceeded(
+                        extra_msg="You have reached your customized image count quota",
+                        extra_data={
+                            "limit": customized_image_count_limit,
+                            "current": existing_image_count,
+                        },
+                    )
+
+                # check if image with same name exists and reuse ID it if is
+                query = sa.select(ImageRow).where(
+                    sa.and_(
+                        ImageRow.name.like(f"{new_canonical}%"),
+                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                        == f"{image_visibility.value}:{image_owner_id}",
+                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
+                        == image_name,
+                        ImageRow.status == ImageStatus.ALIVE,
+                    )
+                )
+                existing_row = await sess.scalar(query)
+
+                customized_image_id: str
+                kern_features: list[str]
+                if existing_row:
+                    kern_features = existing_row.labels.get(
+                        LabelName.FEATURES, DEFAULT_KERNEL_FEATURE
+                    ).split()
+                    customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID]
+                    log.debug("reusing existing customized image ID {}", customized_image_id)
+                else:
+                    kern_features = [DEFAULT_KERNEL_FEATURE]
+                    customized_image_id = str(uuid.uuid4())
+                # Remove PRIVATE label for customized images
+                kern_features = [
+                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
                 ]
 
-                if base_image_ref.name == "":
-                    new_name = base_image_ref.project
-                else:
-                    new_name = base_image_ref.name
+            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
+            new_image_ref = ImageRef.from_image_str(
+                new_canonical,
+                None,
+                registry_hostname,
+                architecture=base_image_ref.architecture,
+                is_local=base_image_ref.is_local,
+            )
 
-                new_canonical = f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            image_labels: dict[str | LabelName, str] = {
+                LabelName.CUSTOMIZED_OWNER: f"{image_visibility.value}:{image_owner_id}",
+                LabelName.CUSTOMIZED_NAME: image_name,
+                LabelName.CUSTOMIZED_ID: customized_image_id,
+                LabelName.FEATURES: " ".join(kern_features),
+            }
+            match image_visibility:
+                case CustomizedImageVisibilityScope.USER:
+                    image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = action.user_email
 
-                async with self._db.begin_readonly_session() as sess:
-                    # check if user has passed its limit of customized image count
-                    query = (
-                        sa.select([sa.func.count()])
-                        .select_from(ImageRow)
-                        .where(
-                            (
-                                ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                                == f"{image_visibility.value}:{image_owner_id}"
-                            )
-                        )
-                        .where(ImageRow.status == ImageStatus.ALIVE)
-                    )
-                    existing_image_count = await sess.scalar(query)
+            # commit image with new tag set
+            resp = await self._agent_registry.commit_session(
+                session,
+                new_image_ref,
+                extra_labels=image_labels,
+            )
+            bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
+            propagator = BgtaskPropagator(self._background_task_manager)
+            self._event_hub.register_event_propagator(
+                propagator, [(EventDomain.BGTASK, str(bgtask_id))]
+            )
+            try:
+                async for event in propagator.receive(bgtask_id):
+                    if not isinstance(event, BaseBgtaskDoneEvent):
+                        log.warning("unexpected event: {}", event)
+                        continue
+                    match event.status():
+                        case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
+                            # TODO: PARTIAL_SUCCESS should be handled
+                            await reporter.update(increment=1, message="Committed image")
+                            break
+                        case BgtaskStatus.FAILED:
+                            raise BgtaskFailedError(extra_msg=event.message)
+                        case BgtaskStatus.CANCELLED:
+                            raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                        case _:
+                            log.warning("unexpected bgtask done event: {}", event)
+            finally:
+                self._event_hub.unregister_event_propagator(propagator.id())
 
-                    customized_image_count_limit = action.max_customized_image_count
-                    if customized_image_count_limit <= existing_image_count:
-                        raise QuotaExceeded(
-                            extra_msg="You have reached your customized image count quota",
-                            extra_data={
-                                "limit": customized_image_count_limit,
-                                "current": existing_image_count,
-                            },
-                        )
-
-                    # check if image with same name exists and reuse ID it if is
-                    query = sa.select(ImageRow).where(
-                        sa.and_(
-                            ImageRow.name.like(f"{new_canonical}%"),
-                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                            == f"{image_visibility.value}:{image_owner_id}",
-                            ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                            == image_name,
-                            ImageRow.status == ImageStatus.ALIVE,
-                        )
-                    )
-                    existing_row = await sess.scalar(query)
-
-                    customized_image_id: str
-                    kern_features: list[str]
-                    if existing_row:
-                        kern_features = existing_row.labels.get(
-                            LabelName.FEATURES, DEFAULT_KERNEL_FEATURE
-                        ).split()
-                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID]
-                        log.debug("reusing existing customized image ID {}", customized_image_id)
-                    else:
-                        kern_features = [DEFAULT_KERNEL_FEATURE]
-                        customized_image_id = str(uuid.uuid4())
-                    # Remove PRIVATE label for customized images
-                    kern_features = [
-                        feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
-                    ]
-
-                new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-                new_image_ref = ImageRef.from_image_str(
-                    new_canonical,
-                    None,
-                    registry_hostname,
-                    architecture=base_image_ref.architecture,
-                    is_local=base_image_ref.is_local,
+            if not new_image_ref.is_local:
+                # push image to registry from local agent
+                image_registry = ImageRegistry(
+                    name=registry_hostname,
+                    url=str(registry_conf.url),
+                    username=registry_conf.username,
+                    password=registry_conf.password,
                 )
-
-                image_labels: dict[str | LabelName, str] = {
-                    LabelName.CUSTOMIZED_OWNER: f"{image_visibility.value}:{image_owner_id}",
-                    LabelName.CUSTOMIZED_NAME: image_name,
-                    LabelName.CUSTOMIZED_ID: customized_image_id,
-                    LabelName.FEATURES: " ".join(kern_features),
-                }
-                match image_visibility:
-                    case CustomizedImageVisibilityScope.USER:
-                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = action.user_email
-
-                # commit image with new tag set
-                resp = await self._agent_registry.commit_session(
-                    session,
+                resp = await self._agent_registry.push_image(
+                    session.main_kernel.agent,
                     new_image_ref,
-                    extra_labels=image_labels,
+                    image_registry,
                 )
                 bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
                 propagator = BgtaskPropagator(self._background_task_manager)
@@ -469,8 +507,6 @@ class SessionService:
                             continue
                         match event.status():
                             case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                                # TODO: PARTIAL_SUCCESS should be handled
-                                await reporter.update(increment=1, message="Committed image")
                                 break
                             case BgtaskStatus.FAILED:
                                 raise BgtaskFailedError(extra_msg=event.message)
@@ -481,52 +517,15 @@ class SessionService:
                 finally:
                     self._event_hub.unregister_event_propagator(propagator.id())
 
-                if not new_image_ref.is_local:
-                    # push image to registry from local agent
-                    image_registry = ImageRegistry(
-                        name=registry_hostname,
-                        url=str(registry_conf.url),
-                        username=registry_conf.username,
-                        password=registry_conf.password,
-                    )
-                    resp = await self._agent_registry.push_image(
-                        session.main_kernel.agent,
-                        new_image_ref,
-                        image_registry,
-                    )
-                    bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-                    propagator = BgtaskPropagator(self._background_task_manager)
-                    self._event_hub.register_event_propagator(
-                        propagator, [(EventDomain.BGTASK, str(bgtask_id))]
-                    )
-                    try:
-                        async for event in propagator.receive(bgtask_id):
-                            if not isinstance(event, BaseBgtaskDoneEvent):
-                                log.warning("unexpected event: {}", event)
-                                continue
-                            match event.status():
-                                case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                                    break
-                                case BgtaskStatus.FAILED:
-                                    raise BgtaskFailedError(extra_msg=event.message)
-                                case BgtaskStatus.CANCELLED:
-                                    raise BgtaskCancelledError(extra_msg="Operation cancelled")
-                                case _:
-                                    log.warning("unexpected bgtask done event: {}", event)
-                    finally:
-                        self._event_hub.unregister_event_propagator(propagator.id())
-
-                await reporter.update(increment=1, message="Pushed image to registry")
-                # rescan updated image only
-                await rescan_images(
-                    self._db,
-                    new_image_ref.canonical,
-                    registry_project,
-                    reporter=reporter,
-                )
-                await reporter.update(increment=1, message="Completed")
-            except BackendAIError:
-                raise
+            await reporter.update(increment=1, message="Pushed image to registry")
+            # rescan updated image only
+            await rescan_images(
+                self._db,
+                new_image_ref.canonical,
+                registry_project,
+                reporter=reporter,
+            )
+            await reporter.update(increment=1, message="Completed")
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
 
@@ -602,6 +601,8 @@ class SessionService:
             return CreateClusterActionResult(result=resp, session_id=resp["kernelId"])
         except TooManySessionsMatched:
             raise SessionAlreadyExists
+        except BackendAIError:
+            raise
         except UnknownImageReference:
             raise UnknownImageReferenceError("Unknown image reference!")
         except Exception as e:
@@ -697,6 +698,8 @@ class SessionService:
             return CreateFromParamsActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
+        except BackendAIError:
+            raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!", e)
@@ -912,6 +915,8 @@ class SessionService:
             return CreateFromTemplateActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
+        except BackendAIError:
+            raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!", e)
@@ -1002,6 +1007,10 @@ class SessionService:
             result = await self._agent_registry.download_single(session, owner_access_key, file)
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
+        except asyncio.CancelledError:
+            raise
+        except BackendAIError:
+            raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
             log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
@@ -1032,6 +1041,10 @@ class SessionService:
                 ),
             )
             log.debug("file(s) inside container retrieved")
+        except asyncio.CancelledError:
+            raise
+        except BackendAIError:
+            raise
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
         except Exception as e:
@@ -1144,6 +1157,8 @@ class SessionService:
         except AssertionError as e:
             log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
             raise InvalidAPIParameters(extra_msg=e.args[0])
+        except BackendAIError:
+            raise
 
         return ExecuteSessionActionResult(result=resp, session_row=session)
 
@@ -1377,6 +1392,10 @@ class SessionService:
             result = await self._agent_registry.list_files(session, path)
             resp.update(result)
             log.debug("container file list for {0} retrieved", path)
+        except asyncio.CancelledError:
+            raise
+        except BackendAIError:
+            raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
             log.exception("LIST_FILES: unexpected error!", e)
