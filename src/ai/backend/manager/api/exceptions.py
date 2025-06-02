@@ -117,14 +117,6 @@ class KernelNotReady(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/kernel-not-ready"
     error_title = "Kernel not ready."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_READY,
-        )
-
 
 class RejectedByHook(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/rejected-by-hook"
