@@ -246,22 +246,19 @@ class SessionService:
         myself = asyncio.current_task()
         assert myself is not None
 
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
-
-            resp: Mapping[str, Any] = await asyncio.shield(
-                self._rpc_ptask_group.create_task(
-                    self._agent_registry.commit_session_to_file(session, filename),
-                ),
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
-        except BackendAIError:
-            raise
+
+        resp: Mapping[str, Any] = await asyncio.shield(
+            self._rpc_ptask_group.create_task(
+                self._agent_registry.commit_session_to_file(session, filename),
+            ),
+        )
 
         return CommitSessionActionResult(
             session_row=session,
@@ -295,8 +292,6 @@ class SessionService:
             )
         except AssertionError:
             raise InvalidAPIParameters
-        except BackendAIError:
-            raise
         return CompleteActionResult(
             session_row=session,
             result=resp,
@@ -607,8 +602,6 @@ class SessionService:
             return CreateClusterActionResult(result=resp, session_id=resp["kernelId"])
         except TooManySessionsMatched:
             raise SessionAlreadyExists
-        except BackendAIError:
-            raise
         except UnknownImageReference:
             raise UnknownImageReferenceError("Unknown image reference!")
         except Exception:
@@ -703,10 +696,9 @@ class SessionService:
             return CreateFromParamsActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
-        except BackendAIError:
-            raise
         except Exception:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
+            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
 
     async def create_from_template(
@@ -919,8 +911,6 @@ class SessionService:
             return CreateFromTemplateActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
-        except BackendAIError:
-            raise
         except Exception:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
             raise InternalServerError
@@ -1008,10 +998,6 @@ class SessionService:
                 )
             await self._agent_registry.increment_session_usage(session)
             result = await self._agent_registry.download_single(session, owner_access_key, file)
-        except asyncio.CancelledError:
-            raise
-        except BackendAIError:
-            raise
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
         except Exception:
@@ -1043,10 +1029,6 @@ class SessionService:
                 ),
             )
             log.debug("file(s) inside container retrieved")
-        except asyncio.CancelledError:
-            raise
-        except BackendAIError:
-            raise
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
         except Exception:
@@ -1158,8 +1140,6 @@ class SessionService:
         except AssertionError as e:
             log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
             raise InvalidAPIParameters(extra_msg=e.args[0])
-        except BackendAIError:
-            raise
 
         return ExecuteSessionActionResult(result=resp, session_row=session)
 
@@ -1168,35 +1148,30 @@ class SessionService:
     ) -> GetAbusingReportActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
-            kernel = session.main_kernel
-            report = await self._agent_registry.get_abusing_report(kernel.id)
-        except BackendAIError:
-            raise
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        kernel = session.main_kernel
+        report = await self._agent_registry.get_abusing_report(kernel.id)
         return GetAbusingReportActionResult(result=report, session_row=session)
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
-            statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
-        except BackendAIError:
-            raise
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
+
         resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
         return GetCommitStatusActionResult(result=resp, session_row=session)
 
@@ -1398,10 +1373,6 @@ class SessionService:
             result = await self._agent_registry.list_files(session, path)
             resp.update(result)
             log.debug("container file list for {0} retrieved", path)
-        except asyncio.CancelledError:
-            raise
-        except BackendAIError:
-            raise
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
             raise InternalServerError
@@ -1492,23 +1463,20 @@ class SessionService:
         envs = action.envs
         login_session_token = action.login_session_token
 
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await asyncio.shield(
-                    self._database_ptask_group.create_task(
-                        SessionRow.get_session(
-                            db_sess,
-                            session_name,
-                            access_key,
-                            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                            eager_loading_op=[
-                                selectinload(SessionRow.routing).options(noload("*")),
-                            ],
-                        ),
-                    )
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await asyncio.shield(
+                self._database_ptask_group.create_task(
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                        eager_loading_op=[
+                            selectinload(SessionRow.routing).options(noload("*")),
+                        ],
+                    ),
                 )
-        except (SessionNotFound, TooManySessionsMatched):
-            raise
+            )
 
         query = (
             sa.select([scaling_groups.c.wsproxy_addr])
