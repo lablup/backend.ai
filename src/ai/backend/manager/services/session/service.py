@@ -606,6 +606,7 @@ class SessionService:
             raise UnknownImageReferenceError("Unknown image reference!")
         except Exception:
             await self._error_monitor.capture_exception()
+            log.exception("GET_OR_CREATE: exception")
             raise InternalServerError
 
     async def create_from_params(
@@ -913,6 +914,7 @@ class SessionService:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
         except Exception:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
+            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
@@ -1002,6 +1004,7 @@ class SessionService:
             raise InvalidAPIParameters("The file is not found.")
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
+            log.exception("DOWNLOAD_SINGLE: unexpected error!")
             raise InternalServerError
 
         return DownloadFileActionResult(result=result, session_row=session)
@@ -1033,6 +1036,7 @@ class SessionService:
             raise InvalidAPIParameters("The file is not found.")
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
+            log.exception("DOWNLOAD_FILE: exception")
             raise InternalServerError
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -1375,6 +1379,7 @@ class SessionService:
             log.debug("container file list for {0} retrieved", path)
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
+            log.exception("LIST_FILES: exception")
             raise InternalServerError
 
         return ListFilesActionResult(result=result, session_row=session)
