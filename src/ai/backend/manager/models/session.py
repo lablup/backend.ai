@@ -1605,11 +1605,11 @@ class SessionLifecycleManager:
             return result
 
         async with self.db.connect() as db_conn:
-            ressult = await _transit(db_conn)
-        for session_row, is_transited in ressult:
+            result = await _transit(db_conn)
+        for session_row, is_transited in result:
             if is_transited:
                 await self._post_status_transition(session_row)
-        return ressult
+        return result
 
     async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
         if not session_ids:
