@@ -246,12 +246,14 @@
     "FolderToCopy": "Thư mục để sao chép",
     "Foldername": "Tên thư mục",
     "Folders": "Thư mục",
+    "From": "Từ",
     "General": "Tổng quan",
     "Host": "Tổ chức",
     "HostDetails": "Hiển thị thông tin hạn ngạch cho máy chủ lưu trữ đã chọn.",
     "InvalidEmail": "Địa chỉ email không hợp lệ",
     "Invited": "được mời",
     "InvitedFolders": "Thư mục được mời",
+    "InvitedFoldersTooltip": "{{ count }} Lời mời thư mục đang chờ phản hồi.",
     "Limit": "Giới hạn",
     "ModelStore": "Cửa hàng mô hình",
     "Models": "Mô hình",
@@ -414,6 +416,8 @@
       "View": "Lượt xem"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Không chấp nhận lời mời",
+      "FailedToDeclineInvitation": "Không thể từ chối lời mời",
       "FolderSharingNotAvailableToUser": "Chia sẻ thư mục không có sẵn cho (những) người dùng được yêu cầu:",
       "InvitationError": "Lời mời không thành công. Người dùng có thể đã được mời.",
       "Invited": "Đã mời thành công",
@@ -424,7 +428,10 @@
       "NoValidEmails": "Không có email hợp lệ nào được nhập",
       "Shared": "Đã chia sẻ thành công thư mục nhóm",
       "SharingError": "Chia sẻ không thành công. Người dùng có thể đã được chia sẻ hoặc không thuộc dự án thích hợp.",
-      "SuccessfullyLeftSharedFolder": "Thành công để lại thư mục chia sẻ"
+      "SuccessfullyAcceptedInvitation": "Lời mời được chấp nhận thành công",
+      "SuccessfullyDeclinedInvitation": "Lời mời từ chối thành công",
+      "SuccessfullyLeftSharedFolder": "Thành công để lại thư mục chia sẻ",
+      "UserIsAlreadyInvited": "{{email}} đã được mời"
     },
     "modelStore": {
       "AddedItems": "Các mục đã thêm",
@@ -469,6 +476,10 @@
       "StatusOfSelectedHost": "Trạng thái của máy chủ được chọn",
       "Used": "đã sử dụng"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Trình duyệt này không hỗ trợ thông báo.",
+    "PermissionDenied": "Bạn đã từ chối truy cập thông báo. \nĐể sử dụng cảnh báo, vui lòng cho phép nó trong cài đặt trình duyệt của bạn."
   },
   "dialog": {
     "ErrorOccurred": "Xảy ra lỗi",
@@ -1154,7 +1165,7 @@
     "ResourcePresets": "Cài đặt trước tài nguyên",
     "Resources": "Tài nguyên",
     "SHMEMShouldBeSmallerThanMemory": "Bộ nhớ dùng chung phải nhỏ hơn bộ nhớ",
-    "SharedMemory": "Bộ nhớ dùng chung (GB)",
+    "SharedMemory": "Bộ nhớ chia sẻ",
     "Updated": "Đã cập nhật cài đặt trước tài nguyên"
   },
   "session": {
@@ -1163,6 +1174,7 @@
     "Agents": "Đại lý",
     "AllowedClientIps": "IP khách hàng được phép",
     "AlreadyTerminatingSession": "Đã kết thúc phiên.",
+    "AnotherUserSession": "Phiên này được tạo bởi người dùng khác",
     "Architecture": "Ngành kiến ​​​​trúc",
     "Arguments": "Tranh luận",
     "AverageUsage": "AVG",
@@ -1663,10 +1675,9 @@
       "Last12Hours": "12 giờ cuối cùng",
       "Last3Hours": "3 giờ cuối cùng",
       "Last7Days": "7 ngày qua",
-      "LastDay": "1 ngày trước"
-    },
-    "timeRanges": {
-      "LastHour": "1 giờ cuối cùng"
+      "LastDay": "1 ngày trước",
+      "LastHour": "1 giờ cuối cùng",
+      "Today": "Hôm nay"
     }
   },
   "storageHost": {
@@ -1801,7 +1812,6 @@
     "BootstrapScriptDescription": "Tập lệnh Bootstrap sẽ chỉ được thực thi một lần sau khi tạo phiên",
     "BootstrapScriptEmpty": "Kịch bản trống rỗng. \nVui lòng nhập kịch bản.",
     "BootstrapScriptUpdated": "Đã cập nhật tập lệnh Bootstrap.",
-    "ClassicSessionLauncher": "Trình khởi chạy phiên Classic",
     "ClearSSHKeypairInput": "Cặp khóa SSH đã viết sẽ bị xóa. Bạn có chắc chắn muốn tiếp tục không?",
     "ConfigFilename": "Định cấu hình tên tệp",
     "CurrentSSHPublicKey": "Khóa công khai hiện tại:",
@@ -1811,7 +1821,7 @@
     "DescAutomaticUpdateCheck": "Thông báo khi phiên bản webui mới được phát hành. <br /> Trong trường hợp Internet không ổn định hoặc ngoại tuyến, tùy chọn này sẽ tự động bị tắt. Bạn có thể bật công tắc này để bắt đầu lại quá trình kiểm tra cập nhật tự động.",
     "DescBetaFeatures": "Sử dụng các tính năng beta cho giao diện người dùng Web. <br /> Các tính năng beta có thể không ổn định. Một số tính năng beta có thể không được chấp nhận làm tính năng chính thức.",
     "DescClassicSessionLauncher": "Sử dụng trình khởi chạy phiên Classic thay vì trình khởi chạy phiên NEO. \nTrình khởi chạy phiên Classic có thể không có các tính năng mới nhất.",
-    "DescDesktopNotification": "Bật hoặc tắt thông báo trên màn hình. <br /> Nếu được bật, Backend.AI cũng sử dụng hệ thống thông báo tích hợp sẵn của OS. Tắt tùy chọn này không ảnh hưởng đến các thông báo trong giao diện người dùng web.",
+    "DescDesktopNotification": "Cho phép thông báo máy tính để bàn. \n<br /> Nếu được bật, Backend.ai cũng sử dụng hệ thống thông báo tích hợp OS. \nTắt tùy chọn này không ảnh hưởng đến thông báo trong UI web. \nTùy thuộc vào hệ điều hành, thông báo máy tính để bàn có thể yêu cầu cho phép các quyền thông báo trong cài đặt hệ thống.",
     "DescExperimentalDashboard": "Sử dụng trang bảng điều khiển thay vì trang tóm tắt.",
     "DescKeepLoginSessionInformation": "Hãy để ứng dụng webui giữ thông tin phiên đăng nhập hiện tại vào lần sau. <br /> Nếu tùy chọn bị tắt, thông tin đăng nhập sẽ bị xóa mỗi lần đăng xuất.",
     "DescLanguage": "Đặt ngôn ngữ giao diện. Các ngôn ngữ khác ngoài tiếng Anh và tiếng Hàn sẽ được cung cấp thông qua dịch máy.",

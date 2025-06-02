@@ -246,12 +246,14 @@
     "FolderToCopy": "Folder do skopiowania",
     "Foldername": "Nazwa folderu",
     "Folders": "Lornetka składana",
+    "From": "Z",
     "General": "Ogólny",
     "Host": "Gospodarz",
     "HostDetails": "Wyświetla informacje o przydziale dla wybranego hosta pamięci masowej.",
     "InvalidEmail": "Nieprawidłowy adres e -mail",
     "Invited": "zaproszony",
     "InvitedFolders": "Zaproszone foldery",
+    "InvitedFoldersTooltip": "{{ count }} Zaproszenia do folderów oczekują odpowiedzi.",
     "Limit": "Limit",
     "ModelStore": "Sklep modelarski",
     "Models": "Modele",
@@ -414,6 +416,8 @@
       "View": "Widok"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Nie przyjął zaproszenia",
+      "FailedToDeclineInvitation": "Nie udało się odmówić zaproszenia",
       "FolderSharingNotAvailableToUser": "Udostępnianie folderów nie jest dostępne dla żądanych użytkowników:",
       "InvitationError": "Zaproszenie nie powiodło się. Użytkownik może już zostać zaproszony.",
       "Invited": "Pomyślnie zaproszono",
@@ -424,7 +428,10 @@
       "NoValidEmails": "Nie wprowadzono poprawnych adresów e-mail",
       "Shared": "Pomyślnie udostępniono folder grupy",
       "SharingError": "Udostępnianie nie powiodło się. Użytkownik może już być udostępniony lub nie należy do odpowiedniego projektu.",
-      "SuccessfullyLeftSharedFolder": "Z powodzeniem zostawił wspólny folder"
+      "SuccessfullyAcceptedInvitation": "Pomyślnie przyjęte zaproszenie",
+      "SuccessfullyDeclinedInvitation": "Pomyślnie odrzucił zaproszenie",
+      "SuccessfullyLeftSharedFolder": "Z powodzeniem zostawił wspólny folder",
+      "UserIsAlreadyInvited": "{{email}} jest już zaproszony"
     },
     "modelStore": {
       "AddedItems": "Dodane elementy",
@@ -469,6 +476,10 @@
       "StatusOfSelectedHost": "Status wybranego hosta",
       "Used": "używany"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Ta przeglądarka nie obsługuje powiadomień.",
+    "PermissionDenied": "Odmówiłeś dostępu do powiadomień. \nAby użyć alertów, pozwól temu w ustawieniach przeglądarki."
   },
   "dialog": {
     "ErrorOccurred": "Wystąpił błąd",
@@ -1154,7 +1165,7 @@
     "ResourcePresets": "Predefiniowane ustawienia zasobów",
     "Resources": "Zasoby",
     "SHMEMShouldBeSmallerThanMemory": "Pamięć współdzielona musi być mniejsza niż pamięć",
-    "SharedMemory": "Pamięć współdzielona (GB)",
+    "SharedMemory": "Udostępniona pamięć",
     "Updated": "Zaktualizowano wstępne ustawienia zasobów"
   },
   "session": {
@@ -1163,6 +1174,7 @@
     "Agents": "Agenci",
     "AllowedClientIps": "Dozwolone adresy IP klientów",
     "AlreadyTerminatingSession": "Zakończono już sesję.",
+    "AnotherUserSession": "Ta sesja została stworzona przez innego użytkownika",
     "Architecture": "Architektura",
     "Arguments": "Argumenty",
     "AverageUsage": "Avg",
@@ -1663,10 +1675,9 @@
       "Last12Hours": "Ostatnie 12 godzin",
       "Last3Hours": "Ostatnie 3 godziny",
       "Last7Days": "Ostatnie 7 dni",
-      "LastDay": "Ostatni 1 dzień"
-    },
-    "timeRanges": {
-      "LastHour": "Ostatnia 1 godzina"
+      "LastDay": "Ostatni 1 dzień",
+      "LastHour": "Ostatnia 1 godzina",
+      "Today": "Dzisiaj"
     }
   },
   "storageHost": {
@@ -1801,7 +1812,6 @@
     "BootstrapScriptDescription": "Skrypt Bootstrap zostanie wykonany tylko raz po utworzeniu sesji.",
     "BootstrapScriptEmpty": "Skrypt jest pusty. \nProszę wprowadzić skrypt.",
     "BootstrapScriptUpdated": "Zaktualizowano skrypt Bootstrap.",
-    "ClassicSessionLauncher": "Classic program uruchamiający sesję",
     "ClearSSHKeypairInput": "Zapisana para kluczy SSH zostanie usunięta. Jesteś pewien, że chcesz kontynuować?",
     "ConfigFilename": "Nazwa pliku konfiguracyjnego",
     "CurrentSSHPublicKey": "Aktualny klucz publiczny:",
@@ -1811,7 +1821,7 @@
     "DescAutomaticUpdateCheck": "Powiadom o wydaniu nowej wersji webui. <br /> W przypadku, gdy Internet jest niestabilny lub offline, ta opcja zostanie automatycznie wyłączona. Możesz przełączyć ten przełącznik, aby ponownie rozpocząć automatyczne sprawdzanie aktualizacji.",
     "DescBetaFeatures": "Korzystaj z funkcji beta interfejsu internetowego. <br /> Funkcje beta mogą być niestabilne. Niektóre funkcje beta mogą nie zostać przyjęte jako funkcja oficjalna.",
     "DescClassicSessionLauncher": "Użyj Classic programu uruchamiającego sesję zamiast programu uruchamiającego sesję NEO. \nClassic program uruchamiający sesję może nie mieć najnowszych funkcji.",
-    "DescDesktopNotification": "Włącz lub wyłącz powiadomienia na pulpicie. <br /> Jeśli jest włączony, Backend.AI używa również wbudowanego systemu powiadomień. Wyłączenie tej opcji nie wpływa na powiadomienia w interfejsie internetowym.",
+    "DescDesktopNotification": "Włącza powiadomienie komputerowe. \n<br /> Jeśli włączony, Backend.ai używa również wbudowanego systemu powiadomień. \nWyłączenie tej opcji nie wpływa na powiadomienia w interfejsie internetowym. \nW zależności od systemu operacyjnego powiadomienia komputerowe mogą wymagać umożliwienia uprawnień powiadomień w ustawieniach systemu.",
     "DescExperimentalDashboard": "Użyj strony Dashboard zamiast strony podsumowującej.",
     "DescKeepLoginSessionInformation": "Pozwól aplikacji webui zachować bieżące informacje o sesji logowania następnym razem. <br /> Jeśli opcja jest wyłączona, dane logowania będą usuwane przy każdym wylogowaniu.",
     "DescLanguage": "Ustaw język interfejsu. Języki inne niż angielski i koreański będą dostarczane przez tłumaczenie maszynowe.",

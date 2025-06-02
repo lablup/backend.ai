@@ -246,12 +246,14 @@
     "FolderToCopy": "Ordner zum Kopieren",
     "Foldername": "Ordnernamen",
     "Folders": "Ordner",
+    "From": "Aus",
     "General": "Allgemein",
     "Host": "Gastgeber",
     "HostDetails": "Zeigt Kontingentinformationen für den ausgewählten Speicherhost an.",
     "InvalidEmail": "Ungültige E -Mail -Adresse",
     "Invited": "eingeladen",
     "InvitedFolders": "Eingeladene Ordner",
+    "InvitedFoldersTooltip": "{{ count }} Ordnereinladungen sind eine Antwort aus.",
     "Limit": "Grenze",
     "ModelStore": "Modellladen",
     "Models": "Modelle",
@@ -414,6 +416,8 @@
       "View": "Aussicht"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Die Einladung nicht akzeptiert",
+      "FailedToDeclineInvitation": "Die Einladung versäumte es, die Einladung abzulehnen",
       "FolderSharingNotAvailableToUser": "Die gemeinsame Nutzung von Ordnern ist für den/die gewünschten Benutzer nicht verfügbar:",
       "InvitationError": "Einladung fehlgeschlagen. Der Benutzer ist möglicherweise bereits eingeladen.",
       "Invited": "Erfolgreich eingeladen",
@@ -424,7 +428,10 @@
       "NoValidEmails": "Es wurden keine gültigen E-Mails eingegeben",
       "Shared": "Gruppenordner erfolgreich freigegeben",
       "SharingError": "Die Freigabe ist fehlgeschlagen. Der Benutzer ist möglicherweise bereits freigegeben oder gehört nicht zu dem entsprechenden Projekt.",
-      "SuccessfullyLeftSharedFolder": "Erfolgreich den gemeinsam genutzten Ordner verlassen"
+      "SuccessfullyAcceptedInvitation": "Erfolgreich akzeptierte Einladung",
+      "SuccessfullyDeclinedInvitation": "Erfolgreich abgelehnt Einladung",
+      "SuccessfullyLeftSharedFolder": "Erfolgreich den gemeinsam genutzten Ordner verlassen",
+      "UserIsAlreadyInvited": "{{email}} ist bereits eingeladen"
     },
     "modelStore": {
       "AddedItems": "Artikel hinzugefügt",
@@ -469,6 +476,10 @@
       "StatusOfSelectedHost": "Status des ausgewählten Hosts",
       "Used": "gebraucht"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Dieser Browser unterstützt keine Benachrichtigungen.",
+    "PermissionDenied": "Sie haben den Benachrichtigungszugriff abgelehnt. \nUm Warnungen zu verwenden, lassen Sie diese bitte in Ihren Browsereinstellungen zu."
   },
   "dialog": {
     "ErrorOccurred": "Ein Fehler ist aufgetreten",
@@ -1151,7 +1162,7 @@
     "ResourcePresets": "Ressourcenvoreinstellungen",
     "Resources": "Ressourcen",
     "SHMEMShouldBeSmallerThanMemory": "Gemeinsamer Speicher muss kleiner sein als der Speicher",
-    "SharedMemory": "Gemeinsamer Speicher (GB)",
+    "SharedMemory": "Gemeinsamer Speicher",
     "Updated": "Ressourcenvoreinstellung aktualisiert"
   },
   "session": {
@@ -1160,6 +1171,7 @@
     "Agents": "Agenten",
     "AllowedClientIps": "Erlaubte Client-IPs",
     "AlreadyTerminatingSession": "Die Sitzung ist bereits beendet.",
+    "AnotherUserSession": "Diese Sitzung wurde von einem anderen Benutzer erstellt",
     "Architecture": "Architektur",
     "Arguments": "Argumente",
     "AverageUsage": "Avg",
@@ -1660,10 +1672,9 @@
       "Last12Hours": "Letzte 12 Stunden",
       "Last3Hours": "Letzte 3 Stunden",
       "Last7Days": "Letzten 7 Tage",
-      "LastDay": "Letzte 1 Tag"
-    },
-    "timeRanges": {
-      "LastHour": "Letzte 1 Stunde"
+      "LastDay": "Letzte 1 Tag",
+      "LastHour": "Letzte 1 Stunde",
+      "Today": "Heute"
     }
   },
   "storageHost": {
@@ -1798,7 +1809,6 @@
     "BootstrapScriptDescription": "Das Bootstrap-Skript wird nur einmal nach der Erstellung der Sitzung ausgeführt",
     "BootstrapScriptEmpty": "Das Skript ist leer. \nBitte geben Sie das Skript ein.",
     "BootstrapScriptUpdated": "Bootstrap-Skript aktualisiert.",
-    "ClassicSessionLauncher": "Classic Sitzungsstarter",
     "ClearSSHKeypairInput": "Geschriebenes SSH-Schlüsselpaar wird entfernt. Sind Sie sicher, dass Sie fortfahren möchten?",
     "ConfigFilename": "Name der Konfigurationsdatei",
     "CurrentSSHPublicKey": "Aktueller öffentlicher Schlüssel:",
@@ -1808,7 +1818,7 @@
     "DescAutomaticUpdateCheck": "Benachrichtigen, wenn eine neue Webui-Version veröffentlicht wird. <br /> Wenn das Internet instabil oder offline ist, wird diese Option automatisch deaktiviert. Sie können diesen Schalter umschalten, um die automatische Updateprüfung erneut zu starten.",
     "DescBetaFeatures": "Verwenden Sie Betafunktionen für die Web-Benutzeroberfläche. <br /> Beta-Funktionen können instabil sein. Einige Betafunktionen werden möglicherweise nicht als offizielle Funktionen übernommen.",
     "DescClassicSessionLauncher": "Verwenden Sie den Classic-Sitzungsstarter anstelle des NEO-Sitzungsstarters. \nDer Classic Sitzungsstarter verfügt möglicherweise nicht über die neuesten Funktionen.",
-    "DescDesktopNotification": "Aktivieren oder deaktivieren Sie die Desktop-Benachrichtigung. <br /> Wenn aktiviert, verwendet Backend.AI auch das im Betriebssystem integrierte Benachrichtigungssystem. Das Deaktivieren dieser Option wirkt sich nicht auf Benachrichtigungen in der Web-Benutzeroberfläche aus.",
+    "DescDesktopNotification": "Aktiviert die Desktop -Benachrichtigung. \n<br /> Wenn er eingeschaltet ist, verwendet Backend.ai auch das integrierte Benachrichtigungssystem des Betriebssystems. \nDas Ausschalten dieser Option wirkt sich nicht auf Benachrichtigungen innerhalb der Web -Benutzeroberfläche aus. \nAbhängig vom Betriebssystem müssen Desktop -Benachrichtigungen möglicherweise Benachrichtigungsberechtigungen in den Systemeinstellungen ermöglichen.",
     "DescExperimentalDashboard": "Verwenden Sie die Dashboard -Seite anstelle einer zusammenfassenden Seite.",
     "DescKeepLoginSessionInformation": "Lassen Sie die Webui-App beim nächsten Mal die aktuellen Anmeldesitzungsinformationen beibehalten. <br /> Wenn die Option deaktiviert ist, werden die Anmeldeinformationen bei jeder Abmeldung gelöscht.",
     "DescLanguage": "Setzen Sie die Schnittstelle. Andere Sprachen als Englisch und Koreanisch werden per maschineller Übersetzung bereitgestellt.",
