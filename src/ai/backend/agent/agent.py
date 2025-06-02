@@ -296,6 +296,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.computers = computers
         self.restarting = restarting
         self.local_config = local_config
+        self.additional_allowed_syscalls = []
 
     @abstractmethod
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -572,10 +573,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         _mount(MountTypes.BIND, helpers_pkg_path, pylib_path + "ai/backend/helpers")
         environ["LD_PRELOAD"] = "/opt/kernel/libbaihook.so"
 
-        # Inject ComputeDevice-specific env-varibles and hooks
+        # Inject ComputeDevice-specific hooks
         already_injected_hooks: set[Path] = set()
-        additional_gid_set: set[int] = set()
-        additional_allowed_syscalls_set: set[str] = set()
 
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
@@ -587,12 +586,6 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 computer_ctx.instance,
                 device_alloc,
             )
-
-            additional_gids = computer_ctx.instance.get_additional_gids()
-            additional_gid_set.update(additional_gids)
-
-            additional_allowed_syscalls = computer_ctx.instance.get_additional_allowed_syscalls()
-            additional_allowed_syscalls_set.update(additional_allowed_syscalls)
 
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
@@ -615,8 +608,24 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     environ["LD_PRELOAD"] += ":" + container_hook_path
                     already_injected_hooks.add(hook_path)
 
+    async def inject_additional_device_env_vars(
+        self, resource_spec: KernelResourceSpec, environ: MutableMapping[str, str]
+    ) -> None:
+        # Inject ComputeDevice-specific env-variables
+        additional_gid_set: set[int] = set()
+        additional_allowed_syscalls_set: set[str] = set()
+
+        for dev_type, _ in resource_spec.allocations.items():
+            computer_ctx = self.computers[dev_type]
+
+            additional_gids = computer_ctx.instance.get_additional_gids()
+            additional_gid_set.update(additional_gids)
+
+            additional_allowed_syscalls = computer_ctx.instance.get_additional_allowed_syscalls()
+            additional_allowed_syscalls_set.update(additional_allowed_syscalls)
+
         self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
-        update_additional_gids(environ, additional_gids)
+        update_additional_gids(environ, list(additional_gid_set))
 
     def get_overriding_uid(self) -> Optional[int]:
         return None
@@ -2087,6 +2096,7 @@ class AbstractAgent(
                 if not restarting:
                     await ctx.mount_vfolders(vfolder_mounts, resource_spec)
                     await ctx.mount_krunner(resource_spec, environ)
+                await ctx.inject_additional_device_env_vars(resource_spec, environ)
 
                 # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
                 label_envs_corecount = image_labels.get(LabelName.ENVS_CORECOUNT, "")
