@@ -1555,7 +1555,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
-                    labels = img_detail["Config"]["Labels"]
+                    labels = img_detail.get("Config", {}).get("Labels")
                     if labels is None:
                         continue
                     kernelspec = int(labels.get("ai.backend.kernelspec", "1"))
