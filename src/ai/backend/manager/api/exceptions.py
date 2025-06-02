@@ -113,6 +113,11 @@ class GenericBadRequest(BackendError, web.HTTPBadRequest):
     error_title = "Bad request."
 
 
+class KernelNotReady(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/kernel-not-ready"
+    error_title = "Kernel not ready."
+
+
 class RejectedByHook(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/rejected-by-hook"
     error_title = "Operation rejected by a hook plugin."
