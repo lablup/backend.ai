@@ -57,9 +57,9 @@ from ai.backend.manager.api.session import (
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.errors.exceptions import (
     AppNotFound,
-    GenericBadRequest,
     GenericForbidden,
     InternalServerError,
+    KernelNotReady,
     QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
@@ -1277,7 +1277,7 @@ class SessionService:
             found_ports: dict[str, list[str]] = {}
             service_ports = cast(Optional[list[dict[str, Any]]], sess.main_kernel.service_ports)
             if service_ports is None:
-                raise GenericBadRequest(
+                raise KernelNotReady(
                     f"Kernel of the session has no service ports yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
                 )
             for sport in service_ports:
