@@ -1591,8 +1591,6 @@ class SessionLifecycleManager:
         self,
         session_ids: Iterable[SessionId],
         status_changed_at: datetime | None = None,
-        *,
-        db_conn: Optional[SAConnection] = None,
     ) -> list[tuple[SessionRow, bool]]:
         if not session_ids:
             return []
@@ -1603,16 +1601,14 @@ class SessionLifecycleManager:
             for sid in session_ids:
                 row, is_transited = await self._transit_session_status(_db_conn, sid, now)
                 result.append((row, is_transited))
-            for row, is_transited in result:
-                if is_transited:
-                    await self._post_status_transition(row)
             return result
 
-        if db_conn is not None:
-            return await _transit(db_conn)
-        else:
-            async with self.db.connect() as db_conn:
-                return await _transit(db_conn)
+        async with self.db.connect() as db_conn:
+            result = await _transit(db_conn)
+        for session_row, is_transited in result:
+            if is_transited:
+                await self._post_status_transition(session_row)
+        return result
 
     async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
         if not session_ids:
