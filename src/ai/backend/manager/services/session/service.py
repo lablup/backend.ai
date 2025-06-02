@@ -606,7 +606,7 @@ class SessionService:
             raise UnknownImageReferenceError("Unknown image reference!")
         except Exception:
             await self._error_monitor.capture_exception()
-            log.exception("GET_OR_CREATE: exception")
+            log.exception("GET_OR_CREATE: unexpected error!")
             raise InternalServerError
 
     async def create_from_params(
@@ -1036,7 +1036,7 @@ class SessionService:
             raise InvalidAPIParameters("The file is not found.")
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_FILE: exception")
+            log.exception("DOWNLOAD_FILE: unexpected error!")
             raise InternalServerError
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -1379,7 +1379,7 @@ class SessionService:
             log.debug("container file list for {0} retrieved", path)
         except Exception:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("LIST_FILES: exception")
+            log.exception("LIST_FILES: unexpected error!")
             raise InternalServerError
 
         return ListFilesActionResult(result=result, session_row=session)
