@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.10 (2025-06-03)
+
+### Fixes
+* Fix broken `Keypair` SDK methods (`activate`, `deactivate`) ([#4547](https://github.com/lablup/backend.ai/issues/4547))
+
+
 ## 24.09.9 (2025-05-23)
 
 ### Fixes
