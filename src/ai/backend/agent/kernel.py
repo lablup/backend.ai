@@ -215,7 +215,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.termination_reason = None
         self.clean_event = None
         self.stats_enabled = False
-        self._tasks = set()
         self.environ = environ
         self.runner = None
         self.container_id = None
@@ -237,7 +236,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         props = self.__dict__.copy()
         del props["agent_config"]
         del props["clean_event"]
-        del props["_tasks"]
         return props
 
     def __setstate__(self, props) -> None:
@@ -253,7 +251,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
-        self._tasks = set()
 
     @abstractmethod
     async def close(self) -> None:
@@ -400,10 +397,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         api_version: int,
         flush_timeout: float,
     ) -> NextResult:
-        myself = asyncio.current_task()
-        assert myself is not None
         assert self.runner is not None
-        self._tasks.add(myself)
         try:
             await self.runner.attach_output_queue(run_id)
             try:
@@ -426,8 +420,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             await self.runner.close()
             raise
-        finally:
-            self._tasks.remove(myself)
 
 
 _zctx = None

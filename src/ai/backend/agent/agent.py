@@ -1813,10 +1813,10 @@ class AbstractAgent(
                     api_version=default_api_version,
                 )
             if kernel_obj.session_type == SessionTypes.BATCH:
-                await kernel_obj.runner.attach_output_queue("batch-job")
-                await kernel_obj.runner.get_next_result(
-                    api_ver=3,
-                    flush_timeout=1.0,
+                self._ongoing_exec_batch_tasks.add(
+                    asyncio.create_task(
+                        self._iterate_batch_result(kernel_obj.kernel_id),
+                    ),
                 )
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
@@ -1874,6 +1874,46 @@ class AbstractAgent(
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> AbstractKernelCreationContext:
         raise NotImplementedError
+
+    async def _iterate_batch_result(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        kernel_obj = self.kernel_registry[kernel_id]
+        session_id = kernel_obj.session_id
+        if kernel_obj.runner is None:
+            log.error("iterate_batch_result(kernel: {}): no kernel runner", kernel_id)
+            return
+        while True:
+            await kernel_obj.runner.attach_output_queue("batch-job")
+            result = await kernel_obj.runner.get_next_result(
+                api_ver=3,
+                flush_timeout=1.0,
+            )
+            match result["status"]:
+                case "finished":
+                    if result["exitCode"] == 0:
+                        await self.produce_event(
+                            SessionSuccessEvent(
+                                session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
+                            ),
+                        )
+                    else:
+                        await self.produce_event(
+                            SessionFailureEvent(
+                                session_id,
+                                KernelLifecycleEventReason.TASK_FAILED,
+                                result["exitCode"] if result["exitCode"] is not None else -1,
+                            ),
+                        )
+                    break
+                case "exec-timeout":
+                    await self.produce_event(
+                        SessionFailureEvent(
+                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                        ),
+                    )
+                    break
 
     async def execute_batch(
         self,
@@ -2839,7 +2879,7 @@ class AbstractAgent(
         opts: Mapping[str, Any],
         api_version: int,
         flush_timeout: float,
-    ):
+    ) -> dict[str, Any]:
         # Wait for the kernel restarting if it's ongoing...
         restart_tracker = self.restarting_kernels.get(kernel_id)
         if restart_tracker is not None:
