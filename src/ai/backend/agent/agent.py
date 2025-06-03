@@ -1988,9 +1988,6 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             pass
-            # await self.produce_event(
-            #     SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
-            # )
 
     async def create_batch_execution_task(
         self,
@@ -2895,10 +2892,6 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             pass
-            # await self.produce_event(
-            #     ExecutionCancelledEvent(session_id),
-            # )
-            # raise
         except KeyError:
             # This situation is handled in the lifecycle management subsystem.
             raise RuntimeError(
