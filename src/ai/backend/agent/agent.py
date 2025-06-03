@@ -179,6 +179,7 @@ from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import (
+    RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
     match_distro_data,
 )
@@ -1878,7 +1879,7 @@ class AbstractAgent(
         if kernel_obj.runner is None:
             log.error("iterate_batch_result(kernel: {}): no kernel runner", kernel_id)
             return
-        await kernel_obj.runner.attach_output_queue("batch-job")
+        await kernel_obj.runner.attach_output_queue(RUN_ID_FOR_BATCH_JOB)
         while True:
             result = await kernel_obj.runner.get_next_result(
                 api_ver=3,
@@ -1932,7 +1933,7 @@ class AbstractAgent(
                         result = await self.execute(
                             session_id,
                             kernel_id,
-                            "batch-job",  # a reserved run ID
+                            RUN_ID_FOR_BATCH_JOB,
                             mode,
                             "",
                             opts=opts,

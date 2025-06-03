@@ -110,6 +110,7 @@ default_client_features = frozenset({
     ClientFeatures.CONTINUATION.value,
 })
 default_api_version = 4
+RUN_ID_FOR_BATCH_JOB = "batch-job"  # TODO: Deprecate usage of run-id
 
 
 class RunEvent(Exception):
