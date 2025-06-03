@@ -248,6 +248,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                 props["session_id"],
                 props["agent_id"],
             )
+        if "session_type" not in props:
+            props["session_type"] = SessionTypes.INTERACTIVE
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None

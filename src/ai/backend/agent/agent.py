@@ -1884,8 +1884,8 @@ class AbstractAgent(
         if kernel_obj.runner is None:
             log.error("iterate_batch_result(kernel: {}): no kernel runner", kernel_id)
             return
+        await kernel_obj.runner.attach_output_queue("batch-job")
         while True:
-            await kernel_obj.runner.attach_output_queue("batch-job")
             result = await kernel_obj.runner.get_next_result(
                 api_ver=3,
                 flush_timeout=1.0,
