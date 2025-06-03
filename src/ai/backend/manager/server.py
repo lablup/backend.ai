@@ -476,7 +476,7 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.to_legacy_format(),
     )
     await plugin_ctx.init(
         context=root_ctx,
@@ -512,9 +512,8 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
+        root_ctx.config_provider.config.redis.to_legacy_format()
     )
-
     root_ctx.redis_live = redis_helper.get_redis_object(
         redis_profile_target.profile_target(RedisRole.LIVE),
         name="live",  # tracking live status of various entities
@@ -732,7 +731,7 @@ def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
+        root_ctx.config_provider.config.redis.to_legacy_format()
     )
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
@@ -790,7 +789,7 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = NetworkPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.to_legacy_format(),
     )
     root_ctx.network_plugin_ctx = ctx
     await ctx.init(
@@ -806,7 +805,7 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.to_legacy_format(),
     )
     root_ctx.hook_plugin_ctx = ctx
     await ctx.init(
@@ -829,7 +828,7 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = EventDispatcherPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.to_legacy_format(),
     )
     root_ctx.event_dispatcher_plugin_ctx = ctx
     await ctx.init(
@@ -894,8 +893,12 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
-    ectx = ManagerErrorPluginContext(root_ctx.etcd, root_ctx.config_provider.config.model_dump())
-    sctx = ManagerStatsPluginContext(root_ctx.etcd, root_ctx.config_provider.config.model_dump())
+    ectx = ManagerErrorPluginContext(
+        root_ctx.etcd, root_ctx.config_provider.config.to_legacy_format()
+    )
+    sctx = ManagerStatsPluginContext(
+        root_ctx.etcd, root_ctx.config_provider.config.to_legacy_format()
+    )
     init_success = False
 
     try:

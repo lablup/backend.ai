@@ -1383,9 +1383,9 @@ class RedisProfileTarget:
         return cls(
             addr=addr,
             sentinel=data.get("sentinel"),
-            service_name=data.get("service_name"),
+            service_name=data.get("service-name"),
             password=data.get("password"),
-            redis_helper_config=data.get("redis_helper_config"),
+            redis_helper_config=data.get("redis-helper-config"),
             override_targets=override_targets,
         )
 

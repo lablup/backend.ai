@@ -44,6 +44,23 @@ class BaseSchema(BaseModel):
     )
 
 
+class BaseConfigModel(BaseModel):
+    @staticmethod
+    def snake_to_kebab_case(string: str) -> str:
+        return string.replace("_", "-")
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+        use_enum_values=True,
+        extra="allow",
+        alias_generator=snake_to_kebab_case,
+    )
+
+    def to_legacy_format(self) -> Mapping[str, Any]:
+        return self.model_dump()
+
+
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
