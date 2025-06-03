@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.8 (2025-06-03)
+
+### Improvements
+* Improve logging for error handling ([#4544](https://github.com/lablup/backend.ai/issues/4544))
+
+### Fixes
+* Fix broken `Keypair` SDK methods (`activate`, `deactivate`) ([#4547](https://github.com/lablup/backend.ai/issues/4547))
+* Fix missing entity id in processor ([#4555](https://github.com/lablup/backend.ai/issues/4555))
+* Fix Backend.AI agent to gracefully handle missing `Config.Labels` field in Docker image inspection ([#4576](https://github.com/lablup/backend.ai/issues/4576))
+* Do null-check of kernel service-ports when query direct access info of a compute session ([#4581](https://github.com/lablup/backend.ai/issues/4581))
+
+
 ## 25.6.7 (2025-05-23)
 
 ### Fixes
