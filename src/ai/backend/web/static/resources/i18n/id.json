@@ -245,12 +245,14 @@
     "FolderToCopy": "Folder untuk disalin",
     "Foldername": "Nama folder",
     "Folders": "Folder",
+    "From": "Dari",
     "General": "Umum",
     "Host": "Host",
     "HostDetails": "Menampilkan informasi kuota untuk host penyimpanan yang dipilih.",
     "InvalidEmail": "Alamat email yang tidak valid",
     "Invited": "diundang",
     "InvitedFolders": "Folder yang diundang",
+    "InvitedFoldersTooltip": "{{ count }} Undangan folder sedang menunggu respons.",
     "Limit": "Batas",
     "ModelStore": "Toko Model",
     "Models": "Model",
@@ -413,6 +415,8 @@
       "View": "Lihat"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Gagal menerima undangan",
+      "FailedToDeclineInvitation": "Gagal menolak undangan",
       "FolderSharingNotAvailableToUser": "Berbagi folder tidak tersedia untuk pengguna yang diminta:",
       "InvitationError": "Undangan gagal. Pengguna mungkin sudah diundang.",
       "Invited": "Berhasil diundang",
@@ -423,7 +427,10 @@
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
       "Shared": "Folder grup berhasil dibagikan",
       "SharingError": "Gagal berbagi. Pengguna mungkin sudah dibagikan atau tidak ada dalamm proyek yang sesuai.",
-      "SuccessfullyLeftSharedFolder": "Berhasil meninggalkan folder bersama"
+      "SuccessfullyAcceptedInvitation": "Undangan yang berhasil diterima",
+      "SuccessfullyDeclinedInvitation": "Undangan yang berhasil ditolak",
+      "SuccessfullyLeftSharedFolder": "Berhasil meninggalkan folder bersama",
+      "UserIsAlreadyInvited": "{{email}} sudah diundang"
     },
     "modelStore": {
       "AddedItems": "Item yang ditambahkan",
@@ -468,6 +475,10 @@
       "StatusOfSelectedHost": "Status Tuan Rumah Terpilih",
       "Used": "digunakan"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Browser ini tidak mendukung pemberitahuan.",
+    "PermissionDenied": "Anda telah menolak akses pemberitahuan. \nUntuk menggunakan lansiran, harap diizinkan di pengaturan browser Anda."
   },
   "dialog": {
     "ErrorOccurred": "Terjadi Galat",
@@ -1152,7 +1163,7 @@
     "ResourcePresets": "Preset Sumber Daya",
     "Resources": "Sumber Daya",
     "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori",
-    "SharedMemory": "Memori bersama (GB)",
+    "SharedMemory": "Memori bersama",
     "Updated": "Preset sumber daya diperbarui"
   },
   "session": {
@@ -1161,6 +1172,7 @@
     "Agents": "Agen",
     "AllowedClientIps": "IP klien yang diizinkan",
     "AlreadyTerminatingSession": "Sudah mengakhiri sesi.",
+    "AnotherUserSession": "Sesi ini dibuat oleh pengguna lain",
     "Architecture": "Arsitektur",
     "Arguments": "Argumen",
     "AverageUsage": "Rata -rata",
@@ -1662,10 +1674,9 @@
       "Last12Hours": "12 jam terakhir",
       "Last3Hours": "3 jam terakhir",
       "Last7Days": "7 hari terakhir",
-      "LastDay": "1 hari terakhir"
-    },
-    "timeRanges": {
-      "LastHour": "1 jam terakhir"
+      "LastDay": "1 hari terakhir",
+      "LastHour": "1 jam terakhir",
+      "Today": "Hari ini"
     }
   },
   "storageHost": {
@@ -1800,7 +1811,6 @@
     "BootstrapScriptDescription": "Skrip bootstrap akan dieksekusi hanya sekali setelah pembuatan sesi",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSilakan masukkan skripnya.",
     "BootstrapScriptUpdated": "Skrip Bootstrap diperbarui.",
-    "ClassicSessionLauncher": "Peluncur Sesi Classic",
     "ClearSSHKeypairInput": "Pasangan Kunci SSH tertulis akan dihapus. Apakah anda yakin ingin melanjutkan?",
     "ConfigFilename": "Nama file konfigurasi",
     "CurrentSSHPublicKey": "Kunci publik saat ini: ",
@@ -1810,7 +1820,7 @@
     "DescAutomaticUpdateCheck": "Beri tahu saat versi UI web baru dirilis. <br /> Di mana Internet tidak stabil atau offline, opsi ini akan dimatikan secara otomatis. Anda dapat mengaktifkan opsi ini untuk memulai lagi pemeriksaan pembaruan otomatis.",
     "DescBetaFeatures": "Gunakan fitur beta untuk UI Web. <br />Fitur beta mungkin tidak stabil. Beberapa fitur beta mungkin tidak diadopsi sebagai fitur resmi.",
     "DescClassicSessionLauncher": "Gunakan peluncur sesi Classic alih-alih peluncur sesi NEO. \nPeluncur sesi Classic mungkin tidak memiliki fitur terbaru.",
-    "DescDesktopNotification": "Mengaktifkan atau menonaktifkan notifikasi desktop. <br />Jika diaktifkan, Backend.AI juga menggunakan sistem notifikasi bawaan OS. Menonaktifkan opsi ini tidak memengaruhi notifikasi dalam UI web.",
+    "DescDesktopNotification": "Memungkinkan pemberitahuan desktop. \n<br /> Jika dihidupkan, backend.ai menggunakan sistem pemberitahuan bawaan OS juga. \nMematikan opsi ini tidak memengaruhi pemberitahuan dalam Web UI. \nBergantung pada sistem operasi, pemberitahuan desktop mungkin memerlukan izin pemberitahuan yang memungkinkan dalam pengaturan sistem.",
     "DescExperimentalDashboard": "Gunakan halaman dasbor alih -alih halaman ringkasan.",
     "DescKeepLoginSessionInformation": "Biarkan aplikasi UI web menyimpan informasi sesi login saat ini di lain waktu. <br />Jika opsi dimatikan, informasi login akan dihapus setiap keluar.",
     "DescLanguage": "Atur bahasa antarmuka. Bahasa selain bahasa Inggris dan Korea akan disediakan melalui terjemahan mesin.",

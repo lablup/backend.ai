@@ -245,12 +245,14 @@
     "FolderToCopy": "Kopioitava kansio",
     "Foldername": "Kansion nimi",
     "Folders": "Kansiot",
+    "From": "-Sta",
     "General": "Yleinen",
     "Host": "Isäntä",
     "HostDetails": "Näyttää valitun tallennusaseman kiintiötiedot.",
     "InvalidEmail": "Virheellinen sähköpostiosoite",
     "Invited": "Kutsuttu",
     "InvitedFolders": "Kutsutut kansiot",
+    "InvitedFoldersTooltip": "{{ count }} -kansiokutsut odottavat vastausta.",
     "Limit": "Raja",
     "ModelStore": "Mallikauppa",
     "Models": "Mallit",
@@ -413,6 +415,8 @@
       "View": "Näytä"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Kutsu epäonnistui",
+      "FailedToDeclineInvitation": "Kutsun hylkääminen epäonnistui",
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
       "InvitationError": "Kutsu epäonnistui. Käyttäjä on ehkä jo kutsuttu.",
       "Invited": "Kutsuttu onnistuneesti",
@@ -423,7 +427,10 @@
       "NoValidEmails": "Kelvollisia sähköposteja ei ole syötetty",
       "Shared": "Ryhmäkansion jakaminen onnistui",
       "SharingError": "Jakaminen epäonnistui. Käyttäjä on ehkä jo jaettu tai ei kuulu asianmukaiseen projektiin.",
-      "SuccessfullyLeftSharedFolder": "Jäljellä jaetussa kansiossa"
+      "SuccessfullyAcceptedInvitation": "Onnistuneesti hyväksytty kutsu",
+      "SuccessfullyDeclinedInvitation": "Onnistuneesti hylätty kutsu",
+      "SuccessfullyLeftSharedFolder": "Jäljellä jaetussa kansiossa",
+      "UserIsAlreadyInvited": "{{email}} on jo kutsuttu"
     },
     "modelStore": {
       "AddedItems": "Lisätyt kohteet",
@@ -468,6 +475,10 @@
       "StatusOfSelectedHost": "Valitun isännän tila",
       "Used": "käytetty"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Tämä selain ei tue ilmoituksia.",
+    "PermissionDenied": "Olet kiistänyt ilmoituskäytön. \nJos haluat käyttää hälytyksiä, salli se selaimen asetuksissa."
   },
   "dialog": {
     "ErrorOccurred": "Tapahtunut virhe",
@@ -1152,7 +1163,7 @@
     "ResourcePresets": "Resurssien esiasetukset",
     "Resources": "Resurssit",
     "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin",
-    "SharedMemory": "Jaettu muisti (GB)",
+    "SharedMemory": "Jaettu muisti",
     "Updated": "Resurssien esiasetus päivitetty"
   },
   "session": {
@@ -1161,6 +1172,7 @@
     "Agents": "Agentit",
     "AllowedClientIps": "Sallitut asiakkaan IP-osoitteet",
     "AlreadyTerminatingSession": "Istunto on jo päättymässä.",
+    "AnotherUserSession": "Tämän istunnon on luonut toinen käyttäjä",
     "Architecture": "Arkkitehtuuri",
     "Arguments": "Argumentit",
     "AverageUsage": "Avg",
@@ -1661,10 +1673,9 @@
       "Last12Hours": "Viimeiset 12 tuntia",
       "Last3Hours": "Viimeiset 3 tuntia",
       "Last7Days": "Viimeiset 7 päivää",
-      "LastDay": "1 päivä"
-    },
-    "timeRanges": {
-      "LastHour": "1 tunti"
+      "LastDay": "1 päivä",
+      "LastHour": "1 tunti",
+      "Today": "Tänään"
     }
   },
   "storageHost": {
@@ -1799,7 +1810,6 @@
     "BootstrapScriptDescription": "Bootstrap-skripti suoritetaan vain kerran istunnon luomisen jälkeen.",
     "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
     "BootstrapScriptUpdated": "Bootstrap-skripti päivitetty.",
-    "ClassicSessionLauncher": "Classic istunnon käynnistysohjelma",
     "ClearSSHKeypairInput": "Kirjoitettu SSH-avainpari poistetaan. Haluatko varmasti jatkaa?",
     "ConfigFilename": "Konfigurointitiedoston nimi",
     "CurrentSSHPublicKey": "Nykyinen julkinen avain:",
@@ -1809,7 +1819,7 @@
     "DescAutomaticUpdateCheck": "Ilmoita, kun uusi webui-versio julkaistaan.<br />Jos Internet on epävakaa tai offline, tämä vaihtoehto kytkeytyy automaattisesti pois päältä. Voit vaihtaa tätä kytkintä käynnistääksesi automaattisen päivityksen tarkistuksen uudelleen.",
     "DescBetaFeatures": "Käytä web-käyttöliittymän beta-ominaisuuksia.<br />Beta-ominaisuudet voivat olla epävakaita. Joitakin beta-ominaisuuksia ei ehkä hyväksytä viralliseksi ominaisuudeksi.",
     "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia.",
-    "DescDesktopNotification": "Ota työpöytäilmoitukset käyttöön tai poista ne käytöstä. <br />Jos se on päällä, Backend.AI käyttää myös käyttöjärjestelmän sisäänrakennettua ilmoitusjärjestelmää. Tämän vaihtoehdon kytkeminen pois päältä ei vaikuta ilmoituksiin web-käyttöliittymässä.",
+    "DescDesktopNotification": "Mahdollistaa työpöytäilmoituksen. \n<br /> Jos kytketään päälle, backend.ai käyttää myös sisäänrakennettua ilmoitusjärjestelmää. \nTämän vaihtoehdon sammuttaminen ei vaikuta ilmoituksiin Web -käyttöliittymässä. \nKäyttöjärjestelmästä riippuen työpöytäilmoitukset voivat edellyttää ilmoitusoikeuksien mahdollistamista järjestelmä -asetuksissa.",
     "DescExperimentalDashboard": "Käytä kojelaudan sivua yhteenvetosivun sijasta.",
     "DescKeepLoginSessionInformation": "Anna webui-sovelluksen säilyttää nykyisen kirjautumisistunnon tiedot seuraavalla kerralla.<br />Jos vaihtoehto on pois päältä, kirjautumistiedot tyhjennetään jokaisen uloskirjautumisen yhteydessä.",
     "DescLanguage": "Aseta käyttöliittymäkieli. Muut kielet kuin englanti ja korea tarjotaan koneen käännöksen kautta.",

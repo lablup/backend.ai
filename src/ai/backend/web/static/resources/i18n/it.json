@@ -245,12 +245,14 @@
     "FolderToCopy": "Cartella da copiare",
     "Foldername": "Nome della cartella",
     "Folders": "cartelle",
+    "From": "Da",
     "General": "Generale",
     "Host": "Ospite",
     "HostDetails": "Visualizza le informazioni sulla quota per l'host di archiviazione selezionato.",
     "InvalidEmail": "Indirizzo e -mail non valido",
     "Invited": "invitato",
     "InvitedFolders": "Cartelle invitate",
+    "InvitedFoldersTooltip": "{{ count }} Gli inviti delle cartelle sono in attesa di risposta.",
     "Limit": "Limite",
     "ModelStore": "Negozio di modelli",
     "Models": "Modelli",
@@ -413,6 +415,8 @@
       "View": "Visualizza"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Impossibile accettare l'invito",
+      "FailedToDeclineInvitation": "Non ha rifiutato l'invito",
       "FolderSharingNotAvailableToUser": "La condivisione delle cartelle non è disponibile per gli utenti richiesti:",
       "InvitationError": "Invito non riuscito. L'utente potrebbe essere già stato invitato.",
       "Invited": "Invitato con successo",
@@ -423,7 +427,10 @@
       "NoValidEmails": "Non sono state inserite email valide",
       "Shared": "Condivisione riuscita della cartella del gruppo",
       "SharingError": "Condivisione non riuscita. L'utente potrebbe essere già condiviso o non appartenere al progetto appropriato.",
-      "SuccessfullyLeftSharedFolder": "Ha lasciato correttamente la cartella condivisa"
+      "SuccessfullyAcceptedInvitation": "Invito accettato con successo",
+      "SuccessfullyDeclinedInvitation": "Ha rifiutato con successo l'invito",
+      "SuccessfullyLeftSharedFolder": "Ha lasciato correttamente la cartella condivisa",
+      "UserIsAlreadyInvited": "{{email}} è già invitato"
     },
     "modelStore": {
       "AddedItems": "Elementi aggiunti",
@@ -468,6 +475,10 @@
       "StatusOfSelectedHost": "Stato dell'host selezionato",
       "Used": "usato"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Questo browser non supporta le notifiche.",
+    "PermissionDenied": "Hai negato l'accesso alla notifica. \nPer utilizzare gli avvisi, consentirlo nelle impostazioni del browser."
   },
   "dialog": {
     "ErrorOccurred": "Errore",
@@ -1151,7 +1162,7 @@
     "ResourcePresets": "Preimpostazioni delle risorse",
     "Resources": "risorse",
     "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria",
-    "SharedMemory": "Memoria condivisa (GB)",
+    "SharedMemory": "Memoria condivisa",
     "Updated": "Preimpostazione delle risorse aggiornata"
   },
   "session": {
@@ -1160,6 +1171,7 @@
     "Agents": "Agenti",
     "AllowedClientIps": "IP client consentiti",
     "AlreadyTerminatingSession": "Sta già terminando la sessione.",
+    "AnotherUserSession": "Questa sessione è stata creata da un altro utente",
     "Architecture": "Architettura",
     "Arguments": "argomenti",
     "AverageUsage": "Avg",
@@ -1660,10 +1672,9 @@
       "Last12Hours": "Ultime 12 ore",
       "Last3Hours": "Ultime 3 ore",
       "Last7Days": "Ultimi 7 giorni",
-      "LastDay": "Ultimo giorno"
-    },
-    "timeRanges": {
-      "LastHour": "Ultima 1 ora"
+      "LastDay": "Ultimo giorno",
+      "LastHour": "Ultima 1 ora",
+      "Today": "Oggi"
     }
   },
   "storageHost": {
@@ -1798,7 +1809,6 @@
     "BootstrapScriptDescription": "Lo script Bootstrap verrà eseguito solo una volta dopo la creazione della sessione.",
     "BootstrapScriptEmpty": "La sceneggiatura è vuota. \nInserisci la sceneggiatura.",
     "BootstrapScriptUpdated": "Script di bootstrap aggiornato.",
-    "ClassicSessionLauncher": "Avvio sessioni Classic",
     "ClearSSHKeypairInput": "La coppia di chiavi SSH scritta verrà rimossa. Sei sicuro di voler continuare?",
     "ConfigFilename": "Nome del file di configurazione",
     "CurrentSSHPublicKey": "Chiave pubblica attuale:",
@@ -1808,7 +1818,7 @@
     "DescAutomaticUpdateCheck": "Avvisa quando viene rilasciata una nuova versione di webui. <br /> Nei casi in cui Internet è instabile o offline, questa opzione verrà automaticamente disattivata. Puoi attivare questo interruttore per avviare nuovamente il controllo automatico degli aggiornamenti.",
     "DescBetaFeatures": "Utilizza le funzionalità beta per l'interfaccia utente Web. <br /> Le funzionalità beta potrebbero essere instabili. Alcune funzionalità beta potrebbero non essere adottate come funzionalità ufficiali.",
     "DescClassicSessionLauncher": "Utilizza l'avvio della sessione Classic anziché l'avvio della sessione NEO. \nIl launcher della sessione Classic potrebbe non avere le funzionalità più recenti.",
-    "DescDesktopNotification": "Attiva o disattiva la notifica sul desktop. <br /> Se attivato, Backend.AI utilizza anche il sistema di notifica integrato nel sistema operativo. La disattivazione di questa opzione non influisce sulle notifiche all'interno dell'interfaccia utente web.",
+    "DescDesktopNotification": "Abilita la notifica desktop. \n<br /> Se acceso, Backend.ai utilizza anche il sistema di notifica integrato del sistema operativo. \nDisattiva questa opzione non influisce sulle notifiche all'interno dell'interfaccia utente Web. \nA seconda del sistema operativo, le notifiche desktop possono richiedere l'abilitazione delle autorizzazioni di notifica nelle impostazioni del sistema.",
     "DescExperimentalDashboard": "Usa la pagina Dashboard anziché la pagina di riepilogo.",
     "DescKeepLoginSessionInformation": "Consenti all'app webui di conservare le informazioni sulla sessione di accesso corrente la prossima volta. <br /> Se l'opzione è disattivata, le informazioni di accesso verranno cancellate ad ogni logout.",
     "DescLanguage": "Imposta il linguaggio dell'interfaccia. Le lingue diverse dall'inglese e dal coreano saranno fornite tramite traduzione di macchine.",
