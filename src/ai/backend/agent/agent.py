@@ -180,8 +180,6 @@ from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import (
     AbstractKernel,
-    default_api_version,
-    default_client_features,
     match_distro_data,
 )
 from .resources import (
@@ -1803,15 +1801,11 @@ class AbstractAgent(
             pass
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
-            if kernel_obj.runner is not None:
-                kernel_obj.runner.event_producer = self.event_producer
-                await kernel_obj.runner.__ainit__()
-            else:
-                kernel_obj.runner = await kernel_obj.create_code_runner(
-                    self.event_producer,
-                    client_features=default_client_features,
-                    api_version=default_api_version,
-                )
+            await kernel_obj.init(self.event_producer)
+            if kernel_obj.runner is None:
+                log.warning("kernel {} has no runner, skipping", kernel_obj.kernel_id)
+                continue
+            await kernel_obj.runner.__ainit__()
             if kernel_obj.session_type == SessionTypes.BATCH:
                 self._ongoing_exec_batch_tasks.add(
                     asyncio.create_task(
