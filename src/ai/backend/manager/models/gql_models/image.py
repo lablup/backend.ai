@@ -912,6 +912,10 @@ class UnloadImage(graphene.Mutation):
 
 
 class RescanImages(graphene.Mutation):
+    """
+    Deprecated since 25.10.0. use `RescanImagesV2` instead
+    """
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -980,6 +984,94 @@ class RescanImages(graphene.Mutation):
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
+class RescanImagesV2Input(graphene.InputObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    registry = graphene.String(
+        required=True, description="The name of the container registry to rescan."
+    )
+    project = graphene.String(
+        required=False, description="The name of the project to rescan images for."
+    )
+
+
+class RescanImagesV2Payload(graphene.ObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    task_id = graphene.String()
+    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
+
+
+class RescanImagesV2(graphene.Mutation):
+    class Arguments:
+        input = RescanImagesV2Input(required=True)
+
+    Output = RescanImagesV2Payload
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        input: RescanImagesV2Input,
+    ) -> RescanImagesV2Payload:
+        registry = input.registry
+        project = input.project
+
+        log.info(
+            "rescanning docker registry {0} by API request",
+            f"(registry: {registry or 'all'}, project: {project or 'all'})",
+        )
+        ctx: GraphQueryContext = info.context
+
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            loaded_registries: list[ContainerRegistryData]
+
+            if registry is None:
+                all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
+                    LoadAllContainerRegistriesAction()
+                )
+                loaded_registries = all_registries.registries
+            else:
+                registries = await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                    LoadContainerRegistriesAction(
+                        registry=registry,
+                        project=project,
+                    )
+                )
+                loaded_registries = registries.registries
+
+            rescanned_images = []
+            errors = []
+            for registry_data in loaded_registries:
+                action_result = (
+                    await ctx.processors.container_registry.rescan_images.wait_for_complete(
+                        RescanImagesAction(
+                            registry=registry_data.registry_name,
+                            project=registry_data.project,
+                            progress_reporter=reporter,
+                        )
+                    )
+                )
+
+                for error in action_result.errors:
+                    log.error(error)
+
+                errors.extend(action_result.errors)
+                rescanned_images.extend(action_result.images)
+
+            rescanned_image_ids = [image.id for image in rescanned_images]
+            if errors:
+                return DispatchResult.partial_success(rescanned_image_ids, errors)
+            return DispatchResult.success(rescanned_image_ids)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
+        return RescanImagesV2Payload(task_id=task_id)
+
+
 class AliasImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -1041,6 +1133,10 @@ class DealiasImage(graphene.Mutation):
 
 
 class ClearImages(graphene.Mutation):
+    """
+    Deprecated since 25.10.0. use `ClearImagesV2` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1076,6 +1172,75 @@ class ClearImages(graphene.Mutation):
             )
 
         return ClearImages(ok=True, msg="")
+
+
+class ClearImagesV2Input(graphene.InputObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    registry = graphene.String(
+        required=True, description="The name of the container registry to clear."
+    )
+    project = graphene.String(
+        required=False, description="The name of the project to clear images for."
+    )
+
+
+class ClearImagesV2Payload(graphene.ObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
+    cleared_images = graphene.List(
+        ImageNode,
+        description="List of images that were cleared from the registry.",
+    )
+
+
+class ClearImagesV2(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        input = ClearImagesV2Input(required=True)
+
+    Output = ClearImagesV2Payload
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        input: ClearImagesV2Input,
+    ) -> ClearImagesV2:
+        registry = input.registry
+        project = input.project
+
+        ctx: GraphQueryContext = info.context
+        log.info("clear images from registry {0} by API request", registry)
+
+        result = (
+            await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                LoadContainerRegistriesAction(
+                    registry=registry,
+                    project=project,
+                )
+            )
+        )
+
+        cleared_images = []
+        for registry_data in result.registries:
+            action_result = await ctx.processors.container_registry.clear_images.wait_for_complete(
+                ClearImagesAction(
+                    registry=registry_data.registry_name,
+                    project=registry_data.project,
+                )
+            )
+            cleared_images.extend(action_result.cleared_image_ids)
+
+        print("cleared_image_ids!", cleared_images)
+
+        return ClearImagesV2Payload(cleared_images=cleared_images)
 
 
 class ModifyImageInput(graphene.InputObjectType):
