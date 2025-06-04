@@ -621,7 +621,7 @@ class BinarySize(int):
     digit delimeters.
     """
 
-    size_unit_map = {
+    _size_unit_map = {
         SizeUnitPrefix.YOTTA: 2**80,
         SizeUnitPrefix.ZETA: 2**70,
         SizeUnitPrefix.EXA: 2**60,
@@ -687,7 +687,7 @@ class BinarySize(int):
                 raise ValueError("Unconvertible value", orig_expr, ending)
             try:
                 size_unit = SizeUnitPrefix(raw_size_unit.upper())
-                multiplier = cls.size_unit_map[size_unit]
+                multiplier = cls._size_unit_map[size_unit]
             except KeyError:
                 raise ValueError("Unconvertible value", orig_expr)
             return cls._from_raw_value(dec_expr * multiplier)
@@ -750,7 +750,7 @@ class BinarySize(int):
                 return f"{int(self)} bytes"
         else:
             size_unit = _size_unit_sequence[size_unit_idx]
-            multiplier = self._size_unit_map()[size_unit]
+            multiplier = self._size_unit_map[size_unit]
             value = self._quantize(self, multiplier)
             return f"{value:f} {size_unit.upper()}iB"
 
@@ -763,14 +763,14 @@ class BinarySize(int):
             if size_unit_idx == 0:
                 return f"{int(self)}"
             size_unit = _size_unit_sequence[size_unit_idx]
-            multiplier = self.size_unit_map[size_unit]
+            multiplier = self._size_unit_map[size_unit]
             value = self._quantize(self, multiplier)
             return f"{value:f}{size_unit.lower()}"
         else:
             # use the given scale
             try:
                 size_unit = SizeUnitPrefix(format_spec.upper())
-                multiplier = self.size_unit_map[size_unit]
+                multiplier = self._size_unit_map[size_unit]
             except (ValueError, KeyError):
                 raise ValueError("Unsupported scale unit.", format_spec)
             value = self._quantize(self, multiplier)
@@ -786,7 +786,7 @@ class DecimalSize(int):
     digit delimeters.
     """
 
-    size_unit_map = {
+    _size_unit_map = {
         SizeUnitPrefix.YOTTA: 1_000_000_000_000_000_000_000_000,  # yotta
         SizeUnitPrefix.ZETA: 1_000_000_000_000_000_000_000,  # zetta
         SizeUnitPrefix.EXA: 1_000_000_000_000_000_000,  # exa
@@ -839,7 +839,7 @@ class DecimalSize(int):
                 raise ValueError("Unconvertible value", orig_expr, ending)
             try:
                 size_unit = SizeUnitPrefix(raw_size_unit.upper())
-                multiplier = cls.size_unit_map[size_unit]
+                multiplier = cls._size_unit_map[size_unit]
             except KeyError:
                 raise ValueError("Unconvertible value", orig_expr)
             return cls._from_raw_value(dec_expr * multiplier)
@@ -902,7 +902,7 @@ class DecimalSize(int):
                 return f"{int(self)} bytes"
         else:
             size_unit = _size_unit_sequence[size_unit_idx]
-            multiplier = self._size_unit_map()[size_unit]
+            multiplier = self._size_unit_map[size_unit]
             value = self._quantize(self, multiplier)
             return f"{value:f} {size_unit.upper()}B"
 
@@ -915,14 +915,14 @@ class DecimalSize(int):
             if size_unit_idx == 0:
                 return f"{int(self)}"
             size_unit = _size_unit_sequence[size_unit_idx]
-            multiplier = self.size_unit_map[size_unit]
+            multiplier = self._size_unit_map[size_unit]
             value = self._quantize(self, multiplier)
             return f"{value:f}{size_unit.lower()}"
         else:
             # use the given scale
             try:
                 size_unit = SizeUnitPrefix(format_spec.upper())
-                multiplier = self.size_unit_map[size_unit]
+                multiplier = self._size_unit_map[size_unit]
             except (ValueError, KeyError):
                 raise ValueError("Unsupported scale unit.", format_spec)
             value = self._quantize(self, multiplier)
