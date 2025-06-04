@@ -1373,22 +1373,21 @@ async def init_idle_checkers(
     )
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(checker_init_args))  # enabled by default
-    enabled_checkers = config_provider.config.idle.enabled
-    if enabled_checkers:
-        for checker_name in enabled_checkers.split(","):
-            checker_name = checker_name.strip()
-            checker_cls = checker_registry.get(checker_name, None)
-            if checker_cls is None:
-                log.warning("ignoring an unknown idle checker name: {}", checker_name)
-                continue
-            log.info("Initializing idle checker: {}", checker_name)
-            checker_instance = checker_cls(checker_init_args)
-            checker_host.add_checker(checker_instance)
+    raw_enabled_checker_name = config_provider.config.idle.enabled
+    enabled_checker_names = [name.strip() for name in raw_enabled_checker_name.split(",")]
+    for checker_name in enabled_checker_names:
+        checker_cls = checker_registry.get(checker_name, None)
+        if checker_cls is None:
+            log.warning("ignoring an unknown idle checker name: {}", checker_name)
+            continue
+        log.info("Initializing idle checker: {}", checker_name)
+        checker_instance = checker_cls(checker_init_args)
+        checker_host.add_checker(checker_instance)
     event_dispatcher_checker_args = EventDispatcherIdleCheckerInitArgs(
         checker_host._redis_live,
     )
     for event_dispatcher_checker_cls in event_dispatcher_idle_checkers:
-        if checker_name in enabled_checkers:
+        if event_dispatcher_checker_cls.name() in enabled_checker_names:
             event_dispatcher_checker = event_dispatcher_checker_cls(event_dispatcher_checker_args)
             checker_host.add_event_dispatch_checker(event_dispatcher_checker)
     return checker_host
