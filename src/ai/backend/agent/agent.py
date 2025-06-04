@@ -2519,8 +2519,8 @@ class AbstractAgent(
                 "image should have its own command when runtime variant is set to values other than CUSTOM!"
             )
 
-        if not len(model_folders) > 0:
-            raise AgentError("At least one model folder must be specified.")
+        if len(model_folders) == 0:
+            raise AgentError("At least one model virtual folder must be specified.")
 
         model_folder: VFolderMount = model_folders[0]
 
@@ -2624,7 +2624,7 @@ class AbstractAgent(
             model_definition = model_definition_iv.check(raw_definition)
             if model_definition is None:
                 raise AgentError(
-                    "Model definition is empty. Please check your model definition file."
+                    "Model definition is empty. Please check your model definition file"
                 )
             for model in model_definition["models"]:
                 if "BACKEND_MODEL_NAME" not in environ:
