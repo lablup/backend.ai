@@ -67,7 +67,7 @@ services:
       retries: 10
 
   backendai-half-redis-exporter:
-    image: oliver006/redis_exporter:v1.62.0
+    image: oliver006/redis_exporter:v1.73.0
     restart: unless-stopped
     networks: [half]
     command: >
