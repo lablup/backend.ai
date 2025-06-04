@@ -990,7 +990,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
     )
     async with root_ctx.db.begin_readonly_session() as db_sess:
         try:
-            route = await RoutingRow.get(db_sess, route_id, load_session=True, load_endpoint=True)
+            route = await RoutingRow.get(db_sess, route_id, load_endpoint=True, load_session=True)
         except NoResultFound:
             raise ObjectNotFound
         if route.endpoint != service_id:
