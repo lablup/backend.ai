@@ -246,12 +246,14 @@
     "FolderToCopy": "要復制的文件夾",
     "Foldername": "文件夾名稱",
     "Folders": "文件夾",
+    "From": "從",
     "General": "一般的",
     "Host": "主持人",
     "HostDetails": "显示所选存储主机的配额信息。",
     "InvalidEmail": "無效的電子郵件地址",
     "Invited": "受邀",
     "InvitedFolders": "邀請的文件夾",
+    "InvitedFoldersTooltip": "{{ count }}文件夾邀請正在待定響應。",
     "Limit": "限制",
     "ModelStore": "模型店",
     "Models": "楷模",
@@ -415,6 +417,8 @@
       "View": "看法"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "未能接受邀請",
+      "FailedToDeclineInvitation": "未能拒絕邀請",
       "FolderSharingNotAvailableToUser": "请求的用户无法共享文件夹：",
       "InvitationError": "邀請失敗。用戶可能已被邀請。",
       "Invited": "已成功邀請",
@@ -425,7 +429,10 @@
       "NoValidEmails": "沒有輸入有效的電子郵件",
       "Shared": "已成功共享群組文件夾",
       "SharingError": "分享失敗。用戶可能已被共享或不屬於適當的項目。",
-      "SuccessfullyLeftSharedFolder": "成功離開共享文件夾"
+      "SuccessfullyAcceptedInvitation": "成功接受的邀請",
+      "SuccessfullyDeclinedInvitation": "成功拒絕了邀請",
+      "SuccessfullyLeftSharedFolder": "成功離開共享文件夾",
+      "UserIsAlreadyInvited": "{{email}}已經被邀請"
     },
     "modelStore": {
       "AddedItems": "新增的項目",
@@ -470,6 +477,10 @@
       "StatusOfSelectedHost": "选定主机的状态",
       "Used": "用過的"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "該瀏覽器不支持通知。",
+    "PermissionDenied": "您否認通知訪問。要使用警報，請在瀏覽器設置中允許它。"
   },
   "dialog": {
     "ErrorOccurred": "錯誤發生",
@@ -1154,7 +1165,7 @@
     "ResourcePresets": "資源預設",
     "Resources": "資源",
     "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存",
-    "SharedMemory": "共享內存 (GB)",
+    "SharedMemory": "共享內存",
     "Updated": "資源預設已更新"
   },
   "session": {
@@ -1163,6 +1174,7 @@
     "Agents": "代理商",
     "AllowedClientIps": "允许的客户端 IP",
     "AlreadyTerminatingSession": "已经终止会话。",
+    "AnotherUserSession": "此會話是由另一個用戶創建的",
     "Architecture": "建筑学",
     "Arguments": "參數",
     "AverageUsage": "avg",
@@ -1662,10 +1674,9 @@
       "Last12Hours": "最近12個小時",
       "Last3Hours": "最近3個小時",
       "Last7Days": "最近7天",
-      "LastDay": "最後一天"
-    },
-    "timeRanges": {
-      "LastHour": "最後1小時"
+      "LastDay": "最後一天",
+      "LastHour": "最後1小時",
+      "Today": "今天"
     }
   },
   "storageHost": {
@@ -1800,7 +1811,6 @@
     "BootstrapScriptDescription": "Bootstrap 脚本只会在会话创建后执行一次",
     "BootstrapScriptEmpty": "腳本是空的。\n請輸入腳本。",
     "BootstrapScriptUpdated": "引導腳本已更新。",
-    "ClassicSessionLauncher": "Classic會話啟動器",
     "ClearSSHKeypairInput": "書面 SSH 密鑰對將被刪除。你確定你要繼續嗎？",
     "ConfigFilename": "配置文件名",
     "CurrentSSHPublicKey": "當前公鑰：",
@@ -1810,7 +1820,7 @@
     "DescAutomaticUpdateCheck": "發布新的 webui 版本時通知。 <br /> 在互聯網不穩定或離線的情況下，此選項將自動關閉。您可以切換此開關以再次啟動自動更新檢查。",
     "DescBetaFeatures": "使用 Web UI 的測試版功能。 <br /> Beta 功能可能不穩定。某些測試版功能可能不會被採用為正式功能。",
     "DescClassicSessionLauncher": "使用 Classic 會話啟動器而不是 NEO 會話啟動器。 \nClassic 會話啟動器可能不具有最新功能。",
-    "DescDesktopNotification": "打開或關閉桌面通知。 <br /> 如果開啟，Backend.AI 也會使用操作系統內置的通知系統。關閉此選項不會影響 Web UI 中的通知。",
+    "DescDesktopNotification": "啟用桌面通知。 <br />如果打開，Backend.ai也使用OS內置通知系統。關閉此選項不會影響Web UI中的通知。根據操作系統，桌面通知可能需要在系統設置中啟用通知權限。",
     "DescExperimentalDashboard": "使用儀表板頁面而不是摘要頁面。",
     "DescKeepLoginSessionInformation": "下次讓 webui 應用程序保留當前登錄會話信息。 <br /> 如果關閉該選項，則每次註銷時都會清除登錄信息。",
     "DescLanguage": "設置接口語言。英語和韓文以外的語言將通過機器翻譯提供。",

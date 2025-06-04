@@ -589,7 +589,9 @@ class ModelServingService:
     async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult:
         async with self._db.begin_readonly_session() as db_sess:
             try:
-                route = await RoutingRow.get(db_sess, action.route_id, load_session=True)
+                route = await RoutingRow.get(
+                    db_sess, action.route_id, load_endpoint=True, load_session=True
+                )
             except NoResultFound:
                 raise RouteNotFound
             if route.endpoint != action.service_id:
