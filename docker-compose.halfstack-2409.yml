@@ -69,7 +69,8 @@ services:
   backendai-half-redis-exporter:
     image: oliver006/redis_exporter:v1.73.0
     restart: unless-stopped
-    networks: [half]
+    networks:
+      - half
     command: >
       --redis.addr redis://backendai-half-redis:6379
       --include-system-metrics
