@@ -584,7 +584,7 @@ class EndpointTokenRow(Base):
         domain: Optional[str] = None,
         project: Optional[UUID] = None,
         user_uuid: Optional[UUID] = None,
-        load_endpoint=False,
+        load_endpoint: bool = False,
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
@@ -611,7 +611,7 @@ class EndpointTokenRow(Base):
         domain: Optional[str] = None,
         project: Optional[UUID] = None,
         user_uuid: Optional[UUID] = None,
-        load_endpoint=False,
+        load_endpoint: bool = False,
     ) -> Self:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
         if load_endpoint:
@@ -706,7 +706,7 @@ class EndpointAutoScalingRuleRow(Base):
 
     @classmethod
     async def get(
-        cls, session: AsyncSession, id: UUID, load_endpoint=False
+        cls, session: AsyncSession, id: UUID, load_endpoint: bool = False
     ) -> "EndpointAutoScalingRuleRow":
         query = sa.select(EndpointAutoScalingRuleRow).filter(EndpointAutoScalingRuleRow.id == id)
         if load_endpoint:

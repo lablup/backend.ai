@@ -246,12 +246,14 @@
     "FolderToCopy": "Kopyalanacak klasör",
     "Foldername": "Klasör adı",
     "Folders": "klasörler",
+    "From": "İtibaren",
     "General": "Genel",
     "Host": "ev sahibi",
     "HostDetails": "Seçili depolama ana bilgisayarı için kota bilgilerini görüntüler.",
     "InvalidEmail": "Geçersiz e -posta adresi",
     "Invited": "davetli",
     "InvitedFolders": "Davet edilen klasörler",
+    "InvitedFoldersTooltip": "{{ count }} klasör davetiyeleri beklemededir.",
     "Limit": "Limit",
     "ModelStore": "Model Mağazası",
     "Models": "Modeller",
@@ -414,6 +416,8 @@
       "View": "Görünüm"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Davetiyeyi kabul edemedi",
+      "FailedToDeclineInvitation": "Davetiyeyi reddetemedi",
       "FolderSharingNotAvailableToUser": "Klasör paylaşımı istenen kullanıcı(lar) için mevcut değil:",
       "InvitationError": "Davet başarısız oldu. Kullanıcı zaten davet edilmiş olabilir.",
       "Invited": "Başarıyla davet edildi",
@@ -424,7 +428,10 @@
       "NoValidEmails": "Geçerli e-posta girilmedi",
       "Shared": "Grup klasörü başarıyla paylaşıldı",
       "SharingError": "Paylaşım başarısız oldu. Kullanıcı zaten paylaşılmış olabilir veya uygun projeye ait değil.",
-      "SuccessfullyLeftSharedFolder": "Paylaşılan klasörü başarıyla bıraktı"
+      "SuccessfullyAcceptedInvitation": "Başarılı bir şekilde kabul edilen davetiye",
+      "SuccessfullyDeclinedInvitation": "Başarılı bir şekilde reddetti",
+      "SuccessfullyLeftSharedFolder": "Paylaşılan klasörü başarıyla bıraktı",
+      "UserIsAlreadyInvited": "{{email}} zaten davet edildi"
     },
     "modelStore": {
       "AddedItems": "Eklenen öğeler",
@@ -469,6 +476,10 @@
       "StatusOfSelectedHost": "Seçilen Ana Bilgisayarın Durumu",
       "Used": "kullanılmış"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Bu tarayıcı bildirimleri desteklemez.",
+    "PermissionDenied": "Bildirim erişimini reddettiniz. \nUyarıları kullanmak için lütfen tarayıcı ayarlarınıza izin verin."
   },
   "dialog": {
     "ErrorOccurred": "Hata oluştu",
@@ -1154,7 +1165,7 @@
     "ResourcePresets": "Kaynak Ön Ayarları",
     "Resources": "Kaynaklar",
     "SHMEMShouldBeSmallerThanMemory": "Paylaşılan bellek, bellekten daha küçük olmalıdır",
-    "SharedMemory": "Paylaşılan bellek (GB)",
+    "SharedMemory": "Paylaşılan Bellek",
     "Updated": "Kaynak ön ayarı güncellendi"
   },
   "session": {
@@ -1163,6 +1174,7 @@
     "Agents": "Temsilciler",
     "AllowedClientIps": "İzin verilen istemci IP'leri",
     "AlreadyTerminatingSession": "Oturum zaten sonlandırılıyor.",
+    "AnotherUserSession": "Bu oturum başka bir kullanıcı tarafından oluşturuldu",
     "Architecture": "Mimarlık",
     "Arguments": "Argümanlar",
     "AverageUsage": "AVG",
@@ -1662,10 +1674,9 @@
       "Last12Hours": "Son 12 Saat",
       "Last3Hours": "Son 3 Saat",
       "Last7Days": "Son 7 Gün",
-      "LastDay": "Son 1 Gün"
-    },
-    "timeRanges": {
-      "LastHour": "Son 1 Saat"
+      "LastDay": "Son 1 Gün",
+      "LastHour": "Son 1 Saat",
+      "Today": "Bugün"
     }
   },
   "storageHost": {
@@ -1800,7 +1811,6 @@
     "BootstrapScriptDescription": "Bootstrap komut dosyası oturum oluşturulduktan sonra yalnızca bir kez çalıştırılacaktır",
     "BootstrapScriptEmpty": "Senaryo boş. \nLütfen betiği girin.",
     "BootstrapScriptUpdated": "Önyükleme komut dosyası güncellendi.",
-    "ClassicSessionLauncher": "Classic Oturum Başlatıcı",
     "ClearSSHKeypairInput": "Yazılı SSH Anahtar Çifti kaldırılacaktır. Devam etmek istediğine emin misin?",
     "ConfigFilename": "Yapılandırma dosyası adı",
     "CurrentSSHPublicKey": "Geçerli ortak anahtar:",
@@ -1810,7 +1820,7 @@
     "DescAutomaticUpdateCheck": "Yeni bir webui sürümü yayınlandığında bildir. <br /> İnternetin kararsız veya çevrimdışı olduğu durumlarda bu seçenek otomatik olarak kapatılacaktır. Otomatik güncelleme kontrolünü yeniden başlatmak için bu anahtarı değiştirebilirsiniz.",
     "DescBetaFeatures": "Web kullanıcı arayüzü için beta özelliklerini kullanın. <br /> Beta özellikleri kararsız olabilir. Bazı beta özellikler resmi özellik olarak kabul edilmeyebilir.",
     "DescClassicSessionLauncher": "NEO oturum başlatıcısı yerine Classic oturum başlatıcıyı kullanın. \nClassic oturum başlatıcı en son özelliklere sahip olmayabilir.",
-    "DescDesktopNotification": "Masaüstü bildirimini açın veya kapatın. <br /> Açıksa, Backend.AI, OS yerleşik bildirim sistemini de kullanır. Bu seçeneği kapatmak, web kullanıcı arayüzündeki bildirimleri etkilemez.",
+    "DescDesktopNotification": "Masaüstü bildirimini etkinleştirir. \n<br /> Açılırsa, backend.ai OS yerleşik bildirim sistemi de kullanır. \nBu seçeneği kapatmak Web kullanıcı arayüzündeki bildirimleri etkilemez. \nİşletim sistemine bağlı olarak, masaüstü bildirimleri sistem ayarlarında bildirim izinlerinin etkinleştirilmesini gerektirebilir.",
     "DescExperimentalDashboard": "Özet sayfası yerine gösterge paneli sayfasını kullanın.",
     "DescKeepLoginSessionInformation": "Webui uygulamasının bir dahaki sefere mevcut oturum açma bilgilerini tutmasına izin verin. <br /> Seçenek kapatılırsa, oturum açma bilgileri her oturum kapatıldığında temizlenir.",
     "DescLanguage": "Arayüz dilini ayarlayın. İngilizce ve Korece dışındaki diller makine çevirisi ile sağlanacaktır.",

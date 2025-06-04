@@ -223,9 +223,7 @@ class IdleCheckerHost:
             name="idle.stat",
             db=REDIS_STATISTICS_DB,
         )
-        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
-            self._redis_live, self._redis_stat
-        )
+        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker()
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -406,14 +404,6 @@ class AbstractIdleCheckReporter(ABC):
     report_key: ClassVar[str] = "base"
     extra_info_key: ClassVar[str] = "base_extra"
 
-    def __init__(
-        self,
-        redis_live: RedisConnectionInfo,
-        redis_stat: RedisConnectionInfo,
-    ) -> None:
-        self._redis_live = redis_live
-        self._redis_stat = redis_stat
-
     async def aclose(self) -> None:
         pass
 
@@ -500,6 +490,9 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
             t.Key("user_initial_grace_period", default=None): t.Null | tx.TimeDuration(),
         },
     ).allow_extra("*")
+
+    def __init__(self) -> None:
+        pass
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
@@ -1280,7 +1273,9 @@ async def init_idle_checkers(
         lock_factory,
     )
     checker_init_args = IdleCheckerArgs(
-        event_producer, checker_host._redis_live, checker_host._redis_stat
+        event_producer,
+        checker_host._redis_live,
+        checker_host._redis_stat,
     )
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(checker_init_args))  # enabled by default

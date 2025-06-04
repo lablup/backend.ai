@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Self, Sequence
 from uuid import UUID
 
 from ..output.fields import network_fields
@@ -52,9 +52,10 @@ class Network(BaseFunction):
         name: str,
         *,
         driver: str | None = None,
-    ) -> "Network":
+    ) -> Self:
         """
         Creates a new network.
+        This method will only work when network plugin is set
         :param project_id: The ID of the project to which the network belongs.
         :param name: The name of the network.
         :param driver: (Optional) The driver of the network. If not specified, the default driver will be used.
@@ -63,11 +64,13 @@ class Network(BaseFunction):
         q = _d("""
             mutation($name: String!, $project_id: UUID!, $driver: String) {
                 create_network(name: $name, project_id: $project_id, driver: $driver) {
+                    ok
+                    msg
                     network { row_id }
                 }
             }
         """)
-        data = await api_session.get().Admin._query(
+        result = await api_session.get().Admin._query(
             q,
             {
                 "name": name,
@@ -75,7 +78,13 @@ class Network(BaseFunction):
                 "driver": driver,
             },
         )
-        return cls(network_id=UUID(data["create_network"]["network"]["row_id"]))
+
+        if not result["create_network"]["ok"]:
+            raise RuntimeError(
+                f"Failed to create network '{name}': {result['create_network']['msg']}"
+            )
+
+        return cls(network_id=UUID(result["create_network"]["network"]["row_id"]))
 
     def __init__(self, network_id: UUID) -> None:
         """
@@ -98,16 +107,15 @@ class Network(BaseFunction):
             }
         """)
         q = q.replace("$fields", " ".join(f.field_ref for f in (fields or _default_list_fields)))
-        data = await api_session.get().Admin._query(q, {"id": str(self.network_id)})
-        return data["images"]
+        return await api_session.get().Admin._query(q, {"id": str(self.network_id)})
 
     @api_function
     async def update(self, name: str) -> None:
         """
-        Updates network.
+        Updates network name.
         """
         q = _d("""
-            mutation($network: String!, $props: UpdateNetworkInput!) {
+            mutation($network: String!, $props: ModifyNetworkInput!) {
                 modify_network(network: $network, props: $props) {
                    ok msg
                 }
@@ -123,7 +131,9 @@ class Network(BaseFunction):
     @api_function
     async def delete(self) -> None:
         """
-        Deletes network. Delete only works for networks that are not attached to active session.
+        Deletes network.
+        Delete only works for networks that are not attached to active session.
+        This method will only work when network plugin is set
         """
         q = _d("""
             mutation($network: String!) {
