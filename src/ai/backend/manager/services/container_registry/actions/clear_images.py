@@ -3,6 +3,7 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
@@ -24,6 +25,7 @@ class ClearImagesAction(ContainerRegistryAction):
 @dataclass
 class ClearImagesActionResult(BaseActionResult):
     registry: ContainerRegistryData
+    cleared_images: list[ImageData]
 
     @override
     def entity_id(self) -> Optional[str]:

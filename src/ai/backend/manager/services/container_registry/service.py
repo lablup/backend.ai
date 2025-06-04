@@ -62,11 +62,13 @@ class ContainerRegistryService:
                 .where(ImageRow.registry == action.registry)
                 .where(ImageRow.status != ImageStatus.DELETED)
                 .values(status=ImageStatus.DELETED)
+                .returning(ImageRow)
             )
             if action.project:
                 update_stmt = update_stmt.where(ImageRow.project == action.project)
 
-            await session.execute(update_stmt)
+            result = await session.execute(update_stmt)
+            cleared_rows: list[ImageRow] = result.scalars().all()
 
             get_registry_row_stmt = sa.select(ContainerRegistryRow).where(
                 ContainerRegistryRow.registry_name == action.registry,
@@ -78,7 +80,10 @@ class ContainerRegistryService:
 
             registry_row: ContainerRegistryRow = await session.scalar(get_registry_row_stmt)
 
-        return ClearImagesActionResult(registry=registry_row.to_dataclass())
+        return ClearImagesActionResult(
+            registry=registry_row.to_dataclass(),
+            cleared_images=[row.to_dataclass() for row in cleared_rows],
+        )
 
     async def load_container_registries(
         self, action: LoadContainerRegistriesAction

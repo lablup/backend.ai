@@ -21,6 +21,10 @@ from ai.backend.common.exception import (
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.event_dispatcher.models.gql_models.image import (
+    ClearImagesV2,
+    RescanImagesV2,
+)
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
     AuditLogNode,
@@ -357,8 +361,12 @@ class Mutations(graphene.ObjectType):
     delete_keypair = DeleteKeyPair.Field()
 
     # admin only
-    rescan_images = RescanImages.Field()
+    rescan_images = RescanImages.Field(
+        deprecation_reason="Deprecated since 25.10.0. Use `rescan_images_v2` instead."
+    )
     preload_image = PreloadImage.Field()
+    rescan_images_v2 = RescanImagesV2.Field()
+
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
     clear_image_custom_resource_limit = ClearImageCustomResourceLimit.Field(
@@ -372,7 +380,10 @@ class Mutations(graphene.ObjectType):
     untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
-    clear_images = ClearImages.Field()
+    clear_images = ClearImages.Field(
+        deprecation_reason="Deprecated since 25.10.0. Use `clear_images_v2` instead."
+    )
+    clear_images_v2 = ClearImagesV2.Field()
     purge_images = PurgeImages.Field(description="Added in 25.4.0")
 
     # super-admin only
