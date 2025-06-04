@@ -31,6 +31,11 @@ class Auth(BaseFunction):
         It creates a server-side web session and return
         a dictionary with ``"authenticated"`` boolean field and
         JSON-encoded raw cookie data.
+
+        This SDK function works when BACKEND_ENDPOINT is webserver, not manager.
+        If you want to use BACKEND_ENDPOINT as manager or BACKEND_ENDPOINT_TYPE api,
+        update cookie in session context manager object and save state with file.
+        See the example in `src/ai/backend/client/cli/config.py` login function.
         """
         rqst = Request("POST", "/server/login")
         body = {
@@ -54,6 +59,11 @@ class Auth(BaseFunction):
         """
         Log-out from the endpoint.
         It clears the server-side web session.
+
+        This SDK function works when BACKEND_ENDPOINT is webserver, not manager.
+        If you want to use BACKEND_ENDPOINT as manager or BACKEND_ENDPOINT_TYPE api,
+        update cookie in session context manager object and save state with file.
+        See the example in `src/ai/backend/client/cli/config.py` login function.
         """
         rqst = Request("POST", "/server/logout")
         async with rqst.fetch() as resp:
