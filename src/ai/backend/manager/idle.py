@@ -645,21 +645,31 @@ SESSION_LIFETIME_CHECKER_NAME = "session_lifetime"
 UTILIZATION_CHECKER_NAME = "utilization"
 
 
+@dataclass
+class EventDispatcherIdleCheckerInitArgs:
+    redis_live: RedisConnectionInfo
+    idle_timeout: Optional[timedelta] = None
+
+
+DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT: Final[timedelta] = timedelta(minutes=10)
+
+
 class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecker):
     _redis_live: RedisConnectionInfo
     _idle_timeout: timedelta
 
     _config_iv = t.Dict(
         {
-            t.Key("threshold", default="10m"): tx.TimeDuration(),
+            t.Key("threshold", default=None): t.Null | tx.TimeDuration(),
         },
     ).allow_extra("*")
 
     def __init__(
-        self, redis_live: RedisConnectionInfo, idle_timeout: timedelta = timedelta(seconds=0)
+        self,
+        args: EventDispatcherIdleCheckerInitArgs,
     ) -> None:
-        self._redis_live = redis_live
-        self._idle_timeout = idle_timeout
+        self._redis_live = args.redis_live
+        self._idle_timeout = args.idle_timeout
 
     @override
     @classmethod
@@ -669,7 +679,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
     @override
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
-        self._idle_timeout = config["threshold"]
+        self._idle_timeout = config["threshold"] or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
 
     @override
     async def watch_session_status(
@@ -746,7 +756,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
     _config_iv = t.Dict(
         {
-            t.Key("threshold", default="10m"): tx.TimeDuration(),
+            t.Key("threshold", default=None): t.Null | tx.TimeDuration(),
         },
     ).allow_extra("*")
 
@@ -759,7 +769,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
-        self.idle_timeout = config["threshold"]
+        self.idle_timeout = config["threshold"] or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
         log.info(
             "NetworkTimeoutIdleChecker: default idle_timeout = {0:,} seconds",
             self.idle_timeout.total_seconds(),
@@ -1374,8 +1384,11 @@ async def init_idle_checkers(
             log.info("Initializing idle checker: {}", checker_name)
             checker_instance = checker_cls(checker_init_args)
             checker_host.add_checker(checker_instance)
+    event_dispatcher_checker_args = EventDispatcherIdleCheckerInitArgs(
+        checker_host._redis_live,
+    )
     for event_dispatcher_checker_cls in event_dispatcher_idle_checkers:
         if checker_name in enabled_checkers:
-            event_dispatcher_checker = event_dispatcher_checker_cls(checker_host._redis_live)
+            event_dispatcher_checker = event_dispatcher_checker_cls(event_dispatcher_checker_args)
             checker_host.add_event_dispatch_checker(event_dispatcher_checker)
     return checker_host
