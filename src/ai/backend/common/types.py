@@ -1602,3 +1602,14 @@ class PurgeImageResult(TypedDict):
     image: str
     result: Optional[list[Any]]
     error: Optional[str]
+
+
+class SessionExecutionStatus(enum.StrEnum):
+    """
+    Status of the session execution.
+    """
+
+    STARTED = "started"
+    FINISHED = "finished"
+    CANCELED = "canceled"
+    TIMEOUT = "timeout"

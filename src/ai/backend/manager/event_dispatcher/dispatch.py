@@ -122,7 +122,10 @@ class Dispatchers:
         self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
-            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
+            args.agent_registry,
+            args.db,
+            args.event_dispatcher_plugin_ctx,
+            args.idle_checker_host,
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)

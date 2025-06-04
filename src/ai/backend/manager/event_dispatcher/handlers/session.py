@@ -35,11 +35,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import SessionNotFound
+from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 
 from ...models.endpoint import EndpointLifecycle, EndpointRow
 from ...models.routing import RouteStatus, RoutingRow
-from ...models.session import KernelLoadingStrategy, SessionRow
+from ...models.session import KernelLoadingStrategy, SessionRow, SessionStatus
 from ...models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -55,10 +56,12 @@ class SessionEventHandler:
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
+        idle_checker_host: IdleCheckerHost,
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
+        self._idle_checker_host = idle_checker_host
 
     async def _handle_started_or_cancelled(
         self, context: None, source: AgentId, event: SessionStartedEvent | SessionCancelledEvent
@@ -84,6 +87,9 @@ class SessionEventHandler:
         """
         log.info("handle_session_started: ev:{} s:{}", event.event_name(), event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
+        await self._idle_checker_host.dispatch_session_status_event(
+            event.session_id, SessionStatus.RUNNING
+        )
         await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
 
     async def handle_session_cancelled(
@@ -340,7 +346,9 @@ class SessionEventHandler:
         source: AgentId,
         event: ExecutionStartedEvent,
     ) -> None:
-        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+        await self._idle_checker_host.dispatch_session_execution_status_event(
+            event.session_id, event.execution_status()
+        )
 
     async def handle_execution_finished(
         self,
@@ -348,7 +356,9 @@ class SessionEventHandler:
         source: AgentId,
         event: ExecutionFinishedEvent,
     ) -> None:
-        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+        await self._idle_checker_host.dispatch_session_execution_status_event(
+            event.session_id, event.execution_status()
+        )
 
     async def handle_execution_timeout(
         self,
@@ -356,7 +366,9 @@ class SessionEventHandler:
         source: AgentId,
         event: ExecutionTimeoutEvent,
     ) -> None:
-        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+        await self._idle_checker_host.dispatch_session_execution_status_event(
+            event.session_id, event.execution_status()
+        )
 
     async def handle_execution_cancelled(
         self,
@@ -364,7 +376,9 @@ class SessionEventHandler:
         source: AgentId,
         event: ExecutionCancelledEvent,
     ) -> None:
-        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+        await self._idle_checker_host.dispatch_session_execution_status_event(
+            event.session_id, event.execution_status()
+        )
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
