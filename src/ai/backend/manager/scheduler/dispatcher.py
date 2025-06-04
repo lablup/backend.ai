@@ -288,7 +288,7 @@ class SchedulerDispatcher(aobject):
         self.lock_factory = lock_factory
         self.db = registry.db
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self.config_provider.config.redis.model_dump()
+            self.config_provider.config.redis.to_legacy_format()
         )
         self.redis_live = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.LIVE),

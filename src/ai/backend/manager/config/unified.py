@@ -180,8 +180,6 @@ from pprint import pformat
 from typing import Any, Literal, Optional
 
 from pydantic import (
-    AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
@@ -190,6 +188,7 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.config import BaseConfigModel
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
@@ -230,7 +229,7 @@ class DatabaseType(enum.StrEnum):
     postgresql = "postgresql"
 
 
-class DatabaseConfig(BaseModel):
+class DatabaseConfig(BaseConfigModel):
     type: Literal["postgresql"] = Field(
         default="postgresql",
         description="""
@@ -284,8 +283,6 @@ class DatabaseConfig(BaseModel):
         Should be tuned based on expected load and database server capacity.
         """,
         examples=[1, 8],
-        validation_alias=AliasChoices("pool-size", "pool_size"),
-        serialization_alias="pool-size",
     )
     pool_recycle: float = Field(
         default=-1,
@@ -296,8 +293,6 @@ class DatabaseConfig(BaseModel):
         Useful to handle cases where database connections are closed by the server after inactivity.
         """,
         examples=[-1, 50],
-        validation_alias=AliasChoices("pool-recycle", "pool_recycle"),
-        serialization_alias="pool-recycle",
     )
     pool_pre_ping: bool = Field(
         default=False,
@@ -307,8 +302,6 @@ class DatabaseConfig(BaseModel):
         Adds a small overhead but improves reliability.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("pool-pre-ping", "pool_pre_ping"),
-        serialization_alias="pool-pre-ping",
     )
     max_overflow: int = Field(
         default=64,
@@ -319,8 +312,6 @@ class DatabaseConfig(BaseModel):
         These connections are created temporarily when pool_size is insufficient.
         """,
         examples=[-1, 64],
-        validation_alias=AliasChoices("max-overflow", "max_overflow"),
-        serialization_alias="max-overflow",
     )
     lock_conn_timeout: float = Field(
         default=0,
@@ -331,9 +322,21 @@ class DatabaseConfig(BaseModel):
         If connections cannot be acquired within this time, an exception is raised.
         """,
         examples=[0, 30],
-        validation_alias=AliasChoices("lock-conn-timeout", "lock_conn_timeout"),
-        serialization_alias="lock-conn-timeout",
     )
+
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "type": self.type,
+            "addr": self.addr.to_legacy(),
+            "name": self.name,
+            "user": self.user,
+            "password": self.password,
+            "pool-size": self.pool_size,
+            "pool-recycle": self.pool_recycle,
+            "pool-pre_ping": self.pool_pre_ping,
+            "max-overflow": self.max_overflow,
+            "lock-conn-timeout": self.lock_conn_timeout,
+        }
 
 
 class EventLoopType(enum.StrEnum):
@@ -349,7 +352,7 @@ class DistributedLockType(enum.StrEnum):
     etcetra = "etcetra"
 
 
-class EtcdConfig(BaseModel):
+class EtcdConfig(BaseConfigModel):
     namespace: str = Field(
         default="ETCD_NAMESPACE",
         description="""
@@ -396,7 +399,7 @@ class EtcdConfig(BaseModel):
         )
 
 
-class ManagerConfig(BaseModel):
+class ManagerConfig(BaseConfigModel):
     ipc_base_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="""
@@ -406,8 +409,6 @@ class ManagerConfig(BaseModel):
         In production environments, consider using /var/run/backend.ai/ipc instead.
         """,
         examples=["/var/run/backend.ai/ipc"],
-        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
-        serialization_alias="ipc-base-path",
     )
     num_proc: int = Field(
         default=_max_num_proc,
@@ -419,8 +420,6 @@ class ManagerConfig(BaseModel):
         For optimal performance, set this to match your CPU core count.
         """,
         examples=[1, 4],
-        validation_alias=AliasChoices("num-proc", "num_proc"),
-        serialization_alias="num-proc",
     )
     id: str = Field(
         default=f"i-{socket.gethostname()}",
@@ -458,8 +457,6 @@ class ManagerConfig(BaseModel):
         For private deployments, consider using 127.0.0.1 instead.
         """,
         examples=[{"host": "127.0.0.1", "port": 8080}],
-        validation_alias=AliasChoices("service-addr", "service_addr"),
-        serialization_alias="service-addr",
     )
     announce_addr: HostPortPair = Field(
         default_factory=lambda: HostPortPair(host="127.0.0.1", port=5432),
@@ -468,7 +465,6 @@ class ManagerConfig(BaseModel):
         This is used for service discovery and should be accessible by other components.
         """,
         examples=[{"host": "127.0.0.1", "port": 5432}],
-        alias="announce-addr",
     )
     announce_internal_addr: HostPortPair = Field(
         default_factory=lambda: HostPortPair(host="host.docker.internal", port=18080),
@@ -477,7 +473,6 @@ class ManagerConfig(BaseModel):
         This is used for service discovery and should be accessible by other components.
         """,
         examples=[{"host": "127.0.0.1", "port": 18080}],
-        alias="announce-internal-addr",
     )
     internal_addr: HostPortPair = Field(
         default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
@@ -485,8 +480,6 @@ class ManagerConfig(BaseModel):
         Set the internal hostname/port to accept internal API requests.
         """,
         examples=[{"host": "127.0.0.1", "port": 18080}],
-        validation_alias=AliasChoices("internal-addr", "internal_addr"),
-        serialization_alias="internal-addr",
     )
     rpc_auth_manager_keypair: FilePath = Field(
         default=Path("fixtures/manager/manager.key_secret"),
@@ -496,8 +489,6 @@ class ManagerConfig(BaseModel):
         In production, should be stored in a secure location with restricted access.
         """,
         examples=["fixtures/manager/manager.key_secret"],
-        validation_alias=AliasChoices("rpc-auth-manager-keypair", "rpc_auth_manager_keypair"),
-        serialization_alias="rpc-auth-manager-keypair",
     )
     heartbeat_timeout: float = Field(
         default=40.0,
@@ -508,8 +499,6 @@ class ManagerConfig(BaseModel):
         Should be set higher than the agent's heartbeat interval.
         """,
         examples=[1.0, 40.0],
-        validation_alias=AliasChoices("heartbeat-timeout", "heartbeat_timeout"),
-        serialization_alias="heartbeat-timeout",
     )
     # TODO: Don't use this. Change to use KMS.
     secret: str = Field(
@@ -530,8 +519,6 @@ class ManagerConfig(BaseModel):
         Requires valid certificate and private key when enabled.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("ssl-enabled", "ssl_enabled"),
-        serialization_alias="ssl-enabled",
     )
     ssl_cert: Optional[FilePath] = Field(
         default=None,
@@ -541,8 +528,6 @@ class ManagerConfig(BaseModel):
         Should be a PEM-formatted certificate file, either self-signed or from a CA.
         """,
         examples=["fixtures/manager/manager.crt"],
-        validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
-        serialization_alias="ssl-cert",
     )
     ssl_privkey: Optional[str] = Field(
         default=None,
@@ -552,8 +537,6 @@ class ManagerConfig(BaseModel):
         Should be a PEM-formatted private key corresponding to the certificate.
         """,
         examples=["fixtures/manager/manager.key"],
-        validation_alias=AliasChoices("ssl-privkey", "ssl_privkey"),
-        serialization_alias="ssl-privkey",
     )
     event_loop: EventLoopType = Field(
         default=EventLoopType.asyncio,
@@ -563,8 +546,6 @@ class ManagerConfig(BaseModel):
         'uvloop' is a faster alternative but may have compatibility issues with some libraries.
         """,
         examples=[item.value for item in EventLoopType],
-        validation_alias=AliasChoices("event-loop", "event_loop"),
-        serialization_alias="event-loop",
     )
     distributed_lock: DistributedLockType = Field(
         default=DistributedLockType.pg_advisory,
@@ -577,8 +558,6 @@ class ManagerConfig(BaseModel):
         - etcetra: etcd v3 API-compatible distributed locking
         """,
         examples=[item.value for item in DistributedLockType],
-        validation_alias=AliasChoices("distributed-lock", "distributed_lock"),
-        serialization_alias="distributed-lock",
     )
     pg_advisory_config: Mapping[str, Any] = Field(
         default=PgAdvisoryLock.default_config,
@@ -587,8 +566,6 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to pg_advisory.
         """,
         examples=[{}],
-        validation_alias=AliasChoices("pg-advisory-config", "pg_advisory_config"),
-        serialization_alias="pg-advisory-config",
     )
     filelock_config: Mapping[str, Any] = Field(
         default=FileLock.default_config,
@@ -597,8 +574,6 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to filelock.
         """,
         examples=[{}],
-        validation_alias=AliasChoices("filelock-config", "filelock_config"),
-        serialization_alias="filelock-config",
     )
     redlock_config: Mapping[str, Any] = Field(
         default=RedisLock.default_config,
@@ -607,8 +582,6 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to redlock.
         """,
         examples=[{"lock_retry_interval": 1.0}],
-        validation_alias=AliasChoices("redlock-config", "redlock_config"),
-        serialization_alias="redlock-config",
     )
     etcdlock_config: Mapping[str, Any] = Field(
         default=EtcdLock.default_config,
@@ -617,8 +590,6 @@ class ManagerConfig(BaseModel):
         This is used when distributed_lock is set to etcd.
         """,
         examples=[{}],
-        validation_alias=AliasChoices("etcdlock-config", "etcdlock_config"),
-        serialization_alias="etcdlock-config",
     )
     session_schedule_lock_lifetime: float = Field(
         default=30,
@@ -628,10 +599,6 @@ class ManagerConfig(BaseModel):
         Prevents deadlocks in case a manager fails during scheduling.
         """,
         examples=[30.0, 60.0],
-        validation_alias=AliasChoices(
-            "session-schedule-lock-lifetime", "session_schedule_lock_lifetime"
-        ),
-        serialization_alias="session_schedule_lock_lifetime",
     )
     session_check_precondition_lock_lifetime: float = Field(
         default=30,
@@ -641,11 +608,6 @@ class ManagerConfig(BaseModel):
         Should be balanced to prevent both deadlocks and race conditions.
         """,
         examples=[30.0, 60.0],
-        validation_alias=AliasChoices(
-            "session-check-precondition-lock-lifetime",
-            "session_check_precondition_lock_lifetime",
-        ),
-        serialization_alias="session_check_precondition_lock_lifetime",
     )
     session_start_lock_lifetime: float = Field(
         default=30,
@@ -655,8 +617,6 @@ class ManagerConfig(BaseModel):
         Longer values are safer but may block other managers longer on failure.
         """,
         examples=[30.0, 60.0],
-        validation_alias=AliasChoices("session-start-lock-lifetime", "session_start_lock_lifetime"),
-        serialization_alias="session_start_lock_lifetime",
     )
     pid_file: Path = Field(
         default=Path(os.devnull),
@@ -666,8 +626,6 @@ class ManagerConfig(BaseModel):
         Set to /dev/null by default to disable this feature.
         """,
         examples=["/var/run/manager.pid"],
-        validation_alias=AliasChoices("pid-file", "pid_file"),
-        serialization_alias="pid-file",
     )
     allowed_plugins: Optional[set[str]] = Field(
         default=None,
@@ -678,8 +636,6 @@ class ManagerConfig(BaseModel):
         Leave as None to load all available plugins except those in disabled_plugins.
         """,
         examples=[["example.plugin.what.you.want"]],
-        validation_alias=AliasChoices("allowed-plugins", "allowed_plugins"),
-        serialization_alias="allowed-plugins",
     )
     disabled_plugins: Optional[set[str]] = Field(
         default=None,
@@ -689,8 +645,6 @@ class ManagerConfig(BaseModel):
         Useful for disabling problematic or unwanted plugins without uninstalling them.
         """,
         examples=[["example.plugin.what.you.want"]],
-        validation_alias=AliasChoices("disabled-plugins", "disabled_plugins"),
-        serialization_alias="disabled-plugins",
     )
     hide_agents: bool = Field(
         default=False,
@@ -700,8 +654,6 @@ class ManagerConfig(BaseModel):
         Useful for security in multi-tenant environments.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("hide-agents", "hide_agents"),
-        serialization_alias="hide-agents",
     )
     agent_selection_resource_priority: list[str] = Field(
         default=["cuda", "rocm", "tpu", "cpu", "mem"],
@@ -711,10 +663,6 @@ class ManagerConfig(BaseModel):
         Default prioritizes GPU resources (CUDA, ROCm) over CPU and memory.
         """,
         examples=[["cuda", "rocm", "tpu", "cpu", "mem"]],
-        validation_alias=AliasChoices(
-            "agent-selection-resource-priority", "agent_selection_resource_priority"
-        ),
-        serialization_alias="agent-selection-resource-priority",
     )
     importer_image: str = Field(
         default="lablup/importer:manylinux2010",
@@ -724,8 +672,6 @@ class ManagerConfig(BaseModel):
         Should be compatible with the Backend.AI environment.
         """,
         examples=["lablup/importer:manylinux2010"],
-        validation_alias=AliasChoices("importer-image", "importer_image"),
-        serialization_alias="importer-image",
     )
     max_wsmsg_size: int = Field(
         default=16 * (2**20),  # default: 16 MiB
@@ -736,8 +682,6 @@ class ManagerConfig(BaseModel):
         Increase for applications that need to transfer larger data chunks.
         """,
         examples=[16 * (2**20), 32 * (2**20)],
-        validation_alias=AliasChoices("max-wsmsg-size", "max_wsmsg_size"),
-        serialization_alias="max-wsmsg-size",
     )
     aiomonitor_port: Optional[int] = Field(
         default=None,
@@ -748,8 +692,6 @@ class ManagerConfig(BaseModel):
         Use `aiomonitor_termui_port` instead.
         """,
         examples=[38100, 38200],
-        validation_alias=AliasChoices("aiomonitor-port", "aiomonitor_port"),
-        serialization_alias="aiomonitor-port",
     )
     aiomonitor_termui_port: int = Field(
         default=38100,
@@ -761,8 +703,6 @@ class ManagerConfig(BaseModel):
         Should be a port that's not used by other services.
         """,
         examples=[38100, 38200],
-        validation_alias=AliasChoices("aiomonitor-termui-port", "aiomonitor_termui_port"),
-        serialization_alias="aiomonitor-termui-port",
     )
     aiomonitor_webui_port: int = Field(
         default=39100,
@@ -774,8 +714,6 @@ class ManagerConfig(BaseModel):
         Should be a port that's not used by other services.
         """,
         examples=[39100, 39200],
-        validation_alias=AliasChoices("aiomonitor-webui-port", "aiomonitor_webui_port"),
-        serialization_alias="aiomonitor-webui-port",
     )
     use_experimental_redis_event_dispatcher: bool = Field(
         default=False,
@@ -785,10 +723,6 @@ class ManagerConfig(BaseModel):
         Not recommended for production use unless specifically needed.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices(
-            "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-        ),
-        serialization_alias="use-experimental-redis-event-dispatcher",
     )
     status_update_interval: Optional[float] = Field(
         default=None,
@@ -799,8 +733,6 @@ class ManagerConfig(BaseModel):
         Smaller values provide more real-time information but increase overhead.
         """,
         examples=[60.0, 120.0],
-        validation_alias=AliasChoices("status-update-interval", "status_update_interval"),
-        serialization_alias="status-update-interval",
     )
     status_lifetime: Optional[int] = Field(
         default=None,
@@ -811,8 +743,6 @@ class ManagerConfig(BaseModel):
         Should be greater than the status_update_interval.
         """,
         examples=[60, 120],
-        validation_alias=AliasChoices("status-lifetime", "status_lifetime"),
-        serialization_alias="status-lifetime",
     )
     public_metrics_port: Optional[int] = Field(
         default=None,
@@ -824,9 +754,51 @@ class ManagerConfig(BaseModel):
         Leave as None to disable public metrics exposure.
         """,
         examples=[8080, 9090],
-        validation_alias=AliasChoices("public-metrics-port", "public_metrics_port"),
-        serialization_alias="public-metrics-port",
     )
+
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "ipc-base-path": str(self.ipc_base_path),
+            "num-proc": self.num_proc,
+            "id": self.id,
+            "user": self.user,
+            "group": self.group,
+            "service-addr": self.service_addr.to_legacy(),
+            "announce-addr": self.announce_addr.to_legacy(),
+            "announce-internal-addr": self.announce_internal_addr.to_legacy(),
+            "internal-addr": self.internal_addr.to_legacy(),
+            "rpc-auth-manager-keypair": str(self.rpc_auth_manager_keypair),
+            "heartbeat-timeout": self.heartbeat_timeout,
+            "secret": self.secret,
+            "ssl-enabled": self.ssl_enabled,
+            "ssl-cert": str(self.ssl_cert) if self.ssl_cert else None,
+            "ssl-privkey": str(self.ssl_privkey) if self.ssl_privkey else None,
+            "event-loop": self.event_loop.value,
+            "distributed-lock": self.distributed_lock.value,
+            "pg-advisory-config": dict(self.pg_advisory_config),
+            "filelock-config": dict(self.filelock_config),
+            "redlock-config": dict(self.redlock_config),
+            "etcdlock-config": dict(self.etcdlock_config),
+            "session_schedule_lock_lifetime": self.session_schedule_lock_lifetime,
+            "session_check_precondition_lock_lifetime": (
+                self.session_check_precondition_lock_lifetime
+            ),
+            "session_start_lock_lifetime": self.session_start_lock_lifetime,
+            "pid-file": str(self.pid_file),
+            "allowed-plugins": self.allowed_plugins,
+            "disabled-plugins": self.disabled_plugins,
+            "hide-agents": self.hide_agents,
+            "agent-selection-resource-priority": self.agent_selection_resource_priority,
+            "importer-image": self.importer_image,
+            "max-wsmsg-size": self.max_wsmsg_size,
+            "aiomonitor-port": self.aiomonitor_port,
+            "aiomonitor-termui-port": self.aiomonitor_termui_port,
+            "aiomonitor-webui-port": self.aiomonitor_webui_port,
+            "use-experimental-redis-event-dispatcher": self.use_experimental_redis_event_dispatcher,
+            "status-update-interval": self.status_update_interval,
+            "status-lifetime": self.status_lifetime,
+            "public-metrics-port": self.public_metrics_port,
+        }
 
     @property
     def aiomonitor_terminal_ui_port(self) -> int:
@@ -841,7 +813,7 @@ class ManagerConfig(BaseModel):
 
 
 # Deprecated: v20.09
-class DockerRegistryConfig(BaseModel):
+class DockerRegistryConfig(BaseConfigModel):
     ssl_verify: bool = Field(
         default=True,
         description="""
@@ -849,12 +821,15 @@ class DockerRegistryConfig(BaseModel):
         Disabling this is not recommended except for testing with self-signed certificates.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("ssl-verify", "ssl_verify"),
-        serialization_alias="ssl-verify",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "ssl-verify": self.ssl_verify,
+        }
 
-class PyroscopeConfig(BaseModel):
+
+class PyroscopeConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="""
@@ -872,8 +847,6 @@ class PyroscopeConfig(BaseModel):
         Required if Pyroscope is enabled.
         """,
         examples=["backendai-half-manager"],
-        validation_alias=AliasChoices("app-name", "app_name"),
-        serialization_alias="app-name",
     )
     server_addr: Optional[str] = Field(
         default=None,
@@ -883,8 +856,6 @@ class PyroscopeConfig(BaseModel):
         Required if Pyroscope is enabled.
         """,
         examples=["http://localhost:4040"],
-        validation_alias=AliasChoices("server-addr", "server_addr"),
-        serialization_alias="server-addr",
     )
     sample_rate: Optional[int] = Field(
         default=None,
@@ -894,12 +865,18 @@ class PyroscopeConfig(BaseModel):
         Balance based on your performance monitoring needs.
         """,
         examples=[10, 100, 1000],
-        validation_alias=AliasChoices("sample-rate", "sample_rate"),
-        serialization_alias="sample-rate",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "app-name": self.app_name,
+            "server-addr": self.server_addr,
+            "sample-rate": self.sample_rate,
+        }
 
-class SMTPReporterConfig(BaseModel):
+
+class SMTPReporterConfig(BaseConfigModel):
     name: str = Field(
         description="""
         Name of the SMTP reporter.
@@ -959,8 +936,6 @@ class SMTPReporterConfig(BaseModel):
         Recommended for production environments to protect sensitive information.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("use-tls", "use_tls"),
-        serialization_alias="use-tls",
     )
     max_workers: int = Field(
         default=5,
@@ -971,8 +946,6 @@ class SMTPReporterConfig(BaseModel):
         Higher values may improve performance but increase resource usage.
         """,
         examples=[5, 10],
-        validation_alias=AliasChoices("max-workers", "max_workers"),
-        serialization_alias="max-workers",
     )
     template: str = Field(
         default=_default_smtp_template,
@@ -992,20 +965,31 @@ class SMTPReporterConfig(BaseModel):
         Choose based on your notification needs.
         """,
         examples=["ALL", "ON_ERROR"],
-        validation_alias=AliasChoices("trigger-policy", "trigger_policy"),
-        serialization_alias="trigger-policy",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "host": self.host,
+            "port": self.port,
+            "username": self.username,
+            "password": self.password,
+            "sender": self.sender,
+            "recipients": self.recipients,
+            "use-tls": self.use_tls,
+            "max-workers": self.max_workers,
+            "template": self.template,
+            "trigger-policy": self.trigger_policy,
+        }
 
-class ActionMonitorsConfig(BaseModel):
+
+class ActionMonitorsConfig(BaseConfigModel):
     subscribed_actions: list[str] = Field(
         default=[],
         description="""
         List of action types to subscribe to for monitoring.
         """,
         examples=[["session:create_from_params", "session:create_cluster"]],
-        validation_alias=AliasChoices("subscribed-actions", "subscribed_actions"),
-        serialization_alias="subscribed-actions",
     )
     reporter: str = Field(
         description="""
@@ -1015,8 +999,14 @@ class ActionMonitorsConfig(BaseModel):
         examples=["smtp", "audit_log"],
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "subscribed-actions": self.subscribed_actions,
+            "reporter": self.reporter,
+        }
 
-class ReporterConfig(BaseModel):
+
+class ReporterConfig(BaseConfigModel):
     smtp: list[SMTPReporterConfig] = Field(
         default=[],
         description="""
@@ -1031,12 +1021,16 @@ class ReporterConfig(BaseModel):
         Action monitors configuration.
         Each reporter can be configured to subscribe to specific actions.
         """,
-        validation_alias=AliasChoices("action-monitors", "action_monitors"),
-        serialization_alias="action-monitors",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "smtp": [reporter.to_legacy_format() for reporter in self.smtp],
+            "action-monitors": [monitor.to_legacy_format() for monitor in self.action_monitors],
+        }
 
-class DebugConfig(BaseModel):
+
+class DebugConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1063,10 +1057,6 @@ class DebugConfig(BaseModel):
         Useful for debugging complex async issues, but adds overhead.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices(
-            "enhanced-aiomonitor-task-info", "enhanced_aiomonitor_task_info"
-        ),
-        serialization_alias="enhanced-aiomonitor-task-info",
     )
     log_events: bool = Field(
         default=False,
@@ -1076,8 +1066,6 @@ class DebugConfig(BaseModel):
         Very verbose, but useful for debugging event-related issues.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("log-events", "log_events"),
-        serialization_alias="log-events",
     )
     log_scheduler_ticks: bool = Field(
         default=False,
@@ -1087,8 +1075,6 @@ class DebugConfig(BaseModel):
         Useful for debugging scheduling issues, but generates many log entries.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("log-scheduler-ticks", "log_scheduler_ticks"),
-        serialization_alias="log-scheduler-ticks",
     )
     periodic_sync_stats: bool = Field(
         default=False,
@@ -1098,12 +1084,20 @@ class DebugConfig(BaseModel):
         Helpful for monitoring system behavior over time.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("periodic-sync-stats", "periodic_sync_stats"),
-        serialization_alias="periodic-sync-stats",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "asyncio": self.asyncio,
+            "enhanced-aiomonitor-task-info": self.enhanced_aiomonitor_task_info,
+            "log-events": self.log_events,
+            "log-scheduler-ticks": self.log_scheduler_ticks,
+            "periodic-sync-stats": self.periodic_sync_stats,
+        }
 
-class SystemConfig(BaseModel):
+
+class SystemConfig(BaseConfigModel):
     timezone: TimeZone = Field(
         default_factory=lambda: timezone.utc,
         description="""
@@ -1114,7 +1108,7 @@ class SystemConfig(BaseModel):
     )
 
 
-class ResourcesConfig(BaseModel):
+class ResourcesConfig(BaseConfigModel):
     group_resource_visibility: bool = Field(
         default=False,
         description="""
@@ -1125,7 +1119,7 @@ class ResourcesConfig(BaseModel):
     )
 
 
-class APIConfig(BaseModel):
+class APIConfig(BaseConfigModel):
     allow_origins: str = Field(
         default="*",
         description="""
@@ -1134,8 +1128,6 @@ class APIConfig(BaseModel):
         Important for browser-based clients connecting to the API.
         """,
         examples=["*", "https://example.com"],
-        validation_alias=AliasChoices("allow_origins", "allow-origins"),
-        serialization_alias="allow-origins",
     )
     allow_graphql_schema_introspection: bool = Field(
         default=False,
@@ -1145,10 +1137,6 @@ class APIConfig(BaseModel):
         When disabled, GraphQL tools like GraphiQL won't be able to explore the schema.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices(
-            "allow_graphql_schema_introspection", "allow-graphql-schema-introspection"
-        ),
-        serialization_alias="allow-graphql-schema-introspection",
     )
     allow_openapi_schema_introspection: bool = Field(
         default=False,
@@ -1158,10 +1146,6 @@ class APIConfig(BaseModel):
         When disabled, Swagger UI and similar tools won't work.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices(
-            "allow_openapi_schema_introspection", "allow-openapi-schema-introspection"
-        ),
-        serialization_alias="allow-openapi-schema-introspection",
     )
     max_gql_query_depth: Optional[int] = Field(
         default=None,
@@ -1172,8 +1156,6 @@ class APIConfig(BaseModel):
         Set to None to disable the limit.
         """,
         examples=[None, 10, 15],
-        validation_alias=AliasChoices("max_gql_query_depth", "max-gql-query-depth"),
-        serialization_alias="max-gql-query-depth",
     )
     max_gql_connection_page_size: Optional[int] = Field(
         default=None,
@@ -1184,10 +1166,6 @@ class APIConfig(BaseModel):
         Set to None to use the default page size.
         """,
         examples=[None, 100, 500],
-        validation_alias=AliasChoices(
-            "max_gql_connection_page_size", "max-gql-connection-page-size"
-        ),
-        serialization_alias="max-gql-connection-page-size",
     )
     resources: Optional[ResourcesConfig] = Field(
         default=None,
@@ -1198,8 +1176,18 @@ class APIConfig(BaseModel):
         examples=[None, {"group_resource_visibility": True}],
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "allow-origins": self.allow_origins,
+            "allow-graphql-schema-introspection": self.allow_graphql_schema_introspection,
+            "allow-openapi-schema-introspection": self.allow_openapi_schema_introspection,
+            "max-gql-query-depth": self.max_gql_query_depth,
+            "max-gql-connection-page-size": self.max_gql_connection_page_size,
+            "resources": self.resources.to_legacy_format() if self.resources else None,
+        }
 
-class RedisHelperConfig(BaseModel):
+
+class RedisHelperConfig(BaseConfigModel):
     socket_timeout: float = Field(
         default=5.0,
         description="""
@@ -1208,8 +1196,6 @@ class RedisHelperConfig(BaseModel):
         Increase for slow or congested networks.
         """,
         examples=[5.0, 10.0],
-        validation_alias=AliasChoices("socket_timeout", "socket-timeout"),
-        serialization_alias="socket_timeout",
     )
     socket_connect_timeout: float = Field(
         default=2.0,
@@ -1219,8 +1205,6 @@ class RedisHelperConfig(BaseModel):
         Shorter values fail faster but may be too aggressive for some networks.
         """,
         examples=[2.0, 5.0],
-        validation_alias=AliasChoices("socket_connect_timeout", "socket-connect-timeout"),
-        serialization_alias="socket_connect_timeout",
     )
     reconnect_poll_timeout: float = Field(
         default=0.3,
@@ -1230,12 +1214,17 @@ class RedisHelperConfig(BaseModel):
         Lower values reconnect faster but may increase network load.
         """,
         examples=[0.3, 1.0],
-        validation_alias=AliasChoices("reconnect_poll_timeout", "reconnect-poll-timeout"),
-        serialization_alias="reconnect_poll_timeout",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "socket_timeout": self.socket_timeout,
+            "socket_connect_timeout": self.socket_connect_timeout,
+            "reconnect_poll_timeout": self.reconnect_poll_timeout,
+        }
 
-class SingleRedisConfig(BaseModel):
+
+class SingleRedisConfig(BaseConfigModel):
     addr: Optional[HostPortPairModel] = Field(
         default=None,
         description="""
@@ -1265,8 +1254,6 @@ class SingleRedisConfig(BaseModel):
         Identifies which service to monitor for failover.
         """,
         examples=[None, "mymaster", "backend-ai"],
-        validation_alias=AliasChoices("service_name", "service-name"),
-        serialization_alias="service-name",
     )
     password: Optional[str] = Field(
         default=None,
@@ -1284,9 +1271,16 @@ class SingleRedisConfig(BaseModel):
         Controls timeouts and reconnection behavior.
         Adjust based on network conditions and reliability requirements.
         """,
-        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
-        serialization_alias="redis-helper-config",
     )
+
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "addr": self.addr.to_legacy() if self.addr else None,
+            "sentinel": ([hp.to_legacy() for hp in self.sentinel] if self.sentinel else None),
+            "service-name": self.service_name,
+            "password": self.password,
+            "redis-helper-config": self.redis_helper_config.to_legacy_format(),
+        }
 
     @field_validator("sentinel", mode="before")
     @classmethod
@@ -1344,7 +1338,7 @@ class DockerImageAutoPullPolicy(enum.StrEnum):
     none = "none"
 
 
-class DockerImageConfig(BaseModel):
+class DockerImageConfig(BaseConfigModel):
     auto_pull: DockerImageAutoPullPolicy = Field(
         default=DockerImageAutoPullPolicy.digest,
         description="""
@@ -1354,12 +1348,15 @@ class DockerImageConfig(BaseModel):
         'none': Never pull automatically (manual control)
         """,
         examples=[item.value for item in DockerImageAutoPullPolicy],
-        validation_alias=AliasChoices("auto_pull", "auto-pull"),
-        serialization_alias="auto_pull",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "auto-pull": self.auto_pull.value,
+        }
 
-class DockerConfig(BaseModel):
+
+class DockerConfig(BaseConfigModel):
     image: DockerImageConfig = Field(
         default_factory=DockerImageConfig,
         description="""
@@ -1369,7 +1366,7 @@ class DockerConfig(BaseModel):
     )
 
 
-class PluginsConfig(BaseModel):
+class PluginsConfig(BaseConfigModel):
     accelerator: dict[str, Any] = Field(
         default_factory=dict,
         description="""
@@ -1396,8 +1393,6 @@ class PluginsConfig(BaseModel):
         Can implement various selection strategies based on load, resource availability, etc.
         """,
         examples=[{}],
-        validation_alias=AliasChoices("agent_selector", "agent-selector"),
-        serialization_alias="agent-selector",
     )
     network: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
@@ -1408,7 +1403,7 @@ class PluginsConfig(BaseModel):
     )
 
 
-class InterContainerNetworkConfig(BaseModel):
+class InterContainerNetworkConfig(BaseConfigModel):
     default_driver: Optional[str] = Field(
         default="overlay",
         description="""
@@ -1417,8 +1412,6 @@ class InterContainerNetworkConfig(BaseModel):
         Container communication performance depends on this setting.
         """,
         examples=["overlay", None],
-        validation_alias=AliasChoices("default_driver", "default-driver"),
-        serialization_alias="default-driver",
     )
     # TODO: Write description
     enabled: bool = Field(
@@ -1435,8 +1428,15 @@ class InterContainerNetworkConfig(BaseModel):
         """,
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "default-driver": self.default_driver,
+            "enabled": self.enabled,
+            "plugin": self.plugin,
+        }
 
-class SubnetNetworkConfig(BaseModel):
+
+class SubnetNetworkConfig(BaseConfigModel):
     agent: IPvAnyNetwork = Field(
         default=IPv4Network("0.0.0.0/0"),
         description="""
@@ -1457,27 +1457,28 @@ class SubnetNetworkConfig(BaseModel):
     )
 
 
-class RpcConfig(BaseModel):
+class RpcConfig(BaseConfigModel):
     keepalive_timeout: float = Field(
         default=60.0,
         # TODO: Write description
         description="""
         """,
         examples=[60.0, 120.0],
-        validation_alias=AliasChoices("keepalive_timeout", "keepalive-timeout"),
-        serialization_alias="keepalive-timeout",
     )
 
+    def to_legacy_format(self):
+        return {
+            "keepalive-timeout": self.keepalive_timeout,
+        }
 
-class NetworkConfig(BaseModel):
+
+class NetworkConfig(BaseConfigModel):
     inter_container: InterContainerNetworkConfig = Field(
         default_factory=InterContainerNetworkConfig,
         description="""
         Settings for networks between containers.
         Controls how containers communicate with each other.
         """,
-        validation_alias=AliasChoices("inter_container", "inter-container"),
-        serialization_alias="inter-container",
     )
     subnet: SubnetNetworkConfig = Field(
         default_factory=SubnetNetworkConfig,
@@ -1492,8 +1493,15 @@ class NetworkConfig(BaseModel):
         """,
     )
 
+    def to_legacy_format(self):
+        return {
+            "inter-container": self.inter_container.to_legacy_format(),
+            "subnet": self.subnet.to_legacy_format(),
+            "rpc": self.rpc.to_legacy_format(),
+        }
 
-class WatcherConfig(BaseModel):
+
+class WatcherConfig(BaseConfigModel):
     token: Optional[str] = Field(
         default=None,
         description="""
@@ -1511,12 +1519,16 @@ class WatcherConfig(BaseModel):
         Increase for handling large files or slow storage systems.
         """,
         examples=[60.0, 120.0],
-        validation_alias=AliasChoices("file_io_timeout", "file-io-timeout"),
-        serialization_alias="file-io-timeout",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "token": self.token,
+            "file-io-timeout": self.file_io_timeout,
+        }
 
-class AuthConfig(BaseModel):
+
+class AuthConfig(BaseConfigModel):
     max_password_age: Optional[TimeDuration] = Field(
         default=None,
         description="""
@@ -1525,12 +1537,15 @@ class AuthConfig(BaseModel):
         Set to None to disable password expiration.
         """,
         examples=[None, "90d", "180d"],
-        validation_alias=AliasChoices("max_password_age", "max-password-age"),
-        serialization_alias="max_password_age",
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "max-password-age": str(self.max_password_age) if self.max_password_age else None,
+        }
 
-class HangToleranceThresholdConfig(BaseModel):
+
+class HangToleranceThresholdConfig(BaseConfigModel):
     PREPARING: Optional[datetime] = Field(
         default=None,
         description="""
@@ -1551,7 +1566,7 @@ class HangToleranceThresholdConfig(BaseModel):
     )
 
 
-class HangToleranceConfig(BaseModel):
+class HangToleranceConfig(BaseConfigModel):
     threshold: HangToleranceThresholdConfig = Field(
         default_factory=HangToleranceThresholdConfig,
         description="""
@@ -1561,19 +1576,22 @@ class HangToleranceConfig(BaseModel):
     )
 
 
-class SessionConfig(BaseModel):
+class SessionConfig(BaseConfigModel):
     hang_tolerance: HangToleranceConfig = Field(
         default_factory=HangToleranceConfig,
         description="""
         Configuration for detecting and handling hung sessions.
         Controls how the system detects and recovers from session failures.
         """,
-        validation_alias=AliasChoices("hang_tolerance", "hang-tolerance"),
-        serialization_alias="hang-tolerance",
     )
 
+    def to_legacy_format(self):
+        return {
+            "hang-tolerance": self.hang_tolerance.threshold.to_legacy_format(),
+        }
 
-class MetricConfig(BaseModel):
+
+class MetricConfig(BaseConfigModel):
     address: HostPortPairModel = Field(
         default=HostPortPairModel(host="127.0.0.1", port=9090),
         description="""
@@ -1597,7 +1615,7 @@ class MetricConfig(BaseModel):
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 
-class IdleCheckerConfig(BaseModel):
+class IdleCheckerConfig(BaseConfigModel):
     enabled: str = Field(
         default="",
         description="""
@@ -1613,10 +1631,6 @@ class IdleCheckerConfig(BaseModel):
         Controls how long the system waits before considering a connection idle.
         """,
         examples=["5m", "10m"],
-        validation_alias=AliasChoices(
-            "app_streaming_packet_timeout", "app-streaming-packet-timeout"
-        ),
-        serialization_alias="app_streaming_packet_timeout",
     )
     checkers: dict[str, Any] = Field(
         default_factory=dict,
@@ -1651,8 +1665,15 @@ class IdleCheckerConfig(BaseModel):
         ],
     )
 
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "app_streaming_packet_timeout": str(self.app_streaming_packet_timeout),
+            "checkers": self.checkers,
+        }
 
-class VolumeTypeConfig(BaseModel):
+
+class VolumeTypeConfig(BaseConfigModel):
     user: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
@@ -1671,7 +1692,7 @@ class VolumeTypeConfig(BaseModel):
     )
 
 
-class VolumeProxyConfig(BaseModel):
+class VolumeProxyConfig(BaseConfigModel):
     client_api: str = Field(
         description="""
         Client-facing API endpoint URL of the volume proxy.
@@ -1679,8 +1700,6 @@ class VolumeProxyConfig(BaseModel):
         Should include protocol, host and port.
         """,
         examples=["http://localhost:6021", "https://proxy1.example.com:6021"],
-        validation_alias=AliasChoices("client_api", "client-api"),
-        serialization_alias="client_api",
     )
     manager_api: str = Field(
         description="""
@@ -1689,8 +1708,6 @@ class VolumeProxyConfig(BaseModel):
         Should include protocol, host and port.
         """,
         examples=["http://localhost:6022", "https://proxy1.example.com:6022"],
-        validation_alias=AliasChoices("manager_api", "manager-api"),
-        serialization_alias="manager_api",
     )
     secret: str = Field(
         description="""
@@ -1708,8 +1725,6 @@ class VolumeProxyConfig(BaseModel):
         Can be disabled for testing with self-signed certificates.
         """,
         examples=[True, False],
-        validation_alias=AliasChoices("ssl_verify", "ssl-verify"),
-        serialization_alias="ssl_verify",
     )
     sftp_scaling_groups: Optional[CommaSeparatedStrList] = Field(
         default=None,
@@ -1718,12 +1733,19 @@ class VolumeProxyConfig(BaseModel):
         Controls which scaling groups can create SFTP sessions for this volume.
         """,
         examples=[None, ["group-1", "group-2"]],
-        validation_alias=AliasChoices("sftp_scaling_groups", "sftp-scaling-groups"),
-        serialization_alias="sftp_scaling_groups",
     )
 
+    def to_legacy_format(self):
+        return {
+            "client_api": self.client_api,
+            "manager_api": self.manager_api,
+            "secret": self.secret,
+            "ssl_verify": self.ssl_verify,
+            "sftp_scaling_groups": self.sftp_scaling_groups,
+        }
 
-class VolumesConfig(BaseModel):
+
+class VolumesConfig(BaseConfigModel):
     types: VolumeTypeConfig = Field(
         default_factory=lambda: VolumeTypeConfig(user={}),
         description="""
@@ -1741,8 +1763,6 @@ class VolumesConfig(BaseModel):
         Used when user doesn't explicitly specify a host.
         """,
         examples=["localhost:6021", "local:default", "nas:main-volume"],
-        validation_alias=AliasChoices("default_host", "default-host"),
-        serialization_alias="default_host",
     )
     exposed_volume_info: CommaSeparatedStrList = Field(
         default=CommaSeparatedStrList(["percentage"]),
@@ -1751,8 +1771,6 @@ class VolumesConfig(BaseModel):
         Options include "percentage" for disk usage percentage.
         """,
         examples=[["percentage"], ["percentage", "bytes"]],
-        validation_alias=AliasChoices("exposed_volume_info", "exposed-volume-info"),
-        serialization_alias="exposed_volume_info",
     )
     proxies: dict[str, VolumeProxyConfig] = Field(
         default_factory=dict,
@@ -1772,15 +1790,23 @@ class VolumesConfig(BaseModel):
         ],
     )
 
+    def to_legacy_format(self):
+        return {
+            "types": self.types.to_legacy_format(),
+            "default-host": self.default_host,
+            "exposed-volume-info": self.exposed_volume_info,
+            "proxies": {name: proxy.to_legacy_format() for name, proxy in self.proxies.items()},
+        }
+
 
 # TODO: Make this more precise type
-class ResourceSlotsConfig(BaseModel):
+class ResourceSlotsConfig(BaseConfigModel):
     model_config = ConfigDict(
         extra="allow",
     )
 
 
-class OTELConfig(BaseModel):
+class OTELConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1797,7 +1823,6 @@ class OTELConfig(BaseModel):
         Common levels include 'debug', 'info', 'warn', 'error'.
         """,
         examples=["DEBUG", "INFO", "WARN", "ERROR"],
-        alias="log-level",
     )
     endpoint: str = Field(
         default="localhost:4317",
@@ -1808,8 +1833,15 @@ class OTELConfig(BaseModel):
         examples=["localhost:4317", "otel-collector:4317"],
     )
 
+    def to_legacy_format(self):
+        return {
+            "enabled": self.enabled,
+            "log-level": self.log_level,
+            "endpoint": self.endpoint,
+        }
 
-class ManagerUnifiedConfig(BaseModel):
+
+class ManagerUnifiedConfig(BaseConfigModel):
     # From legacy local config
     db: DatabaseConfig = Field(
         default_factory=DatabaseConfig,
@@ -1841,8 +1873,6 @@ class ManagerUnifiedConfig(BaseModel):
         Deprecated: Docker registry configuration.
         Contains settings for connecting to Docker registries.
         """,
-        validation_alias=AliasChoices("docker_registry", "docker-registry"),
-        serialization_alias="docker-registry",
     )
     logging: Any = Field(
         default_factory=lambda: {},
@@ -1979,3 +2009,29 @@ class ManagerUnifiedConfig(BaseModel):
 
     def __repr__(self):
         return pformat(self.model_dump())
+
+    def to_legacy_format(self) -> dict[str, Any]:
+        return {
+            "db": self.db.to_legacy_format(),
+            "etcd": self.etcd.to_legacy_format(),
+            "manager": self.manager.to_legacy_format(),
+            "docker-registry": self.docker_registry.to_legacy_format(),
+            "logging": self.logging,
+            "pyroscope": self.pyroscope.to_legacy_format(),
+            "debug": self.debug.to_legacy_format(),
+            "reporter": self.reporter.to_legacy_format(),
+            "system": self.system.to_legacy_format(),
+            "api": self.api.to_legacy_format(),
+            "redis": self.redis.to_legacy_format(),
+            "idle": self.idle.to_legacy_format(),
+            "docker": self.docker.to_legacy_format(),
+            "plugins": self.plugins.to_legacy_format(),
+            "network": self.network.to_legacy_format(),
+            "watcher": self.watcher.to_legacy_format(),
+            "auth": self.auth.to_legacy_format() if self.auth else None,
+            "session": self.session.to_legacy_format(),
+            "metric": self.metric.to_legacy_format(),
+            "volumes": self.volumes.to_legacy_format(),
+            "resource-slots": self.resource_slots.to_legacy_format(),
+            "otel": self.otel.to_legacy_format(),
+        }

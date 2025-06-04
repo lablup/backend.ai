@@ -212,7 +212,7 @@ class IdleCheckerHost:
         self._event_producer = event_producer
         self._lock_factory = lock_factory
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self._config_provider.config.redis.model_dump()
+            self._config_provider.config.redis.to_legacy_format()
         )
         self._redis_live = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.LIVE),

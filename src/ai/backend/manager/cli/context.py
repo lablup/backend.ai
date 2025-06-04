@@ -147,7 +147,7 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
     raw_redis_config = await loader.load()
     redis_config = RedisConfig(**raw_redis_config)
-    etcd_redis_config = RedisProfileTarget.from_dict(redis_config.model_dump())
+    etcd_redis_config = RedisProfileTarget.from_dict(redis_config.to_legacy_format())
 
     redis_live = redis_helper.get_redis_object(
         etcd_redis_config.profile_target(RedisRole.LIVE),

@@ -169,7 +169,7 @@ class KeyPair(graphene.ObjectType):
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            ctx.config_provider.config.redis.model_dump()
+            ctx.config_provider.config.redis.to_legacy_format()
         )
         redis_rlim = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.RATE_LIMIT),
