@@ -32,6 +32,7 @@ python_distribution(
         "src/ai/backend/common/data/vfolder:src",
         "src/ai/backend/common/dto/agent:src",
         "src/ai/backend/common/dto/manager:src",
+        "src/ai/backend/common/dto/manager/auth:src",
         "src/ai/backend/common/dto/storage:src",
         "src/ai/backend/common/events:src",
         "src/ai/backend/common/events/hub:src",

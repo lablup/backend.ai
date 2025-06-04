@@ -115,8 +115,7 @@ class AgentWatcher(BaseFunction):
         """
         Get agent and watcher status.
         """
-        rqst = Request("GET", "/resource/watcher")
-        rqst.set_json({"agent_id": agent_id})
+        rqst = Request("GET", "/resource/watcher", params={"agent_id": agent_id})
         async with rqst.fetch() as resp:
             data = await resp.json()
             if "message" in data:

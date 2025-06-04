@@ -277,7 +277,7 @@ class HiRedisQueue(AbstractMessageQueue):
         # If the group does not exist, create it
         # and start the auto claim loop again
         if not e.args[0].startswith("NOGROUP "):
-            log.error("Error while auto claiming messages: {}", e)
+            log.error("Unexpected error in consumer: {}", e)
             return
         try:
             async with RedisConnection(self._target, db=self._db) as client:

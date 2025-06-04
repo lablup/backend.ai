@@ -67,7 +67,6 @@ class ScalingGroup(BaseFunction):
         )
         async with rqst.fetch() as resp:
             data = await resp.json()
-            print(data)
             return data["scaling_groups"]
 
     @api_function

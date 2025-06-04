@@ -24,10 +24,10 @@ class AuditLogMonitor(ActionMonitor):
         async with self._db.begin_session() as db_sess:
             db_row = AuditLogRow(
                 action_id=result.meta.action_id,
-                entity_type=action.__class__.entity_type(),
-                operation=action.__class__.operation_type(),
+                entity_type=action.entity_type(),
+                operation=action.operation_type(),
                 created_at=result.meta.started_at,
-                entity_id=action.entity_id() or _BLANK_ID,
+                entity_id=result.meta.entity_id or _BLANK_ID,
                 request_id=current_request_id() or _BLANK_ID,
                 description=result.meta.description,
                 status=result.meta.status,

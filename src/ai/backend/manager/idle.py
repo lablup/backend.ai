@@ -224,9 +224,7 @@ class IdleCheckerHost:
             name="idle.stat",
             db=REDIS_STATISTICS_DB,
         )
-        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
-            event_dispatcher, self._redis_live, self._redis_stat
-        )
+        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker()
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -425,16 +423,6 @@ class AbstractIdleCheckReporter(metaclass=ABCMeta):
     report_key: ClassVar[str] = "base"
     extra_info_key: ClassVar[str] = "base_extra"
 
-    def __init__(
-        self,
-        event_dispatcher: EventDispatcher,
-        redis_live: RedisConnectionInfo,
-        redis_stat: RedisConnectionInfo,
-    ) -> None:
-        self._event_dispatcher = event_dispatcher
-        self._redis_live = redis_live
-        self._redis_stat = redis_stat
-
     async def aclose(self) -> None:
         pass
 
@@ -519,6 +507,9 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         },
     ).allow_extra("*")
 
+    def __init__(self) -> None:
+        pass
+
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
         self.user_initial_grace_period = config["user_initial_grace_period"]
@@ -580,7 +571,22 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
 
 
 class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
-    pass
+    _event_dispatcher: EventDispatcher
+    _redis_live: RedisConnectionInfo
+    _redis_stat: RedisConnectionInfo
+    _db: SAEngine
+
+    def __init__(
+        self,
+        event_dispatcher: EventDispatcher,
+        redis_live: RedisConnectionInfo,
+        redis_stat: RedisConnectionInfo,
+        db: SAEngine,
+    ) -> None:
+        self._event_dispatcher = event_dispatcher
+        self._redis_live = redis_live
+        self._redis_stat = redis_stat
+        self._db = db
 
 
 class NetworkTimeoutIdleChecker(BaseIdleChecker):
@@ -604,7 +610,6 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
     idle_timeout: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
-    _db: SAEngine
 
     def __init__(
         self,
@@ -613,8 +618,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         redis_stat: RedisConnectionInfo,
         db: SAEngine,
     ) -> None:
-        super().__init__(event_dispatcher, redis_live, redis_stat)
-        self._db = db
+        super().__init__(event_dispatcher, redis_live, redis_stat, db)
         self._event_dispatcher.subscribe(SessionStartedEvent, None, self._session_started_cb)  # type: ignore
 
         evd = self._event_dispatcher.with_reporters([EventLogger(self._db)])
@@ -1281,7 +1285,7 @@ async def init_idle_checkers(
         event_producer,
         lock_factory,
     )
-    checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
+    checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat, db)
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default
     enabled_checkers = config_provider.config.idle.enabled

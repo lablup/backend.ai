@@ -5,10 +5,9 @@ import hashlib
 import hmac
 import logging
 import secrets
-from collections import ChainMap
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -21,45 +20,39 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.dto.manager.auth.field import (
+    AuthResponseType,
+    AuthSuccessResponse,
+    AuthTokenType,
+)
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
+from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.unified import AuthConfig
+from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
+from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
+from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
+from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
+from ai.backend.manager.services.auth.actions.signout import SignoutAction
+from ai.backend.manager.services.auth.actions.signup import SignupAction
+from ai.backend.manager.services.auth.actions.update_full_name import UpdateFullNameAction
+from ai.backend.manager.services.auth.actions.update_password import UpdatePasswordAction
+from ai.backend.manager.services.auth.actions.update_password_no_auth import (
+    UpdatePasswordNoAuthAction,
+)
+from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 
 from ..errors.exceptions import (
     AuthorizationFailed,
-    GenericBadRequest,
-    GenericForbidden,
-    InternalServerError,
-    InvalidAPIParameters,
     InvalidAuthParameters,
-    ObjectNotFound,
-    PasswordExpired,
     RejectedByHook,
-    UserNotFound,
 )
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
-from ..models.group import association_groups_users, groups
-from ..models.keypair import generate_keypair as _gen_keypair
-from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
-from ..models.keypair import validate_ssh_keypair
-from ..models.user import (
-    INACTIVE_USER_STATUSES,
-    UserRole,
-    UserRow,
-    UserStatus,
-    check_credential,
-    compare_to_hashed_password,
-)
 from ..models.utils import execute_with_retry
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine.row import Row
-
-    from ..models.utils import ExtendedAsyncSAEngine
     from .context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -409,21 +402,6 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
 
-async def check_password_age(
-    db: ExtendedAsyncSAEngine, user: Row, auth_config: Optional[AuthConfig]
-) -> None:
-    if auth_config is not None and (max_password_age := auth_config.max_password_age) is not None:
-        password_changed_at: datetime = user.users_password_changed_at
-
-        async with db.begin_readonly() as db_conn:
-            current_dt: datetime = await db_conn.scalar(sa.select(sa.func.now()))
-            if password_changed_at + max_password_age < current_dt:
-                # Force user to update password
-                raise PasswordExpired(
-                    extra_msg=f"Password expired on {password_changed_at + max_password_age}."
-                )
-
-
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
@@ -650,7 +628,6 @@ async def test(request: web.Request, params: Any) -> web.Response:
     })
 )
 async def get_role(request: web.Request, params: Any) -> web.Response:
-    group_role = None
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
         "AUTH.ROLES(ak:{}, d:{}, g:{})",
@@ -658,29 +635,17 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
         request["user"]["domain_name"],
         params["group"],
     )
-    if params["group"] is not None:
-        query = (
-            # TODO: per-group role is not yet implemented.
-            sa.select([association_groups_users.c.group_id])
-            .select_from(association_groups_users)
-            .where(
-                (association_groups_users.c.group_id == params["group"])
-                & (association_groups_users.c.user_id == request["user"]["uuid"]),
-            )
-        )
-        async with root_ctx.db.begin() as conn:
-            result = await conn.execute(query)
-            row = result.first()
-            if row is None:
-                raise ObjectNotFound(
-                    extra_msg="No such project or you are not the member of it.",
-                    object_name="project (user group)",
-                )
-        group_role = "user"
+    action = GetRoleAction(
+        user_id=request["user"]["uuid"],
+        group_id=params["group"],
+        is_superadmin=request["is_superadmin"],
+        is_admin=request["is_admin"],
+    )
+    result = await root_ctx.processors.auth.get_role.wait_for_complete(action)
     resp_data = {
-        "global_role": "superadmin" if request["is_superadmin"] else "user",
-        "domain_role": "admin" if request["is_admin"] else "user",
-        "group_role": group_role,
+        "global_role": result.global_role,
+        "domain_role": result.domain_role,
+        "group_role": result.group_role,
     }
     return web.json_response(resp_data)
 
@@ -693,66 +658,34 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
         t.Key("password"): t.String,
     }).allow_extra("*")
 )
-async def authorize(request: web.Request, params: Any) -> web.Response:
-    if params["type"] != "keypair":
-        # other types are not implemented yet.
-        raise InvalidAPIParameters("Unsupported authorization type")
+async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
     log.info("AUTH.AUTHORIZE(d:{0[domain]}, u:{0[username]}, passwd:****, type:{0[type]})", params)
     root_ctx: RootContext = request.app["_root.context"]
+    action = AuthorizeAction(
+        request=request,
+        type=AuthTokenType(params["type"]),
+        domain_name=params["domain"],
+        email=params["username"],
+        password=params["password"],
+        auth_config=root_ctx.config_provider.config.auth,
+    )
+    result = await root_ctx.processors.auth.authorize.wait_for_complete(action)
 
-    # [Hooking point for AUTHORIZE with the FIRST_COMPLETED requirement]
-    # The hook handlers should accept the whole ``params`` dict, and optional
-    # ``db`` parameter (if the hook needs to query to database).
-    # They should return a corresponding Backend.AI user object after performing
-    # their own authentication steps, like LDAP authentication, etc.
-    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-        "AUTHORIZE",
-        (request, params),
-        return_when=FIRST_COMPLETED,
+    if result.stream_response is not None:
+        return result.stream_response
+
+    assert result.authorization_result is not None
+    auth_result = result.authorization_result
+    data = AuthSuccessResponse(
+        response_type=AuthResponseType.SUCCESS,
+        access_key=auth_result.access_key,
+        secret_key=auth_result.secret_key,
+        role=auth_result.role,
+        status=auth_result.status,
     )
-    if hook_result.status != PASSED:
-        raise RejectedByHook.from_hook_result(hook_result)
-    elif hook_result.result:
-        # Passed one of AUTHORIZED hook
-        user = hook_result.result
-    else:
-        # No AUTHORIZE hook is defined (proceed with normal login)
-        user = await check_credential(
-            root_ctx.db,
-            params["domain"],
-            params["username"],
-            params["password"],
-        )
-    if user is None:
-        raise AuthorizationFailed("User credential mismatch.")
-    if user["status"] == UserStatus.BEFORE_VERIFICATION:
-        raise AuthorizationFailed("This account needs email verification.")
-    if user["status"] in INACTIVE_USER_STATUSES:
-        raise AuthorizationFailed("User credential mismatch.")
-    await check_password_age(root_ctx.db, user, root_ctx.config_provider.config.auth)
-    async with root_ctx.db.begin_session() as db_session:
-        user_row = await UserRow.query_user_by_uuid(user["uuid"], db_session)
-        if user_row is None:
-            raise UserNotFound(extra_data=user["uuid"])
-        main_keypair_row = user_row.get_main_keypair_row()
-    if main_keypair_row is None:
-        raise AuthorizationFailed("No API keypairs found.")
-    # [Hooking point for POST_AUTHORIZE]
-    # The hook handlers should accept a tuple of the request, user, and keypair objects.
-    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-        "POST_AUTHORIZE",
-        (request, params, user, main_keypair_row.mapping),
-        return_when=FIRST_COMPLETED,
-    )
-    if hook_result.status != PASSED:
-        raise RejectedByHook.from_hook_result(hook_result)
+
     return web.json_response({
-        "data": {
-            "access_key": main_keypair_row.access_key,
-            "secret_key": main_keypair_row.secret_key,
-            "role": user["role"],
-            "status": user["status"],
-        },
+        "data": data.to_dict(),
     })
 
 
@@ -764,127 +697,24 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
     }).allow_extra("*")
 )
 async def signup(request: web.Request, params: Any) -> web.Response:
-    log_fmt = "AUTH.SIGNUP(d:{}, email:{}, passwd:****)"
-    log_args = (params["domain"], params["email"])
-    log.info(log_fmt, *log_args)
+    log.info("AUTH.SIGNUP(d:{}, email:{}, passwd:****)", params["domain"], params["email"])
     root_ctx: RootContext = request.app["_root.context"]
-
-    # [Hooking point for PRE_SIGNUP with the ALL_COMPLETED requirement]
-    # The hook handlers should accept the whole ``params`` dict.
-    # They should return a dict to override the user information,
-    # where the keys must be a valid field name of the users table,
-    # with two exceptions: "resource_policy" (name) and "group" (name).
-    # A plugin may return an empty dict if it has nothing to override.
-    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-        "PRE_SIGNUP",
-        (params,),
-        return_when=ALL_COMPLETED,
+    action = SignupAction(
+        request=request,
+        domain_name=params["domain"],
+        email=params["email"],
+        password=params["password"],
+        username=params["username"] if "username" in params else None,
+        full_name=params["full_name"] if "full_name" in params else None,
+        description=params["description"] if "description" in params else None,
     )
-    if hook_result.status != PASSED:
-        raise RejectedByHook.from_hook_result(hook_result)
-    else:
-        # Merge the hook results as a single map.
-        user_data_overriden = ChainMap(*cast(Mapping, hook_result.result))
-
-    # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-    # The hook handlers should accept the request and whole ``params` dict.
-    # They should return None if the validation is successful and raise the
-    # Reject error otherwise.
-    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-        "VERIFY_PASSWORD_FORMAT",
-        (request, params),
-        return_when=ALL_COMPLETED,
-    )
-    if hook_result.status != PASSED:
-        hook_result.reason = hook_result.reason or "invalid password format"
-        raise RejectedByHook.from_hook_result(hook_result)
-
-    async with root_ctx.db.begin() as conn:
-        # Check if email already exists.
-        query = sa.select([users]).select_from(users).where((users.c.email == params["email"]))
-        result = await conn.execute(query)
-        row = result.first()
-        if row is not None:
-            raise GenericBadRequest("Email already exists")
-
-        # Create a user.
-        data = {
-            "domain_name": params["domain"],
-            "username": params["username"] if "username" in params else params["email"],
-            "email": params["email"],
-            "password": params["password"],
-            "need_password_change": False,
-            "full_name": params["full_name"] if "full_name" in params else "",
-            "description": params["description"] if "description" in params else "",
-            "status": UserStatus.ACTIVE,
-            "status_info": "user-signup",
-            "role": UserRole.USER,
-            "integration_id": None,
-            "resource_policy": "default",
-            "sudo_session_enabled": False,
-        }
-        if user_data_overriden:
-            for key, val in user_data_overriden.items():
-                if (
-                    key in data  # take only valid fields
-                    and key != "resource_policy"  # resource_policy in user_data is for keypair
-                ):
-                    data[key] = val
-        query = users.insert().values(data)
-        result = await conn.execute(query)
-        if result.rowcount > 0:
-            checkq = users.select().where(users.c.email == params["email"])
-            result = await conn.execute(checkq)
-            user = result.first()
-            # Create user's first access_key and secret_key.
-            ak, sk = _gen_keypair()
-            resource_policy = user_data_overriden.get("resource_policy", "default")
-            kp_data = {
-                "user_id": params["email"],
-                "access_key": ak,
-                "secret_key": sk,
-                "is_active": True if data.get("status") == UserStatus.ACTIVE else False,
-                "is_admin": False,
-                "resource_policy": resource_policy,
-                "rate_limit": 1000,
-                "num_queries": 0,
-                "user": user.uuid,
-            }
-            query = keypairs.insert().values(kp_data)
-            await conn.execute(query)
-
-            # Add user to the default group.
-            group_name = user_data_overriden.get("group", "default")
-            query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == params["domain"])
-                .where(groups.c.name == group_name)
-            )
-            result = await conn.execute(query)
-            grp = result.first()
-            if grp is not None:
-                values = [{"user_id": user.uuid, "group_id": grp.id}]
-                query = association_groups_users.insert().values(values)
-                await conn.execute(query)
-        else:
-            raise InternalServerError("Error creating user account")
+    result = await root_ctx.processors.auth.signup.wait_for_complete(action)
 
     resp_data = {
-        "access_key": ak,
-        "secret_key": sk,
+        "access_key": result.access_key,
+        "secret_key": result.secret_key,
     }
 
-    # [Hooking point for POST_SIGNUP as one-way notification]
-    # The hook handlers should accept a tuple of the user email,
-    # the new user's UUID, and a dict with initial user's preferences.
-    initial_user_prefs = {
-        "lang": request.headers.get("Accept-Language", "en-us").split(",")[0].lower(),
-    }
-    await root_ctx.hook_plugin_ctx.notify(
-        "POST_SIGNUP",
-        (params["email"], user.uuid, initial_user_prefs),
-    )
     return web.json_response(resp_data, status=HTTPStatus.CREATED)
 
 
@@ -897,26 +727,21 @@ async def signup(request: web.Request, params: Any) -> web.Response:
 )
 async def signout(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
-    log.info("AUTH.SIGNOUT(d:{}, email:{})", domain_name, params["email"])
+    email = params["email"]
+    password = params["password"]
+    log.info("AUTH.SIGNOUT(d:{}, email:{})", domain_name, email)
     root_ctx: RootContext = request.app["_root.context"]
-    if request["user"]["email"] != params["email"]:
-        raise GenericForbidden("Not the account owner")
-    result = await check_credential(root_ctx.db, domain_name, params["email"], params["password"])
-    if result is None:
-        raise GenericBadRequest("Invalid email and/or password")
-    async with root_ctx.db.begin() as conn:
-        # Inactivate the user.
-        query = (
-            users.update()
-            .values(status=UserStatus.INACTIVE)
-            .where(users.c.email == params["email"])
+
+    await root_ctx.processors.auth.signout.wait_for_complete(
+        SignoutAction(
+            user_id=request["user"]["uuid"],
+            domain_name=domain_name,
+            requester_email=request["user"]["email"],
+            email=email,
+            password=password,
         )
-        await conn.execute(query)
-        # Inactivate every keypairs of the user.
-        query = (
-            keypairs.update().values(is_active=False).where(keypairs.c.user_id == params["email"])
-        )
-        await conn.execute(query)
+    )
+
     return web.json_response({})
 
 
@@ -931,29 +756,20 @@ async def update_full_name(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     domain_name = request["user"]["domain_name"]
     email = request["user"]["email"]
-    log_fmt = "AUTH.UPDATE_FULL_NAME(d:{}, email:{})"
-    log_args = (domain_name, email)
-    log.info(log_fmt, *log_args)
-    async with root_ctx.db.begin() as conn:
-        query = (
-            sa.select([users])
-            .select_from(users)
-            .where(
-                (users.c.email == email) & (users.c.domain_name == domain_name),
-            )
+    log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", domain_name, email)
+    result = await root_ctx.processors.auth.update_full_name.wait_for_complete(
+        UpdateFullNameAction(
+            user_id=request["user"]["uuid"],
+            full_name=params["full_name"],
+            domain_name=domain_name,
+            email=email,
         )
-        result = await conn.execute(query)
-        user = result.first()
-        if user is None:
-            log.info(log_fmt + ": Unknown user", *log_args)
-            return web.json_response({"error_msg": "Unknown user"}, status=HTTPStatus.BAD_REQUEST)
+    )
 
-        # If user is not null, then it updates user full_name.
-        data = {
-            "full_name": params["full_name"],
-        }
-        update_query = users.update().values(data).where(users.c.email == email)
-        await conn.execute(update_query)
+    if not result.success:
+        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{}): Unknown user", domain_name, email)
+        return web.json_response({"error_msg": "Unknown user"}, status=HTTPStatus.BAD_REQUEST)
+
     return web.json_response({}, status=HTTPStatus.OK)
 
 
@@ -969,42 +785,22 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     domain_name = request["user"]["domain_name"]
     email = request["user"]["email"]
-    log_fmt = "AUTH.UDPATE_PASSWORD(d:{}, email:{})"
-    log_args = (domain_name, email)
-    log.info(log_fmt, *log_args)
+    log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", domain_name, email)
 
-    user = await check_credential(root_ctx.db, domain_name, email, params["old_password"])
-    if user is None:
-        log.info(log_fmt + ": old password mismtach", *log_args)
-        raise AuthorizationFailed("Old password mismatch")
-    if params["new_password"] != params["new_password2"]:
-        log.info(log_fmt + ": new password mismtach", *log_args)
+    action = UpdatePasswordAction(
+        request=request,
+        user_id=request["user"]["uuid"],
+        domain_name=domain_name,
+        email=email,
+        old_password=params["old_password"],
+        new_password=params["new_password"],
+        new_password_confirm=params["new_password2"],
+    )
+    result = await root_ctx.processors.auth.update_password.wait_for_complete(action)
+    if not result.success:
         return web.json_response(
             {"error_msg": "new password mismatch"}, status=HTTPStatus.BAD_REQUEST
         )
-
-    # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-    # The hook handlers should accept the request and whole ``params` dict.
-    # They should return None if the validation is successful and raise the
-    # Reject error otherwise.
-    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-        "VERIFY_PASSWORD_FORMAT",
-        (request, params),
-        return_when=ALL_COMPLETED,
-    )
-    if hook_result.status != PASSED:
-        hook_result.reason = hook_result.reason or "invalid password format"
-        raise RejectedByHook.from_hook_result(hook_result)
-
-    async with root_ctx.db.begin() as conn:
-        # Update user password.
-        data = {
-            "password": params["new_password"],
-            "need_password_change": False,
-            "password_changed_at": sa.func.now(),
-        }
-        query = users.update().values(data).where(users.c.email == email)
-        await conn.execute(query)
     return web.json_response({}, status=HTTPStatus.OK)
 
 
@@ -1024,57 +820,23 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
     """
 
     root_ctx: RootContext = request.app["_root.context"]
-    log_fmt = "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)"
-    log_args = (params["domain"], params["username"])
-    log.info(log_fmt, *log_args)
-
-    if (
-        auth_config := root_ctx.config_provider.config.auth
-    ) is None or auth_config.max_password_age is None:
-        raise GenericBadRequest("Unsupported function.")
-
-    checked_user = await check_credential(
-        root_ctx.db, params["domain"], params["username"], params["current_password"]
+    log.info(
+        "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)",
+        params["domain"],
+        params["username"],
     )
-    if checked_user is None:
-        raise AuthorizationFailed("User credential mismatch.")
-    new_password = params["new_password"]
-    if compare_to_hashed_password(new_password, checked_user["password"]):
-        raise AuthorizationFailed("Cannot update to the same password as an existing password.")
 
-    # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-    # The hook handlers should accept the request and whole ``params` dict.
-    # They should return None if the validation is successful and raise the
-    # Reject error otherwise.
-    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-        "VERIFY_PASSWORD_FORMAT",
-        (request, params),
-        return_when=ALL_COMPLETED,
+    action = UpdatePasswordNoAuthAction(
+        request=request,
+        domain_name=params["domain"],
+        email=params["username"],
+        current_password=params["current_password"],
+        new_password=params["new_password"],
+        auth_config=root_ctx.config_provider.config.auth,
     )
-    if hook_result.status != PASSED:
-        hook_result.reason = hook_result.reason or "invalid password format"
-        raise RejectedByHook.from_hook_result(hook_result)
-
-    async def _update() -> datetime:
-        async with root_ctx.db.begin() as conn:
-            # Update user password.
-            data = {
-                "password": new_password,
-                "need_password_change": False,
-                "password_changed_at": sa.func.now(),
-            }
-            query = (
-                sa.update(users)
-                .values(data)
-                .where(users.c.uuid == checked_user["uuid"])
-                .returning(users.c.password_changed_at)
-            )
-            result = await conn.execute(query)
-            return result.scalar()
-
-    changed_at = await execute_with_retry(_update)
+    result = await root_ctx.processors.auth.update_password_no_auth.wait_for_complete(action)
     return web.json_response(
-        {"password_changed_at": changed_at.isoformat()}, status=HTTPStatus.CREATED
+        {"password_changed_at": result.password_changed_at.isoformat()}, status=HTTPStatus.CREATED
     )
 
 
@@ -1083,32 +845,32 @@ async def get_ssh_keypair(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
-    log_fmt = "AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})"
-    log_args = (domain_name, access_key)
-    log.info(log_fmt, *log_args)
-    async with root_ctx.db.begin() as conn:
-        # Get SSH public key. Return partial string from the public key just for checking.
-        query = sa.select([keypairs.c.ssh_public_key]).where(keypairs.c.access_key == access_key)
-        pubkey = await conn.scalar(query)
-    return web.json_response({"ssh_public_key": pubkey}, status=HTTPStatus.OK)
+    log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
+    result = await root_ctx.processors.auth.get_ssh_keypair.wait_for_complete(
+        GetSSHKeypairAction(
+            user_id=request["user"]["uuid"],
+            access_key=access_key,
+        )
+    )
+    return web.json_response({"ssh_public_key": result.public_key}, status=HTTPStatus.OK)
 
 
 @auth_required
 async def generate_ssh_keypair(request: web.Request) -> web.Response:
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
-    log_fmt = "AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})"
-    log_args = (domain_name, access_key)
-    log.info(log_fmt, *log_args)
+    log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
-        pubkey, privkey = _gen_ssh_keypair()
-        data = {
-            "ssh_public_key": pubkey,
-            "ssh_private_key": privkey,
-        }
-        query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
-        await conn.execute(query)
+    result = await root_ctx.processors.auth.generate_ssh_keypair.wait_for_complete(
+        GenerateSSHKeypairAction(
+            user_id=request["user"]["uuid"],
+            access_key=access_key,
+        )
+    )
+    data = {
+        "ssh_public_key": result.ssh_keypair.ssh_public_key,
+        "ssh_private_key": result.ssh_keypair.ssh_private_key,
+    }
     return web.json_response(data, status=HTTPStatus.OK)
 
 
@@ -1124,21 +886,21 @@ async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     pubkey = f"{params['pubkey'].rstrip()}\n"
     privkey = f"{params['privkey'].rstrip()}\n"
-    log_fmt = "AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})"
-    log_args = (domain_name, access_key)
-    log.info(log_fmt, *log_args)
+    log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", domain_name, access_key)
     root_ctx: RootContext = request.app["_root.context"]
 
-    is_valid, err_msg = validate_ssh_keypair(privkey, pubkey)
-    if not is_valid:
-        raise InvalidAPIParameters(err_msg)
-    async with root_ctx.db.begin() as conn:
-        data = {
-            "ssh_public_key": pubkey,
-            "ssh_private_key": privkey,
-        }
-        query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
-        await conn.execute(query)
+    result = await root_ctx.processors.auth.upload_ssh_keypair.wait_for_complete(
+        UploadSSHKeypairAction(
+            user_id=request["user"]["uuid"],
+            public_key=pubkey,
+            private_key=privkey,
+            access_key=access_key,
+        )
+    )
+    data = {
+        "ssh_public_key": result.ssh_keypair.ssh_public_key,
+        "ssh_private_key": result.ssh_keypair.ssh_private_key,
+    }
     return web.json_response(data, status=HTTPStatus.OK)
 
 

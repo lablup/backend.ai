@@ -337,6 +337,8 @@ async def exception_middleware(
     root_ctx: RootContext = request.app["_root.context"]
     error_monitor = root_ctx.error_monitor
     stats_monitor = root_ctx.stats_monitor
+    method = request.method
+    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
@@ -349,8 +351,17 @@ async def exception_middleware(
         else:
             raise InvalidAPIParameters()
     except BackendError as ex:
-        if ex.status_code // 100 == 5:
-            log.warning("Internal server error raised inside handlers")
+        if ex.status_code // 100 == 4:
+            log.warning(
+                "client error raised inside handlers: ({} {}): {}", method, endpoint, repr(ex)
+            )
+        elif ex.status_code // 100 == 5:
+            log.exception(
+                "Internal server error raised inside handlers: ({} {}): {}",
+                method,
+                endpoint,
+                repr(ex),
+            )
         await error_monitor.capture_exception()
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.failures")
         await stats_monitor.report_metric(
@@ -364,6 +375,12 @@ async def exception_middleware(
         await stats_monitor.report_metric(
             INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
         )
+        if ex.status_code // 100 == 4:
+            log.warning("client error raised inside handlers: ({} {}): {}", method, endpoint, ex)
+        elif ex.status_code // 100 == 5:
+            log.exception(
+                "Internal server error raised inside handlers: ({} {}): {}", method, endpoint, ex
+            )
         if ex.status_code == 404:
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
@@ -371,7 +388,6 @@ async def exception_middleware(
             raise MethodNotAllowed(
                 method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
             )
-        log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
         # The server is closing or the client has disconnected in the middle of
@@ -380,7 +396,9 @@ async def exception_middleware(
         raise e
     except Exception as e:
         await error_monitor.capture_exception()
-        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+        log.exception(
+            "Uncaught exception in HTTP request handlers ({} {}): {}", method, endpoint, e
+        )
         if root_ctx.config_provider.config.debug.enabled:
             return _debug_error_response(e)
         else:
@@ -442,7 +460,7 @@ async def config_provider_ctx(
         )
         root_ctx.config_provider = config_provider
 
-        if config_provider.config.debug.enabled:
+        if config_provider.config.debug.enabled and root_ctx.pidx == 0:
             print("== Manager configuration ==", file=sys.stderr)
             print(pformat(config_provider.config), file=sys.stderr)
         yield root_ctx.config_provider
@@ -458,7 +476,7 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.model_dump(by_alias=True),
     )
     await plugin_ctx.init(
         context=root_ctx,
@@ -616,6 +634,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 error_monitor=root_ctx.error_monitor,
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
+                hook_plugin_ctx=root_ctx.hook_plugin_ctx,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -771,7 +790,7 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = NetworkPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.model_dump(by_alias=True),
     )
     root_ctx.network_plugin_ctx = ctx
     await ctx.init(
@@ -787,7 +806,7 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.model_dump(by_alias=True),
     )
     root_ctx.hook_plugin_ctx = ctx
     await ctx.init(
@@ -810,7 +829,7 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = EventDispatcherPluginContext(
         root_ctx.etcd,
-        root_ctx.config_provider.config.model_dump(),
+        root_ctx.config_provider.config.model_dump(by_alias=True),
     )
     root_ctx.event_dispatcher_plugin_ctx = ctx
     await ctx.init(
@@ -875,8 +894,12 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
-    ectx = ManagerErrorPluginContext(root_ctx.etcd, root_ctx.config_provider.config.model_dump())
-    sctx = ManagerStatsPluginContext(root_ctx.etcd, root_ctx.config_provider.config.model_dump())
+    ectx = ManagerErrorPluginContext(
+        root_ctx.etcd, root_ctx.config_provider.config.model_dump(by_alias=True)
+    )
+    sctx = ManagerStatsPluginContext(
+        root_ctx.etcd, root_ctx.config_provider.config.model_dump(by_alias=True)
+    )
     init_success = False
 
     try:
@@ -1341,7 +1364,6 @@ async def server_main_logwrapper(
         log_endpoint=tuple_args[2],
         log_level=tuple_args[3],
     )
-
     logger = Logger(
         args.bootstrap_cfg.logging,
         is_master=False,

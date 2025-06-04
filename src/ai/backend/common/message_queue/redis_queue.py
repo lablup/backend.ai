@@ -124,7 +124,7 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error("Error while auto claiming messages: {}", e)
+                log.exception("Error while auto claiming messages: {}", e)
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int
@@ -145,6 +145,8 @@ class RedisQueue(AbstractMessageQueue):
             return autoclaim_start_id, False
         autoclaim_start_id = reply[0]
         for msg_id, msg_data in reply[1]:
+            if msg_data is None:
+                continue
             msg = MQMessage(msg_id, msg_data)
             if msg.retry():
                 await self._retry_message(msg)

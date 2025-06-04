@@ -30,6 +30,11 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import RedisRole
+from ai.backend.common.dto.manager.auth.field import (
+    AuthSuccessResponse,
+    RequireTwoFactorAuthResponse,
+    RequireTwoFactorRegistrationResponse,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
@@ -380,32 +385,52 @@ async def login_handler(request: web.Request) -> web.Response:
             extra_keys = set(creds.keys()) ^ {"username", "password"}
             for extra_key in extra_keys:
                 extra_args[extra_key] = creds[extra_key]
-            token = await api_session.User.authorize(
+            auth_result = await api_session.User.authorize(
                 creds["username"], creds["password"], extra_args=extra_args
             )
-            stored_token = {
-                "type": "keypair",
-                "access_key": token.content["access_key"],
-                "secret_key": token.content["secret_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
-            }
-            public_return = {
-                "access_key": token.content["access_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
-            }
-            session["authenticated"] = True
-            session["token"] = stored_token  # store full token
-            result["authenticated"] = True
-            result["data"] = public_return  # store public info from token
-            login_fail_count = 0
-            await _set_login_history(last_login_attempt, login_fail_count)
-            log.info(
-                "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
-                creds["username"],
-                client_ip,
-            )
+            match auth_result:
+                case AuthSuccessResponse():
+                    token = auth_result
+                    stored_token = {
+                        "type": "keypair",
+                        "access_key": token.access_key,
+                        "secret_key": token.secret_key,
+                        "role": token.role,
+                        "status": token.status,
+                    }
+                    public_return = {
+                        "access_key": token.access_key,
+                        "role": token.role,
+                        "status": token.status,
+                    }
+                    session["authenticated"] = True
+                    session["token"] = stored_token  # store full token
+                    result["authenticated"] = True
+                    result["data"] = public_return  # store public info from token
+                    login_fail_count = 0
+                    await _set_login_history(last_login_attempt, login_fail_count)
+                    log.info(
+                        "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                        creds["username"],
+                        client_ip,
+                    )
+                case RequireTwoFactorRegistrationResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-registration",
+                        "title": "Two-Factor Authentication registration required.",
+                        "details": "You must register Two-Factor Authentication.",
+                        "two_factor_registration_token": auth_result.token,
+                    }
+                    return web.json_response(result)
+                case RequireTwoFactorAuthResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-authentication",
+                        "title": "Two-Factor Authentication needed.",
+                        "details": "You must authenticate using Two-Factor Authentication.",
+                    }
+                    return web.json_response(result)
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
@@ -527,20 +552,40 @@ async def token_login_handler(request: web.Request) -> web.Response:
             # in token-based login. Each authorize hook plugin will deal with various type of
             # `sToken` and related parameters to authorize a user. In this process, email and
             # password do not play any role.
-            token = await api_session.User.authorize(
+            auth_result = await api_session.User.authorize(
                 "fake-email", "fake-pwd", extra_args=extra_args
             )
+            match auth_result:
+                case AuthSuccessResponse():
+                    token = auth_result
+                case RequireTwoFactorRegistrationResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-registration",
+                        "title": "Two-Factor Authentication registration required.",
+                        "details": "You must register Two-Factor Authentication.",
+                        "two_factor_registration_token": auth_result.token,
+                    }
+                    return web.json_response(result)
+                case RequireTwoFactorAuthResponse():
+                    result["authenticated"] = False
+                    result["data"] = {
+                        "type": "https://api.backend.ai/probs/require-totp-authentication",
+                        "title": "Two-Factor Authentication needed.",
+                        "details": "You must authenticate using Two-Factor Authentication.",
+                    }
+                    return web.json_response(result)
             stored_token = {
                 "type": "keypair",
-                "access_key": token.content["access_key"],
-                "secret_key": token.content["secret_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
+                "access_key": token.access_key,
+                "secret_key": token.secret_key,
+                "role": token.role,
+                "status": token.status,
             }
             public_return = {
-                "access_key": token.content["access_key"],
-                "role": token.content["role"],
-                "status": token.content.get("status"),
+                "access_key": token.access_key,
+                "role": token.role,
+                "status": token.status,
             }
             session["authenticated"] = True
             session["token"] = stored_token  # store full token
@@ -703,6 +748,7 @@ async def server_main(
     cors.add(app.router.add_route("GET", "/func/{path:openid/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:openid/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:saml/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("POST", "/func/{path:totp/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", web_handler))

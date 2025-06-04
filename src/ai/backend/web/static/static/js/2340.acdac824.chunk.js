@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkbackend_ai_webui_react=self.webpackChunkbackend_ai_webui_react||[]).push([[2340],{52340:(e,c,a)=>{a.r(c),a.d(c,{default:()=>n});var t=a(40262),r=(a(1426),a(42906));const n=e=>{let{text:c,children:a}=e;return(0,r.jsx)(t.A.Text,{copyable:!0,code:!0,children:c||a})}}}]);
+//# sourceMappingURL=2340.acdac824.chunk.js.map

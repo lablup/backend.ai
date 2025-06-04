@@ -5,6 +5,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -16,6 +17,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -77,6 +80,7 @@ class ServiceArgs:
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
+    hook_plugin_ctx: HookPluginContext
 
 
 @dataclass
@@ -98,6 +102,7 @@ class Services:
     utilization_metric: UtilizationMetricService
     model_serving: ModelServingService
     model_serving_auto_scaling: AutoScalingService
+    auth: AuthService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -147,6 +152,7 @@ class Services:
             config_provider=args.config_provider,
         )
         model_serving_auto_scaling = AutoScalingService(args.db)
+        auth = AuthService(db=args.db, hook_plugin_ctx=args.hook_plugin_ctx)
 
         return cls(
             agent=agent_service,
@@ -166,6 +172,7 @@ class Services:
             utilization_metric=utilization_metric_service,
             model_serving=model_serving_service,
             model_serving_auto_scaling=model_serving_auto_scaling,
+            auth=auth,
         )
 
 
@@ -193,6 +200,7 @@ class Processors(AbstractProcessorPackage):
     utilization_metric: UtilizationMetricProcessors
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
+    auth: AuthProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -230,6 +238,7 @@ class Processors(AbstractProcessorPackage):
         utilization_metric_processors = UtilizationMetricProcessors(
             services.utilization_metric, action_monitors
         )
+        auth = AuthProcessors(services.auth, action_monitors)
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -248,6 +257,7 @@ class Processors(AbstractProcessorPackage):
             utilization_metric=utilization_metric_processors,
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
+            auth=auth,
         )
 
     @override

@@ -70,7 +70,7 @@ class ServiceConfig:
     environ: Optional[dict[str, str]]
     scaling_group: str
     resources: dict[str, str | int]
-    resource_opts: dict[str, str | int]
+    resource_opts: dict[str, str | int | bool]
 
     def to_dict(self) -> dict[str, Any]:
         return {

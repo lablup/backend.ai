@@ -248,12 +248,14 @@
     "FolderToCopy": "Folder to copy",
     "Foldername": "Folder name",
     "Folders": "Folders",
+    "From": "From",
     "General": "General",
     "Host": "Host",
     "HostDetails": "Displays quota information for the selected storage host.",
     "InvalidEmail": "Invalid email address",
     "Invited": "Invited",
     "InvitedFolders": "Invited Folders",
+    "InvitedFoldersTooltip": "{{ count }} folder invitations are pending response.",
     "Limit": "Limit",
     "ModelStore": "Model Store",
     "Models": "Models",
@@ -416,6 +418,8 @@
       "View": "View"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Failed to accept invitation",
+      "FailedToDeclineInvitation": "Failed to decline invitation",
       "FolderSharingNotAvailableToUser": "Folder sharing is not available for requested user(s): ",
       "InvitationError": "Invitation failed. User may already be invited.",
       "Invited": "Successfully invited",
@@ -426,7 +430,10 @@
       "NoValidEmails": "No valid emails were entered",
       "Shared": "Successfully shared the group folder",
       "SharingError": "Sharing failed. User may already be shared or does not belong to appropriate project.",
-      "SuccessfullyLeftSharedFolder": "Successfully left the shared folder"
+      "SuccessfullyAcceptedInvitation": "Successfully accepted invitation",
+      "SuccessfullyDeclinedInvitation": "Successfully declined invitation",
+      "SuccessfullyLeftSharedFolder": "Successfully left the shared folder",
+      "UserIsAlreadyInvited": "{{email}} is already invited"
     },
     "modelStore": {
       "AddedItems": "Added items",
@@ -471,6 +478,10 @@
       "StatusOfSelectedHost": "Status Of Selected Host",
       "Used": "used"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "This browser does not support notifications.",
+    "PermissionDenied": "You've denied notification access. To use alerts, please allow it in your browser settings."
   },
   "dialog": {
     "ErrorOccurred": "Error Occurred",
@@ -1160,7 +1171,7 @@
     "ResourcePresets": "Resource Presets",
     "Resources": "Resources",
     "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory",
-    "SharedMemory": "Shared memory (GB)",
+    "SharedMemory": "Shared memory",
     "Updated": "Resource preset updated"
   },
   "session": {
@@ -1169,6 +1180,7 @@
     "Agents": "Agents",
     "AllowedClientIps": "Allowed client IPs",
     "AlreadyTerminatingSession": "Already terminating the session.",
+    "AnotherUserSession": "This session was created by another user",
     "Architecture": "Architecture",
     "Arguments": "Arguments",
     "AverageUsage": "Average",
@@ -1670,10 +1682,9 @@
       "Last12Hours": "Last 12 Hours",
       "Last3Hours": "Last 3 Hours",
       "Last7Days": "Last 7 Days",
-      "LastDay": "Last 1 Day"
-    },
-    "timeRanges": {
-      "LastHour": "Last 1 Hour"
+      "LastDay": "Last 1 Day",
+      "LastHour": "Last 1 Hour",
+      "Today": "Today"
     }
   },
   "storageHost": {
@@ -1809,7 +1820,6 @@
     "BootstrapScriptDescription": "Bootstrap script will be executed only once after session creation",
     "BootstrapScriptEmpty": "The script is empty. \nPlease enter the script.",
     "BootstrapScriptUpdated": "Bootstrap script updated.",
-    "ClassicSessionLauncher": "Classic Session Launcher",
     "ClearSSHKeypairInput": "Written SSH Keypair will be removed. Are you sure you want to continue?",
     "ConfigFilename": "Config file name",
     "CurrentSSHPublicKey": "Current public key: ",
@@ -1819,7 +1829,7 @@
     "DescAutomaticUpdateCheck": "Notify when a new webui version is released.<br />In where the Internet is unstable or offline, this option will be automatically turned off. You can toggle this switch to start the automatic update check again.",
     "DescBetaFeatures": "Use beta features for Web UI.<br />Beta features may be unstable. Some beta features may not be adopted as official feature.",
     "DescClassicSessionLauncher": "Use the Classic session launcher instead of the NEO session launcher. Classic session launcher may not have the latest features.",
-    "DescDesktopNotification": "Enables desktop notification. <br />If turned on, Backend.AI uses OS built-in notification system too. Turning off this option does not affect notifications within web UI.",
+    "DescDesktopNotification": "Enables desktop notification. <br />If turned on, Backend.AI uses OS built-in notification system too. Turning off this option does not affect notifications within web UI. Depending on the operating system, desktop notifications may require enabling notification permissions in system settings.",
     "DescExperimentalDashboard": "Use Dashboard page instead of Summary page.",
     "DescKeepLoginSessionInformation": "Let webui app keep current login session information next time.<br />If the option is turned off, login information will be cleared each logout.",
     "DescLanguage": "Set interface language. Languages other than English and Korean will be provided via machine translation.",
