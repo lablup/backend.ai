@@ -1426,7 +1426,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/events/session": {
@@ -1496,7 +1496,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/auth": {
@@ -2080,7 +2080,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "folders.delete_by_id",
@@ -2136,7 +2136,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "folders.delete_by_name",
@@ -2236,7 +2236,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/all-hosts": {
@@ -2256,7 +2256,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/allowed-types": {
@@ -2276,7 +2276,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/all_hosts": {
@@ -2296,7 +2296,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/allowed_types": {
@@ -2316,7 +2316,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/perf-metric": {
@@ -2345,7 +2345,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/rename": {
@@ -2502,7 +2502,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/request-upload": {
@@ -2553,7 +2553,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/request-download": {
@@ -2604,7 +2604,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/move-file": {
@@ -2655,7 +2655,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/rename-file": {
@@ -2710,7 +2710,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/delete-files": {
@@ -2764,7 +2764,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "folders.delete_files.2",
@@ -2810,7 +2810,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/rename_file": {
@@ -2865,7 +2865,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/delete_files": {
@@ -2913,7 +2913,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/files": {
@@ -2950,7 +2950,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/{name}/invite": {
@@ -3383,7 +3383,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/invitations/list_sent": {
@@ -3403,7 +3403,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/invitations/update/{inv_id}": {
@@ -3475,7 +3475,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/invitations/accept": {
@@ -3608,7 +3608,7 @@
             "in": "query"
           }
         ],
-        "description": "\nList shared vfolders.\n\nNot available for group vfolders.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nList shared vfolders.\n\nNot available for group vfolders.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "post": {
         "operationId": "folders.update_shared_vfolder",
@@ -3724,7 +3724,7 @@
             "in": "query"
           }
         ],
-        "description": "\nReturn the contents of `/etc/fstab` file.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nReturn the contents of `/etc/fstab` file.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/mounts": {
@@ -3744,7 +3744,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nList all mounted vfolder hosts in vfroot.\n\nAll mounted hosts from connected (ALIVE) agents are also gathered.\nGenerally, agents should be configured to have same hosts structure,\nbut newly introduced one may not.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nList all mounted vfolder hosts in vfroot.\n\nAll mounted hosts from connected (ALIVE) agents are also gathered.\nGenerally, agents should be configured to have same hosts structure,\nbut newly introduced one may not.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       },
       "post": {
         "operationId": "folders.mount_host",
@@ -3982,7 +3982,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "post": {
         "operationId": "folders.update_quota",
@@ -4067,7 +4067,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/folders/_/used-bytes": {
@@ -4105,7 +4105,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "//graphql": {
@@ -4293,7 +4293,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "post": {
         "operationId": "services.create",
@@ -4390,7 +4390,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/services/{service_id}": {
@@ -4426,7 +4426,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "services.delete",
@@ -4460,7 +4460,7 @@
             }
           }
         ],
-        "description": "\nRemoves model service (and inference sessions for the service also).\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nRemoves model service (and inference sessions for the service also).\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/services/{service_id}/errors": {
@@ -4496,7 +4496,7 @@
             }
           }
         ],
-        "description": "\nList errors raised while trying to create the inference sessions. Backend.AI will\nstop trying to create an inference session for the model service if six (6) error stacks\nup. The only way to clear the error and retry spawning session is to call\n`clear_error` (POST /services/{service_id}/errors/clear) API.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nList errors raised while trying to create the inference sessions. Backend.AI will\nstop trying to create an inference session for the model service if six (6) error stacks\nup. The only way to clear the error and retry spawning session is to call\n`clear_error` (POST /services/{service_id}/errors/clear) API.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/services/{service_id}/errors/clear": {
@@ -4525,7 +4525,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/services/{service_id}/scale": {
@@ -4570,7 +4570,7 @@
             }
           }
         ],
-        "description": "\nUpdates ideal inference session count manually. Based on the difference of this number,\ninference sessions will be created or removed automatically.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nUpdates ideal inference session count manually. Based on the difference of this number,\ninference sessions will be created or removed automatically.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/services/{service_id}/sync": {
@@ -4606,7 +4606,7 @@
             }
           }
         ],
-        "description": "\nForce syncs up-to-date model service information with AppProxy.\nIn normal situations this will be automatically handled by Backend.AI schedulers,\nbut this API is left open in case of unexpected restart of AppProxy process.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nForce syncs up-to-date model service information with AppProxy.\nIn normal situations this will be automatically handled by Backend.AI schedulers,\nbut this API is left open in case of unexpected restart of AppProxy process.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/services/{service_id}/routings/{route_id}": {
@@ -4659,7 +4659,7 @@
             }
           }
         ],
-        "description": "\nUpdates traffic bias of specific route.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nUpdates traffic bias of specific route.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "services.delete_route",
@@ -4701,7 +4701,7 @@
             }
           }
         ],
-        "description": "\nScales down the service by removing specific inference session.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nScales down the service by removing specific inference session.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/services/{service_id}/token": {
@@ -4746,7 +4746,7 @@
             }
           }
         ],
-        "description": "\nGenerates a token which acts as an API key to authenticate when calling model service endpoint.\nIf both duration and valid_until is not set then the AppProxy will determine appropriate lifetime of the token.\nduration and valid_until can't be both specified.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nGenerates a token which acts as an API key to authenticate when calling model service endpoint.\nIf both duration and valid_until is not set then the AppProxy will determine appropriate lifetime of the token.\nduration and valid_until can't be both specified.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session": {
@@ -5308,7 +5308,7 @@
             "in": "query"
           }
         ],
-        "description": "\nA quick session-ID matcher API for use with auto-completion in CLI.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nA quick session-ID matcher API for use with auto-completion in CLI.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/sync-agent-registry": {
@@ -5411,7 +5411,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "patch": {
         "operationId": "session.restart",
@@ -5454,7 +5454,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "session.destroy",
@@ -5507,7 +5507,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "post": {
         "operationId": "session.execute",
@@ -5534,7 +5534,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/logs": {
@@ -5573,7 +5573,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "session.get_task_logs.2",
@@ -5601,7 +5601,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/direct-access-info": {
@@ -5630,7 +5630,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/logs": {
@@ -5668,7 +5668,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/rename": {
@@ -5745,7 +5745,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/complete": {
@@ -5774,7 +5774,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/shutdown-service": {
@@ -5821,7 +5821,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/upload": {
@@ -5850,7 +5850,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/download": {
@@ -5922,7 +5922,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/download_single": {
@@ -5991,7 +5991,7 @@
             }
           }
         ],
-        "description": "\nDownload a single file from the scratch root. Only for small files.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nDownload a single file from the scratch root. Only for small files.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/files": {
@@ -6020,7 +6020,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/start-service": {
@@ -6081,7 +6081,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/{session_name}/commit": {
@@ -6275,7 +6275,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/stream/session/{session_name}/pty": {
@@ -6304,7 +6304,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/stream/session/{session_name}/execute": {
@@ -6333,7 +6333,7 @@
             }
           }
         ],
-        "description": "\nWebSocket-version of gateway.kernel.execute().\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nWebSocket-version of gateway.kernel.execute().\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/stream/session/{session_name}/apps": {
@@ -6362,7 +6362,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/stream/session/{session_name}/httpproxy": {
@@ -6425,7 +6425,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/stream/session/{session_name}/tcpproxy": {
@@ -6488,7 +6488,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/manager/status": {
@@ -6795,7 +6795,7 @@
           }
         },
         "parameters": [],
-        "description": "\nReturns the list of all resource presets in the current scaling group,\nwith additional information including allocatability of each preset,\namount of total remaining resources, and the current keypair resource limits.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nReturns the list of all resource presets in the current scaling group,\nwith additional information including allocatability of each preset,\namount of total remaining resources, and the current keypair resource limits.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/recalculate-usage": {
@@ -6815,7 +6815,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nUpdate `keypair_resource_usages` in redis and `agents.c.occupied_slots`.\n\nThose two values are sometimes out of sync. In that case, calling this API\nre-calculates the values for running containers and updates them in DB.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nUpdate `keypair_resource_usages` in redis and `agents.c.occupied_slots`.\n\nThose two values are sometimes out of sync. In that case, calling this API\nre-calculates the values for running containers and updates them in DB.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/usage/month": {
@@ -6856,7 +6856,7 @@
             "in": "query"
           }
         ],
-        "description": "\nReturn usage statistics of terminated containers for a specified month.\nThe date/time comparison is done using the configured timezone.\n\n:param group_ids: If not None, query containers only in those groups.\n:param month: The year-month to query usage statistics. ex) \"202006\" to query for Jun 2020\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nReturn usage statistics of terminated containers for a specified month.\nThe date/time comparison is done using the configured timezone.\n\n:param group_ids: If not None, query containers only in those groups.\n:param month: The year-month to query usage statistics. ex) \"202006\" to query for Jun 2020\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/usage/period": {
@@ -6903,7 +6903,7 @@
             "in": "query"
           }
         ],
-        "description": "\nReturn usage statistics of terminated containers belonged to the given group for a specified\nperiod in dates.\nThe date/time comparison is done using the configured timezone.\n\n:param project_id: If not None, query containers only in the project.\n:param start_date str: \"yyyymmdd\" format.\n:param end_date str: \"yyyymmdd\" format.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nReturn usage statistics of terminated containers belonged to the given group for a specified\nperiod in dates.\nThe date/time comparison is done using the configured timezone.\n\n:param project_id: If not None, query containers only in the project.\n:param start_date str: \"yyyymmdd\" format.\n:param end_date str: \"yyyymmdd\" format.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/stats/user/month": {
@@ -6923,7 +6923,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nReturn time-binned (15 min) stats for terminated user sessions\nover last 30 days.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nReturn time-binned (15 min) stats for terminated user sessions\nover last 30 days.\n\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/stats/admin/month": {
@@ -6943,7 +6943,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nReturn time-binned (15 min) stats for all terminated sessions\nover last 30 days.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\nReturn time-binned (15 min) stats for all terminated sessions\nover last 30 days.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/watcher": {
@@ -6972,7 +6972,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/watcher/agent/start": {
@@ -7010,7 +7010,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/watcher/agent/stop": {
@@ -7048,7 +7048,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/watcher/agent/restart": {
@@ -7086,7 +7086,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/scaling-groups": {
@@ -7123,7 +7123,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/scaling-groups/{scaling_group}/wsproxy-version": {
@@ -7168,7 +7168,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/template/cluster": {
@@ -7219,7 +7219,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "template/cluster.list_template",
@@ -7262,7 +7262,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/template/cluster/{template_id}": {
@@ -7312,7 +7312,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "put": {
         "operationId": "template/cluster.put",
@@ -7360,7 +7360,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "template/cluster.delete",
@@ -7395,7 +7395,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/template/session": {
@@ -7446,7 +7446,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "template/session.list_template",
@@ -7489,7 +7489,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/template/session/{template_id}": {
@@ -7539,7 +7539,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "put": {
         "operationId": "template/session.put",
@@ -7597,7 +7597,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "template/session.delete",
@@ -7632,7 +7632,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/user-config/dotfiles": {
@@ -7682,7 +7682,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "user-config.list_or_get",
@@ -7717,7 +7717,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "patch": {
         "operationId": "user-config.update",
@@ -7765,7 +7765,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "user-config.delete",
@@ -7800,7 +7800,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/user-config/bootstrap-script": {
@@ -7838,7 +7838,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "user-config.get_bootstrap_script",
@@ -7856,7 +7856,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/domain-config/dotfiles": {
@@ -7907,7 +7907,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "domain-config.list_or_get",
@@ -7942,7 +7942,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "patch": {
         "operationId": "domain-config.update",
@@ -7991,7 +7991,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "domain-config.delete",
@@ -8026,7 +8026,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/group-config/dotfiles": {
@@ -8088,7 +8088,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "group-config.list_or_get",
@@ -8139,7 +8139,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "patch": {
         "operationId": "group-config.update",
@@ -8199,7 +8199,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       },
       "delete": {
         "operationId": "group-config.delete",
@@ -8250,7 +8250,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/logs/error": {
@@ -8322,7 +8322,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       },
       "get": {
         "operationId": "logs/error.list_logs",
@@ -8367,7 +8367,7 @@
             "in": "query"
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/logs/error/{log_id}/clear": {
@@ -8396,7 +8396,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: FROZEN\n"
+        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     }
   }
