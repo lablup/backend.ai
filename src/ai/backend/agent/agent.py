@@ -2518,7 +2518,10 @@ class AbstractAgent(
             raise AgentError(
                 "image should have its own command when runtime variant is set to values other than CUSTOM!"
             )
-        assert len(model_folders) > 0
+
+        if len(model_folders) == 0:
+            raise AgentError("At least one model virtual folder must be specified.")
+
         model_folder: VFolderMount = model_folders[0]
 
         match runtime_variant:
@@ -2619,7 +2622,10 @@ class AbstractAgent(
                     raise AgentError(f"Invalid YAML syntax: {e}") from e
         try:
             model_definition = model_definition_iv.check(raw_definition)
-            assert model_definition is not None
+            if model_definition is None:
+                raise AgentError(
+                    "Model definition is empty. Please check your model definition file"
+                )
             for model in model_definition["models"]:
                 if "BACKEND_MODEL_NAME" not in environ:
                     environ["BACKEND_MODEL_NAME"] = model["name"]
