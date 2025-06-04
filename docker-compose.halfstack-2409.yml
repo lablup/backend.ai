@@ -49,6 +49,19 @@ services:
       timeout: 3s
       retries: 10
 
+  backendai-half-redis-exporter:
+    image: oliver006/redis_exporter:v1.73.0
+    restart: unless-stopped
+    networks:
+      - half
+    command: >
+      --redis.addr redis://backendai-half-redis:6379
+      --include-system-metrics
+      --include-config-metrics
+      --include-modules-metrics
+    ports:
+      - "9121:9121"
+
   backendai-half-etcd:
     image: quay.io/coreos/etcd:v3.5.14
     restart: unless-stopped
@@ -77,19 +90,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
-  backendai-half-redis-exporter:
-    image: oliver006/redis_exporter:v1.73.0
-    restart: unless-stopped
-    networks:
-      - half
-    command: >
-      --redis.addr redis://backendai-half-redis:6379
-      --include-system-metrics
-      --include-config-metrics
-      --include-modules-metrics
-    ports:
-      - "9121:9121"
 
   backendai-half-grafana:
     image: grafana/grafana-enterprise:11.4.0
