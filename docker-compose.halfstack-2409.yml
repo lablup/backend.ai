@@ -19,6 +19,18 @@ services:
       timeout: 3s
       retries: 10
 
+  backendai-half-db-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    restart: unless-stopped
+    networks:
+      - half
+    environment:
+      - DATA_SOURCE_URI=backendai-half-db:5432/backend?sslmode=disable
+      - DATA_SOURCE_USER=postgres
+      - DATA_SOURCE_PASS=develove
+    ports:
+      - "9187:9187"
+
   backendai-half-redis:
     image: redis:7.2.4-alpine
     restart: unless-stopped

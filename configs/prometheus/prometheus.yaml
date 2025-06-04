@@ -26,4 +26,9 @@ scrape_configs:
           - backendai-half-etcd:2379
   - job_name: 'redis-exporter'
     static_configs:
-      - targets: ['backendai-half-redis-exporter:9121']
+      - targets:
+          - backendai-half-redis-exporter:9121
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets:
+          - backendai-half-db-exporter:9187
