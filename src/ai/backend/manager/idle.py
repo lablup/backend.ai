@@ -669,7 +669,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
         args: EventDispatcherIdleCheckerInitArgs,
     ) -> None:
         self._redis_live = args.redis_live
-        self._idle_timeout = args.idle_timeout
+        self._idle_timeout = args.idle_timeout or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
 
     @override
     @classmethod
