@@ -75,6 +75,10 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    RedisServiceDiscovery,
+    RedisServiceDiscoveryArgs,
+)
 from ai.backend.common.service_discovery.service_discovery import (
     ServiceDiscoveryLoop,
     ServiceEndpoint,
@@ -84,6 +88,7 @@ from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
     RedisProfileTarget,
+    ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -657,7 +662,16 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(root_ctx.etcd))
+    match root_ctx.config_provider.config.service_discovery.type_:
+        case ServiceDiscoveryType.ETCD:
+            root_ctx.service_discovery = ETCDServiceDiscovery(
+                ETCDServiceDiscoveryArgs(root_ctx.etcd)
+            )
+        case ServiceDiscoveryType.REDIS:
+            root_ctx.service_discovery = RedisServiceDiscovery(
+                RedisServiceDiscoveryArgs(root_ctx.redis_live)
+            )
+
     root_ctx.sd_loop = ServiceDiscoveryLoop(
         root_ctx.service_discovery,
         ServiceMetadata(
