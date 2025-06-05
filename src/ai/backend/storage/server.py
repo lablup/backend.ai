@@ -282,7 +282,7 @@ async def server_main(
                     live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
                     redis_live = redis_helper.get_redis_object(
                         live_redis_target,
-                        name="agent.live",
+                        name="storage-proxy.live",
                         db=REDIS_LIVE_DB,
                     )
                     service_discovery = RedisServiceDiscovery(
