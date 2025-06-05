@@ -23,7 +23,7 @@ class RedisServiceDiscoveryArgs:
 
 class RedisServiceDiscovery(ServiceDiscovery):
     _redis: RedisConnectionInfo
-    _ttl: int = 60
+    _ttl: int
     _prefix: str
 
     def __init__(self, args: RedisServiceDiscoveryArgs) -> None:
