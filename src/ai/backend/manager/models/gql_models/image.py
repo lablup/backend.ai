@@ -1009,6 +1009,10 @@ class RescanImagesV2Payload(graphene.ObjectType):
 
 
 class RescanImagesV2(graphene.Mutation):
+    """
+    Added in 25.10.0.
+    """
+
     class Arguments:
         input = RescanImagesV2Input(required=True)
 
@@ -1196,7 +1200,7 @@ class ClearImagesV2Payload(graphene.ObjectType):
     Added in 25.10.0.
     """
 
-    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
+    allowed_roles = (UserRole.SUPERADMIN,)
     cleared_images = graphene.List(
         ImageNode,
         description="List of images that were cleared from the registry.",
@@ -1204,6 +1208,10 @@ class ClearImagesV2Payload(graphene.ObjectType):
 
 
 class ClearImagesV2(graphene.Mutation):
+    """
+    Added in 25.10.0.
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
