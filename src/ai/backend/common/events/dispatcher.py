@@ -36,7 +36,7 @@ from ..types import (
     AgentId,
 )
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
-from .types import AbstractEvent
+from .types import AbstractConsumeEvent, AbstractEvent, AbstractSubscribeEvent
 
 __all__ = (
     "EventCallback",
@@ -632,7 +632,25 @@ class EventProducer:
 
     async def produce_event(
         self,
-        event: AbstractEvent,
+        event: AbstractConsumeEvent,
+        source_override: Optional[AgentId] = None,
+    ) -> None:
+        if self._closed:
+            return
+        source_bytes = self._source_bytes
+        if source_override is not None:
+            source_bytes = source_override.encode()
+
+        raw_event = {
+            b"name": event.event_name().encode(),
+            b"source": source_bytes,
+            b"args": msgpack.packb(event.serialize()),
+        }
+        await self._msg_queue.send(raw_event)
+
+    async def broadcast_event(
+        self,
+        event: AbstractSubscribeEvent,
         source_override: Optional[AgentId] = None,
     ) -> None:
         if self._closed:

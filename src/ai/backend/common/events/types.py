@@ -1,12 +1,15 @@
 import enum
 from abc import ABC, abstractmethod
-from typing import Optional, Self
+from typing import Optional, Self, override
 
 from .user_event.user_event import UserEvent
 
 __all__ = (
     "EventDomain",
+    "EventProcessingMode",
     "AbstractEvent",
+    "AbstractConsumeEvent",
+    "AbstractSubscribeEvent",
 )
 
 
@@ -26,7 +29,20 @@ class EventDomain(enum.StrEnum):
     WORKFLOW = "workflow"
 
 
+class EventProcessingMode(enum.StrEnum):
+    CONSUME = "consume"
+    SUBSCRIBE = "subscribe"
+
+
 class AbstractEvent(ABC):
+    @classmethod
+    @abstractmethod
+    def mode(cls) -> EventProcessingMode:
+        """
+        Return the processing mode of the event.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def serialize(self) -> tuple[bytes, ...]:
         """
@@ -73,3 +89,25 @@ class AbstractEvent(ABC):
         If user event is not supported, return None.
         """
         raise NotImplementedError
+
+
+class AbstractConsumeEvent(AbstractEvent):
+    """
+    An event that should be consumed.
+    """
+
+    @classmethod
+    @override
+    def mode(cls) -> EventProcessingMode:
+        return EventProcessingMode.CONSUME
+
+
+class AbstractSubscribeEvent(AbstractEvent):
+    """
+    An event that should be subscribed.
+    """
+
+    @classmethod
+    @override
+    def mode(cls) -> EventProcessingMode:
+        return EventProcessingMode.SUBSCRIBE
