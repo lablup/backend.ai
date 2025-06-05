@@ -2247,12 +2247,15 @@ type Mutations {
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
+
+  """Deprecated since 25.10.0. use `RescanImagesV2` instead"""
   rescan_images(
     """Added in 25.1.0."""
     project: String
     registry: String
-  ): RescanImages
+  ): RescanImages @deprecated(reason: "Deprecated since 25.10.0. Use `rescan_images_v2` instead.")
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
+  rescan_images_v2(input: RescanImagesV2Input!): RescanImagesV2Payload
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
 
@@ -2272,7 +2275,10 @@ type Mutations {
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
-  clear_images(registry: String): ClearImages
+
+  """Deprecated since 25.10.0. use `ClearImagesV2` instead"""
+  clear_images(registry: String): ClearImages @deprecated(reason: "Deprecated since 25.10.0. Use `clear_images_v2` instead.")
+  clear_images_v2(input: ClearImagesV2Input!): ClearImagesV2Payload
 
   """Added in 25.4.0"""
   purge_images(keys: [PurgeImagesKey]!, options: PurgeImagesOptions = {force: false, noprune: false}): PurgeImagesPayload
@@ -2785,6 +2791,7 @@ type DeleteKeyPair {
   msg: String
 }
 
+"""Deprecated since 25.10.0. use `RescanImagesV2` instead"""
 type RescanImages {
   ok: Boolean
   msg: String
@@ -2795,6 +2802,20 @@ type PreloadImage {
   ok: Boolean
   msg: String
   task_id: String
+}
+
+"""Added in 25.10.0."""
+type RescanImagesV2Payload {
+  task_id: String
+}
+
+"""Added in 25.10.0."""
+input RescanImagesV2Input {
+  """The name of the container registry to rescan."""
+  registry: String!
+
+  """The name of the project to rescan images for."""
+  project: String
 }
 
 type UnloadImage {
@@ -2887,9 +2908,25 @@ type DealiasImage {
   msg: String
 }
 
+"""Deprecated since 25.10.0. use `ClearImagesV2` instead"""
 type ClearImages {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.10.0."""
+type ClearImagesV2Payload {
+  """List of images that were cleared from the registry."""
+  cleared_images: [ImageNode]
+}
+
+"""Added in 25.10.0."""
+input ClearImagesV2Input {
+  """The name of the container registry to clear."""
+  registry: String!
+
+  """The name of the project to clear images for."""
+  project: String
 }
 
 """Added in 25.6.0."""

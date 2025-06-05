@@ -21,10 +21,6 @@ from ai.backend.common.exception import (
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.event_dispatcher.models.gql_models.image import (
-    ClearImagesV2,
-    RescanImagesV2,
-)
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
     AuditLogNode,
@@ -155,6 +151,7 @@ from .gql_models.image import (
     AliasImage,
     ClearImageCustomResourceLimit,
     ClearImages,
+    ClearImagesV2,
     DealiasImage,
     ForgetImage,
     ForgetImageById,
@@ -168,6 +165,7 @@ from .gql_models.image import (
     PurgeImageById,
     PurgeImages,
     RescanImages,
+    RescanImagesV2,
     UnloadImage,
     UntagImageFromRegistry,
 )
