@@ -1909,6 +1909,14 @@ class AbstractAgent(
                         ),
                     )
                     break
+                case "continued":
+                    continue
+                case _:
+                    log.warning(
+                        "iterate_batch_result(kernel: {}): unexpected result: {!r}, continuing",
+                        kernel_id,
+                        result,
+                    )
 
     async def execute_batch(
         self,
@@ -1982,7 +1990,8 @@ class AbstractAgent(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
             )
         except asyncio.CancelledError:
-            pass
+            log.warning("execute_batch(k:{}) cancelled", kernel_id)
+            raise
 
     async def create_batch_execution_task(
         self,
@@ -2892,7 +2901,8 @@ class AbstractAgent(
                 run_id, mode, text, opts=opts, flush_timeout=flush_timeout, api_version=api_version
             )
         except asyncio.CancelledError:
-            pass
+            log.warning("execute(k:{}) cancelled", kernel_id)
+            raise
         except KeyError:
             # This situation is handled in the lifecycle management subsystem.
             raise RuntimeError(
