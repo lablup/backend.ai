@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.9 (2025-06-05)
+
+### Features
+* Prevent batch kernel termination when an agent shutdown ([#4587](https://github.com/lablup/backend.ai/issues/4587))
+
+### Fixes
+* Include endpoint loading in route retrieval for delete_route function ([#4594](https://github.com/lablup/backend.ai/issues/4594))
+* Replace assert statements in `load_model_definition` with raising exception ([#4599](https://github.com/lablup/backend.ai/issues/4599))
+
+
 ## 25.6.8 (2025-06-03)
 
 ### Improvements
