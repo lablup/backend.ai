@@ -1236,9 +1236,7 @@ class ClearImagesV2(graphene.Mutation):
                     project=registry_data.project,
                 )
             )
-            cleared_images.extend(action_result.cleared_image_ids)
-
-        print("cleared_image_ids!", cleared_images)
+            cleared_images.extend(action_result.cleared_images)
 
         return ClearImagesV2Payload(cleared_images=cleared_images)
 
