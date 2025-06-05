@@ -12,12 +12,13 @@ from ai.backend.common.types import RedisConnectionInfo
 from ..service_discovery import ServiceDiscovery, ServiceMetadata
 
 _DEFAULT_PREFIX = "service_discovery"
+_DEFAULT_TTL = 60 * 3  # 3 minutes
 
 
 @dataclass
 class RedisServiceDiscoveryArgs:
     redis: RedisConnectionInfo
-    ttl: int = 60
+    ttl: int = _DEFAULT_TTL  # 3 minutes
     prefix: str = _DEFAULT_PREFIX
 
 
