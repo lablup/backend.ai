@@ -45,7 +45,7 @@ class RedisServiceDiscovery(ServiceDiscovery):
 
     async def _scan_keys(self, pattern: str) -> list[str]:
         async def _run(r: Redis) -> list[str]:
-            return [key.decode() async for key in r.scan_iter(match=pattern)]
+            return [key.decode() async for key in r.scan_iter(match=pattern, count=100)]
 
         return await redis_helper.execute(self._redis, _run)
 
