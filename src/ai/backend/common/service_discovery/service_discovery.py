@@ -3,10 +3,11 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Self, Sequence
+from typing import Any, Optional, Self, Sequence
 
 from pydantic import BaseModel, Field
 
+from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging.utils import BraceStyleAdapter
 
 _DEFAULT_HEARTBEAT_TIMEOUT = 60 * 5  # 5 minutes
@@ -147,27 +148,36 @@ class ServiceDiscoveryLoop:
     This class is used to discover services in a distributed system.
     """
 
+    _type: ServiceDiscoveryType
     _service_discovery: ServiceDiscovery
     _metadata: ServiceMetadata
     _interval_seconds: int
     _closed: bool = False
     _run_service_task: asyncio.Task[None]
-    _sweep_unhealthy_services_task: asyncio.Task[None]
+    _sweep_unhealthy_services_task: Optional[asyncio.Task[None]]
 
     def __init__(
         self,
+        sd_type: ServiceDiscoveryType,
         service_discovery: ServiceDiscovery,
         metadata: ServiceMetadata,
         interval_seconds: int = 60,
     ) -> None:
+        self._type = sd_type
         self._service_discovery = service_discovery
         self._metadata = metadata
         self._interval_seconds = interval_seconds
         self._closed = False
         self._run_service_task = asyncio.create_task(self._run_service_loop())
-        self._sweep_unhealthy_services_task = asyncio.create_task(
-            self._sweep_unhealthy_services_loop()
-        )
+
+        match self._type:
+            case ServiceDiscoveryType.ETCD:
+                self._sweep_unhealthy_services_task = asyncio.create_task(
+                    self._sweep_unhealthy_services_loop()
+                )
+            case ServiceDiscoveryType.REDIS:
+                # We can set expire time for Redis keys, so no need to sweep unhealthy services.
+                self._sweep_unhealthy_services_task = None
 
     @property
     def metadata(self) -> ServiceMetadata:
@@ -181,7 +191,8 @@ class ServiceDiscoveryLoop:
             return
         self._closed = True
         self._run_service_task.cancel()
-        self._sweep_unhealthy_services_task.cancel()
+        if self._sweep_unhealthy_services_task:
+            self._sweep_unhealthy_services_task.cancel()
 
     async def _sweep_unhealthy_services_loop(self) -> None:
         """

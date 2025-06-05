@@ -1602,3 +1602,8 @@ class PurgeImageResult(TypedDict):
     image: str
     result: Optional[list[Any]]
     error: Optional[str]
+
+
+class ServiceDiscoveryType(enum.StrEnum):
+    ETCD = "etcd"
+    REDIS = "redis"
