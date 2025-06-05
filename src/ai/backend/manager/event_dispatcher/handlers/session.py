@@ -15,6 +15,7 @@ from ai.backend.common.events.kernel import (
 from ai.backend.common.events.session import (
     DoTerminateSessionEvent,
     SessionCancelledEvent,
+    SessionCheckingPrecondEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
     SessionPreparingEvent,
@@ -165,6 +166,7 @@ class SessionEventHandler:
         event: (
             SessionEnqueuedEvent
             | SessionScheduledEvent
+            | SessionCheckingPrecondEvent
             | SessionPreparingEvent
             | SessionStartedEvent
             | SessionCancelledEvent
