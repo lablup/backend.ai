@@ -50,6 +50,7 @@ from ai.backend.common.events.session import (
     DoTerminateSessionEvent,
     DoUpdateSessionStatusEvent,
     SessionCancelledEvent,
+    SessionCheckingPrecondEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
     SessionPreparingEvent,
@@ -350,6 +351,11 @@ class Dispatchers:
         evd.consume(SessionEnqueuedEvent, None, self._session_event_handler.invoke_session_callback)
         evd.consume(
             SessionScheduledEvent, None, self._session_event_handler.invoke_session_callback
+        )
+        evd.consume(
+            SessionCheckingPrecondEvent,
+            None,
+            self._session_event_handler.invoke_session_callback,
         )
         evd.consume(
             SessionPreparingEvent, None, self._session_event_handler.invoke_session_callback
