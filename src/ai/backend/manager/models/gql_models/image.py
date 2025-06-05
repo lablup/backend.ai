@@ -1216,7 +1216,7 @@ class ClearImagesV2(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         input: ClearImagesV2Input,
-    ) -> ClearImagesV2:
+    ) -> ClearImagesV2Payload:
         registry = input.registry
         project = input.project
 
