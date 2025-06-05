@@ -81,6 +81,7 @@ from ai.backend.common.events import (
     ModelServiceStatusEvent,
     RouteCreatedEvent,
     SessionCancelledEvent,
+    SessionCheckingPrecondEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
     SessionPreparingEvent,
@@ -366,6 +367,7 @@ class AgentRegistry:
             name="api.session.sterm",
         )
         evd.consume(SessionEnqueuedEvent, self, invoke_session_callback)
+        evd.consume(SessionCheckingPrecondEvent, self, invoke_session_callback)
         evd.consume(SessionScheduledEvent, self, invoke_session_callback)
         evd.consume(SessionPreparingEvent, self, invoke_session_callback)
         evd.consume(SessionSuccessEvent, self, handle_batch_result)
@@ -4006,6 +4008,7 @@ async def invoke_session_callback(
     source: AgentId,
     event: (
         SessionEnqueuedEvent
+        | SessionCheckingPrecondEvent
         | SessionScheduledEvent
         | SessionPreparingEvent
         | SessionStartedEvent
