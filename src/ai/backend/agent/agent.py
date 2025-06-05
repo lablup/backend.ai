@@ -91,7 +91,6 @@ from ai.backend.common.events import (
     DoVolumeUnmountEvent,
     EventDispatcher,
     EventProducer,
-    ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
@@ -101,12 +100,7 @@ from ai.backend.common.events import (
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
-)
-from ai.backend.common.events.model_serving import ModelServiceStatusEvent
-from ai.backend.common.events.session import (
-    ExecutionFinishedEvent,
-    ExecutionStartedEvent,
-    ExecutionTimeoutEvent,
+    ModelServiceStatusEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
     VolumeMountableNodeType,
