@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.9.1 (2025-06-05)
+
+### Features
+* Prevent batch kernel termination when an agent shutdown ([#4587](https://github.com/lablup/backend.ai/issues/4587))
+* Add Redis-based Service Discovery ([#4609](https://github.com/lablup/backend.ai/issues/4609))
+
+### Fixes
+* Fix `ModelServingService.delete_route()` to query the `RouteRow` with `load_endpoint=True`, ensuring the `endpoint` relationship is eagerly loaded ([#4590](https://github.com/lablup/backend.ai/issues/4590))
+* Replace assert statements in `load_model_definition` with raising exception ([#4599](https://github.com/lablup/backend.ai/issues/4599))
+* Resolve `generate-rpc-keypair` CLI command failure due to `rpc_auth_manager_keypair` not found error ([#4612](https://github.com/lablup/backend.ai/issues/4612))
+
+### Documentation Updates
+* Added clarifying comments to prevent `Auth` SDK config confusion ([#4607](https://github.com/lablup/backend.ai/issues/4607))
+
+### Miscellaneous
+* Add Etcd, Redis, and PostgreSQL exporters/scrapers in local development environment configuration. ([#4606](https://github.com/lablup/backend.ai/issues/4606))
+
+
 ## 25.9.0 (2025-06-02)
 
 ### Features
