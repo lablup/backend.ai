@@ -363,7 +363,7 @@ class Mutations(graphene.ObjectType):
         deprecation_reason="Deprecated since 25.10.0. Use `rescan_images_v2` instead."
     )
     preload_image = PreloadImage.Field()
-    rescan_images_v2 = RescanImagesV2.Field()
+    rescan_images_v2 = RescanImagesV2.Field(description="Added in 25.10.0.")
 
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
@@ -381,7 +381,7 @@ class Mutations(graphene.ObjectType):
     clear_images = ClearImages.Field(
         deprecation_reason="Deprecated since 25.10.0. Use `clear_images_v2` instead."
     )
-    clear_images_v2 = ClearImagesV2.Field()
+    clear_images_v2 = ClearImagesV2.Field(description="Added in 25.10.0.")
     purge_images = PurgeImages.Field(description="Added in 25.4.0")
 
     # super-admin only

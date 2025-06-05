@@ -2255,6 +2255,8 @@ type Mutations {
     registry: String
   ): RescanImages @deprecated(reason: "Deprecated since 25.10.0. Use `rescan_images_v2` instead.")
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
+
+  """Added in 25.10.0."""
   rescan_images_v2(input: RescanImagesV2Input!): RescanImagesV2Payload
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
@@ -2278,6 +2280,8 @@ type Mutations {
 
   """Deprecated since 25.10.0. use `ClearImagesV2` instead"""
   clear_images(registry: String): ClearImages @deprecated(reason: "Deprecated since 25.10.0. Use `clear_images_v2` instead.")
+
+  """Added in 25.10.0."""
   clear_images_v2(input: ClearImagesV2Input!): ClearImagesV2Payload
 
   """Added in 25.4.0"""
@@ -2815,7 +2819,7 @@ input RescanImagesV2Input {
   registry: String!
 
   """The name of the project to rescan images for."""
-  project: String
+  project: String = null
 }
 
 type UnloadImage {
@@ -2926,7 +2930,7 @@ input ClearImagesV2Input {
   registry: String!
 
   """The name of the project to clear images for."""
-  project: String
+  project: String = null
 }
 
 """Added in 25.6.0."""

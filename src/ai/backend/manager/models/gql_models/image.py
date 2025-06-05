@@ -993,7 +993,9 @@ class RescanImagesV2Input(graphene.InputObjectType):
         required=True, description="The name of the container registry to rescan."
     )
     project = graphene.String(
-        required=False, description="The name of the project to rescan images for."
+        required=False,
+        default_value=None,
+        description="The name of the project to rescan images for.",
     )
 
 
@@ -1183,7 +1185,9 @@ class ClearImagesV2Input(graphene.InputObjectType):
         required=True, description="The name of the container registry to clear."
     )
     project = graphene.String(
-        required=False, description="The name of the project to clear images for."
+        required=False,
+        default_value=None,
+        description="The name of the project to clear images for.",
     )
 
 
