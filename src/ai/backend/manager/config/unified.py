@@ -1811,13 +1811,12 @@ class OTELConfig(BaseModel):
 
 
 class ServiceDiscoveryConfig(BaseModel):
-    type_: ServiceDiscoveryType = Field(
+    type: ServiceDiscoveryType = Field(
         default=ServiceDiscoveryType.REDIS,
         description="""
         Type of service discovery to use.
         """,
         examples=[item.value for item in ServiceDiscoveryType],
-        # alias="type",
     )
 
 

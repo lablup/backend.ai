@@ -662,7 +662,7 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    match root_ctx.config_provider.config.service_discovery.type_:
+    match root_ctx.config_provider.config.service_discovery.type:
         case ServiceDiscoveryType.ETCD:
             root_ctx.service_discovery = ETCDServiceDiscovery(
                 ETCDServiceDiscoveryArgs(root_ctx.etcd)
