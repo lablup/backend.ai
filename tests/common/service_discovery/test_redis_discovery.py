@@ -4,6 +4,7 @@ import uuid
 import pytest
 
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    _DEFAULT_TTL,
     RedisServiceDiscovery,
 )
 from ai.backend.common.service_discovery.service_discovery import (
@@ -198,6 +199,7 @@ async def test_redis_discovery_loop_with_unhealthy_metadata(
     default_service_metadata: ServiceMetadata,
     unhealthy_service_metadata: ServiceMetadata,
 ) -> None:
+    redis_discovery._ttl = 1  # Set a short TTL for testing
     await redis_discovery.register(
         service_meta=unhealthy_service_metadata,
     )
@@ -214,3 +216,4 @@ async def test_redis_discovery_loop_with_unhealthy_metadata(
             service_id=unhealthy_service_metadata.id,
         )
     sd_loop.close()
+    redis_discovery._ttl = _DEFAULT_TTL  # Reset TTL
