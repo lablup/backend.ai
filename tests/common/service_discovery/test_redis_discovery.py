@@ -3,8 +3,9 @@ import uuid
 
 import pytest
 
-from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
-    ETCDServiceDiscovery,
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    _DEFAULT_TTL,
+    RedisServiceDiscovery,
 )
 from ai.backend.common.service_discovery.service_discovery import (
     HealthStatus,
@@ -15,32 +16,32 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import ServiceDiscoveryType
 
 
-async def test_etcd_discovery_register(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_register(
+    redis_discovery: RedisServiceDiscovery,
     default_service_metadata: ServiceMetadata,
 ) -> None:
-    await etcd_discovery.register(
+    await redis_discovery.register(
         service_meta=default_service_metadata,
     )
-    service = await etcd_discovery.get_service(
+    service = await redis_discovery.get_service(
         service_group=default_service_metadata.service_group,
         service_id=default_service_metadata.id,
     )
     assert service == default_service_metadata
 
 
-async def test_etcd_discovery_heartbeat(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_heartbeat(
+    redis_discovery: RedisServiceDiscovery,
     default_service_metadata: ServiceMetadata,
 ) -> None:
     prev_meta = default_service_metadata.model_copy(deep=True)
-    await etcd_discovery.register(
+    await redis_discovery.register(
         service_meta=default_service_metadata,
     )
-    await etcd_discovery.heartbeat(
+    await redis_discovery.heartbeat(
         service_meta=default_service_metadata,
     )
-    updated_service_meta: ServiceMetadata = await etcd_discovery.get_service(
+    updated_service_meta: ServiceMetadata = await redis_discovery.get_service(
         service_group=default_service_metadata.service_group,
         service_id=default_service_metadata.id,
     )
@@ -50,32 +51,32 @@ async def test_etcd_discovery_heartbeat(
     assert prev_meta == updated_service_meta
 
 
-async def test_etcd_discovery_unregister(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_unregister(
+    redis_discovery: RedisServiceDiscovery,
     default_service_metadata: ServiceMetadata,
 ) -> None:
-    await etcd_discovery.register(
+    await redis_discovery.register(
         service_meta=default_service_metadata,
     )
-    await etcd_discovery.unregister(
+    await redis_discovery.unregister(
         service_group=default_service_metadata.service_group,
         service_id=default_service_metadata.id,
     )
     with pytest.raises(ValueError):
-        await etcd_discovery.get_service(
+        await redis_discovery.get_service(
             service_group=default_service_metadata.service_group,
             service_id=default_service_metadata.id,
         )
 
 
-async def test_etcd_discovery_discover_single_service(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_discover_single_service(
+    redis_discovery: RedisServiceDiscovery,
     default_service_metadata: ServiceMetadata,
 ) -> None:
-    await etcd_discovery.register(
+    await redis_discovery.register(
         service_meta=default_service_metadata,
     )
-    services = await etcd_discovery.discover()
+    services = await redis_discovery.discover()
     assert len(services) == 1
     assert services[0] == default_service_metadata
 
@@ -98,90 +99,92 @@ def make_mock_service_metadata(
     )
 
 
-async def test_etcd_discovery_discover_multiple_services(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_discover_multiple_services(
+    redis_discovery: RedisServiceDiscovery,
 ) -> None:
     service_group_1 = "test_group_1"
     service_group_2 = "test_group_2"
     for i in range(5):
         service = make_mock_service_metadata(service_group_1)
-        await etcd_discovery.register(
+        await redis_discovery.register(
             service_meta=service,
         )
 
     for i in range(3):
         service = make_mock_service_metadata(service_group_2)
-        await etcd_discovery.register(
+        await redis_discovery.register(
             service_meta=service,
         )
 
-    services = await etcd_discovery.discover()
+    services = await redis_discovery.discover()
     assert len(services) == 8
     assert len(list(filter(lambda s: s.service_group == service_group_1, services))) == 5
     assert len(list(filter(lambda s: s.service_group == service_group_2, services))) == 3
 
 
-async def test_etcd_discovery_get_service_group(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_get_service_group(
+    redis_discovery: RedisServiceDiscovery,
 ) -> None:
     service_group_1 = "test_group_1"
     service_group_2 = "test_group_2"
     for i in range(5):
         service = make_mock_service_metadata(service_group_1)
-        await etcd_discovery.register(
+        await redis_discovery.register(
             service_meta=service,
         )
 
     for i in range(3):
         service = make_mock_service_metadata(service_group_2)
-        await etcd_discovery.register(
+        await redis_discovery.register(
             service_meta=service,
         )
 
-    services = await etcd_discovery.get_service_group(service_group_1)
+    services = await redis_discovery.get_service_group(service_group_1)
     assert len(services) == 5
 
-    services = await etcd_discovery.get_service_group(service_group_2)
+    services = await redis_discovery.get_service_group(service_group_2)
     assert len(services) == 3
 
 
-async def test_etcd_discovery_get_service_when_multiple_services(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_get_service_when_multiple_services(
+    redis_discovery: RedisServiceDiscovery,
 ) -> None:
     service_group_1 = "test_group_1"
     service_group_2 = "test_group_2"
     first_service = make_mock_service_metadata(service_group_1)
-    await etcd_discovery.register(
+    await redis_discovery.register(
         service_meta=first_service,
     )
     for i in range(5):
         service = make_mock_service_metadata(service_group_1)
-        await etcd_discovery.register(
+        await redis_discovery.register(
             service_meta=service,
         )
 
     for i in range(3):
         service = make_mock_service_metadata(service_group_2)
-        await etcd_discovery.register(
+        await redis_discovery.register(
             service_meta=service,
         )
 
-    service = await etcd_discovery.get_service(
+    service = await redis_discovery.get_service(
         service_group=service_group_1,
         service_id=first_service.id,
     )
     assert service == first_service
 
 
-async def test_etcd_discovery_loop_heartbeat(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_loop_heartbeat(
+    redis_discovery: RedisServiceDiscovery,
     default_service_metadata: ServiceMetadata,
 ) -> None:
     prev_meta = default_service_metadata.model_copy(deep=True)
-    loop = ServiceDiscoveryLoop(ServiceDiscoveryType.ETCD, etcd_discovery, default_service_metadata)
+    loop = ServiceDiscoveryLoop(
+        ServiceDiscoveryType.REDIS, redis_discovery, default_service_metadata
+    )
 
     await asyncio.sleep(5)
-    updated_service_meta: ServiceMetadata = await etcd_discovery.get_service(
+    updated_service_meta: ServiceMetadata = await redis_discovery.get_service(
         service_group=default_service_metadata.service_group,
         service_id=default_service_metadata.id,
     )
@@ -191,24 +194,26 @@ async def test_etcd_discovery_loop_heartbeat(
     loop.close()
 
 
-async def test_etcd_discovery_loop_with_unhealthy_metadata(
-    etcd_discovery: ETCDServiceDiscovery,
+async def test_redis_discovery_loop_with_unhealthy_metadata(
+    redis_discovery: RedisServiceDiscovery,
     default_service_metadata: ServiceMetadata,
     unhealthy_service_metadata: ServiceMetadata,
 ) -> None:
-    await etcd_discovery.register(
+    redis_discovery._ttl = 1  # Set a short TTL for testing
+    await redis_discovery.register(
         service_meta=unhealthy_service_metadata,
     )
 
     sd_loop = ServiceDiscoveryLoop(
-        ServiceDiscoveryType.ETCD, etcd_discovery, default_service_metadata
+        ServiceDiscoveryType.REDIS, redis_discovery, default_service_metadata
     )
 
     await asyncio.sleep(5)
 
     with pytest.raises(ValueError):
-        await etcd_discovery.get_service(
+        await redis_discovery.get_service(
             service_group=unhealthy_service_metadata.service_group,
             service_id=unhealthy_service_metadata.id,
         )
     sd_loop.close()
+    redis_discovery._ttl = _DEFAULT_TTL  # Reset TTL
