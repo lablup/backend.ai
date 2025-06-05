@@ -846,7 +846,6 @@ class ManagerConfig(BaseModel):
             log.warning(
                 f'RPC authentication keypair file does not exist: "{v}".',
             )
-            return v
         return v
 
 
