@@ -488,7 +488,7 @@ class ManagerConfig(BaseModel):
         validation_alias=AliasChoices("internal-addr", "internal_addr"),
         serialization_alias="internal-addr",
     )
-    rpc_auth_manager_keypair: FilePath = Field(
+    rpc_auth_manager_keypair: Path = Field(
         default=Path("fixtures/manager/manager.key_secret"),
         description="""
         Path to the keypair file used for RPC authentication.
@@ -838,6 +838,15 @@ class ManagerConfig(BaseModel):
         if self.aiomonitor_port is not None:
             return self.aiomonitor_port
         return self.aiomonitor_termui_port
+
+    @field_validator("rpc_auth_manager_keypair", mode="before")
+    @classmethod
+    def _parse_rpc_auth_manager_keypair(cls, v: str) -> str:
+        if not Path(v).exists():
+            log.warning(
+                f'RPC authentication keypair file does not exist: "{v}".',
+            )
+        return v
 
 
 # Deprecated: v20.09
