@@ -1258,6 +1258,7 @@ async def server_main(
             )
 
     sd_loop = ServiceDiscoveryLoop(
+        sd_type,
         service_discovery,
         ServiceMetadata(
             display_name=f"agent-{local_config['agent']['id']}",

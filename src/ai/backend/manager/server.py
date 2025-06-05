@@ -662,7 +662,8 @@ async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    match root_ctx.config_provider.config.service_discovery.type:
+    sd_type = root_ctx.config_provider.config.service_discovery.type
+    match sd_type:
         case ServiceDiscoveryType.ETCD:
             root_ctx.service_discovery = ETCDServiceDiscovery(
                 ETCDServiceDiscoveryArgs(root_ctx.etcd)
@@ -673,6 +674,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             )
 
     root_ctx.sd_loop = ServiceDiscoveryLoop(
+        sd_type,
         root_ctx.service_discovery,
         ServiceMetadata(
             display_name=f"manager-{root_ctx.config_provider.config.manager.id}",
