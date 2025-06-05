@@ -12,7 +12,7 @@ class TestRunner:
 
     async def run(self) -> None:
         try:
-            await self._spec.run_test()
-            await self._exporter.export_done(self._spec)
+            await self._spec.template.run_test(self._exporter)
+            await self._exporter.export_done(self._spec.name)
         except BaseException as e:
-            await self._exporter.export_exception(self._spec, e)
+            await self._exporter.export_exception(self._spec.name, e)

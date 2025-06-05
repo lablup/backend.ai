@@ -120,7 +120,7 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
     print("Available test specifications:")
     print("====================================")
     for spec in spec_manager.all_specs():
-        print(f"{spec.name()}:\n {spec.description()}")
+        print(f"{spec.name}:\n {spec.description}")
 
 
 @click.argument("name", type=str)
@@ -133,6 +133,17 @@ def run_test(cli_ctx: CLIContext, name: str) -> None:
         exporter=PrintExporter(),
     )
     asyncio.run(tester.run_by_name(name))
+
+
+@main.command()
+@click.pass_obj
+def run_all(cli_ctx: CLIContext) -> None:
+    spec_manager = TestSpecManager.default()
+    tester = Tester(
+        spec_manager=spec_manager,
+        exporter=PrintExporter(),
+    )
+    asyncio.run(tester.run_all())
 
 
 if __name__ == "__main__":

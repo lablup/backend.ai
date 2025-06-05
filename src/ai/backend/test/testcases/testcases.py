@@ -1,6 +1,12 @@
 import enum
-from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Mapping, Self
+
+from ai.backend.test.testcases.template import (
+    BasicTestTemplate,
+    NopTestCode,
+    TestTemplate,
+)
 
 
 class TestTag(enum.StrEnum):
@@ -14,48 +20,21 @@ class TestTag(enum.StrEnum):
     SESSION = "session"
 
 
-class TestSpec(ABC):
-    @abstractmethod
-    def name(self) -> str:
-        """
-        Get the name of the test specification.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
+@dataclass
+class TestSpec:
+    name: str
+    description: str
+    tags: set[TestTag]
+    template: TestTemplate
 
-    @abstractmethod
-    def description(self) -> str:
-        """
-        Get the description of the test specification.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
+    def __hash__(self):
+        return hash(self.name)
 
-    @abstractmethod
-    def tags(self) -> set[TestTag]:
-        """
-        Get the tags associated with the test specification.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
-
-    @abstractmethod
-    async def run_test(self) -> None:
-        """
-        Run the test case associated with this specification.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
-
-
-class NopTestSpec(TestSpec):
-    def name(self) -> str:
-        return "nop"
-
-    def description(self) -> str:
-        return "A no-operation test specification for testing purposes."
-
-    def tags(self) -> set[TestTag]:
-        return {TestTag.MANAGER}
-
-    async def run_test(self) -> None:
-        pass
+    def __eq__(self, other):
+        if not isinstance(other, TestSpec):
+            return NotImplemented
+        # If name is the same, consider them equal
+        return self.name == other.name
 
 
 class TestSpecManager:
@@ -66,7 +45,14 @@ class TestSpecManager:
 
     @classmethod
     def default(cls) -> Self:
-        specs = {"nop": NopTestSpec()}
+        specs = {
+            "nop": TestSpec(
+                name="nop",
+                description="No operation test case.",
+                tags=set(),
+                template=BasicTestTemplate(NopTestCode()),
+            )
+        }
         return cls(specs)
 
     def all_specs(self) -> set[TestSpec]:
@@ -79,7 +65,7 @@ class TestSpecManager:
         """
         Get test specifications by tag.
         """
-        return {spec for spec in self._specs.values() if tag in spec.tags()}
+        return {spec for spec in self._specs.values() if tag in spec.tags}
 
     def spec_by_name(self, name: str) -> TestSpec:
         """
