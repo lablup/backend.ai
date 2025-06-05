@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import subprocess
 import sys
 
 import click
+
+from ai.backend.test.testcases.testcases import TestSpecManager
+from ai.backend.test.tester.exporter import PrintExporter
+from ai.backend.test.tester.tester import Tester
 
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
@@ -106,6 +111,28 @@ def run_cli(
         },
     )
     ctx.exit(result.returncode)
+
+
+@main.command()
+@click.pass_obj
+def get_all_specs(cli_ctx: CLIContext) -> None:
+    spec_manager = TestSpecManager.default()
+    print("Available test specifications:")
+    print("====================================")
+    for spec in spec_manager.all_specs():
+        print(f"{spec.name()}:\n {spec.description()}")
+
+
+@click.argument("name", type=str)
+@main.command()
+@click.pass_obj
+def run_test(cli_ctx: CLIContext, name: str) -> None:
+    spec_manager = TestSpecManager.default()
+    tester = Tester(
+        spec_manager=spec_manager,
+        exporter=PrintExporter(),
+    )
+    asyncio.run(tester.run_by_name(name))
 
 
 if __name__ == "__main__":
