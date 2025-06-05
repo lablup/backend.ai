@@ -2815,10 +2815,10 @@ type RescanImagesV2Payload {
 
 """Added in 25.10.0."""
 input RescanImagesV2Input {
-  """The name of the container registry to rescan."""
+  """Name of the container registry to rescan."""
   registry: String!
 
-  """The name of the project to rescan images for."""
+  """Name of the project of the container registry to rescan images."""
   project: String = null
 }
 
@@ -2926,10 +2926,10 @@ type ClearImagesV2Payload {
 
 """Added in 25.10.0."""
 input ClearImagesV2Input {
-  """The name of the container registry to clear."""
+  """Name of the container registry to clear images."""
   registry: String!
 
-  """The name of the project to clear images for."""
+  """Name of the project of the container registry to clear images."""
   project: String = null
 }
 
