@@ -12,6 +12,7 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceEndpoint,
     ServiceMetadata,
 )
+from ai.backend.common.types import ServiceDiscoveryType
 
 
 async def test_redis_discovery_register(
@@ -177,7 +178,9 @@ async def test_redis_discovery_loop_heartbeat(
     default_service_metadata: ServiceMetadata,
 ) -> None:
     prev_meta = default_service_metadata.model_copy(deep=True)
-    loop = ServiceDiscoveryLoop(redis_discovery, default_service_metadata)
+    loop = ServiceDiscoveryLoop(
+        ServiceDiscoveryType.REDIS, redis_discovery, default_service_metadata
+    )
 
     await asyncio.sleep(5)
     updated_service_meta: ServiceMetadata = await redis_discovery.get_service(
@@ -199,7 +202,9 @@ async def test_redis_discovery_loop_with_unhealthy_metadata(
         service_meta=unhealthy_service_metadata,
     )
 
-    sd_loop = ServiceDiscoveryLoop(redis_discovery, default_service_metadata)
+    sd_loop = ServiceDiscoveryLoop(
+        ServiceDiscoveryType.REDIS, redis_discovery, default_service_metadata
+    )
 
     await asyncio.sleep(5)
 
