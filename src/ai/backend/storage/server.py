@@ -24,7 +24,7 @@ from ai.backend.common.config import (
     override_key,
     redis_config_iv,
 )
-from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -36,7 +36,12 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    RedisServiceDiscovery,
+    RedisServiceDiscoveryArgs,
+)
 from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscovery,
     ServiceDiscoveryLoop,
     ServiceEndpoint,
     ServiceMetadata,
@@ -45,6 +50,7 @@ from ai.backend.common.types import (
     AGENTID_STORAGE,
     HostPortPair,
     RedisProfileTarget,
+    ServiceDiscoveryType,
     safe_print_redis_target,
 )
 from ai.backend.common.utils import env_info
@@ -265,9 +271,27 @@ async def server_main(
             announce_internal_addr: HostPortPair = local_config["api"]["manager"][
                 "announce-internal-addr"
             ]
-            etcd_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
+
+            sd_type = local_config["service-discovery"]["type"]
+
+            service_discovery: ServiceDiscovery
+            match sd_type:
+                case ServiceDiscoveryType.ETCD:
+                    service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
+                case ServiceDiscoveryType.REDIS:
+                    live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+                    redis_live = redis_helper.get_redis_object(
+                        live_redis_target,
+                        name="storage-proxy.live",
+                        db=REDIS_LIVE_DB,
+                    )
+                    service_discovery = RedisServiceDiscovery(
+                        args=RedisServiceDiscoveryArgs(redis=redis_live)
+                    )
+
             sd_loop = ServiceDiscoveryLoop(
-                etcd_discovery,
+                sd_type,
+                service_discovery,
                 ServiceMetadata(
                     display_name=f"storage-{local_config['storage-proxy']['node-id']}",
                     service_group="storage-proxy",

@@ -254,6 +254,8 @@ class APIConfig:
         )
         self._version = version if version is not None else default_clean(self.DEFAULTS["version"])
         self._user_agent = user_agent if user_agent is not None else get_user_agent()
+        # Note: Running a web server with session BACKEND_ENDPOINT_TYPE is not an intended scenario;
+        # The normal scenario is to run with "api" as the endpoint type.
         if self._endpoint_type == "api":
             self._access_key = access_key if access_key is not None else get_env("ACCESS_KEY", "")
             self._secret_key = secret_key if secret_key is not None else get_env("SECRET_KEY", "")

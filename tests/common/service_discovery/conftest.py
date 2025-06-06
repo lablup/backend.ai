@@ -3,16 +3,22 @@ import uuid
 
 import pytest
 
+from ai.backend.common import redis_helper
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    RedisServiceDiscovery,
+    RedisServiceDiscoveryArgs,
 )
 from ai.backend.common.service_discovery.service_discovery import (
     HealthStatus,
     ServiceEndpoint,
     ServiceMetadata,
 )
+from ai.backend.common.types import RedisHelperConfig, RedisTarget
 
 
 @pytest.fixture
@@ -26,6 +32,37 @@ async def etcd_discovery(etcd: AsyncEtcd):
     )
     # Cleanup
     await etcd.delete_prefix(prefix)
+
+
+@pytest.fixture
+async def redis_conn(redis_container):
+    # Configure test Redis connection
+    conn = redis_helper.get_redis_object(
+        RedisTarget(
+            addr=redis_container[1],
+            redis_helper_config=RedisHelperConfig(
+                socket_timeout=1.0,
+                socket_connect_timeout=1.0,
+                reconnect_poll_timeout=1.0,
+                max_connections=10,
+                connection_ready_timeout=1.0,
+            ),
+        ),
+        name="test-redis",
+    )
+    yield conn
+    # Cleanup after tests
+    await conn.client.flushdb()
+    await conn.close()
+
+
+@pytest.fixture
+async def redis_discovery(redis_conn):
+    yield RedisServiceDiscovery(
+        args=RedisServiceDiscoveryArgs(
+            redis=redis_conn,
+        ),
+    )
 
 
 @pytest.fixture

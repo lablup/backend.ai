@@ -204,6 +204,7 @@ from ai.backend.common.typed_validators import (
     _TimeDurationPydanticAnnotation,
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
@@ -488,7 +489,7 @@ class ManagerConfig(BaseModel):
         validation_alias=AliasChoices("internal-addr", "internal_addr"),
         serialization_alias="internal-addr",
     )
-    rpc_auth_manager_keypair: FilePath = Field(
+    rpc_auth_manager_keypair: Path = Field(
         default=Path("fixtures/manager/manager.key_secret"),
         description="""
         Path to the keypair file used for RPC authentication.
@@ -838,6 +839,15 @@ class ManagerConfig(BaseModel):
         if self.aiomonitor_port is not None:
             return self.aiomonitor_port
         return self.aiomonitor_termui_port
+
+    @field_validator("rpc_auth_manager_keypair", mode="before")
+    @classmethod
+    def _parse_rpc_auth_manager_keypair(cls, v: str) -> str:
+        if not Path(v).exists():
+            log.warning(
+                f'RPC authentication keypair file does not exist: "{v}".',
+            )
+        return v
 
 
 # Deprecated: v20.09
@@ -1809,6 +1819,16 @@ class OTELConfig(BaseModel):
     )
 
 
+class ServiceDiscoveryConfig(BaseModel):
+    type: ServiceDiscoveryType = Field(
+        default=ServiceDiscoveryType.REDIS,
+        description="""
+        Type of service discovery to use.
+        """,
+        examples=[item.value for item in ServiceDiscoveryType],
+    )
+
+
 class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -1974,6 +1994,13 @@ class ManagerUnifiedConfig(BaseModel):
         description="""
         OpenTelemetry configuration.
         Controls how tracing and logging are handled with OpenTelemetry.
+        """,
+    )
+    service_discovery: ServiceDiscoveryConfig = Field(
+        default_factory=ServiceDiscoveryConfig,
+        description="""
+        Service discovery configuration.
+        Controls how services are discovered and connected within the Backend.AI system.
         """,
     )
 

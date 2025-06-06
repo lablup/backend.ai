@@ -5,7 +5,7 @@ import trafaret as t
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.types import ResourceGroupType
+from ai.backend.common.types import ResourceGroupType, ServiceDiscoveryType
 
 from .affinity_map import AffinityPolicy
 from .stats import StatModes
@@ -34,6 +34,10 @@ _default_otel_config: dict[str, Any] = {
     "enabled": False,
     "log-level": "INFO",
     "endpoint": "http://127.0.0.1:4317",
+}
+
+_default_service_discovery_config: dict[str, Any] = {
+    "type": ServiceDiscoveryType.REDIS,
 }
 
 agent_local_config_iv = (
@@ -144,6 +148,9 @@ agent_local_config_iv = (
                 "CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"
             ),
             t.Key("endpoint", default=_default_otel_config["endpoint"]): t.String,
+        }).allow_extra("*"),
+        t.Key("service-discovery", default=_default_service_discovery_config): t.Dict({
+            t.Key("type", default=ServiceDiscoveryType.REDIS): tx.Enum(ServiceDiscoveryType),
         }).allow_extra("*"),
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,

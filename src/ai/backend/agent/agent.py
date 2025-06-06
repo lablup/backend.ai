@@ -102,7 +102,6 @@ from ai.backend.common.events.kernel import (
 )
 from ai.backend.common.events.model_serving import ModelServiceStatusEvent
 from ai.backend.common.events.session import (
-    ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
@@ -179,7 +178,11 @@ from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
-from .kernel import AbstractKernel, match_distro_data
+from .kernel import (
+    RUN_ID_FOR_BATCH_JOB,
+    AbstractKernel,
+    match_distro_data,
+)
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -1799,9 +1802,17 @@ class AbstractAgent(
             pass
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
-            if kernel_obj.runner is not None:
-                kernel_obj.runner.event_producer = self.event_producer
-                await kernel_obj.runner.__ainit__()
+            await kernel_obj.init(self.event_producer)
+            if kernel_obj.runner is None:
+                log.warning("kernel {} has no runner, skipping", kernel_obj.kernel_id)
+                continue
+            await kernel_obj.runner.__ainit__()
+            if kernel_obj.session_type == SessionTypes.BATCH:
+                self._ongoing_exec_batch_tasks.add(
+                    asyncio.create_task(
+                        self._iterate_batch_result(kernel_obj.kernel_id),
+                    ),
+                )
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
@@ -1859,6 +1870,54 @@ class AbstractAgent(
     ) -> AbstractKernelCreationContext:
         raise NotImplementedError
 
+    async def _iterate_batch_result(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        kernel_obj = self.kernel_registry[kernel_id]
+        session_id = kernel_obj.session_id
+        if kernel_obj.runner is None:
+            log.error("iterate_batch_result(kernel: {}): no kernel runner", kernel_id)
+            return
+        await kernel_obj.runner.attach_output_queue(RUN_ID_FOR_BATCH_JOB)
+        while True:
+            result = await kernel_obj.runner.get_next_result(
+                api_ver=3,
+                flush_timeout=1.0,
+            )
+            match result["status"]:
+                case "finished":
+                    if result["exitCode"] == 0:
+                        await self.produce_event(
+                            SessionSuccessEvent(
+                                session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
+                            ),
+                        )
+                    else:
+                        await self.produce_event(
+                            SessionFailureEvent(
+                                session_id,
+                                KernelLifecycleEventReason.TASK_FAILED,
+                                result["exitCode"] if result["exitCode"] is not None else -1,
+                            ),
+                        )
+                    break
+                case "exec-timeout":
+                    await self.produce_event(
+                        SessionFailureEvent(
+                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                        ),
+                    )
+                    break
+                case "continued":
+                    continue
+                case _:
+                    log.warning(
+                        "iterate_batch_result(kernel: {}): unexpected result: {!r}, continuing",
+                        kernel_id,
+                        result,
+                    )
+
     async def execute_batch(
         self,
         session_id: SessionId,
@@ -1882,7 +1941,7 @@ class AbstractAgent(
                         result = await self.execute(
                             session_id,
                             kernel_id,
-                            "batch-job",  # a reserved run ID
+                            RUN_ID_FOR_BATCH_JOB,
                             mode,
                             "",
                             opts=opts,
@@ -1931,9 +1990,8 @@ class AbstractAgent(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
             )
         except asyncio.CancelledError:
-            await self.produce_event(
-                SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
-            )
+            log.warning("execute_batch(k:{}) cancelled", kernel_id)
+            raise
 
     async def create_batch_execution_task(
         self,
@@ -2287,6 +2345,7 @@ class AbstractAgent(
                     service_ports,
                     cluster_info,
                 )
+                kernel_obj.session_type = kernel_config["session_type"]
                 async with self.registry_lock:
                     self.kernel_registry[kernel_id] = kernel_obj
                 try:
@@ -2827,7 +2886,7 @@ class AbstractAgent(
         opts: Mapping[str, Any],
         api_version: int,
         flush_timeout: float,
-    ):
+    ) -> dict[str, Any]:
         # Wait for the kernel restarting if it's ongoing...
         restart_tracker = self.restarting_kernels.get(kernel_id)
         if restart_tracker is not None:
@@ -2842,9 +2901,7 @@ class AbstractAgent(
                 run_id, mode, text, opts=opts, flush_timeout=flush_timeout, api_version=api_version
             )
         except asyncio.CancelledError:
-            await self.produce_event(
-                ExecutionCancelledEvent(session_id),
-            )
+            log.warning("execute(k:{}) cancelled", kernel_id)
             raise
         except KeyError:
             # This situation is handled in the lifecycle management subsystem.

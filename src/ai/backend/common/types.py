@@ -1604,6 +1604,11 @@ class PurgeImageResult(TypedDict):
     error: Optional[str]
 
 
+class ServiceDiscoveryType(enum.StrEnum):
+    ETCD = "etcd"
+    REDIS = "redis"
+
+
 class SessionExecutionStatus(enum.StrEnum):
     """
     Status of the session execution.
