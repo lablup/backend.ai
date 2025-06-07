@@ -16,13 +16,13 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventHandler,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
+from ai.backend.common.events.event_types.model_serving.broadcast import (
     ModelServiceStatusEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.broadcast import (
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,

@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, override
 
-from ai.backend.common.events.types import AbstractConsumeEvent, EventDomain
+from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import ContainerId, KernelId, SessionId
 
@@ -10,7 +10,7 @@ from .types import KernelLifecycleEventReason
 
 
 @dataclass
-class BaseKernelEvent(AbstractConsumeEvent):
+class BaseKernelEvent(AbstractAnycastEvent):
     kernel_id: KernelId
 
     @classmethod

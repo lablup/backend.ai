@@ -28,8 +28,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
-from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelPreparingEvent,
@@ -38,7 +37,7 @@ from ai.backend.common.events.kernel import (
     KernelTerminatedEvent,
     KernelTerminatingEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.broadcast import (
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -48,6 +47,7 @@ from ai.backend.common.events.session import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
+from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId

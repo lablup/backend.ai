@@ -36,7 +36,7 @@ from ..types import (
     AgentId,
 )
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
-from .types import AbstractConsumeEvent, AbstractEvent, AbstractSubscribeEvent
+from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
 
 __all__ = (
     "EventCallback",
@@ -54,6 +54,8 @@ class _EventHandlerType(enum.StrEnum):
 
 
 TEvent = TypeVar("TEvent", bound="AbstractEvent")
+TSubscirbedEvent = TypeVar("TSubscirbedEvent", bound=AbstractBroadcastEvent)
+TConsumedEvent = TypeVar("TConsumedEvent", bound=AbstractAnycastEvent)
 TEventCov = TypeVar("TEventCov", bound="AbstractEvent")
 TContext = TypeVar("TContext")
 
@@ -202,28 +204,28 @@ class EventDispatcherGroup(ABC):
     @abstractmethod
     def consume(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TConsumedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TConsumedEvent]:
         raise NotImplementedError
 
     @abstractmethod
     def subscribe(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TSubscirbedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         override_event_name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TSubscirbedEvent]:
         raise NotImplementedError
 
 
@@ -258,14 +260,14 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TConsumedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TConsumedEvent]:
         return self._event_dispatcher.consume(
             event_cls,
             context,
@@ -280,15 +282,15 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TSubscirbedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         override_event_name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TSubscirbedEvent]:
         return self._event_dispatcher.subscribe(
             event_cls,
             context,
@@ -396,16 +398,16 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def consume(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TConsumedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TConsumedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
         args_matcher: Optional[Callable[[tuple], bool]] = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TConsumedEvent]:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
         on a single event, only one callable among those will be called.
@@ -443,9 +445,9 @@ class EventDispatcher(EventDispatcherGroup):
     @override
     def subscribe(
         self,
-        event_cls: Type[TEvent],
+        event_cls: Type[TSubscirbedEvent],
         context: TContext,
-        callback: EventCallback[TContext, TEvent],
+        callback: EventCallback[TContext, TSubscirbedEvent],
         coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: Optional[str] = None,
@@ -453,7 +455,7 @@ class EventDispatcher(EventDispatcherGroup):
         args_matcher: Optional[Callable[[tuple], bool]] = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
-    ) -> EventHandler[TContext, TEvent]:
+    ) -> EventHandler[TContext, TSubscirbedEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
 
@@ -632,7 +634,7 @@ class EventProducer:
 
     async def produce_event(
         self,
-        event: AbstractConsumeEvent,
+        event: AbstractAnycastEvent,
         source_override: Optional[AgentId] = None,
     ) -> None:
         if self._closed:
@@ -646,11 +648,12 @@ class EventProducer:
             b"source": source_bytes,
             b"args": msgpack.packb(event.serialize()),
         }
+        # TODO: impl anycast message queue
         await self._msg_queue.send(raw_event)
 
     async def broadcast_event(
         self,
-        event: AbstractSubscribeEvent,
+        event: AbstractBroadcastEvent,
         source_override: Optional[AgentId] = None,
     ) -> None:
         if self._closed:
@@ -664,4 +667,5 @@ class EventProducer:
             b"source": source_bytes,
             b"args": msgpack.packb(event.serialize()),
         }
+        # TODO: impl broadcast message queue
         await self._msg_queue.send(raw_event)

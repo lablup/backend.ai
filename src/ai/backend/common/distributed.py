@@ -9,7 +9,7 @@ from aiomonitor.task import preserve_termination_log
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from .events.dispatcher import AbstractEvent, EventProducer
+    from .events.dispatcher import AbstractAnycastEvent, EventProducer
     from .lock import AbstractDistributedLock
 
 
@@ -28,7 +28,7 @@ class GlobalTimer:
         self,
         dist_lock: AbstractDistributedLock,
         event_producer: EventProducer,
-        event_factory: Callable[[], AbstractEvent],
+        event_factory: Callable[[], AbstractAnycastEvent],
         interval: float = 10.0,
         initial_delay: float = 0.0,
         *,

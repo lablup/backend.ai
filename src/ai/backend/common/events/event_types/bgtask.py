@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional, override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_bgtask_event import (
     UserBgtaskCancelledEvent,
     UserBgtaskDoneEvent,
@@ -20,7 +20,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
-class BaseBgtaskEvent(AbstractEvent, ABC):
+class BaseBgtaskEvent(AbstractBroadcastEvent, ABC):
     task_id: uuid.UUID
 
     @classmethod

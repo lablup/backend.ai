@@ -78,7 +78,13 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events.agent import (
+from ai.backend.common.events.dispatcher import (
+    AbstractAnycastEvent,
+    AbstractBroadcastEvent,
+    EventDispatcher,
+    EventProducer,
+)
+from ai.backend.common.events.event_types.agent import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
@@ -86,29 +92,48 @@ from ai.backend.common.events.agent import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.dispatcher import (
-    AbstractEvent,
-    EventDispatcher,
-    EventProducer,
-)
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
     KernelCreatingEvent,
-    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
 )
-from ai.backend.common.events.model_serving import ModelServiceStatusEvent
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelCreatingEvent as KernelCreatingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelPreparingEvent as KernelPreparingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelPullingEvent as KernelPullingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelStartedEvent as KernelStartedBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelTerminatedEvent as KernelTerminatedBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.model_serving.anycast import ModelServiceStatusEvent
+from ai.backend.common.events.event_types.model_serving.broadcast import (
+    ModelServiceStatusEvent as ModelServiceStatusBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.anycast import (
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
 )
-from ai.backend.common.events.volume import (
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionFailureEvent as SessionFailureBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionSuccessEvent as SessionSuccessBroadcastEvent,
+)
+from ai.backend.common.events.event_types.volume import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
     VolumeMountableNodeType,
@@ -927,7 +952,7 @@ class AbstractAgent(
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
 
-    async def produce_event(self, event: AbstractEvent) -> None:
+    async def produce_event(self, event: AbstractAnycastEvent) -> None:
         """
         Send an event to the manager(s).
         """
@@ -959,6 +984,14 @@ class AbstractAgent(
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
         pretty_tb = "".join(traceback.format_tb(tb)).strip()
         await self.produce_event(AgentErrorEvent(pretty_message, pretty_tb))
+
+    async def produce_and_broadcast_event(
+        self,
+        anycast_event: AbstractAnycastEvent,
+        broadcast_event: AbstractBroadcastEvent,
+    ) -> None:
+        await self.produce_event(anycast_event)
+        await self.event_producer.broadcast_event(broadcast_event)
 
     async def _report_all_kernel_commit_status_map(self, interval: float) -> None:
         """
@@ -1192,8 +1225,13 @@ class AbstractAgent(
                     if ev.container_id is None:
                         await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
-                            await self.produce_event(
+                            await self.produce_and_broadcast_event(
                                 KernelTerminatedEvent(
+                                    ev.kernel_id,
+                                    ev.session_id,
+                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                                ),
+                                KernelTerminatedBroadcastEvent(
                                     ev.kernel_id,
                                     ev.session_id,
                                     reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
@@ -1282,8 +1320,11 @@ class AbstractAgent(
                     else:
                         await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
-                            await self.produce_event(
+                            await self.produce_and_broadcast_event(
                                 KernelTerminatedEvent(
+                                    ev.kernel_id, ev.session_id, reason=ev.reason
+                                ),
+                                KernelTerminatedBroadcastEvent(
                                     ev.kernel_id, ev.session_id, reason=ev.reason
                                 ),
                             )
@@ -1888,14 +1929,22 @@ class AbstractAgent(
             match result["status"]:
                 case "finished":
                     if result["exitCode"] == 0:
-                        await self.produce_event(
+                        await self.produce_and_broadcast_event(
                             SessionSuccessEvent(
+                                session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
+                            ),
+                            SessionSuccessBroadcastEvent(
                                 session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
                             ),
                         )
                     else:
-                        await self.produce_event(
+                        await self.produce_and_broadcast_event(
                             SessionFailureEvent(
+                                session_id,
+                                KernelLifecycleEventReason.TASK_FAILED,
+                                result["exitCode"] if result["exitCode"] is not None else -1,
+                            ),
+                            SessionFailureBroadcastEvent(
                                 session_id,
                                 KernelLifecycleEventReason.TASK_FAILED,
                                 result["exitCode"] if result["exitCode"] is not None else -1,
@@ -1903,8 +1952,11 @@ class AbstractAgent(
                         )
                     break
                 case "exec-timeout":
-                    await self.produce_event(
+                    await self.produce_and_broadcast_event(
                         SessionFailureEvent(
+                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                        ),
+                        SessionFailureBroadcastEvent(
                             session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
                         ),
                     )
@@ -1949,8 +2001,13 @@ class AbstractAgent(
                             api_version=3,
                         )
                     except KeyError:
-                        await self.produce_event(
+                        await self.produce_and_broadcast_event(
                             KernelTerminatedEvent(
+                                kernel_id,
+                                session_id,
+                                reason=KernelLifecycleEventReason.SELF_TERMINATED,
+                            ),
+                            KernelTerminatedBroadcastEvent(
                                 kernel_id,
                                 session_id,
                                 reason=KernelLifecycleEventReason.SELF_TERMINATED,
@@ -1960,14 +2017,22 @@ class AbstractAgent(
 
                     if result["status"] == "finished":
                         if result["exitCode"] == 0:
-                            await self.produce_event(
+                            await self.produce_and_broadcast_event(
                                 SessionSuccessEvent(
+                                    session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
+                                ),
+                                SessionSuccessBroadcastEvent(
                                     session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
                                 ),
                             )
                         else:
-                            await self.produce_event(
+                            await self.produce_and_broadcast_event(
                                 SessionFailureEvent(
+                                    session_id,
+                                    KernelLifecycleEventReason.TASK_FAILED,
+                                    result["exitCode"],
+                                ),
+                                SessionFailureBroadcastEvent(
                                     session_id,
                                     KernelLifecycleEventReason.TASK_FAILED,
                                     result["exitCode"],
@@ -1975,8 +2040,11 @@ class AbstractAgent(
                             )
                         break
                     if result["status"] == "exec-timeout":
-                        await self.produce_event(
+                        await self.produce_and_broadcast_event(
                             SessionFailureEvent(
+                                session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                            ),
+                            SessionFailureBroadcastEvent(
                                 session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
                             ),
                         )
@@ -1986,8 +2054,11 @@ class AbstractAgent(
                     }
                     mode = "continue"
         except asyncio.TimeoutError:
-            await self.produce_event(
+            await self.produce_and_broadcast_event(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
+                SessionFailureBroadcastEvent(
+                    session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                ),
             )
         except asyncio.CancelledError:
             log.warning("execute_batch(k:{}) cancelled", kernel_id)
@@ -2026,8 +2097,9 @@ class AbstractAgent(
             throttle_sema = asyncio.Semaphore(1)
         async with throttle_sema:
             if not restarting:
-                await self.produce_event(
+                await self.produce_and_broadcast_event(
                     KernelPreparingEvent(kernel_id, session_id),
+                    KernelPreparingBroadcastEvent(kernel_id, session_id),
                 )
 
             # Initialize the creation context
@@ -2084,8 +2156,9 @@ class AbstractAgent(
                 float | None, self.local_config["agent"]["api"]["pull-timeout"]
             )
             if do_pull:
-                await self.produce_event(
+                await self.produce_and_broadcast_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
+                    KernelPullingBroadcastEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
                 try:
                     await self.pull_image(
@@ -2102,8 +2175,9 @@ class AbstractAgent(
                     )
 
             if not restarting:
-                await self.produce_event(
+                await self.produce_and_broadcast_event(
                     KernelCreatingEvent(kernel_id, session_id),
+                    KernelCreatingBroadcastEvent(kernel_id, session_id),
                 )
 
             # Get the resource spec from existing kernel scratches
@@ -2524,8 +2598,17 @@ class AbstractAgent(
                         )
 
                 # Finally we are done.
-                await self.produce_event(
+                await self.produce_and_broadcast_event(
                     KernelStartedEvent(
+                        kernel_id,
+                        session_id,
+                        creation_info={
+                            **kernel_creation_info,
+                            "id": str(KernelId(kernel_id)),
+                            "container_id": str(kernel_obj["container_id"]),
+                        },
+                    ),
+                    KernelStartedBroadcastEvent(
                         kernel_id,
                         session_id,
                         creation_info={
@@ -2557,6 +2640,14 @@ class AbstractAgent(
             # if everything went well then krunner itself will report the status via zmq
             await self.event_producer.produce_event(
                 ModelServiceStatusEvent(
+                    kernel_obj.kernel_id,
+                    kernel_obj.session_id,
+                    model["name"],
+                    ModelServiceStatus.UNHEALTHY,
+                )
+            )
+            await self.event_producer.broadcast_event(
+                ModelServiceStatusBroadcastEvent(
                     kernel_obj.kernel_id,
                     kernel_obj.session_id,
                     model["name"],
@@ -3009,7 +3100,7 @@ async def handle_volume_mount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
-        await context.event_producer.produce_event(
+        await context.event_producer.broadcast_event(
             VolumeMounted(
                 str(context.id),
                 VolumeMountableNodeType.AGENT,
@@ -3036,7 +3127,7 @@ async def handle_volume_mount(
         )
     except VolumeMountFailed as e:
         err_msg = str(e)
-    await context.event_producer.produce_event(
+    await context.event_producer.broadcast_event(
         VolumeMounted(
             str(context.id),
             VolumeMountableNodeType.AGENT,
@@ -3054,7 +3145,7 @@ async def handle_volume_umount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
-        await context.event_producer.produce_event(
+        await context.event_producer.broadcast_event(
             VolumeUnmounted(
                 str(context.id),
                 VolumeMountableNodeType.AGENT,
@@ -3081,7 +3172,7 @@ async def handle_volume_umount(
         err_msg = str(e)
     if not did_umount:
         log.warning(f"{real_path} does not exist. Skip umount")
-    await context.event_producer.produce_event(
+    await context.event_producer.broadcast_event(
         VolumeUnmounted(
             str(context.id),
             VolumeMountableNodeType.AGENT,

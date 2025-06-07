@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 
-from ai.backend.common.events.agent import (
+from ai.backend.common.events.dispatcher import (
+    CoalescingOptions,
+    EventDispatcher,
+)
+from ai.backend.common.events.event_types.agent import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
@@ -8,25 +12,20 @@ from ai.backend.common.events.agent import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.bgtask import (
+from ai.backend.common.events.event_types.bgtask import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
 )
-from ai.backend.common.events.dispatcher import (
-    CoalescingOptions,
-    EventDispatcher,
-)
-from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.idle import DoIdleCheckEvent
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.idle import DoIdleCheckEvent
+from ai.backend.common.events.event_types.image import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
@@ -37,17 +36,17 @@ from ai.backend.common.events.kernel import (
     KernelTerminatedEvent,
     KernelTerminatingEvent,
 )
-from ai.backend.common.events.model_serving import (
+from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusEvent,
     RouteCreatedEvent,
 )
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     DoUpdateSessionStatusEvent,
     ExecutionCancelledEvent,
@@ -65,10 +64,11 @@ from ai.backend.common.events.session import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
+from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler

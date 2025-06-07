@@ -7,7 +7,7 @@ from typing import AsyncIterator, Optional
 
 from aiohttp import web
 
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )

@@ -4,7 +4,7 @@ from typing import Any, Optional
 import sqlalchemy as sa
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.events.model_serving import (
+from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusEvent,
     RouteCreatedEvent,
 )

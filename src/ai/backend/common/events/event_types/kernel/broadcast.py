@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, override
 
-from ai.backend.common.events.types import AbstractSubscribeEvent, EventDomain
+from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import KernelId, SessionId
 
@@ -10,7 +10,7 @@ from .types import KernelLifecycleEventReason
 
 
 @dataclass
-class BaseKernelEvent(AbstractSubscribeEvent):
+class BaseKernelEvent(AbstractBroadcastEvent):
     kernel_id: KernelId
 
     @classmethod
@@ -153,3 +153,17 @@ class KernelTerminationEvent(BaseKernelEvent):
     @override
     def user_event(self) -> Optional[UserEvent]:
         return None
+
+
+class KernelTerminatingEvent(KernelTerminationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_terminating"
+
+
+class KernelTerminatedEvent(KernelTerminationEvent):
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_terminated"

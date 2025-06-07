@@ -6,10 +6,10 @@ from .user_event.user_event import UserEvent
 
 __all__ = (
     "EventDomain",
-    "EventProcessingMode",
+    "DeliveryPattern",
     "AbstractEvent",
-    "AbstractConsumeEvent",
-    "AbstractSubscribeEvent",
+    "AbstractAnycastEvent",
+    "AbstractBroadcastEvent",
 )
 
 
@@ -29,17 +29,17 @@ class EventDomain(enum.StrEnum):
     WORKFLOW = "workflow"
 
 
-class EventProcessingMode(enum.StrEnum):
-    CONSUME = "consume"
-    SUBSCRIBE = "subscribe"
+class DeliveryPattern(enum.StrEnum):
+    BROADCAST = "broadcast"
+    ANYCAST = "anycast"
 
 
 class AbstractEvent(ABC):
     @classmethod
     @abstractmethod
-    def mode(cls) -> EventProcessingMode:
+    def delivery_pattern(cls) -> DeliveryPattern:
         """
-        Return the processing mode of the event.
+        Return the delivery pattern of the event.
         """
         raise NotImplementedError
 
@@ -91,23 +91,23 @@ class AbstractEvent(ABC):
         raise NotImplementedError
 
 
-class AbstractConsumeEvent(AbstractEvent):
+class AbstractAnycastEvent(AbstractEvent):
     """
-    An event that should be consumed.
-    """
-
-    @classmethod
-    @override
-    def mode(cls) -> EventProcessingMode:
-        return EventProcessingMode.CONSUME
-
-
-class AbstractSubscribeEvent(AbstractEvent):
-    """
-    An event that should be subscribed.
+    An event that should be sent to a single recipient.
     """
 
     @classmethod
     @override
-    def mode(cls) -> EventProcessingMode:
-        return EventProcessingMode.SUBSCRIBE
+    def delivery_pattern(cls) -> DeliveryPattern:
+        return DeliveryPattern.ANYCAST
+
+
+class AbstractBroadcastEvent(AbstractEvent):
+    """
+    An event that should be broadcasted to all subscribers.
+    """
+
+    @classmethod
+    @override
+    def delivery_pattern(cls) -> DeliveryPattern:
+        return DeliveryPattern.BROADCAST

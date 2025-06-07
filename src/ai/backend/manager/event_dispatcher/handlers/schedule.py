@@ -1,13 +1,13 @@
 import logging
 
 from ai.backend.common.events.agent import AgentStartedEvent
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
     SessionEnqueuedEvent,
     SessionTerminatedEvent,
