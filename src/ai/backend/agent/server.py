@@ -30,7 +30,6 @@ from typing import (
     Optional,
     Sequence,
     Set,
-    Tuple,
     cast,
 )
 from uuid import UUID
@@ -1074,7 +1073,7 @@ class AgentRPCServer(aobject):
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Tuple[Any, ...],
+    _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: agent worker-{pidx}")
     log_endpoint = _args[1]
@@ -1117,7 +1116,7 @@ def build_root_server() -> web.Application:
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Tuple[Any, ...],
+    _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     local_config = _args[0]
 

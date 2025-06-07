@@ -5,6 +5,7 @@ import logging
 import multiprocessing
 import os
 import pwd
+import signal
 import ssl
 import sys
 from contextlib import asynccontextmanager as actxmgr
@@ -17,6 +18,7 @@ import aiotools
 import click
 from aiohttp import web
 from setproctitle import setproctitle
+from typing_extensions import AsyncGenerator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.config import (
@@ -73,7 +75,7 @@ async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
     _args: Sequence[Any],
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
     try:
         asyncio.get_child_watcher()

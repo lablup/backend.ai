@@ -5,7 +5,7 @@ import signal
 import ssl
 import subprocess
 import sys
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
@@ -17,6 +17,7 @@ import click
 import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
+from typing_extensions import AsyncGenerator
 
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
@@ -260,7 +261,7 @@ async def watcher_server(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
     args: Sequence[Any],
-) -> AsyncIterator[Any]:
+) -> AsyncGenerator[Any, signal.Signals]:
     global shutdown_enabled
 
     app = web.Application()
