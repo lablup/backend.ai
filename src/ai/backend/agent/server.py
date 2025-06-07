@@ -60,15 +60,18 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.image import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
-    KernelLifecycleEventReason,
+from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatedEvent,
 )
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelTerminatedEvent as KernelTerminatedBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
@@ -572,12 +575,17 @@ class AgentRPCServer(aobject):
         for kid, sid in kernel_session_ids:
             if kid not in self.agent.kernel_registry:
                 # produce KernelTerminatedEvent
-                await self.agent.produce_event(
+                await self.agent.produce_and_broadcast_event(
                     KernelTerminatedEvent(
                         kid,
                         sid,
                         reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
-                    )
+                    ),
+                    KernelTerminatedBroadcastEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    ),
                 )
 
         kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}

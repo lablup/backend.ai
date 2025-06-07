@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import QuotaScopeID, VolumeMountableNodeType
 
 
-class BaseVolumeEvent(AbstractEvent):
+class BaseVolumeEvent(AbstractBroadcastEvent):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:

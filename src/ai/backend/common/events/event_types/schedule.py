@@ -1,10 +1,10 @@
 from typing import Optional, Self, override
 
-from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
 
-class BaseScheduleEvent(AbstractEvent):
+class BaseScheduleEvent(AbstractAnycastEvent):
     @override
     def serialize(self) -> tuple:
         return tuple()

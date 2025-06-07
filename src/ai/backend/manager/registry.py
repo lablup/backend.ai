@@ -59,35 +59,31 @@ from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events.agent import (
+from ai.backend.common.events.event_types.agent import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.image import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelHeartbeatEvent,
-    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
-    RouteCreatedEvent,
-)
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
@@ -99,9 +95,25 @@ from ai.backend.common.events.session import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledEvent as SessionCancelledBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionEnqueuedEvent as SessionEnqueuedBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionStartedEvent as SessionStartedBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionTerminatingEvent as SessionTerminatingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
+)
+from ai.backend.common.events.model_serving import (
+    ModelServiceStatusEvent,
+    RouteCreatedEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -1365,6 +1377,9 @@ class AgentRegistry:
         await self.event_producer.produce_event(
             SessionEnqueuedEvent(session_id, session_creation_id),
         )
+        await self.event_producer.broadcast_event(
+            SessionEnqueuedBroadcastEvent(session_id, session_creation_id),
+        )
         return session_id
 
     async def _check_and_pull_in_one_agent(
@@ -2391,6 +2406,9 @@ class AgentRegistry:
                         await self.event_producer.produce_event(
                             SessionTerminatingEvent(session_id, reason),
                         )
+                        await self.event_producer.broadcast_event(
+                            SessionTerminatingBroadcastEvent(session_id, reason),
+                        )
                 case SessionStatus.TERMINATED:
                     raise GenericForbidden(
                         "Cannot destroy sessions that has already been already terminated"
@@ -2408,6 +2426,9 @@ class AgentRegistry:
                     )
                     await self.event_producer.produce_event(
                         SessionTerminatingEvent(session_id, reason),
+                    )
+                    await self.event_producer.broadcast_event(
+                        SessionTerminatingBroadcastEvent(session_id, reason),
                     )
 
             kernel_list = target_session.kernels
@@ -2448,6 +2469,13 @@ class AgentRegistry:
                                 )
                                 await self.event_producer.produce_event(
                                     SessionCancelledEvent(
+                                        session_id,
+                                        target_session.creation_id,
+                                        reason,
+                                    ),
+                                )
+                                await self.event_producer.broadcast_event(
+                                    SessionCancelledBroadcastEvent(
                                         session_id,
                                         target_session.creation_id,
                                         reason,
@@ -2752,6 +2780,9 @@ class AgentRegistry:
         #       will be executed again after restart.
         await self.event_producer.produce_event(
             SessionStartedEvent(session.id, session.creation_id),
+        )
+        await self.event_producer.broadcast_event(
+            SessionStartedBroadcastEvent(session.id, session.creation_id),
         )
 
         if session.session_type == SessionTypes.BATCH:

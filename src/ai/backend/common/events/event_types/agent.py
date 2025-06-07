@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Self, override
 
 from ai.backend.common.events.types import (
-    AbstractEvent,
+    AbstractAnycastEvent,
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -10,7 +10,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging.types import LogLevel
 
 
-class BaseAgentEvent(AbstractEvent):
+class BaseAgentEvent(AbstractAnycastEvent):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:

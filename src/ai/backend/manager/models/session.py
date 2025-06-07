@@ -1571,6 +1571,9 @@ class SessionLifecycleManager:
                 await self.event_producer.produce_event(
                     SessionStartedEvent(session_row.id, session_row.creation_id),
                 )
+                await self.event_producer.broadcast_event(
+                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
                     (
@@ -1583,6 +1586,9 @@ class SessionLifecycleManager:
                     await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
                 await self.event_producer.produce_event(
+                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                )
+                await self.event_producer.broadcast_event(
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
                 )
             case _:

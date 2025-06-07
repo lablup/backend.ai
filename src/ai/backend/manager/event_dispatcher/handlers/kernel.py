@@ -4,7 +4,7 @@ from io import BytesIO
 import sqlalchemy as sa
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,

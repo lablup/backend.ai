@@ -1,12 +1,15 @@
 import enum
 from abc import ABC, abstractmethod
-from typing import Optional, Self
+from typing import Optional, Self, override
 
 from .user_event.user_event import UserEvent
 
 __all__ = (
     "EventDomain",
+    "DeliveryPattern",
     "AbstractEvent",
+    "AbstractAnycastEvent",
+    "AbstractBroadcastEvent",
 )
 
 
@@ -26,7 +29,20 @@ class EventDomain(enum.StrEnum):
     WORKFLOW = "workflow"
 
 
+class DeliveryPattern(enum.StrEnum):
+    BROADCAST = "broadcast"
+    ANYCAST = "anycast"
+
+
 class AbstractEvent(ABC):
+    @classmethod
+    @abstractmethod
+    def delivery_pattern(cls) -> DeliveryPattern:
+        """
+        Return the delivery pattern of the event.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def serialize(self) -> tuple[bytes, ...]:
         """
@@ -73,3 +89,25 @@ class AbstractEvent(ABC):
         If user event is not supported, return None.
         """
         raise NotImplementedError
+
+
+class AbstractAnycastEvent(AbstractEvent):
+    """
+    An event that should be sent to a single recipient.
+    """
+
+    @classmethod
+    @override
+    def delivery_pattern(cls) -> DeliveryPattern:
+        return DeliveryPattern.ANYCAST
+
+
+class AbstractBroadcastEvent(AbstractEvent):
+    """
+    An event that should be broadcasted to all subscribers.
+    """
+
+    @classmethod
+    @override
+    def delivery_pattern(cls) -> DeliveryPattern:
+        return DeliveryPattern.BROADCAST

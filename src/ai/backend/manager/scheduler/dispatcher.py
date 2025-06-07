@@ -43,24 +43,33 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
+from ai.backend.common.events.event_types.model_serving.anycast import (
     RouteCreatedEvent,
 )
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
     SessionCancelledEvent,
     SessionCheckingPrecondEvent,
     SessionPreparingEvent,
     SessionScheduledEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledEvent as SessionCancelledBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionPreparingEvent as SessionPreparingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionScheduledEvent as SessionScheduledBroadcastEvent,
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import PASSED, HookResult
@@ -682,6 +691,13 @@ class SchedulerDispatcher(aobject):
                                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                                 )
                             )
+                            await self.event_producer.broadcast_event(
+                                SessionCancelledBroadcastEvent(
+                                    pending_sess.id,
+                                    pending_sess.creation_id,
+                                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                                ),
+                            )
 
                 await execute_with_retry(_cancel_failed_system_session)
                 # Predicate failures are *NOT* permanent errors.
@@ -1026,6 +1042,9 @@ class SchedulerDispatcher(aobject):
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
+        await self.registry.event_producer.broadcast_event(
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
+        )
 
     async def _schedule_multi_node_session(
         self,
@@ -1262,6 +1281,9 @@ class SchedulerDispatcher(aobject):
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
+        await self.registry.event_producer.broadcast_event(
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
+        )
 
     async def check_precond(
         self,
@@ -1425,6 +1447,12 @@ class SchedulerDispatcher(aobject):
                     for scheduled_session in scheduled_sessions:
                         await self.registry.event_producer.produce_event(
                             SessionPreparingEvent(
+                                scheduled_session.id,
+                                scheduled_session.creation_id,
+                            ),
+                        )
+                        await self.registry.event_producer.broadcast_event(
+                            SessionPreparingBroadcastEvent(
                                 scheduled_session.id,
                                 scheduled_session.creation_id,
                             ),
@@ -1898,6 +1926,13 @@ class SchedulerDispatcher(aobject):
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
+                await self.event_producer.broadcast_event(
+                    SessionCancelledBroadcastEvent(
+                        session.id,
+                        session.creation_id,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                    ),
+                )
                 async with self.db.begin_readonly_session() as db_sess:
                     query = sa.select(KernelRow.id, KernelRow.container_id).where(
                         KernelRow.session_id == session.id
@@ -1937,6 +1972,13 @@ class SchedulerDispatcher(aobject):
         for item in cancelled_sessions:
             await self.event_producer.produce_event(
                 SessionCancelledEvent(
+                    item.id,
+                    item.creation_id,
+                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                ),
+            )
+            await self.event_producer.broadcast_event(
+                SessionCancelledBroadcastEvent(
                     item.id,
                     item.creation_id,
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,

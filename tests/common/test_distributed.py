@@ -25,7 +25,7 @@ from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
 from ai.backend.common.events.types import (
-    AbstractEvent,
+    AbstractAnycastEvent,
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -69,7 +69,7 @@ def dslice(start: Decimal, stop: Decimal, num: int):
 
 
 @dataclass
-class NoopEvent(AbstractEvent):
+class NoopAnycastEvent(AbstractAnycastEvent):
     test_case_ns: str
 
     def serialize(self) -> tuple:
@@ -105,7 +105,7 @@ async def run_timer(
     test_case_ns: str,
     interval: int | float,
 ) -> None:
-    async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
+    async def _tick(context: Any, source: AgentId, event: NoopAnycastEvent) -> None:
         print("_tick")
         event_records.append(time.monotonic())
 
@@ -134,13 +134,13 @@ async def run_timer(
         redis_mq,
         source=AgentId(node_id),
     )
-    event_dispatcher.consume(NoopEvent, None, _tick)
+    event_dispatcher.consume(NoopAnycastEvent, None, _tick)
     await event_dispatcher.start()
 
     timer = GlobalTimer(
         lock_factory(),
         event_producer,
-        lambda: NoopEvent(test_case_ns),
+        lambda: NoopAnycastEvent(test_case_ns),
         interval=interval,
     )
     try:
@@ -162,7 +162,7 @@ def etcd_timer_node_process(
     asyncio.set_event_loop(asyncio.new_event_loop())
 
     async def _main() -> None:
-        async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
+        async def _tick(context: Any, source: AgentId, event: NoopAnycastEvent) -> None:
             print("_tick")
             queue.put(time.monotonic())
 
@@ -191,7 +191,7 @@ def etcd_timer_node_process(
             redis_mq,
             source=AgentId(node_id),
         )
-        event_dispatcher.consume(NoopEvent, None, _tick)
+        event_dispatcher.consume(NoopAnycastEvent, None, _tick)
         await event_dispatcher.start()
 
         etcd_lock: AbstractDistributedLock
@@ -211,7 +211,7 @@ def etcd_timer_node_process(
         timer = GlobalTimer(
             etcd_lock,
             event_producer,
-            lambda: NoopEvent(timer_ctx.test_case_ns),
+            lambda: NoopAnycastEvent(timer_ctx.test_case_ns),
             timer_ctx.interval,
         )
         try:
@@ -246,7 +246,7 @@ class TimerNode(threading.Thread):
         self.loop = asyncio.get_running_loop()
         self.stop_event = asyncio.Event()
 
-        async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
+        async def _tick(context: Any, source: AgentId, event: NoopAnycastEvent) -> None:
             print("_tick")
             self.event_records.append(time.monotonic())
 
@@ -274,13 +274,13 @@ class TimerNode(threading.Thread):
             redis_mq,
             source=AgentId(node_id),
         )
-        event_dispatcher.consume(NoopEvent, None, _tick)
+        event_dispatcher.consume(NoopAnycastEvent, None, _tick)
         await event_dispatcher.start()
 
         timer = GlobalTimer(
             self.lock_factory(),
             event_producer,
-            lambda: NoopEvent(self.test_case_ns),
+            lambda: NoopAnycastEvent(self.test_case_ns),
             interval=self.interval,
         )
         try:
@@ -460,7 +460,7 @@ async def test_global_timer_join_leave(
 ) -> None:
     event_records = []
 
-    async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
+    async def _tick(context: Any, source: AgentId, event: NoopAnycastEvent) -> None:
         print("_tick")
         event_records.append(time.monotonic())
 
@@ -488,7 +488,7 @@ async def test_global_timer_join_leave(
         redis_mq,
         source=AgentId(node_id),
     )
-    event_dispatcher.consume(NoopEvent, None, _tick)
+    event_dispatcher.consume(NoopAnycastEvent, None, _tick)
     await event_dispatcher.start()
 
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
@@ -497,7 +497,7 @@ async def test_global_timer_join_leave(
         timer = GlobalTimer(
             FileLock(lock_path, timeout=0, debug=True),
             event_producer,
-            lambda: NoopEvent(test_case_ns),
+            lambda: NoopAnycastEvent(test_case_ns),
             0.01,
         )
         await timer.join()

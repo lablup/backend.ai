@@ -54,12 +54,12 @@ from ai.backend.common.events.dispatcher import (
     EventHandler,
     EventProducer,
 )
-from ai.backend.common.events.idle import (
+from ai.backend.common.events.event_types.idle import (
     DoIdleCheckEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    KernelLifecycleEventReason,
 )
 from ai.backend.common.types import (
     AccessKey,
