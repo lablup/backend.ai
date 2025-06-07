@@ -25,6 +25,7 @@ import ai.backend.manager.models.agent  # noqa
 import ai.backend.manager.models.kernel  # noqa
 import ai.backend.manager.models.keypair  # noqa
 import ai.backend.manager.models.vfolder  # noqa
+import ai.backend.manager.models.event_log  # noqa
 
 # Import the shared metadata and all models.
 # (We need to explicilty import models because model modules

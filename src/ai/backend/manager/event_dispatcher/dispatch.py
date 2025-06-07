@@ -20,6 +20,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.events.idle import DoIdleCheckEvent
 from ai.backend.common.events.image import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
@@ -49,6 +50,10 @@ from ai.backend.common.events.schedule import (
 from ai.backend.common.events.session import (
     DoTerminateSessionEvent,
     DoUpdateSessionStatusEvent,
+    ExecutionCancelledEvent,
+    ExecutionFinishedEvent,
+    ExecutionStartedEvent,
+    ExecutionTimeoutEvent,
     SessionCancelledEvent,
     SessionCheckingPrecondEvent,
     SessionEnqueuedEvent,
@@ -67,11 +72,13 @@ from ai.backend.common.events.vfolder import (
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
+from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 
 from ..models.utils import ExtendedAsyncSAEngine
 from .handlers.agent import AgentEventHandler
+from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.model_serving import ModelServingEventHandler
@@ -86,6 +93,7 @@ class DispatcherArgs:
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
+    idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
 
 
@@ -99,21 +107,29 @@ class Dispatchers:
     _model_serving_event_handler: ModelServingEventHandler
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
+    _idle_check_event_handler: IdleCheckEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
         Initialize the Dispatchers with the given arguments.
         """
         self._db = args.db
-        self._event_dispatcher_plugin_ctx = args.event_dispatcher_plugin_ctx
         self._propagator_handler = PropagatorEventHandler(args.event_hub)
-        self._agent_event_handler = AgentEventHandler(args.agent_registry, args.db)
+        self._agent_event_handler = AgentEventHandler(
+            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx
+        )
         self._image_event_handler = ImageEventHandler(args.agent_registry, args.db)
         self._kernel_event_handler = KernelEventHandler(args.agent_registry, args.db)
         self._schedule_event_handler = ScheduleEventHandler(args.scheduler_dispatcher)
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
-        self._session_event_handler = SessionEventHandler(args.agent_registry, args.db)
+        self._session_event_handler = SessionEventHandler(
+            args.agent_registry,
+            args.db,
+            args.event_dispatcher_plugin_ctx,
+            args.idle_checker_host,
+        )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
+        self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -121,13 +137,13 @@ class Dispatchers:
         """
         self._dispatch_bgtask_events(event_dispatcher)
         self._dispatch_agent_events(event_dispatcher)
-        self._dispatch_error_monitor_events(event_dispatcher)
         self._dispatch_image_events(event_dispatcher)
         self._dispatch_kernel_events(event_dispatcher)
         self._dispatch_schedule_events(event_dispatcher)
         self._dispatch_model_serving_events(event_dispatcher)
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
+        self._dispatch_idle_check_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -171,15 +187,10 @@ class Dispatchers:
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler.handle_agent_images_remove
         )
-
-    def _dispatch_error_monitor_events(self, event_dispatcher: EventDispatcher) -> None:
-        evd = event_dispatcher.with_reporters([
-            EventLogger(self._db),
-        ])
         evd.consume(
             AgentErrorEvent,
             None,
-            self._event_dispatcher_plugin_ctx.handle_event,
+            self._agent_event_handler.handle_agent_error,
             name="agent.error",
         )
 
@@ -362,6 +373,30 @@ class Dispatchers:
         )
         evd.consume(SessionSuccessEvent, None, self._session_event_handler.handle_batch_result)
         evd.consume(SessionFailureEvent, None, self._session_event_handler.handle_batch_result)
+        evd.consume(
+            ExecutionStartedEvent,
+            None,
+            self._session_event_handler.handle_execution_started,
+            name="session_execution.started",
+        )
+        evd.consume(
+            ExecutionFinishedEvent,
+            None,
+            self._session_event_handler.handle_execution_finished,
+            name="session_execution.finished",
+        )
+        evd.consume(
+            ExecutionTimeoutEvent,
+            None,
+            self._session_event_handler.handle_execution_timeout,
+            name="session_execution.timeout",
+        )
+        evd.consume(
+            ExecutionCancelledEvent,
+            None,
+            self._session_event_handler.handle_execution_cancelled,
+            name="session_execution.cancelled",
+        )
 
     def _dispatch_vfolder_events(self, event_dispatcher: EventDispatcher) -> None:
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
@@ -374,4 +409,15 @@ class Dispatchers:
             VFolderDeletionFailureEvent,
             None,
             self._vfolder_event_handler.handle_vfolder_deletion_failure,
+        )
+
+    def _dispatch_idle_check_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            DoIdleCheckEvent,
+            None,
+            self._idle_check_event_handler.handle_do_idle_check,
+            name="idle_check",
         )

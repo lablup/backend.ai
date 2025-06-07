@@ -735,6 +735,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
+            root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
         )
     )
@@ -784,7 +785,6 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.idle_checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.config_provider,
-        root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -1138,10 +1138,10 @@ def build_root_app(
             monitoring_ctx,
             network_plugin_ctx,
             event_dispatcher_plugin_ctx,
+            idle_checker_ctx,
             agent_registry_ctx,
             sched_dispatcher_ctx,
             event_dispatcher_ctx,
-            idle_checker_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,

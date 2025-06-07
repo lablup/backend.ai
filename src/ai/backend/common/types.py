@@ -1607,3 +1607,14 @@ class PurgeImageResult(TypedDict):
 class ServiceDiscoveryType(enum.StrEnum):
     ETCD = "etcd"
     REDIS = "redis"
+
+
+class SessionExecutionStatus(enum.StrEnum):
+    """
+    Status of the session execution.
+    """
+
+    STARTED = "started"
+    FINISHED = "finished"
+    CANCELED = "canceled"
+    TIMEOUT = "timeout"
