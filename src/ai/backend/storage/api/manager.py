@@ -50,7 +50,14 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
+from ai.backend.common.types import (
+    AgentId,
+    BinarySize,
+    ItemResult,
+    QuotaConfig,
+    QuotaScopeID,
+    ResultSet,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
@@ -64,7 +71,7 @@ from ..exception import (
     StorageProxyError,
     VFolderNotFoundError,
 )
-from ..types import QuotaConfig, VFolderID
+from ..types import VFolderID
 from ..utils import check_params, log_manager_api_entry
 from ..watcher import ChownTask, MountTask, UmountTask
 from .vfolder.handler import VFolderHandler
