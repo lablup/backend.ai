@@ -43,7 +43,7 @@ class ManagerConfigProvider:
         legacy_etcd_config_loader: LegacyEtcdLoader,
     ) -> Self:
         raw_config = await loader.load()
-        config = ManagerUnifiedConfig.model_validate(raw_config)
+        config = ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
         return cls(loader, config, etcd_watcher, legacy_etcd_config_loader)
 
     @property
@@ -60,7 +60,7 @@ class ManagerConfigProvider:
     async def _run_watcher(self) -> None:
         async for event in self._etcd_watcher.watch():
             raw_config = await self._loader.load()
-            self._config = ManagerUnifiedConfig.model_validate(raw_config)
+            self._config = ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
             log.debug("config reloaded due to etcd event.")
 
     async def terminate(self) -> None:
