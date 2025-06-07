@@ -151,6 +151,7 @@ from .gql_models.image import (
     AliasImage,
     ClearImageCustomResourceLimit,
     ClearImages,
+    ClearImagesV2,
     DealiasImage,
     ForgetImage,
     ForgetImageById,
@@ -164,6 +165,7 @@ from .gql_models.image import (
     PurgeImageById,
     PurgeImages,
     RescanImages,
+    RescanImagesV2,
     UnloadImage,
     UntagImageFromRegistry,
 )
@@ -357,8 +359,12 @@ class Mutations(graphene.ObjectType):
     delete_keypair = DeleteKeyPair.Field()
 
     # admin only
-    rescan_images = RescanImages.Field()
+    rescan_images = RescanImages.Field(
+        deprecation_reason="Deprecated since 25.10.0. Use `rescan_images_v2` instead."
+    )
     preload_image = PreloadImage.Field()
+    rescan_images_v2 = RescanImagesV2.Field(description="Added in 25.10.0.")
+
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
     clear_image_custom_resource_limit = ClearImageCustomResourceLimit.Field(
@@ -372,7 +378,10 @@ class Mutations(graphene.ObjectType):
     untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
-    clear_images = ClearImages.Field()
+    clear_images = ClearImages.Field(
+        deprecation_reason="Deprecated since 25.10.0. Use `clear_images_v2` instead."
+    )
+    clear_images_v2 = ClearImagesV2.Field(description="Added in 25.10.0.")
     purge_images = PurgeImages.Field(description="Added in 25.4.0")
 
     # super-admin only

@@ -1,3 +1,5 @@
+import uuid
+
 import sqlalchemy as sa
 
 from ai.backend.manager.container_registry import get_container_registry_cls
@@ -62,11 +64,16 @@ class ContainerRegistryService:
                 .where(ImageRow.registry == action.registry)
                 .where(ImageRow.status != ImageStatus.DELETED)
                 .values(status=ImageStatus.DELETED)
+                .returning(ImageRow.id)
             )
             if action.project:
                 update_stmt = update_stmt.where(ImageRow.project == action.project)
 
-            await session.execute(update_stmt)
+            cleared_row_ids: list[uuid.UUID] = (await session.scalars(update_stmt)).all()
+
+            cleared_rows: list[ImageRow] = (
+                await session.scalars(sa.select(ImageRow).where(ImageRow.id.in_(cleared_row_ids)))
+            ).all()
 
             get_registry_row_stmt = sa.select(ContainerRegistryRow).where(
                 ContainerRegistryRow.registry_name == action.registry,
@@ -78,7 +85,10 @@ class ContainerRegistryService:
 
             registry_row: ContainerRegistryRow = await session.scalar(get_registry_row_stmt)
 
-        return ClearImagesActionResult(registry=registry_row.to_dataclass())
+        return ClearImagesActionResult(
+            registry=registry_row.to_dataclass(),
+            cleared_images=[row.to_dataclass() for row in cleared_rows],
+        )
 
     async def load_container_registries(
         self, action: LoadContainerRegistriesAction
