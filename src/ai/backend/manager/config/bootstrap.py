@@ -103,5 +103,5 @@ class BootstrapConfig(BaseModel):
         ])
         raw_cfg = await cfg_loader.load()
 
-        cfg = cls.model_validate(raw_cfg)
+        cfg = cls.model_validate(raw_cfg, by_name=True)
         return cfg
