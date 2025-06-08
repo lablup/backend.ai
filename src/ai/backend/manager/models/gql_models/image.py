@@ -882,7 +882,6 @@ class UntagImageFromRegistry(graphene.Mutation):
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context
-
         result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
             UntagImageFromRegistryAction(
                 user_id=ctx.user["uuid"],
