@@ -881,19 +881,18 @@ class UntagImageFromRegistry(graphene.Mutation):
 
         log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
 
-        async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ImageNotFound
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
+        result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+            UntagImageFromRegistryAction(
+                user_id=ctx.user["uuid"],
+                client_role=ctx.user["role"],
+                image_id=image_uuid,
+            )
+        )
 
-            await image_row.untag_image_from_registry(ctx.db, session)
-
-        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
+        return UntagImageFromRegistry(
+            ok=True, msg="", image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image))
+        )
 
 
 class PreloadImage(graphene.Mutation):
