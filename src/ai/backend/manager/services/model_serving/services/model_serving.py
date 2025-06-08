@@ -120,6 +120,7 @@ from ai.backend.manager.services.model_serving.types import (
     CompactServiceInfo,
     EndpointData,
     ErrorInfo,
+    ModelServiceDefinition,
     MutationResult,
     RouteInfo,
     ServiceInfo,
@@ -192,10 +193,10 @@ class ModelServingService:
 
             variant = action.creator.runtime_variant
             if variant in service_definition:
-                variant_def = service_definition[variant]
-                action.creator.config.resources = variant_def["resource_slots"]
-                action.creator.image = variant_def["environment"]["image"]
-                action.creator.architecture = variant_def["environment"]["architecture"]
+                variant_def = ModelServiceDefinition.model_validate(service_definition[variant])
+                action.creator.config.resources = variant_def.resource_slots
+                action.creator.image = variant_def.environment.image
+                action.creator.architecture = variant_def.environment.architecture
 
             image_row = await ImageRow.resolve(
                 db_sess,

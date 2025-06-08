@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any, Mapping, Optional, Self, Sequence, override
 
 import yarl
-from pydantic import AnyUrl, HttpUrl
+from pydantic import AnyUrl, BaseModel, HttpUrl
 
 from ai.backend.common.types import (
     AccessKey,
@@ -429,3 +429,13 @@ class EndpointAutoScalingRuleModifier(PartialModifier):
         self.min_replicas.update_dict(to_update, "min_replicas")
         self.max_replicas.update_dict(to_update, "max_replicas")
         return to_update
+
+
+class ImageEnvironment(BaseModel):
+    image: str
+    architecture: str
+
+
+class ModelServiceDefinition(BaseModel):
+    environment: ImageEnvironment
+    resource_slots: dict[str, Any]
