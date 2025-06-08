@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any, Mapping, Optional, Self, Sequence, override
 
 import yarl
-from pydantic import AnyUrl, BaseModel, HttpUrl
+from pydantic import AnyUrl, BaseModel, Field, HttpUrl
 
 from ai.backend.common.types import (
     AccessKey,
@@ -437,5 +437,24 @@ class ImageEnvironment(BaseModel):
 
 
 class ModelServiceDefinition(BaseModel):
-    environment: ImageEnvironment
-    resource_slots: dict[str, Any]
+    environment: Optional[ImageEnvironment] = Field(
+        default=None,
+        description="""
+        The environment in which the model service will run.
+        """,
+        examples=[
+            {
+                "image": "myregistry/myimage:latest",
+                "architecture": "x86_64",
+            }
+        ],
+    )
+    resource_slots: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="""
+        The resource slots used by the model service session.
+        """,
+        examples=[
+            {"cpu": 1, "mem": "2gb"},
+        ],
+    )

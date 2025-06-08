@@ -188,15 +188,21 @@ class ModelServingService:
         async with self._db.begin_readonly_session() as db_sess:
             model_vfolder_row = await VFolderRow.get(db_sess, service_prepare_ctx.model_id)
             chunks = await self._fetch_file("service-definition.toml", model_vfolder_row)
-            raw_service_definition = chunks.decode("utf-8")
-            service_definition = tomli.loads(raw_service_definition)
 
-            variant = action.creator.runtime_variant
-            if variant in service_definition:
-                variant_def = ModelServiceDefinition.model_validate(service_definition[variant])
-                action.creator.config.resources = variant_def.resource_slots
-                action.creator.image = variant_def.environment.image
-                action.creator.architecture = variant_def.environment.architecture
+            if chunks:
+                raw_service_definition = chunks.decode("utf-8")
+                service_definition = tomli.loads(raw_service_definition)
+
+                definition = action.creator.runtime_variant
+                if definition in service_definition:
+                    variant_def = ModelServiceDefinition.model_validate(
+                        service_definition[definition]
+                    )
+                    if variant_def.resource_slots:
+                        action.creator.config.resources = variant_def.resource_slots
+                    if variant_def.environment:
+                        action.creator.image = variant_def.environment.image
+                        action.creator.architecture = variant_def.environment.architecture
 
             image_row = await ImageRow.resolve(
                 db_sess,
