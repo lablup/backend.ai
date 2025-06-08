@@ -135,7 +135,7 @@ class ServiceConfigConnection(Connection):
         description = "Added in 25.8.0."
 
 
-class ModifyServiceConfigNodeInput(graphene.InputObjectType):
+class ModifyServiceConfigNodeKey(graphene.InputObjectType):
     """
     Input data for modifying configuration.
     Added in 25.8.0.
@@ -176,7 +176,7 @@ class ModifyServiceConfigNode(graphene.Mutation):
     Output = ModifyServiceConfigNodePayload
 
     class Arguments:
-        input = ModifyServiceConfigNodeInput(required=True, description="Added in 25.8.0.")
+        key = ModifyServiceConfigNodeKey(required=True, description="Added in 25.8.0.")
 
     @classmethod
     def _get_etcd_prefix_key(cls, service: str) -> str:
@@ -187,7 +187,7 @@ class ModifyServiceConfigNode(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        input: ModifyServiceConfigNodeInput,
+        key: ModifyServiceConfigNodeKey,
     ) -> ModifyServiceConfigNodePayload:
         ctx: GraphQueryContext = info.context
 
@@ -197,14 +197,14 @@ class ModifyServiceConfigNode(graphene.Mutation):
         async with EtcdLock(ETCD_LOCK_KEY, ctx.etcd, timeout=20, lifetime=20) as _:
             merged_raw_unified_config = deep_merge(
                 ctx.config_provider.config.model_dump(by_alias=True),
-                input.configuration,
+                key.configuration,
             )
 
             new_config = ManagerUnifiedConfig.model_validate(merged_raw_unified_config)
             ctx.config_provider.reload(new_config)
 
-            await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(input.service), input.configuration)
+            await ctx.etcd.put_prefix(cls._get_etcd_prefix_key(key.service), key.configuration)
 
         return ModifyServiceConfigNodePayload(
-            service_config=ServiceConfigNode.load(info, input.service),
+            service_config=ServiceConfigNode.load(info, key.service),
         )

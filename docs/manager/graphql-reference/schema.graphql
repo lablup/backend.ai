@@ -2304,7 +2304,7 @@ type Mutations {
   """Updates configuration for a given service. Added in 25.8.0."""
   modify_service_config(
     """Added in 25.8.0."""
-    input: ModifyServiceConfigNodeInput!
+    key: ModifyServiceConfigNodeKey!
   ): ModifyServiceConfigNodePayload
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
@@ -3153,7 +3153,7 @@ type ModifyServiceConfigNodePayload {
 Input data for modifying configuration.
 Added in 25.8.0.
 """
-input ModifyServiceConfigNodeInput {
+input ModifyServiceConfigNodeKey {
   """
   Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
   """
