@@ -2875,7 +2875,9 @@ type PurgeImageById {
 
 """Added in 25.10.0."""
 input PurgeImageOptions {
-  """Only available in the HarborV2 registry."""
+  """
+  Untag the deleted image from the registry. Only available in the HarborV2 registry.
+  """
   remove_from_registry: Boolean = false
 }
 
