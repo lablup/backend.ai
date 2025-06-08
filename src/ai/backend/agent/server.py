@@ -575,7 +575,7 @@ class AgentRPCServer(aobject):
         for kid, sid in kernel_session_ids:
             if kid not in self.agent.kernel_registry:
                 # produce KernelTerminatedEvent
-                await self.agent.produce_and_broadcast_event(
+                await self.agent.anycast_and_broadcast_event(
                     KernelTerminatedEvent(
                         kid,
                         sid,

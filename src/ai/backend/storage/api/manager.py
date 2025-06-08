@@ -424,7 +424,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 msg = str(e) if e.strerror is None else e.strerror
                 msg = f"{msg} (errno:{e.errno})"
                 log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
-                await ctx.event_producer.produce_event(
+                await ctx.event_producer.anycast_event(
                     VFolderDeletionFailureEvent(
                         vfid,
                         msg,
@@ -432,7 +432,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 )
             except Exception as e:
                 log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
-                await ctx.event_producer.produce_event(
+                await ctx.event_producer.anycast_event(
                     VFolderDeletionFailureEvent(
                         vfid,
                         str(e),
@@ -442,7 +442,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
             else:
                 log.info(f"VFolder deletion task successed. (vfid:{vfid})")
-                await ctx.event_producer.produce_event(VFolderDeletionSuccessEvent(vfid))
+                await ctx.event_producer.anycast_event(VFolderDeletionSuccessEvent(vfid))
 
         try:
             async with ctx.get_volume(params["volume"]) as volume:
@@ -1283,7 +1283,7 @@ async def handle_volume_mount(
         # Produce volume mounted event with error message.
         # And skip chown.
         err_msg = resp.body
-        await context.event_producer.produce_event(
+        await context.event_producer.anycast_event(
             VolumeMounted(
                 str(context.node_id),
                 VolumeMountableNodeType.STORAGE_PROXY,
@@ -1299,7 +1299,7 @@ async def handle_volume_mount(
     resp = await context.watcher.request_task(chown_task)
     if not resp.succeeded:
         err_msg = resp.body
-    await context.event_producer.produce_event(
+    await context.event_producer.anycast_event(
         VolumeMounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
@@ -1334,7 +1334,7 @@ async def handle_volume_umount(
     err_msg = resp.body if not resp.succeeded else None
     if resp.body:
         log.warning(resp.body)
-    await context.event_producer.produce_event(
+    await context.event_producer.anycast_event(
         VolumeUnmounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,

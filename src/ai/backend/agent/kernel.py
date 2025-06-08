@@ -1089,7 +1089,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                                     else ModelServiceStatus.UNHEALTHY
                                 ),
                             )
-                            await self.event_producer.produce_event(event)
+                            await self.event_producer.anycast_event(event)
                         case b"apps-result":
                             await self.service_apps_info_queue.put(msg_data)
                         case b"stdout":

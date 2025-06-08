@@ -53,7 +53,7 @@ class GlobalTimer:
                     async with self._dist_lock:
                         if self._stopped:
                             return
-                        await self._event_producer.produce_event(self._event_factory())
+                        await self._event_producer.anycast_event(self._event_factory())
                         if self._stopped:
                             return
                         await asyncio.sleep(self.interval)

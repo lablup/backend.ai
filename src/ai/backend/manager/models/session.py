@@ -1561,14 +1561,14 @@ class SessionLifecycleManager:
     ) -> None:
         match session_row.status:
             case SessionStatus.PREPARED:
-                await self.event_producer.produce_event(DoStartSessionEvent())
+                await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
                 log.debug(
                     "Producing SessionStartedEvent({}, {})",
                     session_row.id,
                     session_row.creation_id,
                 )
-                await self.event_producer.produce_event(
+                await self.event_producer.anycast_event(
                     SessionStartedEvent(session_row.id, session_row.creation_id),
                 )
                 await self.event_producer.broadcast_event(
@@ -1585,7 +1585,7 @@ class SessionLifecycleManager:
                 if session_row.session_type == SessionTypes.BATCH:
                     await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
-                await self.event_producer.produce_event(
+                await self.event_producer.anycast_event(
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
                 )
                 await self.event_producer.broadcast_event(
@@ -1640,7 +1640,7 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
-        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
+        await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
         pop_all_session_id_script = textwrap.dedent("""

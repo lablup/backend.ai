@@ -1374,7 +1374,7 @@ class AgentRegistry:
             "POST_ENQUEUE_SESSION",
             (session_id, session_name, access_key),
         )
-        await self.event_producer.produce_event(
+        await self.event_producer.anycast_event(
             SessionEnqueuedEvent(session_id, session_creation_id),
         )
         await self.event_producer.broadcast_event(
@@ -2403,7 +2403,7 @@ class AgentRegistry:
                         await SessionRow.set_session_status(
                             self.db, session_id, SessionStatus.TERMINATING
                         )
-                        await self.event_producer.produce_event(
+                        await self.event_producer.anycast_event(
                             SessionTerminatingEvent(session_id, reason),
                         )
                         await self.event_producer.broadcast_event(
@@ -2424,7 +2424,7 @@ class AgentRegistry:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
                     )
-                    await self.event_producer.produce_event(
+                    await self.event_producer.anycast_event(
                         SessionTerminatingEvent(session_id, reason),
                     )
                     await self.event_producer.broadcast_event(
@@ -2455,7 +2455,7 @@ class AgentRegistry:
                                 reason=reason,
                                 status_changed_at=now,
                             )
-                            await self.event_producer.produce_event(
+                            await self.event_producer.anycast_event(
                                 KernelCancelledEvent(kernel.id, session_id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
@@ -2467,7 +2467,7 @@ class AgentRegistry:
                                     reason=reason,
                                     status_changed_at=now,
                                 )
-                                await self.event_producer.produce_event(
+                                await self.event_producer.anycast_event(
                                     SessionCancelledEvent(
                                         session_id,
                                         target_session.creation_id,
@@ -2532,7 +2532,7 @@ class AgentRegistry:
                                     )
 
                             await execute_with_retry(_update)
-                            await self.event_producer.produce_event(
+                            await self.event_producer.anycast_event(
                                 KernelTerminatedEvent(kernel.id, target_session.id, reason),
                             )
                         case _:
@@ -2562,7 +2562,7 @@ class AgentRegistry:
                                     )
 
                             await execute_with_retry(_update)
-                            await self.event_producer.produce_event(
+                            await self.event_producer.anycast_event(
                                 KernelTerminatingEvent(kernel.id, target_session.id, reason),
                             )
 
@@ -2625,7 +2625,7 @@ class AgentRegistry:
             if per_agent_tasks:
                 await asyncio.gather(*per_agent_tasks, return_exceptions=True)
             for kernel in to_be_terminated:
-                await self.event_producer.produce_event(
+                await self.event_producer.anycast_event(
                     KernelTerminatedEvent(kernel.id, target_session.id, reason),
                 )
             await self.hook_plugin_ctx.notify(
@@ -2778,7 +2778,7 @@ class AgentRegistry:
 
         # NOTE: If the restarted session is a batch-type one, then the startup command
         #       will be executed again after restart.
-        await self.event_producer.produce_event(
+        await self.event_producer.anycast_event(
             SessionStartedEvent(session.id, session.creation_id),
         )
         await self.event_producer.broadcast_event(
@@ -3136,7 +3136,7 @@ class AgentRegistry:
                 return
 
             if instance_rejoin:
-                await self.event_producer.produce_event(
+                await self.event_producer.anycast_event(
                     AgentStartedEvent("revived"),
                     source_override=agent_id,
                 )

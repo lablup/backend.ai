@@ -632,7 +632,7 @@ class EventProducer:
         self._closed = True
         await self._msg_queue.close()
 
-    async def produce_event(
+    async def anycast_event(
         self,
         event: AbstractAnycastEvent,
         source_override: Optional[AgentId] = None,

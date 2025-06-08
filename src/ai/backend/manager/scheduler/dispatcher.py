@@ -684,7 +684,7 @@ class SchedulerDispatcher(aobject):
                         await db_sess.execute(query)
                         if pending_sess.is_private:
                             await _apply_cancellation(db_sess, [pending_sess.id])
-                            await self.event_producer.produce_event(
+                            await self.event_producer.anycast_event(
                                 SessionCancelledEvent(
                                     pending_sess.id,
                                     pending_sess.creation_id,
@@ -799,7 +799,7 @@ class SchedulerDispatcher(aobject):
                 continue
             num_scheduled += 1
         if num_scheduled > 0:
-            await self.event_producer.produce_event(DoCheckPrecondEvent())
+            await self.event_producer.anycast_event(DoCheckPrecondEvent())
 
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
@@ -1039,7 +1039,7 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.produce_event(
+        await self.registry.event_producer.anycast_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
         await self.registry.event_producer.broadcast_event(
@@ -1278,7 +1278,7 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.produce_event(
+        await self.registry.event_producer.anycast_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
         await self.registry.event_producer.broadcast_event(
@@ -1353,7 +1353,7 @@ class SchedulerDispatcher(aobject):
                                 allocated_host_ports=set(),
                             )
                         )
-                    await self.registry.event_producer.produce_event(
+                    await self.registry.event_producer.anycast_event(
                         SessionCheckingPrecondEvent(
                             scheduled_session.id,
                             scheduled_session.creation_id,
@@ -1445,7 +1445,7 @@ class SchedulerDispatcher(aobject):
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
-                        await self.registry.event_producer.produce_event(
+                        await self.registry.event_producer.anycast_event(
                             SessionPreparingEvent(
                                 scheduled_session.id,
                                 scheduled_session.creation_id,
@@ -1803,7 +1803,7 @@ class SchedulerDispatcher(aobject):
                     created_routes.append(route_id)
             await db_sess.commit()
         for route_id in created_routes:
-            await self.event_producer.produce_event(RouteCreatedEvent(route_id))
+            await self.event_producer.anycast_event(RouteCreatedEvent(route_id))
         await redis_helper.execute(
             self.redis_live,
             lambda r: r.hset(
@@ -1919,7 +1919,7 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
                 await execute_with_retry(_mark_session_cancelled)
-                await self.registry.event_producer.produce_event(
+                await self.registry.event_producer.anycast_event(
                     SessionCancelledEvent(
                         session.id,
                         session.creation_id,
@@ -1970,7 +1970,7 @@ class SchedulerDispatcher(aobject):
                 async with self.db.begin_session() as db_sess:
                     await _apply_cancellation(db_sess, session_ids)
         for item in cancelled_sessions:
-            await self.event_producer.produce_event(
+            await self.event_producer.anycast_event(
                 SessionCancelledEvent(
                     item.id,
                     item.creation_id,

@@ -955,7 +955,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
             async for agent_id, prev in r.hscan_iter("agent.last_seen"):
                 prev = datetime.fromtimestamp(float(prev), tzutc())
                 if now - prev > timeout:
-                    await root_ctx.event_producer.produce_event(
+                    await root_ctx.event_producer.anycast_event(
                         AgentTerminatedEvent("agent-lost"),
                         source_override=agent_id.decode(),
                     )
