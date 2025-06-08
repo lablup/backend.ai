@@ -2873,7 +2873,7 @@ type PurgeImageById {
   image: ImageNode
 }
 
-"""Added in 25.6.0."""
+"""Added in 25.10.0."""
 input PurgeImageOptions {
   """Only available in the HarborV2 registry."""
   remove_from_registry: Boolean = false
