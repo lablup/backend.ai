@@ -307,14 +307,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     ) -> None:
         async with concurrency_sema.get():
             rqst_args = copy.deepcopy(rqst_args)
-            rqst_args["headers"]["Accept"] = ",".join([
+            acceptables = [
                 self.MEDIA_TYPE_DOCKER_MANIFEST_LIST,
                 self.MEDIA_TYPE_DOCKER_MANIFEST,
                 self.MEDIA_TYPE_OCI_INDEX,
                 self.MEDIA_TYPE_OCI_MANIFEST,
                 self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON,
                 self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS,
-            ])
+            ]
+            rqst_args["headers"]["Accept"] = ",".join(acceptables)
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
             ) as resp:
