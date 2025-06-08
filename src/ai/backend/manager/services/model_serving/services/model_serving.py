@@ -154,7 +154,7 @@ class ModelServingService:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
-    async def _fetch_file(
+    async def _fetch_file_from_storage_proxy(
         self,
         filename: str,
         model_vfolder_row: VFolderRow,
@@ -187,7 +187,9 @@ class ModelServingService:
 
         async with self._db.begin_readonly_session() as db_sess:
             model_vfolder_row = await VFolderRow.get(db_sess, service_prepare_ctx.model_id)
-            chunks = await self._fetch_file("service-definition.toml", model_vfolder_row)
+            chunks = await self._fetch_file_from_storage_proxy(
+                "service-definition.toml", model_vfolder_row
+            )
 
             if chunks:
                 raw_service_definition = chunks.decode("utf-8")

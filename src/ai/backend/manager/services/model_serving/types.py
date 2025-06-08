@@ -432,15 +432,30 @@ class EndpointAutoScalingRuleModifier(PartialModifier):
 
 
 class ImageEnvironment(BaseModel):
-    image: str
-    architecture: str
+    image: str = Field(
+        description="""
+        Container image to use for the model service.
+        """,
+        examples=[
+            "myregistry/myimage:latest",
+        ],
+    )
+    architecture: str = Field(
+        description="""
+        Architecture of the container image.
+        """,
+        examples=[
+            "x86_64",
+            "arm64",
+        ],
+    )
 
 
 class ModelServiceDefinition(BaseModel):
     environment: Optional[ImageEnvironment] = Field(
         default=None,
         description="""
-        The environment in which the model service will run.
+        Environment in which the model service will run.
         """,
         examples=[
             {
@@ -452,7 +467,7 @@ class ModelServiceDefinition(BaseModel):
     resource_slots: Optional[dict[str, Any]] = Field(
         default=None,
         description="""
-        The resource slots used by the model service session.
+        Resource slots used by the model service session.
         """,
         examples=[
             {"cpu": 1, "mem": "2gb"},
