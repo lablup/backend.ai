@@ -797,7 +797,7 @@ class ForgetImage(graphene.Mutation):
 
 class PurgeImageOptions(graphene.InputObjectType):
     """
-    Added in 25.6.0.
+    Added in 25.10.0.
     """
 
     remove_from_registry = graphene.Boolean(
