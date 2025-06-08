@@ -25,14 +25,15 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponses
+from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     DispatchResult,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -818,7 +819,7 @@ class PurgeImageById(graphene.Mutation):
         options = PurgeImageOptions(
             required=False,
             default_value={"remove_from_registry": False},
-            description="Added in 25.6.0.",
+            description="Added in 25.10.0.",
         )
 
     image = graphene.Field(ImageNode)
@@ -842,27 +843,20 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
-            if not image_row:
-                raise ObjectNotFound("image")
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    raise GenericForbidden("Image is not owned by your account.")
+        if options.remove_from_registry:
+            await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+                UntagImageFromRegistryAction(
+                    user_id=ctx.user["uuid"],
+                    client_role=ctx.user["role"],
+                    image_id=image_uuid,
+                )
+            )
 
-            for alias in image_row.aliases:
-                await session.delete(alias)
-
-            await session.delete(image_row)
-
-            if options.remove_from_registry:
-                await image_row.untag_image_from_registry(ctx.db, session)
-
-            return PurgeImageById(image=ImageNode.from_row(ctx, image_row))
+        return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Deprecated since 25.6.0. Use `purge_image_by_id`, and `remove_from_registry` option instead."""
+    """Deprecated since 25.10.0. Use `purge_image_by_id`, and `remove_from_registry` option instead."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
