@@ -1937,9 +1937,6 @@ type ModelCard implements Node {
 
   """Added in 24.03.8."""
   error_msg: String
-
-  """Added in 25.7.0."""
-  service_config(endpoint_id: String!): JSONString
 }
 
 """Added in 24.03.4"""

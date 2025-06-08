@@ -36,3 +36,14 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         self.rename_file = ActionProcessor(service.rename_file, action_monitors)
         self.delete_files = ActionProcessor(service.delete_files, action_monitors)
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            CreateUploadSessionAction.spec(),
+            CreateDownloadSessionAction.spec(),
+            ListFilesAction.spec(),
+            RenameFileAction.spec(),
+            DeleteFilesAction.spec(),
+            MkdirAction.spec(),
+        ]

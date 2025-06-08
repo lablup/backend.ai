@@ -8,7 +8,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
 )
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -18,6 +18,7 @@ from ai.backend.manager.models.vfolder import (
     is_unmanaged,
     query_accessible_vfolders,
 )
+from ai.backend.manager.services.vfolder.exceptions import VFolderInvalidParameter
 
 from ..actions.file import (
     CreateDownloadSessionAction,
@@ -33,7 +34,6 @@ from ..actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
-from ..exceptions import InvalidParameter
 from ..types import FileInfo
 
 
