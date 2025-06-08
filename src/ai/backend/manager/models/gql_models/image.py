@@ -801,7 +801,8 @@ class PurgeImageOptions(graphene.InputObjectType):
     """
 
     remove_from_registry = graphene.Boolean(
-        default_value=False, description="Only available in the HarborV2 registry."
+        default_value=False,
+        description="Untag the deleted image from the registry. Only available in the HarborV2 registry.",
     )
 
 
