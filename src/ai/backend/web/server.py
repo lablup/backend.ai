@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, Mapping, Optional, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
 
 import aiohttp_cors
 import aiotools
@@ -25,7 +25,6 @@ import jinja2
 import tomli
 from aiohttp import web
 from setproctitle import setproctitle
-from typing_extensions import AsyncGenerator
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError

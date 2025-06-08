@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import aiofiles
 import aiotools
@@ -17,7 +17,6 @@ import click
 import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
-from typing_extensions import AsyncGenerator
 
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx

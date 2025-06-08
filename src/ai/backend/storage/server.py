@@ -11,14 +11,13 @@ import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncIterator, Sequence
+from typing import Any, AsyncGenerator, AsyncIterator, Sequence
 
 import aiomonitor
 import aiotools
 import click
 from aiohttp import web
 from setproctitle import setproctitle
-from typing_extensions import AsyncGenerator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.config import (

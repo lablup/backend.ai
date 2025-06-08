@@ -17,6 +17,7 @@ from logging import LoggerAdapter
 from pathlib import Path
 from typing import (
     Any,
+    AsyncGenerator,
     AsyncIterator,
     Final,
     Optional,
@@ -30,7 +31,6 @@ import click
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
-from typing_extensions import AsyncGenerator
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.metrics.http import (

@@ -25,6 +25,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
+    AsyncGenerator,
     AsyncIterator,
     Final,
     Optional,
@@ -38,7 +39,6 @@ import click
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from setproctitle import setproctitle
-from typing_extensions import AsyncGenerator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
