@@ -1014,7 +1014,7 @@ class RescanImagesV2(graphene.Mutation):
     """
 
     class Arguments:
-        input = RescanImagesV2Input(required=True)
+        key = RescanImagesV2Input(required=True)
 
     Output = RescanImagesV2Payload
 
@@ -1022,10 +1022,10 @@ class RescanImagesV2(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        input: RescanImagesV2Input,
+        key: RescanImagesV2Input,
     ) -> RescanImagesV2Payload:
-        registry = input.registry
-        project = input.project
+        registry = key.registry
+        project = key.project
 
         log.info(
             "rescanning docker registry {0} by API request",
@@ -1215,7 +1215,7 @@ class ClearImagesV2(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        input = ClearImagesV2Input(required=True)
+        key = ClearImagesV2Input(required=True)
 
     Output = ClearImagesV2Payload
 
@@ -1223,10 +1223,10 @@ class ClearImagesV2(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        input: ClearImagesV2Input,
+        key: ClearImagesV2Input,
     ) -> ClearImagesV2Payload:
-        registry = input.registry
-        project = input.project
+        registry = key.registry
+        project = key.project
 
         ctx: GraphQueryContext = info.context
         log.info("clear images from registry {0} by API request", registry)

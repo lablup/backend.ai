@@ -2257,7 +2257,7 @@ type Mutations {
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
 
   """Added in 25.10.0."""
-  rescan_images_v2(input: RescanImagesV2Input!): RescanImagesV2Payload
+  rescan_images_v2(key: RescanImagesV2Input!): RescanImagesV2Payload
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
 
@@ -2282,7 +2282,7 @@ type Mutations {
   clear_images(registry: String): ClearImages @deprecated(reason: "Deprecated since 25.10.0. Use `clear_images_v2` instead.")
 
   """Added in 25.10.0."""
-  clear_images_v2(input: ClearImagesV2Input!): ClearImagesV2Payload
+  clear_images_v2(key: ClearImagesV2Input!): ClearImagesV2Payload
 
   """Added in 25.4.0"""
   purge_images(keys: [PurgeImagesKey]!, options: PurgeImagesOptions = {force: false, noprune: false}): PurgeImagesPayload
