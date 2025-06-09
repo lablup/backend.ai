@@ -84,17 +84,17 @@ class ContainerUtilizationMetricService:
         self._config_provider = config_provider
 
     @property
-    def metric_query_endpoint(self) -> yarl.URL:
+    def _metric_query_endpoint(self) -> yarl.URL:
         metric_query_addr = self._config_provider.config.metric.address.to_legacy()
         return yarl.URL(f"http://{metric_query_addr}/api/v1")
 
     @property
-    def range_vector_timewindow(self) -> str:
+    def _range_vector_timewindow(self) -> str:
         # 1m by default
         return self._config_provider.config.metric.timewindow
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:
-        endpoint = self.metric_query_endpoint / "label" / label_name / "values"
+        endpoint = self._metric_query_endpoint / "label" / label_name / "values"
         form_data = aiohttp.FormData({"match[]": "backendai_container_utilization"})
         async with aiohttp.ClientSession() as session:
             async with session.get(endpoint, data=form_data) as response:
@@ -183,7 +183,7 @@ class ContainerUtilizationMetricService:
             MetricSpecForQuery(
                 metric_name=metric_name,
                 metric_type=metric_type,
-                timewindow=self.range_vector_timewindow,
+                timewindow=self._range_vector_timewindow,
                 sum_by=sum_by_values,
                 labels=label_values,
             )
@@ -193,7 +193,7 @@ class ContainerUtilizationMetricService:
         self,
         action: ContainerMetricAction,
     ) -> ContainerMetricActionResult:
-        endpoint = self.metric_query_endpoint / "query_range"
+        endpoint = self._metric_query_endpoint / "query_range"
         query = await self._get_query_string(action.metric_name, action.labels)
         form_data = aiohttp.FormData({
             "query": query,
