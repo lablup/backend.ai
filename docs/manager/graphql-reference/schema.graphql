@@ -2921,7 +2921,7 @@ type ClearImages {
 """Added in 25.10.0."""
 type ClearImagesV2Payload {
   """List of images that were cleared from the registry."""
-  cleared_images: [ImageNode]
+  cleared_images(before: String, after: String, first: Int, last: Int): ImageConnection
 }
 
 """Added in 25.10.0."""

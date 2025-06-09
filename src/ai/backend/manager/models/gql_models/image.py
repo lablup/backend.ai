@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from decimal import Decimal
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -19,6 +20,7 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from graphene.relay.connection import connection_adapter, connection_from_array, page_info_adapter
 from graphql import Undefined, UndefinedType
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -84,7 +86,14 @@ from ..base import (
     batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
 )
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
+from ..gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionField,
+    ConnectionPaginationOrder,
+    ConnectionResolverResult,
+    ResolvedGlobalID,
+)
 from ..image import (
     ImageIdentifier,
     ImageLoadFilter,
@@ -1201,10 +1210,35 @@ class ClearImagesV2Payload(graphene.ObjectType):
     """
 
     allowed_roles = (UserRole.SUPERADMIN,)
-    cleared_images = graphene.List(
-        ImageNode,
-        description="List of images that were cleared from the registry.",
+    cleared_images = ConnectionField(
+        ImageConnection, description="List of images that were cleared from the registry."
     )
+
+    def __init__(self, _cleared_images: Sequence[ImageNode], **kwargs: Any):
+        super().__init__(**kwargs)
+        self._cleared_images = _cleared_images
+
+    async def resolve_cleared_images(
+        self, info: graphene.ResolveInfo, **args: Any
+    ) -> ConnectionResolverResult[ImageNode]:
+        conn = connection_from_array(
+            self._cleared_images,
+            args,
+            partial(connection_adapter, ImageConnection),
+            ImageConnection.Edge,
+            page_info_adapter,
+        )
+        node_seq = [edge.node for edge in conn.edges]
+        cursor = conn.page_info.end_cursor  # type: ignore
+        page_sz = args.get("first") or args.get("last")
+
+        return ConnectionResolverResult(
+            node_list=node_seq,
+            cursor=cursor,
+            pagination_order=ConnectionPaginationOrder.FORWARD,
+            requested_page_size=page_sz,
+            total_count=len(node_seq),
+        )
 
 
 class ClearImagesV2(graphene.Mutation):
@@ -1250,7 +1284,11 @@ class ClearImagesV2(graphene.Mutation):
             )
             cleared_images.extend(action_result.cleared_images)
 
-        return ClearImagesV2Payload(cleared_images=cleared_images)
+        return ClearImagesV2Payload(
+            _cleared_images=[
+                ImageNode.from_row(ctx, ImageRow.from_dataclass(image)) for image in cleared_images
+            ]
+        )
 
 
 class ModifyImageInput(graphene.InputObjectType):
