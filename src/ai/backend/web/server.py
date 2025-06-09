@@ -4,18 +4,19 @@ import logging
 import logging.config
 import os
 import re
+import signal
 import socket
 import ssl
 import sys
 import time
 import traceback
-from collections.abc import MutableMapping
+from collections.abc import MutableMapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, Mapping, Optional, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
 
 import aiohttp_cors
 import aiotools
@@ -579,8 +580,8 @@ async def server_cleanup(app) -> None:
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: tuple[Any, ...],
-) -> AsyncIterator[Any]:
+    _args: Sequence[Any],
+) -> AsyncGenerator[Any, signal.Signals]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
     log_endpoint = _args[1]
     logger = Logger(
@@ -604,7 +605,7 @@ async def server_main_logwrapper(
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    args: tuple[Any, ...],
+    args: Sequence[Any],
 ) -> AsyncIterator[Any]:
     config = args[0]
     app = web.Application(

@@ -8,6 +8,7 @@ import importlib.resources
 import logging
 import os
 import pwd
+import signal
 import ssl
 import sys
 import traceback
@@ -22,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
+    AsyncGenerator,
     AsyncIterator,
     Final,
     List,
@@ -1113,8 +1115,8 @@ async def server_main(
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: List[Any],
-) -> AsyncIterator[None]:
+    tuple_args: Sequence[Any],
+) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
     log_endpoint = _args[1]
     logger = Logger(
