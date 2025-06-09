@@ -44,7 +44,7 @@ from etcd_client import GRPCStatusCode, GRPCStatusError
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.kernel import KernelTerminatingEvent
+from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatingEvent
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
