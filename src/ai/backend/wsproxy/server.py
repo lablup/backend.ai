@@ -6,13 +6,14 @@ import importlib.resources
 import logging
 import os
 import pwd
+import signal
 import sys
 import traceback
 import uuid
 from contextlib import asynccontextmanager as actxmgr
 from logging import LoggerAdapter
 from pathlib import Path
-from typing import Any, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Final, Iterable, Mapping, Sequence, cast
 
 import aiohttp_cors
 import aiohttp_jinja2
@@ -410,8 +411,8 @@ async def server_main(
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: tuple[ServerConfig, str],
-) -> AsyncIterator[None]:
+    _args: Any,
+) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: wsproxy worker-{pidx}")
     log_endpoint = _args[1]
     logging_config = config_key_to_kebab_case(_args[0].logging.model_dump(exclude_none=True))
