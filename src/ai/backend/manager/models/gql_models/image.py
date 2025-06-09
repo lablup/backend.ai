@@ -1228,16 +1228,22 @@ class ClearImagesV2Payload(graphene.ObjectType):
             ImageConnection.Edge,
             page_info_adapter,
         )
-        node_seq = [edge.node for edge in conn.edges]
+        node_list = [edge.node for edge in conn.edges]
         cursor = conn.page_info.end_cursor  # type: ignore
-        page_sz = args.get("first") or args.get("last")
+
+        order = ConnectionPaginationOrder.FORWARD
+        page_sz = args.get("first")
+
+        if args.get("last"):
+            order = ConnectionPaginationOrder.BACKWARD
+            page_sz = args.get("last")
 
         return ConnectionResolverResult(
-            node_list=node_seq,
+            node_list=node_list,
             cursor=cursor,
-            pagination_order=ConnectionPaginationOrder.FORWARD,
+            pagination_order=order,
             requested_page_size=page_sz,
-            total_count=len(node_seq),
+            total_count=len(node_list),
         )
 
 
