@@ -55,7 +55,7 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 
 from ..container_registry import get_container_registry_cls
-from ..errors.exceptions import ImageNotFound
+from ..errors.exceptions import ImageNotFound, NotImplementedAPI
 from ..models.container_registry import ContainerRegistryRow
 from .base import (
     GUID,
@@ -858,7 +858,7 @@ class ImageRow(Base):
 
         registry_info: ContainerRegistryRow = (await session.execute(query)).scalar()
         if registry_info.type != ContainerRegistryType.HARBOR2:
-            raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+            raise NotImplementedAPI("This feature is only supported for Harbor 2 registries")
 
         scanner = HarborRegistry_v2(db, self.image_ref.registry, registry_info)
         await scanner.untag(self.image_ref)
