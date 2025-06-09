@@ -37,7 +37,7 @@ from ai.backend.common.events.event_types.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
-from ai.backend.common.events.volume import (
+from ai.backend.common.events.event_types.volume import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
     VolumeMountableNodeType,
@@ -1283,7 +1283,7 @@ async def handle_volume_mount(
         # Produce volume mounted event with error message.
         # And skip chown.
         err_msg = resp.body
-        await context.event_producer.anycast_event(
+        await context.event_producer.broadcast_event(
             VolumeMounted(
                 str(context.node_id),
                 VolumeMountableNodeType.STORAGE_PROXY,
@@ -1299,7 +1299,7 @@ async def handle_volume_mount(
     resp = await context.watcher.request_task(chown_task)
     if not resp.succeeded:
         err_msg = resp.body
-    await context.event_producer.anycast_event(
+    await context.event_producer.broadcast_event(
         VolumeMounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
@@ -1334,7 +1334,7 @@ async def handle_volume_umount(
     err_msg = resp.body if not resp.succeeded else None
     if resp.body:
         log.warning(resp.body)
-    await context.event_producer.anycast_event(
+    await context.event_producer.broadcast_event(
         VolumeUnmounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,

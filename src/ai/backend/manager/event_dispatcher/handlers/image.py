@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.image import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,

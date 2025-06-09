@@ -83,6 +83,10 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatingEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusEvent,
+    RouteCreatedEvent,
+)
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     SessionCancelledEvent,
@@ -110,10 +114,6 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.events.event_types.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
-)
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
-    RouteCreatedEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext

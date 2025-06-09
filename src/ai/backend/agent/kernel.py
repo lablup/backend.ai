@@ -42,11 +42,11 @@ from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusEvent,
+)
 from ai.backend.common.events.kernel import (
     KernelLifecycleEventReason,
-)
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
 )
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import (

@@ -15,7 +15,7 @@ import zmq
 import zmq.asyncio
 
 from ai.backend.common import msgpack
-from ai.backend.common.events.volume import DoVolumeMountEvent, DoVolumeUnmountEvent
+from ai.backend.common.events.event_types.volume import DoVolumeMountEvent, DoVolumeUnmountEvent
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount

@@ -21,7 +21,7 @@ from aiotools import aclosing
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,

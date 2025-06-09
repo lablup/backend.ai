@@ -38,13 +38,16 @@ from ai.backend.common import redis_helper
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule import (
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
     SessionStartedEvent,
     SessionTerminatedEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionStartedEvent as SessionStartedBroadcastEvent,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
@@ -1572,7 +1575,7 @@ class SessionLifecycleManager:
                     SessionStartedEvent(session_row.id, session_row.creation_id),
                 )
                 await self.event_producer.broadcast_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                    SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
@@ -1589,7 +1592,9 @@ class SessionLifecycleManager:
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
                 )
                 await self.event_producer.broadcast_event(
-                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                    SessionStartedBroadcastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
                 )
             case _:
                 pass

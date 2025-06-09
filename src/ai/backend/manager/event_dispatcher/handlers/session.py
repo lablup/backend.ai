@@ -9,10 +9,7 @@ import sqlalchemy as sa
 import yarl
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.events.kernel import (
-    KernelLifecycleEventReason,
-)
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
@@ -28,6 +25,9 @@ from ai.backend.common.events.session import (
     SessionSuccessEvent,
     SessionTerminatedEvent,
     SessionTerminatingEvent,
+)
+from ai.backend.common.events.kernel import (
+    KernelLifecycleEventReason,
 )
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (

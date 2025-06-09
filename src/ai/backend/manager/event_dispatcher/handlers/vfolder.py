@@ -1,6 +1,6 @@
 import logging
 
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.vfolder import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
