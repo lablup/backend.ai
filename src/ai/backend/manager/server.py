@@ -8,6 +8,7 @@ import importlib.resources
 import logging
 import os
 import pwd
+import signal
 import ssl
 import sys
 import traceback
@@ -24,6 +25,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
+    AsyncGenerator,
     AsyncIterator,
     Final,
     Optional,
@@ -1371,8 +1373,8 @@ async def server_main(
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    tuple_args: tuple[Any, ...],
-) -> AsyncIterator[None]:
+    tuple_args: Sequence[Any],
+) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
     args = ServerMainArgs(
         bootstrap_cfg=tuple_args[0],
