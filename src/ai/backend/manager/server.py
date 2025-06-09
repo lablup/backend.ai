@@ -26,7 +26,6 @@ from typing import (
     AsyncGenerator,
     AsyncIterator,
     Final,
-    List,
     Optional,
     cast,
 )
@@ -1004,7 +1003,7 @@ def build_public_app(
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: List[Any],
+    _args: Sequence[Any],
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     internal_app = build_internal_app()
@@ -1118,9 +1117,9 @@ async def server_main_logwrapper(
     tuple_args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
-    log_endpoint = _args[1]
+    log_endpoint = tuple_args[1]
     logger = Logger(
-        _args[0]["logging"],
+        tuple_args[0]["logging"],
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -1130,7 +1129,7 @@ async def server_main_logwrapper(
     )
     try:
         with logger:
-            async with server_main(loop, pidx, _args):
+            async with server_main(loop, pidx, tuple_args):
                 yield
     except Exception:
         traceback.print_exc()
