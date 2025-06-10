@@ -40,7 +40,6 @@ from ai.backend.common.events.event_types.vfolder import (
 from ai.backend.common.events.event_types.volume import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
-    VolumeMountableNodeType,
     VolumeMounted,
     VolumeUnmounted,
 )
@@ -50,7 +49,14 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
+from ai.backend.common.types import (
+    AgentId,
+    BinarySize,
+    ItemResult,
+    QuotaScopeID,
+    ResultSet,
+    VolumeMountableNodeType,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__

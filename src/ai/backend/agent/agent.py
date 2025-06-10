@@ -136,7 +136,6 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.events.event_types.volume import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
-    VolumeMountableNodeType,
     VolumeMounted,
     VolumeUnmounted,
 )
@@ -188,6 +187,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMount,
     VFolderUsageMode,
+    VolumeMountableNodeType,
     aobject,
 )
 from ai.backend.common.utils import (
