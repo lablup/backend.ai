@@ -1,8 +1,7 @@
 import asyncio
-import typing
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator
+from typing import AsyncIterator, final
 
 from ai.backend.test.tester.exporter import TestExporter
 
@@ -46,6 +45,7 @@ class TestTemplate(ABC):
         raise NotImplementedError("Subclasses must implement this method.")
 
 
+@final
 class BasicTestTemplate(TestTemplate):
     _testcode: TestCode
 
@@ -86,7 +86,7 @@ class WrapperTestTemplate(TestTemplate, ABC):
         raise NotImplementedError("Subclasses must implement this method.")
         yield  # Not used, but required for type checking
 
-    @typing.final
+    @final
     async def run_test(self, exporter: TestExporter) -> None:
         try:
             # NOTE: self.context() should be an async context manager
@@ -106,6 +106,7 @@ class SequenceTestTemplate(TestTemplate, ABC):
         """
         self._templates = templates
 
+    @final
     async def run_test(self, exporter: TestExporter) -> None:
         """
         Run the test case by executing each template in sequence.
