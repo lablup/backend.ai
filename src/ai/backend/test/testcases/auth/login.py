@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager as actxmgr
-from contextvars import ContextVar
 from typing import AsyncIterator, Optional, override
 
 from ai.backend.client.session import AsyncSession
@@ -10,7 +9,7 @@ from ai.backend.test.testcases.utils import login, logout
 
 
 class AuthenticationContext(BaseTestContext[AsyncSession]):
-    _ctxvar: ContextVar[Optional[AsyncSession]] = ContextVar("authentication_context", default=None)
+    pass
 
 
 class AuthenticationWrapperTemplate(WrapperTestTemplate):

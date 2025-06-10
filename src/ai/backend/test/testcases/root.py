@@ -13,10 +13,6 @@ class TestRunContext(BaseTestContext[dict[str, Any]]):
     _ctxvar: ContextVar[Optional[dict[str, Any]]] = ContextVar("test_run_context", default=None)
 
     @classmethod
-    def get_current(cls) -> Any:
-        return super().get_current()
-
-    @classmethod
     def get_test_id(cls) -> str:
         return cls.get_current()["test_id"]
 
