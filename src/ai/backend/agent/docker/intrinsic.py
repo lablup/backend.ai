@@ -2,10 +2,11 @@ import asyncio
 import logging
 import os
 import platform
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Optional, cast
 
 import aiohttp
 import async_timeout
@@ -86,7 +87,7 @@ async def netstat_ns(ns_path: Path):
     return result
 
 
-async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
+async def fetch_api_stats(container: DockerContainer) -> Optional[dict[str, Any]]:
     short_cid = container._id[:7]
     try:
         ret = await container.stats(stream=False)  # TODO: cache
@@ -304,19 +305,19 @@ class CPUPlugin(AbstractComputePlugin):
                 return cpu_used
             return None
 
-        async def api_impl(cid: str, pids: List[int]) -> List[Optional[Decimal]]:
+        async def api_impl(cid: str, pids: list[int]) -> list[Optional[Decimal]]:
             return []
 
         per_process_cpu_util = {}
         per_process_cpu_used = {}
-        results: List[Decimal | None] = []
+        results: list[Optional[Decimal]] = []
         q = Decimal("0.000")
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
-                api_tasks: list[asyncio.Task[list[Decimal | None]]] = []
+                api_tasks: list[asyncio.Task[list[Optional[Decimal]]]] = []
                 # group by container ID
-                cid_pids_map: Dict[str, List[int]] = {}
+                cid_pids_map: dict[str, list[int]] = {}
                 for pid, cid in pid_map_list:
                     if cid_pids_map.get(cid) is None:
                         cid_pids_map[cid] = []
@@ -407,7 +408,7 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[DeviceModelInfo]:
         device_ids = [*device_alloc[SlotName("cpu")].keys()]
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 attached_devices.append({
@@ -419,12 +420,12 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
@@ -783,7 +784,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(pid) -> Tuple[Optional[int], Optional[int], Optional[int]]:
+        async def psutil_impl(pid) -> tuple[Optional[int], Optional[int], Optional[int]]:
             try:
                 p = psutil.Process(pid)
             except psutil.NoSuchProcess:
@@ -800,20 +801,20 @@ class MemoryPlugin(AbstractComputePlugin):
             return None, None, None
 
         async def api_impl(
-            cid: str, pids: List[int]
-        ) -> List[Tuple[Optional[int], Optional[int], Optional[int]]]:
+            cid: str, pids: list[int]
+        ) -> list[tuple[Optional[int], Optional[int], Optional[int]]]:
             return []
 
         per_process_mem_used_bytes = {}
         per_process_io_read_bytes = {}
         per_process_io_write_bytes = {}
-        results: List[Tuple[Optional[int], Optional[int], Optional[int]]]
+        results: list[tuple[Optional[int], Optional[int], Optional[int]]]
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
                 api_tasks = []
                 # group by container ID
-                cid_pids_map: Dict[str, List[int]] = {}
+                cid_pids_map: dict[str, list[int]] = {}
                 for pid, cid in pid_map_list:
                     if cid_pids_map.get(cid) is None:
                         cid_pids_map[cid] = []
@@ -907,7 +908,7 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> Sequence[DeviceModelInfo]:
         device_ids = [*device_alloc[SlotName("mem")].keys()]
         available_devices = await self.list_devices()
-        attached_devices: List[DeviceModelInfo] = []
+        attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
                 attached_devices.append({
@@ -919,12 +920,12 @@ class MemoryPlugin(AbstractComputePlugin):
 
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+    ) -> list[str]:
         return []
 
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
@@ -936,3 +937,119 @@ class MemoryPlugin(AbstractComputePlugin):
             "number_format": {"binary": True, "round_length": 0},
             "display_icon": "ram",
         }
+
+
+class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
+    async def get_capabilities(self) -> set[ContainerNetworkCapability]:
+        return set()
+
+    async def join_network(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        network_name: str = kwargs["network_name"]
+        return {
+            "HostConfig": {
+                "NetworkMode": network_name,
+            },
+            "NetworkingConfig": {
+                "EndpointsConfig": {
+                    network_name: {
+                        "Aliases": [kernel_config["cluster_hostname"]],
+                    },
+                },
+            },
+        }
+
+    async def leave_network(self, kernel: DockerKernel) -> None:
+        pass
+
+
+class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
+    async def get_capabilities(self) -> set[ContainerNetworkCapability]:
+        return set([ContainerNetworkCapability.GLOBAL])
+
+    async def join_network(
+        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs
+    ) -> dict[str, Any]:
+        if _cluster_ssh_port_mapping := cluster_info.get("cluster_ssh_port_mapping"):
+            return {
+                "HostConfig": {
+                    "ExtraHosts": [
+                        f"{hostname}:{host_port[0]}"
+                        for hostname, host_port in _cluster_ssh_port_mapping.items()
+                    ],
+                    "NetworkMode": "host",
+                }
+            }
+        else:
+            return {
+                "HostConfig": {
+                    "NetworkMode": "host",
+                },
+            }
+
+    async def leave_network(self, kernel: DockerKernel) -> None:
+        pass
+
+    async def prepare_port_forward(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs
+    ) -> None:
+        host_ports = [p[0] for p in ports]
+        scratch_dir = (
+            self.local_config["container"]["scratch-root"] / str(kernel.kernel_id)
+        ).resolve()
+        config_dir: Path = scratch_dir / "config"
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        await current_loop().run_in_executor(
+            None,
+            lambda: (config_dir / "intrinsic-ports.json").write_bytes(dump_json(intrinsic_ports)),
+        )
+
+    async def expose_ports(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs
+    ) -> ContainerNetworkInfo:
+        host_ports = [p[0] for p in ports]
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        return ContainerNetworkInfo(
+            bind_host,
+            {service_name: {port: port} for service_name, port in intrinsic_ports.items()},
+        )
