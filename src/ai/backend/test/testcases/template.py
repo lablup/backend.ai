@@ -1,5 +1,8 @@
 import asyncio
+import typing
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 from ai.backend.test.tester.exporter import TestExporter
 
@@ -74,31 +77,25 @@ class WrapperTestTemplate(TestTemplate, ABC):
         self._template = template
 
     @abstractmethod
-    async def setup(self) -> None:
+    @asynccontextmanager
+    async def context(self) -> AsyncIterator[None]:
         """
-        Set up the test environment. This method should be overridden by subclasses
-        to perform any necessary setup before running the test.
+        Async Context manager for setup and cleanup operations.
+        This method should be overridden by subclasses to implement specific setup and cleanup logic.
         """
         raise NotImplementedError("Subclasses must implement this method.")
+        yield  # Not used, but required for type checking
 
+    @typing.final
     async def run_test(self, exporter: TestExporter) -> None:
-        await self.setup()
         try:
-            await self._template.run_test(exporter)
-            await exporter.export_stage_done(self.name)
+            # NOTE: self.context() should be an async context manager
+            async with self.context():  # type: ignore
+                await self._template.run_test(exporter)
+                await exporter.export_stage_done(self.name)
         except BaseException as e:
             await exporter.export_stage_exception(self.name, e)
             raise
-        finally:
-            await self.cleanup()
-
-    @abstractmethod
-    async def cleanup(self) -> None:
-        """
-        Clean up after the test. This method should be overridden by subclasses
-        to perform any necessary cleanup after running the test.
-        """
-        raise NotImplementedError("Subclasses must implement this method.")
 
 
 class SequenceTestTemplate(TestTemplate, ABC):

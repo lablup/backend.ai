@@ -2,6 +2,12 @@ import enum
 from dataclasses import dataclass
 from typing import Mapping, Self
 
+from ai.backend.test.testcases.auth.login import AuthenticationWrapperTemplate
+from ai.backend.test.testcases.root import RootTestTemplate
+from ai.backend.test.testcases.session.test_container_log_retriever import (
+    BasicContainerLogRetrieverTemplate,
+    TestContainerLogRetriever,
+)
 from ai.backend.test.testcases.template import (
     BasicTestTemplate,
     NopTestCode,
@@ -51,7 +57,22 @@ class TestSpecManager:
                 description="No operation test case.",
                 tags=set(),
                 template=BasicTestTemplate(NopTestCode()),
-            )
+            ),
+            "session": TestSpec(
+                name="session",
+                description="Test session management.",
+                tags={TestTag.SESSION, TestTag.MANAGER},
+                template=RootTestTemplate(
+                    template=AuthenticationWrapperTemplate(
+                        user_id="admin@lablup.com",
+                        password="wJalrXUt",
+                        otp=None,
+                        template=BasicContainerLogRetrieverTemplate(
+                            testCode=TestContainerLogRetriever(),
+                        ),
+                    )
+                ),
+            ),
         }
         return cls(specs)
 
