@@ -2,7 +2,6 @@ import logging
 from typing import (
     Any,
     Optional,
-    cast,
 )
 
 import aiohttp
@@ -13,7 +12,6 @@ from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     UTILIZATION_METRIC_INTERVAL,
 )
-from ai.backend.common.types import HostPortPair
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 
@@ -80,14 +78,20 @@ class MetricResponse(BaseModel):
 
 
 class ContainerUtilizationMetricService:
-    _metric_query_endpoint: yarl.URL
-    _range_vector_timewindow: str  # 1m by default
+    _config_provider: ManagerConfigProvider
 
     def __init__(self, config_provider: ManagerConfigProvider) -> None:
-        metric_config = config_provider.config.metric
-        metric_query_addr: HostPortPair = metric_config.address.to_legacy()
-        self._metric_query_endpoint = yarl.URL(f"http://{metric_query_addr}/api/v1")
-        self._range_vector_timewindow = cast(str, metric_config.timewindow)
+        self._config_provider = config_provider
+
+    @property
+    def _metric_query_endpoint(self) -> yarl.URL:
+        metric_query_addr = self._config_provider.config.metric.address.to_legacy()
+        return yarl.URL(f"http://{metric_query_addr}/api/v1")
+
+    @property
+    def _range_vector_timewindow(self) -> str:
+        # 1m by default
+        return self._config_provider.config.metric.timewindow
 
     async def _query_label_values(self, label_name: str) -> LabelValueResponse:
         endpoint = self._metric_query_endpoint / "label" / label_name / "values"
