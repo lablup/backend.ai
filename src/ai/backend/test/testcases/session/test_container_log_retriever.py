@@ -12,13 +12,10 @@ class TestContainerLogRetriever(TestCode):
         session = AuthenticationContext.get_current()
 
         try:
-            compute_session = await session.ComputeSession.get_or_create(
-                    image="cr.backend.ai/multiarch/python:3.13-ubuntu24.04",
-                    name=test_id,
-                )
-            if not compute_session:
-                raise ValueError("Failed to create compute session")
-
+            await session.ComputeSession.get_or_create(
+                image="cr.backend.ai/multiarch/python:3.13-ubuntu24.04",
+                name=test_id,
+            )
             info = await session.ComputeSession(name=test_id).get_info()
 
             print(info)
