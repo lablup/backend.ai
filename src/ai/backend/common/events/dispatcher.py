@@ -669,3 +669,19 @@ class EventProducer:
         }
         # TODO: impl broadcast message queue
         await self._msg_queue.send(raw_event)
+
+    async def anycast_and_broadcast_event(
+        self,
+        anycast_event: AbstractAnycastEvent,
+        broadcast_event: AbstractBroadcastEvent,
+    ) -> None:
+        """
+        Send both anycast and broadcast events.
+
+        Note:
+        Recommend to use `anycast_event` and `broadcast_event` separately.
+        Do not use this method as long as possible.
+        This is a temporary solution to avoid breaking changes.
+        """
+        await self.anycast_event(anycast_event)
+        await self.broadcast_event(broadcast_event)

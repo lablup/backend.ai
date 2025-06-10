@@ -1571,10 +1571,8 @@ class SessionLifecycleManager:
                     session_row.id,
                     session_row.creation_id,
                 )
-                await self.event_producer.anycast_event(
+                await self.event_producer.anycast_and_broadcast_event(
                     SessionStartedEvent(session_row.id, session_row.creation_id),
-                )
-                await self.event_producer.broadcast_event(
                     SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
@@ -1588,10 +1586,8 @@ class SessionLifecycleManager:
                 if session_row.session_type == SessionTypes.BATCH:
                     await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
-                await self.event_producer.anycast_event(
+                await self.event_producer.anycast_and_broadcast_event(
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
-                )
-                await self.event_producer.broadcast_event(
                     SessionStartedBroadcastEvent(
                         session_row.id, session_row.main_kernel.status_info
                     ),

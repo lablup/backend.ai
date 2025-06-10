@@ -1374,10 +1374,8 @@ class AgentRegistry:
             "POST_ENQUEUE_SESSION",
             (session_id, session_name, access_key),
         )
-        await self.event_producer.anycast_event(
+        await self.event_producer.anycast_and_broadcast_event(
             SessionEnqueuedEvent(session_id, session_creation_id),
-        )
-        await self.event_producer.broadcast_event(
             SessionEnqueuedBroadcastEvent(session_id, session_creation_id),
         )
         return session_id
@@ -2403,10 +2401,8 @@ class AgentRegistry:
                         await SessionRow.set_session_status(
                             self.db, session_id, SessionStatus.TERMINATING
                         )
-                        await self.event_producer.anycast_event(
+                        await self.event_producer.anycast_and_broadcast_event(
                             SessionTerminatingEvent(session_id, reason),
-                        )
-                        await self.event_producer.broadcast_event(
                             SessionTerminatingBroadcastEvent(session_id, reason),
                         )
                 case SessionStatus.TERMINATED:
@@ -2424,10 +2420,8 @@ class AgentRegistry:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
                     )
-                    await self.event_producer.anycast_event(
+                    await self.event_producer.anycast_and_broadcast_event(
                         SessionTerminatingEvent(session_id, reason),
-                    )
-                    await self.event_producer.broadcast_event(
                         SessionTerminatingBroadcastEvent(session_id, reason),
                     )
 
@@ -2467,14 +2461,12 @@ class AgentRegistry:
                                     reason=reason,
                                     status_changed_at=now,
                                 )
-                                await self.event_producer.anycast_event(
+                                await self.event_producer.anycast_and_broadcast_event(
                                     SessionCancelledEvent(
                                         session_id,
                                         target_session.creation_id,
                                         reason,
                                     ),
-                                )
-                                await self.event_producer.broadcast_event(
                                     SessionCancelledBroadcastEvent(
                                         session_id,
                                         target_session.creation_id,
@@ -2778,10 +2770,8 @@ class AgentRegistry:
 
         # NOTE: If the restarted session is a batch-type one, then the startup command
         #       will be executed again after restart.
-        await self.event_producer.anycast_event(
+        await self.event_producer.anycast_and_broadcast_event(
             SessionStartedEvent(session.id, session.creation_id),
-        )
-        await self.event_producer.broadcast_event(
             SessionStartedBroadcastEvent(session.id, session.creation_id),
         )
 

@@ -684,14 +684,12 @@ class SchedulerDispatcher(aobject):
                         await db_sess.execute(query)
                         if pending_sess.is_private:
                             await _apply_cancellation(db_sess, [pending_sess.id])
-                            await self.event_producer.anycast_event(
+                            await self.event_producer.anycast_and_broadcast_event(
                                 SessionCancelledEvent(
                                     pending_sess.id,
                                     pending_sess.creation_id,
                                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
-                                )
-                            )
-                            await self.event_producer.broadcast_event(
+                                ),
                                 SessionCancelledBroadcastEvent(
                                     pending_sess.id,
                                     pending_sess.creation_id,
@@ -1039,10 +1037,8 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.anycast_event(
+        await self.registry.event_producer.anycast_and_broadcast_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
-        )
-        await self.registry.event_producer.broadcast_event(
             SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
@@ -1278,10 +1274,8 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.anycast_event(
+        await self.registry.event_producer.anycast_and_broadcast_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
-        )
-        await self.registry.event_producer.broadcast_event(
             SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
@@ -1445,13 +1439,11 @@ class SchedulerDispatcher(aobject):
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
-                        await self.registry.event_producer.anycast_event(
+                        await self.registry.event_producer.anycast_and_broadcast_event(
                             SessionPreparingEvent(
                                 scheduled_session.id,
                                 scheduled_session.creation_id,
                             ),
-                        )
-                        await self.registry.event_producer.broadcast_event(
                             SessionPreparingBroadcastEvent(
                                 scheduled_session.id,
                                 scheduled_session.creation_id,
@@ -1919,14 +1911,12 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
                 await execute_with_retry(_mark_session_cancelled)
-                await self.registry.event_producer.anycast_event(
+                await self.registry.event_producer.anycast_and_broadcast_event(
                     SessionCancelledEvent(
                         session.id,
                         session.creation_id,
                         KernelLifecycleEventReason.FAILED_TO_START,
                     ),
-                )
-                await self.event_producer.broadcast_event(
                     SessionCancelledBroadcastEvent(
                         session.id,
                         session.creation_id,
@@ -1970,14 +1960,12 @@ class SchedulerDispatcher(aobject):
                 async with self.db.begin_session() as db_sess:
                     await _apply_cancellation(db_sess, session_ids)
         for item in cancelled_sessions:
-            await self.event_producer.anycast_event(
+            await self.event_producer.anycast_and_broadcast_event(
                 SessionCancelledEvent(
                     item.id,
                     item.creation_id,
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                 ),
-            )
-            await self.event_producer.broadcast_event(
                 SessionCancelledBroadcastEvent(
                     item.id,
                     item.creation_id,

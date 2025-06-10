@@ -81,6 +81,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import (
     AbstractAnycastEvent,
     AbstractBroadcastEvent,
+    AbstractEvent,
     EventDispatcher,
     EventProducer,
 )
@@ -882,7 +883,7 @@ class AbstractAgent(
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
         # Notify the gateway.
-        await self.produce_event(AgentStartedEvent(reason="self-started"))
+        await self.anycast_event(AgentStartedEvent(reason="self-started"))
 
         # passive events
         evd = self.event_dispatcher
@@ -944,7 +945,7 @@ class AbstractAgent(
         await self.container_lifecycle_handler
 
         # Notify the gateway.
-        await self.produce_event(AgentTerminatedEvent(reason="shutdown"))
+        await self.anycast_event(AgentTerminatedEvent(reason="shutdown"))
 
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
@@ -952,10 +953,7 @@ class AbstractAgent(
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
 
-    async def produce_event(self, event: AbstractAnycastEvent) -> None:
-        """
-        Send an event to the manager(s).
-        """
+    async def _pre_anycast_event(self, event: AbstractEvent) -> None:
         if self.local_config["debug"]["log-heartbeats"]:
             _log = log.debug if isinstance(event, AgentHeartbeatEvent) else log.info
         else:
@@ -974,6 +972,12 @@ class AbstractAgent(
                             continue
         if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
             await self.save_last_registry()
+
+    async def anycast_event(self, event: AbstractAnycastEvent) -> None:
+        """
+        Send an event to the manager(s).
+        """
+        await self._pre_anycast_event(event)
         await self.event_producer.anycast_event(event)
 
     async def produce_error_event(
@@ -983,15 +987,15 @@ class AbstractAgent(
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
         pretty_tb = "".join(traceback.format_tb(tb)).strip()
-        await self.produce_event(AgentErrorEvent(pretty_message, pretty_tb))
+        await self.anycast_event(AgentErrorEvent(pretty_message, pretty_tb))
 
     async def anycast_and_broadcast_event(
         self,
         anycast_event: AbstractAnycastEvent,
         broadcast_event: AbstractBroadcastEvent,
     ) -> None:
-        await self.produce_event(anycast_event)
-        await self.event_producer.broadcast_event(broadcast_event)
+        await self._pre_anycast_event(anycast_event)
+        await self.event_producer.anycast_and_broadcast_event(anycast_event, broadcast_event)
 
     async def _report_all_kernel_commit_status_map(self, interval: float) -> None:
         """
@@ -1082,7 +1086,7 @@ class AbstractAgent(
                     "force-terminate-abusing-containers"
                 ],
             }
-            await self.produce_event(AgentHeartbeatEvent(agent_info))
+            await self.anycast_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:
@@ -1137,7 +1141,7 @@ class AbstractAgent(
             self.redis_stream_pool,
             lambda r: r.expire(log_key, 3600),
         )
-        await self.produce_event(DoSyncKernelLogsEvent(kernel_id, container_id))
+        await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 
     async def collect_node_stat(self, interval: float):
         if self.local_config["debug"]["log-stats"]:
@@ -1778,7 +1782,7 @@ class AbstractAgent(
         result = await self.scan_images()
         self.images = result.scanned_images
         if result.removed_images:
-            await self.produce_event(
+            await self.anycast_event(
                 AgentImagesRemoveEvent(image_canonicals=list(result.removed_images.keys()))
             )
 
@@ -2212,7 +2216,7 @@ class AbstractAgent(
                             allow_fractional_resource_fragmentation=allow_fractional_resource_fragmentation,
                         )
                     except ResourceError:
-                        await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
+                        await self.anycast_event(DoAgentResourceCheckEvent(ctx.agent_id))
                         raise
             try:
                 # Prepare scratch spaces and dotfiles inside it.
@@ -2981,7 +2985,7 @@ class AbstractAgent(
         if restart_tracker is not None:
             await restart_tracker.done_event.wait()
 
-        await self.produce_event(
+        await self.anycast_event(
             ExecutionStartedEvent(session_id),
         )
         try:
@@ -3002,11 +3006,11 @@ class AbstractAgent(
         if result["status"] in ("finished", "exec-timeout"):
             log.debug("_execute({0}) {1}", kernel_id, result["status"])
         if result["status"] == "finished":
-            await self.produce_event(
+            await self.anycast_event(
                 ExecutionFinishedEvent(session_id),
             )
         elif result["status"] == "exec-timeout":
-            await self.produce_event(
+            await self.anycast_event(
                 ExecutionTimeoutEvent(session_id),
             )
             await self.inject_container_lifecycle_event(

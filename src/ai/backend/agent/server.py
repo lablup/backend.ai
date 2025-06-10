@@ -630,7 +630,7 @@ class AgentRPCServer(aobject):
             )
             if need_to_pull:
                 log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
-                await self.agent.produce_event(
+                await self.agent.anycast_event(
                     ImagePullStartedEvent(
                         image=str(img_ref),
                         image_ref=img_ref,
@@ -649,7 +649,7 @@ class AgentRPCServer(aobject):
                     log.exception(
                         f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
                     )
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -659,7 +659,7 @@ class AgentRPCServer(aobject):
                     )
                 except Exception as e:
                     log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -669,7 +669,7 @@ class AgentRPCServer(aobject):
                     )
                 else:
                     log.info(f"Image pull succeeded {img_ref}")
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -679,7 +679,7 @@ class AgentRPCServer(aobject):
                     )
             else:
                 log.debug(f"No need to pull image {img_ref}")
-                await self.agent.produce_event(
+                await self.agent.anycast_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
                         image_ref=img_ref,
