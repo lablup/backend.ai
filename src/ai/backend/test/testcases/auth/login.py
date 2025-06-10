@@ -1,15 +1,15 @@
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import AsyncIterator, Optional, override
 
 from ai.backend.client.session import AsyncSession
-from ai.backend.test.testcases.context import TestContextManager
+from ai.backend.test.testcases.context import BaseTestContext
 from ai.backend.test.testcases.root import test_run_context
 from ai.backend.test.testcases.template import TestTemplate, WrapperTestTemplate
 from ai.backend.test.testcases.utils import login, logout
 
 
-class AuthenticationContext(TestContextManager):
+class AuthenticationContext(BaseTestContext):
     _ctxvar: ContextVar[Optional[str]]
 
     def __init__(self) -> None:
@@ -36,7 +36,7 @@ class AuthenticationWrapperTemplate(WrapperTestTemplate):
         return "auth-test"
 
     @override
-    @asynccontextmanager
+    @actxmgr
     async def context(self) -> AsyncIterator[None]:
         test_id = test_run_context.get_test_id()
         async with AsyncSession() as session:

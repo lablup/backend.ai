@@ -1,13 +1,13 @@
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import Any, AsyncIterator, Optional
 
-from ai.backend.test.testcases.context import TestContextManager
+from ai.backend.test.testcases.context import BaseTestContext
 from ai.backend.test.testcases.template import TestTemplate, WrapperTestTemplate
 
 
-class TestRunContext(TestContextManager):
+class TestRunContext(BaseTestContext):
     """Context for the entire test run"""
 
     _ctxvar: ContextVar[Optional[dict[str, Any]]]
@@ -39,7 +39,7 @@ class RootTestTemplate(WrapperTestTemplate):
     def name(self) -> str:
         return f"{self._template.name}-{self._test_id}"
 
-    @asynccontextmanager
+    @actxmgr
     async def context(self) -> AsyncIterator[None]:
         test_info = {
             "test_id": str(self._test_id),

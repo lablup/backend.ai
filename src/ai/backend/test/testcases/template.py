@@ -1,7 +1,7 @@
 import asyncio
 import typing
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator
 
 from ai.backend.test.tester.exporter import TestExporter
@@ -77,7 +77,7 @@ class WrapperTestTemplate(TestTemplate, ABC):
         self._template = template
 
     @abstractmethod
-    @asynccontextmanager
+    @actxmgr  # type: ignore
     async def context(self) -> AsyncIterator[None]:
         """
         Async Context manager for setup and cleanup operations.
