@@ -5,7 +5,20 @@ from typing import Any, Mapping, Optional, Sequence
 
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.template import (
+    BasicTestTemplate,
     TestTemplate,
+)
+from ai.backend.test.testcases.session.create_multi_node_multi_container_session import (
+    MultiNodeMultiContainerSessionCreation,
+)
+from ai.backend.test.testcases.session.create_single_node_multi_container_session import (
+    SingleNodeMultiContainerSessionCreation,
+)
+from ai.backend.test.testcases.session.create_single_node_single_container_session import (
+    SingleNodeSingleContainerSessionCreation,
+)
+from ai.backend.test.testcases.session.template import (
+    SessionTestTemplateWrapper,
 )
 
 
@@ -55,6 +68,36 @@ class TestSpecManager:
 
     def __init__(self, specs: Mapping[str, TestSpec]) -> None:
         self._specs = specs
+
+    @classmethod
+    def default(cls) -> Self:
+        specs = {
+            "single_node_single_container_session": TestSpec(
+                name="single_node_single_container_session",
+                description="TODO: Write this.",
+                tags={TestTag.MANAGER, TestTag.SESSION},
+                template=SessionTestTemplateWrapper(
+                    BasicTestTemplate(SingleNodeSingleContainerSessionCreation())
+                ),
+            ),
+            "single_node_multi_container_session": TestSpec(
+                name="single_node_multi_container_session",
+                description="TODO: Write this.",
+                tags={TestTag.MANAGER, TestTag.SESSION},
+                template=SessionTestTemplateWrapper(
+                    BasicTestTemplate(SingleNodeMultiContainerSessionCreation())
+                ),
+            ),
+            "multi_node_multi_container_session": TestSpec(
+                name="multi_node_multi_container_session",
+                description="TODO: Write this.",
+                tags={TestTag.MANAGER, TestTag.SESSION},
+                template=SessionTestTemplateWrapper(
+                    BasicTestTemplate(MultiNodeMultiContainerSessionCreation())
+                ),
+            ),
+        }
+        return cls(specs)
 
     def all_specs(self) -> set[TestSpec]:
         """
