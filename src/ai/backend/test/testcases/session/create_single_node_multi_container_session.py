@@ -6,7 +6,7 @@ from ai.backend.test.testcases.session.context import ComputeSessionContext
 from ai.backend.test.testcases.template import TestCode
 
 # Test environment configuration
-# TODO: 이것들은 다른 값으로 오버라이드 하거나 설정할 수 있어야 할 듯?
+# TODO: Make these configurable loaderable by template wrapper
 _IMAGE_NAME = "cr.backend.ai/stable/python:3.9-ubuntu20.04"
 _IMAGE_RESOURCES = {"cpu": 1, "mem": "512m"}
 _TEST_TIMEOUT = 10.0  # seconds
@@ -16,7 +16,7 @@ _TEST_TIMEOUT = 10.0  # seconds
 class SingleNodeMultiContainerSessionCreation(TestCode):
     async def test(self) -> None:
         async with AsyncSession() as client_session:
-            session_name = ComputeSessionContext.current_session()
+            session_name = ComputeSessionContext.get_current()
 
             EXPECTED_EVENTS = {
                 "session_enqueued",
