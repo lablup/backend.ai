@@ -681,7 +681,6 @@ class EventProducer:
         Note:
         Recommend to use `anycast_event` and `broadcast_event` separately.
         Do not use this method as long as possible.
-        This is a temporary solution to avoid breaking changes.
         """
         await self.anycast_event(anycast_event)
         await self.broadcast_event(broadcast_event)

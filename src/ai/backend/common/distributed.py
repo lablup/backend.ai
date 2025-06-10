@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Callable, Final
+from typing import Callable, Final
 
 from aiomonitor.task import preserve_termination_log
 
 from ai.backend.logging import BraceStyleAdapter
 
-if TYPE_CHECKING:
-    from .events.dispatcher import AbstractAnycastEvent, EventProducer
-    from .lock import AbstractDistributedLock
-
+from .events.dispatcher import EventProducer
+from .events.types import AbstractAnycastEvent
+from .lock import AbstractDistributedLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

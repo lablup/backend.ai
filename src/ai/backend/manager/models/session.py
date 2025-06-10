@@ -49,6 +49,9 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.events.event_types.session.broadcast import (
     SessionStartedEvent as SessionStartedBroadcastEvent,
 )
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionTerminatedEvent as SessionTerminatedBroadcastEvent,
+)
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AccessKey,
@@ -1588,7 +1591,7 @@ class SessionLifecycleManager:
             case SessionStatus.TERMINATED:
                 await self.event_producer.anycast_and_broadcast_event(
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
-                    SessionStartedBroadcastEvent(
+                    SessionTerminatedBroadcastEvent(
                         session_row.id, session_row.main_kernel.status_info
                     ),
                 )
