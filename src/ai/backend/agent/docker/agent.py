@@ -1189,7 +1189,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await network.connect({"Container": container._id})
 
             kernel_obj.container_id = container._id
-            container_network_info: ContainerNetworkInfo | None = None
+            container_network_info: Optional[ContainerNetworkInfo] = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
@@ -1229,8 +1229,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 stdin_port = 0
                 stdout_port = 0
                 for idx, port in enumerate(exposed_ports):
-                    ports: list[PortInfo] | None = await container.port(port)
-                    if ports is None:
+                    ports: Optional[list[PortInfo]] = await container.port(port)
+                    if not ports:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
                         )
@@ -1436,7 +1436,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> Optional[str]:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
             return result["Config"].get("Cmd")
@@ -1675,7 +1675,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout: Optional[float] | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
             return
@@ -1707,7 +1707,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout: Optional[float],
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
