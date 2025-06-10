@@ -18,7 +18,7 @@ from ai.backend.test.testcases.session.create_single_node_single_container_sessi
     SingleNodeSingleContainerSessionCreation,
 )
 from ai.backend.test.testcases.session.template import (
-    SessionTestTemplateWrapper,
+    SessionSetupTemplateWrapper,
 )
 
 
@@ -76,7 +76,7 @@ class TestSpecManager:
                 name="single_node_single_container_session",
                 description="TODO: Write this.",
                 tags={TestTag.MANAGER, TestTag.SESSION},
-                template=SessionTestTemplateWrapper(
+                template=SessionSetupTemplateWrapper(
                     BasicTestTemplate(SingleNodeSingleContainerSessionCreation())
                 ),
             ),
@@ -84,7 +84,7 @@ class TestSpecManager:
                 name="single_node_multi_container_session",
                 description="TODO: Write this.",
                 tags={TestTag.MANAGER, TestTag.SESSION},
-                template=SessionTestTemplateWrapper(
+                template=SessionSetupTemplateWrapper(
                     BasicTestTemplate(SingleNodeMultiContainerSessionCreation())
                 ),
             ),
@@ -92,7 +92,7 @@ class TestSpecManager:
                 name="multi_node_multi_container_session",
                 description="TODO: Write this.",
                 tags={TestTag.MANAGER, TestTag.SESSION},
-                template=SessionTestTemplateWrapper(
+                template=SessionSetupTemplateWrapper(
                     BasicTestTemplate(MultiNodeMultiContainerSessionCreation())
                 ),
             ),
