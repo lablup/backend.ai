@@ -10,18 +10,20 @@ class BaseTestContext(Generic[T]):
 
     _ctxvar: ContextVar[Optional[T]]
 
-    def get_current(self) -> T:
+    @classmethod
+    def get_current(cls) -> T:
         """Get the current value from context"""
-        res = self._ctxvar.get()
+        res = cls._ctxvar.get()
         if res is None:
-            raise RuntimeError(f"No value is set in {self.__class__.__name__}")
+            raise RuntimeError(f"No value is set in {cls.__class__.__name__}")
         return res
 
+    @classmethod
     @actxmgr
-    async def with_current(self, value: Any) -> AsyncIterator[None]:
+    async def with_current(cls, value: Any) -> AsyncIterator[None]:
         """Set the current value in the context"""
-        token = self._ctxvar.set(value)
+        token = cls._ctxvar.set(value)
         try:
             yield
         finally:
-            self._ctxvar.reset(token)
+            cls._ctxvar.reset(token)

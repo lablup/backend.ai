@@ -1,15 +1,15 @@
 from typing import override
 
+from ai.backend.test.testcases.auth.login import AuthenticationContext
+from ai.backend.test.testcases.root import TestRunContext
 from ai.backend.test.testcases.template import TestCode, TestTemplate
-from ai.backend.test.testcases.root import test_run_context
-from ai.backend.test.testcases.auth.login import authentication_context
 
 
 class TestContainerLogRetriever(TestCode):
     @override
     async def test(self) -> None:
-        test_id = test_run_context.get_test_id()
-        session = authentication_context.get_current()
+        test_id = TestRunContext.get_test_id()
+        session = AuthenticationContext.get_current()
 
         try:
             compute_session = await session.ComputeSession.get_or_create(

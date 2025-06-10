@@ -7,22 +7,18 @@ from ai.backend.test.testcases.context import BaseTestContext
 from ai.backend.test.testcases.template import TestTemplate, WrapperTestTemplate
 
 
-class TestRunContext(BaseTestContext):
+class TestRunContext(BaseTestContext[dict[str, Any]]):
     """Context for the entire test run"""
 
-    _ctxvar: ContextVar[Optional[dict[str, Any]]]
+    _ctxvar: ContextVar[Optional[dict[str, Any]]] = ContextVar("test_run_context", default=None)
 
-    def __init__(self) -> None:
-        self._ctxvar = ContextVar("test_run_context", default=None)
-
-    def get_current(self) -> Any:
+    @classmethod
+    def get_current(cls) -> Any:
         return super().get_current()
 
-    def get_test_id(self) -> str:
-        return self.get_current()["test_id"]
-
-
-test_run_context = TestRunContext()
+    @classmethod
+    def get_test_id(cls) -> str:
+        return cls.get_current()["test_id"]
 
 
 class RootTestTemplate(WrapperTestTemplate):
@@ -44,5 +40,5 @@ class RootTestTemplate(WrapperTestTemplate):
         test_info = {
             "test_id": str(self._test_id),
         }
-        async with test_run_context.with_current(test_info):
+        async with TestRunContext.with_current(test_info):
             yield

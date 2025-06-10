@@ -4,22 +4,13 @@ from typing import AsyncIterator, Optional, override
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.testcases.context import BaseTestContext
-from ai.backend.test.testcases.root import test_run_context
+from ai.backend.test.testcases.root import TestRunContext
 from ai.backend.test.testcases.template import TestTemplate, WrapperTestTemplate
 from ai.backend.test.testcases.utils import login, logout
 
 
-class AuthenticationContext(BaseTestContext):
-    _ctxvar: ContextVar[Optional[str]]
-
-    def __init__(self) -> None:
-        self._ctxvar = ContextVar("auth_context", default=None)
-
-    def get_current(self) -> AsyncSession:
-        return super().get_current()
-
-
-authentication_context = AuthenticationContext()
+class AuthenticationContext(BaseTestContext[AsyncSession]):
+    _ctxvar: ContextVar[Optional[AsyncSession]] = ContextVar("authentication_context", default=None)
 
 
 class AuthenticationWrapperTemplate(WrapperTestTemplate):
@@ -38,7 +29,7 @@ class AuthenticationWrapperTemplate(WrapperTestTemplate):
     @override
     @actxmgr
     async def context(self) -> AsyncIterator[None]:
-        test_id = test_run_context.get_test_id()
+        test_id = TestRunContext.get_test_id()
         async with AsyncSession() as session:
             await login(
                 session=session,
@@ -48,7 +39,7 @@ class AuthenticationWrapperTemplate(WrapperTestTemplate):
                 otp=self.otp,
             )
 
-            async with authentication_context.with_current(session):
+            async with AuthenticationContext.with_current(session):
                 try:
                     yield
                 finally:
