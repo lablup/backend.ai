@@ -2,16 +2,14 @@ import enum
 from dataclasses import dataclass
 from typing import Mapping, Self
 
-from ai.backend.test.testcases.auth.login import AuthenticationWrapperTemplate
-from ai.backend.test.testcases.root import RootTestTemplate
-from ai.backend.test.testcases.session.test_session_creation import (
-    BasicContainerLogRetrieverTemplate,
-    TestSessionCreation,
-)
-from ai.backend.test.testcases.template import (
+from ai.backend.test.templates.auth.login import LoginTemplate
+from ai.backend.test.templates.template import (
     BasicTestTemplate,
     NopTestCode,
     TestTemplate,
+)
+from ai.backend.test.testcases.session.session_creation import (
+    TestSessionCreation,
 )
 
 
@@ -62,15 +60,13 @@ class TestSpecManager:
                 name="session",
                 description="Test session management.",
                 tags={TestTag.SESSION, TestTag.MANAGER},
-                template=RootTestTemplate(
-                    template=AuthenticationWrapperTemplate(
-                        user_id="admin@lablup.com",
-                        password="wJalrXUt",
-                        otp=None,
-                        template=BasicContainerLogRetrieverTemplate(
-                            testCode=TestSessionCreation(),
-                        ),
-                    )
+                template=LoginTemplate(
+                    user_id="admin@lablup.com",  # TODO: Don't use hardcoded user info rather use injected user info
+                    password="wJalrXUt",
+                    otp=None,
+                    template=BasicTestTemplate(
+                        testcode=TestSessionCreation(),
+                    ),
                 ),
             ),
         }

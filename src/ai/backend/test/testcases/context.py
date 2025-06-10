@@ -1,6 +1,6 @@
-from contextlib import asynccontextmanager as actxmgr
+from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import AsyncIterator, Generic, Optional, TypeVar
+from typing import Generic, Iterator, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -34,8 +34,8 @@ class BaseTestContext(Generic[T]):
         return res
 
     @classmethod
-    @actxmgr
-    async def with_current(cls, value: T) -> AsyncIterator[None]:
+    @contextmanager
+    def with_current(cls, value: T) -> Iterator[None]:
         """Set the current value in the context"""
         if cls._ctxvar is None:
             raise RuntimeError("Don't use BaseTestContext directly, subclass it instead")
