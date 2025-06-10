@@ -5,7 +5,7 @@ from ai.backend.test.testcases.root import TestRunContext
 from ai.backend.test.testcases.template import TestCode, TestTemplate
 
 
-class TestContainerLogRetriever(TestCode):
+class TestSessionCreation(TestCode):
     @override
     async def test(self) -> None:
         test_id = TestRunContext.get_test_id()
@@ -24,16 +24,16 @@ class TestContainerLogRetriever(TestCode):
 
 
 class BasicContainerLogRetrieverTemplate(TestTemplate):
-    _testCode: TestContainerLogRetriever
+    _test_code: TestSessionCreation
 
-    def __init__(self, testCode: TestContainerLogRetriever) -> None:
-        self._testCode = testCode
+    def __init__(self, testCode: TestSessionCreation) -> None:
+        self._test_code = testCode
 
     @property
     @override
     def name(self) -> str:
-        return "basic-container-log-retriever"
+        return "session-creation"
 
     @override
     async def run_test(self, exporter) -> None:
-        await self._testCode.test()
+        await self._test_code.test()

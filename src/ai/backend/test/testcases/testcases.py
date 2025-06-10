@@ -4,9 +4,9 @@ from typing import Mapping, Self
 
 from ai.backend.test.testcases.auth.login import AuthenticationWrapperTemplate
 from ai.backend.test.testcases.root import RootTestTemplate
-from ai.backend.test.testcases.session.test_container_log_retriever import (
+from ai.backend.test.testcases.session.test_session_creation import (
     BasicContainerLogRetrieverTemplate,
-    TestContainerLogRetriever,
+    TestSessionCreation,
 )
 from ai.backend.test.testcases.template import (
     BasicTestTemplate,
@@ -68,7 +68,7 @@ class TestSpecManager:
                         password="wJalrXUt",
                         otp=None,
                         template=BasicContainerLogRetrieverTemplate(
-                            testCode=TestContainerLogRetriever(),
+                            testCode=TestSessionCreation(),
                         ),
                     )
                 ),
