@@ -1047,8 +1047,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    ports: list[PortInfo] | None = await container.port(port)
-                    if ports is None:
+                    ports: Optional[list[PortInfo]] = await container.port(port)
+                    if not ports:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
                         )
@@ -1248,7 +1248,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> Optional[str]:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
             return result["Config"].get("Cmd")
@@ -1504,7 +1504,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout: Optional[float],
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
