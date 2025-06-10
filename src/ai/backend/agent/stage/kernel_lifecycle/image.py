@@ -20,7 +20,7 @@ class ScrathInfo:
 
 
 @dataclass
-class KernelCreationPullingSpec:
+class ImageSpec:
     # throttle_semaphore: asyncio.Semaphore
     image_ref: ImageRef
     image_digest: str
@@ -31,36 +31,34 @@ class KernelCreationPullingSpec:
     is_debug: bool
 
 
-class KernelCreationPullingSpecGenerator(SpecGenerator[KernelCreationPullingSpec]):
+class ImageSpecGenerator(SpecGenerator[ImageSpec]):
     # def __init__(
     #     self,
     # ) -> None:
     #     pass
 
     @override
-    async def wait_for_spec(self) -> KernelCreationPullingSpec:
+    async def wait_for_spec(self) -> ImageSpec:
         """
         Waits for the spec to be ready.
         """
         # In a real implementation, this would wait for some condition to be met.
-        return KernelCreationPullingSpec()
+        return ImageSpec()
 
 
 @dataclass
-class KernelCreationPullingResult:
+class ImageResult:
     image_ref: ImageRef
 
 
-class KernelCreationPullingProvisioner(
-    Provisioner[KernelCreationPullingSpec, KernelCreationPullingResult]
-):
+class ImageProvisioner(Provisioner[ImageSpec, ImageResult]):
     @property
     @override
     def name(self) -> str:
         return "kernel_creation_setup"
 
     @override
-    async def setup(self, spec: KernelCreationPullingSpec) -> KernelCreationPullingResult:
+    async def setup(self, spec: ImageSpec) -> ImageResult:
         """
         Just pull an image if it is needed
         """
@@ -98,7 +96,5 @@ class KernelCreationPullingProvisioner(
         pass
 
 
-class KernelCreationPullingStage(
-    ProvisionStage[KernelCreationPullingSpec, KernelCreationPullingResult]
-):
+class ImageStage(ProvisionStage[ImageSpec, ImageResult]):
     pass
