@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generic, Iterator, Optional, TypeVar
+from typing import Generic, Iterator, Optional, TypeVar, final
 
 T = TypeVar("T")
 
@@ -21,6 +21,7 @@ class BaseTestContext(Generic[T]):
         cls._ctxvar = ContextVar[T](f"{cls.__name__}_ctxvar", default=None)
 
     @classmethod
+    @final
     def get_current(cls) -> T:
         """
         Get the current value from context
@@ -34,6 +35,7 @@ class BaseTestContext(Generic[T]):
         return res
 
     @classmethod
+    @final
     @contextmanager
     def with_current(cls, value: T) -> Iterator[None]:
         """Set the current value in the context"""
