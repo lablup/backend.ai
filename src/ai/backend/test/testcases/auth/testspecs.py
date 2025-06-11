@@ -7,6 +7,11 @@ AUTH_TEST_SPECS = {
         name="login",
         description="Test user login functionality.",
         tags={TestTag.WEBSERVER, TestTag.AUTH},
-        template=LoginTemplate(template=BasicTestTemplate(NopTestCode())),
+        template=BasicTestTemplate(
+            testcode=NopTestCode(),
+            wrapper_templates=[
+                LoginTemplate,
+            ],
+        ),
     )
 }

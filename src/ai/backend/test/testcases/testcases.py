@@ -64,10 +64,11 @@ class TestSpecManager:
                 name="session",
                 description="Test session management.",
                 tags={TestTag.SESSION, TestTag.MANAGER},
-                template=KeypairTemplate(
-                    template=BasicTestTemplate(
-                        testcode=TestSessionCreation(),
-                    ),
+                template=BasicTestTemplate(
+                    testcode=TestSessionCreation(),
+                    wrapper_templates=[
+                        KeypairTemplate,
+                    ],
                 ),
             ),
         }

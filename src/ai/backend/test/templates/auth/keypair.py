@@ -5,10 +5,20 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.auth import KeypairContext, KeypairEndpointContext
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.templates.template import WrapperTestTemplate
+from ai.backend.test.templates.template import (
+    TestTemplate,
+    WrapperTestTemplate,
+    WrapperTestTemplateProtocol,
+)
 
 
 class KeypairTemplate(WrapperTestTemplate):
+    # TODO: How to Remove this?
+    def __init__(
+        self, template: TestTemplate, wrapper_templates: list["WrapperTestTemplateProtocol"] = []
+    ) -> None:
+        super().__init__(template, wrapper_templates)
+
     @property
     def name(self) -> str:
         return "auth_keypair"

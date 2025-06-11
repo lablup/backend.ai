@@ -9,12 +9,19 @@ from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.auth import LoginCredentialContext, LoginEndpointContext
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.tester import TestIDContext
-from ai.backend.test.templates.template import TestTemplate, WrapperTestTemplate
+from ai.backend.test.templates.template import (
+    TestTemplate,
+    WrapperTestTemplate,
+    WrapperTestTemplateProtocol,
+)
 
 
 class LoginTemplate(WrapperTestTemplate):
-    def __init__(self, template: TestTemplate) -> None:
-        super().__init__(template)
+    # TODO: How to Remove this?
+    def __init__(
+        self, template: TestTemplate, wrapper_templates: list["WrapperTestTemplateProtocol"] = []
+    ) -> None:
+        super().__init__(template, wrapper_templates)
 
     @property
     def name(self) -> str:
