@@ -126,7 +126,7 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 @click.argument("name", type=str)
 @main.command()
 @click.pass_obj
-def run_test(cli_ctx: CLIContext, name: str, test_users: list[str]) -> None:
+def run_test(cli_ctx: CLIContext, name: str) -> None:
     spec_manager = TestSpecManager.default()
     tester = Tester(
         spec_manager=spec_manager,
@@ -137,7 +137,7 @@ def run_test(cli_ctx: CLIContext, name: str, test_users: list[str]) -> None:
 
 @main.command()
 @click.pass_obj
-def run_all(cli_ctx: CLIContext, test_users: list[str]) -> None:
+def run_all(cli_ctx: CLIContext) -> None:
     spec_manager = TestSpecManager.default()
     tester = Tester(
         spec_manager=spec_manager,
