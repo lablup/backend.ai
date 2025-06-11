@@ -29,6 +29,11 @@ class LoginTemplate(WrapperTestTemplate):
         test_id = TestIDContext.get_current()
         test_id_str = str(test_id)
         client_session = AsyncSessionContext.get_current()
+        endpoint = EndpointContext.get_current()
+        api_config = APIConfig(
+            endpoint=endpoint.endpoint,
+            endpoint_type=endpoint.endpoint_type,
+        )
 
         await _login(
             session=client_session,

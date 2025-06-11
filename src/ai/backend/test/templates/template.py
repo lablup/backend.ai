@@ -52,7 +52,7 @@ class TestTemplate(ABC):
 class BasicTestTemplate(TestTemplate):
     _testcode: TestCode
 
-    def __init__(self, testcode: TestCode) -> None:
+    def __init__(self, testcode: TestCode, wrapper_templates: list["WrapperTestTemplate"] = []) -> None:
         """
         Initialize the basic template with a test code function.
 
@@ -68,10 +68,19 @@ class BasicTestTemplate(TestTemplate):
         await self._testcode.test()
 
 
+"SessionTest": BasicTestTemplate(
+    testcode=NopTestCode(),
+    wrapper_templates=[
+        "ClientSessionTemplate",
+        "LoginTemplate",
+    ]
+)
+
 class WrapperTestTemplate(TestTemplate, ABC):
     _template: TestTemplate
+    _wrappers: list["WrapperTestTemplate"]
 
-    def __init__(self, template: TestTemplate) -> None:
+    def __init__(self, template: TestTemplate, wrapper_templates: list["WrapperTestTemplate"] = []) -> None:
         """
         Initialize the wrapper template with a test template.
 
@@ -92,6 +101,8 @@ class WrapperTestTemplate(TestTemplate, ABC):
     @final
     async def run_test(self, exporter: TestExporter) -> None:
         try:
+            for wrapper in self._wrappers:
+                self.context()
             # NOTE: self.context() should be an async context manager
             async with self.context():  # type: ignore
                 await self._template.run_test(exporter)

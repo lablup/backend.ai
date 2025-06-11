@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -31,9 +32,45 @@ class APIConfigModel(BaseModel):
         )
 
 
+@dataclass
+class KeyPair:
+    access_key: str
+    secret_key: str
+
+
+@dataclass
+class Endpoint:
+    endpoint: str
+    endpoint_type: Literal["api", "session"]
+
+
+@dataclass
+class LoginCred:
+    user_id: str
+    password: str
+
+class TestContextInjectionModel(BaseModel):
+    endpoint: Optional[Endpoint] = Field(
+        default=None,
+        description="The endpoint configuration for the test context.",
+        validation_alias="endpoint",
+    )
+    key_pair: Optional[KeyPair] = Field(
+        default=None,
+        description="The key pair for the test context.",
+        validation_alias="key-pair",
+    )
+    login_cred: Optional[LoginCred] = Field(
+        default=None,
+        description="The login credentials for the test context.",
+        validation_alias="login-cred",
+    )
+
+
 class TesterConfigModel(BaseModel):
     api_configs: dict[str, APIConfigModel] = Field(
         default_factory=dict,
         description="Dictionary of API configurations for the test.",
         validation_alias="api-configs",
     )
+    contexts: TestContextInjectionModel

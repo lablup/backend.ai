@@ -1,6 +1,9 @@
 import asyncio
+from pathlib import Path
+from typing import Optional
 
 import aiofiles
+from ai.backend.test.testcases.context import BaseTestContext
 import aiotools
 import tomli
 
@@ -28,25 +31,24 @@ class Tester:
         self._exporter = exporter
         self._test_users = test_users
         self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
-
+    
     @aiotools.lru_cache(maxsize=1)
-    async def load_tester_config(self) -> TesterConfigModel:
-        async with aiofiles.open("tester.toml", mode="r") as fp:
+    async def load_tester_config(self, config_path: Path) -> TesterConfigModel:
+        async with aiofiles.open(config_path, mode="r") as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
             config = TesterConfigModel.model_validate(content, by_alias=True)
-
-            for test_user in self._test_users:
-                if test_user not in config.api_configs:
-                    raise RuntimeError(f"Test user '{test_user}' is not defined in tester.toml")
-
             return config
-
+    
     async def _run_spec(self, spec: TestSpec) -> None:
         """
         Run a single test specification.
         """
         tester_config = await self.load_tester_config()
+        ctx_map = BaseTestContext.get_used_contexts()
+        ctx_map["endpoint"].with_current(config.contexts.endpoint)
+        ctx_map["key_pair"].with_current(config.contexts.key_pair)
+        ctx_map["login_cred"].with_current(config.contexts.login_cred)
         with TestConfigContext.with_current(tester_config):
             for test_user in self._test_users:
                 config = tester_config.api_configs[test_user].to_api_config()

@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generic, Iterator, Optional, TypeVar, final
+from typing import Generic, Iterator, Mapping, Optional, TypeVar, final
 
 T = TypeVar("T")
 
@@ -14,11 +14,21 @@ class BaseTestContext(Generic[T]):
     """
 
     _ctxvar: Optional[ContextVar[Optional[T]]] = None
+    _used: Mapping[str, "BaseTestContext"] = {}
 
     def __init_subclass__(cls):
         if cls._ctxvar is not None:
             raise RuntimeError(f"{cls.__name__} is already initialized")
         cls._ctxvar = ContextVar[T](f"{cls.__name__}_ctxvar", default=None)
+        cls._used[cls.__name__] = cls
+
+    @classmethod
+    def get_used_contexts(cls) -> Mapping[str, "BaseTestContext"]:
+        """
+        Get all used contexts
+        :return: mapping of context names to context instances
+        """
+        return cls._used
 
     @classmethod
     @final
