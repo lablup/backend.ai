@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from typing import Mapping, Self
 
 from ai.backend.test.templates.template import (
-    AsyncSessionTemplate,
     BasicTestTemplate,
+    ClientSessionTemplate,
     NopTestCode,
     TestTemplate,
 )
@@ -60,7 +60,7 @@ class TestSpecManager:
                 name="session",
                 description="Test session management.",
                 tags={TestTag.SESSION, TestTag.MANAGER},
-                template=AsyncSessionTemplate(
+                template=ClientSessionTemplate(
                     template=BasicTestTemplate(
                         testcode=TestSessionCreation(),
                     ),

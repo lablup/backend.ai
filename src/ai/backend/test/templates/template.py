@@ -124,7 +124,7 @@ class SequenceTestTemplate(TestTemplate, ABC):
                 raise
 
 
-class AsyncSessionTemplate(WrapperTestTemplate):
+class ClientSessionTemplate(WrapperTestTemplate):
     def __init__(self, template: TestTemplate) -> None:
         super().__init__(template)
 
