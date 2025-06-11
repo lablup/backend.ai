@@ -2,16 +2,16 @@ import uuid
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
 
-from ai.backend.client.session import AsyncSession
-from ai.backend.test.templates.template import WrapperTestTemplate
+from ai.backend.test.templates.template import SequenceTestTemplate, WrapperTestTemplate
 from ai.backend.test.testcases.session.context import ComputeSessionContext
 
 
-class SessionSetupTemplateWrapper(WrapperTestTemplate):
+# TODO: How to improve this?
+class SessionNameTemplateWrapper(WrapperTestTemplate):
     @property
     @override
     def name(self) -> str:
-        return "session_setup"
+        return "session_name_setup"
 
     @override
     @actxmgr
@@ -23,5 +23,9 @@ class SessionSetupTemplateWrapper(WrapperTestTemplate):
         with ComputeSessionContext.with_current(session_name):
             yield
 
-            async with AsyncSession() as client_session:
-                await client_session.ComputeSession(session_name).destroy()
+
+class SessionLifecycleTemplate(SequenceTestTemplate):
+    @property
+    @override
+    def name(self) -> str:
+        return "session_lifecycle"

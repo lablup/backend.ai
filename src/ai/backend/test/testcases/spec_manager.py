@@ -17,8 +17,10 @@ from ai.backend.test.testcases.session.create_single_node_multi_container_sessio
 from ai.backend.test.testcases.session.create_single_node_single_container_session import (
     SingleNodeSingleContainerSessionCreation,
 )
+from ai.backend.test.testcases.session.destroy_session import DestroySession
 from ai.backend.test.testcases.session.template import (
-    SessionSetupTemplateWrapper,
+    SessionLifecycleTemplate,
+    SessionNameTemplateWrapper,
 )
 
 
@@ -76,24 +78,33 @@ class TestSpecManager:
                 name="single_node_single_container_session",
                 description="TODO: Write this.",
                 tags={TestTag.MANAGER, TestTag.SESSION},
-                template=SessionSetupTemplateWrapper(
-                    BasicTestTemplate(SingleNodeSingleContainerSessionCreation())
+                template=SessionNameTemplateWrapper(
+                    SessionLifecycleTemplate([
+                        BasicTestTemplate(SingleNodeSingleContainerSessionCreation()),
+                        BasicTestTemplate(DestroySession()),
+                    ])
                 ),
             ),
             "single_node_multi_container_session": TestSpec(
                 name="single_node_multi_container_session",
                 description="TODO: Write this.",
                 tags={TestTag.MANAGER, TestTag.SESSION},
-                template=SessionSetupTemplateWrapper(
-                    BasicTestTemplate(SingleNodeMultiContainerSessionCreation())
+                template=SessionNameTemplateWrapper(
+                    SessionLifecycleTemplate([
+                        BasicTestTemplate(SingleNodeMultiContainerSessionCreation()),
+                        BasicTestTemplate(DestroySession()),
+                    ])
                 ),
             ),
             "multi_node_multi_container_session": TestSpec(
                 name="multi_node_multi_container_session",
                 description="TODO: Write this.",
                 tags={TestTag.MANAGER, TestTag.SESSION},
-                template=SessionSetupTemplateWrapper(
-                    BasicTestTemplate(MultiNodeMultiContainerSessionCreation())
+                template=SessionNameTemplateWrapper(
+                    SessionLifecycleTemplate([
+                        BasicTestTemplate(MultiNodeMultiContainerSessionCreation()),
+                        BasicTestTemplate(DestroySession()),
+                    ])
                 ),
             ),
         }
