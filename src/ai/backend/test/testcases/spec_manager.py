@@ -1,28 +1,13 @@
 import enum
-import textwrap
 from dataclasses import dataclass
 from itertools import product
 from typing import Any, Mapping, Optional, Sequence
 
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.template import (
-    BasicTestTemplate,
     TestTemplate,
 )
-from ai.backend.test.testcases.session.create_multi_node_multi_container_session import (
-    MultiNodeMultiContainerSessionCreation,
-)
-from ai.backend.test.testcases.session.create_single_node_multi_container_session import (
-    SingleNodeMultiContainerSessionCreation,
-)
-from ai.backend.test.testcases.session.create_single_node_single_container_session import (
-    SingleNodeSingleContainerSessionCreation,
-)
-from ai.backend.test.testcases.session.destroy_session import DestroySession
-from ai.backend.test.testcases.session.template import (
-    SessionLifecycleTemplate,
-    SessionNameTemplateWrapper,
-)
+from ai.backend.test.testcases.session.testspecs import SESSION_TEST_SPECS
 
 
 class TestTag(enum.StrEnum):
@@ -75,66 +60,7 @@ class TestSpecManager:
     @classmethod
     def default(cls) -> Self:
         specs = {
-            "single_node_single_container_session": TestSpec(
-                name="single_node_single_container_session",
-                description=textwrap.dedent("""\
-                    Test for creating a single-node, single-container session.
-                    This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
-
-                    The test will:
-                    1. Create a session with the specified image and resources.
-                    2. Listen for lifecycle events and verify that the session transitions through the expected states.
-                    3. Assert that the session is running after creation.
-                    4. Destroy the session after the test is complete.
-                """),
-                tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-                template=SessionNameTemplateWrapper(
-                    SessionLifecycleTemplate([
-                        BasicTestTemplate(SingleNodeSingleContainerSessionCreation()),
-                        BasicTestTemplate(DestroySession()),
-                    ])
-                ),
-            ),
-            "single_node_multi_container_session": TestSpec(
-                name="single_node_multi_container_session",
-                description=textwrap.dedent("""\
-                    Test for creating a single-node, multi-container session.
-                    This test verifies that a session can be created with a single node and multiple containers, and that it transitions through the expected lifecycle events.
-
-                    The test will:
-                    1. Create a session with the specified image and resources.
-                    2. Listen for lifecycle events and verify that the session transitions through the expected states.
-                    3. Assert that the session is running after creation.
-                    4. Destroy the session after the test is complete.
-                """),
-                tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-                template=SessionNameTemplateWrapper(
-                    SessionLifecycleTemplate([
-                        BasicTestTemplate(SingleNodeMultiContainerSessionCreation()),
-                        BasicTestTemplate(DestroySession()),
-                    ])
-                ),
-            ),
-            "multi_node_multi_container_session": TestSpec(
-                name="multi_node_multi_container_session",
-                description=textwrap.dedent("""\
-                    Test for creating a multi-node, multi-container session.
-                    This test verifies that a session can be created with multiple nodes and multiple containers, and that it transitions through the expected lifecycle events.
-
-                    The test will:
-                    1. Create a session with the specified image and resources.
-                    2. Listen for lifecycle events and verify that the session transitions through the expected states.
-                    3. Assert that the session is running after creation.
-                    4. Destroy the session after the test is complete.
-                """),
-                tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-                template=SessionNameTemplateWrapper(
-                    SessionLifecycleTemplate([
-                        BasicTestTemplate(MultiNodeMultiContainerSessionCreation()),
-                        BasicTestTemplate(DestroySession()),
-                    ])
-                ),
-            ),
+            **SESSION_TEST_SPECS,
         }
         return cls(specs)
 
