@@ -11,20 +11,20 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    ExecutionCancelledEvent,
-    ExecutionFinishedEvent,
-    ExecutionStartedEvent,
-    ExecutionTimeoutEvent,
-    SessionCancelledEvent,
-    SessionCheckingPrecondEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
+    ExecutionCancelledAnycastEvent,
+    ExecutionFinishedAnycastEvent,
+    ExecutionStartedAnycastEvent,
+    ExecutionTimeoutAnycastEvent,
+    SessionCancelledAnycastEvent,
+    SessionCheckingPrecondAnycastEvent,
+    SessionEnqueuedAnycastEvent,
+    SessionFailureAnycastEvent,
+    SessionPreparingAnycastEvent,
+    SessionScheduledAnycastEvent,
+    SessionStartedAnycastEvent,
+    SessionSuccessAnycastEvent,
+    SessionTerminatedAnycastEvent,
+    SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.kernel import (
     KernelLifecycleEventReason,
@@ -65,7 +65,10 @@ class SessionEventHandler:
         self._idle_checker_host = idle_checker_host
 
     async def _handle_started_or_cancelled(
-        self, context: None, source: AgentId, event: SessionStartedEvent | SessionCancelledEvent
+        self,
+        context: None,
+        source: AgentId,
+        event: SessionStartedAnycastEvent | SessionCancelledAnycastEvent,
     ) -> None:
         if event.creation_id not in self._registry.session_creation_tracker:
             return
@@ -80,7 +83,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: SessionStartedEvent,
+        event: SessionStartedAnycastEvent,
     ) -> None:
         """
         Update the database according to the session-level lifecycle events
@@ -97,7 +100,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: SessionCancelledEvent,
+        event: SessionCancelledAnycastEvent,
     ) -> None:
         """
         Update the database according to the session-level lifecycle events
@@ -110,7 +113,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: SessionTerminatingEvent,
+        event: SessionTerminatingAnycastEvent,
     ) -> None:
         """
         Update the database according to the session-level lifecycle events
@@ -122,7 +125,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: SessionTerminatedEvent,
+        event: SessionTerminatedAnycastEvent,
     ) -> None:
         await self._registry.clean_session(event.session_id)
         await self.invoke_session_callback(None, source, event)
@@ -147,17 +150,21 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: SessionSuccessEvent | SessionFailureEvent,
+        event: SessionSuccessAnycastEvent | SessionFailureAnycastEvent,
     ) -> None:
         """
         Update the database according to the batch-job completion results
         """
         match event:
-            case SessionSuccessEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+            case SessionSuccessAnycastEvent(
+                session_id=session_id, reason=reason, exit_code=exit_code
+            ):
                 await SessionRow.set_session_result(
                     self._db, session_id, success=True, exit_code=exit_code
                 )
-            case SessionFailureEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+            case SessionFailureAnycastEvent(
+                session_id=session_id, reason=reason, exit_code=exit_code
+            ):
                 await SessionRow.set_session_result(
                     self._db, session_id, success=False, exit_code=exit_code
                 )
@@ -182,21 +189,23 @@ class SessionEventHandler:
         context: None,
         source: AgentId,
         event: (
-            SessionEnqueuedEvent
-            | SessionScheduledEvent
-            | SessionCheckingPrecondEvent
-            | SessionPreparingEvent
-            | SessionStartedEvent
-            | SessionCancelledEvent
-            | SessionTerminatingEvent
-            | SessionTerminatedEvent
-            | SessionSuccessEvent
-            | SessionFailureEvent
+            SessionEnqueuedAnycastEvent
+            | SessionScheduledAnycastEvent
+            | SessionCheckingPrecondAnycastEvent
+            | SessionPreparingAnycastEvent
+            | SessionStartedAnycastEvent
+            | SessionCancelledAnycastEvent
+            | SessionTerminatingAnycastEvent
+            | SessionTerminatedAnycastEvent
+            | SessionSuccessAnycastEvent
+            | SessionFailureAnycastEvent
         ),
     ) -> None:
         log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
         try:
-            allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
+            allow_stale = isinstance(
+                event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
+            )
             async with self._db.begin_readonly_session() as db_sess:
                 session = await SessionRow.get_session(
                     db_sess,
@@ -219,7 +228,7 @@ class SessionEventHandler:
                             db_sess, session.id, load_endpoint=True
                         )
                         endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                        if isinstance(event, SessionCancelledEvent):
+                        if isinstance(event, SessionCancelledAnycastEvent):
                             update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                             if "error" in session.status_data:
                                 if session.status_data["error"]["name"] == "MultiAgentError":
@@ -243,7 +252,7 @@ class SessionEventHandler:
                                 .where(EndpointRow.id == endpoint.id)
                             )
                             await db_sess.execute(query)
-                        elif isinstance(event, SessionTerminatedEvent):
+                        elif isinstance(event, SessionTerminatedAnycastEvent):
                             query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
                             await db_sess.execute(query)
                             if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
@@ -265,7 +274,7 @@ class SessionEventHandler:
                             await db_sess.commit()
                         else:
                             new_route_status: Optional[RouteStatus] = None
-                            if isinstance(event, SessionTerminatingEvent):
+                            if isinstance(event, SessionTerminatingAnycastEvent):
                                 new_route_status = RouteStatus.TERMINATING
 
                             if new_route_status:
@@ -346,7 +355,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: ExecutionStartedEvent,
+        event: ExecutionStartedAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
             event.session_id, event.execution_status()
@@ -356,7 +365,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: ExecutionFinishedEvent,
+        event: ExecutionFinishedAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
             event.session_id, event.execution_status()
@@ -366,7 +375,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: ExecutionTimeoutEvent,
+        event: ExecutionTimeoutAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
             event.session_id, event.execution_status()
@@ -376,7 +385,7 @@ class SessionEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: ExecutionCancelledEvent,
+        event: ExecutionCancelledAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
             event.session_id, event.execution_status()

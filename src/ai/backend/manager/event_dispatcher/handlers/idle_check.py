@@ -1,6 +1,6 @@
 import logging
 
-from ai.backend.common.events.event_types.idle import DoIdleCheckEvent
+from ai.backend.common.events.event_types.idle.anycast import DoIdleCheckEvent
 from ai.backend.common.types import (
     AgentId,
 )

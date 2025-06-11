@@ -45,7 +45,7 @@ class ModelServiceStatusEventArgs(AbstractBroadcastEvent):
         return None
 
 
-class ModelServiceStatusEvent(ModelServiceStatusEventArgs):
+class ModelServiceStatusBroadcastEvent(ModelServiceStatusEventArgs):
     @classmethod
     @override
     def event_name(cls) -> str:

@@ -38,19 +38,17 @@ from ai.backend.common import redis_helper
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.event_types.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
-    SessionStartedEvent,
-    SessionTerminatedEvent,
+    SessionStartedAnycastEvent,
+    SessionTerminatedAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
-    SessionStartedEvent as SessionStartedBroadcastEvent,
-)
-from ai.backend.common.events.event_types.session.broadcast import (
-    SessionTerminatedEvent as SessionTerminatedBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
@@ -1575,7 +1573,7 @@ class SessionLifecycleManager:
                     session_row.creation_id,
                 )
                 await self.event_producer.anycast_and_broadcast_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                    SessionStartedAnycastEvent(session_row.id, session_row.creation_id),
                     SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
@@ -1590,7 +1588,9 @@ class SessionLifecycleManager:
                     await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
                 await self.event_producer.anycast_and_broadcast_event(
-                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                    SessionTerminatedAnycastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
                     SessionTerminatedBroadcastEvent(
                         session_row.id, session_row.main_kernel.status_info
                     ),

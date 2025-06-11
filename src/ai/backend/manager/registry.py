@@ -59,59 +59,53 @@ from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events.event_types.agent import (
+from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.event_types.image import (
+from ai.backend.common.events.event_types.image.anycast import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
 from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
+    KernelCancelledAnycastEvent,
+    KernelCreatingAnycastEvent,
     KernelHeartbeatEvent,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
+    KernelPreparingAnycastEvent,
+    KernelPullingAnycastEvent,
+    KernelStartedAnycastEvent,
+    KernelTerminatedAnycastEvent,
+    KernelTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.model_serving.anycast import (
-    ModelServiceStatusEvent,
-    RouteCreatedEvent,
+    ModelServiceStatusAnycastEvent,
+    RouteCreatedAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
+    SessionCancelledAnycastEvent,
+    SessionEnqueuedAnycastEvent,
+    SessionFailureAnycastEvent,
+    SessionPreparingAnycastEvent,
+    SessionScheduledAnycastEvent,
+    SessionStartedAnycastEvent,
+    SessionSuccessAnycastEvent,
+    SessionTerminatedAnycastEvent,
+    SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
-    SessionCancelledEvent as SessionCancelledBroadcastEvent,
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionTerminatingBroadcastEvent,
 )
-from ai.backend.common.events.event_types.session.broadcast import (
-    SessionEnqueuedEvent as SessionEnqueuedBroadcastEvent,
-)
-from ai.backend.common.events.event_types.session.broadcast import (
-    SessionStartedEvent as SessionStartedBroadcastEvent,
-)
-from ai.backend.common.events.event_types.session.broadcast import (
-    SessionTerminatingEvent as SessionTerminatingBroadcastEvent,
-)
-from ai.backend.common.events.event_types.vfolder import (
+from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -1375,7 +1369,7 @@ class AgentRegistry:
             (session_id, session_name, access_key),
         )
         await self.event_producer.anycast_and_broadcast_event(
-            SessionEnqueuedEvent(session_id, session_creation_id),
+            SessionEnqueuedAnycastEvent(session_id, session_creation_id),
             SessionEnqueuedBroadcastEvent(session_id, session_creation_id),
         )
         return session_id
@@ -2402,7 +2396,7 @@ class AgentRegistry:
                             self.db, session_id, SessionStatus.TERMINATING
                         )
                         await self.event_producer.anycast_and_broadcast_event(
-                            SessionTerminatingEvent(session_id, reason),
+                            SessionTerminatingAnycastEvent(session_id, reason),
                             SessionTerminatingBroadcastEvent(session_id, reason),
                         )
                 case SessionStatus.TERMINATED:
@@ -2421,7 +2415,7 @@ class AgentRegistry:
                         self.db, session_id, SessionStatus.TERMINATING
                     )
                     await self.event_producer.anycast_and_broadcast_event(
-                        SessionTerminatingEvent(session_id, reason),
+                        SessionTerminatingAnycastEvent(session_id, reason),
                         SessionTerminatingBroadcastEvent(session_id, reason),
                     )
 
@@ -2450,7 +2444,7 @@ class AgentRegistry:
                                 status_changed_at=now,
                             )
                             await self.event_producer.anycast_event(
-                                KernelCancelledEvent(kernel.id, session_id, reason),
+                                KernelCancelledAnycastEvent(kernel.id, session_id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 main_stat = {"status": "cancelled"}
@@ -2462,7 +2456,7 @@ class AgentRegistry:
                                     status_changed_at=now,
                                 )
                                 await self.event_producer.anycast_and_broadcast_event(
-                                    SessionCancelledEvent(
+                                    SessionCancelledAnycastEvent(
                                         session_id,
                                         target_session.creation_id,
                                         reason,
@@ -2525,7 +2519,7 @@ class AgentRegistry:
 
                             await execute_with_retry(_update)
                             await self.event_producer.anycast_event(
-                                KernelTerminatedEvent(kernel.id, target_session.id, reason),
+                                KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
                             )
                         case _:
 
@@ -2555,7 +2549,7 @@ class AgentRegistry:
 
                             await execute_with_retry(_update)
                             await self.event_producer.anycast_event(
-                                KernelTerminatingEvent(kernel.id, target_session.id, reason),
+                                KernelTerminatingAnycastEvent(kernel.id, target_session.id, reason),
                             )
 
                     if kernel.agent_addr is None:
@@ -2618,7 +2612,7 @@ class AgentRegistry:
                 await asyncio.gather(*per_agent_tasks, return_exceptions=True)
             for kernel in to_be_terminated:
                 await self.event_producer.anycast_event(
-                    KernelTerminatedEvent(kernel.id, target_session.id, reason),
+                    KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
                 )
             await self.hook_plugin_ctx.notify(
                 "POST_DESTROY_SESSION",
@@ -2771,7 +2765,7 @@ class AgentRegistry:
         # NOTE: If the restarted session is a batch-type one, then the startup command
         #       will be executed again after restart.
         await self.event_producer.anycast_and_broadcast_event(
-            SessionStartedEvent(session.id, session.creation_id),
+            SessionStartedAnycastEvent(session.id, session.creation_id),
             SessionStartedBroadcastEvent(session.id, session.creation_id),
         )
 
@@ -3808,13 +3802,11 @@ async def handle_image_pull_failed(
 async def handle_kernel_creation_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: (
-        KernelPreparingEvent
-        | KernelPullingEvent
-        | KernelCreatingEvent
-        | KernelStartedEvent
-        | KernelCancelledEvent
-    ),
+    event: KernelPreparingAnycastEvent
+    | KernelPullingAnycastEvent
+    | KernelCreatingAnycastEvent
+    | KernelStartedAnycastEvent
+    | KernelCancelledAnycastEvent,
 ) -> None:
     """
     Update the database and perform post_create_kernel() upon
@@ -3831,34 +3823,36 @@ async def handle_kernel_creation_lifecycle(
         event.kernel_id,
     )
     match event:
-        case KernelPreparingEvent():
+        case KernelPreparingAnycastEvent():
             # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
             pass
-        case KernelPullingEvent(kernel_id, session_id, reason=reason):
+        case KernelPullingAnycastEvent(kernel_id, session_id, reason=reason):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
-        case KernelCreatingEvent(kernel_id, session_id, reason=reason):
+        case KernelCreatingAnycastEvent(kernel_id, session_id, reason=reason):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_creating(db_conn, kernel_id, session_id, reason)
-        case KernelStartedEvent(kernel_id, session_id, reason=reason, creation_info=creation_info):
+        case KernelStartedAnycastEvent(
+            kernel_id, session_id, reason=reason, creation_info=creation_info
+        ):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_running(
                     db_conn, kernel_id, session_id, reason, creation_info
                 )
-        case KernelCancelledEvent():
+        case KernelCancelledAnycastEvent():
             log.warning(f"Kernel cancelled, {event.reason = }")
 
 
 async def handle_kernel_termination_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: KernelTerminatingEvent | KernelTerminatedEvent,
+    event: KernelTerminatingAnycastEvent | KernelTerminatedAnycastEvent,
 ) -> None:
     match event:
-        case KernelTerminatingEvent():
+        case KernelTerminatingAnycastEvent():
             # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
             pass
-        case KernelTerminatedEvent(kernel_id, session_id, reason, exit_code):
+        case KernelTerminatedAnycastEvent(kernel_id, session_id, reason, exit_code):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_terminated(
                     db_conn, kernel_id, session_id, reason, exit_code
@@ -3876,7 +3870,7 @@ async def handle_kernel_heartbeat(
 async def handle_session_creation_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: SessionStartedEvent | SessionCancelledEvent,
+    event: SessionStartedAnycastEvent | SessionCancelledAnycastEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
@@ -3885,10 +3879,10 @@ async def handle_session_creation_lifecycle(
     if event.creation_id not in context.session_creation_tracker:
         return
     log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.event_name(), event.session_id)
-    if isinstance(event, SessionStartedEvent):
+    if isinstance(event, SessionStartedAnycastEvent):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
-    elif isinstance(event, SessionCancelledEvent):
+    elif isinstance(event, SessionCancelledAnycastEvent):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
 
@@ -3900,16 +3894,16 @@ async def handle_session_creation_lifecycle(
 async def handle_session_termination_lifecycle(
     context: AgentRegistry,
     agent_id: AgentId,
-    event: SessionTerminatingEvent | SessionTerminatedEvent,
+    event: SessionTerminatingAnycastEvent | SessionTerminatedAnycastEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
     match event:
-        case SessionTerminatingEvent():
+        case SessionTerminatingAnycastEvent():
             pass
-        case SessionTerminatedEvent(session_id=session_id):
+        case SessionTerminatedAnycastEvent(session_id=session_id):
             await context.clean_session(session_id)
 
     await invoke_session_callback(context, agent_id, event)
@@ -3934,7 +3928,7 @@ async def handle_destroy_session(
 async def handle_model_service_status_update(
     context: AgentRegistry,
     source: AgentId,
-    event: ModelServiceStatusEvent,
+    event: ModelServiceStatusAnycastEvent,
 ) -> None:
     log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
     try:
@@ -3987,20 +3981,22 @@ async def invoke_session_callback(
     context: AgentRegistry,
     source: AgentId,
     event: (
-        SessionEnqueuedEvent
-        | SessionScheduledEvent
-        | SessionPreparingEvent
-        | SessionStartedEvent
-        | SessionCancelledEvent
-        | SessionTerminatingEvent
-        | SessionTerminatedEvent
-        | SessionSuccessEvent
-        | SessionFailureEvent
+        SessionEnqueuedAnycastEvent
+        | SessionScheduledAnycastEvent
+        | SessionPreparingAnycastEvent
+        | SessionStartedAnycastEvent
+        | SessionCancelledAnycastEvent
+        | SessionTerminatingAnycastEvent
+        | SessionTerminatedAnycastEvent
+        | SessionSuccessAnycastEvent
+        | SessionFailureAnycastEvent
     ),
 ) -> None:
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     try:
-        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
+        allow_stale = isinstance(
+            event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
+        )
         async with context.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
@@ -4021,7 +4017,7 @@ async def invoke_session_callback(
                 async with context.db.begin_session() as db_sess:
                     route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                     endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                    if isinstance(event, SessionCancelledEvent):
+                    if isinstance(event, SessionCancelledAnycastEvent):
                         update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                         if "error" in session.status_data:
                             if session.status_data["error"]["name"] == "MultiAgentError":
@@ -4045,7 +4041,7 @@ async def invoke_session_callback(
                             .where(EndpointRow.id == endpoint.id)
                         )
                         await db_sess.execute(query)
-                    elif isinstance(event, SessionTerminatedEvent):
+                    elif isinstance(event, SessionTerminatedAnycastEvent):
                         query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
                         await db_sess.execute(query)
                         if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
@@ -4067,7 +4063,7 @@ async def invoke_session_callback(
                         await db_sess.commit()
                     else:
                         new_route_status: Optional[RouteStatus] = None
-                        if isinstance(event, SessionTerminatingEvent):
+                        if isinstance(event, SessionTerminatingAnycastEvent):
                             new_route_status = RouteStatus.TERMINATING
 
                         if new_route_status:
@@ -4146,15 +4142,15 @@ async def invoke_session_callback(
 async def handle_batch_result(
     context: AgentRegistry,
     source: AgentId,
-    event: SessionSuccessEvent | SessionFailureEvent,
+    event: SessionSuccessAnycastEvent | SessionFailureAnycastEvent,
 ) -> None:
     """
     Update the database according to the batch-job completion results
     """
     match event:
-        case SessionSuccessEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+        case SessionSuccessAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
             await SessionRow.set_session_result(context.db, session_id, True, exit_code)
-        case SessionFailureEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+        case SessionFailureAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
             await SessionRow.set_session_result(context.db, session_id, False, exit_code)
     async with context.db.begin_session() as db_sess:
         try:
@@ -4222,7 +4218,7 @@ async def handle_agent_images_remove(
 async def handle_route_creation(
     context: AgentRegistry,
     source: AgentId,
-    event: RouteCreatedEvent,
+    event: RouteCreatedAnycastEvent,
 ) -> None:
     endpoint: EndpointRow | None = None
 

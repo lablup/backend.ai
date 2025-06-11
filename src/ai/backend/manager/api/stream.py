@@ -44,7 +44,7 @@ from etcd_client import GRPCStatusCode, GRPCStatusError
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatingEvent
+from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatingBroadcastEvent
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -657,7 +657,7 @@ async def get_stream_apps(request: web.Request) -> web.Response:
 async def handle_kernel_terminating(
     app: web.Application,
     source: AgentId,
-    event: KernelTerminatingEvent,
+    event: KernelTerminatingBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["stream.context"]
@@ -766,7 +766,9 @@ async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx.active_session_ids = defaultdict(int)  # multiset[int]
     app_ctx.conn_tracker_gc_task = asyncio.create_task(stream_conn_tracker_gc(root_ctx, app_ctx))
 
-    root_ctx.event_dispatcher.subscribe(KernelTerminatingEvent, app, handle_kernel_terminating)
+    root_ctx.event_dispatcher.subscribe(
+        KernelTerminatingBroadcastEvent, app, handle_kernel_terminating
+    )
 
     yield
 

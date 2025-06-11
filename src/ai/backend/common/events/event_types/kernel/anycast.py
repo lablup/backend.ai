@@ -62,7 +62,7 @@ class KernelCreationEvent(KernelLifecycleEvent):
 
 
 @dataclass
-class KernelPreparingEvent(KernelCreationEvent):
+class KernelPreparingAnycastEvent(KernelCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -70,7 +70,7 @@ class KernelPreparingEvent(KernelCreationEvent):
 
 
 @dataclass
-class KernelPullingEvent(KernelCreationEvent):
+class KernelPullingAnycastEvent(KernelCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -78,21 +78,21 @@ class KernelPullingEvent(KernelCreationEvent):
 
 
 @dataclass
-class KernelCreatingEvent(KernelCreationEvent):
+class KernelCreatingAnycastEvent(KernelCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "kernel_creating"
 
 
-class KernelStartedEvent(KernelCreationEvent):
+class KernelStartedAnycastEvent(KernelCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "kernel_started"
 
 
-class KernelCancelledEvent(KernelLifecycleEvent):
+class KernelCancelledAnycastEvent(KernelLifecycleEvent):
     @override
     def serialize(self) -> tuple:
         return (
@@ -150,14 +150,14 @@ class KernelTerminationEvent(BaseKernelEvent):
         return None
 
 
-class KernelTerminatingEvent(KernelTerminationEvent):
+class KernelTerminatingAnycastEvent(KernelTerminationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "kernel_terminating"
 
 
-class KernelTerminatedEvent(KernelTerminationEvent):
+class KernelTerminatedAnycastEvent(KernelTerminationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:

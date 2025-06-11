@@ -45,7 +45,7 @@ class ModelServiceStatusEventArgs(AbstractAnycastEvent):
         return None
 
 
-class ModelServiceStatusEvent(ModelServiceStatusEventArgs):
+class ModelServiceStatusAnycastEvent(ModelServiceStatusEventArgs):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -77,7 +77,7 @@ class RouteCreationEvent(AbstractAnycastEvent):
         return None
 
 
-class RouteCreatedEvent(RouteCreationEvent):
+class RouteCreatedAnycastEvent(RouteCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:

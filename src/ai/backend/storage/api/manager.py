@@ -33,11 +33,11 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
-from ai.backend.common.events.event_types.vfolder import (
+from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
-from ai.backend.common.events.event_types.volume import (
+from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
     VolumeMounted,

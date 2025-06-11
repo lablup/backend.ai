@@ -21,7 +21,7 @@ from sqlalchemy.orm import load_only, noload, selectinload
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
-from ai.backend.common.events.event_types.bgtask import (
+from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
 )
 from ai.backend.common.events.hub.hub import EventHub

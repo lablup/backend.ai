@@ -37,7 +37,7 @@ from .. import redis_helper
 from ..events.dispatcher import (
     EventProducer,
 )
-from ..events.event_types.bgtask import (
+from ..events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,

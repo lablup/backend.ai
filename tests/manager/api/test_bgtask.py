@@ -15,7 +15,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.events.event_types.bgtask import (
+from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskUpdatedEvent,

@@ -78,7 +78,7 @@ class SessionCreationEvent(BaseSessionEvent):
 
 
 @dataclass
-class SessionEnqueuedEvent(SessionCreationEvent):
+class SessionEnqueuedBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -86,7 +86,7 @@ class SessionEnqueuedEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionScheduledEvent(SessionCreationEvent):
+class SessionScheduledBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -94,7 +94,7 @@ class SessionScheduledEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionCheckingPrecondEvent(SessionCreationEvent):
+class SessionCheckingPrecondBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -102,7 +102,7 @@ class SessionCheckingPrecondEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionPreparingEvent(SessionCreationEvent):
+class SessionPreparingBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -110,7 +110,7 @@ class SessionPreparingEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionCancelledEvent(SessionCreationEvent):
+class SessionCancelledBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -118,7 +118,7 @@ class SessionCancelledEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionStartedEvent(SessionCreationEvent):
+class SessionStartedBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -150,7 +150,7 @@ class SessionTerminationEvent(BaseSessionEvent):
 
 
 @dataclass
-class SessionTerminatingEvent(SessionTerminationEvent):
+class SessionTerminatingBroadcastEvent(SessionTerminationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -158,7 +158,7 @@ class SessionTerminatingEvent(SessionTerminationEvent):
 
 
 @dataclass
-class SessionTerminatedEvent(SessionTerminationEvent):
+class SessionTerminatedBroadcastEvent(SessionTerminationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -191,7 +191,7 @@ class SessionResultEvent(BaseSessionEvent):
 
 
 @dataclass
-class SessionSuccessEvent(SessionResultEvent):
+class SessionSuccessBroadcastEvent(SessionResultEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -199,7 +199,7 @@ class SessionSuccessEvent(SessionResultEvent):
 
 
 @dataclass
-class SessionFailureEvent(SessionResultEvent):
+class SessionFailureBroadcastEvent(SessionResultEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
