@@ -7,7 +7,6 @@ from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.template import (
     TestTemplate,
 )
-from ai.backend.test.testcases.session.testspecs import SESSION_TEST_SPECS
 
 
 class TestTag(enum.StrEnum):
@@ -59,6 +58,9 @@ class TestSpecManager:
 
     @classmethod
     def default(cls) -> Self:
+        # TODO: Resolve cyclic import
+        from ai.backend.test.testcases.session.testspecs import SESSION_TEST_SPECS
+
         specs = {
             **SESSION_TEST_SPECS,
         }

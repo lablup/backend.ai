@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.types import ClusterMode
@@ -12,8 +13,17 @@ _IMAGE_RESOURCES = {"cpu": 1, "mem": "512m"}
 _TEST_TIMEOUT = 30.0  # seconds
 
 
-# TODO: Refactor this using `parametrize` concept.
-class SingleNodeMultiContainerSessionCreation(TestCode):
+@dataclass
+class CreateSessionArgs:
+    cluster_mode: ClusterMode
+    cluster_size: int = 1
+
+
+class CreateSession(TestCode):
+    def __init__(self, args: CreateSessionArgs):
+        super().__init__()
+        self.args = args
+
     async def test(self) -> None:
         async with AsyncSession() as client_session:
             session_name = ComputeSessionContext.get_current()
@@ -45,8 +55,8 @@ class SingleNodeMultiContainerSessionCreation(TestCode):
                 _IMAGE_NAME,
                 name=session_name,
                 resources=_IMAGE_RESOURCES,
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=3,
+                cluster_mode=self.args.cluster_mode,
+                cluster_size=self.args.cluster_size,
             )
 
             assert created_session.created, "Session should be created successfully"

@@ -1,15 +1,12 @@
 import textwrap
 
+from ai.backend.common.types import ClusterMode
+
 from ...templates.template import BasicTestTemplate
 from ..testcases import TestSpec, TestTag
-from .create_multi_node_multi_container_session import (
-    MultiNodeMultiContainerSessionCreation,
-)
-from .create_single_node_multi_container_session import (
-    SingleNodeMultiContainerSessionCreation,
-)
-from .create_single_node_single_container_session import (
-    SingleNodeSingleContainerSessionCreation,
+from .create_session import (
+    CreateSession,
+    CreateSessionArgs,
 )
 from .destroy_session import DestroySession
 from .template import (
@@ -33,7 +30,11 @@ SESSION_TEST_SPECS = {
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=SessionNameTemplateWrapper(
             SessionLifecycleTemplate([
-                BasicTestTemplate(SingleNodeSingleContainerSessionCreation()),
+                BasicTestTemplate(
+                    CreateSession(
+                        CreateSessionArgs(cluster_mode=ClusterMode.SINGLE_NODE, cluster_size=1)
+                    )
+                ),
                 BasicTestTemplate(DestroySession()),
             ])
         ),
@@ -53,7 +54,11 @@ SESSION_TEST_SPECS = {
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=SessionNameTemplateWrapper(
             SessionLifecycleTemplate([
-                BasicTestTemplate(SingleNodeMultiContainerSessionCreation()),
+                BasicTestTemplate(
+                    CreateSession(
+                        CreateSessionArgs(cluster_mode=ClusterMode.SINGLE_NODE, cluster_size=3)
+                    )
+                ),
                 BasicTestTemplate(DestroySession()),
             ])
         ),
@@ -73,7 +78,11 @@ SESSION_TEST_SPECS = {
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=SessionNameTemplateWrapper(
             SessionLifecycleTemplate([
-                BasicTestTemplate(MultiNodeMultiContainerSessionCreation()),
+                BasicTestTemplate(
+                    CreateSession(
+                        CreateSessionArgs(cluster_mode=ClusterMode.MULTI_NODE, cluster_size=3)
+                    )
+                ),
                 BasicTestTemplate(DestroySession()),
             ])
         ),
