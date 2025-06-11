@@ -20,10 +20,14 @@ class Tester:
     _spec_manager: TestSpecManager
     _exporter: TestExporter
     _semaphore: asyncio.Semaphore
+    _config_file_path: Path
 
-    def __init__(self, spec_manager: TestSpecManager, exporter: TestExporter) -> None:
+    def __init__(
+        self, spec_manager: TestSpecManager, exporter: TestExporter, config_file_path: Path
+    ) -> None:
         self._spec_manager = spec_manager
         self._exporter = exporter
+        self._config_file_path = config_file_path
         self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
 
     @aiotools.lru_cache(maxsize=1)
@@ -38,7 +42,7 @@ class Tester:
         """
         Run a single test specification.
         """
-        tester_config = await self._load_tester_config("tester.toml")
+        tester_config = await self._load_tester_config(self._config_file_path)
         ctx_map = BaseTestContext.get_used_contexts()
 
         async with self._semaphore:

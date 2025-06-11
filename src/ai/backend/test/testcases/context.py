@@ -1,4 +1,5 @@
-from collections.abc import Mapping
+from abc import abstractmethod
+from collections.abc import Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Generic, Iterator, Optional, TypeVar, final
@@ -15,7 +16,7 @@ class BaseTestContext(Generic[T]):
     """
 
     _ctxvar: Optional[ContextVar[Optional[T]]] = None
-    _used: Mapping[str, "BaseTestContext"] = {}
+    _used: MutableMapping[str, "BaseTestContext"] = {}
 
     def __init_subclass__(cls):
         if cls._ctxvar is not None:
@@ -24,6 +25,7 @@ class BaseTestContext(Generic[T]):
         cls._used[cls.get_name()] = cls
 
     @classmethod
+    @abstractmethod
     def get_name(cls) -> str:
         """
         Get the name of the context

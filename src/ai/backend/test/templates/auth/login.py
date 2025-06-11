@@ -25,7 +25,7 @@ class LoginTemplate(WrapperTestTemplate):
 
     @property
     def name(self) -> str:
-        return "auth_login"
+        return "login"
 
     @override
     @actxmgr
