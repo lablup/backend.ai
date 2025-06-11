@@ -4,6 +4,7 @@ import asyncio
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import click
 
@@ -13,6 +14,8 @@ from ai.backend.test.tester.tester import Tester
 
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
+
+_CONFIG_PATH = Path("tester.toml")
 
 
 @click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
@@ -129,8 +132,7 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 def run_test(cli_ctx: CLIContext, name: str) -> None:
     spec_manager = TestSpecManager.default()
     tester = Tester(
-        spec_manager=spec_manager,
-        exporter=PrintExporter(),
+        spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=_CONFIG_PATH
     )
     asyncio.run(tester.run_by_name(name))
 
@@ -140,8 +142,7 @@ def run_test(cli_ctx: CLIContext, name: str) -> None:
 def run_all(cli_ctx: CLIContext) -> None:
     spec_manager = TestSpecManager.default()
     tester = Tester(
-        spec_manager=spec_manager,
-        exporter=PrintExporter(),
+        spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=_CONFIG_PATH
     )
     asyncio.run(tester.run_all())
 
