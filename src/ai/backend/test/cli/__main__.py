@@ -7,7 +7,6 @@ import sys
 
 import click
 
-from ai.backend.cli.params import CommaSeparatedListType
 from ai.backend.test.testcases.testcases import TestSpecManager
 from ai.backend.test.tester.exporter import PrintExporter
 from ai.backend.test.tester.tester import Tester
@@ -125,13 +124,6 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 
 
 @click.argument("name", type=str)
-@click.option(
-    "--test-users",
-    "test_users",
-    default=[],
-    type=CommaSeparatedListType(str),
-    help="List of test users to run the tests with",
-)
 @main.command()
 @click.pass_obj
 def run_test(cli_ctx: CLIContext, name: str, test_users: list[str]) -> None:
@@ -139,26 +131,17 @@ def run_test(cli_ctx: CLIContext, name: str, test_users: list[str]) -> None:
     tester = Tester(
         spec_manager=spec_manager,
         exporter=PrintExporter(),
-        test_users=test_users,
     )
     asyncio.run(tester.run_by_name(name))
 
 
 @main.command()
-@click.option(
-    "--test-users",
-    "test_users",
-    default=[],
-    type=CommaSeparatedListType(str),
-    help="List of test users to run the tests with",
-)
 @click.pass_obj
 def run_all(cli_ctx: CLIContext, test_users: list[str]) -> None:
     spec_manager = TestSpecManager.default()
     tester = Tester(
         spec_manager=spec_manager,
         exporter=PrintExporter(),
-        test_users=test_users,
     )
     asyncio.run(tester.run_all())
 

@@ -19,15 +19,11 @@ _DEFAULT_CONCURRENCY = 10
 class Tester:
     _spec_manager: TestSpecManager
     _exporter: TestExporter
-    _test_users: list[str]
     _semaphore: asyncio.Semaphore
 
-    def __init__(
-        self, spec_manager: TestSpecManager, exporter: TestExporter, test_users: list[str]
-    ) -> None:
+    def __init__(self, spec_manager: TestSpecManager, exporter: TestExporter) -> None:
         self._spec_manager = spec_manager
         self._exporter = exporter
-        self._test_users = test_users
         self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
 
     @aiotools.lru_cache(maxsize=1)
