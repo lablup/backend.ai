@@ -2,8 +2,8 @@ import asyncio
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.types import ClusterMode
+from ai.backend.test.templates.template import TestCode
 from ai.backend.test.testcases.session.context import ComputeSessionContext
-from ai.backend.test.testcases.template import TestCode
 
 # Test environment configuration
 # TODO: Make these configurable loaderable by template wrapper
