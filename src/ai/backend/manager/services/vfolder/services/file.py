@@ -18,6 +18,7 @@ from ai.backend.manager.models.vfolder import (
     is_unmanaged,
     query_accessible_vfolders,
 )
+from ai.backend.manager.services.vfolder.exceptions import VFolderInvalidParameter
 
 from ..actions.file import (
     CreateDownloadSessionAction,
@@ -33,7 +34,6 @@ from ..actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
-from ..exceptions import VFolderInvalidParameter
 from ..types import FileInfo
 
 
