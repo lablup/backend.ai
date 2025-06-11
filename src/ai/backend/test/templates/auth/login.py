@@ -4,43 +4,47 @@ from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import AsyncIterator, Optional, override
 
+from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
-from ai.backend.test.contexts.client_session import AsyncSessionContext
+from ai.backend.test.contexts.auth import LoginCredentialContext, LoginEndpointContext
+from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.tester import TestIDContext
 from ai.backend.test.templates.template import TestTemplate, WrapperTestTemplate
 
 
 class LoginTemplate(WrapperTestTemplate):
-    def __init__(
-        self, template: TestTemplate, user_id: str, password: str, otp: Optional[str] = None
-    ) -> None:
+    def __init__(self, template: TestTemplate) -> None:
         super().__init__(template)
-        self.user_id = user_id
-        self.password = password
-        self.otp = otp
 
     @property
     def name(self) -> str:
-        return "login"
+        return "auth_login"
 
     @override
     @actxmgr
     async def context(self) -> AsyncIterator[None]:
         test_id = TestIDContext.get_current()
         test_id_str = str(test_id)
-        client_session = AsyncSessionContext.get_current()
+        credential_ctx = LoginCredentialContext.get_current()
+        endpoint_ctx = LoginEndpointContext.get_current()
 
-        await _login(
-            session=client_session,
-            test_id=test_id_str,
-            user_id=self.user_id,
-            password=self.password,
-            otp=self.otp,
+        api_config = APIConfig(
+            endpoint=endpoint_ctx.endpoint,
+            endpoint_type="session",
         )
-        try:
-            yield
-        finally:
-            await _logout(session=client_session, test_id=test_id_str)
+        async with AsyncSession(config=api_config) as session:
+            await _login(
+                session=session,
+                test_id=test_id_str,
+                user_id=credential_ctx.user_id,
+                password=credential_ctx.password,
+                otp=credential_ctx.otp,
+            )
+            with ClientSessionContext.with_current(session):
+                try:
+                    yield
+                finally:
+                    await _logout(session=session, test_id=test_id_str)
 
 
 def _get_test_temp_dir(test_id: str) -> Path:

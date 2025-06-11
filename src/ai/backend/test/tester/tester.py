@@ -1,12 +1,13 @@
 import asyncio
+from contextlib import ExitStack
+from pathlib import Path
 
 import aiofiles
 import aiotools
 import tomli
 
-from ai.backend.test.contexts.api_config import APIConfigContext
-from ai.backend.test.contexts.tester_config import TestConfigContext
-from ai.backend.test.tester.types import TesterConfigModel
+from ai.backend.test.testcases.context import BaseTestContext
+from ai.backend.test.tester.config import TesterConfig
 
 from ..testcases.testcases import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
@@ -30,30 +31,29 @@ class Tester:
         self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
 
     @aiotools.lru_cache(maxsize=1)
-    async def load_tester_config(self) -> TesterConfigModel:
-        async with aiofiles.open("tester.toml", mode="r") as fp:
+    async def _load_tester_config(self, config_path: Path) -> TesterConfig:
+        async with aiofiles.open(config_path, mode="r") as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
-            config = TesterConfigModel.model_validate(content, by_alias=True)
-
-            for test_user in self._test_users:
-                if test_user not in config.api_configs:
-                    raise RuntimeError(f"Test user '{test_user}' is not defined in tester.toml")
-
+            config = TesterConfig.model_validate(content, by_alias=True)
             return config
 
     async def _run_spec(self, spec: TestSpec) -> None:
         """
         Run a single test specification.
         """
-        tester_config = await self.load_tester_config()
-        with TestConfigContext.with_current(tester_config):
-            for test_user in self._test_users:
-                config = tester_config.api_configs[test_user].to_api_config()
-                with APIConfigContext.with_current(config):
-                    async with self._semaphore:
-                        runner = TestRunner(spec, self._exporter)
-                        await runner.run()
+        tester_config = await self._load_tester_config("tester.toml")
+        ctx_map = BaseTestContext.get_used_contexts()
+
+        async with self._semaphore:
+            with ExitStack() as stack:
+                for key, ctx in ctx_map.items():
+                    if config := getattr(tester_config.context, key, None):
+                        ctx_mgr = ctx.with_current(config)
+                        stack.enter_context(ctx_mgr)
+
+                runner = TestRunner(spec, self._exporter)
+                await runner.run()
 
     async def run_all(self) -> None:
         """

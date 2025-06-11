@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Generic, Iterator, Optional, TypeVar, final
@@ -14,11 +15,31 @@ class BaseTestContext(Generic[T]):
     """
 
     _ctxvar: Optional[ContextVar[Optional[T]]] = None
+    _used: Mapping[str, "BaseTestContext"] = {}
 
     def __init_subclass__(cls):
         if cls._ctxvar is not None:
             raise RuntimeError(f"{cls.__name__} is already initialized")
         cls._ctxvar = ContextVar[T](f"{cls.__name__}_ctxvar", default=None)
+        cls._used[cls.get_name()] = cls
+
+    @classmethod
+    def get_name(cls) -> str:
+        """
+        Get the name of the context
+        :return: name of the context
+        """
+        raise NotImplementedError(
+            f"{cls.__name__} must implement get_name method to return the context name"
+        )
+
+    @classmethod
+    def get_used_contexts(cls) -> Mapping[str, "BaseTestContext"]:
+        """
+        Get all used contexts
+        :return: mapping of context names to context instances
+        """
+        return cls._used
 
     @classmethod
     @final
@@ -31,7 +52,7 @@ class BaseTestContext(Generic[T]):
             raise RuntimeError("Don't use BaseTestContext directly, subclass it instead")
         res = cls._ctxvar.get()
         if res is None:
-            raise RuntimeError(f"No value is set in {cls.__class__.__name__} tester context")
+            raise RuntimeError(f'No value is set in "{cls.get_name()}" context')
         return res
 
     @classmethod

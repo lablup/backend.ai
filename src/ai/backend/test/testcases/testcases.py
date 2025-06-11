@@ -2,23 +2,23 @@ import enum
 from dataclasses import dataclass
 from typing import Mapping, Self
 
+from ai.backend.test.templates.auth.keypair import KeypairTemplate
 from ai.backend.test.templates.template import (
     BasicTestTemplate,
-    ClientSessionTemplate,
     NopTestCode,
     TestTemplate,
 )
-from ai.backend.test.testcases.session.session_creation import (
-    TestSessionCreation,
-)
+from ai.backend.test.testcases.session.session_creation import TestSessionCreation
 
 
 class TestTag(enum.StrEnum):
     # component based tags
     MANAGER = "manager"
     AGENT = "agent"
+    WEBSERVER = "webserver"
 
     # Domain specific tags
+    AUTH = "auth"
     VFOLDER = "vfolder"
     IMAGE = "image"
     SESSION = "session"
@@ -49,7 +49,11 @@ class TestSpecManager:
 
     @classmethod
     def default(cls) -> Self:
+        # TODO: Resolve cyclic import
+        from ai.backend.test.testcases.auth.testspecs import AUTH_TEST_SPECS
+
         specs = {
+            **AUTH_TEST_SPECS,
             "nop": TestSpec(
                 name="nop",
                 description="No operation test case.",
@@ -60,7 +64,7 @@ class TestSpecManager:
                 name="session",
                 description="Test session management.",
                 tags={TestTag.SESSION, TestTag.MANAGER},
-                template=ClientSessionTemplate(
+                template=KeypairTemplate(
                     template=BasicTestTemplate(
                         testcode=TestSessionCreation(),
                     ),

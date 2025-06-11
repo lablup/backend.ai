@@ -1,23 +1,13 @@
-[api-configs.admin]
-endpoint = "http://127.0.0.1:8091/"
-endpoint-type = "api"
+[context.keypair_endpoint]
+endpoint = "http://127.0.0.1:8091"
+
+[context.login_endpoint]
+endpoint = "http://127.0.0.1:8090"
+
+[context.keypair]
 access-key = "AKIAIOSFODNN7EXAMPLE"
 secret-key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
-[api-configs.domain-admin]
-endpoint = "http://127.0.0.1:8091/"
-endpoint-type = "api"
-access-key = "AKIAHUKCHDEZGEXAMPLE"
-secret-key = "cWbsM_vBB4CzTW7JdORRMx8SjGI3-wEXAMPLEKEY"
-
-[api-configs.user]
-endpoint = "http://127.0.0.1:8091/"
-endpoint-type = "api"
-access-key = "AKIANABBDUSEREXAMPLE"
-secret-key = "C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf"
-
-[api-configs.user2]
-endpoint = "http://127.0.0.1:8091/"
-endpoint-type = "api"
-access-key = "AKIANATWOUSEREXAMPLE"
-secret-key = "P7oxTDdzHbEpUSs5v7r7EWj9yKstp8VpZ7SEyA-g"
+[context.login-credential]
+user-id = "admin@lablup.com"
+password = "wJalrXUt"
