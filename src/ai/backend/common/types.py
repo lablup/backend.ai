@@ -587,16 +587,53 @@ class ReadableCIDR(Generic[_Address]):
         return self.address == other.address
 
 
+class SizeUnitPrefix(enum.StrEnum):
+    NONE = " "
+    KILO = "K"
+    MEGA = "M"
+    GIGA = "G"
+    TERA = "T"
+    PETA = "P"
+    EXA = "E"
+    ZETA = "Z"
+    YOTTA = "Y"
+
+
+_size_unit_sequence: tuple[SizeUnitPrefix, ...] = (
+    SizeUnitPrefix.NONE,
+    SizeUnitPrefix.KILO,
+    SizeUnitPrefix.MEGA,
+    SizeUnitPrefix.GIGA,
+    SizeUnitPrefix.TERA,
+    SizeUnitPrefix.PETA,
+    SizeUnitPrefix.EXA,
+    SizeUnitPrefix.ZETA,
+    SizeUnitPrefix.YOTTA,
+)
+
+
 class BinarySize(int):
     """
-    A wrapper around Python integers to represent binary sizes for storage and
-    memory in various places.
+    A wrapper around Python integers to represent binary sizes for memory in various places.
 
     Its string representation and parser, ``from_str()`` classmethod, does not use
     any locale-specific digit delimeters -- it supports only standard Python
     digit delimeters.
     """
 
+    _size_unit_map = {
+        SizeUnitPrefix.YOTTA: 2**80,
+        SizeUnitPrefix.ZETA: 2**70,
+        SizeUnitPrefix.EXA: 2**60,
+        SizeUnitPrefix.PETA: 2**50,
+        SizeUnitPrefix.TERA: 2**40,
+        SizeUnitPrefix.GIGA: 2**30,
+        SizeUnitPrefix.MEGA: 2**20,
+        SizeUnitPrefix.KILO: 2**10,
+        SizeUnitPrefix.NONE: 1,
+    }
+
+    # Leave this `suffix_map` because there are a few references in the codebase
     suffix_map = {
         "y": 2**80,  # yotta
         "z": 2**70,  # zetta
@@ -608,81 +645,95 @@ class BinarySize(int):
         "k": 2**10,  # kilo
         " ": 1,
     }
-    suffices = (" ", "K", "M", "G", "T", "P", "E", "Z", "Y")
-    endings = ("ibytes", "ibyte", "ib", "bytes", "byte", "b")
+    _endings = ("ibytes", "ibyte", "ib", "bytes", "byte", "b")
 
     @classmethod
-    def _parse_str(cls, expr: str) -> Union[BinarySize, Decimal]:
+    def _from_raw_value(cls, value: Self | Decimal | str) -> Self:
+        return cls(value)
+
+    @classmethod
+    def _from_integral(cls, value: numbers.Integral) -> Self:
+        return cls(int(value))
+
+    @classmethod
+    def _parse_str(cls, expr: str) -> Self | Decimal:
         if expr.lower() in ("inf", "infinite", "infinity"):
             return Decimal("Infinity")
         orig_expr = expr
         expr = expr.strip().replace("_", "")
         try:
-            return cls(expr)
+            return cls._from_raw_value(expr)
         except ValueError:
             expr = expr.lower()
             ending = ""
             dec_expr: Decimal
             try:
-                for ending in cls.endings:
+                for ending in cls._endings:
                     if (stem := expr.removesuffix(ending)) != expr:
-                        suffix = stem[-1]
+                        # The expression ends with a valid ending
+                        raw_size_unit = stem[-1]
                         dec_expr = Decimal(stem[:-1])
                         break
                 else:
-                    # when there is suffix without scale (e.g., "2K")
+                    # when there is size unit without scale (e.g., "2K")
                     if not str.isnumeric(expr[-1]):
-                        suffix = expr[-1]
+                        raw_size_unit = expr[-1]
                         dec_expr = Decimal(expr[:-1])
                     else:
-                        # has no suffix and is not an integer
+                        # has no size unit and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
             except (ArithmeticError, IndexError):
                 raise ValueError("Unconvertible value", orig_expr, ending)
             try:
-                multiplier = cls.suffix_map[suffix]
+                size_unit = SizeUnitPrefix(raw_size_unit.upper())
+                multiplier = cls._size_unit_map[size_unit]
             except KeyError:
                 raise ValueError("Unconvertible value", orig_expr)
-            return cls(dec_expr * multiplier)
+            return cls._from_raw_value(dec_expr * multiplier)
 
     @classmethod
     def finite_from_str(
         cls,
-        expr: Union[str, Decimal, numbers.Integral],
-    ) -> BinarySize:
+        expr: str | Decimal | numbers.Integral,
+    ) -> Self:
         if isinstance(expr, Decimal):
             if expr.is_infinite():
                 raise ValueError("infinite values are not allowed")
-            return cls(expr)
+            return cls._from_raw_value(expr)
         if isinstance(expr, numbers.Integral):
-            return cls(int(expr))
+            return cls._from_integral(expr)
         result = cls._parse_str(expr)
         if isinstance(result, Decimal) and result.is_infinite():
             raise ValueError("infinite values are not allowed")
-        return cls(int(result))
+        return cls._from_raw_value(result)
 
     @classmethod
     def from_str(
         cls,
-        expr: Union[str, Decimal, numbers.Integral],
-    ) -> Union[BinarySize, Decimal]:
+        expr: str | Decimal | numbers.Integral,
+    ) -> Self | Decimal:
         if isinstance(expr, Decimal):
-            return cls(expr)
+            return cls._from_raw_value(expr)
         if isinstance(expr, numbers.Integral):
-            return cls(int(expr))
+            return cls._from_integral(expr)
         return cls._parse_str(expr)
 
     def _preformat(self):
         scale = self
-        suffix_idx = 0
-        while scale >= 1024:
-            scale //= 1024
-            suffix_idx += 1
-        return suffix_idx
+        size_unit_idx = 0
+        scale_unit = 1024
+        while scale >= scale_unit:
+            scale //= scale_unit
+            size_unit_idx += 1
+        if size_unit_idx >= len(_size_unit_sequence):
+            raise ValueError(
+                f"Size {self} is too large to be represented with the current size unit prefixes."
+            )
+        return size_unit_idx
 
     @staticmethod
-    def _quantize(val, multiplier):
+    def _quantize(val, multiplier) -> Decimal:
         d = Decimal(val) / Decimal(multiplier)
         if d == d.to_integral():
             value = d.quantize(Decimal(1))
@@ -691,38 +742,191 @@ class BinarySize(int):
         return value
 
     def __str__(self):
-        suffix_idx = self._preformat()
-        if suffix_idx == 0:
+        size_unit_idx = self._preformat()
+        if size_unit_idx == 0:
             if self == 1:
                 return f"{int(self)} byte"
             else:
                 return f"{int(self)} bytes"
         else:
-            suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix.lower()]
+            size_unit = _size_unit_sequence[size_unit_idx]
+            multiplier = self._size_unit_map[size_unit]
             value = self._quantize(self, multiplier)
-            return f"{value:f} {suffix.upper()}iB"
+            return f"{value:f} {size_unit.upper()}iB"
 
-    def __format__(self, format_spec):
+    def __format__(self, format_spec: str):
         if len(format_spec) != 1:
             raise ValueError("format-string for BinarySize can be only one character.")
         if format_spec == "s":
             # automatically scaled
-            suffix_idx = self._preformat()
-            if suffix_idx == 0:
+            size_unit_idx = self._preformat()
+            if size_unit_idx == 0:
                 return f"{int(self)}"
-            suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix.lower()]
+            size_unit = _size_unit_sequence[size_unit_idx]
+            multiplier = self._size_unit_map[size_unit]
             value = self._quantize(self, multiplier)
-            return f"{value:f}{suffix.lower()}"
+            return f"{value:f}{size_unit.lower()}"
         else:
             # use the given scale
-            suffix = format_spec.lower()
-            multiplier = type(self).suffix_map.get(suffix)
-            if multiplier is None:
-                raise ValueError("Unsupported scale unit.", suffix)
+            try:
+                size_unit = SizeUnitPrefix(format_spec.upper())
+                multiplier = self._size_unit_map[size_unit]
+            except (ValueError, KeyError):
+                raise ValueError("Unsupported scale unit.", format_spec)
             value = self._quantize(self, multiplier)
-            return f"{value:f}{suffix.lower()}".strip()
+            return f"{value:f}{size_unit.lower()}".strip()
+
+
+class DecimalSize(int):
+    """
+    A wrapper around Python integers to represent binary sizes for storage in various places.
+
+    Its string representation and parser, ``from_str()`` classmethod, does not use
+    any locale-specific digit delimeters -- it supports only standard Python
+    digit delimeters.
+    """
+
+    _size_unit_map = {
+        SizeUnitPrefix.YOTTA: 1_000_000_000_000_000_000_000_000,  # yotta
+        SizeUnitPrefix.ZETA: 1_000_000_000_000_000_000_000,  # zetta
+        SizeUnitPrefix.EXA: 1_000_000_000_000_000_000,  # exa
+        SizeUnitPrefix.PETA: 1_000_000_000_000_000,  # peta
+        SizeUnitPrefix.TERA: 1_000_000_000_000,  # tera
+        SizeUnitPrefix.GIGA: 1_000_000_000,  # giga
+        SizeUnitPrefix.MEGA: 1_000_000,  # mega
+        SizeUnitPrefix.KILO: 1_000,  # kilo
+        SizeUnitPrefix.NONE: 1,
+    }
+    _endings = ("bytes", "byte", "b", "bytes")
+
+    @classmethod
+    def _from_raw_value(cls, value: Self | Decimal | str) -> Self:
+        return cls(value)
+
+    @classmethod
+    def _from_integral(cls, value: numbers.Integral) -> Self:
+        return cls(int(value))
+
+    @classmethod
+    def _parse_str(cls, expr: str) -> Self | Decimal:
+        if expr.lower() in ("inf", "infinite", "infinity"):
+            return Decimal("Infinity")
+        orig_expr = expr
+        expr = expr.strip().replace("_", "")
+        try:
+            return cls._from_raw_value(expr)
+        except ValueError:
+            expr = expr.lower()
+            ending = ""
+            dec_expr: Decimal
+            try:
+                for ending in cls._endings:
+                    if (stem := expr.removesuffix(ending)) != expr:
+                        # The expression ends with a valid ending
+                        raw_size_unit = stem[-1]
+                        dec_expr = Decimal(stem[:-1])
+                        break
+                else:
+                    # when there is size unit without scale (e.g., "2K")
+                    if not str.isnumeric(expr[-1]):
+                        raw_size_unit = expr[-1]
+                        dec_expr = Decimal(expr[:-1])
+                    else:
+                        # has no size unit and is not an integer
+                        # -> fractional bytes (e.g., 1.5 byte)
+                        raise ValueError("Fractional bytes are not allowed")
+            except (ArithmeticError, IndexError):
+                raise ValueError("Unconvertible value", orig_expr, ending)
+            try:
+                size_unit = SizeUnitPrefix(raw_size_unit.upper())
+                multiplier = cls._size_unit_map[size_unit]
+            except KeyError:
+                raise ValueError("Unconvertible value", orig_expr)
+            return cls._from_raw_value(dec_expr * multiplier)
+
+    @classmethod
+    def finite_from_str(
+        cls,
+        expr: str | Decimal | numbers.Integral,
+    ) -> Self:
+        if isinstance(expr, Decimal):
+            if expr.is_infinite():
+                raise ValueError("infinite values are not allowed")
+            return cls._from_raw_value(expr)
+        if isinstance(expr, numbers.Integral):
+            return cls._from_integral(expr)
+        result = cls._parse_str(expr)
+        if isinstance(result, Decimal) and result.is_infinite():
+            raise ValueError("infinite values are not allowed")
+        return cls._from_raw_value(result)
+
+    @classmethod
+    def from_str(
+        cls,
+        expr: str | Decimal | numbers.Integral,
+    ) -> Self | Decimal:
+        if isinstance(expr, Decimal):
+            return cls._from_raw_value(expr)
+        if isinstance(expr, numbers.Integral):
+            return cls._from_integral(expr)
+        return cls._parse_str(expr)
+
+    def _preformat(self):
+        scale = self
+        size_unit_idx = 0
+        scale_unit = 1000
+        while scale >= scale_unit:
+            scale //= scale_unit
+            size_unit_idx += 1
+        if size_unit_idx >= len(_size_unit_sequence):
+            raise ValueError(
+                f"Size {self} is too large to be represented with the current size unit prefixes."
+            )
+        return size_unit_idx
+
+    @staticmethod
+    def _quantize(val, multiplier) -> Decimal:
+        d = Decimal(val) / Decimal(multiplier)
+        if d == d.to_integral():
+            value = d.quantize(Decimal(1))
+        else:
+            value = d.quantize(Decimal(".00")).normalize()
+        return value
+
+    def __str__(self):
+        size_unit_idx = self._preformat()
+        if size_unit_idx == 0:
+            if self == 1:
+                return f"{int(self)} byte"
+            else:
+                return f"{int(self)} bytes"
+        else:
+            size_unit = _size_unit_sequence[size_unit_idx]
+            multiplier = self._size_unit_map[size_unit]
+            value = self._quantize(self, multiplier)
+            return f"{value:f} {size_unit.upper()}B"
+
+    def __format__(self, format_spec: str):
+        if len(format_spec) != 1:
+            raise ValueError("format-string for BinarySize can be only one character.")
+        if format_spec == "s":
+            # automatically scaled
+            size_unit_idx = self._preformat()
+            if size_unit_idx == 0:
+                return f"{int(self)}"
+            size_unit = _size_unit_sequence[size_unit_idx]
+            multiplier = self._size_unit_map[size_unit]
+            value = self._quantize(self, multiplier)
+            return f"{value:f}{size_unit.lower()}"
+        else:
+            # use the given scale
+            try:
+                size_unit = SizeUnitPrefix(format_spec.upper())
+                multiplier = self._size_unit_map[size_unit]
+            except (ValueError, KeyError):
+                raise ValueError("Unsupported scale unit.", format_spec)
+            value = self._quantize(self, multiplier)
+            return f"{value:f}{size_unit.lower()}".strip()
 
 
 class ResourceSlot(UserDict):
