@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from typing import Optional, Self, override
 
-from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import VFolderID
 
 
 @dataclass
-class VFolderEvent(AbstractEvent):
+class VFolderEvent(AbstractAnycastEvent):
     vfid: VFolderID
 
     @classmethod

@@ -59,15 +59,18 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.image.anycast import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
-    KernelLifecycleEventReason,
-    KernelTerminatedEvent,
+from ai.backend.common.events.event_types.kernel.anycast import (
+    KernelTerminatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelTerminatedBroadcastEvent,
+)
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
@@ -571,12 +574,17 @@ class AgentRPCServer(aobject):
         for kid, sid in kernel_session_ids:
             if kid not in self.agent.kernel_registry:
                 # produce KernelTerminatedEvent
-                await self.agent.produce_event(
-                    KernelTerminatedEvent(
+                await self.agent.anycast_and_broadcast_event(
+                    KernelTerminatedAnycastEvent(
                         kid,
                         sid,
                         reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
-                    )
+                    ),
+                    KernelTerminatedBroadcastEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    ),
                 )
 
         kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}
@@ -622,7 +630,7 @@ class AgentRPCServer(aobject):
             )
             if need_to_pull:
                 log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
-                await self.agent.produce_event(
+                await self.agent.anycast_event(
                     ImagePullStartedEvent(
                         image=str(img_ref),
                         image_ref=img_ref,
@@ -641,7 +649,7 @@ class AgentRPCServer(aobject):
                     log.exception(
                         f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
                     )
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -651,7 +659,7 @@ class AgentRPCServer(aobject):
                     )
                 except Exception as e:
                     log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -661,7 +669,7 @@ class AgentRPCServer(aobject):
                     )
                 else:
                     log.info(f"Image pull succeeded {img_ref}")
-                    await self.agent.produce_event(
+                    await self.agent.anycast_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
                             image_ref=img_ref,
@@ -671,7 +679,7 @@ class AgentRPCServer(aobject):
                     )
             else:
                 log.debug(f"No need to pull image {img_ref}")
-                await self.agent.produce_event(
+                await self.agent.anycast_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
                         image_ref=img_ref,

@@ -54,12 +54,12 @@ from ai.backend.common.events.dispatcher import (
     EventHandler,
     EventProducer,
 )
-from ai.backend.common.events.idle import (
+from ai.backend.common.events.event_types.idle.anycast import (
     DoIdleCheckEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    KernelLifecycleEventReason,
 )
 from ai.backend.common.types import (
     AccessKey,
@@ -600,7 +600,7 @@ class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
 
     @override
     async def callback_idle_session(self, session_id: SessionId) -> None:
-        await self._event_producer.produce_event(
+        await self._event_producer.anycast_event(
             DoTerminateSessionEvent(session_id, self.terminate_reason())
         )
 

@@ -2,7 +2,7 @@ import logging
 
 import sqlalchemy as sa
 
-from ai.backend.common.events.agent import (
+from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,

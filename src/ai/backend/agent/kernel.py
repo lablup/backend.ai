@@ -42,11 +42,11 @@ from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
 )
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import (
@@ -1079,7 +1079,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
                             response = load_json(msg_data)
-                            event = ModelServiceStatusEvent(
+                            event = ModelServiceStatusAnycastEvent(
                                 self.kernel_id,
                                 self.session_id,
                                 response["model_name"],
@@ -1089,7 +1089,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                                     else ModelServiceStatus.UNHEALTHY
                                 ),
                             )
-                            await self.event_producer.produce_event(event)
+                            await self.event_producer.anycast_event(event)
                         case b"apps-result":
                             await self.service_apps_info_queue.put(msg_data)
                         case b"stdout":

@@ -2,13 +2,13 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
-from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import KernelId, ModelServiceStatus, SessionId
 
 
 @dataclass
-class ModelServiceStatusEventArgs(AbstractEvent):
+class ModelServiceStatusEventArgs(AbstractAnycastEvent):
     kernel_id: KernelId
     session_id: SessionId
     model_name: str
@@ -45,7 +45,7 @@ class ModelServiceStatusEventArgs(AbstractEvent):
         return None
 
 
-class ModelServiceStatusEvent(ModelServiceStatusEventArgs):
+class ModelServiceStatusAnycastEvent(ModelServiceStatusEventArgs):
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -53,7 +53,7 @@ class ModelServiceStatusEvent(ModelServiceStatusEventArgs):
 
 
 @dataclass
-class RouteCreationEvent(AbstractEvent):
+class RouteCreationEvent(AbstractAnycastEvent):
     route_id: uuid.UUID
 
     def serialize(self) -> tuple:
@@ -77,7 +77,7 @@ class RouteCreationEvent(AbstractEvent):
         return None
 
 
-class RouteCreatedEvent(RouteCreationEvent):
+class RouteCreatedAnycastEvent(RouteCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:

@@ -2,13 +2,13 @@ from dataclasses import dataclass
 from typing import Optional, Self, override
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events.types import AbstractEvent, EventDomain
+from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import AgentId
 
 
 @dataclass
-class BaseImageEvent(AbstractEvent):
+class BaseImageEvent(AbstractAnycastEvent):
     image: str
     agent_id: AgentId
 

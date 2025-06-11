@@ -17,18 +17,18 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventHandler,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
+from ai.backend.common.events.event_types.model_serving.broadcast import (
+    ModelServiceStatusBroadcastEvent,
 )
-from ai.backend.common.events.session import (
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionPreparingEvent,
-    SessionStartedEvent,
-    SessionTerminatedEvent,
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionPreparingBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
@@ -460,23 +460,23 @@ class ModelServingService:
             async def _handle_event(
                 context: None,
                 source: AgentId,
-                event: SessionEnqueuedEvent
-                | SessionPreparingEvent
-                | SessionStartedEvent
-                | SessionCancelledEvent
-                | SessionTerminatedEvent
-                | ModelServiceStatusEvent,
+                event: SessionEnqueuedBroadcastEvent
+                | SessionPreparingBroadcastEvent
+                | SessionStartedBroadcastEvent
+                | SessionCancelledBroadcastEvent
+                | SessionTerminatedBroadcastEvent
+                | ModelServiceStatusBroadcastEvent,
             ) -> None:
                 task_message = {"event": event.event_name(), "session_id": str(event.session_id)}
                 match event:
-                    case ModelServiceStatusEvent():
+                    case ModelServiceStatusBroadcastEvent():
                         task_message["is_healthy"] = event.new_status.value
                 await reporter.update(message=dump_json_str(task_message))
 
                 match event:
-                    case SessionTerminatedEvent() | SessionCancelledEvent():
+                    case SessionTerminatedBroadcastEvent() | SessionCancelledBroadcastEvent():
                         terminated_event.set()
-                    case ModelServiceStatusEvent():
+                    case ModelServiceStatusBroadcastEvent():
                         async with self._db.begin_readonly_session() as db_sess:
                             session = await SessionRow.get_session(
                                 db_sess,
@@ -494,31 +494,31 @@ class ModelServingService:
 
             handlers: list[EventHandler] = [
                 self._event_dispatcher.subscribe(
-                    SessionPreparingEvent,
+                    SessionPreparingBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    SessionStartedEvent,
+                    SessionStartedBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    SessionCancelledEvent,
+                    SessionCancelledBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    SessionTerminatedEvent,
+                    SessionTerminatedBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    ModelServiceStatusEvent,
+                    ModelServiceStatusBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=model_service_event_matcher,
