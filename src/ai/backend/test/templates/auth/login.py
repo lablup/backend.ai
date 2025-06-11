@@ -28,20 +28,19 @@ class LoginTemplate(WrapperTestTemplate):
     async def context(self) -> AsyncIterator[None]:
         test_id = TestIDContext.get_current()
         test_id_str = str(test_id)
-        async with AsyncSession() as session:
-            await _login(
-                session=session,
-                test_id=test_id_str,
-                user_id=self.user_id,
-                password=self.password,
-                otp=self.otp,
-            )
+        client_session = AsyncSessionContext.get_current()
 
-            with AsyncSessionContext.with_current(session):
-                try:
-                    yield
-                finally:
-                    await _logout(session=session, test_id=test_id_str)
+        await _login(
+            session=client_session,
+            test_id=test_id_str,
+            user_id=self.user_id,
+            password=self.password,
+            otp=self.otp,
+        )
+        try:
+            yield
+        finally:
+            await _logout(session=client_session, test_id=test_id_str)
 
 
 def _get_test_temp_dir(test_id: str) -> Path:

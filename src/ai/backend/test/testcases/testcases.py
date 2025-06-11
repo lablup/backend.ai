@@ -2,8 +2,8 @@ import enum
 from dataclasses import dataclass
 from typing import Mapping, Self
 
-from ai.backend.test.templates.auth.login import LoginTemplate
 from ai.backend.test.templates.template import (
+    AsyncSessionTemplate,
     BasicTestTemplate,
     NopTestCode,
     TestTemplate,
@@ -60,10 +60,7 @@ class TestSpecManager:
                 name="session",
                 description="Test session management.",
                 tags={TestTag.SESSION, TestTag.MANAGER},
-                template=LoginTemplate(
-                    user_id="admin@lablup.com",  # TODO: Don't use hardcoded user info rather use injected user info
-                    password="wJalrXUt",
-                    otp=None,
+                template=AsyncSessionTemplate(
                     template=BasicTestTemplate(
                         testcode=TestSessionCreation(),
                     ),

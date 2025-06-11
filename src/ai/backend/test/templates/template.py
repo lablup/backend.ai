@@ -1,8 +1,11 @@
 import asyncio
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, final
+from typing import AsyncIterator, final, override
 
+from ai.backend.client.session import AsyncSession
+from ai.backend.test.contexts.api_config import APIConfigContext
+from ai.backend.test.contexts.client_session import AsyncSessionContext
 from ai.backend.test.tester.exporter import TestExporter
 
 
@@ -119,3 +122,20 @@ class SequenceTestTemplate(TestTemplate, ABC):
             except BaseException as e:
                 await exporter.export_stage_exception(self.name, e)
                 raise
+
+
+class AsyncSessionTemplate(WrapperTestTemplate):
+    def __init__(self, template: TestTemplate) -> None:
+        super().__init__(template)
+
+    @property
+    def name(self) -> str:
+        return "create_client_session"
+
+    @override
+    @actxmgr
+    async def context(self) -> AsyncIterator[None]:
+        api_config = APIConfigContext.get_current()
+        async with AsyncSession(config=api_config) as session:
+            with AsyncSessionContext.with_current(session):
+                yield
