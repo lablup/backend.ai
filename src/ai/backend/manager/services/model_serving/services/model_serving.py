@@ -7,6 +7,7 @@ from typing import Awaitable, Callable
 
 import aiohttp
 import sqlalchemy as sa
+import tomli
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
@@ -40,6 +41,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.constant import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
@@ -57,6 +59,7 @@ from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
@@ -117,6 +120,7 @@ from ai.backend.manager.services.model_serving.types import (
     CompactServiceInfo,
     EndpointData,
     ErrorInfo,
+    ModelServiceDefinition,
     MutationResult,
     RouteInfo,
     ServiceInfo,
@@ -150,11 +154,60 @@ class ModelServingService:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
+    async def _fetch_file_from_storage_proxy(
+        self,
+        filename: str,
+        model_vfolder_row: VFolderRow,
+    ) -> bytes:
+        vfid = model_vfolder_row.vfid
+        folder_host = model_vfolder_row.host
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
+
+        chunks = bytes()
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/fetch",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": f"./{filename}",
+            },
+        ) as (_, storage_resp):
+            while True:
+                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+        return chunks
+
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx
-        async with self._db.begin_readonly_session() as session:
+
+        async with self._db.begin_readonly_session() as db_sess:
+            model_vfolder_row = await VFolderRow.get(db_sess, service_prepare_ctx.model_id)
+            chunks = await self._fetch_file_from_storage_proxy(
+                "service-definition.toml", model_vfolder_row
+            )
+
+            if chunks:
+                raw_service_definition = chunks.decode("utf-8")
+                service_definition = tomli.loads(raw_service_definition)
+
+                definition = action.creator.runtime_variant
+                if definition in service_definition:
+                    variant_def = ModelServiceDefinition.model_validate(
+                        service_definition[definition]
+                    )
+                    if variant_def.resource_slots:
+                        action.creator.config.resources = variant_def.resource_slots
+                    if variant_def.environment:
+                        action.creator.image = variant_def.environment.image
+                        action.creator.architecture = variant_def.environment.architecture
+
             image_row = await ImageRow.resolve(
-                session,
+                db_sess,
                 [
                     ImageIdentifier(action.creator.image, action.creator.architecture),
                     ImageAlias(action.creator.image),
