@@ -98,12 +98,7 @@ class BasicTestTemplate(TestTemplate):
 
     async def run_test(self, exporter: TestExporter) -> None:
         async with _apply_wrapper_templates(self._wrapper_templates, exporter):
-            try:
-                await self._testcode.test()
-                await exporter.export_stage_done(self.name)
-            except BaseException as e:
-                await exporter.export_stage_exception(self.name, e)
-                raise
+            await self._testcode.test()
 
 
 class WrapperTestTemplate(TestTemplate, ABC):
