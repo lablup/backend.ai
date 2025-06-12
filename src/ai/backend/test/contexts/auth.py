@@ -8,19 +8,13 @@ class KeypairContext(BaseTestContext[KeyPair]):
         return "keypair"
 
 
-class KeypairEndpointContext(BaseTestContext[Endpoint]):
+class EndpointContext(BaseTestContext[Endpoint]):
     @classmethod
     def get_name(cls) -> str:
-        return "keypair_endpoint"
+        return "endpoint"
 
 
 class LoginCredentialContext(BaseTestContext[LoginCredential]):
     @classmethod
     def get_name(cls) -> str:
         return "login_credential"
-
-
-class LoginEndpointContext(BaseTestContext[Endpoint]):
-    @classmethod
-    def get_name(cls) -> str:
-        return "login_endpoint"

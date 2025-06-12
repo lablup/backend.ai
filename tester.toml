@@ -1,8 +1,6 @@
-[context.keypair_endpoint]
-endpoint = "http://127.0.0.1:8091"
-
-[context.login_endpoint]
-endpoint = "http://127.0.0.1:8090"
+[context.endpoint]
+api-endpoint = "http://127.0.0.1:8091"
+login-endpoint = "http://127.0.0.1:8090"
 
 [context.keypair]
 access-key = "AKIAIOSFODNN7EXAMPLE"

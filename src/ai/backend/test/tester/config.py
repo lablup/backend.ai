@@ -13,9 +13,15 @@ class KeyPair(BaseModel):
 
 
 class Endpoint(BaseModel):
-    endpoint: str = Field(
-        description="The API endpoint.",
-        examples=["http://127.0.0.1:8090/", "http://127.0.0.1:8091/"],
+    api_endpoint: Optional[str] = Field(
+        default=None,
+        description="The API endpoint configuration for the test context.",
+        alias="api-endpoint",
+    )
+    login_endpoint: Optional[str] = Field(
+        default=None,
+        description="The login endpoint configuration for the test context.",
+        alias="login-endpoint",
     )
 
 
@@ -32,17 +38,13 @@ class LoginCredential(BaseModel):
 
 
 class TestContextInjectionModel(BaseModel):
-    keypair_endpoint: Optional[Endpoint] = Field(
+    endpoint: Optional[Endpoint] = Field(
         default=None,
-        description="The endpoint configuration for the test context.",
+        description="The endpoint configurations for the test context.",
     )
     keypair: Optional[KeyPair] = Field(
         default=None,
         description="The key pair for the test context.",
-    )
-    login_endpoint: Optional[Endpoint] = Field(
-        default=None,
-        description="The endpoint configuration for the test context.",
     )
     login_credential: Optional[LoginCredential] = Field(
         default=None,

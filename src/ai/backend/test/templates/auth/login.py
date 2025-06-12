@@ -6,7 +6,7 @@ from typing import AsyncIterator, Optional, override
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
-from ai.backend.test.contexts.auth import LoginCredentialContext, LoginEndpointContext
+from ai.backend.test.contexts.auth import EndpointContext, LoginCredentialContext
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.tester import TestIDContext
 from ai.backend.test.templates.template import (
@@ -33,10 +33,10 @@ class LoginTemplate(WrapperTestTemplate):
         test_id = TestIDContext.get_current()
         test_id_str = str(test_id)
         credential_ctx = LoginCredentialContext.get_current()
-        endpoint_ctx = LoginEndpointContext.get_current()
+        endpoint_ctx = EndpointContext.get_current()
 
         api_config = APIConfig(
-            endpoint=endpoint_ctx.endpoint,
+            endpoint=endpoint_ctx.login_endpoint,
             endpoint_type="session",
         )
         async with AsyncSession(config=api_config) as session:
