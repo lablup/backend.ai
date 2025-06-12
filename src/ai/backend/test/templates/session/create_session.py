@@ -63,9 +63,8 @@ class SessionTemplate(WrapperTestTemplate):
                 type_="interactive",
                 resources=creation_ctx.image_resources,
                 name=session_name,
-                # TODO: Refactor this
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
+                cluster_mode=creation_ctx.cluster_mode,
+                cluster_size=creation_ctx.cluster_size,
             )
             assert created_session.created, "Session should be created successfully"
             assert created_session.name == session_name, (
@@ -132,6 +131,8 @@ class SessionTemplate(WrapperTestTemplate):
         creation_ctx = SessionCreationContextArgs(
             image_canonical=_IMAGE_NAME,
             image_resources=_IMAGE_RESOURCES,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
         )
         session_name = f"test_session_{str(test_id)}"
 
