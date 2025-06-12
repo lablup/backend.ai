@@ -5,10 +5,10 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Awaitable, Callable
 
-from ai.backend.common.events import (
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.agent.anycast import (
     DanglingContainerDetected,
     DanglingKernelDetected,
-    EventProducer,
 )
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
@@ -61,7 +61,7 @@ class AgentProbe:
                     existing_kernel,
                     container.id,
                 )
-                await self._event_producer.produce_event(
+                await self._event_producer.anycast_event(
                     DanglingContainerDetected(container.id),
                 )
 
@@ -81,7 +81,7 @@ class AgentProbe:
                     "scan_containers() detected dangling kernel (k:{})",
                     registered_kernel_id,
                 )
-                await self._event_producer.produce_event(
+                await self._event_producer.anycast_event(
                     DanglingKernelDetected(registered_kernel_id),
                 )
 

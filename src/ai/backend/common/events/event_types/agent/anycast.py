@@ -163,7 +163,6 @@ class DoAgentResourceCheckEvent(AgentOperationEvent):
 
 @dataclass
 class DanglingKernelDetected(AgentOperationEvent):
-    name = "dangling_kernel_detected"
     kernel_id: KernelId
 
     def serialize(self) -> tuple:
@@ -175,11 +174,14 @@ class DanglingKernelDetected(AgentOperationEvent):
             KernelId(uuid.UUID(value[0])),
         )
 
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "dangling_kernel_detected"
+
 
 @dataclass
 class DanglingContainerDetected(AgentOperationEvent):
-    name = "dangling_container_detected"
-
     container_id: ContainerId
 
     def serialize(self) -> tuple:
@@ -190,3 +192,8 @@ class DanglingContainerDetected(AgentOperationEvent):
         return cls(
             ContainerId(value[0]),
         )
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "dangling_container_detected"

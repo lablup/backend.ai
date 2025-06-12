@@ -5,9 +5,9 @@ from typing import Callable, Optional
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
-from ai.backend.common.events import (
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.agent.anycast import (
     DanglingKernelDetected,
-    EventProducer,
 )
 from ai.backend.common.types import ContainerId, KernelId
 
@@ -66,4 +66,4 @@ class DockerKernelProbe:
             container = await self._get_container_info()
             self._compare_with_container(container)
         except DanglingKernel:
-            await self._event_producer.produce_event(DanglingKernelDetected(self._kernel_id))
+            await self._event_producer.anycast_event(DanglingKernelDetected(self._kernel_id))

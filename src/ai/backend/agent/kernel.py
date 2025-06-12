@@ -175,7 +175,7 @@ class KernelInitArgs:
     data: dict[str, Any]
     environ: Mapping[str, Any]
     event_producer: EventProducer
-    session_type: SessionTypes
+    session_type: SessionTypes = SessionTypes.INTERACTIVE  # TODO: Remove default value
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
