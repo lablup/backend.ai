@@ -2,6 +2,9 @@ import textwrap
 
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
+from ai.backend.test.testcases.session.batchsession_creation_failure_wrong_command import (
+    BatchSessionCreationFailureWrongCommand,
+)
 from ai.backend.test.testcases.session.session_creation_failure_low_resources import (
     SessionCreationFailureLowResources,
 )
@@ -89,6 +92,14 @@ SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(SessionCreationFailureTooManyContainer()),
+    ),
+    "create_batchsession_failure_due_to_wrong_command": TestSpec(
+        name="create_batchsession_failure_due_to_wrong_command",
+        description=textwrap.dedent("""\
+            Test for creating a batch session with an invalid startup command.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(BatchSessionCreationFailureWrongCommand()),
     ),
     # "single_node_multi_container_session": TestSpec(
     #     name="single_node_multi_container_session",
