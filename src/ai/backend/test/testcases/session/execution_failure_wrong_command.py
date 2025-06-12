@@ -17,7 +17,7 @@ class BatchSessionCreationFailureWrongCommand(TestCode):
 
     async def test(self) -> None:
         async with AsyncSession() as client_session:
-            session_name = "test-batch-session-creation-failure"
+            session_name = "test-batch-session-execution-failure"
 
             async def collect_events():
                 async with client_session.ComputeSession(session_name).listen_events() as events:
