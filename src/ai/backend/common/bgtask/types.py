@@ -3,6 +3,7 @@ import enum
 
 class BgtaskStatus(enum.StrEnum):
     STARTED = "bgtask_started"
+    UPDATED = "bgtask_updated"
     DONE = "bgtask_done"
     CANCELLED = "bgtask_cancelled"
     FAILED = "bgtask_failed"
