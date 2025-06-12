@@ -147,6 +147,13 @@ SESSION_TEMPLATE_TEST_SPECS = {
     "creation_success_from_template": TestSpec(
         name="creation_success_from_template",
         description=textwrap.dedent("""\
+        Test for creating a session from a template.
+        This test verifies that a session can be created from a predefined template, and that it transitions through the expected lifecycle events.
+        The test will:
+        1. Create a session from the specified template.
+        2. Listen for lifecycle events and verify that the session transitions through the expected states.
+        3. Assert that the session is running after creation.
+        4. Destroy the session after the test is complete.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=SessionTemplateTemplate(
@@ -156,6 +163,12 @@ SESSION_TEMPLATE_TEST_SPECS = {
     "execute_success_from_template": TestSpec(
         name="execute_success_from_template",
         description=textwrap.dedent("""\
+        Test for executing a session from a template.
+        This test verifies that a session can be executed from a predefined template, and that it transitions through the expected lifecycle events.
+        The test will:
+        1. Create a session from the specified template.
+        2. Listen for lifecycle events and verify that the session transitions through the expected states.
+        3. Assert that the session is terminated after completion.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=SessionTemplateTemplate(BatchSessionTemplate(BasicTestTemplate(NopTestCode()))),
