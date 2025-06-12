@@ -1,9 +1,9 @@
 import asyncio
-import json
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
 
 from ai.backend.client.session import AsyncSession
+from ai.backend.common.json import load_json
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import AsyncSessionContext
 from ai.backend.test.contexts.compute_session import (
@@ -96,7 +96,7 @@ class SessionTemplate(WrapperTestTemplate):
         async def collect_events():
             async with client_session.ComputeSession(session_name).listen_events() as events:
                 async for event in events:
-                    data = json.loads(event.data)
+                    data = load_json(event.data)
                     assert data["reason"] == "user-requested", (
                         "Session should be terminated by user request"
                     )
