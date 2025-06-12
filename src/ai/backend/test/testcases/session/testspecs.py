@@ -2,6 +2,7 @@ import textwrap
 
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
+from ai.backend.test.templates.session.session_template import SessionTemplateTemplate
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
 )
@@ -142,7 +143,27 @@ INTERACTIVE_SESSION_TEST_SPECS = {
     # ),
 }
 
+SESSION_TEMPLATE_TEST_SPECS = {
+    "creation_success_from_template": TestSpec(
+        name="creation_success_from_template",
+        description=textwrap.dedent("""\
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=SessionTemplateTemplate(
+            InteractiveSessionTemplate(BasicTestTemplate(NopTestCode()))
+        ),
+    ),
+    "execute_success_from_template": TestSpec(
+        name="execute_success_from_template",
+        description=textwrap.dedent("""\
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=SessionTemplateTemplate(BatchSessionTemplate(BasicTestTemplate(NopTestCode()))),
+    ),
+}
+
 SESSION_TEST_SPECS = {
     **BATCH_SESSION_TEST_SPECS,
     **INTERACTIVE_SESSION_TEST_SPECS,
+    **SESSION_TEMPLATE_TEST_SPECS,
 }

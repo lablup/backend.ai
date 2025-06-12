@@ -1,18 +1,27 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
+from uuid import UUID
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.testcases.context import BaseTestContext
 
 
-class ComputeSessionContext(BaseTestContext[str]):
-    pass
+@dataclass
+class SessionCreationFromImageContextArgs:
+    canonical: str
+    resources: dict[str, Any]
+
+
+@dataclass
+class SessionCreationFromTemplateContextArgs:
+    content: str
+    template_id: UUID
 
 
 @dataclass
 class SessionCreationContextArgs:
-    image_canonical: str
-    image_resources: dict[str, Any]
+    image: Optional[SessionCreationFromImageContextArgs]
+    template: Optional[SessionCreationFromTemplateContextArgs]
 
     # TODO: Remove them
     cluster_mode: ClusterMode
@@ -20,4 +29,9 @@ class SessionCreationContextArgs:
 
 
 class SessionCreationContext(BaseTestContext[SessionCreationContextArgs]):
+    pass
+
+
+# TODO: Inject and use this
+class BatchSessionCommandContext(BaseTestContext[str]):
     pass

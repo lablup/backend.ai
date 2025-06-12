@@ -8,6 +8,7 @@ from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import AsyncSessionContext
 from ai.backend.test.contexts.compute_session import (
     SessionCreationContextArgs,
+    SessionCreationFromImageContextArgs,
 )
 from ai.backend.test.contexts.tester import TestIDContext
 from ai.backend.test.templates.template import (
@@ -58,14 +59,28 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
                 asyncio.wait_for(collect_events(), timeout=_TEST_TIMEOUT)
             )
 
-            created_session = await client_session.ComputeSession.get_or_create(
-                creation_ctx.image_canonical,
-                type_="interactive",
-                resources=creation_ctx.image_resources,
-                name=session_name,
-                cluster_mode=creation_ctx.cluster_mode,
-                cluster_size=creation_ctx.cluster_size,
-            )
+            if creation_ctx.image:
+                created_session = await client_session.ComputeSession.get_or_create(
+                    creation_ctx.image.canonical,
+                    type_="interactive",
+                    resources=creation_ctx.image.resources,
+                    name=session_name,
+                    cluster_mode=creation_ctx.cluster_mode,
+                    cluster_size=creation_ctx.cluster_size,
+                )
+            else:
+                assert creation_ctx.template is not None, (
+                    "Session creation context must have either image or template defined"
+                )
+
+                created_session = await client_session.ComputeSession.create_from_template(
+                    creation_ctx.template.template_id,
+                    type_="interactive",
+                    name=session_name,
+                    cluster_mode=creation_ctx.cluster_mode,
+                    cluster_size=creation_ctx.cluster_size,
+                )
+
             assert created_session.created, "Session should be created successfully"
             assert created_session.name == session_name, (
                 "Session name should match the provided name"
@@ -129,10 +144,13 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         # TODO: After the refactoring, we can use the creation context instead of hardcoding
         # creation_ctx = SessionCreationContext.get_current()
         creation_ctx = SessionCreationContextArgs(
-            image_canonical=_IMAGE_NAME,
-            image_resources=_IMAGE_RESOURCES,
+            image=SessionCreationFromImageContextArgs(
+                canonical=_IMAGE_NAME,
+                resources=_IMAGE_RESOURCES,
+            ),
             cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
+            template=None,
         )
         session_name = f"test_session_{str(test_id)}"
 
