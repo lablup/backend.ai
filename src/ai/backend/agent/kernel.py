@@ -236,10 +236,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                 api_version=default_api_version,
             )
         except Exception as e:
-            log.exception(
-                "kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e
-            )
+            log.error("kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e)
             self.runner = None
+            raise
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()

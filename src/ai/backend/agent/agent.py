@@ -1841,7 +1841,15 @@ class AbstractAgent(
             pass
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
-            await kernel_obj.init(self.event_producer)
+            try:
+                await kernel_obj.init(self.event_producer)
+            except Exception as e:
+                log.error(
+                    "Failed to initialize kernel {}: {}, skipping",
+                    kernel_obj.kernel_id,
+                    e,
+                )
+                continue
             if kernel_obj.runner is None:
                 log.warning("kernel {} has no runner, skipping", kernel_obj.kernel_id)
                 continue
