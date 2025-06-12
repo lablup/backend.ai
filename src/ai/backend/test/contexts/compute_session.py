@@ -32,6 +32,10 @@ class SessionCreationContext(BaseTestContext[SessionCreationContextArgs]):
     pass
 
 
+class CreatedSessionIDContext(BaseTestContext[UUID]):
+    pass
+
+
 # TODO: Inject and use this
 class BatchSessionCommandContext(BaseTestContext[str]):
     pass

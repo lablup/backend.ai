@@ -1,11 +1,13 @@
 import asyncio
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
+from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import AsyncSessionContext
 from ai.backend.test.contexts.compute_session import (
+    CreatedSessionIDContext,
     SessionCreationContextArgs,
     SessionCreationFromImageContextArgs,
 )
@@ -33,7 +35,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
         client_session: AsyncSession,
         creation_ctx: SessionCreationContextArgs,
         session_name: str,
-    ) -> None:
+    ) -> UUID:
         with AsyncSessionContext.with_current(client_session):
             EXPECTED_EVENTS = {
                 "session_enqueued",
@@ -97,6 +99,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
                 assert created_session.status in ["TERMINATING", "TERMINATED"], (
                     f"Session should be terminiated or terminiating, actual status: {created_session.status}"
                 )
+                return created_session.id
             except asyncio.TimeoutError as e:
                 raise asyncio.TimeoutError(
                     f"Timed out after {_TEST_TIMEOUT}s; events received so far: {collected_events}"
@@ -120,5 +123,8 @@ class BatchSessionTemplate(WrapperTestTemplate):
         session_name = f"test_session_{str(test_id)}"
 
         async with AsyncSession() as client_session:
-            await self._verify_session_creation(client_session, creation_ctx, session_name)
-            yield
+            session_id = await self._verify_session_creation(
+                client_session, creation_ctx, session_name
+            )
+            with CreatedSessionIDContext.with_current(session_id):
+                yield
