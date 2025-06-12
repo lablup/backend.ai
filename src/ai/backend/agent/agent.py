@@ -866,7 +866,7 @@ class AbstractAgent(
             self.event_producer,
         )
         self._container_observer = TaskRunner(
-            TaskRunnerArgs(task=_container_observer_task, interval=10)
+            TaskRunnerArgs(task=_container_observer_task, interval=10, continue_on_error=True)
         )
         await self._container_observer.run()
 

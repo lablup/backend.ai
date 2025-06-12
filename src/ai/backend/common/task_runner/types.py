@@ -34,16 +34,23 @@ class TaskRunnerArgs:
     interval: float
     grace_period: float = 0
 
+    continue_on_error: bool = False
+
 
 class TaskRunner:
     _task: AbstractTask
-    _grace_period: float
     _interval: float
+    _grace_period: float
+    _continue_on_error: bool
+
+    _stopped: bool
+    _runner_task: Optional[asyncio.Task]
 
     def __init__(self, args: TaskRunnerArgs) -> None:
         self._task = args.task
         self._interval = args.interval
         self._grace_period = args.grace_period
+        self._continue_on_error = args.continue_on_error
 
         self._stopped = False
         self._runner_task: Optional[asyncio.Task] = None
@@ -63,6 +70,14 @@ class TaskRunner:
             except asyncio.CancelledError:
                 log.debug("Task {} was cancelled", self._task.name())
                 break
+            except Exception as e:
+                log.error(
+                    "Task {} raised an exception: {}",
+                    self._task.name(),
+                    e,
+                )
+                if not self._continue_on_error:
+                    raise
             finally:
                 await asyncio.sleep(0)
             if self._stopped:
@@ -75,8 +90,14 @@ class TaskRunner:
 
     async def stop(self) -> None:
         self._stopped = True
-        if self._runner_task is not None:
-            self._runner_task.cancel()
-            await asyncio.sleep(0)
-            if not self._runner_task.done():
-                await self._runner_task
+        if self._runner_task is None:
+            return
+        is_canceled = self._runner_task.cancel()
+        if not is_canceled:
+            # Task has already finished
+            return
+        await asyncio.sleep(0)
+        try:
+            await self._runner_task
+        except BaseException as e:
+            log.debug("Task raises error when stopping: {}", e)
