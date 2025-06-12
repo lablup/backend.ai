@@ -20,7 +20,7 @@ _IMAGE_RESOURCES = {"cpu": 1, "mem": "512m"}
 _TEST_TIMEOUT = 30.0  # seconds
 
 
-class SessionTemplate(WrapperTestTemplate):
+class InteractiveSessionTemplate(WrapperTestTemplate):
     def __init__(self, template: TestTemplate) -> None:
         super().__init__(template)
 
