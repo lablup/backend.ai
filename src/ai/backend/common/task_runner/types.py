@@ -33,14 +33,44 @@ class TaskRunnerArgs:
     task: AbstractTask
     interval: float
     grace_period: float = 0
+    timeout: Optional[float] = None
 
     continue_on_error: bool = False
 
 
 class TaskRunner:
+    """
+    TaskRunner is a utility class that runs a task at a specified interval.
+
+    Parameters
+    ----------
+    task : AbstractTask
+        An instance of a class that implements AbstractTask.
+    interval : float
+        The interval in seconds between task runs.
+    grace_period : float
+        The initial delay before the first run.
+    timeout : float, optional
+        timeout for the task execution. task.timeout() will override this value if it is set.
+    continue_on_error : bool
+        If True, the runner will continue running
+        even if the task raises an error except asyncio.CancelledError and asyncio.TimeoutError.
+
+    Examples
+    --------
+    task = MyTask()  # An instance of a class that implements AbstractTask
+    runner_args = TaskRunnerArgs(task=task, interval=5.0, grace_period=2.0, timeout=10.0)
+    task_runner = TaskRunner(runner_args)
+    await task_runner.run()
+
+    # To stop the runner
+    await task_runner.stop()
+    """
+
     _task: AbstractTask
     _interval: float
     _grace_period: float
+    _timeout: Optional[float]
     _continue_on_error: bool
 
     _stopped: bool
@@ -50,6 +80,7 @@ class TaskRunner:
         self._task = args.task
         self._interval = args.interval
         self._grace_period = args.grace_period
+        self._timeout = args.task.timeout() if args.task.timeout() is not None else args.timeout
         self._continue_on_error = args.continue_on_error
 
         self._stopped = False
@@ -59,16 +90,16 @@ class TaskRunner:
         await asyncio.sleep(self._grace_period)
         while not self._stopped:
             try:
-                async with asyncio.timeout(self._task.timeout()):
+                async with asyncio.timeout(self._timeout):
                     await self._task.run()
             except asyncio.TimeoutError:
                 log.warning(
                     "Task {} timed out after {} seconds",
                     self._task.name(),
-                    self._task.timeout(),
+                    self._timeout,
                 )
             except asyncio.CancelledError:
-                log.debug("Task {} was cancelled", self._task.name())
+                log.debug("Task {} was canceled", self._task.name())
                 break
             except Exception as e:
                 log.error(
@@ -97,6 +128,8 @@ class TaskRunner:
             # Task has already finished
             return
         await asyncio.sleep(0)
+        if self._runner_task.done():
+            return
         try:
             await self._runner_task
         except BaseException as e:
