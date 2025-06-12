@@ -88,6 +88,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
     # Only used in the ConcentratedAgentSelector
     enforce_spreading_endpoint_replica: bool = False
 
+    allow_fractional_resource_fragmentation: bool = True
+    """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
+
     def to_json(self) -> dict[str, Any]:
         return {
             "allowed_session_types": [item.value for item in self.allowed_session_types],
@@ -96,6 +99,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "agent_selection_strategy": self.agent_selection_strategy,
             "agent_selector_config": self.agent_selector_config,
             "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
+            "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
         }
 
     @classmethod
@@ -116,6 +120,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             ),
             t.Key("agent_selector_config", default={}): agent_selector_config_iv,
             t.Key("enforce_spreading_endpoint_replica", default=False): t.ToBool,
+            t.Key("allow_fractional_resource_fragmentation", default=True): t.ToBool,
         }).allow_extra("*")
 
 

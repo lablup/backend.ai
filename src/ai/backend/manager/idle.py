@@ -4,12 +4,13 @@ import asyncio
 import enum
 import logging
 import math
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections import UserDict, defaultdict
 from collections.abc import (
     Mapping,
     Sequence,
 )
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
@@ -25,6 +26,7 @@ from typing import (
     Type,
     TypedDict,
     cast,
+    override,
 )
 
 import aiotools
@@ -49,21 +51,15 @@ from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import (
     AbstractEvent,
-    EventDispatcher,
     EventHandler,
     EventProducer,
 )
-from ai.backend.common.events.idle import (
+from ai.backend.common.events.event_types.idle.anycast import (
     DoIdleCheckEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    ExecutionCancelledEvent,
-    ExecutionFinishedEvent,
-    ExecutionStartedEvent,
-    ExecutionTimeoutEvent,
-    KernelLifecycleEventReason,
-    SessionStartedEvent,
 )
 from ai.backend.common.types import (
     AccessKey,
@@ -71,23 +67,25 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     RedisProfileTarget,
     ResourceSlot,
+    SessionExecutionStatus,
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 
 from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
+from .models.session import SessionStatus
 from .models.user import users
 from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-    from ai.backend.common.types import AgentId, KernelId, SessionId
+    from ai.backend.common.types import KernelId, SessionId
 
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
@@ -198,20 +196,19 @@ class IdleCheckerHost:
     def __init__(
         self,
         db: SAEngine,
-        unified_config: ManagerUnifiedConfig,
-        event_dispatcher: EventDispatcher,
+        config_provider: ManagerConfigProvider,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
+        self._event_dispatch_checkers: list[AbstractEventDispatcherIdleChecker] = []
         self._frozen = False
         self._db = db
-        self._unified_config = unified_config
-        self._event_dispatcher = event_dispatcher
+        self._config_provider = config_provider
         self._event_producer = event_producer
         self._lock_factory = lock_factory
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self._unified_config.shared.redis.model_dump()
+            self._config_provider.config.redis.model_dump()
         )
         self._redis_live = redis_helper.get_redis_object(
             redis_profile_target.profile_target(RedisRole.LIVE),
@@ -224,7 +221,7 @@ class IdleCheckerHost:
             db=REDIS_STATISTICS_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
-            event_dispatcher, self._redis_live, self._redis_stat
+            self._redis_live
         )
 
     def add_checker(self, checker: BaseIdleChecker):
@@ -234,14 +231,25 @@ class IdleCheckerHost:
             )
         self._checkers.append(checker)
 
+    def add_event_dispatch_checker(self, checker: AbstractEventDispatcherIdleChecker):
+        if self._frozen:
+            raise RuntimeError(
+                "Cannot add a new event dispatch idle checker after the idle checker host is frozen."
+            )
+        self._event_dispatch_checkers.append(checker)
+
     async def start(self) -> None:
         self._frozen = True
-        raw_config = self._unified_config.shared.idle.checkers
+        raw_config = self._config_provider.config.idle.checkers
         await self._grace_period_checker.populate_config(
             raw_config.get(self._grace_period_checker.name) or {}
         )
         for checker in self._checkers:
             await checker.populate_config(raw_config.get(checker.name) or {})
+        for event_dispatcher_checker in self._event_dispatch_checkers:
+            await event_dispatcher_checker.populate_config(
+                raw_config.get(event_dispatcher_checker.name()) or {}
+            )
         self.timer = GlobalTimer(
             self._lock_factory(LockID.LOCKID_IDLE_CHECK_TIMER, self.check_interval),
             self._event_producer,
@@ -249,18 +257,12 @@ class IdleCheckerHost:
             self.check_interval,
             task_name="idle_checker",
         )
-        self._evh_idle_check = self._event_dispatcher.consume(
-            DoIdleCheckEvent,
-            None,
-            self._do_idle_check,
-        )
         await self.timer.join()
 
     async def shutdown(self) -> None:
         for checker in self._checkers:
             await checker.aclose()
         await self.timer.leave()
-        self._event_dispatcher.unconsume(self._evh_idle_check)
         await self._redis_stat.close()
         await self._redis_live.close()
 
@@ -272,12 +274,23 @@ class IdleCheckerHost:
         for checker in self._checkers:
             await checker.update_app_streaming_status(session_id, status)
 
-    async def _do_idle_check(
+    async def dispatch_session_status_event(
         self,
-        context: None,
-        source: AgentId,
-        event: DoIdleCheckEvent,
+        session_id: SessionId,
+        status: SessionStatus,
     ) -> None:
+        for checker in self._event_dispatch_checkers:
+            await checker.watch_session_status(session_id, status)
+
+    async def dispatch_session_execution_status_event(
+        self,
+        session_id: SessionId,
+        status: SessionExecutionStatus,
+    ) -> None:
+        for checker in self._event_dispatch_checkers:
+            await checker.watch_session_execution(session_id, status)
+
+    async def do_idle_check(self) -> None:
         log.debug("do_idle_check(): triggered")
         policy_cache: dict[AccessKey, Row] = {}
         async with self._db.begin_readonly() as conn:
@@ -327,9 +340,7 @@ class IdleCheckerHost:
                     policy_cache[kernel["access_key"]] = policy
 
                 check_task = [
-                    checker.check_idleness(
-                        kernel, conn, policy, self._redis_live, grace_period_end=grace_period_end
-                    )
+                    checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
                     for checker in self._checkers
                 ]
                 check_results = await asyncio.gather(*check_task, return_exceptions=True)
@@ -351,12 +362,7 @@ class IdleCheckerHost:
                         )
                         if not terminated:
                             terminated = True
-                            await self._event_producer.produce_event(
-                                DoTerminateSessionEvent(
-                                    kernel["session_id"],
-                                    checker.terminate_reason,
-                                ),
-                            )
+                            await checker.callback_idle_session(kernel["session_id"])
                 if errors:
                     raise IdleCheckerError("idle checker(s) raise errors", errors)
 
@@ -418,21 +424,14 @@ class IdleCheckerHost:
         return ret
 
 
-class AbstractIdleCheckReporter(metaclass=ABCMeta):
+class AbstractIdleCheckReporter(ABC):
     remaining_time_type: RemainingTimeType
     name: ClassVar[str] = "base"
     report_key: ClassVar[str] = "base"
     extra_info_key: ClassVar[str] = "base_extra"
 
-    def __init__(
-        self,
-        event_dispatcher: EventDispatcher,
-        redis_live: RedisConnectionInfo,
-        redis_stat: RedisConnectionInfo,
-    ) -> None:
-        self._event_dispatcher = event_dispatcher
+    def __init__(self, redis_live: RedisConnectionInfo) -> None:
         self._redis_live = redis_live
-        self._redis_stat = redis_stat
 
     async def aclose(self) -> None:
         pass
@@ -473,11 +472,9 @@ class AbstractIdleCheckReporter(metaclass=ABCMeta):
         """
         pass
 
-    async def set_remaining_time_report(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId, remaining: float
-    ) -> None:
+    async def set_remaining_time_report(self, session_id: SessionId, remaining: float) -> None:
         await redis_helper.execute(
-            redis_obj,
+            self._redis_live,
             lambda r: r.set(
                 self.get_report_key(session_id),
                 msgpack.packb(remaining),
@@ -486,8 +483,10 @@ class AbstractIdleCheckReporter(metaclass=ABCMeta):
         )
 
 
-class AbstractIdleChecker(metaclass=ABCMeta):
-    terminate_reason: KernelLifecycleEventReason
+class AbstractIdleChecker(ABC):
+    @abstractmethod
+    def terminate_reason(self) -> KernelLifecycleEventReason:
+        raise NotImplementedError
 
     @abstractmethod
     async def check_idleness(
@@ -495,7 +494,6 @@ class AbstractIdleChecker(metaclass=ABCMeta):
         kernel: Row,
         dbconn: SAConnection,
         policy: Row,
-        redis_obj: RedisConnectionInfo,
         *,
         grace_period_end: Optional[datetime] = None,
     ) -> bool:
@@ -503,7 +501,11 @@ class AbstractIdleChecker(metaclass=ABCMeta):
         Check the kernel is whether idle or not.
         And report the result to Redis.
         """
-        return True
+        raise NotImplementedError
+
+    @abstractmethod
+    async def callback_idle_session(self, session_id: SessionId) -> None:
+        raise NotImplementedError
 
 
 class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
@@ -578,59 +580,132 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         return msgpack.unpackb(data) if data is not None else None
 
 
+@dataclass
+class IdleCheckerArgs:
+    event_producer: EventProducer
+    redis_live: RedisConnectionInfo
+    redis_stat: RedisConnectionInfo
+
+
 class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
-    pass
-
-
-class NetworkTimeoutIdleChecker(BaseIdleChecker):
-    """
-    Checks the idleness of a session by the elapsed time since last used.
-    The usage means processing of any computation requests, such as
-    query/batch-mode code execution and having active service-port connections.
-    """
-
-    terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_TIMEOUT
-    remaining_time_type: RemainingTimeType = RemainingTimeType.EXPIRE_AFTER
-    name: ClassVar[str] = "network_timeout"
-    report_key: ClassVar[str] = "network_timeout"
-    extra_info_key: ClassVar[str] = "network_timeout_timeout_extra"
-
-    _config_iv = t.Dict(
-        {
-            t.Key("threshold", default="10m"): tx.TimeDuration(),
-        },
-    ).allow_extra("*")
-
-    idle_timeout: timedelta
-    _evhandlers: List[EventHandler[None, AbstractEvent]]
+    _event_producer: EventProducer
 
     def __init__(
         self,
-        event_dispatcher: EventDispatcher,
-        redis_live: RedisConnectionInfo,
-        redis_stat: RedisConnectionInfo,
+        args: IdleCheckerArgs,
     ) -> None:
-        super().__init__(event_dispatcher, redis_live, redis_stat)
-        d = self._event_dispatcher
-        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
-        self._evhandlers = [
-            d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
-            d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
-            d.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
-            d.consume(ExecutionCancelledEvent, None, self._execution_exited_cb),  # type: ignore
-        ]
+        self._redis_live = args.redis_live
+        self._redis_stat = args.redis_stat
+        self._event_producer = args.event_producer
 
-    async def aclose(self) -> None:
-        for _evh in self._evhandlers:
-            self._event_dispatcher.unconsume(_evh)
+    @override
+    async def callback_idle_session(self, session_id: SessionId) -> None:
+        await self._event_producer.anycast_event(
+            DoTerminateSessionEvent(session_id, self.terminate_reason())
+        )
 
+
+class AbstractEventDispatcherIdleChecker(ABC):
+    @classmethod
+    @abstractmethod
+    def name(cls) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def watch_session_status(
+        self,
+        session_id: SessionId,
+        status: SessionStatus,
+    ) -> None:
+        """
+        Check the session status and update the idle checker's state accordingly.
+        This method is called when the session status changes.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def watch_session_execution(
+        self,
+        session_id: SessionId,
+        status: SessionExecutionStatus,
+    ) -> None:
+        """
+        Check the session status and update the idle checker's state accordingly.
+        This method is called when the session status changes.
+        """
+        raise NotImplementedError
+
+
+NETWORK_IDLE_CHECKER_NAME = "network_timeout"
+SESSION_LIFETIME_CHECKER_NAME = "session_lifetime"
+UTILIZATION_CHECKER_NAME = "utilization"
+
+
+@dataclass
+class EventDispatcherIdleCheckerInitArgs:
+    redis_live: RedisConnectionInfo
+    idle_timeout: Optional[timedelta] = None
+
+
+DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT: Final[timedelta] = timedelta(minutes=10)
+
+
+class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecker):
+    _redis_live: RedisConnectionInfo
+    _idle_timeout: timedelta
+
+    _config_iv = t.Dict(
+        {
+            t.Key("threshold", default=None): t.Null | tx.TimeDuration(),
+        },
+    ).allow_extra("*")
+
+    def __init__(
+        self,
+        args: EventDispatcherIdleCheckerInitArgs,
+    ) -> None:
+        self._redis_live = args.redis_live
+        self._idle_timeout = args.idle_timeout or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
+
+    @override
+    @classmethod
+    def name(cls) -> str:
+        return NETWORK_IDLE_CHECKER_NAME
+
+    @override
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
-        self.idle_timeout = config["threshold"]
-        log.info(
-            "NetworkTimeoutIdleChecker: default idle_timeout = {0:,} seconds",
-            self.idle_timeout.total_seconds(),
-        )
+        self._idle_timeout = config["threshold"] or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
+
+    @override
+    async def watch_session_status(
+        self,
+        session_id: SessionId,
+        status: SessionStatus,
+    ) -> None:
+        match status:
+            case SessionStatus.RUNNING:
+                await self._update_timeout(session_id)
+
+    @override
+    async def watch_session_execution(
+        self,
+        session_id: SessionId,
+        status: SessionExecutionStatus,
+    ) -> None:
+        match status:
+            case SessionExecutionStatus.STARTED:
+                await self._disable_timeout(session_id)
+            case (
+                SessionExecutionStatus.FINISHED
+                | SessionExecutionStatus.TIMEOUT
+                | SessionExecutionStatus.CANCELED
+            ):
+                await self._update_timeout(session_id)
 
     async def update_app_streaming_status(
         self,
@@ -662,46 +737,55 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
             lambda r: r.set(
                 f"session.{session_id}.last_access",
                 f"{t:.06f}",
-                ex=max(86400, int(self.idle_timeout.total_seconds() * 2)),
+                ex=max(86400, int(self._idle_timeout.total_seconds() * 2)),
             ),
         )
 
-    async def _session_started_cb(
-        self,
-        context: None,
-        source: AgentId,
-        event: SessionStartedEvent,
-    ) -> None:
-        log.debug("Got SessionStartedEvent")
-        await self._update_timeout(event.session_id)
 
-    async def _execution_started_cb(
-        self,
-        context: None,
-        source: AgentId,
-        event: ExecutionStartedEvent,
-    ) -> None:
-        await self._disable_timeout(event.session_id)
+class NetworkTimeoutIdleChecker(BaseIdleChecker):
+    """
+    Checks the idleness of a session by the elapsed time since last used.
+    The usage means processing of any computation requests, such as
+    query/batch-mode code execution and having active service-port connections.
+    """
 
-    async def _execution_exited_cb(
-        self,
-        context: None,
-        source: AgentId,
-        event: ExecutionFinishedEvent | ExecutionTimeoutEvent | ExecutionCancelledEvent,
-    ) -> None:
-        await self._update_timeout(event.session_id)
+    remaining_time_type: RemainingTimeType = RemainingTimeType.EXPIRE_AFTER
+    name: ClassVar[str] = NETWORK_IDLE_CHECKER_NAME
+    report_key: ClassVar[str] = "network_timeout"
+    extra_info_key: ClassVar[str] = "network_timeout_timeout_extra"
+
+    _config_iv = t.Dict(
+        {
+            t.Key("threshold", default=None): t.Null | tx.TimeDuration(),
+        },
+    ).allow_extra("*")
+
+    idle_timeout: timedelta
+    _evhandlers: List[EventHandler[None, AbstractEvent]]
+
+    @override
+    def terminate_reason(self) -> KernelLifecycleEventReason:
+        return KernelLifecycleEventReason.IDLE_TIMEOUT
+
+    async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
+        config = self._config_iv.check(raw_config)
+        self.idle_timeout = config["threshold"] or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
+        log.info(
+            "NetworkTimeoutIdleChecker: default idle_timeout = {0:,} seconds",
+            self.idle_timeout.total_seconds(),
+        )
 
     async def get_extra_info(
         self, redis_obj: RedisConnectionInfo, session_id: SessionId
     ) -> Optional[dict[str, Any]]:
         return None
 
+    @override
     async def check_idleness(
         self,
         kernel: Row,
         dbconn: SAConnection,
         policy: Row,
-        redis_obj: RedisConnectionInfo,
         *,
         grace_period_end: Optional[datetime] = None,
     ) -> bool:
@@ -749,7 +833,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
             grace_period_end,
         )
         await self.set_remaining_time_report(
-            redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
+            session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
         )
         return remaining >= 0
 
@@ -764,9 +848,8 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
 
 
 class SessionLifetimeChecker(BaseIdleChecker):
-    terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_SESSION_LIFETIME
     remaining_time_type: RemainingTimeType = RemainingTimeType.EXPIRE_AFTER
-    name: ClassVar[str] = "session_lifetime"
+    name: ClassVar[str] = SESSION_LIFETIME_CHECKER_NAME
     report_key: ClassVar[str] = "session_lifetime"
     extra_info_key: ClassVar[str] = "session_lifetime_extra"
 
@@ -778,12 +861,16 @@ class SessionLifetimeChecker(BaseIdleChecker):
     ) -> Optional[dict[str, Any]]:
         return None
 
+    @override
+    def terminate_reason(self) -> KernelLifecycleEventReason:
+        return KernelLifecycleEventReason.IDLE_SESSION_LIFETIME
+
+    @override
     async def check_idleness(
         self,
         kernel: Row,
         dbconn: SAConnection,
         policy: Row,
-        redis_obj: RedisConnectionInfo,
         *,
         grace_period_end: Optional[datetime] = None,
     ) -> bool:
@@ -803,7 +890,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
                 now, kernel_created_at, idle_timeout, grace_period_end
             )
             await self.set_remaining_time_report(
-                redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
+                session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
             )
             return remaining > 0
         return True
@@ -905,9 +992,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
     Checks the idleness of a session by the average utilization of compute devices.
     """
 
-    terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_UTILIZATION
     remaining_time_type: RemainingTimeType = RemainingTimeType.GRACE_PERIOD
-    name: ClassVar[str] = "utilization"
+    name: ClassVar[str] = UTILIZATION_CHECKER_NAME
     report_key: ClassVar[str] = "utilization"
     extra_info_key: ClassVar[str] = "utilization_extra"
 
@@ -917,6 +1003,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
     time_window: timedelta
     initial_grace_period: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
+
+    @override
+    def terminate_reason(self) -> KernelLifecycleEventReason:
+        return KernelLifecycleEventReason.IDLE_UTILIZATION
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = UtilizationConfig(**config_key_to_snake_case(raw_config))
@@ -970,12 +1060,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
     def _get_first_collected_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.util_first_collected"
 
+    @override
     async def check_idleness(
         self,
         kernel: Row,
         dbconn: SAConnection,
         policy: Row,
-        redis_obj: RedisConnectionInfo,
         *,
         grace_period_end: Optional[datetime] = None,
     ) -> bool:
@@ -1049,7 +1139,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             db_now, kernel_created_at, time_window, total_initial_grace_period_end
         )
         await self.set_remaining_time_report(
-            redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
+            session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
         )
 
         # Respect initial grace period (no calculation of utilization and no termination of the session)
@@ -1156,7 +1246,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         _key = self.get_extra_info_key(session_id)
         assert _key is not None
         await redis_helper.execute(
-            redis_obj,
+            self._redis_live,
             lambda r: r.set(
                 _key,
                 msgpack.packb(report),
@@ -1257,37 +1347,47 @@ checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
     UtilizationIdleChecker.name: UtilizationIdleChecker,
 }
 
+event_dispatcher_idle_checkers = (NetworkTimeoutEventDispatcherIdleChecker,)
+
 
 async def init_idle_checkers(
     db: SAEngine,
-    unified_config: ManagerUnifiedConfig,
-    event_dispatcher: EventDispatcher,
+    config_provider: ManagerConfigProvider,
     event_producer: EventProducer,
     lock_factory: DistributedLockFactory,
 ) -> IdleCheckerHost:
     """
     Create an instance of session idleness checker
-    from the given configuration and using the given event dispatcher.
+    from the given configuration.
     """
     checker_host = IdleCheckerHost(
         db,
-        unified_config,
-        event_dispatcher,
+        config_provider,
         event_producer,
         lock_factory,
     )
-    checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
+    checker_init_args = IdleCheckerArgs(
+        event_producer,
+        checker_host._redis_live,
+        checker_host._redis_stat,
+    )
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
-    checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default
-    enabled_checkers = unified_config.shared.idle.enabled
-    if enabled_checkers:
-        for checker_name in enabled_checkers.split(","):
-            checker_name = checker_name.strip()
-            checker_cls = checker_registry.get(checker_name, None)
-            if checker_cls is None:
-                log.warning("ignoring an unknown idle checker name: {}", checker_name)
-                continue
-            log.info("Initializing idle checker: {}", checker_name)
-            checker_instance = checker_cls(*checker_init_args)
-            checker_host.add_checker(checker_instance)
+    checker_host.add_checker(SessionLifetimeChecker(checker_init_args))  # enabled by default
+    raw_enabled_checker_name = config_provider.config.idle.enabled
+    enabled_checker_names = [name.strip() for name in raw_enabled_checker_name.split(",")]
+    for checker_name in enabled_checker_names:
+        checker_cls = checker_registry.get(checker_name, None)
+        if checker_cls is None:
+            log.warning("ignoring an unknown idle checker name: {}", checker_name)
+            continue
+        log.info("Initializing idle checker: {}", checker_name)
+        checker_instance = checker_cls(checker_init_args)
+        checker_host.add_checker(checker_instance)
+    event_dispatcher_checker_args = EventDispatcherIdleCheckerInitArgs(
+        checker_host._redis_live,
+    )
+    for event_dispatcher_checker_cls in event_dispatcher_idle_checkers:
+        if event_dispatcher_checker_cls.name() in enabled_checker_names:
+            event_dispatcher_checker = event_dispatcher_checker_cls(event_dispatcher_checker_args)
+            checker_host.add_event_dispatch_checker(event_dispatcher_checker)
     return checker_host

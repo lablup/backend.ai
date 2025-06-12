@@ -10,12 +10,14 @@ import pytest
 from ai.backend.common import config, redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events.dispatcher import (
-    AbstractEvent,
     CoalescingOptions,
     CoalescingState,
     EventDispatcher,
-    EventDomain,
     EventProducer,
+)
+from ai.backend.common.events.types import (
+    AbstractBroadcastEvent,
+    EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -23,7 +25,7 @@ from ai.backend.common.types import AgentId, RedisTarget
 
 
 @dataclass
-class DummyEvent(AbstractEvent):
+class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
 
     def serialize(self) -> tuple:
@@ -79,29 +81,30 @@ async def test_dispatch(redis_container) -> None:
 
     records = set()
 
-    async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
+    async def acb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
+        assert isinstance(event, DummyBroadcastEvent)
         assert event.event_name() == "testing"
         assert event.value == 1001
         await asyncio.sleep(0.01)
         records.add("async")
 
-    def scb(context: object, source: AgentId, event: DummyEvent) -> None:
+    def scb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
+        assert isinstance(event, DummyBroadcastEvent)
         assert event.event_name() == "testing"
         assert event.value == 1001
         records.add("sync")
 
-    dispatcher.subscribe(DummyEvent, app, acb)
-    dispatcher.subscribe(DummyEvent, app, scb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, acb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, scb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
     # Dispatch the event
-    await producer.produce_event(DummyEvent(999), source_override=AgentId("i-test"))
+    await producer.broadcast_event(DummyBroadcastEvent(999), source_override=AgentId("i-test"))
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
@@ -147,23 +150,24 @@ async def test_error_on_dispatch(redis_container) -> None:
     )
     producer = EventProducer(redis_mq, source=AgentId(node_id))
 
-    async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
+    async def acb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
+        assert isinstance(event, DummyBroadcastEvent)
         raise ZeroDivisionError
 
-    def scb(context: object, source: AgentId, event: DummyEvent) -> None:
+    def scb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
+        assert isinstance(event, DummyBroadcastEvent)
         raise OverflowError
 
-    dispatcher.subscribe(DummyEvent, app, scb)
-    dispatcher.subscribe(DummyEvent, app, acb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, scb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, acb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
-    await producer.produce_event(DummyEvent(0), source_override=AgentId("i-test"))
+    await producer.broadcast_event(DummyBroadcastEvent(0), source_override=AgentId("i-test"))
     await asyncio.sleep(0.5)
     assert len(exception_log) == 2
     assert "ZeroDivisionError" in exception_log

@@ -77,6 +77,7 @@ from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
 )
 from ai.backend.manager.services.session.actions.get_session_info import GetSessionInfoAction
+from ai.backend.manager.services.session.actions.get_status_history import GetStatusHistoryAction
 from ai.backend.manager.services.session.actions.interrupt_session import InterruptSessionAction
 from ai.backend.manager.services.session.actions.list_files import ListFilesAction
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
@@ -93,7 +94,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.agent import (
+from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
 )
 from ai.backend.common.plugin.monitor import GAUGE
@@ -161,6 +162,11 @@ class UndefChecker(t.Trafaret):
             return None
 
 
+resource_opts_iv = t.Dict({
+    t.Key("shmem", default=None): t.Null | tx.BinarySize,
+    t.Key("allow_fractional_resource_fragmentation", default=None): t.Null | t.ToBool,
+}).allow_extra("*")
+
 creation_config_v1 = t.Dict({
     t.Key("mounts", default=None): t.Null | t.List(t.String),
     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
@@ -181,8 +187,7 @@ creation_config_v3 = t.Dict({
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
 })
 creation_config_v3_template = t.Dict({
     t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
@@ -195,7 +200,7 @@ creation_config_v3_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | resource_opts_iv
     ),
 })
 creation_config_v4 = t.Dict({
@@ -205,8 +210,7 @@ creation_config_v4 = t.Dict({
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
     tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
     | t.List(t.Int[1024:65535]),
 })
@@ -224,7 +228,7 @@ creation_config_v4_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | t.Null | resource_opts_iv
     ),
 })
 creation_config_v5 = t.Dict({
@@ -242,8 +246,7 @@ creation_config_v5 = t.Dict({
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
     tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
     | t.List(t.Int[1024:65535]),
     tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
@@ -260,7 +263,7 @@ creation_config_v5_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | t.Null | resource_opts_iv
     ),
 })
 creation_config_v6 = t.Dict({
@@ -278,8 +281,7 @@ creation_config_v6 = t.Dict({
     # cluster_size is moved to the root-level parameters
     tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
     t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | resource_opts_iv,
     tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
     | t.List(t.Int[1024:65535]),
     tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
@@ -297,7 +299,7 @@ creation_config_v6_template = t.Dict({
     ),
     t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
-        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        UndefChecker | t.Null | resource_opts_iv
     ),
     tx.AliasedKey(["attach_network", "attachNetwork"], default=undefined): (
         UndefChecker | t.Null | tx.UUID
@@ -567,7 +569,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     if agent_list is not None:
         if (
             request["user"]["role"] != UserRole.SUPERADMIN
-            and root_ctx.unified_config.local.manager.hide_agents
+            and root_ctx.config_provider.config.manager.hide_agents
         ):
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
@@ -947,13 +949,13 @@ async def convert_session_to_image(
 async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
     try:
         now = datetime.now(tzutc())
-        timeout = timedelta(seconds=root_ctx.unified_config.local.manager.heartbeat_timeout)
+        timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
 
         async def _check_impl(r: Redis):
             async for agent_id, prev in r.hscan_iter("agent.last_seen"):
                 prev = datetime.fromtimestamp(float(prev), tzutc())
                 if now - prev > timeout:
-                    await root_ctx.event_producer.produce_event(
+                    await root_ctx.event_producer.anycast_event(
                         AgentTerminatedEvent("agent-lost"),
                         source_override=agent_id.decode(),
                     )
@@ -1622,6 +1624,33 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     return result.response
 
 
+@server_status_required(READ_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict({
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    })
+)
+async def get_status_history(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
+    log.info(
+        "GET_STATUS_HISTORY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+
+    resp: dict[str, Mapping] = {"result": {}}
+    result = await root_ctx.processors.session.get_status_history.wait_for_complete(
+        GetStatusHistoryAction(
+            session_name=session_name,
+            owner_access_key=request["keypair"]["access_key"],
+        )
+    )
+
+    resp["result"] = result.status_history
+    return web.json_response(resp, status=200)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     agent_lost_checker: asyncio.Task[None]
@@ -1708,6 +1737,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("POST", "/{session_name}/imagify", convert_session_to_image))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
+    cors.add(app.router.add_route("GET", "/{session_name}/status-history", get_status_history))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
     cors.add(app.router.add_route("GET", "/{session_name}/dependency-graph", get_dependency_graph))
     return app, []

@@ -28,6 +28,7 @@ from typing import (
 import aiofiles
 import yarl
 from async_timeout import timeout
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -320,12 +321,14 @@ async def mount(
     edit_fstab: bool = False,
     fstab_path: str | None = None,
     mount_prefix: str | None = None,
-) -> None:
+) -> bool:
     if mount_prefix is None:
         mount_prefix = "/"
     if fstab_path is None:
         fstab_path = "/etc/fstab"
     mountpoint = Path(mount_prefix) / mount_path
+    if mountpoint.is_mount():
+        return False
     mountpoint.mkdir(exist_ok=True)
     if cmd_options is not None:
         cmd = [
@@ -357,6 +360,7 @@ async def mount(
                 fs_type,
                 cmd_options,
             )
+    return True
 
 
 async def umount(
@@ -434,3 +438,29 @@ def b64encode(s: str) -> str:
     """
     b: bytes = s.encode("utf-8") if isinstance(s, str) else s
     return base64.b64encode(b).decode("ascii")
+
+
+T = TypeVar("T", bound=BaseModel)
+
+
+def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
+    """
+    Recursively merge any number of mappings.
+    Later mappings override earlier ones on key conflicts.
+
+    Example
+    -------
+    >>> deep_merge({"a": 1, "b": {"x": 1}},
+    ...            {"b": {"y": 2}, "c": 3},
+    ...            {"b": {"x": 10}})
+    {'a': 1, 'b': {'x': 10, 'y': 2}, 'c': 3}
+    """
+    merged: dict[str, Any] = {}
+    for m in args:
+        for k, vb in m.items():
+            va = merged.get(k)
+            if isinstance(va, Mapping) and isinstance(vb, Mapping):
+                merged[k] = deep_merge(va, vb)
+            else:
+                merged[k] = vb
+    return merged

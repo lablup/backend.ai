@@ -585,13 +585,13 @@ def ls(name, path):
             if "error_msg" in result and result["error_msg"]:
                 print_fail(result["error_msg"])
                 return
-            files = json.loads(result["files"])
+            files = result["items"]
             table = []
             headers = ["file name", "size", "modified", "mode"]
             for file in files:
-                mdt = datetime.fromtimestamp(file["mtime"])
+                mdt = datetime.fromisoformat(file["modified"])
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
-                row = [file["filename"], file["size"], mtime, file["mode"]]
+                row = [file["name"], file["size"], mtime, file["mode"]]
                 table.append(row)
             print_done("Retrieved.")
             print(tabulate(table, headers=headers))

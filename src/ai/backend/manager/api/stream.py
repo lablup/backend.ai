@@ -44,7 +44,7 @@ from etcd_client import GRPCStatusCode, GRPCStatusError
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.kernel import KernelTerminatingEvent
+from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatingBroadcastEvent
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -105,7 +105,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             root_ctx.registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=root_ctx.unified_config.local.manager.max_wsmsg_size)
+    ws = web.WebSocketResponse(max_msg_size=root_ctx.config_provider.config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -121,12 +121,12 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             kernel_host = urlparse(compute_session.agent_addr).hostname
         else:
             kernel_host = compute_session.kernel_host
-        stdin_addr = f"tcp://{kernel_host}:{compute_session.stdin_port}"
+        stdin_addr = f"tcp://{kernel_host}:{compute_session.repl_in_port}"
         log.debug("stream_pty({0}): stdin: {1}", stream_key, stdin_addr)
         stdin_sock = app_ctx.zctx.socket(zmq.PUB)
         stdin_sock.connect(stdin_addr)
         stdin_sock.setsockopt(zmq.LINGER, 100)
-        stdout_addr = f"tcp://{kernel_host}:{compute_session.stdout_port}"
+        stdout_addr = f"tcp://{kernel_host}:{compute_session.repl_out_port}"
         log.debug("stream_pty({0}): stdout: {1}", stream_key, stdout_addr)
         stdout_sock = app_ctx.zctx.socket(zmq.SUB)
         stdout_sock.connect(stdout_addr)
@@ -149,7 +149,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                     if data["type"] == "stdin":
                         raw_data = base64.b64decode(data["chars"].encode("ascii"))
                         try:
-                            await socks[0].send_mlutipart([raw_data])
+                            await socks[0].send_multipart([raw_data])
                         except (RuntimeError, zmq.error.ZMQError):
                             # when socks[0] is closed, re-initiate the connection.
                             app_ctx.stream_stdin_socks[stream_key].discard(socks[0])
@@ -289,7 +289,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
-    local_config = root_ctx.unified_config.local
+    config = root_ctx.config_provider.config
     registry = root_ctx.registry
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
@@ -316,7 +316,7 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=local_config.manager.max_wsmsg_size)
+    ws = web.WebSocketResponse(max_msg_size=config.manager.max_wsmsg_size)
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -602,7 +602,7 @@ async def stream_proxy(
         # TODO: weakref to proxies for graceful shutdown?
         ws = web.WebSocketResponse(
             autoping=False,
-            max_msg_size=root_ctx.unified_config.local.manager.max_wsmsg_size,
+            max_msg_size=root_ctx.config_provider.config.manager.max_wsmsg_size,
         )
         await ws.prepare(request)
         proxy = proxy_cls(
@@ -657,7 +657,7 @@ async def get_stream_apps(request: web.Request) -> web.Response:
 async def handle_kernel_terminating(
     app: web.Application,
     source: AgentId,
-    event: KernelTerminatingEvent,
+    event: KernelTerminatingBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["stream.context"]
@@ -766,7 +766,9 @@ async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx.active_session_ids = defaultdict(int)  # multiset[int]
     app_ctx.conn_tracker_gc_task = asyncio.create_task(stream_conn_tracker_gc(root_ctx, app_ctx))
 
-    root_ctx.event_dispatcher.subscribe(KernelTerminatingEvent, app, handle_kernel_terminating)
+    root_ctx.event_dispatcher.subscribe(
+        KernelTerminatingBroadcastEvent, app, handle_kernel_terminating
+    )
 
     yield
 

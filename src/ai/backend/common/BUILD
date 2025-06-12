@@ -32,6 +32,7 @@ python_distribution(
         "src/ai/backend/common/data/vfolder:src",
         "src/ai/backend/common/dto/agent:src",
         "src/ai/backend/common/dto/manager:src",
+        "src/ai/backend/common/dto/manager/auth:src",
         "src/ai/backend/common/dto/storage:src",
         "src/ai/backend/common/events:src",
         "src/ai/backend/common/events/hub:src",
@@ -43,6 +44,8 @@ python_distribution(
         "src/ai/backend/common/plugin:src",
         "src/ai/backend/common/service_discovery:src",
         "src/ai/backend/common/service_discovery/etcd_discovery:src",
+        "src/ai/backend/common/service_discovery/redis_discovery:src",
+        "src/ai/backend/common/stage:src",
         "src/ai/backend/common/web/session:src",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],

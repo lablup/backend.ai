@@ -90,9 +90,11 @@
     "SaveAndClose": "Speichern und schließen",
     "SaveChanges": "Änderungen speichern",
     "SaveWithoutClose": "Speichern ohne Schließen",
+    "SeeErrorLogs": "Siehe Fehler",
     "Share": "Teilen",
     "Unset": "Nicht eingestellt",
     "Update": "Aktualisieren",
+    "Upload": "Hochladen",
     "Yes": "Ja"
   },
   "chatui": {
@@ -111,7 +113,18 @@
     "Thinking": "Denken",
     "UploadFiles": "Dateien hochladen",
     "UploadFilesDescription": "Klicken oder ziehen Sie Dateien zum Hochladen in diesen Bereich",
-    "ViewReasoning": "Argumentation anzeigen"
+    "ViewReasoning": "Argumentation anzeigen",
+    "chat": {
+      "parameter": {
+        "FrequencyPenalty": "Bestraft häufige Token, um Wiederholungen zu reduzieren",
+        "MaxTokens": " Begrenzt die Anzahl der Token in der Ausgabe",
+        "PresencePenalty": "Bestrafung bereits erschienener Token, um neue Themen zu fördern",
+        "Temperature": "Steuert die Zufälligkeit; niedriger ist konzentrierter, höher ist kreativer",
+        "Title": "Parameter",
+        "TopK": "Stichproben aus den K wahrscheinlichsten Token",
+        "TopP": "Stichproben aus Token, deren kumulative Wahrscheinlichkeit innerhalb von P"
+      }
+    }
   },
   "credential": {
     "AccessKey": "Zugriffsschlüssel",
@@ -233,12 +246,14 @@
     "FolderToCopy": "Ordner zum Kopieren",
     "Foldername": "Ordnernamen",
     "Folders": "Ordner",
+    "From": "Aus",
     "General": "Allgemein",
     "Host": "Gastgeber",
     "HostDetails": "Zeigt Kontingentinformationen für den ausgewählten Speicherhost an.",
     "InvalidEmail": "Ungültige E -Mail -Adresse",
     "Invited": "eingeladen",
     "InvitedFolders": "Eingeladene Ordner",
+    "InvitedFoldersTooltip": "{{ count }} Ordnereinladungen sind eine Antwort aus.",
     "Limit": "Grenze",
     "ModelStore": "Modellladen",
     "Models": "Modelle",
@@ -328,6 +343,7 @@
       "CloneFolder": "Ordner klonen",
       "Cloneable": "klonbar",
       "Control": "Steuerung",
+      "CreatedAt": "Erstellt at",
       "Delete": "Löschen",
       "DeleteAFolder": "Einen Ordner löschen",
       "DeleteForever": "Unwiederuflich löschen",
@@ -360,6 +376,7 @@
       "LeaveFolder": "Ordner verlassen",
       "Location": "Ort",
       "MaxFolderQuota": "Maximale Ordner-Quote",
+      "MaxSize": "Maximale Größe",
       "ModifyPermissions": "Berechtigungen ändern",
       "MountPermission": "Erlaubnis montieren",
       "MoveToTrash": "Ziehen Sie zu Müllbehälter",
@@ -376,6 +393,7 @@
       "OpenAFolder": "Einen Ordner öffnen",
       "Owner": "Inhaber",
       "Ownership": "Eigentum",
+      "Path": "Speicherpfad",
       "Permission": "Genehmigung",
       "ProjectFolderAlertDesc": "Dieser Ordner wird an alle Mitglieder des Projekts geteilt",
       "Rename": "Umbenennen",
@@ -398,6 +416,8 @@
       "View": "Aussicht"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Die Einladung nicht akzeptiert",
+      "FailedToDeclineInvitation": "Die Einladung versäumte es, die Einladung abzulehnen",
       "FolderSharingNotAvailableToUser": "Die gemeinsame Nutzung von Ordnern ist für den/die gewünschten Benutzer nicht verfügbar:",
       "InvitationError": "Einladung fehlgeschlagen. Der Benutzer ist möglicherweise bereits eingeladen.",
       "Invited": "Erfolgreich eingeladen",
@@ -408,7 +428,10 @@
       "NoValidEmails": "Es wurden keine gültigen E-Mails eingegeben",
       "Shared": "Gruppenordner erfolgreich freigegeben",
       "SharingError": "Die Freigabe ist fehlgeschlagen. Der Benutzer ist möglicherweise bereits freigegeben oder gehört nicht zu dem entsprechenden Projekt.",
-      "SuccessfullyLeftSharedFolder": "Erfolgreich den gemeinsam genutzten Ordner verlassen"
+      "SuccessfullyAcceptedInvitation": "Erfolgreich akzeptierte Einladung",
+      "SuccessfullyDeclinedInvitation": "Erfolgreich abgelehnt Einladung",
+      "SuccessfullyLeftSharedFolder": "Erfolgreich den gemeinsam genutzten Ordner verlassen",
+      "UserIsAlreadyInvited": "{{email}} ist bereits eingeladen"
     },
     "modelStore": {
       "AddedItems": "Artikel hinzugefügt",
@@ -453,6 +476,10 @@
       "StatusOfSelectedHost": "Status des ausgewählten Hosts",
       "Used": "gebraucht"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Dieser Browser unterstützt keine Benachrichtigungen.",
+    "PermissionDenied": "Sie haben den Benachrichtigungszugriff abgelehnt. \nUm Warnungen zu verwenden, lassen Sie diese bitte in Ihren Browsereinstellungen zu."
   },
   "dialog": {
     "ErrorOccurred": "Ein Fehler ist aufgetreten",
@@ -1019,20 +1046,28 @@
     "UsernameOptional": "Benutzername (optional)"
   },
   "resourceGroup": {
+    "Activate": "Aktivieren",
+    "ActivateResourceGroup": "Ressourcengruppe aktivieren",
     "Active": "Aktiv",
     "ActiveStatus": "Aktiver Status",
     "AllowedSessionTypes": "Erlaubte Sitzungstypen",
     "CreateResourceGroup": "Ressourcengruppe erstellen",
+    "Deactivate": "Deaktivieren",
+    "DeactivateResourceGroup": "Deaktivierung der Ressourcengruppe",
+    "DeleteResourceGroup": "Ressourcengruppe löschen",
     "Description": "Beschreibung",
     "Domain": "Bereich",
     "Driver": "Treiber",
     "DriverOptions": "Treiberoptionen",
     "EnterValidResourceGroupName": "Geben Sie einen gültigen Ressourcengruppennamen ein",
+    "Information": "Information",
     "ModifyResourceGroup": "Ressourcengruppe ändern",
     "Name": "Name",
     "NoChangesMade": "Keine Änderungen vorgenommen",
     "NoGroupToDisplay": "NoGroupToDisplay",
     "NoScalingGroupAssignedToThisProject": "Dieses Projekt wird keine Ressourcengruppe zugewiesen. \nDie Erstellung der Sitzung und die Erstellung von Modelldienstleistungen werden eingeschränkt.",
+    "PendingTimeout": "Ausstehende Auszeit",
+    "PendingTimeoutDesc": "Eine maximale Zeit, die eine Sitzung in einem anhängigen Zustand bleibt.\n\nWenn es auf 0 gesetzt ist, warten Sie auf unbestimmte Zeit ohne Grenzwert.\n\nWenn es nicht festgelegt wird, ist es standardmäßig 0.",
     "Public": "Öffentlich",
     "PublicStatus": "Öffentlicher Status",
     "ResourceGroupAlreadyExist": "Eine Ressourcengruppe mit demselben Namen ist bereits vorhanden.",
@@ -1045,6 +1080,7 @@
     "ResourceGroupNameRequired": "Der Name der Ressourcengruppe ist erforderlich.",
     "ResourceGroups": "Ressourcengruppen",
     "RetriesToSkip": "Zeiten",
+    "RetriesToSkipDesc": "Wiederholung zum Überspringen der ausstehenden Sitzung",
     "Scheduler": "Planer",
     "SchedulerOptions": "Scheduler-Optionen",
     "SelectDomain": "Domain auswählen",
@@ -1065,15 +1101,19 @@
     "ContainerPerSession": "Container pro Sitzung",
     "CreateResourcePolicy": "Erstellen Sie eine Ressourcenrichtlinie",
     "CreatedAt": "Hergestellt in",
+    "DeletePolicy": "Richtlinien löschen",
+    "DeletePolicyDescription": "Sie sind kurz davor, diese Richtlinie zu löschen:",
     "ExportCSV": "CSV exportieren",
     "Folders": "Ordner",
     "IdleTimeout": "Leerlauf-Timeout",
     "IdleTimeoutSec": "Leerlauf-Timeout (Sek.)",
     "Keypair": "Schlüsselpaar",
     "KeypairResourcePolicy": "Schlüsselpaar-Ressourcenrichtlinie",
+    "MaxConcurrentSFTPSessions": "Max gleichzeitige SFTP -Sitzungen",
     "MaxCustomizedImageCount": "Maximale Anzahl benutzerdefinierter Bilder",
     "MaxFolderCount": "Maximale Ordneranzahl",
     "MaxNetworkCount": "Maximale Netzwerkanzahl",
+    "MaxPendingSessionCount": "Maximal ausstehende Sitzungsanzahl",
     "MaxQuotaScopeSize": "Maximale Kontingentumfangsgröße (GB)",
     "MaxSessionCountPerModelSession": "Maximale Sitzungsanzahl pro Modellsitzung",
     "MaxSessionLifetime": "Lebensdauer der Sitzung (Sek.)",
@@ -1122,7 +1162,7 @@
     "ResourcePresets": "Ressourcenvoreinstellungen",
     "Resources": "Ressourcen",
     "SHMEMShouldBeSmallerThanMemory": "Gemeinsamer Speicher muss kleiner sein als der Speicher",
-    "SharedMemory": "Gemeinsamer Speicher (GB)",
+    "SharedMemory": "Gemeinsamer Speicher",
     "Updated": "Ressourcenvoreinstellung aktualisiert"
   },
   "session": {
@@ -1131,6 +1171,7 @@
     "Agents": "Agenten",
     "AllowedClientIps": "Erlaubte Client-IPs",
     "AlreadyTerminatingSession": "Die Sitzung ist bereits beendet.",
+    "AnotherUserSession": "Diese Sitzung wurde von einem anderen Benutzer erstellt",
     "Architecture": "Architektur",
     "Arguments": "Argumente",
     "AverageUsage": "Avg",
@@ -1309,7 +1350,8 @@
       "DescSession": " <p> Eine Sitzung ist eine Einheit einer Rechenumgebung, die gemäß einer bestimmten Umgebung und Ressourcen erstellt wird. </p> <p> Wenn dieser Wert auf einen Wert größer als 1 gesetzt ist, werden mehrere Sitzungen erstellt, die dem oben genannten Ressourcensatz entsprechen. </p> <p> Wenn nicht genügend Ressourcen verfügbar sind, werden Anforderungen zum Erstellen von Sitzungen, die nicht erstellt werden können, in die Warteschlange gestellt. </p>",
       "DescSetEnv": " <p> Wenn Sie eine Standardumgebungsvariable im Container setzen und auch eine Umgebungsvariable mit demselben Namen auf der Backend.AI setzen, hat der auf der Backend.AI festgelegte Wert Vorrang. </p> <p style='color:var(--paper-red-400);'> Jeder Eingabewert wird nach dem Start des Sitzungsstarters initialisiert. <br /> Außerdem werden diese Umgebungen nur übergeben, wenn sowohl die Variable als auch der Wert nicht leer sind. </p>",
       "DescSetPreOpenPort": "Preopen Ports\" bezieht sich auf einen bestimmten <span style='color:var(--paper-red-400);'>internen Container-Port</span>, der eingehende Verbindungen von externen Geräten oder Computern auf einem Netzwerkgerät oder Computer erlaubt.",
-      "DescSharedMemory": " <p> Shared Memory ist Speicher, auf den mehrere Programme gleichzeitig zugreifen können, um die Kommunikation zwischen ihnen zu ermöglichen oder redundante Kopien zu vermeiden. </p> <p> Für Multi-CPU- oder Multithread-Workloads ist Shared Memory wichtig, da es für die Interthread-Kommunikation verwendet wird. Für Deep-Learning-Workloads und High-Performance-Computing-Workloads mit Multithreading empfehlen wir, diesen Wert auf 1 GB oder höher einzustellen. </p>",
+      "DescSharedMemory": "Shared Memory ist ein Speicher, auf den möglicherweise gleichzeitig von mehreren Programmen zugegriffen werden kann, mit der Absicht, unter ihnen Kommunikation bereitzustellen oder redundante Kopien zu vermeiden.",
+      "DescSharedMemoryContext": "Für Multi-GPU- oder Multi-Process-Workloads ist der gemeinsame Speicher wichtig, da er für die Kommunikation zwischen den Prozess verwendet wird. \nFür Deep-Learning-Workloads und Hochleistungs-Computing-Workloads mithilfe von Multi-Process empfehlen wir diesen Wert auf 1 GB oder höher.",
       "DescSingleNode": " <p> Beim Ausführen einer Sitzung werden der verwaltete Knoten und die Worker-Knoten auf einem einzelnen physischen Knoten oder einer virtuellen Maschine platziert. </p>",
       "DuplicatedPort": "Es gibt doppelte Anschlüsse.",
       "DuplicatedSessionName": "Doppelter Sitzungsname nicht zulässig",
@@ -1630,10 +1672,9 @@
       "Last12Hours": "Letzte 12 Stunden",
       "Last3Hours": "Letzte 3 Stunden",
       "Last7Days": "Letzten 7 Tage",
-      "LastDay": "Letzte 1 Tag"
-    },
-    "timeRanges": {
-      "LastHour": "Letzte 1 Stunde"
+      "LastDay": "Letzte 1 Tag",
+      "LastHour": "Letzte 1 Stunde",
+      "Today": "Heute"
     }
   },
   "storageHost": {
@@ -1768,7 +1809,6 @@
     "BootstrapScriptDescription": "Das Bootstrap-Skript wird nur einmal nach der Erstellung der Sitzung ausgeführt",
     "BootstrapScriptEmpty": "Das Skript ist leer. \nBitte geben Sie das Skript ein.",
     "BootstrapScriptUpdated": "Bootstrap-Skript aktualisiert.",
-    "ClassicSessionLauncher": "Classic Sitzungsstarter",
     "ClearSSHKeypairInput": "Geschriebenes SSH-Schlüsselpaar wird entfernt. Sind Sie sicher, dass Sie fortfahren möchten?",
     "ConfigFilename": "Name der Konfigurationsdatei",
     "CurrentSSHPublicKey": "Aktueller öffentlicher Schlüssel:",
@@ -1778,10 +1818,10 @@
     "DescAutomaticUpdateCheck": "Benachrichtigen, wenn eine neue Webui-Version veröffentlicht wird. <br /> Wenn das Internet instabil oder offline ist, wird diese Option automatisch deaktiviert. Sie können diesen Schalter umschalten, um die automatische Updateprüfung erneut zu starten.",
     "DescBetaFeatures": "Verwenden Sie Betafunktionen für die Web-Benutzeroberfläche. <br /> Beta-Funktionen können instabil sein. Einige Betafunktionen werden möglicherweise nicht als offizielle Funktionen übernommen.",
     "DescClassicSessionLauncher": "Verwenden Sie den Classic-Sitzungsstarter anstelle des NEO-Sitzungsstarters. \nDer Classic Sitzungsstarter verfügt möglicherweise nicht über die neuesten Funktionen.",
-    "DescDesktopNotification": "Aktivieren oder deaktivieren Sie die Desktop-Benachrichtigung. <br /> Wenn aktiviert, verwendet Backend.AI auch das im Betriebssystem integrierte Benachrichtigungssystem. Das Deaktivieren dieser Option wirkt sich nicht auf Benachrichtigungen in der Web-Benutzeroberfläche aus.",
+    "DescDesktopNotification": "Aktiviert die Desktop -Benachrichtigung. \n<br /> Wenn er eingeschaltet ist, verwendet Backend.ai auch das integrierte Benachrichtigungssystem des Betriebssystems. \nDas Ausschalten dieser Option wirkt sich nicht auf Benachrichtigungen innerhalb der Web -Benutzeroberfläche aus. \nAbhängig vom Betriebssystem müssen Desktop -Benachrichtigungen möglicherweise Benachrichtigungsberechtigungen in den Systemeinstellungen ermöglichen.",
     "DescExperimentalDashboard": "Verwenden Sie die Dashboard -Seite anstelle einer zusammenfassenden Seite.",
     "DescKeepLoginSessionInformation": "Lassen Sie die Webui-App beim nächsten Mal die aktuellen Anmeldesitzungsinformationen beibehalten. <br /> Wenn die Option deaktiviert ist, werden die Anmeldeinformationen bei jeder Abmeldung gelöscht.",
-    "DescLanguage": "Legen Sie die Sprache der Benutzeroberfläche fest.",
+    "DescLanguage": "Setzen Sie die Schnittstelle. Andere Sprachen als Englisch und Koreanisch werden per maschineller Übersetzung bereitgestellt.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Bitte aktualisieren Sie das Skript mit einem nicht leeren Wert.",
     "DescMyKeypairInfo": "Siehe meine Schlüsselpaarinformationen",
     "DescNewUserConfigFileCreated": "Eine neue Benutzerkonfigurationsdatei kann mit nicht leeren Daten erstellt werden.",
@@ -1855,9 +1895,11 @@
       "AboutBackendAI": "Über Backend.AI",
       "Administration": "Verwaltung",
       "AgentSummary": "Agent Zusammenfassung",
+      "Architecture": "Architektur",
       "Cancel": "Stornieren",
       "ChangePassword": "Kennwort ändern",
       "Chat": "Chat",
+      "ClickToDownload": "Klicken Sie hier, um herunterzuladen",
       "ComputationResources": "Rechenressourcen",
       "Configurations": "Konfigurationen",
       "Data": "Daten",

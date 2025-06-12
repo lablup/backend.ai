@@ -29,7 +29,8 @@ class CreateUploadSessionAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "upload"
 
 
@@ -60,7 +61,8 @@ class CreateDownloadSessionAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "download"
 
 
@@ -88,7 +90,8 @@ class ListFilesAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "list_files"
 
 
@@ -117,7 +120,8 @@ class RenameFileAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "rename"
 
 
@@ -143,7 +147,8 @@ class DeleteFilesAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "delete_files"
 
 
@@ -169,7 +174,8 @@ class MkdirAction(VFolderAction):
         return str(self.vfolder_uuid)
 
     @override
-    def operation_type(self) -> str:
+    @classmethod
+    def operation_type(cls) -> str:
         return "mkdir"
 
 

@@ -383,6 +383,10 @@ ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
 class AbstractConfig(UserDict):
+    """
+    Deprecated: Use ai.backend.manager.config.unified instead.
+    """
+
     _watch_callbacks: List[ConfigWatchCallback]
 
     def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
@@ -410,6 +414,9 @@ def load(
     config_path: Optional[Path] = None,
     log_level: LogLevel = LogLevel.NOTSET,
 ) -> LocalConfig:
+    """
+    Deprecated: Use ai.backend.manager.config.unified instead.
+    """
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 

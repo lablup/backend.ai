@@ -1,17 +1,10 @@
 import logging
 import uuid
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Optional,
-    Self,
-    Sequence,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 import aiohttp_cors
 import aiotools
@@ -313,7 +306,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         default={},
     )
 
-    environ: dict[str, str] | None = Field(
+    environ: Optional[dict[str, str]] = Field(
         description="Environment variables to be set inside the inference session",
         default=None,
     )
@@ -323,7 +316,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         alias="scalingGroup",
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
-    resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
+    resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
 
     def to_dataclass(self) -> ServiceConfig:
         extra_mounts_converted = {}
@@ -543,7 +536,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         assert owner_role
 
         allowed_vfolder_types = (
-            await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+            await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
         try:
             extra_vf_conds = vfolders.c.id == uuid.UUID(params.config.model)
@@ -585,7 +578,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 
         vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
             conn,
-            root_ctx.unified_config.legacy_etcd_config_loader,
+            root_ctx.config_provider.legacy_etcd_config_loader,
             root_ctx.storage_manager,
             model_id,
             params.config.model_mount_destination,
@@ -1050,7 +1043,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["prefix"] = "services"
     app["api_versions"] = (4, 5)

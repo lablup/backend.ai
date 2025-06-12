@@ -1,10 +1,11 @@
-name: graphql
+name: update-api-schema
 
 on:
   pull_request:
     paths:
       - 'src/ai/backend/manager/models/**'
       - 'src/ai/backend/manager/api/**'
+      - 'VERSION'
 
 jobs:
   api-updated:

@@ -21,14 +21,14 @@ from sqlalchemy.orm import load_only, noload, selectinload
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
-from ai.backend.common.events.bgtask import (
+from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
-)
-from ai.backend.common.events.dispatcher import (
-    EventDomain,
 )
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.types import (
+    EventDomain,
+)
 from ai.backend.common.exception import (
     BackendAIError,
     BgtaskCancelledError,
@@ -59,6 +59,7 @@ from ai.backend.manager.errors.exceptions import (
     AppNotFound,
     GenericForbidden,
     InternalServerError,
+    KernelNotReady,
     QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
@@ -156,6 +157,10 @@ from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
 )
+from ai.backend.manager.services.session.actions.get_status_history import (
+    GetStatusHistoryAction,
+    GetStatusHistoryActionResult,
+)
 from ai.backend.manager.services.session.actions.interrupt_session import (
     InterruptSessionAction,
     InterruptSessionActionResult,
@@ -242,23 +247,19 @@ class SessionService:
         myself = asyncio.current_task()
         assert myself is not None
 
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
-
-            resp: Mapping[str, Any] = await asyncio.shield(
-                self._rpc_ptask_group.create_task(
-                    self._agent_registry.commit_session_to_file(session, filename),
-                ),
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
-        except BackendAIError:
-            log.exception("COMMIT_SESSION: exception")
-            raise
+
+        resp: Mapping[str, Any] = await asyncio.shield(
+            self._rpc_ptask_group.create_task(
+                self._agent_registry.commit_session_to_file(session, filename),
+            ),
+        )
 
         return CommitSessionActionResult(
             session_row=session,
@@ -292,9 +293,6 @@ class SessionService:
             )
         except AssertionError:
             raise InvalidAPIParameters
-        except BackendAIError:
-            log.exception("COMPLETE: exception")
-            raise
         return CompleteActionResult(
             session_row=session,
             result=resp,
@@ -368,97 +366,135 @@ class SessionService:
         async def _commit_and_upload(reporter: ProgressReporter) -> None:
             reporter.total_progress = 3
             await reporter.update(message="Commit started")
-            try:
-                # remove any existing customized related tag from base canonical
-                filtered_tag_set = [
-                    x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
+            # remove any existing customized related tag from base canonical
+            filtered_tag_set = [
+                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
+            ]
+
+            if base_image_ref.name == "":
+                new_name = base_image_ref.project
+            else:
+                new_name = base_image_ref.name
+
+            new_canonical = (
+                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            )
+
+            async with self._db.begin_readonly_session() as sess:
+                # check if user has passed its limit of customized image count
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(ImageRow)
+                    .where(
+                        (
+                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                            == f"{image_visibility.value}:{image_owner_id}"
+                        )
+                    )
+                    .where(ImageRow.status == ImageStatus.ALIVE)
+                )
+                existing_image_count = await sess.scalar(query)
+
+                customized_image_count_limit = action.max_customized_image_count
+                if customized_image_count_limit <= existing_image_count:
+                    raise QuotaExceeded(
+                        extra_msg="You have reached your customized image count quota",
+                        extra_data={
+                            "limit": customized_image_count_limit,
+                            "current": existing_image_count,
+                        },
+                    )
+
+                # check if image with same name exists and reuse ID it if is
+                query = sa.select(ImageRow).where(
+                    sa.and_(
+                        ImageRow.name.like(f"{new_canonical}%"),
+                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                        == f"{image_visibility.value}:{image_owner_id}",
+                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
+                        == image_name,
+                        ImageRow.status == ImageStatus.ALIVE,
+                    )
+                )
+                existing_row = await sess.scalar(query)
+
+                customized_image_id: str
+                kern_features: list[str]
+                if existing_row:
+                    kern_features = existing_row.labels.get(
+                        LabelName.FEATURES, DEFAULT_KERNEL_FEATURE
+                    ).split()
+                    customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID]
+                    log.debug("reusing existing customized image ID {}", customized_image_id)
+                else:
+                    kern_features = [DEFAULT_KERNEL_FEATURE]
+                    customized_image_id = str(uuid.uuid4())
+                # Remove PRIVATE label for customized images
+                kern_features = [
+                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
                 ]
 
-                if base_image_ref.name == "":
-                    new_name = base_image_ref.project
-                else:
-                    new_name = base_image_ref.name
+            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
+            new_image_ref = ImageRef.from_image_str(
+                new_canonical,
+                None,
+                registry_hostname,
+                architecture=base_image_ref.architecture,
+                is_local=base_image_ref.is_local,
+            )
 
-                new_canonical = f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+            image_labels: dict[str | LabelName, str] = {
+                LabelName.CUSTOMIZED_OWNER: f"{image_visibility.value}:{image_owner_id}",
+                LabelName.CUSTOMIZED_NAME: image_name,
+                LabelName.CUSTOMIZED_ID: customized_image_id,
+                LabelName.FEATURES: " ".join(kern_features),
+            }
+            match image_visibility:
+                case CustomizedImageVisibilityScope.USER:
+                    image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = action.user_email
 
-                async with self._db.begin_readonly_session() as sess:
-                    # check if user has passed its limit of customized image count
-                    query = (
-                        sa.select([sa.func.count()])
-                        .select_from(ImageRow)
-                        .where(
-                            (
-                                ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                                == f"{image_visibility.value}:{image_owner_id}"
-                            )
-                        )
-                        .where(ImageRow.status == ImageStatus.ALIVE)
-                    )
-                    existing_image_count = await sess.scalar(query)
+            # commit image with new tag set
+            resp = await self._agent_registry.commit_session(
+                session,
+                new_image_ref,
+                extra_labels=image_labels,
+            )
+            bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
+            propagator = BgtaskPropagator(self._background_task_manager)
+            self._event_hub.register_event_propagator(
+                propagator, [(EventDomain.BGTASK, str(bgtask_id))]
+            )
+            try:
+                async for event in propagator.receive(bgtask_id):
+                    if not isinstance(event, BaseBgtaskDoneEvent):
+                        log.warning("unexpected event: {}", event)
+                        continue
+                    match event.status():
+                        case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
+                            # TODO: PARTIAL_SUCCESS should be handled
+                            await reporter.update(increment=1, message="Committed image")
+                            break
+                        case BgtaskStatus.FAILED:
+                            raise BgtaskFailedError(extra_msg=event.message)
+                        case BgtaskStatus.CANCELLED:
+                            raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                        case _:
+                            log.warning("unexpected bgtask done event: {}", event)
+            finally:
+                self._event_hub.unregister_event_propagator(propagator.id())
 
-                    customized_image_count_limit = action.max_customized_image_count
-                    if customized_image_count_limit <= existing_image_count:
-                        raise QuotaExceeded(
-                            extra_msg="You have reached your customized image count quota",
-                            extra_data={
-                                "limit": customized_image_count_limit,
-                                "current": existing_image_count,
-                            },
-                        )
-
-                    # check if image with same name exists and reuse ID it if is
-                    query = sa.select(ImageRow).where(
-                        sa.and_(
-                            ImageRow.name.like(f"{new_canonical}%"),
-                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                            == f"{image_visibility.value}:{image_owner_id}",
-                            ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                            == image_name,
-                            ImageRow.status == ImageStatus.ALIVE,
-                        )
-                    )
-                    existing_row = await sess.scalar(query)
-
-                    customized_image_id: str
-                    kern_features: list[str]
-                    if existing_row:
-                        kern_features = existing_row.labels.get(
-                            LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE
-                        ).split()
-                        customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID.value]
-                        log.debug("reusing existing customized image ID {}", customized_image_id)
-                    else:
-                        kern_features = [DEFAULT_KERNEL_FEATURE]
-                        customized_image_id = str(uuid.uuid4())
-                    # Remove PRIVATE label for customized images
-                    kern_features = [
-                        feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
-                    ]
-
-                new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-                new_image_ref = ImageRef.from_image_str(
-                    new_canonical,
-                    None,
-                    registry_hostname,
-                    architecture=base_image_ref.architecture,
-                    is_local=base_image_ref.is_local,
+            if not new_image_ref.is_local:
+                # push image to registry from local agent
+                image_registry = ImageRegistry(
+                    name=registry_hostname,
+                    url=str(registry_conf.url),
+                    username=registry_conf.username,
+                    password=registry_conf.password,
                 )
-
-                image_labels = {
-                    LabelName.CUSTOMIZED_OWNER.value: f"{image_visibility.value}:{image_owner_id}",
-                    LabelName.CUSTOMIZED_NAME.value: image_name,
-                    LabelName.CUSTOMIZED_ID.value: customized_image_id,
-                    LabelName.FEATURES.value: " ".join(kern_features),
-                }
-                match image_visibility:
-                    case CustomizedImageVisibilityScope.USER:
-                        image_labels[LabelName.CUSTOMIZED_USER_EMAIL.value] = action.user_email
-
-                # commit image with new tag set
-                resp = await self._agent_registry.commit_session(
-                    session,
+                resp = await self._agent_registry.push_image(
+                    session.main_kernel.agent,
                     new_image_ref,
-                    extra_labels=image_labels,
+                    image_registry,
                 )
                 bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
                 propagator = BgtaskPropagator(self._background_task_manager)
@@ -471,11 +507,7 @@ class SessionService:
                             log.warning("unexpected event: {}", event)
                             continue
                         match event.status():
-                            case (
-                                BgtaskStatus.DONE,
-                                BgtaskStatus.PARTIAL_SUCCESS,
-                            ):  # TODO: PARTIAL_SUCCESS should be handled
-                                await reporter.update(increment=1, message="Committed image")
+                            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
                                 break
                             case BgtaskStatus.FAILED:
                                 raise BgtaskFailedError(extra_msg=event.message)
@@ -486,55 +518,18 @@ class SessionService:
                 finally:
                     self._event_hub.unregister_event_propagator(propagator.id())
 
-                if not new_image_ref.is_local:
-                    # push image to registry from local agent
-                    image_registry = ImageRegistry(
-                        name=registry_hostname,
-                        url=str(registry_conf.url),
-                        username=registry_conf.username,
-                        password=registry_conf.password,
-                    )
-                    resp = await self._agent_registry.push_image(
-                        session.main_kernel.agent,
-                        new_image_ref,
-                        image_registry,
-                    )
-                    bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-                    propagator = BgtaskPropagator(self._background_task_manager)
-                    self._event_hub.register_event_propagator(
-                        propagator, [(EventDomain.BGTASK, str(bgtask_id))]
-                    )
-                    try:
-                        async for event in propagator.receive(bgtask_id):
-                            if not isinstance(event, BaseBgtaskDoneEvent):
-                                log.warning("unexpected event: {}", event)
-                                continue
-                            match event.status():
-                                case BgtaskStatus.DONE, BgtaskStatus.PARTIAL_SUCCESS:
-                                    break
-                                case BgtaskStatus.FAILED:
-                                    raise BgtaskFailedError(extra_msg=event.message)
-                                case BgtaskStatus.CANCELLED:
-                                    raise BgtaskCancelledError(extra_msg="Operation cancelled")
-                                case _:
-                                    log.warning("unexpected bgtask done event: {}", event)
-                    finally:
-                        self._event_hub.unregister_event_propagator(propagator.id())
-
-                await reporter.update(increment=1, message="Pushed image to registry")
-                # rescan updated image only
-                await rescan_images(
-                    self._db,
-                    new_image_ref.canonical,
-                    registry_project,
-                    reporter=reporter,
-                )
-                await reporter.update(increment=1, message="Completed")
-            except BackendAIError:
-                log.exception("CONVERT_SESSION_TO_IMAGE: exception")
-                raise
+            await reporter.update(increment=1, message="Pushed image to registry")
+            # rescan updated image only
+            await rescan_images(
+                self._db,
+                new_image_ref.canonical,
+                registry_project,
+                reporter=reporter,
+            )
+            await reporter.update(increment=1, message="Completed")
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
+
         return ConvertSessionToImageActionResult(task_id=task_id, session_row=session)
 
     async def create_cluster(self, action: CreateClusterAction) -> CreateClusterActionResult:
@@ -608,13 +603,12 @@ class SessionService:
         except TooManySessionsMatched:
             raise SessionAlreadyExists
         except BackendAIError:
-            log.exception("GET_OR_CREATE: exception")
             raise
         except UnknownImageReference:
             raise UnknownImageReferenceError("Unknown image reference!")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception()
-            log.exception("GET_OR_CREATE: unexpected error!")
+            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError
 
     async def create_from_params(
@@ -706,11 +700,10 @@ class SessionService:
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
         except BackendAIError:
-            log.exception("GET_OR_CREATE: exception")
             raise
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!")
+            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError
 
     async def create_from_template(
@@ -924,11 +917,10 @@ class SessionService:
         except UnknownImageReference:
             raise UnknownImageReferenceError(f"Unknown image reference: {image}")
         except BackendAIError:
-            log.exception("GET_OR_CREATE: exception")
             raise
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!")
+            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
@@ -1004,7 +996,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         file = action.file
-
         try:
             async with self._db.begin_readonly_session() as db_sess:
                 session = await SessionRow.get_session(
@@ -1015,16 +1006,15 @@ class SessionService:
                 )
             await self._agent_registry.increment_session_usage(session)
             result = await self._agent_registry.download_single(session, owner_access_key, file)
+        except (ValueError, FileNotFoundError):
+            raise InvalidAPIParameters("The file is not found.")
         except asyncio.CancelledError:
             raise
         except BackendAIError:
-            log.exception("DOWNLOAD_SINGLE: exception")
             raise
-        except (ValueError, FileNotFoundError):
-            raise InvalidAPIParameters("The file is not found.")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_SINGLE: unexpected error!")
+            log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
             raise InternalServerError
 
         return DownloadFileActionResult(result=result, session_row=session)
@@ -1034,7 +1024,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         files = action.files
-
         async with self._db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
@@ -1056,13 +1045,12 @@ class SessionService:
         except asyncio.CancelledError:
             raise
         except BackendAIError:
-            log.exception("DOWNLOAD_FILE: exception")
             raise
         except (ValueError, FileNotFoundError):
             raise InvalidAPIParameters("The file is not found.")
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_FILE: unexpected error!")
+            log.exception("DOWNLOAD_FILE: unexpected error!", e)
             raise InternalServerError
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -1171,7 +1159,6 @@ class SessionService:
             log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
             raise InvalidAPIParameters(extra_msg=e.args[0])
         except BackendAIError:
-            log.exception("EXECUTE: exception")
             raise
 
         return ExecuteSessionActionResult(result=resp, session_row=session)
@@ -1181,37 +1168,30 @@ class SessionService:
     ) -> GetAbusingReportActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
-            kernel = session.main_kernel
-            report = await self._agent_registry.get_abusing_report(kernel.id)
-        except BackendAIError:
-            log.exception("GET_ABUSING_REPORT: exception")
-            raise
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        kernel = session.main_kernel
+        report = await self._agent_registry.get_abusing_report(kernel.id)
         return GetAbusingReportActionResult(result=report, session_row=session)
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
 
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                )
-            statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
-        except BackendAIError:
-            log.exception("GET_COMMIT_STATUS: exception")
-            raise
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+        statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
+
         resp = {"status": statuses[session.main_kernel.id], "kernel": str(session.main_kernel.id)}
         return GetCommitStatusActionResult(result=resp, session_row=session)
 
@@ -1295,7 +1275,12 @@ class SessionService:
         if sess_type in PRIVATE_SESSION_TYPES:
             public_host = sess.main_kernel.agent_row.public_host
             found_ports: dict[str, list[str]] = {}
-            for sport in sess.main_kernel.service_ports:
+            service_ports = cast(Optional[list[dict[str, Any]]], sess.main_kernel.service_ports)
+            if service_ports is None:
+                raise KernelNotReady(
+                    f"Kernel of the session has no service ports yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
+                )
+            for sport in service_ports:
                 if sport["name"] == "sshd":
                     found_ports["sshd"] = sport["host_ports"]
                 elif sport["name"] == "sftpd":
@@ -1360,6 +1345,23 @@ class SessionService:
 
         return GetSessionInfoActionResult(result=resp, session_row=sess)
 
+    async def get_status_history(
+        self, action: GetStatusHistoryAction
+    ) -> GetStatusHistoryActionResult:
+        session_name = action.session_name
+        owner_access_key = action.owner_access_key
+
+        async with self._db.begin_readonly_session() as db_sess:
+            session_row = await SessionRow.get_session(
+                db_sess,
+                session_name,
+                owner_access_key,
+                kernel_loading_strategy=KernelLoadingStrategy.NONE,
+            )
+            result = session_row.status_history
+
+        return GetStatusHistoryActionResult(status_history=result, session_id=session_row.id)
+
     async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
@@ -1399,11 +1401,10 @@ class SessionService:
         except asyncio.CancelledError:
             raise
         except BackendAIError:
-            log.exception("LIST_FILES: exception")
             raise
-        except Exception:
+        except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("LIST_FILES: unexpected error!")
+            log.exception("LIST_FILES: unexpected error!", e)
             raise InternalServerError
 
         return ListFilesActionResult(result=result, session_row=session)
@@ -1492,23 +1493,20 @@ class SessionService:
         envs = action.envs
         login_session_token = action.login_session_token
 
-        try:
-            async with self._db.begin_readonly_session() as db_sess:
-                session = await asyncio.shield(
-                    self._database_ptask_group.create_task(
-                        SessionRow.get_session(
-                            db_sess,
-                            session_name,
-                            access_key,
-                            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                            eager_loading_op=[
-                                selectinload(SessionRow.routing).options(noload("*")),
-                            ],
-                        ),
-                    )
+        async with self._db.begin_readonly_session() as db_sess:
+            session = await asyncio.shield(
+                self._database_ptask_group.create_task(
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                        eager_loading_op=[
+                            selectinload(SessionRow.routing).options(noload("*")),
+                        ],
+                    ),
                 )
-        except (SessionNotFound, TooManySessionsMatched):
-            raise
+            )
 
         query = (
             sa.select([scaling_groups.c.wsproxy_addr])

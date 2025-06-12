@@ -1,10 +1,11 @@
 import enum
-import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Self
 
 from aiohttp import web
+
+from .json import dump_json
 
 
 class ConfigurationError(Exception):
@@ -149,6 +150,7 @@ class ErrorDomain(enum.StrEnum):
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
     MODEL_SERVICE = "model-service"
+    RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
     AGENT = "agent"
     PERMISSION = "permission"
@@ -177,6 +179,7 @@ class ErrorOperation(enum.StrEnum):
     PARSING = "parsing"
     EXECUTE = "execute"
     SETUP = "setup"
+    GRANT = "grant"
 
 
 class ErrorDetail(enum.StrEnum):
@@ -196,12 +199,21 @@ class ErrorDetail(enum.StrEnum):
     # Invalid parameters means the received parameters are invalid.
     # This is different from BAD_REQUEST, which means the request is malformed.
     INVALID_PARAMETERS = "invalid-parameters"
+    # DATA_EXPIRED means the data is expired and cannot be used anymore.
+    # This is different from NOT_FOUND, which means the resource does not exist.
+    # For example, the password is expired or the auth token is expired.
+    DATA_EXPIRED = "data-expired"
     # Forbidden means the user is not allowed to access the resource.
     # This is different from UNAUTHORIZED, which means the user is not authenticated.
     FORBIDDEN = "forbidden"
     # Unauthorized means the user is not authenticated.
     # This means the user is not logged in or the token is invalid.
     UNAUTHORIZED = "unauthorized"
+    # Incomplete user profile means the user profile is not complete.
+    # This means the user has not completed the required fields in the profile.
+    # For example, the user has not completed a 2FA setup or any verification.
+    INCOMPLETE_USER_PROFILE = "incomplete-user-profile"
+    NOT_READY = "not-ready"  # The resource is not ready to be used.
 
     # Server Error
     INTERNAL_ERROR = (
@@ -213,9 +225,6 @@ class ErrorDetail(enum.StrEnum):
     UNREACHABLE = "unreachable"
     # TIMEOUT means the request timed out.
     TASK_TIMEOUT = "task-timeout"
-    # DATA_EXPIRED means the data is expired.
-    # This is different from NOT_FOUND, which means the resource does not exist.
-    DATA_EXPIRED = "data-expired"
     CANCELED = "canceled"
     # Unexpected Error
     NOT_IMPLEMENTED = "not-implemented"
@@ -295,7 +304,7 @@ class BackendAIError(web.HTTPError, ABC):
         if extra_data is not None:
             body["data"] = extra_data
         self.body_dict = body
-        self.body = json.dumps(body).encode()
+        self.body = dump_json(body)
 
     def __str__(self):
         lines = []
@@ -363,6 +372,19 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ResourcePresetConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-resource"
+    error_title = "Duplicate Resource Preset"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_PRESET,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
@@ -441,4 +463,17 @@ class UnreachableError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.UNREACHABLE,
+        )
+
+
+class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/permission-denied"
+    error_title = "Permission Denied."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
         )

@@ -90,7 +90,7 @@ KNOWN_SLOT_METADATA: dict[str, AcceleratorMetadata] = {
 async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
-    known_slots = await root_ctx.unified_config.legacy_etcd_config_loader.get_resource_slots()
+    known_slots = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
     return web.json_response(known_slots, status=HTTPStatus.OK)
 
 
@@ -102,7 +102,7 @@ async def get_resource_slots(request: web.Request) -> web.Response:
 async def get_resource_metadata(request: web.Request, params: Any) -> web.Response:
     log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params["sgroup"])
     root_ctx: RootContext = request.app["_root.context"]
-    known_slots = await root_ctx.unified_config.legacy_etcd_config_loader.get_resource_slots()
+    known_slots = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
     # Collect plugin-reported accelerator metadata
     reported_accelerator_metadata: dict[str, AcceleratorMetadata] = {
@@ -148,7 +148,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
 async def get_vfolder_types(request: web.Request) -> web.Response:
     log.info("ETCD.GET_VFOLDER_TYPES ()")
     root_ctx: RootContext = request.app["_root.context"]
-    vfolder_types = await root_ctx.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+    vfolder_types = await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
     return web.json_response(vfolder_types, status=HTTPStatus.OK)
 
 
@@ -286,10 +286,10 @@ async def delete_config(request: web.Request, params: Any) -> web.Response:
 async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
     root_ctx: RootContext = app["_root.context"]
     if root_ctx.pidx == 0:
-        await root_ctx.unified_config.legacy_etcd_config_loader.register_myself()
+        await root_ctx.config_provider.legacy_etcd_config_loader.register_myself()
     yield
     if root_ctx.pidx == 0:
-        await root_ctx.unified_config.legacy_etcd_config_loader.deregister_myself()
+        await root_ctx.config_provider.legacy_etcd_config_loader.deregister_myself()
 
 
 @superadmin_required

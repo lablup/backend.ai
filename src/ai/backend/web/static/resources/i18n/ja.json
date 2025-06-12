@@ -89,9 +89,11 @@
     "SaveAndClose": "保存して閉じます",
     "SaveChanges": "変更内容を保存",
     "SaveWithoutClose": "閉じずに保存",
+    "SeeErrorLogs": "エラーを参照してください",
     "Share": "シェア",
     "Unset": "初期化",
     "Update": "更新",
+    "Upload": "アップロード",
     "Yes": "はい"
   },
   "chatui": {
@@ -110,7 +112,18 @@
     "Thinking": "考え",
     "UploadFiles": "ファイルをアップロードする",
     "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします",
-    "ViewReasoning": "推論を見る"
+    "ViewReasoning": "推論を見る",
+    "chat": {
+      "parameter": {
+        "FrequencyPenalty": "頻繁なトークンにペナルティを与え、繰り返しを減らす",
+        "MaxTokens": "出力のトークン数を制限する",
+        "PresencePenalty": "新しいトピックを奨励するため、すでに出現したトークンにペナルティを課す。",
+        "Temperature": "ランダム性をコントロールし、低ければより集中し、高ければより創造的になる。",
+        "Title": "パラメータ",
+        "TopK": "最も可能性の高い上位K個のトークンからのサンプル",
+        "TopP": "累積確率がPの範囲内にあるトークンからのサンプル"
+      }
+    }
   },
   "credential": {
     "AccessKey": "アクセスキー",
@@ -232,12 +245,14 @@
     "FolderToCopy": "コピーするフォルダ",
     "Foldername": "フォルダ名",
     "Folders": "フォルダー",
+    "From": "から",
     "General": "一般的な",
     "Host": "ホスト",
     "HostDetails": "選択したストレージホストの空き容量情報を表示します。",
     "InvalidEmail": "無効なメールアドレス",
     "Invited": "招待",
     "InvitedFolders": "招待されたフォルダー",
+    "InvitedFoldersTooltip": "{{ count }}フォルダーの招待状は、回答が保留されています。",
     "Limit": "制限",
     "ModelStore": "模型店",
     "Models": "モデル",
@@ -327,6 +342,7 @@
       "CloneFolder": "フォルダクローン",
       "Cloneable": "クローン可能",
       "Control": "コントロール",
+      "CreatedAt": "で作成されました",
       "Delete": "削除",
       "DeleteAFolder": "フォルダを削除する",
       "DeleteForever": "永久に削除",
@@ -359,6 +375,7 @@
       "LeaveFolder": "招待されたフォルダを出る",
       "Location": "ロケーション",
       "MaxFolderQuota": "最大割り当て可能容量",
+      "MaxSize": "最大サイズ",
       "ModifyPermissions": "権限修正",
       "MountPermission": "マウント許可",
       "MoveToTrash": "ゴミ箱に移動します",
@@ -375,6 +392,7 @@
       "OpenAFolder": "フォルダを開く",
       "Owner": "オーナー",
       "Ownership": "所有",
+      "Path": "ストレージパス",
       "Permission": "許可",
       "ProjectFolderAlertDesc": "このフォルダはプロジェクトのすべてのメンバーと共有されます",
       "Rename": "名前を変更",
@@ -397,6 +415,8 @@
       "View": "見る"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "招待状を受け入れなかった",
+      "FailedToDeclineInvitation": "招待状を拒否できませんでした",
       "FolderSharingNotAvailableToUser": "次のユーザーはフォルダ共有ができない状態です：",
       "InvitationError": "招待に失敗しました。ユーザーはすでに招待されている可能性があります。",
       "Invited": "招待に成功",
@@ -407,7 +427,10 @@
       "NoValidEmails": "有効なメールが入力されていません",
       "Shared": "グループフォルダを正常に共有しました",
       "SharingError": "共有に失敗しました。ユーザーはすでに共有されているか、適切なプロジェクトに属していない可能性があります。",
-      "SuccessfullyLeftSharedFolder": "共有フォルダーを正常に残しました"
+      "SuccessfullyAcceptedInvitation": "招待状に成功しました",
+      "SuccessfullyDeclinedInvitation": "招待状を成功裏に拒否しました",
+      "SuccessfullyLeftSharedFolder": "共有フォルダーを正常に残しました",
+      "UserIsAlreadyInvited": "{{email}}はすでに招待されています"
     },
     "modelStore": {
       "AddedItems": "追加された項目",
@@ -452,6 +475,10 @@
       "StatusOfSelectedHost": "選択したホストの状態",
       "Used": "使用中"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "このブラウザは通知をサポートしていません。",
+    "PermissionDenied": "通知アクセスを拒否しました。\nアラートを使用するには、ブラウザの設定で許可してください。"
   },
   "dialog": {
     "ErrorOccurred": "エラーが発生しました",
@@ -1018,20 +1045,28 @@
     "UsernameOptional": "ユーザー名（オプション）"
   },
   "resourceGroup": {
+    "Activate": "活性化",
+    "ActivateResourceGroup": "リソースグループをアクティブにします",
     "Active": "アクティブ",
     "ActiveStatus": "アクティブステータス",
     "AllowedSessionTypes": "許可されたセッションタイプ",
     "CreateResourceGroup": "リソースグループの作成",
+    "Deactivate": "無効にします",
+    "DeactivateResourceGroup": "リソースグループを無効にします",
+    "DeleteResourceGroup": "リソースグループを削除します",
     "Description": "説明",
     "Domain": "ドメイン",
     "Driver": "運転者",
     "DriverOptions": "ドライバーオプション",
     "EnterValidResourceGroupName": "有効なリソースグループ名を入力してください",
+    "Information": "情報",
     "ModifyResourceGroup": "リソースグループの変更",
     "Name": "名前",
     "NoChangesMade": "変更はありません",
     "NoGroupToDisplay": "グループがありません。",
     "NoScalingGroupAssignedToThisProject": "このプロジェクトにはリソースグループが割り当てられていません。\nセッションの作成とモデルサービスの作成は制限されます。",
+    "PendingTimeout": "保留中のタイムアウト",
+    "PendingTimeoutDesc": "セッションが保留中の状態にとどまることができる最大時間。\n\n0に設定すると、制限なしに無期限に待機します。\n\n設定されたままにしておくと、デフォルトは0になります。",
     "Public": "公開",
     "PublicStatus": "公開状況",
     "ResourceGroupAlreadyExist": "同じ名前のリソースグループがすでに存在します。",
@@ -1044,6 +1079,7 @@
     "ResourceGroupNameRequired": "リソースグループ名が必要です。",
     "ResourceGroups": "リソースグループ",
     "RetriesToSkip": "回",
+    "RetriesToSkipDesc": "保留中のセッションをスキップするために再試行します",
     "Scheduler": "スケジューラー",
     "SchedulerOptions": "スケジューラオプション",
     "SelectDomain": "ドメインを選択",
@@ -1064,15 +1100,22 @@
     "ContainerPerSession": "セッションごとのコンテナ",
     "CreateResourcePolicy": "リソースポリシーの作成",
     "CreatedAt": "作成日",
+    "DefaultForUnspecified": "不特定のデフォルト",
+    "DefaultForUnspecifiedTooltipDesc1": "特定のCPUまたはメモリが要求されていない場合、デフォルトのポリシーを設定します。",
+    "DefaultForUnspecifiedTooltipDesc2": "「Unlimited」により、エージェントノードの容量までの使用が可能になり、「Limited」は明示的に設定しない限りリソースを拒否します。\nほとんどの場合、「無制限」が推奨されます。",
+    "DeletePolicy": "ポリシーを削除します",
+    "DeletePolicyDescription": "このポリシーを削除しようとしています：",
     "ExportCSV": "CSVエクスポート",
     "Folders": "フォルダー",
     "IdleTimeout": "アイドルタイムアウト",
     "IdleTimeoutSec": "アイドルタイムアウト（秒）",
     "Keypair": "キーペア",
     "KeypairResourcePolicy": "キーペアのリソースポリシー",
+    "MaxConcurrentSFTPSessions": "Max Concurrent SFTPセッション",
     "MaxCustomizedImageCount": "カスタマイズされた画像の最大数",
     "MaxFolderCount": "最大フォルダ数",
     "MaxNetworkCount": "最大ネットワーク数",
+    "MaxPendingSessionCount": "最大保留中のセッションカウント",
     "MaxQuotaScopeSize": "最大クォータ スコープ サイズ (GB)",
     "MaxSessionCountPerModelSession": "モデルセッションごとの最大セッション数",
     "MaxSessionLifetime": "セッションの最大実行時間",
@@ -1121,7 +1164,7 @@
     "ResourcePresets": "リソースプリセット",
     "Resources": "リソース",
     "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない",
-    "SharedMemory": "共有メモリ（GB）",
+    "SharedMemory": "共有メモリ",
     "Updated": "リソースプリセットが更新されました"
   },
   "session": {
@@ -1130,6 +1173,7 @@
     "Agents": "エージェント",
     "AllowedClientIps": "許可されたクライアントIP",
     "AlreadyTerminatingSession": "すでに終了しているセッションです",
+    "AnotherUserSession": "このセッションは、別のユーザーによって作成されました",
     "Architecture": "アーキテクチャ",
     "Arguments": "引数",
     "AverageUsage": "平均",
@@ -1308,7 +1352,8 @@
       "DescSession": " <p>セッションは、指定された環境とリソースに従って作成される計算環境の単位です。 </p> <p>この値が1より大きい値に設定されている場合、上記のリソースセットに対応する複数のセッションが作成されます。 </p> <p>使用可能なリソースが十分にない場合、作成できないセッションを作成する要求は待機キューに入れられます。 </p>",
       "DescSetEnv": " <p>コンテナにデフォルトの環境変数を設定し、Backend.AIに同じ名前の環境変数を設定すると、Backend.AIに設定された値が優先されます。 </p> <p style='color:var(--paper-red-400);'>すべての入力値は、セッションランチャーの開始後に初期化されます。 <br />また、これらの環境は、変数と値の両方が空でない場合にのみ渡されます。 </p>",
       "DescSetPreOpenPort": "ネットワーク機器またはコンピュータで外部からの接続を許可する <span style='color:var(--paper-red-400);'> コンテナ内部の特定のポート番号</span>を「事前開放ポート」の値に設定します。",
-      "DescSharedMemory": " <p>共有メモリは、複数のプログラム間で通信を提供したり、冗長なコピーを回避したりする目的で、複数のプログラムから同時にアクセスできるメモリです。 </p> <p>マルチCPUまたはマルチスレッドワークロードの場合、共有メモリはスレッド間通信に使用されるため重要です。マルチスレッドを使用したディープラーニングワークロードおよびハイパフォーマンスコンピューティングワークロードの場合、この値を1GB以上に設定することをお勧めします。 </p>",
+      "DescSharedMemory": "共有メモリは、複数のプログラムによって同時にアクセスできるメモリと、それらの間でコミュニケーションを提供したり、冗長なコピーを避けようとしていることを目的としています。",
+      "DescSharedMemoryContext": "マルチGPUまたはマルチプロセスワークロードの場合、プロセス間通信に使用されるため、共有メモリが重要です。\nマルチプロセスを使用した深い学習ワークロードと高性能コンピューティングワークロードの場合、この値を1 GB以上に設定することをお勧めします。",
       "DescSingleNode": " <p>セッションを実行すると、管理対象ノードとワーカーノードが単一の物理ノードまたは仮想マシンに配置されます。 </p>",
       "DuplicatedPort": "ポートが重複している。",
       "DuplicatedSessionName": "重複したセッション名は許可されていません",
@@ -1629,10 +1674,9 @@
       "Last12Hours": "過去12時間",
       "Last3Hours": "最後の3時間",
       "Last7Days": "過去7日間",
-      "LastDay": "最後の1日"
-    },
-    "timeRanges": {
-      "LastHour": "最後の1時間"
+      "LastDay": "最後の1日",
+      "LastHour": "最後の1時間",
+      "Today": "今日"
     }
   },
   "storageHost": {
@@ -1767,7 +1811,6 @@
     "BootstrapScriptDescription": "ブートストラップスクリプトはセッション作成後一度だけ実行されます。",
     "BootstrapScriptEmpty": "スクリプトが空です。\nスクリプトを入力してください。",
     "BootstrapScriptUpdated": "ブートストラップスクリプトが更新されました。",
-    "ClassicSessionLauncher": "Classic セッションランチャー",
     "ClearSSHKeypairInput": "書き込まれたSSHキーペアは削除されます。続行してもよろしいですか？",
     "ConfigFilename": "構成ファイル名",
     "CurrentSSHPublicKey": "現在の公開鍵：",
@@ -1777,10 +1820,10 @@
     "DescAutomaticUpdateCheck": "新しいwebuiバージョンがリリースされたときに通知します。 <br />インターネットが不安定またはオフラインの場合、このオプションは自動的にオフになります。このスイッチを切り替えると、自動更新チェックを再開できます。",
     "DescBetaFeatures": "WebUIのベータ機能を使用します。 <br />ベータ機能が不安定な場合があります。一部のベータ機能は、公式機能として採用されない場合があります。",
     "DescClassicSessionLauncher": "NEO セッション ランチャーの代わりに Classic セッション ランチャーを使用します。\nClassic セッション ランチャーには最新の機能が含まれていない可能性があります。",
-    "DescDesktopNotification": "デスクトップ通知をオンまたはオフにします。 <br />オンにすると、Backend.AIはOS組み込みの通知システムも使用します。このオプションをオフにしても、WebUI内の通知には影響しません。",
+    "DescDesktopNotification": "デスクトップ通知を有効にします。 \n<br />オンになった場合、backend.aiはOSビルトイン通知システムも使用します。\nこのオプションをオフにしても、Web UI内の通知には影響しません。\nオペレーティングシステムに応じて、デスクトップ通知には、システム設定で通知アクセス許可を有効にする必要があります。",
     "DescExperimentalDashboard": "要約ページの代わりにダッシュボードページを使用します。",
     "DescKeepLoginSessionInformation": "次回、webuiアプリに現在のログインセッション情報を保持させます。 <br />オプションがオフの場合、ログイン情報はログアウトごとにクリアされます。",
-    "DescLanguage": "UI言語を設定します。",
+    "DescLanguage": "インターフェイス言語を設定します。英語と韓国以外の言語は、機械翻訳によって提供されます。",
     "DescLetUserUpdateScriptWithNonEmptyValue": "空でない値でスクリプトを更新してください。",
     "DescMyKeypairInfo": "私のキーペア情報を参照してください",
     "DescNewUserConfigFileCreated": "空でないデータを使用して、新しいユーザー構成ファイルを作成できます。",
@@ -1854,9 +1897,11 @@
       "AboutBackendAI": "Backend.AIについて",
       "Administration": "管理",
       "AgentSummary": "リソース概要",
+      "Architecture": "建築",
       "Cancel": "キャンセル",
       "ChangePassword": "パスワードを変更する",
       "Chat": "チャット",
+      "ClickToDownload": "クリックしてダウンロードします",
       "ComputationResources": "計算リソース",
       "Configurations": "構成",
       "Data": "データ",

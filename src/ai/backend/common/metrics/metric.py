@@ -256,7 +256,7 @@ class EventMetricObserver:
         exception_name = exception.__class__.__name__
         self._event_failure_count.labels(
             event_type=event_type,
-            exeception=exception_name,
+            exception=exception_name,
             domain=error_code.domain,
             operation=error_code.operation,
             error_detail=error_code.error_detail,

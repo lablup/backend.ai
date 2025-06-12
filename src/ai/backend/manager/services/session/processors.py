@@ -1,5 +1,8 @@
+from typing import override
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -68,6 +71,10 @@ from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
 )
+from ai.backend.manager.services.session.actions.get_status_history import (
+    GetStatusHistoryAction,
+    GetStatusHistoryActionResult,
+)
 from ai.backend.manager.services.session.actions.interrupt_session import (
     InterruptSessionAction,
     InterruptSessionActionResult,
@@ -107,7 +114,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
 from ai.backend.manager.services.session.service import SessionService
 
 
-class SessionProcessors:
+class SessionProcessors(AbstractProcessorPackage):
     commit_session: ActionProcessor[CommitSessionAction, CommitSessionActionResult]
     complete: ActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: ActionProcessor[
@@ -134,6 +141,7 @@ class SessionProcessors:
         GetDirectAccessInfoAction, GetDirectAccessInfoActionResult
     ]
     get_session_info: ActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
+    get_status_history: ActionProcessor[GetStatusHistoryAction, GetStatusHistoryActionResult]
     interrupt: ActionProcessor[InterruptSessionAction, InterruptSessionActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
@@ -168,6 +176,7 @@ class SessionProcessors:
             service.get_direct_access_info, action_monitors
         )
         self.get_session_info = ActionProcessor(service.get_session_info, action_monitors)
+        self.get_status_history = ActionProcessor(service.get_status_history, action_monitors)
         self.interrupt = ActionProcessor(service.interrupt, action_monitors)
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.match_sessions = ActionProcessor(service.match_sessions, action_monitors)
@@ -180,3 +189,35 @@ class SessionProcessors:
         self.check_and_transit_status = ActionProcessor(
             service.check_and_transit_status, action_monitors
         )
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            CommitSessionAction.spec(),
+            CompleteAction.spec(),
+            ConvertSessionToImageAction.spec(),
+            CreateClusterAction.spec(),
+            CreateFromParamsAction.spec(),
+            CreateFromTemplateAction.spec(),
+            DestroySessionAction.spec(),
+            DownloadFileAction.spec(),
+            DownloadFilesAction.spec(),
+            ExecuteSessionAction.spec(),
+            GetAbusingReportAction.spec(),
+            GetCommitStatusAction.spec(),
+            GetContainerLogsAction.spec(),
+            GetDependencyGraphAction.spec(),
+            GetDirectAccessInfoAction.spec(),
+            GetSessionInfoAction.spec(),
+            GetStatusHistoryAction.spec(),
+            InterruptSessionAction.spec(),
+            ListFilesAction.spec(),
+            MatchSessionsAction.spec(),
+            RenameSessionAction.spec(),
+            RestartSessionAction.spec(),
+            ShutdownServiceAction.spec(),
+            StartServiceAction.spec(),
+            UploadFilesAction.spec(),
+            ModifySessionAction.spec(),
+            CheckAndTransitStatusAction.spec(),
+        ]

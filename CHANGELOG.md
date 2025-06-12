@@ -16,6 +16,145 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.9.1 (2025-06-05)
+
+### Features
+* Prevent batch kernel termination when an agent shutdown ([#4587](https://github.com/lablup/backend.ai/issues/4587))
+* Add Redis-based Service Discovery ([#4609](https://github.com/lablup/backend.ai/issues/4609))
+
+### Fixes
+* Fix `ModelServingService.delete_route()` to query the `RouteRow` with `load_endpoint=True`, ensuring the `endpoint` relationship is eagerly loaded ([#4590](https://github.com/lablup/backend.ai/issues/4590))
+* Replace assert statements in `load_model_definition` with raising exception ([#4599](https://github.com/lablup/backend.ai/issues/4599))
+* Resolve `generate-rpc-keypair` CLI command failure due to `rpc_auth_manager_keypair` not found error ([#4612](https://github.com/lablup/backend.ai/issues/4612))
+
+### Documentation Updates
+* Added clarifying comments to prevent `Auth` SDK config confusion ([#4607](https://github.com/lablup/backend.ai/issues/4607))
+
+### Miscellaneous
+* Add Etcd, Redis, and PostgreSQL exporters/scrapers in local development environment configuration. ([#4606](https://github.com/lablup/backend.ai/issues/4606))
+
+
+## 25.9.0 (2025-06-02)
+
+### Features
+* Add Action Tests for `Image`. ([#4048](https://github.com/lablup/backend.ai/issues/4048))
+* Enable TOTP registration for anonymous users ([#4354](https://github.com/lablup/backend.ai/issues/4354))
+* Refactor event dispatcher and handlers directory structure ([#4497](https://github.com/lablup/backend.ai/issues/4497))
+* Add `EventDomain.WORKFLOW` enum value to support workflow-related event categorization ([#4499](https://github.com/lablup/backend.ai/issues/4499))
+* Create new manager CLI command `backend.ai mgr scheduler last-execution-time` to let administrators fetch each manager scheduler's last execution time ([#4507](https://github.com/lablup/backend.ai/issues/4507))
+* Add stage package to support deterministic step-by-step execution ([#4509](https://github.com/lablup/backend.ai/issues/4509))
+* Make resource fragmentation configurable ([#4533](https://github.com/lablup/backend.ai/issues/4533))
+* Add missing `GET /status_history` endpoint to the session REST API ([#4543](https://github.com/lablup/backend.ai/issues/4543))
+
+### Improvements
+* Refactor `keypair_preparation` from a classmethod of the Graphene class to a utility function to decouple logic from GraphQL ([#4510](https://github.com/lablup/backend.ai/issues/4510))
+* Introduce service layer in `auth` APIs to apply audit logs for user login APIs ([#4535](https://github.com/lablup/backend.ai/issues/4535))
+* Improve logging for error handling in various modules ([#4540](https://github.com/lablup/backend.ai/issues/4540))
+* Initialize device env vars with/without restart to make session restart successfully ([#4585](https://github.com/lablup/backend.ai/issues/4585))
+
+### Fixes
+* heartbeat register service when service is dead ([#4492](https://github.com/lablup/backend.ai/issues/4492))
+* Fix missing log output of GraphQL top-level query fields by improving graphene's resolver info object usage ([#4505](https://github.com/lablup/backend.ai/issues/4505))
+* Fix Backend.AI agent equipped with mock accelerator refusing to allocate mock accelerator to session after agent restart ([#4532](https://github.com/lablup/backend.ai/issues/4532))
+* Fix broken `list_presets` API, SDK ([#4541](https://github.com/lablup/backend.ai/issues/4541))
+* Fix broken `usage_per_month` method in Resource SDK ([#4546](https://github.com/lablup/backend.ai/issues/4546))
+* Fix broken `Keypair` SDK methods (`activate`, `deactivate`) ([#4547](https://github.com/lablup/backend.ai/issues/4547))
+* Broken `stream_pty` method in Session SDK ([#4548](https://github.com/lablup/backend.ai/issues/4548))
+* Fix missing entity id in processor ([#4550](https://github.com/lablup/backend.ai/issues/4550))
+* Fix wrong idle checker init arguments ([#4557](https://github.com/lablup/backend.ai/issues/4557))
+* Fix broken `Network` SDK implementations to work properly ([#4558](https://github.com/lablup/backend.ai/issues/4558))
+* Skip processing messages with None data in RedisQueue ([#4559](https://github.com/lablup/backend.ai/issues/4559))
+* Add missing `message` field to `BgTaskFailedEvent` to provide information about the occurred error ([#4563](https://github.com/lablup/backend.ai/issues/4563))
+* Fix `AgentWatcher.get_status` SDK API to use query parameter instead of using body ([#4569](https://github.com/lablup/backend.ai/issues/4569))
+* Correct the worker process ID and names in the server log outputs, which had been unintentionally overriden as the main process information ([#4572](https://github.com/lablup/backend.ai/issues/4572))
+* Resolve session creation failure due to incorrect resource label loading ([#4573](https://github.com/lablup/backend.ai/issues/4573))
+* Remove duplicated error logging in Session service ([#4574](https://github.com/lablup/backend.ai/issues/4574))
+* Fix Backend.AI agent to gracefully handle missing `Config.Labels` field in Docker image inspection ([#4576](https://github.com/lablup/backend.ai/issues/4576))
+* Do null-check of kernel service-ports when query direct access info of a compute session ([#4581](https://github.com/lablup/backend.ai/issues/4581))
+
+### Miscellaneous
+* Remove outdated Image SDK methods (`get_image_import_form`, `build`) ([#4537](https://github.com/lablup/backend.ai/issues/4537))
+* Remove useless print in `ScalingGroup.list_available` ([#4538](https://github.com/lablup/backend.ai/issues/4538))
+
+
+## 25.8.1 (2025-05-23)
+
+### Fixes
+* Fixed client SDK method `Service.create()` signature to comply with `NewServiceRequestModel` schema ([#4449](https://github.com/lablup/backend.ai/issues/4449))
+
+
+## 25.8.0 (2025-05-23)
+
+### Features
+* Add Manager config implementations based on Pydantic. ([#3994](https://github.com/lablup/backend.ai/issues/3994))
+* Add Action Test Code for `Group` ([#4051](https://github.com/lablup/backend.ai/issues/4051))
+* Add Action Test Code for `User` ([#4059](https://github.com/lablup/backend.ai/issues/4059))
+* Add model service & processors ([#4109](https://github.com/lablup/backend.ai/issues/4109))
+* Apply error code in BackendError ([#4245](https://github.com/lablup/backend.ai/issues/4245))
+* Migrate manager config to Pydantic. ([#4317](https://github.com/lablup/backend.ai/issues/4317))
+* Introduce `LabelName` enum to avoid hardcoded image/container labels ([#4328](https://github.com/lablup/backend.ai/issues/4328))
+* Add error code to API exception message ([#4336](https://github.com/lablup/backend.ai/issues/4336))
+* Add error code to metric ([#4337](https://github.com/lablup/backend.ai/issues/4337))
+* Add etcd service discovery ([#4343](https://github.com/lablup/backend.ai/issues/4343))
+* Introduce ConfigLoaders, UnifiedConfig, and refactor existing config logic. ([#4351](https://github.com/lablup/backend.ai/issues/4351))
+* Add VFolder force-delete API to Python client SDK ([#4353](https://github.com/lablup/backend.ai/issues/4353))
+* Refactor event propagation ([#4358](https://github.com/lablup/backend.ai/issues/4358))
+* Integrate of `ManagerLocalConfig` with `ManagerSharedConfig`, and Make all manager configs to share the same Chain Config Loader. ([#4370](https://github.com/lablup/backend.ai/issues/4370))
+* Add GQL APIs for querying and updating the current config status. ([#4376](https://github.com/lablup/backend.ai/issues/4376))
+* Introduce ProcessorPackage for list up each action types that can be processed by ActionProcessor. ([#4379](https://github.com/lablup/backend.ai/issues/4379))
+* Add kernel last-seen event and handler ([#4386](https://github.com/lablup/backend.ai/issues/4386))
+* Add event logger for consumer handlers ([#4387](https://github.com/lablup/backend.ai/issues/4387))
+* Introduce `ActionSpec`. ([#4393](https://github.com/lablup/backend.ai/issues/4393))
+* Support relative path for `AutoDirectoryPath`. ([#4413](https://github.com/lablup/backend.ai/issues/4413))
+* Register service discovery and add http service discovery for prometheus ([#4438](https://github.com/lablup/backend.ai/issues/4438))
+* Add OpenTelemetry dependencies for enhanced observability ([#4479](https://github.com/lablup/backend.ai/issues/4479))
+
+### Improvements
+* Refactor the `alias` of `ManagerSharedConfig` into `validation_alias` and `serialization_alias`. ([#4365](https://github.com/lablup/backend.ai/issues/4365))
+
+### Fixes
+* Resolve `BgTaskFailedError` is not propagated to the client. ([#4272](https://github.com/lablup/backend.ai/issues/4272))
+* Fix invalid msg_id type in hiredis message queue ([#4309](https://github.com/lablup/backend.ai/issues/4309))
+* Prevent invalid resource slot creation, and mutation in `ResourcePresetService`. ([#4314](https://github.com/lablup/backend.ai/issues/4314))
+* Agent retries retrieving kernel service info if it fails during the kernel creation step ([#4321](https://github.com/lablup/backend.ai/issues/4321))
+* Add TypeError handling in redis_helper ([#4339](https://github.com/lablup/backend.ai/issues/4339))
+* Add default value of task_info value ([#4340](https://github.com/lablup/backend.ai/issues/4340))
+* Use label's items for making resource info ([#4341](https://github.com/lablup/backend.ai/issues/4341))
+* Add missing `KernelStatus.ERROR` to dead kernel status set ([#4371](https://github.com/lablup/backend.ai/issues/4371))
+* Make BaseAction's `entity_type()`, `operation_type()` classmethod. ([#4377](https://github.com/lablup/backend.ai/issues/4377))
+* Revert addition of `SessionStatus.ERROR` and `KernelStatus.ERROR` to dead status sets ([#4384](https://github.com/lablup/backend.ai/issues/4384))
+* Fix event handling observer to report success or failure after handling completes ([#4392](https://github.com/lablup/backend.ai/issues/4392))
+* Revert sane default config update. ([#4395](https://github.com/lablup/backend.ai/issues/4395))
+* Add missing `UserBgtaskEvent` implementation. ([#4404](https://github.com/lablup/backend.ai/issues/4404))
+* Change pyzmq version on python-kernel, compatible with python 3.13 ([#4405](https://github.com/lablup/backend.ai/issues/4405))
+* Fix `vfolder ls` CLI command which referred deprecated response schema fields. ([#4425](https://github.com/lablup/backend.ai/issues/4425))
+* Fix `backend.ai admin resource usage-per-period` CLI command. ([#4429](https://github.com/lablup/backend.ai/issues/4429))
+* Add import statement of `KernelLifecycleEventReason` to load legacy kernels in agents ([#4436](https://github.com/lablup/backend.ai/issues/4436))
+* Increase blocking timeout for message retrieval in redis message queue ([#4441](https://github.com/lablup/backend.ai/issues/4441))
+* Add UUID serialization support in ExtendedJSONEncoder ([#4442](https://github.com/lablup/backend.ai/issues/4442))
+* Improve error handling for token generation in ModelServingService ([#4443](https://github.com/lablup/backend.ai/issues/4443))
+* Fix issue preventing admins from leaving invited vfolders ([#4446](https://github.com/lablup/backend.ai/issues/4446))
+* Fixed session environment variable init during route creation when `endpoint.environ` is `None` ([#4447](https://github.com/lablup/backend.ai/issues/4447))
+* Check unregistered email and update error code when vfolder invitation conflicts & Enhance error handling with detailed debug responses in exception middleware ([#4448](https://github.com/lablup/backend.ai/issues/4448))
+* Fixed `Service.create()` in client SDK to truncate the default generated session name to the maximum allowed length ([#4450](https://github.com/lablup/backend.ai/issues/4450))
+* Add missing defaults to BootstrapConfig. ([#4453](https://github.com/lablup/backend.ai/issues/4453))
+* Fix issue preventing users from uploading files to compute sessions ([#4457](https://github.com/lablup/backend.ai/issues/4457))
+* Calculate correct VFolder permissions when admins query ([#4459](https://github.com/lablup/backend.ai/issues/4459))
+* Fix incorrect handling of disallowed permissions in GQL middleware. ([#4463](https://github.com/lablup/backend.ai/issues/4463))
+* Handle `NoItems` exception correctly in CLI framework. ([#4465](https://github.com/lablup/backend.ai/issues/4465))
+* Fix wrong method name in rpc call metric ([#4475](https://github.com/lablup/backend.ai/issues/4475))
+
+### Documentation Updates
+* Update Python Version Compatibility in README ([#4306](https://github.com/lablup/backend.ai/issues/4306))
+* Update towncrier command documentation ([#4364](https://github.com/lablup/backend.ai/issues/4364))
+
+### Miscellaneous
+* Add build wheel script ([#4313](https://github.com/lablup/backend.ai/issues/4313))
+* Add release script ([#4316](https://github.com/lablup/backend.ai/issues/4316))
+* Renamed `RedisConfig` to `RedisTarget` to avoid name conflicts with the existing `config`. ([#4363](https://github.com/lablup/backend.ai/issues/4363))
+* Remove subscribed_actions config, and change AuditLogReporter to AuditLogMonitor. ([#4400](https://github.com/lablup/backend.ai/issues/4400))
+
+
 ## 25.7.0 (2025-04-28)
 No significant changes.
 

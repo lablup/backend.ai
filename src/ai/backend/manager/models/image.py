@@ -51,7 +51,7 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     RescanImagesResult,
 )
-from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
+from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 
 from ..container_registry import get_container_registry_cls
 from ..errors.exceptions import ImageNotFound
@@ -300,7 +300,7 @@ async def rescan_images(
     # TODO: delete images removed from registry?
 
 
-type Resources = dict[SlotName, dict[str, Decimal]]
+type Resources = dict[SlotName, dict[str, Any]]
 
 
 # Defined for avoiding circular import
@@ -673,14 +673,30 @@ class ImageRow(Base):
     @property
     def resources(self) -> Resources:
         custom_resources = self._resources or {}
-        label_resources = self.get_resources_from_labels()  # Set this as default
+        label_resources = self.get_resources_from_labels()
 
-        resources = dict(custom_resources)
-        for label_key, value in label_resources.items():
-            if label_key not in resources:
-                resources[label_key] = value
+        merged_resources: dict[str, Any] = {}
 
-        return ImageRow._resources.type._schema.check(resources)
+        for label_key in {*custom_resources.keys(), *label_resources.keys()}:
+            custom_spec = custom_resources.get(label_key, {})
+            label_spec = label_resources.get(label_key, {})
+
+            merged_spec = dict(custom_spec)
+            for label_spec_key, value in label_spec.items():
+                merged_spec.setdefault(label_spec_key, value)
+
+            # TODO: Consider other slot types
+            if label_key in INTRINSIC_SLOTS.keys():
+                mins = [m for m in (custom_spec.get("min"), label_spec.get("min")) if m is not None]
+                if mins:
+                    match label_key:
+                        case "cpu":
+                            merged_spec["min"] = max(mins)
+                        case "mem":
+                            merged_spec["min"] = max(mins, key=BinarySize.from_str)
+
+            merged_resources[label_key] = merged_spec
+        return ImageRow._resources.type._schema.check(merged_resources)
 
     def get_resources_from_labels(self) -> Resources:
         if self.labels is None:

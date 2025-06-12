@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Sequence
 
 from ..common.types import DeviceId, SlotName
 
@@ -62,6 +62,34 @@ class InsufficientResource(ResourceError):
                 self.requested_alloc,
                 self.total_allocatable,
                 self.allocation,
+                self.context_tag,
+            ),
+        )
+
+
+@dataclass
+class FractionalResourceFragmented(ResourceError):
+    msg: str
+    slot_name: SlotName
+    requested_alloc: Decimal
+    dev_allocs: Sequence[tuple[DeviceId, Decimal]]
+    context_tag: Optional[str] = None
+
+    def __str__(self) -> str:
+        return (
+            f"FractionalResourceFragmented: {self.msg} ({self.slot_name}"
+            + (f" (tag: {self.context_tag!r}), " if self.context_tag else ", ")
+            + f"allocating {self.requested_alloc} from {self.dev_allocs})"
+        )
+
+    def __reduce__(self):
+        return (
+            self.__class__,
+            (
+                self.msg,
+                self.slot_name,
+                self.requested_alloc,
+                self.dev_allocs,
                 self.context_tag,
             ),
         )

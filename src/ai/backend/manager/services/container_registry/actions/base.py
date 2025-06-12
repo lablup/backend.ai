@@ -7,12 +7,14 @@ from ai.backend.manager.actions.action import BaseAction, BaseBatchAction
 @dataclass
 class ContainerRegistryAction(BaseAction):
     @override
-    def entity_type(self):
+    @classmethod
+    def entity_type(cls) -> str:
         return "container_registry"
 
 
 @dataclass
 class ContainerRegistryBatchAction(BaseBatchAction):
     @override
-    def entity_type(self):
+    @classmethod
+    def entity_type(cls) -> str:
         return "container_registry"

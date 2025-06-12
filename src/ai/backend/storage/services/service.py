@@ -7,7 +7,7 @@ from typing import AsyncIterator, Optional
 
 from aiohttp import web
 
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -84,7 +84,7 @@ class VolumeService:
             msg = str(e) if e.strerror is None else e.strerror
             msg = f"{msg} (errno:{e.errno})"
             log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{msg})")
-            await self._volume_pool._event_producer.produce_event(
+            await self._volume_pool._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
                     message=msg,
@@ -92,7 +92,7 @@ class VolumeService:
             )
         except Exception as e:
             log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{str(e)})")
-            await self._volume_pool._event_producer.produce_event(
+            await self._volume_pool._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
                     message=str(e),
@@ -102,7 +102,7 @@ class VolumeService:
             log.warning(f"Vfolder deletion task cancelled. (vfolder_id:{vfolder_id})")
         else:
             log.info(f"VFolder deletion task successed. (vfolder_id:{vfolder_id})")
-            await self._volume_pool._event_producer.produce_event(
+            await self._volume_pool._event_producer.anycast_event(
                 VFolderDeletionSuccessEvent(vfolder_id)
             )
 

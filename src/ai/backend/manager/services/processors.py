@@ -1,20 +1,24 @@
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -67,7 +71,7 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 class ServiceArgs:
     db: ExtendedAsyncSAEngine
     etcd: AsyncEtcd
-    unified_config: ManagerUnifiedConfig
+    config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
     background_task_manager: BackgroundTaskManager
@@ -76,6 +80,7 @@ class ServiceArgs:
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
+    hook_plugin_ctx: HookPluginContext
 
 
 @dataclass
@@ -97,6 +102,7 @@ class Services:
     utilization_metric: UtilizationMetricService
     model_serving: ModelServingService
     model_serving_auto_scaling: AutoScalingService
+    auth: AuthService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -104,22 +110,22 @@ class Services:
             args.db,
             args.etcd,
             args.agent_registry,
-            args.unified_config,
+            args.config_provider,
         )
         domain_service = DomainService(args.db)
         group_service = GroupService(
-            args.db, args.storage_manager, args.unified_config.shared, args.redis_stat
+            args.db, args.storage_manager, args.config_provider, args.redis_stat
         )
         user_service = UserService(args.db, args.storage_manager, args.redis_stat)
         image_service = ImageService(args.db, args.agent_registry)
         container_registry_service = ContainerRegistryService(args.db)
         vfolder_service = VFolderService(
-            args.db, args.unified_config, args.storage_manager, args.background_task_manager
+            args.db, args.config_provider, args.storage_manager, args.background_task_manager
         )
         vfolder_file_service = VFolderFileService(
-            args.db, args.unified_config, args.storage_manager
+            args.db, args.config_provider, args.storage_manager
         )
-        vfolder_invite_service = VFolderInviteService(args.db, args.unified_config)
+        vfolder_invite_service = VFolderInviteService(args.db, args.config_provider)
         session_service = SessionService(
             SessionServiceArgs(
                 db=args.db,
@@ -134,18 +140,19 @@ class Services:
         user_resource_policy_service = UserResourcePolicyService(args.db)
         project_resource_policy_service = ProjectResourcePolicyService(args.db)
         resource_preset_service = ResourcePresetService(
-            args.db, args.agent_registry, args.unified_config
+            args.db, args.agent_registry, args.config_provider
         )
-        utilization_metric_service = UtilizationMetricService(args.unified_config)
+        utilization_metric_service = UtilizationMetricService(args.config_provider)
         model_serving_service = ModelServingService(
             db=args.db,
             agent_registry=args.agent_registry,
             background_task_manager=args.background_task_manager,
             event_dispatcher=args.event_dispatcher,
             storage_manager=args.storage_manager,
-            unified_config=args.unified_config,
+            config_provider=args.config_provider,
         )
         model_serving_auto_scaling = AutoScalingService(args.db)
+        auth = AuthService(db=args.db, hook_plugin_ctx=args.hook_plugin_ctx)
 
         return cls(
             agent=agent_service,
@@ -165,6 +172,7 @@ class Services:
             utilization_metric=utilization_metric_service,
             model_serving=model_serving_service,
             model_serving_auto_scaling=model_serving_auto_scaling,
+            auth=auth,
         )
 
 
@@ -174,7 +182,7 @@ class ProcessorArgs:
 
 
 @dataclass
-class Processors:
+class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     domain: DomainProcessors
     group: GroupProcessors
@@ -192,6 +200,7 @@ class Processors:
     utilization_metric: UtilizationMetricProcessors
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
+    auth: AuthProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -229,6 +238,7 @@ class Processors:
         utilization_metric_processors = UtilizationMetricProcessors(
             services.utilization_metric, action_monitors
         )
+        auth = AuthProcessors(services.auth, action_monitors)
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -247,4 +257,27 @@ class Processors:
             utilization_metric=utilization_metric_processors,
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
+            auth=auth,
         )
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            *self.agent.supported_actions(),
+            *self.domain.supported_actions(),
+            *self.group.supported_actions(),
+            *self.user.supported_actions(),
+            *self.image.supported_actions(),
+            *self.container_registry.supported_actions(),
+            *self.vfolder.supported_actions(),
+            *self.vfolder_file.supported_actions(),
+            *self.vfolder_invite.supported_actions(),
+            *self.session.supported_actions(),
+            *self.keypair_resource_policy.supported_actions(),
+            *self.user_resource_policy.supported_actions(),
+            *self.project_resource_policy.supported_actions(),
+            *self.resource_preset.supported_actions(),
+            *self.utilization_metric.supported_actions(),
+            *self.model_serving.supported_actions(),
+            *self.model_serving_auto_scaling.supported_actions(),
+        ]

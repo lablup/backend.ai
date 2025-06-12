@@ -162,7 +162,6 @@ class HiRedisQueue(AbstractMessageQueue):
                 command_timeout=(autoclaim_idle_timeout + 5_000) / 1000,
             )
             if reply is None or reply[0] == b"0-0":
-                log.debug("No messages to claim")
                 return autoclaim_start_id, False
             for stream_msg in reply.values():
                 for msg_id, messages in stream_msg:
@@ -221,7 +220,7 @@ class HiRedisQueue(AbstractMessageQueue):
                     "COUNT",
                     1,
                     "BLOCK",
-                    1000,
+                    30_000,
                     "STREAMS",
                     self._stream_key,
                     ">",  # fetch messages not seen by other consumers
@@ -256,7 +255,7 @@ class HiRedisQueue(AbstractMessageQueue):
     async def _read_broadcast_messages(self, last_msg_id: bytes) -> bytes:
         async with RedisConnection(self._target, db=self._db) as client:
             reply = await client.execute(
-                ["XREAD", "BLOCK", "1000", "STREAMS", self._stream_key, last_msg_id],
+                ["XREAD", "BLOCK", "30000", "STREAMS", self._stream_key, last_msg_id],
                 command_timeout=5,
             )
             if reply is None:
@@ -278,7 +277,7 @@ class HiRedisQueue(AbstractMessageQueue):
         # If the group does not exist, create it
         # and start the auto claim loop again
         if not e.args[0].startswith("NOGROUP "):
-            log.error("Error while auto claiming messages: {}", e)
+            log.error("Unexpected error in consumer: {}", e)
             return
         try:
             async with RedisConnection(self._target, db=self._db) as client:

@@ -8,13 +8,13 @@ from graphene import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.exceptions import ObjectNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.domain import domains
@@ -62,18 +62,18 @@ def filter_by_id(id: UUID) -> Callable[[QueryStatement], QueryStatement]:
 
 class ResourcePresetService:
     _db: ExtendedAsyncSAEngine
-    _unified_config: ManagerUnifiedConfig
+    _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         agent_registry: AgentRegistry,
-        unified_config: ManagerUnifiedConfig,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
-        self._unified_config = unified_config
+        self._config_provider = config_provider
 
     async def create_preset(
         self, action: CreateResourcePresetAction
@@ -81,13 +81,16 @@ class ResourcePresetService:
         name = action.creator.name
         creator = action.creator
 
+        if not creator.resource_slots.has_intrinsic_slots():
+            raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
+
         async def _create(db_session: AsyncSession) -> Optional[ResourcePresetRow]:
             return await ResourcePresetRow.create(creator, db_session=db_session)
 
         async with self._db.connect() as db_conn:
             preset_row = await execute_with_txn_retry(_create, self._db.begin_session, db_conn)
         if preset_row is None:
-            raise ValueError(
+            raise ResourcePresetConflict(
                 f"Duplicate resource preset name (name:{name}, scaling_group:{creator.scaling_group_name})"
             )
 
@@ -101,7 +104,11 @@ class ResourcePresetService:
         modifier = action.modifier
 
         if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
+            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
+
+        if resource_slots := modifier.resource_slots.optional_value():
+            if not resource_slots.has_intrinsic_slots():
+                raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         async with self._db.begin_session() as db_sess:
             if preset_id is not None:
@@ -137,7 +144,7 @@ class ResourcePresetService:
         preset_id = action.id
 
         if preset_id is None and name is None:
-            raise ValueError("One of (`id` or `name`) parameter should be not null")
+            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
 
         async with self._db.begin_session() as db_sess:
             if preset_id is not None:
@@ -175,6 +182,7 @@ class ResourcePresetService:
                 )
             query = query.where(query_condition)
             presets = []
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
             async for row in await db_session.stream_scalars(query):
                 row = cast(ResourcePresetRow, row)
                 preset_slots = row.resource_slots.normalize_slots(ignore_unknown=True)
@@ -194,7 +202,9 @@ class ResourcePresetService:
         resource_policy = action.resource_policy
         domain_name = action.domain_name
 
-        known_slot_types = await self._unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
 
         async with self._db.begin_readonly() as conn:
             # Check keypair resource limit.
@@ -353,7 +363,7 @@ class ResourcePresetService:
 
             # Return group resource status as NaN if not allowed.
             group_resource_visibility = (
-                await self._unified_config.legacy_etcd_config_loader.get_raw(
+                await self._config_provider.legacy_etcd_config_loader.get_raw(
                     "config/api/resources/group_resource_visibility"
                 )
             )

@@ -18,6 +18,7 @@ from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.manager.data.keypair.types import KeyPairCreator
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
@@ -152,6 +153,24 @@ def generate_ssh_keypair() -> Tuple[str, str]:
     return (public_key, private_key)
 
 
+def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, Any]:
+    ak, sk = generate_keypair()
+    pubkey, privkey = generate_ssh_keypair()
+    data = {
+        "user_id": user_email,
+        "access_key": ak,
+        "secret_key": sk,
+        "is_active": creator.is_active,
+        "is_admin": creator.is_admin,
+        "resource_policy": creator.resource_policy,
+        "rate_limit": creator.rate_limit,
+        "num_queries": 0,
+        "ssh_public_key": pubkey,
+        "ssh_private_key": privkey,
+    }
+    return data
+
+
 def _generate_random_bytes_to_verify_keypairs() -> bytes:
     # Check if the keys match by signing and verifying a test message
     return os.urandom(32)
@@ -184,11 +203,9 @@ def validate_ssh_keypair(
 ) -> tuple[bool, Optional[str]]:
     """
     Validate RSA keypair for SSH/SFTP connection.
-
     Args:
         private_key_value: PEM-encoded private key string (OpenSSL format)
         public_key_value: OpenSSH-encoded public key string
-
     Returns:
         tuple[bool, Optional[str]]:
             Tuple containing a boolean indicating if the keypair is valid,

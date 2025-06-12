@@ -40,7 +40,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.shared import VolumesConfig
+from ai.backend.manager.config.unified import VolumesConfig
 
 from ..errors.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument

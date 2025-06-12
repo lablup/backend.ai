@@ -42,11 +42,11 @@ from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
 )
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.runner import LoopRunner
@@ -58,6 +58,7 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     ServicePort,
     SessionId,
+    SessionTypes,
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -111,6 +112,7 @@ default_client_features = frozenset({
     ClientFeatures.CONTINUATION.value,
 })
 default_api_version = 4
+RUN_ID_FOR_BATCH_JOB = "batch-job"  # TODO: Deprecate usage of run-id
 
 
 class RunEvent(Exception):
@@ -173,6 +175,7 @@ class KernelInitArgs:
     data: dict[str, Any]
     environ: Mapping[str, Any]
     event_producer: EventProducer
+    session_type: SessionTypes
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
@@ -196,6 +199,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
     _event_producer: EventProducer
+    session_type: SessionTypes
 
     _tasks: Set[asyncio.Task]
 
@@ -226,6 +230,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
         self._event_producer = args.event_producer
+        self.session_type = args.session_type
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -258,10 +263,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                 props["session_id"],
                 props["agent_id"],
             )
+        if "session_type" not in props:
+            props["session_type"] = SessionTypes.INTERACTIVE
         self.__dict__.update(props)
         # agent_config and _event_producer are set by the pickle.loads() caller.
         self.clean_event = None
-        self._tasks = set()
 
     def get_container_id(self) -> Optional[ContainerId]:
         return ContainerId(self.container_id) if self.container_id is not None else None
@@ -357,7 +363,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def accept_file(self, container_path: os.PathLike | str, filedata) -> None:
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         """
         Put the uploaded file to the designated container path.
         The path should be inside /home/work of the container.
@@ -421,10 +427,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         api_version: int,
         flush_timeout: float,
     ) -> NextResult:
-        myself = asyncio.current_task()
-        assert myself is not None
         assert self.runner is not None
-        self._tasks.add(myself)
         try:
             await self.runner.attach_output_queue(run_id)
             try:
@@ -447,8 +450,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             await self.runner.close()
             raise
-        finally:
-            self._tasks.remove(myself)
 
 
 _zctx = None
@@ -1105,7 +1106,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
                             response = load_json(msg_data)
-                            event = ModelServiceStatusEvent(
+                            event = ModelServiceStatusAnycastEvent(
                                 self.kernel_id,
                                 self.session_id,
                                 response["model_name"],
@@ -1115,7 +1116,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                                     else ModelServiceStatus.UNHEALTHY
                                 ),
                             )
-                            await self.event_producer.produce_event(event)
+                            await self.event_producer.anycast_event(event)
                         case b"apps-result":
                             await self.service_apps_info_queue.put(msg_data)
                         case b"stdout":

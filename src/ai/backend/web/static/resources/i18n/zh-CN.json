@@ -90,9 +90,11 @@
     "SaveAndClose": "保存并关闭",
     "SaveChanges": "保存更改",
     "SaveWithoutClose": "保存而不关闭",
+    "SeeErrorLogs": "请参阅错误",
     "Share": "分享",
     "Unset": "未设置",
     "Update": "更新",
+    "Upload": "上传",
     "Yes": "是的"
   },
   "chatui": {
@@ -111,7 +113,18 @@
     "Thinking": "思维",
     "UploadFiles": "上传文件",
     "UploadFilesDescription": "点击或拖拽文件到该区域即可上传",
-    "ViewReasoning": "查看推理"
+    "ViewReasoning": "查看推理",
+    "chat": {
+      "parameter": {
+        "FrequencyPenalty": "对频繁出现的标记进行惩罚，以减少重复",
+        "MaxTokens": "限制输出中的标记数",
+        "PresencePenalty": "惩罚已出现的代币，鼓励新话题的出现",
+        "Temperature": "控制随机性；越低越专注，越高越有创造力",
+        "Title": "参数",
+        "TopK": "从 K 个最有可能的代币中提取样本",
+        "TopP": "从累计概率在 P"
+      }
+    }
   },
   "credential": {
     "AccessKey": "访问密钥",
@@ -233,12 +246,14 @@
     "FolderToCopy": "要复制的文件夹",
     "Foldername": "文件夹名称",
     "Folders": "文件夹",
+    "From": "从",
     "General": "一般的",
     "Host": "主持人",
     "HostDetails": "显示所选存储主机的配额信息。",
     "InvalidEmail": "无效的电子邮件地址",
     "Invited": "受邀",
     "InvitedFolders": "邀请的文件夹",
+    "InvitedFoldersTooltip": "{{ count }}文件夹邀请正在待定响应。",
     "Limit": "限制",
     "ModelStore": "模型店",
     "Models": "楷模",
@@ -328,6 +343,7 @@
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
       "Control": "控制",
+      "CreatedAt": "创建在",
       "Delete": "删除",
       "DeleteAFolder": "删除文件夹",
       "DeleteForever": "永久删除",
@@ -360,6 +376,7 @@
       "LeaveFolder": "离开文件夹",
       "Location": "地点",
       "MaxFolderQuota": "最大文件夹配额",
+      "MaxSize": "最大尺寸",
       "ModifyPermissions": "修改权限",
       "MountPermission": "安装许可",
       "MoveToTrash": "移至垃圾箱",
@@ -376,6 +393,7 @@
       "OpenAFolder": "打开文件夹",
       "Owner": "所有者",
       "Ownership": "所有权",
+      "Path": "存储路径",
       "Permission": "允许",
       "ProjectFolderAlertDesc": "该文件夹与项目的所有成员共享",
       "Rename": "改名",
@@ -398,6 +416,8 @@
       "View": "看法"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "未能接受邀请",
+      "FailedToDeclineInvitation": "未能拒绝邀请",
       "FolderSharingNotAvailableToUser": "请求的用户无法共享文件夹：",
       "InvitationError": "邀请失败。用户可能已被邀请。",
       "Invited": "已成功邀请",
@@ -408,7 +428,10 @@
       "NoValidEmails": "没有输入有效的电子邮件",
       "Shared": "已成功共享群组文件夹",
       "SharingError": "分享失败。用户可能已被共享或不属于适当的项目。",
-      "SuccessfullyLeftSharedFolder": "成功离开共享文件夹"
+      "SuccessfullyAcceptedInvitation": "成功接受的邀请",
+      "SuccessfullyDeclinedInvitation": "成功拒绝了邀请",
+      "SuccessfullyLeftSharedFolder": "成功离开共享文件夹",
+      "UserIsAlreadyInvited": "{{email}}已经被邀请"
     },
     "modelStore": {
       "AddedItems": "添加的项目",
@@ -453,6 +476,10 @@
       "StatusOfSelectedHost": "选定主机的状态",
       "Used": "中古"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "该浏览器不支持通知。",
+    "PermissionDenied": "您否认通知访问。\n要使用警报，请在浏览器设置中允许它。"
   },
   "dialog": {
     "ErrorOccurred": "错误发生",
@@ -1019,20 +1046,28 @@
     "UsernameOptional": "用户名（可选）"
   },
   "resourceGroup": {
+    "Activate": "激活",
+    "ActivateResourceGroup": "激活资源组",
     "Active": "积极的",
     "ActiveStatus": "活动状态",
     "AllowedSessionTypes": "允许的会话类型",
     "CreateResourceGroup": "创建资源组",
+    "Deactivate": "停用",
+    "DeactivateResourceGroup": "停用资源组",
+    "DeleteResourceGroup": "删除资源组",
     "Description": "描述",
     "Domain": "域名",
     "Driver": "司机",
     "DriverOptions": "驱动程序选项",
     "EnterValidResourceGroupName": "输入有效的资源组名称",
+    "Information": "信息",
     "ModifyResourceGroup": "修改资源组",
     "Name": "名称",
     "NoChangesMade": "未做任何更改",
     "NoGroupToDisplay": "无组显示",
     "NoScalingGroupAssignedToThisProject": "没有资源组分配给该项目。\n会话创建和模型服务创建将受到限制。",
+    "PendingTimeout": "等待暂停",
+    "PendingTimeoutDesc": "会话可以保持在待处理状态。\n\n如果设置为0，它将无限期地等待而无需限制。\n\n如果保持不设定，则默认为0。",
     "Public": "公众",
     "PublicStatus": "公众地位",
     "ResourceGroupAlreadyExist": "已存在同名的资源组。",
@@ -1045,6 +1080,7 @@
     "ResourceGroupNameRequired": "需要资源组名称。",
     "ResourceGroups": "资源组",
     "RetriesToSkip": "时代",
+    "RetriesToSkipDesc": "重试跳过待定会话",
     "Scheduler": "调度器",
     "SchedulerOptions": "调度程序选项",
     "SelectDomain": "选择域",
@@ -1065,15 +1101,22 @@
     "ContainerPerSession": "每个会话的容器",
     "CreateResourcePolicy": "创建资源策略",
     "CreatedAt": "创建于",
+    "DefaultForUnspecified": "未指定的默认值",
+    "DefaultForUnspecifiedTooltipDesc1": "当不请求特定的CPU或内存时，设置默认策略。",
+    "DefaultForUnspecifiedTooltipDesc2": "“无限”允许使用代理节点的容量，而“有限”拒绝资源，除非明确设置。\n在大多数情况下，建议“无限”。",
+    "DeletePolicy": "删除政策",
+    "DeletePolicyDescription": "您将要删除此策略：",
     "ExportCSV": "导出 CSV",
     "Folders": "文件夹",
     "IdleTimeout": "空闲超时",
     "IdleTimeoutSec": "空闲超时（秒）",
     "Keypair": "密钥对",
     "KeypairResourcePolicy": "密钥对资源策略",
+    "MaxConcurrentSFTPSessions": "最大并发SFTP会话",
     "MaxCustomizedImageCount": "最大自定义图像数量",
     "MaxFolderCount": "最大文件夹数",
     "MaxNetworkCount": "最大网络数",
+    "MaxPendingSessionCount": "最大待定会话计数",
     "MaxQuotaScopeSize": "最大配额范围大小 (GB)",
     "MaxSessionCountPerModelSession": "每个模型会话的最大会话计数",
     "MaxSessionLifetime": "会话寿命（秒）",
@@ -1122,7 +1165,7 @@
     "ResourcePresets": "资源预设",
     "Resources": "资源",
     "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存",
-    "SharedMemory": "共享内存 (GB)",
+    "SharedMemory": "共享内存",
     "Updated": "资源预设已更新"
   },
   "session": {
@@ -1131,6 +1174,7 @@
     "Agents": "代理商",
     "AllowedClientIps": "允许的客户端 IP",
     "AlreadyTerminatingSession": "已经终止会话。",
+    "AnotherUserSession": "此会话是由另一个用户创建的",
     "Architecture": "建筑学",
     "Arguments": "参数",
     "AverageUsage": "avg",
@@ -1309,7 +1353,8 @@
       "DescSession": " <p> 会话是根据指定的环境和资源创建的计算环境单元。 </p> <p> 如果将此值设置为大于 1 的值，则会创建与上面设置的资源对应的多个会话。 </p> <p> 如果没有足够的可用资源，则创建无法创建的会话的请求将置于等待队列中。 </p>",
       "DescSetEnv": " <p> 如果在容器中设置了默认环境变量，并且在Backend.AI上也设置了同名环境变量，则Backend.AI上设置的值优先。 </p> <p style='color:var(--paper-red-400);'> 启动会话启动器后，每个输入值都将被初始化。 <br /> 此外，只有当变量和值都不为空时，才会传递这些环境。 </p>",
       "DescSetPreOpenPort": "预开放端口 \"指的是特定的<span style='color:var(--paper-red-400);'>内部容器端口</span>，它允许从网络设备或计算机上的外部设备或计算机传入连接。",
-      "DescSharedMemory": " <p> 共享内存是多个程序可以同时访问的内存，目的是在它们之间提供通信或避免冗余副本。 </p> <p> 对于多 CPU 或多线程工作负载，共享内存很重要，因为它用于线程间通信。对于使用多线程的深度学习工作负载和高性能计算工作负载，我们建议将此值设置为 1 GB 或更高。 </p>",
+      "DescSharedMemory": "共享内存是内存，可以通过多个程序同时访问，其意图是在它们之间提供通信或避免冗余副本。",
+      "DescSharedMemoryContext": "对于多GPU或多过程工作负载，共享内存很重要，因为它用于过程间通信。\n对于使用多进程的深度学习工作负载和高性能计算工作负载，我们建议将此值设置为1 GB或更高。",
       "DescSingleNode": " <p> 运行会话时，受管节点和工作节点放置在单个物理节点或虚拟机上。 </p>",
       "DuplicatedPort": "有重复的端口。",
       "DuplicatedSessionName": "不允许重复的会话名称",
@@ -1630,10 +1675,9 @@
       "Last12Hours": "最近12个小时",
       "Last3Hours": "最近3个小时",
       "Last7Days": "最近7天",
-      "LastDay": "最后一天"
-    },
-    "timeRanges": {
-      "LastHour": "最后1小时"
+      "LastDay": "最后一天",
+      "LastHour": "最后1小时",
+      "Today": "今天"
     }
   },
   "storageHost": {
@@ -1768,7 +1812,6 @@
     "BootstrapScriptDescription": "Bootstrap 脚本只会在会话创建后执行一次",
     "BootstrapScriptEmpty": "脚本是空的。\n请输入脚本。",
     "BootstrapScriptUpdated": "引导脚本已更新。",
-    "ClassicSessionLauncher": "Classic会话启动器",
     "ClearSSHKeypairInput": "书面 SSH 密钥对将被删除。你确定你要继续吗？",
     "ConfigFilename": "配置文件名",
     "CurrentSSHPublicKey": "当前公钥：",
@@ -1778,10 +1821,10 @@
     "DescAutomaticUpdateCheck": "发布新的 webui 版本时通知。 <br /> 在互联网不稳定或离线的情况下，此选项将自动关闭。您可以切换此开关以再次启动自动更新检查。",
     "DescBetaFeatures": "使用 Web UI 的测试版功能。 <br /> Beta 功能可能不稳定。某些测试版功能可能不会被采用为正式功能。",
     "DescClassicSessionLauncher": "使用 Classic 会话启动器而不是 NEO 会话启动器。 \nClassic 会话启动器可能不具有最新功能。",
-    "DescDesktopNotification": "打开或关闭桌面通知。 <br /> 如果开启，Backend.AI 也会使用操作系统内置的通知系统。关闭此选项不会影响 Web UI 中的通知。",
+    "DescDesktopNotification": "启用桌面通知。 \n<br />如果打开，Backend.ai也使用OS内置通知系统。\n关闭此选项不会影响Web UI中的通知。\n根据操作系统，桌面通知可能需要在系统设置中启用通知权限。",
     "DescExperimentalDashboard": "使用仪表板页面而不是摘要页面。",
     "DescKeepLoginSessionInformation": "下次让 webui 应用程序保留当前登录会话信息。 <br /> 如果关闭该选项，则每次注销时都会清除登录信息。",
-    "DescLanguage": "设置界面语言。",
+    "DescLanguage": "设置接口语言。英语和韩文以外的语言将通过机器翻译提供。",
     "DescLetUserUpdateScriptWithNonEmptyValue": "请使用非空值更新脚本。",
     "DescMyKeypairInfo": "查看我的密钥对信息",
     "DescNewUserConfigFileCreated": "可以使用非空数据创建新用户配置文件。",
@@ -1855,9 +1898,11 @@
       "AboutBackendAI": "关于后端.AI",
       "Administration": "行政",
       "AgentSummary": "代理摘要",
+      "Architecture": "建筑学",
       "Cancel": "取消",
       "ChangePassword": "更改密码",
       "Chat": "聊天",
+      "ClickToDownload": "点击下载",
       "ComputationResources": "计算资源",
       "Configurations": "配置",
       "Data": "数据",

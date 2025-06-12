@@ -7,12 +7,14 @@ from ai.backend.manager.actions.action import BaseAction, BaseBatchAction
 @dataclass
 class SessionAction(BaseAction):
     @override
-    def entity_type(self):
+    @classmethod
+    def entity_type(cls) -> str:
         return "session"
 
 
 @dataclass
 class SessionBatchAction(BaseBatchAction):
     @override
-    def entity_type(self):
+    @classmethod
+    def entity_type(cls) -> str:
         return "session"

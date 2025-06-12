@@ -90,9 +90,11 @@
     "SaveAndClose": "Tallenna ja sulje",
     "SaveChanges": "Tallenna muutokset",
     "SaveWithoutClose": "Tallenna ilman sulkemista",
+    "SeeErrorLogs": "Katso virhe",
     "Share": "Jaa",
     "Unset": "Unset",
     "Update": "Päivitys",
+    "Upload": "Lataa",
     "Yes": "Kyllä"
   },
   "chatui": {
@@ -110,7 +112,18 @@
     "Thinking": "Ajattelu",
     "UploadFiles": "Lataa tiedostoja",
     "UploadFilesDescription": "Napsauta tai vedä tiedostoja tälle alueelle ladataksesi",
-    "ViewReasoning": "Näytä päättely"
+    "ViewReasoning": "Näytä päättely",
+    "chat": {
+      "parameter": {
+        "FrequencyPenalty": "Rankaisee usein esiintyviä merkkejä toiston vähentämiseksi.",
+        "MaxTokens": " Rajoittaa merkkien lukumäärää tulosteessa.",
+        "PresencePenalty": "Rankaisee jo ilmestyneitä merkkejä uusien aiheiden edistämiseksi.",
+        "Temperature": "Säätelee satunnaisuutta; alempi on keskittyneempi, korkeampi on luovempi.",
+        "Title": "Parametrit",
+        "TopK": "Näytteet K todennäköisimmän merkin joukosta.",
+        "TopP": "Näytteet merkinnöistä, joiden kumulatiivinen todennäköisyys on P:n sisällä."
+      }
+    }
   },
   "credential": {
     "AccessKey": "Pääsyavain",
@@ -232,12 +245,14 @@
     "FolderToCopy": "Kopioitava kansio",
     "Foldername": "Kansion nimi",
     "Folders": "Kansiot",
+    "From": "-Sta",
     "General": "Yleinen",
     "Host": "Isäntä",
     "HostDetails": "Näyttää valitun tallennusaseman kiintiötiedot.",
     "InvalidEmail": "Virheellinen sähköpostiosoite",
     "Invited": "Kutsuttu",
     "InvitedFolders": "Kutsutut kansiot",
+    "InvitedFoldersTooltip": "{{ count }} -kansiokutsut odottavat vastausta.",
     "Limit": "Raja",
     "ModelStore": "Mallikauppa",
     "Models": "Mallit",
@@ -327,6 +342,7 @@
       "CloneFolder": "Kloonattu kansio",
       "Cloneable": "Kloonattavissa",
       "Control": "Valvonta",
+      "CreatedAt": "Luotu jhk",
       "Delete": "Poista",
       "DeleteAFolder": "Poista kansio",
       "DeleteForever": "Poista ikuisesti",
@@ -359,6 +375,7 @@
       "LeaveFolder": "Jätä kansio",
       "Location": "Sijainti",
       "MaxFolderQuota": "Kansioiden enimmäiskiintiö",
+      "MaxSize": "Enimmäiskoko",
       "ModifyPermissions": "Muokkaa käyttöoikeuksia",
       "MountPermission": "Kiinnityslupa",
       "MoveToTrash": "Siirry roskakoriin",
@@ -375,6 +392,7 @@
       "OpenAFolder": "Avaa kansio",
       "Owner": "Omistaja",
       "Ownership": "Omistus",
+      "Path": "Säilytyspolku",
       "Permission": "Lupa",
       "ProjectFolderAlertDesc": "Tämä kansio on jaettu kaikkien projektin jäsenten kanssa",
       "Rename": "Nimeä uudelleen",
@@ -397,6 +415,8 @@
       "View": "Näytä"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Kutsu epäonnistui",
+      "FailedToDeclineInvitation": "Kutsun hylkääminen epäonnistui",
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
       "InvitationError": "Kutsu epäonnistui. Käyttäjä on ehkä jo kutsuttu.",
       "Invited": "Kutsuttu onnistuneesti",
@@ -407,7 +427,10 @@
       "NoValidEmails": "Kelvollisia sähköposteja ei ole syötetty",
       "Shared": "Ryhmäkansion jakaminen onnistui",
       "SharingError": "Jakaminen epäonnistui. Käyttäjä on ehkä jo jaettu tai ei kuulu asianmukaiseen projektiin.",
-      "SuccessfullyLeftSharedFolder": "Jäljellä jaetussa kansiossa"
+      "SuccessfullyAcceptedInvitation": "Onnistuneesti hyväksytty kutsu",
+      "SuccessfullyDeclinedInvitation": "Onnistuneesti hylätty kutsu",
+      "SuccessfullyLeftSharedFolder": "Jäljellä jaetussa kansiossa",
+      "UserIsAlreadyInvited": "{{email}} on jo kutsuttu"
     },
     "modelStore": {
       "AddedItems": "Lisätyt kohteet",
@@ -452,6 +475,10 @@
       "StatusOfSelectedHost": "Valitun isännän tila",
       "Used": "käytetty"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Tämä selain ei tue ilmoituksia.",
+    "PermissionDenied": "Olet kiistänyt ilmoituskäytön. \nJos haluat käyttää hälytyksiä, salli se selaimen asetuksissa."
   },
   "dialog": {
     "ErrorOccurred": "Tapahtunut virhe",
@@ -1017,20 +1044,28 @@
     "UsernameOptional": "Käyttäjätunnus (valinnainen)"
   },
   "resourceGroup": {
+    "Activate": "Aktivoida",
+    "ActivateResourceGroup": "Aktivoi resurssiryhmä",
     "Active": "Aktiivinen",
     "ActiveStatus": "Aktiivinen tila",
     "AllowedSessionTypes": "Sallitut istuntotyypit",
     "CreateResourceGroup": "Luo resurssiryhmä",
+    "Deactivate": "Deaktivoida",
+    "DeactivateResourceGroup": "Deaktivoi resurssiryhmä",
+    "DeleteResourceGroup": "Poista resurssiryhmä",
     "Description": "Kuvaus",
     "Domain": "Verkkotunnus",
     "Driver": "Kuljettaja",
     "DriverOptions": "Kuljettajan vaihtoehdot",
     "EnterValidResourceGroupName": "Syötä kelvollinen resurssiryhmän nimi",
+    "Information": "Tiedot",
     "ModifyResourceGroup": "Resurssiryhmän muokkaaminen",
     "Name": "Nimi",
     "NoChangesMade": "Ei muutoksia",
     "NoGroupToDisplay": "NoGroupToDisplay",
     "NoScalingGroupAssignedToThisProject": "Resurssiryhmää ei ole osoitettu tähän projektiin. \nIstunnon luominen ja mallipalvelun luominen rajoitetaan.",
+    "PendingTimeout": "Odotettaessa aikakatkaisua",
+    "PendingTimeoutDesc": "Suurin aika, jonka istunto voi pysyä vireillä olevassa tilassa.\n\nJos se on asetettu 0: een, se odottaa määräämättömäksi sanottuna ilman rajaa.\n\nJos se on jätetty, se oletusarvo on 0.",
     "Public": "Julkinen",
     "PublicStatus": "Julkinen asema",
     "ResourceGroupAlreadyExist": "Samanniminen resurssiryhmä on jo olemassa.",
@@ -1043,6 +1078,7 @@
     "ResourceGroupNameRequired": "Resurssiryhmän nimi vaaditaan.",
     "ResourceGroups": "Resurssiryhmät",
     "RetriesToSkip": "Times",
+    "RetriesToSkipDesc": "Tarkastelee ohittamiseen vireillä olevaan istuntoon",
     "Scheduler": "Aikatauluttaja",
     "SchedulerOptions": "Aikataulun asetukset",
     "SelectDomain": "Valitse verkkotunnus",
@@ -1063,15 +1099,22 @@
     "ContainerPerSession": "Säiliö istuntoa kohti",
     "CreateResourcePolicy": "Luo resurssikäytäntö",
     "CreatedAt": "Luotu klo",
+    "DefaultForUnspecified": "Määrittelemättömän oletus",
+    "DefaultForUnspecifiedTooltipDesc1": "Asettaa oletuskäytäntö, kun tiettyä suorittimen tai muistia ei pyydetä.",
+    "DefaultForUnspecifiedTooltipDesc2": "'Rajoittamaton' sallii käytön Agent -solmun kapasiteettiin saakka, kun taas 'rajoitettu' kieltää resursseja, ellei nimenomaisesti ole asetettu. \nUseimmissa tapauksissa suositellaan 'rajoittamatonta'.",
+    "DeletePolicy": "Poistaa käytännöt",
+    "DeletePolicyDescription": "Poistat tämän politiikan:",
     "ExportCSV": "vie CSV",
     "Folders": "Kansiot",
     "IdleTimeout": "Idle Timeout",
     "IdleTimeoutSec": "Tyhjäkäynnin aikakatkaisu (sek.)",
     "Keypair": "Avainpari",
     "KeypairResourcePolicy": "Avainparin resurssikäytäntö",
+    "MaxConcurrentSFTPSessions": "Max samanaikaiset SFTP -istunnot",
     "MaxCustomizedImageCount": "Suurin mukautettu kuvien määrä",
     "MaxFolderCount": "Kansioiden enimmäismäärä",
     "MaxNetworkCount": "Verkkojen enimmäismäärä",
+    "MaxPendingSessionCount": "Maxin vireillä oleva istuntomäärä",
     "MaxQuotaScopeSize": "Kiintiön enimmäiskoko (GB)",
     "MaxSessionCountPerModelSession": "Maksimi istuntojen määrä malliistuntoa kohti",
     "MaxSessionLifetime": "Istunnon kesto (sek.)",
@@ -1120,7 +1163,7 @@
     "ResourcePresets": "Resurssien esiasetukset",
     "Resources": "Resurssit",
     "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin",
-    "SharedMemory": "Jaettu muisti (GB)",
+    "SharedMemory": "Jaettu muisti",
     "Updated": "Resurssien esiasetus päivitetty"
   },
   "session": {
@@ -1129,6 +1172,7 @@
     "Agents": "Agentit",
     "AllowedClientIps": "Sallitut asiakkaan IP-osoitteet",
     "AlreadyTerminatingSession": "Istunto on jo päättymässä.",
+    "AnotherUserSession": "Tämän istunnon on luonut toinen käyttäjä",
     "Architecture": "Arkkitehtuuri",
     "Arguments": "Argumentit",
     "AverageUsage": "Avg",
@@ -1307,7 +1351,8 @@
       "DescSession": "<p>Sessio on laskentaympäristön yksikkö, joka luodaan määritellyn ympäristön ja resurssien mukaan.</p><p>Jos tämä arvo on suurempi kuin 1, luodaan useita edellä mainittua resurssijoukkoa vastaavia sessioita.</p><p>Jos resursseja ei ole riittävästi käytettävissä, sessioiden luomista koskevat pyynnöt, joita ei voida luoda, asetetaan odotusjonoon.</p>",
       "DescSetEnv": "<p>Jos asetat oletusympäristömuuttujan konttiin ja asetat samannimisen ympäristömuuttujan myös Backend.AI:ssa, Backend.AI:ssa asetettu arvo on etusijalla.</p><p style='color:var(--paper-red-400);'>Jokainen syöttöarvo alustetaan istunnon käynnistämisen jälkeen.<br />Ympäristömuuttujat siirretään vain, jos sekä muuttuja että arvo eivät ole tyhjiä.</p>",
       "DescSetPreOpenPort": "'Preopen Ports' viittaa tiettyyn <span style='color:var(--paperipunainen-400);'>sisäiseen konttiporttiin</span>, joka sallii verkkolaitteen tai -tietokoneen ulkoisista laitteista tai tietokoneista tulevat yhteydet.",
-      "DescSharedMemory": "<p>Jakomuisti on muistia, jota useat ohjelmat voivat käyttää samanaikaisesti, jotta ne voivat kommunikoida keskenään tai välttää turhia kopioita.</p><p>Monitehoisten suorittimien tai monisäikeisten työtaakkojen kannalta jaettu muisti on tärkeää, koska sitä käytetään säikeiden väliseen kommunikointiin. Syväoppimisen työtehtävissä ja monisäikeistystä käyttävissä suurteholaskennan työtehtävissä suosittelemme asettamaan tämän arvon 1 Gt:ksi tai suuremmaksi.</p>",
+      "DescSharedMemory": "Jaettu muisti on muistia, johon voi samanaikaisesti käyttää useat ohjelmat, joiden tarkoituksena on tarjota viestintää keskenään tai välttää tarpeettomia kopioita.",
+      "DescSharedMemoryContext": "Multi-GPU: n tai moniprosessin työmäärät jaettu muisti on tärkeä, koska sitä käytetään prosessinväliseen viestintään. \nSyvän oppimisen työmäärät ja korkean suorituskyvyn laskentakuormat moniprosessin avulla suosittelemme, että asetetaan tämä arvo 1 Gt: lle tai korkeammalle.",
       "DescSingleNode": "<p>Sessiota ajettaessa hallittu solmu ja työläissolmut on sijoitettu yhteen fyysiseen solmuun tai virtuaalikoneeseen.</p>",
       "DuplicatedPort": "Portteja on päällekkäin.",
       "DuplicatedSessionName": "Kaksinkertainen istunnon nimi ei ole sallittu",
@@ -1628,10 +1673,9 @@
       "Last12Hours": "Viimeiset 12 tuntia",
       "Last3Hours": "Viimeiset 3 tuntia",
       "Last7Days": "Viimeiset 7 päivää",
-      "LastDay": "1 päivä"
-    },
-    "timeRanges": {
-      "LastHour": "1 tunti"
+      "LastDay": "1 päivä",
+      "LastHour": "1 tunti",
+      "Today": "Tänään"
     }
   },
   "storageHost": {
@@ -1766,7 +1810,6 @@
     "BootstrapScriptDescription": "Bootstrap-skripti suoritetaan vain kerran istunnon luomisen jälkeen.",
     "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
     "BootstrapScriptUpdated": "Bootstrap-skripti päivitetty.",
-    "ClassicSessionLauncher": "Classic istunnon käynnistysohjelma",
     "ClearSSHKeypairInput": "Kirjoitettu SSH-avainpari poistetaan. Haluatko varmasti jatkaa?",
     "ConfigFilename": "Konfigurointitiedoston nimi",
     "CurrentSSHPublicKey": "Nykyinen julkinen avain:",
@@ -1776,10 +1819,10 @@
     "DescAutomaticUpdateCheck": "Ilmoita, kun uusi webui-versio julkaistaan.<br />Jos Internet on epävakaa tai offline, tämä vaihtoehto kytkeytyy automaattisesti pois päältä. Voit vaihtaa tätä kytkintä käynnistääksesi automaattisen päivityksen tarkistuksen uudelleen.",
     "DescBetaFeatures": "Käytä web-käyttöliittymän beta-ominaisuuksia.<br />Beta-ominaisuudet voivat olla epävakaita. Joitakin beta-ominaisuuksia ei ehkä hyväksytä viralliseksi ominaisuudeksi.",
     "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia.",
-    "DescDesktopNotification": "Ota työpöytäilmoitukset käyttöön tai poista ne käytöstä. <br />Jos se on päällä, Backend.AI käyttää myös käyttöjärjestelmän sisäänrakennettua ilmoitusjärjestelmää. Tämän vaihtoehdon kytkeminen pois päältä ei vaikuta ilmoituksiin web-käyttöliittymässä.",
+    "DescDesktopNotification": "Mahdollistaa työpöytäilmoituksen. \n<br /> Jos kytketään päälle, backend.ai käyttää myös sisäänrakennettua ilmoitusjärjestelmää. \nTämän vaihtoehdon sammuttaminen ei vaikuta ilmoituksiin Web -käyttöliittymässä. \nKäyttöjärjestelmästä riippuen työpöytäilmoitukset voivat edellyttää ilmoitusoikeuksien mahdollistamista järjestelmä -asetuksissa.",
     "DescExperimentalDashboard": "Käytä kojelaudan sivua yhteenvetosivun sijasta.",
     "DescKeepLoginSessionInformation": "Anna webui-sovelluksen säilyttää nykyisen kirjautumisistunnon tiedot seuraavalla kerralla.<br />Jos vaihtoehto on pois päältä, kirjautumistiedot tyhjennetään jokaisen uloskirjautumisen yhteydessä.",
-    "DescLanguage": "Aseta käyttöliittymän kieli.",
+    "DescLanguage": "Aseta käyttöliittymäkieli. Muut kielet kuin englanti ja korea tarjotaan koneen käännöksen kautta.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Päivitä skripti ei-tyhjällä arvolla.",
     "DescMyKeypairInfo": "Katso avainparini tiedot",
     "DescNewUserConfigFileCreated": "Uusi User config-tiedosto voidaan luoda ei-tyhjillä tiedoilla.",
@@ -1853,9 +1896,11 @@
       "AboutBackendAI": "Tietoja Backend.AI:sta",
       "Administration": "Hallinto",
       "AgentSummary": "Agentin yhteenveto",
+      "Architecture": "Arkkitehtuuri",
       "Cancel": "Peruuta",
       "ChangePassword": "Vaihda salasana",
       "Chat": "Chat",
+      "ClickToDownload": "Napsauta ladataksesi",
       "ComputationResources": "Laskentaresurssit",
       "Configurations": "Kokoonpanot",
       "Data": "Tiedot",

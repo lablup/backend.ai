@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any, Mapping, Optional, Self, Sequence, override
 
 import yarl
-from pydantic import AnyUrl, HttpUrl
+from pydantic import AnyUrl, BaseModel, Field, HttpUrl
 
 from ai.backend.common.types import (
     AccessKey,
@@ -70,7 +70,7 @@ class ServiceConfig:
     environ: Optional[dict[str, str]]
     scaling_group: str
     resources: dict[str, str | int]
-    resource_opts: dict[str, str | int]
+    resource_opts: dict[str, str | int | bool]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -429,3 +429,47 @@ class EndpointAutoScalingRuleModifier(PartialModifier):
         self.min_replicas.update_dict(to_update, "min_replicas")
         self.max_replicas.update_dict(to_update, "max_replicas")
         return to_update
+
+
+class ImageEnvironment(BaseModel):
+    image: str = Field(
+        description="""
+        Container image to use for the model service.
+        """,
+        examples=[
+            "myregistry/myimage:latest",
+        ],
+    )
+    architecture: str = Field(
+        description="""
+        Architecture of the container image.
+        """,
+        examples=[
+            "x86_64",
+            "arm64",
+        ],
+    )
+
+
+class ModelServiceDefinition(BaseModel):
+    environment: Optional[ImageEnvironment] = Field(
+        default=None,
+        description="""
+        Environment in which the model service will run.
+        """,
+        examples=[
+            {
+                "image": "myregistry/myimage:latest",
+                "architecture": "x86_64",
+            }
+        ],
+    )
+    resource_slots: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="""
+        Resource slots used by the model service session.
+        """,
+        examples=[
+            {"cpu": 1, "mem": "2gb"},
+        ],
+    )

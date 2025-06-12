@@ -2,10 +2,12 @@ import asyncio
 import logging
 import secrets
 import uuid
+from http import HTTPStatus
 from typing import Awaitable, Callable
 
 import aiohttp
 import sqlalchemy as sa
+import tomli
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 from yarl import URL
@@ -15,18 +17,18 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventHandler,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
+from ai.backend.common.events.event_types.model_serving.broadcast import (
+    ModelServiceStatusBroadcastEvent,
 )
-from ai.backend.common.events.session import (
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionPreparingEvent,
-    SessionStartedEvent,
-    SessionTerminatedEvent,
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionPreparingBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
@@ -39,7 +41,8 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.constant import DEFAULT_CHUNK_SIZE
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
@@ -56,6 +59,7 @@ from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
@@ -116,6 +120,7 @@ from ai.backend.manager.services.model_serving.types import (
     CompactServiceInfo,
     EndpointData,
     ErrorInfo,
+    ModelServiceDefinition,
     MutationResult,
     RouteInfo,
     ServiceInfo,
@@ -131,7 +136,7 @@ class ModelServingService:
     _background_task_manager: BackgroundTaskManager
     _event_dispatcher: EventDispatcher
     _storage_manager: StorageSessionManager
-    _unified_config: ManagerUnifiedConfig
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
@@ -140,20 +145,69 @@ class ModelServingService:
         background_task_manager: BackgroundTaskManager,
         event_dispatcher: EventDispatcher,
         storage_manager: StorageSessionManager,
-        unified_config: ManagerUnifiedConfig,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._db = db
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
         self._event_dispatcher = event_dispatcher
         self._storage_manager = storage_manager
-        self._unified_config = unified_config
+        self._config_provider = config_provider
+
+    async def _fetch_file_from_storage_proxy(
+        self,
+        filename: str,
+        model_vfolder_row: VFolderRow,
+    ) -> bytes:
+        vfid = model_vfolder_row.vfid
+        folder_host = model_vfolder_row.host
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
+
+        chunks = bytes()
+        async with self._storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/file/fetch",
+            json={
+                "volume": volume_name,
+                "vfid": str(vfid),
+                "relpath": f"./{filename}",
+            },
+        ) as (_, storage_resp):
+            while True:
+                chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    break
+                chunks += chunk
+        return chunks
 
     async def create(self, action: CreateModelServiceAction) -> CreateModelServiceActionResult:
         service_prepare_ctx = action.creator.model_service_prepare_ctx
-        async with self._db.begin_readonly_session() as session:
+
+        async with self._db.begin_readonly_session() as db_sess:
+            model_vfolder_row = await VFolderRow.get(db_sess, service_prepare_ctx.model_id)
+            chunks = await self._fetch_file_from_storage_proxy(
+                "service-definition.toml", model_vfolder_row
+            )
+
+            if chunks:
+                raw_service_definition = chunks.decode("utf-8")
+                service_definition = tomli.loads(raw_service_definition)
+
+                definition = action.creator.runtime_variant
+                if definition in service_definition:
+                    variant_def = ModelServiceDefinition.model_validate(
+                        service_definition[definition]
+                    )
+                    if variant_def.resource_slots:
+                        action.creator.config.resources = variant_def.resource_slots
+                    if variant_def.environment:
+                        action.creator.image = variant_def.environment.image
+                        action.creator.architecture = variant_def.environment.architecture
+
             image_row = await ImageRow.resolve(
-                session,
+                db_sess,
                 [
                     ImageIdentifier(action.creator.image, action.creator.architecture),
                     ImageAlias(action.creator.image),
@@ -406,23 +460,23 @@ class ModelServingService:
             async def _handle_event(
                 context: None,
                 source: AgentId,
-                event: SessionEnqueuedEvent
-                | SessionPreparingEvent
-                | SessionStartedEvent
-                | SessionCancelledEvent
-                | SessionTerminatedEvent
-                | ModelServiceStatusEvent,
+                event: SessionEnqueuedBroadcastEvent
+                | SessionPreparingBroadcastEvent
+                | SessionStartedBroadcastEvent
+                | SessionCancelledBroadcastEvent
+                | SessionTerminatedBroadcastEvent
+                | ModelServiceStatusBroadcastEvent,
             ) -> None:
                 task_message = {"event": event.event_name(), "session_id": str(event.session_id)}
                 match event:
-                    case ModelServiceStatusEvent():
+                    case ModelServiceStatusBroadcastEvent():
                         task_message["is_healthy"] = event.new_status.value
                 await reporter.update(message=dump_json_str(task_message))
 
                 match event:
-                    case SessionTerminatedEvent() | SessionCancelledEvent():
+                    case SessionTerminatedBroadcastEvent() | SessionCancelledBroadcastEvent():
                         terminated_event.set()
-                    case ModelServiceStatusEvent():
+                    case ModelServiceStatusBroadcastEvent():
                         async with self._db.begin_readonly_session() as db_sess:
                             session = await SessionRow.get_session(
                                 db_sess,
@@ -440,31 +494,31 @@ class ModelServingService:
 
             handlers: list[EventHandler] = [
                 self._event_dispatcher.subscribe(
-                    SessionPreparingEvent,
+                    SessionPreparingBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    SessionStartedEvent,
+                    SessionStartedBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    SessionCancelledEvent,
+                    SessionCancelledBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    SessionTerminatedEvent,
+                    SessionTerminatedBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=session_event_matcher,
                 ),
                 self._event_dispatcher.subscribe(
-                    ModelServiceStatusEvent,
+                    ModelServiceStatusBroadcastEvent,
                     None,
                     _handle_event,
                     args_matcher=model_service_event_matcher,
@@ -490,7 +544,6 @@ class ModelServingService:
                 raise ModelServiceNotFound
 
         await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
-
         return GetModelServiceInfoActionResult(
             ServiceInfo(
                 endpoint_id=endpoint.id,
@@ -503,7 +556,7 @@ class ModelServingService:
                 active_routes=[
                     RouteInfo(
                         route_id=r.id,
-                        session_id=r.session_id,
+                        session_id=r.session,
                         traffic_ratio=r.traffic_ratio,
                     )
                     for r in endpoint.routings
@@ -589,7 +642,9 @@ class ModelServingService:
     async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult:
         async with self._db.begin_readonly_session() as db_sess:
             try:
-                route = await RoutingRow.get(db_sess, action.route_id, load_session=True)
+                route = await RoutingRow.get(
+                    db_sess, action.route_id, load_endpoint=True, load_session=True
+                )
             except NoResultFound:
                 raise RouteNotFound
             if route.endpoint != action.service_id:
@@ -634,18 +689,22 @@ class ModelServingService:
             wsproxy_api_token = sgroup["wsproxy_api_token"]
 
         await verify_user_access_scopes(self._db, action.requester_ctx, endpoint.session_owner)
-
         body = {"user_uuid": str(endpoint.session_owner), "exp": action.expires_at}
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",
                 json=body,
                 headers={
+                    "accept": "application/json",
                     "X-BackendAI-Token": wsproxy_api_token,
                 },
             ) as resp:
-                token_json = await resp.json()
-                token = token_json["token"]
+                resp_json = await resp.json()
+                if resp.status != HTTPStatus.OK:
+                    raise EndpointNotFound(
+                        f"Failed to generate token: {resp.status} {resp.reason} {resp_json}"
+                    )
+                token = resp_json["token"]
 
         async with self._db.begin_session() as db_sess:
             token_id = uuid.uuid4()
@@ -778,7 +837,7 @@ class ModelServingService:
                     }
                     vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
                         conn,
-                        self._unified_config.legacy_etcd_config_loader,
+                        self._config_provider.legacy_etcd_config_loader,
                         self._storage_manager,
                         endpoint_row.model,
                         endpoint_row.model_mount_destination,

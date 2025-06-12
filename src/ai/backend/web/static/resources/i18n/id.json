@@ -89,9 +89,11 @@
     "SaveAndClose": "Simpan dan Tutup",
     "SaveChanges": "Simpan Perubahan",
     "SaveWithoutClose": "Simpan Tanpa Tutup",
+    "SeeErrorLogs": "Lihat kesalahan",
     "Share": "Bagikan",
     "Unset": "Tidak diatur",
     "Update": "Perbarui",
+    "Upload": "Mengunggah",
     "Yes": "Iya"
   },
   "chatui": {
@@ -110,7 +112,18 @@
     "Thinking": "Pemikiran",
     "UploadFiles": "Unggah file",
     "UploadFilesDescription": "Klik atau seret file ke area ini untuk diunggah",
-    "ViewReasoning": "Lihat alasan"
+    "ViewReasoning": "Lihat alasan",
+    "chat": {
+      "parameter": {
+        "FrequencyPenalty": "Menghukum token yang sering digunakan untuk mengurangi pengulangan",
+        "MaxTokens": " Membatasi jumlah token dalam output",
+        "PresencePenalty": "Menghukum token yang sudah muncul untuk mendorong topik baru",
+        "Temperature": "Mengontrol keacakan; lebih rendah lebih fokus, lebih tinggi lebih kreatif",
+        "Title": "Parameter",
+        "TopK": "Sampel dari K teratas kemungkinan besar token",
+        "TopP": "Sampel dari token yang probabilitas kumulatifnya berada di dalam P"
+      }
+    }
   },
   "credential": {
     "AccessKey": "Kunci Akses",
@@ -232,12 +245,14 @@
     "FolderToCopy": "Folder untuk disalin",
     "Foldername": "Nama folder",
     "Folders": "Folder",
+    "From": "Dari",
     "General": "Umum",
     "Host": "Host",
     "HostDetails": "Menampilkan informasi kuota untuk host penyimpanan yang dipilih.",
     "InvalidEmail": "Alamat email yang tidak valid",
     "Invited": "diundang",
     "InvitedFolders": "Folder yang diundang",
+    "InvitedFoldersTooltip": "{{ count }} Undangan folder sedang menunggu respons.",
     "Limit": "Batas",
     "ModelStore": "Toko Model",
     "Models": "Model",
@@ -327,6 +342,7 @@
       "CloneFolder": "Folder klon",
       "Cloneable": "Dapat diklon",
       "Control": "Kontrol",
+      "CreatedAt": "Dibuat di",
       "Delete": "Hapus",
       "DeleteAFolder": "Hapus folder",
       "DeleteForever": "Hapus selamanya",
@@ -359,6 +375,7 @@
       "LeaveFolder": "Tinggalkan folder",
       "Location": "Lokasi",
       "MaxFolderQuota": "Kuota Folder Maksimal",
+      "MaxSize": "Ukuran maksimal",
       "ModifyPermissions": "Memodifikasi izin",
       "MountPermission": "MUNGGAL Izin",
       "MoveToTrash": "Pindah ke tempat sampah",
@@ -375,6 +392,7 @@
       "OpenAFolder": "Membuka folder",
       "Owner": "Pemilik",
       "Ownership": "Kepemilikan",
+      "Path": "Jalur penyimpanan",
       "Permission": "Izin",
       "ProjectFolderAlertDesc": "Folder ini dibagikan dengan semua anggota proyek",
       "Rename": "Ganti nama",
@@ -397,6 +415,8 @@
       "View": "Lihat"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Gagal menerima undangan",
+      "FailedToDeclineInvitation": "Gagal menolak undangan",
       "FolderSharingNotAvailableToUser": "Berbagi folder tidak tersedia untuk pengguna yang diminta:",
       "InvitationError": "Undangan gagal. Pengguna mungkin sudah diundang.",
       "Invited": "Berhasil diundang",
@@ -407,7 +427,10 @@
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
       "Shared": "Folder grup berhasil dibagikan",
       "SharingError": "Gagal berbagi. Pengguna mungkin sudah dibagikan atau tidak ada dalamm proyek yang sesuai.",
-      "SuccessfullyLeftSharedFolder": "Berhasil meninggalkan folder bersama"
+      "SuccessfullyAcceptedInvitation": "Undangan yang berhasil diterima",
+      "SuccessfullyDeclinedInvitation": "Undangan yang berhasil ditolak",
+      "SuccessfullyLeftSharedFolder": "Berhasil meninggalkan folder bersama",
+      "UserIsAlreadyInvited": "{{email}} sudah diundang"
     },
     "modelStore": {
       "AddedItems": "Item yang ditambahkan",
@@ -452,6 +475,10 @@
       "StatusOfSelectedHost": "Status Tuan Rumah Terpilih",
       "Used": "digunakan"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Browser ini tidak mendukung pemberitahuan.",
+    "PermissionDenied": "Anda telah menolak akses pemberitahuan. \nUntuk menggunakan lansiran, harap diizinkan di pengaturan browser Anda."
   },
   "dialog": {
     "ErrorOccurred": "Terjadi Galat",
@@ -1017,20 +1044,28 @@
     "UsernameOptional": "Nama Pengguna (Opsional)"
   },
   "resourceGroup": {
+    "Activate": "Mengaktifkan",
+    "ActivateResourceGroup": "Aktifkan Grup Sumber Daya",
     "Active": "Aktif",
     "ActiveStatus": "Status Aktif",
     "AllowedSessionTypes": "Jenis sesi yang diizinkan",
     "CreateResourceGroup": "Buat Grup Sumber Daya",
+    "Deactivate": "Menonaktifkan",
+    "DeactivateResourceGroup": "Nonaktifkan Grup Sumber Daya",
+    "DeleteResourceGroup": "Hapus Grup Sumber Daya",
     "Description": "Deskripsi",
     "Domain": "Domain",
     "Driver": "Driver",
     "DriverOptions": "Opsi Driver",
     "EnterValidResourceGroupName": "Masukkan nama grup Sumber Daya yang valid",
+    "Information": "Informasi",
     "ModifyResourceGroup": "Ubah Grup Sumber Daya",
     "Name": "Nama",
     "NoChangesMade": "Tidak ada perubahan yang dilakukan",
     "NoGroupToDisplay": "NoGroupToDisplay",
     "NoScalingGroupAssignedToThisProject": "Tidak ada grup sumber daya yang ditugaskan untuk proyek ini. \nPembuatan Sesi dan Pembuatan Layanan Model akan dibatasi.",
+    "PendingTimeout": "Waktu tunggu yang tertunda",
+    "PendingTimeoutDesc": "Waktu maksimum sesi dapat tetap dalam keadaan tertunda.\n\nJika diatur ke 0, itu akan menunggu tanpa batas tanpa batas.\n\nJika dibiarkan tidak disetel, itu default ke 0.",
     "Public": "Publik",
     "PublicStatus": "Status Publik",
     "ResourceGroupAlreadyExist": "Grup sumber daya dengan nama yang sama sudah ada.",
@@ -1043,6 +1078,7 @@
     "ResourceGroupNameRequired": "Nama grup sumber daya wajib diisi.",
     "ResourceGroups": "Grup Sumber Daya",
     "RetriesToSkip": "Waktu",
+    "RetriesToSkipDesc": "Retries untuk melewatkan sesi yang tertunda",
     "Scheduler": "Penjadwal",
     "SchedulerOptions": "Opsi Penjadwal",
     "SelectDomain": "Pilih Domain",
@@ -1063,15 +1099,22 @@
     "ContainerPerSession": "Kontainer Per Sesi",
     "CreateResourcePolicy": "Buat Kebijakan Sumber Daya",
     "CreatedAt": "Dibuat di",
+    "DefaultForUnspecified": "Default untuk tidak ditentukan",
+    "DefaultForUnspecifiedTooltipDesc1": "Menetapkan kebijakan default ketika tidak ada CPU atau memori tertentu yang diminta.",
+    "DefaultForUnspecifiedTooltipDesc2": "'Unlimited' memungkinkan penggunaan hingga kapasitas agen node, sementara 'Limited' menolak sumber daya kecuali diatur secara eksplisit. \nDalam kebanyakan kasus, 'tidak terbatas' direkomendasikan.",
+    "DeletePolicy": "Hapus Kebijakan",
+    "DeletePolicyDescription": "Anda akan menghapus kebijakan ini:",
     "ExportCSV": "ekspor CSV",
     "Folders": "Folder",
     "IdleTimeout": "Batas Waktu Diam",
     "IdleTimeoutSec": "Waktu tunggu menganggur (dtk.)",
     "Keypair": "pasangan kunci",
     "KeypairResourcePolicy": "Kebijakan Sumber Daya Pasangan Kunci",
+    "MaxConcurrentSFTPSessions": "Sesi SFTP Max Concurrent",
     "MaxCustomizedImageCount": "Jumlah Gambar Khusus Maksimum",
     "MaxFolderCount": "Jumlah Folder Maks",
     "MaxNetworkCount": "Jumlah Jaringan Maks",
+    "MaxPendingSessionCount": "Hitungan sesi Max Tertunda",
     "MaxQuotaScopeSize": "Ukuran Cakupan Kuota Maks (GB)",
     "MaxSessionCountPerModelSession": "Jumlah Sesi Maks Per Sesi Model",
     "MaxSessionLifetime": "Sesi Seumur Hidup (detik)",
@@ -1120,7 +1163,7 @@
     "ResourcePresets": "Preset Sumber Daya",
     "Resources": "Sumber Daya",
     "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori",
-    "SharedMemory": "Memori bersama (GB)",
+    "SharedMemory": "Memori bersama",
     "Updated": "Preset sumber daya diperbarui"
   },
   "session": {
@@ -1129,6 +1172,7 @@
     "Agents": "Agen",
     "AllowedClientIps": "IP klien yang diizinkan",
     "AlreadyTerminatingSession": "Sudah mengakhiri sesi.",
+    "AnotherUserSession": "Sesi ini dibuat oleh pengguna lain",
     "Architecture": "Arsitektur",
     "Arguments": "Argumen",
     "AverageUsage": "Rata -rata",
@@ -1307,7 +1351,8 @@
       "DescSession": " <p>Sesi adalah unit lingkungan komputasi yang dibuat sesuai dengan lingkungan dan sumber daya yang ditentukan.</p><p>Jika nilai ini disetel ke nilai yang lebih besar dari 1, beberapa sesi yang terkait dengan kumpulan sumber daya di atas akan dibuat.</p><p>Jika tidak ada cukup sumber daya yang tersedia, permintaan untuk membuat sesi yang tidak dapat dibuat akan dimasukkan ke dalam antrian tunggu.</p>",
       "DescSetEnv": " <p>Jika Anda menetapkan variabel lingkungan default dalam kontainer dan juga menetapkan variabel lingkungan dengan nama yang sama di Backend.AI, nilai yang ditetapkan di Backend.AI akan diutamakan.</p><p style='color:var(--paper-red-400);'> Setiap nilai input akan diinisialisasi setelah memulai peluncur sesi.<br/>Selain itu, lingkungan tersebut akan diteruskan hanya jika variabel dan nilai tidak kosong.</p>",
       "DescSetPreOpenPort": "'Preopen Ports' mengacu pada <span style='color:var(--paper-red-400);'>internal container port</span> tertentu yang memungkinkan koneksi masuk dari perangkat eksternal atau komputer pada perangkat jaringan atau komputer.",
-      "DescSharedMemory": " <p>Memori bersama adalah memori yang dapat diakses secara bersamaan oleh beberapa program dengan maksud untuk menyediakan komunikasi di antara mereka atau menghindari salinan yang berlebihan.</p><p>Untuk beban kerja multi-CPU atau multi-thread, memori bersama penting karena digunakan untuk komunikasi antar-utas. Untuk beban kerja deep learning dan beban kerja komputasi kinerja tinggi yang menggunakan multi-thread, sebaiknya tetapkan nilai ini ke 1 GB atau lebih tinggi.</p>",
+      "DescSharedMemory": "Memori bersama adalah memori yang dapat diakses secara bersamaan oleh banyak program dengan maksud untuk memberikan komunikasi di antara mereka atau menghindari salinan yang berlebihan.",
+      "DescSharedMemoryContext": "Untuk beban kerja multi-GPU atau multi-proses, memori bersama adalah penting karena digunakan untuk komunikasi antar proses. \nUntuk beban kerja pembelajaran yang mendalam dan beban kerja komputasi kinerja tinggi menggunakan multi-proses, kami sarankan untuk menetapkan nilai ini menjadi 1 GB atau lebih tinggi.",
       "DescSingleNode": " <p>Saat menjalankan sesi, node yang dikelola dan node pekerja ditempatkan pada satu node fisik atau mesin virtual.</p>",
       "DuplicatedPort": "Terdapat port ganda.",
       "DuplicatedSessionName": "Nama sesi yang ganda tidak diizinkan",
@@ -1629,10 +1674,9 @@
       "Last12Hours": "12 jam terakhir",
       "Last3Hours": "3 jam terakhir",
       "Last7Days": "7 hari terakhir",
-      "LastDay": "1 hari terakhir"
-    },
-    "timeRanges": {
-      "LastHour": "1 jam terakhir"
+      "LastDay": "1 hari terakhir",
+      "LastHour": "1 jam terakhir",
+      "Today": "Hari ini"
     }
   },
   "storageHost": {
@@ -1767,7 +1811,6 @@
     "BootstrapScriptDescription": "Skrip bootstrap akan dieksekusi hanya sekali setelah pembuatan sesi",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSilakan masukkan skripnya.",
     "BootstrapScriptUpdated": "Skrip Bootstrap diperbarui.",
-    "ClassicSessionLauncher": "Peluncur Sesi Classic",
     "ClearSSHKeypairInput": "Pasangan Kunci SSH tertulis akan dihapus. Apakah anda yakin ingin melanjutkan?",
     "ConfigFilename": "Nama file konfigurasi",
     "CurrentSSHPublicKey": "Kunci publik saat ini: ",
@@ -1777,10 +1820,10 @@
     "DescAutomaticUpdateCheck": "Beri tahu saat versi UI web baru dirilis. <br /> Di mana Internet tidak stabil atau offline, opsi ini akan dimatikan secara otomatis. Anda dapat mengaktifkan opsi ini untuk memulai lagi pemeriksaan pembaruan otomatis.",
     "DescBetaFeatures": "Gunakan fitur beta untuk UI Web. <br />Fitur beta mungkin tidak stabil. Beberapa fitur beta mungkin tidak diadopsi sebagai fitur resmi.",
     "DescClassicSessionLauncher": "Gunakan peluncur sesi Classic alih-alih peluncur sesi NEO. \nPeluncur sesi Classic mungkin tidak memiliki fitur terbaru.",
-    "DescDesktopNotification": "Mengaktifkan atau menonaktifkan notifikasi desktop. <br />Jika diaktifkan, Backend.AI juga menggunakan sistem notifikasi bawaan OS. Menonaktifkan opsi ini tidak memengaruhi notifikasi dalam UI web.",
+    "DescDesktopNotification": "Memungkinkan pemberitahuan desktop. \n<br /> Jika dihidupkan, backend.ai menggunakan sistem pemberitahuan bawaan OS juga. \nMematikan opsi ini tidak memengaruhi pemberitahuan dalam Web UI. \nBergantung pada sistem operasi, pemberitahuan desktop mungkin memerlukan izin pemberitahuan yang memungkinkan dalam pengaturan sistem.",
     "DescExperimentalDashboard": "Gunakan halaman dasbor alih -alih halaman ringkasan.",
     "DescKeepLoginSessionInformation": "Biarkan aplikasi UI web menyimpan informasi sesi login saat ini di lain waktu. <br />Jika opsi dimatikan, informasi login akan dihapus setiap keluar.",
-    "DescLanguage": "Setel bahasa UI.",
+    "DescLanguage": "Atur bahasa antarmuka. Bahasa selain bahasa Inggris dan Korea akan disediakan melalui terjemahan mesin.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Harap perbarui skrip dengan nilai yang tidak kosong.",
     "DescMyKeypairInfo": "Lihat informasi keypair saya",
     "DescNewUserConfigFileCreated": "File konfigurasi pengguna baru dapat dibuat dengan data yang tidak kosong.",
@@ -1854,9 +1897,11 @@
       "AboutBackendAI": "Tentang Backend.AI",
       "Administration": "Administrasi",
       "AgentSummary": "Ringkasan Agen",
+      "Architecture": "Arsitektur",
       "Cancel": "Batal",
       "ChangePassword": "Ganti kata sandi",
       "Chat": "Mengobrol",
+      "ClickToDownload": "Klik untuk mengunduh",
       "ComputationResources": "Sumber Daya Komputasi",
       "Configurations": "Konfigurasi",
       "Data": "Data",

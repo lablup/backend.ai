@@ -49,7 +49,13 @@ from async_timeout import timeout
 
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, KernelFeatures
+from ai.backend.common.docker import (
+    MAX_KERNELSPEC,
+    MIN_KERNELSPEC,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
@@ -998,12 +1004,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "WorkingDir": "/home/work",
             "Hostname": self.kernel_config["cluster_hostname"],
             "Labels": {
-                "ai.backend.kernel-id": str(self.kernel_id),
-                "ai.backend.session-id": str(self.session_id),
-                "ai.backend.owner-user-id": self.ownership_data.owner_user_id_to_str,
-                "ai.backend.owner-project-id": self.ownership_data.owner_project_id_to_str,
-                "ai.backend.owner": str(self.agent_id),
-                "ai.backend.internal.block-service-ports": (
+                LabelName.KERNEL_ID: str(self.kernel_id),
+                LabelName.SESSION_ID: str(self.session_id),
+                LabelName.OWNER_USER: self.ownership_data.owner_user_id_to_str,
+                LabelName.OWNER_PROJECT: self.ownership_data.owner_project_id_to_str,
+                LabelName.OWNER_AGENT: str(self.agent_id),
+                LabelName.BLOCK_SERVICE_PORTS: (
                     "1" if self.internal_data.get("block_service_ports", False) else "0"
                 ),
             },
@@ -1058,10 +1064,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
         service_ports_label: list[str] = []
-        service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
+        service_ports_label += image_labels.get(LabelName.SERVICE_PORTS, "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+        container_config["Labels"][LabelName.SERVICE_PORTS] = ",".join([
             label for label in service_ports_label if label
         ])
         update_nested_dict(container_config, self.computer_docker_args)
@@ -1164,7 +1170,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await network.connect({"Container": container._id})
 
             kernel_obj.container_id = container._id
-            container_network_info: ContainerNetworkInfo | None = None
+            container_network_info: Optional[ContainerNetworkInfo] = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
@@ -1204,8 +1210,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 stdin_port = 0
                 stdout_port = 0
                 for idx, port in enumerate(exposed_ports):
-                    ports: list[PortInfo] | None = await container.port(port)
-                    if ports is None:
+                    ports: Optional[list[PortInfo]] = await container.port(port)
+                    if not ports:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
                         )
@@ -1411,7 +1417,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> Optional[str]:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
             return result["Config"].get("Cmd")
@@ -1433,7 +1439,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             return
                         if container["State"]["Status"] in status_filter:
                             owner_id = AgentId(
-                                container["Config"]["Labels"].get("ai.backend.owner", "")
+                                container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
                             )
                             if self.id == owner_id:
                                 await container.show()
@@ -1459,7 +1465,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def resolve_image_distro(self, image: ImageConfig) -> str:
         image_labels = image["labels"]
-        distro = image_labels.get("ai.backend.base-distro")
+        distro = image_labels.get(LabelName.BASE_DISTRO)
         if distro:
             return distro
 
@@ -1537,10 +1543,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
-                    labels = img_detail["Config"]["Labels"]
+                    labels = img_detail.get("Config", {}).get("Labels")
                     if labels is None:
                         continue
-                    kernelspec = int(labels.get("ai.backend.kernelspec", "1"))
+                    kernelspec = int(labels.get(LabelName.KERNEL_SPEC, "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
                         scanned_images[repo_tag] = img_detail["Id"]
             for added_image in scanned_images.keys() - self.images.keys():
@@ -1650,7 +1656,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout: Optional[float] | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
             return
@@ -1682,7 +1688,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout: Optional[float],
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
@@ -2031,7 +2037,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                     evdata["Actor"],
                                 )
                             session_id = SessionId(
-                                UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"])
+                                UUID(evdata["Actor"]["Attributes"][LabelName.SESSION_ID])
                             )
                             match evdata["Action"]:
                                 case "start":

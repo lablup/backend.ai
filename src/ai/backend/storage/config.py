@@ -16,6 +16,7 @@ from ai.backend.common.config import (
     read_from_file,
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging.config import logging_config_iv
 
 from .types import VolumeInfo
@@ -34,6 +35,10 @@ _default_pyroscope_config: dict[str, Any] = {
     "app-name": None,
     "server-addr": None,
     "sample-rate": None,
+}
+
+_default_service_discovery_config: dict[str, Any] = {
+    "type": ServiceDiscoveryType.REDIS,
 }
 
 local_config_iv = (
@@ -100,6 +105,10 @@ local_config_iv = (
                             t.Key("service-addr"): tx.HostPortPair(
                                 allow_blank_host=True,
                             ),
+                            t.Key("announce-addr", default=("127.0.0.1", 6022)): tx.HostPortPair,
+                            t.Key(
+                                "announce-internal-addr", default=("host.docker.internal", 6023)
+                            ): tx.HostPortPair,
                             t.Key("internal-addr", default=("127.0.0.1", 16023)): tx.HostPortPair(
                                 allow_blank_host=True,
                             ),
@@ -123,6 +132,9 @@ local_config_iv = (
                     t.Key("log-events", default=False): t.ToBool,
                 },
             ).allow_extra("*"),
+            t.Key("service-discovery", default=_default_service_discovery_config): t.Dict({
+                t.Key("type", default=ServiceDiscoveryType.REDIS): tx.Enum(ServiceDiscoveryType),
+            }).allow_extra("*"),
         },
     )
     .merge(etcd_config_iv)

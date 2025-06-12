@@ -18,7 +18,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from typing import (
@@ -56,10 +56,10 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.events.agent import (
+from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
@@ -68,39 +68,46 @@ from ai.backend.common.events.agent import (
     DanglingKernelDetected,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.image import (
+from ai.backend.common.events.event_types.image.anycast import (
     ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
-    KernelLifecycleEventReason,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
+    KernelCancelledAnycastEvent,
+    KernelCreatingAnycastEvent,
+    KernelHeartbeatEvent,
+    KernelPreparingAnycastEvent,
+    KernelPullingAnycastEvent,
+    KernelStartedAnycastEvent,
+    KernelTerminatedAnycastEvent,
+    KernelTerminatingAnycastEvent,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
-    RouteCreatedEvent,
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
+    RouteCreatedAnycastEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
+    SessionCancelledAnycastEvent,
+    SessionEnqueuedAnycastEvent,
+    SessionFailureAnycastEvent,
+    SessionPreparingAnycastEvent,
+    SessionScheduledAnycastEvent,
+    SessionStartedAnycastEvent,
+    SessionSuccessAnycastEvent,
+    SessionTerminatedAnycastEvent,
+    SessionTerminatingAnycastEvent,
 )
-from ai.backend.common.events.vfolder import (
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionTerminatingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
@@ -137,8 +144,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.local import ManagerLocalConfig
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
@@ -179,6 +185,7 @@ from .models import (
     NetworkType,
     RouteStatus,
     RoutingRow,
+    ScalingGroupRow,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
@@ -223,7 +230,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
-    from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+    from ai.backend.common.events.dispatcher import EventProducer
 
     from .agent_cache import AgentRPCCache
     from .models.storage import StorageSessionManager
@@ -248,7 +255,6 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
-    local_config: ManagerLocalConfig
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -256,14 +262,13 @@ class AgentRegistry:
 
     def __init__(
         self,
-        unified_config: ManagerUnifiedConfig,
+        config_provider: ManagerConfigProvider,
         db: ExtendedAsyncSAEngine,
         agent_cache: AgentRPCCache,
         redis_stat: RedisConnectionInfo,
         redis_live: RedisConnectionInfo,
         redis_image: RedisConnectionInfo,
         redis_stream: RedisConnectionInfo,
-        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
@@ -273,7 +278,7 @@ class AgentRegistry:
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
     ) -> None:
-        self.unified_config = unified_config
+        self.config_provider = config_provider
         self.docker = aiodocker.Docker()
         self.db = db
         self.agent_cache = agent_cache
@@ -281,20 +286,18 @@ class AgentRegistry:
         self.redis_live = redis_live
         self.redis_image = redis_image
         self.redis_stream = redis_stream
-        self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
-        self.rpc_keepalive_timeout = int(unified_config.shared.network.rpc.keepalive_timeout)
+        self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self.session_lifecycle_mgr = SessionLifecycleManager(
             db,
             redis_stat,
-            event_dispatcher,
             event_producer,
             hook_plugin_ctx,
             self,
@@ -306,104 +309,6 @@ class AgentRegistry:
         self.pending_waits = set()
         self.database_ptask_group = aiotools.PersistentTaskGroup()
         self.webhook_ptask_group = aiotools.PersistentTaskGroup()
-
-        # passive events
-        evd = self.event_dispatcher
-        evd.consume(
-            KernelPreparingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kprep"
-        )
-        evd.consume(
-            KernelPullingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kpull"
-        )
-        evd.consume(
-            ImagePullStartedEvent, self, handle_image_pull_started, name="api.session.ipullst"
-        )
-        evd.consume(
-            ImagePullFinishedEvent, self, handle_image_pull_finished, name="api.session.ipullfin"
-        )
-        evd.consume(
-            ImagePullFailedEvent, self, handle_image_pull_failed, name="api.session.ipullfail"
-        )
-        evd.consume(
-            KernelCreatingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kcreat"
-        )
-        evd.consume(
-            KernelStartedEvent, self, handle_kernel_creation_lifecycle, name="api.session.kstart"
-        )
-        evd.consume(
-            KernelCancelledEvent, self, handle_kernel_creation_lifecycle, name="api.session.kstart"
-        )
-        evd.subscribe(
-            SessionStartedEvent,
-            self,
-            handle_session_creation_lifecycle,
-            name="api.session.sstart",
-        )
-        evd.subscribe(
-            SessionCancelledEvent,
-            self,
-            handle_session_creation_lifecycle,
-            name="api.session.scancel",
-        )
-        evd.consume(
-            KernelTerminatingEvent,
-            self,
-            handle_kernel_termination_lifecycle,
-            name="api.session.kterming",
-        )
-        evd.consume(
-            KernelTerminatedEvent,
-            self,
-            handle_kernel_termination_lifecycle,
-            name="api.session.kterm",
-        )
-        evd.consume(
-            ModelServiceStatusEvent,
-            self,
-            handle_model_service_status_update,
-        )
-        evd.consume(
-            SessionTerminatingEvent,
-            self,
-            handle_session_termination_lifecycle,
-            name="api.session.sterming",
-        )
-        evd.consume(
-            SessionTerminatedEvent,
-            self,
-            handle_session_termination_lifecycle,
-            name="api.session.sterm",
-        )
-        evd.consume(SessionEnqueuedEvent, self, invoke_session_callback)
-        evd.consume(SessionScheduledEvent, self, invoke_session_callback)
-        evd.consume(SessionPreparingEvent, self, invoke_session_callback)
-        evd.consume(SessionSuccessEvent, self, handle_batch_result)
-        evd.consume(SessionFailureEvent, self, handle_batch_result)
-        evd.consume(AgentStartedEvent, self, handle_agent_lifecycle)
-        evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
-        evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
-        evd.consume(AgentImagesRemoveEvent, self, handle_agent_images_remove)
-        evd.consume(RouteCreatedEvent, self, handle_route_creation)
-
-        evd.consume(VFolderDeletionSuccessEvent, self, handle_vfolder_deletion_success)
-        evd.consume(VFolderDeletionFailureEvent, self, handle_vfolder_deletion_failure)
-
-        # action-trigerring events
-        evd.consume(DoSyncKernelLogsEvent, self, handle_kernel_log, name="api.session.syncklog")
-        evd.consume(
-            DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
-        )
-        evd.consume(DoAgentResourceCheckEvent, self, handle_check_agent_resource)
-
-        evd.consume(
-            DanglingKernelDetected, self, handle_dangling_kernel, name="api.session.dangling-kernel"
-        )
-        evd.consume(
-            DanglingContainerDetected,
-            self,
-            handle_dangling_container,
-            name="api.session.dangling-container",
-        )
 
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)
@@ -521,7 +426,7 @@ class AgentRegistry:
 
         if _resources := config["resources"]:
             available_resource_slots = (
-                await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+                await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
             )
             try:
                 ResourceSlot.from_user_input(_resources, available_resource_slots)
@@ -1010,7 +915,9 @@ class AgentRegistry:
                 f"{resource_policy['max_containers_per_session']} containers.",
             )
 
-        async with self.db.begin_readonly() as conn:
+        async with self.db.begin_readonly_session() as sess:
+            conn = await sess.connection()
+            assert conn
             checked_scaling_group = await check_scaling_group(
                 conn,
                 scaling_group,
@@ -1027,13 +934,11 @@ class AgentRegistry:
                     f"falling back to {checked_scaling_group}",
                 )
 
-            use_host_network_query = (
-                sa.select([scaling_groups.c.use_host_network])
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name == checked_scaling_group)
+            scaling_group_query = sa.select(ScalingGroupRow).where(
+                ScalingGroupRow.name == checked_scaling_group
             )
-            use_host_network_result = await conn.execute(use_host_network_query)
-            use_host_network = use_host_network_result.scalar()
+            scaling_group_query_result = await sess.execute(scaling_group_query)
+            scaling_group_row: ScalingGroupRow = scaling_group_query_result.scalar()
             # Translate mounts/mount_map/mount_options into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
@@ -1041,7 +946,7 @@ class AgentRegistry:
                 session_enqueue_configs["creation_config"].get("mount_options") or {}
             )
             allowed_vfolder_types = (
-                await self.unified_config.legacy_etcd_config_loader.get_vfolder_types()
+                await self.config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -1169,13 +1074,13 @@ class AgentRegistry:
             "stdin_port": 0,
             "stdout_port": 0,
             "preopen_ports": sa.bindparam("preopen_ports"),
-            "use_host_network": use_host_network,
+            "use_host_network": scaling_group_row.use_host_network,
         }
 
         if network:
             session_data["network_type"] = NetworkType.PERSISTENT
             session_data["network_id"] = str(network.id)
-        elif use_host_network:
+        elif scaling_group_row.use_host_network:
             session_data["network_type"] = NetworkType.HOST
         else:
             session_data["network_type"] = NetworkType.VOLATILE
@@ -1197,10 +1102,10 @@ class AgentRegistry:
                 )
                 image_row = await ImageRow.resolve(session, [image_ref])
             image_min_slots, image_max_slots = await image_row.get_slot_ranges(
-                self.unified_config.legacy_etcd_config_loader
+                self.config_provider.legacy_etcd_config_loader
             )
             known_slot_types = (
-                await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+                await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
             )
 
             labels = cast(dict, image_row.labels)
@@ -1250,6 +1155,16 @@ class AgentRegistry:
                     f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
                 )
                 shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
+            allow_fractional_resource_fragmentation = resource_opts.get(
+                "allow_fractional_resource_fragmentation"
+            )
+            if allow_fractional_resource_fragmentation is None:
+                allow_fractional_resource_fragmentation = (
+                    scaling_group_row.scheduler_opts.allow_fractional_resource_fragmentation
+                )
+            resource_opts["allow_fractional_resource_fragmentation"] = (
+                allow_fractional_resource_fragmentation
+            )
             resource_opts["shmem"] = shmem
             image_min_slots = copy.deepcopy(image_min_slots)
             image_min_slots["mem"] += shmem
@@ -1455,8 +1370,9 @@ class AgentRegistry:
             "POST_ENQUEUE_SESSION",
             (session_id, session_name, access_key),
         )
-        await self.event_producer.produce_event(
-            SessionEnqueuedEvent(session_id, session_creation_id),
+        await self.event_producer.anycast_and_broadcast_event(
+            SessionEnqueuedAnycastEvent(session_id, session_creation_id),
+            SessionEnqueuedBroadcastEvent(session_id, session_creation_id),
         )
         return session_id
 
@@ -1493,7 +1409,7 @@ class AgentRegistry:
     ) -> None:
         if not bindings:
             return
-        auto_pull = self.unified_config.shared.docker.image.auto_pull.value
+        auto_pull = self.config_provider.config.docker.image.auto_pull.value
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
             if binding.agent_alloc_ctx.agent_id is None:
@@ -1587,7 +1503,7 @@ class AgentRegistry:
                 result = await db_sess.execute(query)
                 resource_policy = result.scalars().first()
                 idle_timeout = cast(int, resource_policy.idle_timeout)
-                auto_pull = self.unified_config.shared.docker.image.auto_pull.value
+                auto_pull = self.config_provider.config.docker.image.auto_pull.value
 
                 # Aggregate image registry information
                 image_refs: set[ImageRef] = set()
@@ -1650,7 +1566,7 @@ class AgentRegistry:
                     }
                 elif ClusterMode(scheduled_session.cluster_mode) == ClusterMode.MULTI_NODE:
                     # Create overlay network for multi-node sessions
-                    driver = self.unified_config.shared.network.inter_container.default_driver
+                    driver = self.config_provider.config.network.inter_container.default_driver
                     if driver is None:
                         raise ValueError("No inter-container network driver is configured.")
 
@@ -1976,7 +1892,7 @@ class AgentRegistry:
         }
 
     async def get_user_occupancy(self, user_id, *, db_sess=None):
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -1998,7 +1914,7 @@ class AgentRegistry:
         return await execute_with_retry(_query)
 
     async def get_keypair_occupancy(self, access_key, *, db_sess=None):
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2025,7 +1941,7 @@ class AgentRegistry:
 
     async def get_domain_occupancy(self, domain_name, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2053,7 +1969,7 @@ class AgentRegistry:
 
     async def get_group_occupancy(self, group_id, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
-        known_slot_types = await self.unified_config.legacy_etcd_config_loader.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
@@ -2481,8 +2397,9 @@ class AgentRegistry:
                         await SessionRow.set_session_status(
                             self.db, session_id, SessionStatus.TERMINATING
                         )
-                        await self.event_producer.produce_event(
-                            SessionTerminatingEvent(session_id, reason),
+                        await self.event_producer.anycast_and_broadcast_event(
+                            SessionTerminatingAnycastEvent(session_id, reason),
+                            SessionTerminatingBroadcastEvent(session_id, reason),
                         )
                 case SessionStatus.TERMINATED:
                     raise GenericForbidden(
@@ -2499,8 +2416,9 @@ class AgentRegistry:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
                     )
-                    await self.event_producer.produce_event(
-                        SessionTerminatingEvent(session_id, reason),
+                    await self.event_producer.anycast_and_broadcast_event(
+                        SessionTerminatingAnycastEvent(session_id, reason),
+                        SessionTerminatingBroadcastEvent(session_id, reason),
                     )
 
             kernel_list = target_session.kernels
@@ -2527,8 +2445,8 @@ class AgentRegistry:
                                 reason=reason,
                                 status_changed_at=now,
                             )
-                            await self.event_producer.produce_event(
-                                KernelCancelledEvent(kernel.id, session_id, reason),
+                            await self.event_producer.anycast_event(
+                                KernelCancelledAnycastEvent(kernel.id, session_id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 main_stat = {"status": "cancelled"}
@@ -2539,8 +2457,13 @@ class AgentRegistry:
                                     reason=reason,
                                     status_changed_at=now,
                                 )
-                                await self.event_producer.produce_event(
-                                    SessionCancelledEvent(
+                                await self.event_producer.anycast_and_broadcast_event(
+                                    SessionCancelledAnycastEvent(
+                                        session_id,
+                                        target_session.creation_id,
+                                        reason,
+                                    ),
+                                    SessionCancelledBroadcastEvent(
                                         session_id,
                                         target_session.creation_id,
                                         reason,
@@ -2597,8 +2520,8 @@ class AgentRegistry:
                                     )
 
                             await execute_with_retry(_update)
-                            await self.event_producer.produce_event(
-                                KernelTerminatedEvent(kernel.id, target_session.id, reason),
+                            await self.event_producer.anycast_event(
+                                KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
                             )
                         case _:
 
@@ -2627,8 +2550,8 @@ class AgentRegistry:
                                     )
 
                             await execute_with_retry(_update)
-                            await self.event_producer.produce_event(
-                                KernelTerminatingEvent(kernel.id, target_session.id, reason),
+                            await self.event_producer.anycast_event(
+                                KernelTerminatingAnycastEvent(kernel.id, target_session.id, reason),
                             )
 
                     if kernel.agent_addr is None:
@@ -2690,8 +2613,8 @@ class AgentRegistry:
             if per_agent_tasks:
                 await asyncio.gather(*per_agent_tasks, return_exceptions=True)
             for kernel in to_be_terminated:
-                await self.event_producer.produce_event(
-                    KernelTerminatedEvent(kernel.id, target_session.id, reason),
+                await self.event_producer.anycast_event(
+                    KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
                 )
             await self.hook_plugin_ctx.notify(
                 "POST_DESTROY_SESSION",
@@ -2744,11 +2667,11 @@ class AgentRegistry:
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
                     raise ValueError("network_id should not be None!")
-                if self.unified_config.shared.network.inter_container.default_driver is None:
+                if self.config_provider.config.network.inter_container.default_driver is None:
                     raise ValueError("No inter-container network driver is configured.")
 
                 network_plugin = self.network_plugin_ctx.plugins[
-                    self.unified_config.shared.network.inter_container.default_driver
+                    self.config_provider.config.network.inter_container.default_driver
                 ]
                 try:
                     await network_plugin.destroy_network(network_ref_name)
@@ -2843,8 +2766,9 @@ class AgentRegistry:
 
         # NOTE: If the restarted session is a batch-type one, then the startup command
         #       will be executed again after restart.
-        await self.event_producer.produce_event(
-            SessionStartedEvent(session.id, session.creation_id),
+        await self.event_producer.anycast_and_broadcast_event(
+            SessionStartedAnycastEvent(session.id, session.creation_id),
+            SessionStartedBroadcastEvent(session.id, session.creation_id),
         )
 
         if session.session_type == SessionTypes.BATCH:
@@ -3094,7 +3018,7 @@ class AgentRegistry:
                     if row is None or row["status"] is None:
                         # new agent detected!
                         log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.unified_config.legacy_etcd_config_loader.update_resource_slots(
+                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
                             slot_key_and_units
                         )
                         self.agent_cache.update(
@@ -3152,17 +3076,15 @@ class AgentRegistry:
                                 agent_info["public_key"],
                             )
                         if updates:
-                            await (
-                                self.unified_config.legacy_etcd_config_loader.update_resource_slots(
-                                    slot_key_and_units
-                                )
+                            await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
+                                slot_key_and_units
                             )
                             update_query = (
                                 sa.update(agents).values(updates).where(agents.c.id == agent_id)
                             )
                             await conn.execute(update_query)
                     elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.unified_config.legacy_etcd_config_loader.update_resource_slots(
+                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
                             slot_key_and_units
                         )
                         instance_rejoin = True
@@ -3200,7 +3122,7 @@ class AgentRegistry:
                 return
 
             if instance_rejoin:
-                await self.event_producer.produce_event(
+                await self.event_producer.anycast_event(
                     AgentStartedEvent("revived"),
                     source_override=agent_id,
                 )
@@ -3601,6 +3523,12 @@ class AgentRegistry:
         await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
+    async def mark_kernel_heartbeat(self, kernel_id: KernelId) -> None:
+        last_seen = datetime.now(timezone.utc)
+        async with self.db.begin_session() as db_session:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            kernel_row.last_seen = last_seen
+
     async def _get_user_email(
         self,
         kernel: KernelRow,
@@ -3634,7 +3562,7 @@ class AgentRegistry:
         session: SessionRow,
         new_image_ref: ImageRef,
         *,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str | LabelName, str] = {},
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
@@ -3876,13 +3804,11 @@ async def handle_image_pull_failed(
 async def handle_kernel_creation_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: (
-        KernelPreparingEvent
-        | KernelPullingEvent
-        | KernelCreatingEvent
-        | KernelStartedEvent
-        | KernelCancelledEvent
-    ),
+    event: KernelPreparingAnycastEvent
+    | KernelPullingAnycastEvent
+    | KernelCreatingAnycastEvent
+    | KernelStartedAnycastEvent
+    | KernelCancelledAnycastEvent,
 ) -> None:
     """
     Update the database and perform post_create_kernel() upon
@@ -3899,44 +3825,54 @@ async def handle_kernel_creation_lifecycle(
         event.kernel_id,
     )
     match event:
-        case KernelPreparingEvent():
+        case KernelPreparingAnycastEvent():
             # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
             pass
-        case KernelPullingEvent(kernel_id, session_id, reason=reason):
+        case KernelPullingAnycastEvent(kernel_id, session_id, reason=reason):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
-        case KernelCreatingEvent(kernel_id, session_id, reason=reason):
+        case KernelCreatingAnycastEvent(kernel_id, session_id, reason=reason):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_creating(db_conn, kernel_id, session_id, reason)
-        case KernelStartedEvent(kernel_id, session_id, reason=reason, creation_info=creation_info):
+        case KernelStartedAnycastEvent(
+            kernel_id, session_id, reason=reason, creation_info=creation_info
+        ):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_running(
                     db_conn, kernel_id, session_id, reason, creation_info
                 )
-        case KernelCancelledEvent():
+        case KernelCancelledAnycastEvent():
             log.warning(f"Kernel cancelled, {event.reason = }")
 
 
 async def handle_kernel_termination_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: KernelTerminatingEvent | KernelTerminatedEvent,
+    event: KernelTerminatingAnycastEvent | KernelTerminatedAnycastEvent,
 ) -> None:
     match event:
-        case KernelTerminatingEvent():
+        case KernelTerminatingAnycastEvent():
             # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
             pass
-        case KernelTerminatedEvent(kernel_id, session_id, reason, exit_code):
+        case KernelTerminatedAnycastEvent(kernel_id, session_id, reason, exit_code):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_terminated(
                     db_conn, kernel_id, session_id, reason, exit_code
                 )
 
 
+async def handle_kernel_heartbeat(
+    context: AgentRegistry,
+    source: AgentId,
+    event: KernelHeartbeatEvent,
+) -> None:
+    await context.mark_kernel_heartbeat(event.kernel_id)
+
+
 async def handle_session_creation_lifecycle(
     context: AgentRegistry,
     source: AgentId,
-    event: SessionStartedEvent | SessionCancelledEvent,
+    event: SessionStartedAnycastEvent | SessionCancelledAnycastEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
@@ -3945,10 +3881,10 @@ async def handle_session_creation_lifecycle(
     if event.creation_id not in context.session_creation_tracker:
         return
     log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.event_name(), event.session_id)
-    if isinstance(event, SessionStartedEvent):
+    if isinstance(event, SessionStartedAnycastEvent):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
-    elif isinstance(event, SessionCancelledEvent):
+    elif isinstance(event, SessionCancelledAnycastEvent):
         if tracker := context.session_creation_tracker.get(event.creation_id):
             tracker.set()
 
@@ -3960,16 +3896,16 @@ async def handle_session_creation_lifecycle(
 async def handle_session_termination_lifecycle(
     context: AgentRegistry,
     agent_id: AgentId,
-    event: SessionTerminatingEvent | SessionTerminatedEvent,
+    event: SessionTerminatingAnycastEvent | SessionTerminatedAnycastEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
     match event:
-        case SessionTerminatingEvent():
+        case SessionTerminatingAnycastEvent():
             pass
-        case SessionTerminatedEvent(session_id=session_id):
+        case SessionTerminatedAnycastEvent(session_id=session_id):
             await context.clean_session(session_id)
 
     await invoke_session_callback(context, agent_id, event)
@@ -3994,7 +3930,7 @@ async def handle_destroy_session(
 async def handle_model_service_status_update(
     context: AgentRegistry,
     source: AgentId,
-    event: ModelServiceStatusEvent,
+    event: ModelServiceStatusAnycastEvent,
 ) -> None:
     log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
     try:
@@ -4047,20 +3983,22 @@ async def invoke_session_callback(
     context: AgentRegistry,
     source: AgentId,
     event: (
-        SessionEnqueuedEvent
-        | SessionScheduledEvent
-        | SessionPreparingEvent
-        | SessionStartedEvent
-        | SessionCancelledEvent
-        | SessionTerminatingEvent
-        | SessionTerminatedEvent
-        | SessionSuccessEvent
-        | SessionFailureEvent
+        SessionEnqueuedAnycastEvent
+        | SessionScheduledAnycastEvent
+        | SessionPreparingAnycastEvent
+        | SessionStartedAnycastEvent
+        | SessionCancelledAnycastEvent
+        | SessionTerminatingAnycastEvent
+        | SessionTerminatedAnycastEvent
+        | SessionSuccessAnycastEvent
+        | SessionFailureAnycastEvent
     ),
 ) -> None:
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     try:
-        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
+        allow_stale = isinstance(
+            event, (SessionCancelledAnycastEvent, SessionTerminatedAnycastEvent)
+        )
         async with context.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
@@ -4081,7 +4019,7 @@ async def invoke_session_callback(
                 async with context.db.begin_session() as db_sess:
                     route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                     endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-                    if isinstance(event, SessionCancelledEvent):
+                    if isinstance(event, SessionCancelledAnycastEvent):
                         update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                         if "error" in session.status_data:
                             if session.status_data["error"]["name"] == "MultiAgentError":
@@ -4105,7 +4043,7 @@ async def invoke_session_callback(
                             .where(EndpointRow.id == endpoint.id)
                         )
                         await db_sess.execute(query)
-                    elif isinstance(event, SessionTerminatedEvent):
+                    elif isinstance(event, SessionTerminatedAnycastEvent):
                         query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
                         await db_sess.execute(query)
                         if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
@@ -4127,7 +4065,7 @@ async def invoke_session_callback(
                         await db_sess.commit()
                     else:
                         new_route_status: Optional[RouteStatus] = None
-                        if isinstance(event, SessionTerminatingEvent):
+                        if isinstance(event, SessionTerminatingAnycastEvent):
                             new_route_status = RouteStatus.TERMINATING
 
                         if new_route_status:
@@ -4206,15 +4144,15 @@ async def invoke_session_callback(
 async def handle_batch_result(
     context: AgentRegistry,
     source: AgentId,
-    event: SessionSuccessEvent | SessionFailureEvent,
+    event: SessionSuccessAnycastEvent | SessionFailureAnycastEvent,
 ) -> None:
     """
     Update the database according to the batch-job completion results
     """
     match event:
-        case SessionSuccessEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+        case SessionSuccessAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
             await SessionRow.set_session_result(context.db, session_id, True, exit_code)
-        case SessionFailureEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+        case SessionFailureAnycastEvent(session_id=session_id, reason=reason, exit_code=exit_code):
             await SessionRow.set_session_result(context.db, session_id, False, exit_code)
     async with context.db.begin_session() as db_sess:
         try:
@@ -4282,7 +4220,7 @@ async def handle_agent_images_remove(
 async def handle_route_creation(
     context: AgentRegistry,
     source: AgentId,
-    event: RouteCreatedEvent,
+    event: RouteCreatedAnycastEvent,
 ) -> None:
     endpoint: EndpointRow | None = None
 
@@ -4326,7 +4264,7 @@ async def handle_route_creation(
                 ],
             )
 
-            environ = {**endpoint.environ}
+            environ = dict(endpoint.environ or {})
             if "BACKEND_MODEL_NAME" not in environ:
                 environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
 

@@ -14,7 +14,8 @@ class UserMonthStatsAction(UserAction):
         return self.user_id
 
     @override
-    def operation_type(self):
+    @classmethod
+    def operation_type(cls) -> str:
         return "user_month_stats"
 
 

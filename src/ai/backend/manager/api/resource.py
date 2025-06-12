@@ -155,7 +155,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
 @superadmin_required
 @check_api_params(
     t.Dict({
-        tx.MultiKey("group_ids"): t.List(t.String) | t.Null,
+        t.Key("group_ids"): tx.DelimiterSeperatedList[str](t.String) | t.Null,
         t.Key("month"): t.Regexp(r"^\d{6}", re.ASCII),
     }),
     loads=_json_loads,
@@ -261,7 +261,7 @@ async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     :return token: agent watcher token ("insecure" if not set in config server)
     """
     root_ctx: RootContext = request.app["_root.context"]
-    token = root_ctx.unified_config.shared.watcher.token
+    token = root_ctx.config_provider.config.watcher.token
     if token is None:
         token = "insecure"
     agent_ip = await root_ctx.etcd.get(f"nodes/agents/{agent_id}/ip")

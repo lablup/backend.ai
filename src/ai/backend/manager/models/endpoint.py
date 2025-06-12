@@ -584,7 +584,7 @@ class EndpointTokenRow(Base):
         domain: Optional[str] = None,
         project: Optional[UUID] = None,
         user_uuid: Optional[UUID] = None,
-        load_endpoint=False,
+        load_endpoint: bool = False,
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
@@ -611,7 +611,7 @@ class EndpointTokenRow(Base):
         domain: Optional[str] = None,
         project: Optional[UUID] = None,
         user_uuid: Optional[UUID] = None,
-        load_endpoint=False,
+        load_endpoint: bool = False,
     ) -> Self:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
         if load_endpoint:
@@ -706,7 +706,7 @@ class EndpointAutoScalingRuleRow(Base):
 
     @classmethod
     async def get(
-        cls, session: AsyncSession, id: UUID, load_endpoint=False
+        cls, session: AsyncSession, id: UUID, load_endpoint: bool = False
     ) -> "EndpointAutoScalingRuleRow":
         query = sa.select(EndpointAutoScalingRuleRow).filter(EndpointAutoScalingRuleRow.id == id)
         if load_endpoint:
@@ -768,7 +768,7 @@ class ModelServicePredicateChecker:
     @staticmethod
     async def check_extra_mounts(
         conn: AsyncConnection,
-        shared_config_loader: LegacyEtcdLoader,
+        legacy_etcd_loader: LegacyEtcdLoader,
         storage_manager: StorageSessionManager,
         model_id: UUID,
         model_mount_destination: str,
@@ -806,7 +806,7 @@ class ModelServicePredicateChecker:
             requested_mount_map,
             requested_mount_options,
         )
-        allowed_vfolder_types = await shared_config_loader.get_vfolder_types()
+        allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
         vfolder_mounts = await prepare_vfolder_mounts(
             conn,
             storage_manager,

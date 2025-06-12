@@ -319,7 +319,7 @@ class CreateNetwork(graphene.Mutation):
         driver: str | None,
     ) -> "CreateNetwork":
         graph_ctx: GraphQueryContext = info.context
-        network_config = graph_ctx.unified_config.shared.network.inter_container
+        network_config = graph_ctx.config_provider.config.network.inter_container
         if network_config.enabled:
             return CreateNetwork(
                 ok=False, msg="Inter-container networking disabled on this cluster", network=None
@@ -350,14 +350,6 @@ class CreateNetwork(graphene.Mutation):
                 raise GenericForbidden(
                     "Cannot create more networks on this project (restricted by project resource policy)"
                 )
-
-        network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
-        try:
-            network_info = await network_plugin.create_network()
-            network_name = network_info.network_id
-        except Exception:
-            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
-            raise
 
         network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
         try:
