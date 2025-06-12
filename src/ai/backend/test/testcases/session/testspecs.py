@@ -1,6 +1,10 @@
 import textwrap
 
-from ai.backend.test.templates.session.create_session import SessionTemplate
+from ai.backend.test.templates.session.session import SessionTemplate
+from ai.backend.test.testcases.session.session_creation_failure import (
+    SessionCreationArgs,
+    SessionCreationFailure,
+)
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 from ..testcases import TestSpec, TestTag
@@ -20,6 +24,41 @@ SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=SessionTemplate(BasicTestTemplate(NopTestCode())),
+    ),
+    "create_session_failure_due_to_low_resources": TestSpec(
+        name="create_session_failure_due_to_low_resources",
+        description=textwrap.dedent("""\
+            Test for creating a session with too low resources.
+            This test verifies that a session creation fails when the specified resources are insufficient to run the image.
+            The test will:
+            1. Attempt to create a session with the specified image and insufficient resources.
+            2. Assert that the session creation fails with an appropriate error message.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            SessionCreationFailure(
+                SessionCreationArgs(resources={"cpu": 1, "mem": "10m"}, container_count=1),
+                "api_generic_invalid-parameters",
+            )
+        ),
+    ),
+    "create_session_failure_due_to_too_many_container_count": TestSpec(
+        name="create_session_failure_due_to_too_many_container_count",
+        description=textwrap.dedent("""\
+            Test for creating a session with too many containers.
+            This test verifies that a session creation fails when the specified container count exceeds the limit.
+
+            The test will:
+            1. Attempt to create a session with the specified image and too many containers.
+            2. Assert that the session creation fails with an appropriate error message.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            SessionCreationFailure(
+                SessionCreationArgs(resources={"cpu": 5, "mem": "300m"}, container_count=10),
+                "session_create_unavailable",
+            )
+        ),
     ),
     # "single_node_multi_container_session": TestSpec(
     #     name="single_node_multi_container_session",
