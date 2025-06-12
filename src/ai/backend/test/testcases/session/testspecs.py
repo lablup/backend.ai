@@ -3,6 +3,7 @@ import textwrap
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
 from ai.backend.test.templates.session.session_template import SessionTemplateTemplate
+from ai.backend.test.templates.vfolder.vfolder import VFolderTemplate
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
 )
@@ -109,8 +110,8 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(SessionCreationFailureTooManyContainer()),
     ),
-    # "single_node_multi_container_session": TestSpec(
-    #     name="single_node_multi_container_session",
+    # "creation_success_single_node_multi_container": TestSpec(
+    #     name="creation_success_single_node_multi_container",
     #     description=textwrap.dedent("""\
     #         Test for creating a single-node, multi-container session.
     #         This test verifies that a session can be created with a single node and multiple containers, and that it transitions through the expected lifecycle events.
@@ -125,8 +126,8 @@ INTERACTIVE_SESSION_TEST_SPECS = {
     #         BasicTestTemplate(NopTestCode())
     #     ),
     # ),
-    # "multi_node_multi_container_session": TestSpec(
-    #     name="multi_node_multi_container_session",
+    # "creation_success_multi_node_multi_container": TestSpec(
+    #     name="creation_success_multi_node_multi_container",
     #     description=textwrap.dedent("""\
     #         Test for creating a multi-node, multi-container session.
     #         This test verifies that a session can be created with multiple nodes and multiple containers, and that it transitions through the expected lifecycle events.
@@ -160,8 +161,8 @@ SESSION_TEMPLATE_TEST_SPECS = {
             InteractiveSessionTemplate(BasicTestTemplate(NopTestCode()))
         ),
     ),
-    "execute_success_from_template": TestSpec(
-        name="execute_success_from_template",
+    "execution_success_from_template": TestSpec(
+        name="execution_success_from_template",
         description=textwrap.dedent("""\
         Test for executing a session from a template.
         This test verifies that a session can be executed from a predefined template, and that it transitions through the expected lifecycle events.
@@ -175,8 +176,26 @@ SESSION_TEMPLATE_TEST_SPECS = {
     ),
 }
 
+SESSION_WITH_VFOLDER_TEST_SPECS = {
+    "creation_success_with_vfolder_mount": TestSpec(
+        name="creation_success_with_vfolder_mount",
+        description=textwrap.dedent("""\
+            Test for creating a single-node, single-container session with a vfolder mount.
+            This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
+            The test will:
+            1. Create a session with the specified image and resources.
+            2. Listen for lifecycle events and verify that the session transitions through the expected states.
+            3. Assert that the session is running after creation.
+            4. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION, TestTag.VFOLDER},
+        template=VFolderTemplate(InteractiveSessionTemplate(BasicTestTemplate(NopTestCode()))),
+    ),
+}
+
 SESSION_TEST_SPECS = {
     **BATCH_SESSION_TEST_SPECS,
     **INTERACTIVE_SESSION_TEST_SPECS,
     **SESSION_TEMPLATE_TEST_SPECS,
+    **SESSION_WITH_VFOLDER_TEST_SPECS,
 }

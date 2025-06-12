@@ -1,12 +1,14 @@
 import asyncio
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
+from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.json import load_json
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import AsyncSessionContext
 from ai.backend.test.contexts.compute_session import (
+    CreatedSessionIDContext,
     SessionCreationContextArgs,
     SessionCreationFromImageContextArgs,
 )
@@ -34,7 +36,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         client_session: AsyncSession,
         creation_ctx: SessionCreationContextArgs,
         session_name: str,
-    ) -> None:
+    ) -> UUID:
         with AsyncSessionContext.with_current(client_session):
             EXPECTED_EVENTS = {
                 "session_enqueued",
@@ -89,6 +91,8 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
             try:
                 await listener_task
                 assert created_session.status == "RUNNING", "Session should be running"
+
+                return created_session.id
             except asyncio.TimeoutError as e:
                 raise asyncio.TimeoutError(
                     f"Timed out after {_TEST_TIMEOUT}s; events received so far: {collected_events}"
@@ -156,8 +160,11 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
 
         async with AsyncSession() as client_session:
             try:
-                await self._verify_session_creation(client_session, creation_ctx, session_name)
-                yield
+                session_id = await self._verify_session_creation(
+                    client_session, creation_ctx, session_name
+                )
+                with CreatedSessionIDContext.with_current(session_id):
+                    yield
             finally:
                 await self._verify_session_destruction(client_session, session_name)
                 pass
