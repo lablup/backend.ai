@@ -229,9 +229,17 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             default_api_version,
             default_client_features,
         )
-        self.runner = await self.create_code_runner(
-            event_producer, client_features=default_client_features, api_version=default_api_version
-        )
+        try:
+            self.runner = await self.create_code_runner(
+                event_producer,
+                client_features=default_client_features,
+                api_version=default_api_version,
+            )
+        except Exception as e:
+            log.exception(
+                "kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e
+            )
+            self.runner = None
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
