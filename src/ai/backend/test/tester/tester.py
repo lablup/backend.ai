@@ -9,7 +9,7 @@ import tomli
 from ai.backend.test.testcases.context import BaseTestContext
 from ai.backend.test.tester.config import TesterConfig
 
-from ..testcases.testcases import TestSpec, TestSpecManager, TestTag
+from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
 from .runner import TestRunner
 

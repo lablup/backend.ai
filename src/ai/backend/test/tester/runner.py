@@ -1,7 +1,7 @@
 import uuid
 
 from ..contexts.tester import TestIDContext
-from ..testcases.testcases import TestSpec
+from ..testcases.spec_manager import TestSpec
 from .exporter import TestExporter
 
 

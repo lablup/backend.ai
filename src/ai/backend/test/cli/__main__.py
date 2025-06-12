@@ -8,7 +8,8 @@ from pathlib import Path
 
 import click
 
-from ai.backend.test.testcases.testcases import TestSpecManager
+from ai.backend.test.testcases.spec_manager import TestSpecManager
+from ai.backend.test.testcases.testspecs import ROOT_TEST_SPECS
 from ai.backend.test.tester.exporter import PrintExporter
 from ai.backend.test.tester.tester import Tester
 
@@ -119,7 +120,7 @@ def run_cli(
 @main.command()
 @click.pass_obj
 def get_all_specs(cli_ctx: CLIContext) -> None:
-    spec_manager = TestSpecManager.default()
+    spec_manager = TestSpecManager(specs=ROOT_TEST_SPECS)
     print("Available test specifications:")
     print("====================================")
     for spec in spec_manager.all_specs():
@@ -130,7 +131,7 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 @main.command()
 @click.pass_obj
 def run_test(cli_ctx: CLIContext, name: str) -> None:
-    spec_manager = TestSpecManager.default()
+    spec_manager = TestSpecManager(specs=ROOT_TEST_SPECS)
     tester = Tester(
         spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=_CONFIG_PATH
     )
@@ -140,7 +141,7 @@ def run_test(cli_ctx: CLIContext, name: str) -> None:
 @main.command()
 @click.pass_obj
 def run_all(cli_ctx: CLIContext) -> None:
-    spec_manager = TestSpecManager.default()
+    spec_manager = TestSpecManager(specs=ROOT_TEST_SPECS)
     tester = Tester(
         spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=_CONFIG_PATH
     )
