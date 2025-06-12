@@ -315,6 +315,15 @@ AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
 
+class ContainerStatus(enum.StrEnum):
+    RUNNING = "running"
+    RESTARTING = "restarting"
+    PAUSED = "paused"
+    EXITED = "exited"
+    DEAD = "dead"
+    REMOVING = "removing"
+
+
 class AbstractPermission(enum.StrEnum):
     """
     Abstract enum type for permissions

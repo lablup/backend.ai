@@ -7,6 +7,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
+    AgentStatusHeartbeat,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
@@ -112,3 +113,11 @@ class AgentEventHandler:
         event: AgentErrorEvent,
     ) -> None:
         await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+
+    async def handle_agent_container_heartbeat(
+        self,
+        context: None,
+        source: AgentId,
+        event: AgentStatusHeartbeat,
+    ) -> None:
+        pass

@@ -146,6 +146,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
+from ai.backend.common.task_runner.types import TaskRunner, TaskRunnerArgs
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
@@ -211,6 +212,7 @@ from .resources import (
     known_slot_types,
 )
 from .stats import StatContext, StatModes
+from .task_runner.heartbeat import HeartbeatTask
 from .types import (
     Container,
     ContainerLifecycleEvent,
@@ -858,6 +860,16 @@ class AbstractAgent(
                 )
             )
 
+        _container_observer_task = HeartbeatTask(
+            self.id,
+            self.enumerate_containers,
+            self.event_producer,
+        )
+        self._container_observer = TaskRunner(
+            TaskRunnerArgs(task=_container_observer_task, interval=10)
+        )
+        await self._container_observer.run()
+
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
             log.info(
                 "Monitoring abnormal kernel activities reported by Watcher at {}", abuse_report_path
@@ -931,6 +943,7 @@ class AbstractAgent(
         for result in cancel_results:
             if isinstance(result, Exception):
                 log.error("timer cancellation error: {}", result)
+        await self._container_observer.stop()
 
         # Stop lifecycle event handler.
         await self.container_lifecycle_queue.put(_sentinel)
