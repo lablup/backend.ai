@@ -10,19 +10,11 @@ from ai.backend.test.contexts.auth import EndpointContext, LoginCredentialContex
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.tester import TestIDContext
 from ai.backend.test.templates.template import (
-    TestTemplate,
     WrapperTestTemplate,
-    WrapperTestTemplateProtocol,
 )
 
 
 class LoginTemplate(WrapperTestTemplate):
-    # TODO: How to Remove this?
-    def __init__(
-        self, template: TestTemplate, wrapper_templates: list["WrapperTestTemplateProtocol"] = []
-    ) -> None:
-        super().__init__(template, wrapper_templates)
-
     @property
     def name(self) -> str:
         return "login"
