@@ -1,4 +1,4 @@
-from ai.backend.test.templates.auth.keypair import KeypairTemplate
+from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.testcases.session.session_creation import TestSessionCreation
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
@@ -11,7 +11,7 @@ SESSION_TEST_SPECS = {
         template=BasicTestTemplate(
             testcode=TestSessionCreation(),
             wrapper_templates=[
-                KeypairTemplate,
+                KeypairAuthTemplate,
             ],
         ),
     ),

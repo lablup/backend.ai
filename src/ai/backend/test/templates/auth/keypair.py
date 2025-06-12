@@ -12,7 +12,7 @@ from ai.backend.test.templates.template import (
 )
 
 
-class KeypairTemplate(WrapperTestTemplate):
+class KeypairAuthTemplate(WrapperTestTemplate):
     # TODO: How to Remove this?
     def __init__(
         self, template: TestTemplate, wrapper_templates: list["WrapperTestTemplateProtocol"] = []
