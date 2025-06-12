@@ -25,7 +25,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
 
     @property
     def name(self) -> str:
-        return "create_session"
+        return "batch_session"
 
     async def _verify_session_creation(
         self,
