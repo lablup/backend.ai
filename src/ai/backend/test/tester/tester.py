@@ -14,13 +14,11 @@ from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
 from .runner import TestRunner
 
-_DEFAULT_CONCURRENCY = 10
-
 
 class Tester:
     _spec_manager: TestSpecManager
     _exporter_type: Type[TestExporter]
-    _semaphore: asyncio.Semaphore
+    _semaphore: Optional[asyncio.Semaphore]
     _config_file_path: Path
 
     def __init__(
@@ -32,18 +30,24 @@ class Tester:
         self._spec_manager = spec_manager
         self._exporter_type = exporter_type
         self._config_file_path = config_file_path
-        self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
+        self._semaphore = None
+
+    async def _get_semaphore(self) -> asyncio.Semaphore:
+        if self._semaphore is None:
+            cfg = await self._load_tester_config(self._config_file_path)
+            self._semaphore = asyncio.Semaphore(cfg.runner.concurrency)
+        return self._semaphore
 
     @aiotools.lru_cache(maxsize=1)
     async def _load_tester_config(self, config_path: Path) -> TesterConfig:
         async with aiofiles.open(config_path, mode="r") as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
-            config = TesterConfig.model_validate(content, by_alias=True)
+            config = TesterConfig.model_validate(content, by_alias=True, by_name=True)
             return config
 
     async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
-        async with self._semaphore:
+        async with await self._get_semaphore():
             exporter = await self._exporter_type.create(sub_name)
             runner = TestRunner(spec, exporter)
             await runner.run()
