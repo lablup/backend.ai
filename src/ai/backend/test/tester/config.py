@@ -37,6 +37,14 @@ class LoginCredential(BaseModel):
     )
 
 
+class Image(BaseModel):
+    name: Optional[str] = Field(
+        default=None,
+        description="The Docker image to use for the test context.",
+        examples=["cr.backend.ai/multiarch/python:3.13-ubuntu24.04"],
+    )
+
+
 class TestContextInjectionModel(BaseModel):
     endpoint: Optional[Endpoint] = Field(
         default=None,
@@ -50,6 +58,10 @@ class TestContextInjectionModel(BaseModel):
         default=None,
         description="The login credentials for the test context.",
         alias="login-credential",
+    )
+    image: Optional[Image] = Field(
+        default=None,
+        description="The Docker image context for the test.",
     )
 
 

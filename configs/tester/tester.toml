@@ -9,3 +9,6 @@ secret-key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 [context.login-credential]
 user-id = "admin@lablup.com"
 password = "wJalrXUt"
+
+[context.image]
+name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"

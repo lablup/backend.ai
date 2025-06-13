@@ -16,7 +16,7 @@ from ai.backend.test.tester.tester import Tester
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
 
-_DEFAULT_CONFIG_PATH = "tester.toml"
+_DEFAULT_CONFIG_PATH = "configs/tester/tester.toml"
 
 
 def _spec_manager() -> TestSpecManager:
