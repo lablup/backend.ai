@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Final, Generic, Optional, Protocol, TypeVar
 
@@ -44,25 +43,6 @@ class TaskProtocol(Protocol[TResource]):
         Optional teardown method that can be called after running the task.
         This can be used to clean up resources or perform any necessary teardown.
         """
-
-
-class AbstractTask(ABC):
-    @classmethod
-    @abstractmethod
-    def name(cls) -> str:
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def timeout(cls) -> Optional[float]:
-        """
-        Returns the timeout for the task in seconds.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    async def run(self) -> None:
-        raise NotImplementedError
 
 
 @dataclass

@@ -17,7 +17,6 @@ from ..types import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-# class HeartbeatTask(AbstractTask):
 class HeartbeatTask:
     def __init__(
         self,
@@ -31,17 +30,14 @@ class HeartbeatTask:
         self._container_enumerator = container_enumerator
         self._event_producer = event_producer
 
-    # @override
     @classmethod
     def name(cls) -> str:
         return "agent_hearbeat"
 
-    # @override
     @classmethod
     def timeout(cls) -> Optional[float]:
         return 10.0
 
-    # @override
     async def run(self, resource: None) -> None:
         containers = await self._container_enumerator(frozenset([ContainerStatus.RUNNING]))
         container_data = [
