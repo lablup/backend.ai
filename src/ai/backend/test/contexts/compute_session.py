@@ -1,41 +1,71 @@
-from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, override
 from uuid import UUID
 
+from pydantic.dataclasses import dataclass
+
 from ai.backend.common.types import ClusterMode
-from ai.backend.test.testcases.context import BaseTestContext
+from ai.backend.test.contexts.context import BaseTestContext, ContextName
 
 
 @dataclass
-class SessionCreationFromImageContextArgs:
-    canonical: str
-    resources: dict[str, Any]
-
-
-@dataclass
-class SessionCreationFromTemplateContextArgs:
-    content: str
-    template_id: UUID
-
-
-@dataclass
-class SessionCreationContextArgs:
-    image: Optional[SessionCreationFromImageContextArgs]
-    template: Optional[SessionCreationFromTemplateContextArgs]
-
-    # TODO: Remove them
+class ClusterConfigArgs:
     cluster_mode: ClusterMode
     cluster_size: int
 
 
+class ClusterConfigContext(BaseTestContext[ClusterConfigArgs]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.CLUSTER_CONFIGS
+
+
+@dataclass
+class SessionCreationContextArgs:
+    image: str
+    architecture: str
+    resources: dict[str, Any]
+
+
 class SessionCreationContext(BaseTestContext[SessionCreationContextArgs]):
-    pass
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.SESSION_CREATION
+
+
+@dataclass
+class SessionTemplateContextArgs:
+    content: str
+    template_id: Optional[UUID]
+
+
+class SessionTemplateContext(BaseTestContext[SessionTemplateContextArgs]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.SESSION_TEMPLATE
+
+
+class CreatedSessionTemplateIDContext(BaseTestContext[UUID]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.CREATED_SESSION_TEMPLATE_ID
+
+
+#
 
 
 class CreatedSessionIDContext(BaseTestContext[UUID]):
-    pass
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.CREATED_SESSION_ID
 
 
-# TODO: Inject and use this
 class BatchSessionCommandContext(BaseTestContext[str]):
-    pass
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.BATCH_SESSION_COMMAND

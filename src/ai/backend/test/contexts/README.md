@@ -6,6 +6,6 @@ Typical usage includes wrapping resources like client sessions or test IDs, and 
 
 Example classes:
 - `TestIDContext`: Stores and provides a test UUID.
-- `AsyncSessionContext`: Stores and provides an asynchronous client session.
+- `ClientSessionContext`: Stores and provides an asynchronous client session.
 
 These context classes are typically used as part of the test scenario setup and teardown process.

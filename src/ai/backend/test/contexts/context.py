@@ -21,6 +21,14 @@ class ContextName(enum.StrEnum):
     KEYPAIR = "keypair"
     LOGIN_CREDENTIAL = "login_credential"
 
+    SESSION_CREATION = "session_creation"
+    CLUSTER_CONFIGS = "cluster_configs"
+
+    SESSION_TEMPLATE = "session_template"
+    CREATED_SESSION_ID = "created_session_id"
+    CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
+    BATCH_SESSION_COMMAND = "batch_session_command"
+
 
 class BaseTestContext(Generic[T]):
     """
@@ -70,6 +78,19 @@ class BaseTestContext(Generic[T]):
         res = cls._ctxvar.get()
         if res is None:
             raise RuntimeError(f'No value is set in "{cls.name()}" context')
+        return res
+
+    @classmethod
+    @final
+    def current_or_none(cls) -> Optional[T]:
+        """
+        Get the current value from context if it exists, otherwise return None.
+        """
+        if cls._ctxvar is None:
+            return None
+        res = cls._ctxvar.get()
+        if res is None:
+            return None
         return res
 
     @classmethod

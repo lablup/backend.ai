@@ -12,3 +12,8 @@ password = "wJalrXUt"
 
 [context.image]
 name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"
+
+[context.session-creation]
+image = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"
+architecture = "x86_64"
+resources = { cpu = 1, mem = "2gb" }
