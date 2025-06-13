@@ -7,14 +7,13 @@ import click
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.image import _default_list_fields_admin
 from ai.backend.client.session import Session
+from ai.backend.common.bgtask.types import BgtaskStatus
 
 from ...compat import asyncio_run
 from ...session import AsyncSession
 from ..extensions import pass_ctx_obj
 from ..pretty import ProgressViewer, print_done, print_error, print_fail, print_warn
 from ..types import CLIContext
-
-# from ai.backend.client.output.fields import image_fields
 from . import admin
 
 
@@ -82,29 +81,32 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
-                        if ev.event == "bgtask_updated":
-                            if viewer.tqdm is None:
-                                pbar = await viewer.to_tqdm(unit="images")
-                            else:
-                                pbar.total = data["total_progress"]
-                                pbar.write(data["message"])
-                                pbar.update(data["current_progress"] - pbar.n)
-                        elif ev.event == "bgtask_failed":
-                            error_msg = data["message"]
-                            completion_msg_func = lambda: print_fail(f"Error occurred: {error_msg}")
-                        elif ev.event == "bgtask_cancelled":
-                            completion_msg_func = lambda: print_warn(
-                                "Registry scanning has been cancelled in the middle."
-                            )
-                        # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
-                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            errors = data.get("errors")
-                            if errors:
-                                for error in errors:
-                                    print_fail(f"Error reported: {error}")
-                                completion_msg_func = lambda: print_warn(
-                                    f"Finished registry scanning with {len(errors)} issues."
+                        match ev.event:
+                            case BgtaskStatus.UPDATED:
+                                if viewer.tqdm is None:
+                                    pbar = await viewer.to_tqdm(unit="images")
+                                else:
+                                    pbar.total = data["total_progress"]
+                                    pbar.write(data["message"])
+                                    pbar.update(data["current_progress"] - pbar.n)
+                            case BgtaskStatus.FAILED:
+                                error_msg = data["message"]
+                                completion_msg_func = lambda: print_fail(
+                                    f"Error occurred: {error_msg}"
                                 )
+                            case BgtaskStatus.CANCELLED:
+                                completion_msg_func = lambda: print_warn(
+                                    "Registry scanning has been cancelled in the middle."
+                                )
+                            # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
+                            case BgtaskStatus.PARTIAL_SUCCESS | BgtaskStatus.DONE:
+                                errors = data.get("errors")
+                                if errors:
+                                    for error in errors:
+                                        print_fail(f"Error reported: {error}")
+                                    completion_msg_func = lambda: print_warn(
+                                        f"Finished registry scanning with {len(errors)} issues."
+                                    )
             finally:
                 completion_msg_func()
 

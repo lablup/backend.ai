@@ -1,7 +1,7 @@
 import uuid
 
 from ..contexts.tester import TestIDContext
-from ..testcases.testcases import TestSpec
+from ..testcases.spec_manager import TestSpec
 from .exporter import TestExporter
 
 
@@ -15,6 +15,7 @@ class TestRunner:
 
     async def run(self) -> None:
         with TestIDContext.with_current(uuid.uuid4()):
+            await self._exporter.export_start(self._spec.name)
             try:
                 await self._spec.template.run_test(self._exporter)
                 await self._exporter.export_done(self._spec.name)

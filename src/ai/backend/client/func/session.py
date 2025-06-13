@@ -751,7 +751,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_logs(self, kernel_id: UUID | None = None):
+    async def get_logs(self, kernel_id: Optional[UUID] = None):
         """
         Retrieves the console log of the compute session container.
         """

@@ -1,15 +1,9 @@
 import enum
 from dataclasses import dataclass
-from typing import Mapping, Self
+from typing import Mapping
 
-from ai.backend.test.templates.auth.login import LoginTemplate
 from ai.backend.test.templates.template import (
-    BasicTestTemplate,
-    NopTestCode,
     TestTemplate,
-)
-from ai.backend.test.testcases.session.session_creation import (
-    TestSessionCreation,
 )
 
 
@@ -17,8 +11,10 @@ class TestTag(enum.StrEnum):
     # component based tags
     MANAGER = "manager"
     AGENT = "agent"
+    WEBSERVER = "webserver"
 
     # Domain specific tags
+    AUTH = "auth"
     VFOLDER = "vfolder"
     IMAGE = "image"
     SESSION = "session"
@@ -46,31 +42,6 @@ class TestSpecManager:
 
     def __init__(self, specs: Mapping[str, TestSpec]) -> None:
         self._specs = specs
-
-    @classmethod
-    def default(cls) -> Self:
-        specs = {
-            "nop": TestSpec(
-                name="nop",
-                description="No operation test case.",
-                tags=set(),
-                template=BasicTestTemplate(NopTestCode()),
-            ),
-            "session": TestSpec(
-                name="session",
-                description="Test session management.",
-                tags={TestTag.SESSION, TestTag.MANAGER},
-                template=LoginTemplate(
-                    user_id="admin@lablup.com",  # TODO: Don't use hardcoded user info rather use injected user info
-                    password="wJalrXUt",
-                    otp=None,
-                    template=BasicTestTemplate(
-                        testcode=TestSessionCreation(),
-                    ),
-                ),
-            ),
-        }
-        return cls(specs)
 
     def all_specs(self) -> set[TestSpec]:
         """

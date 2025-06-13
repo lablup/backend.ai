@@ -15,6 +15,7 @@ from ai.backend.client.cli.session.execute import (
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.types import ClusterMode
 
 from ..exceptions import BackendError
@@ -546,32 +547,33 @@ def try_start(
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
-                        if ev.event == "bgtask_updated":
-                            print(data["message"])
-                            if viewer.tqdm is None:
-                                pbar = await viewer.to_tqdm()
-                            else:
-                                pbar.total = data["total_progress"]
-                                pbar.update(data["current_progress"] - pbar.n)
-                        elif ev.event == "bgtask_failed":
-                            error_msg = data["message"]
-                            completion_msg_func = lambda: print_fail(
-                                f"Error during the operation: {error_msg}",
-                            )
-                        elif ev.event == "bgtask_cancelled":
-                            completion_msg_func = lambda: print_warn(
-                                "The operation has been cancelled in the middle. "
-                                "(This may be due to server shutdown.)",
-                            )
-                        # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
-                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            errors = data.get("errors")
-                            if errors:
-                                for error in errors:
-                                    print_fail(f"Error reported: {error}")
-                                completion_msg_func = lambda: print_warn(
-                                    f"Task finished with {len(errors)} issues."
+                        match ev.event:
+                            case BgtaskStatus.UPDATED:
+                                print(data["message"])
+                                if viewer.tqdm is None:
+                                    pbar = await viewer.to_tqdm()
+                                else:
+                                    pbar.total = data["total_progress"]
+                                    pbar.update(data["current_progress"] - pbar.n)
+                            case BgtaskStatus.FAILED:
+                                error_msg = data["message"]
+                                completion_msg_func = lambda: print_fail(
+                                    f"Error during the operation: {error_msg}",
                                 )
+                            case BgtaskStatus.CANCELLED:
+                                completion_msg_func = lambda: print_warn(
+                                    "The operation has been cancelled in the middle. "
+                                    "(This may be due to server shutdown.)",
+                                )
+                            # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
+                            case BgtaskStatus.PARTIAL_SUCCESS | BgtaskStatus.DONE:
+                                errors = data.get("errors")
+                                if errors:
+                                    for error in errors:
+                                        print_fail(f"Error reported: {error}")
+                                    completion_msg_func = lambda: print_warn(
+                                        f"Task finished with {len(errors)} issues."
+                                    )
             finally:
                 completion_msg_func()
 

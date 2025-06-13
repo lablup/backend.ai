@@ -4,40 +4,42 @@ from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import AsyncIterator, Optional, override
 
+from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
-from ai.backend.test.contexts.client_session import AsyncSessionContext
+from ai.backend.test.contexts.auth import EndpointContext, LoginCredentialContext
+from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.tester import TestIDContext
-from ai.backend.test.templates.template import TestTemplate, WrapperTestTemplate
+from ai.backend.test.templates.template import (
+    WrapperTestTemplate,
+)
 
 
 class LoginTemplate(WrapperTestTemplate):
-    def __init__(
-        self, template: TestTemplate, user_id: str, password: str, otp: Optional[str] = None
-    ) -> None:
-        super().__init__(template)
-        self.user_id = user_id
-        self.password = password
-        self.otp = otp
-
     @property
     def name(self) -> str:
         return "login"
 
     @override
     @actxmgr
-    async def context(self) -> AsyncIterator[None]:
-        test_id = TestIDContext.get_current()
+    async def _context(self) -> AsyncIterator[None]:
+        test_id = TestIDContext.current()
         test_id_str = str(test_id)
-        async with AsyncSession() as session:
+        credential = LoginCredentialContext.current()
+        endpoint = EndpointContext.current()
+
+        api_config = APIConfig(
+            endpoint=endpoint.login_endpoint,
+            endpoint_type="session",
+        )
+        async with AsyncSession(config=api_config) as session:
             await _login(
                 session=session,
                 test_id=test_id_str,
-                user_id=self.user_id,
-                password=self.password,
-                otp=self.otp,
+                user_id=credential.user_id,
+                password=credential.password,
+                otp=credential.otp,
             )
-
-            with AsyncSessionContext.with_current(session):
+            with ClientSessionContext.with_current(session):
                 try:
                     yield
                 finally:
