@@ -1,11 +1,12 @@
 import time
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class TestExporter(ABC):
     @classmethod
     @abstractmethod
-    async def create(cls) -> "TestExporter":
+    async def create(cls, sub_name: Optional[str]) -> "TestExporter":
         """
         Create an instance of the exporter.
         This method can be overridden to provide custom initialization logic.
@@ -50,45 +51,56 @@ class TestExporter(ABC):
 
 
 class PrintExporter(TestExporter):
-    started: float
-    last_stage_done: float
+    _sub_name: Optional[str]
+    _started: float
+    _last_stage_done: float
 
-    def __init__(self, started: float, last_stage_done: float) -> None:
-        self.started = started
-        self.last_stage_done = last_stage_done
+    def __init__(self, sub_name: Optional[str], started: float, last_stage_done: float) -> None:
+        self._sub_name = sub_name
+        self._started = started
+        self._last_stage_done = last_stage_done
 
     @classmethod
-    async def create(cls) -> TestExporter:
-        return cls(started=0.0, last_stage_done=0.0)
+    async def create(cls, sub_name: Optional[str] = None) -> TestExporter:
+        return cls(sub_name, started=0.0, last_stage_done=0.0)
 
     async def export_start(self, spec_name: str) -> None:
         current = time.perf_counter()
-        self.started = current
-        self.last_stage_done = current
-        print(f"Starting test '{spec_name}'...")
+        self._started = current
+        self._last_stage_done = current
+        print(f"Starting test '{self._spec_name(spec_name)}'...")
 
     async def export_done(self, spec_name: str) -> None:
         current = time.perf_counter()
-        elapsed = current - self.started
-        print(f"Test '{spec_name}' completed in {elapsed:.2f} seconds.")
+        elapsed = current - self._started
+        print(f"Test '{self._spec_name(spec_name)}' completed in {elapsed:.2f} seconds.")
 
     async def export_stage_done(self, stage: str) -> None:
         current = time.perf_counter()
-        elapsed = current - self.last_stage_done
-        self.last_stage_done = current
+        elapsed = current - self._last_stage_done
+        self._last_stage_done = current
         print(f"Stage '{stage}' completed in {elapsed:.2f} seconds.")
 
     async def export_stage_exception(self, stage: str, exception: BaseException) -> None:
         current = time.perf_counter()
-        elapsed = current - self.last_stage_done
-        self.last_stage_done = current
+        elapsed = current - self._last_stage_done
+        self._last_stage_done = current
         print(
             f"Stage '{stage}' failed after {elapsed:.2f} seconds. {exception.__class__.__name__}: {exception}"
         )
 
     async def export_exception(self, spec_name: str, exception: BaseException) -> None:
         current = time.perf_counter()
-        elapsed = current - self.started
+        elapsed = current - self._started
         print(
-            f"Test '{spec_name}' failed after {elapsed:.2f} seconds. {exception.__class__.__name__}: {exception}"
+            f"Test '{self._spec_name(spec_name)}' failed after {elapsed:.2f} seconds. {exception.__class__.__name__}: {exception}"
         )
+
+    def _spec_name(self, spec_name: str) -> str:
+        """
+        Helper method to format the spec name for export.
+        This can be overridden in subclasses for custom formatting.
+        """
+        if not self._sub_name:
+            return spec_name
+        return f"{spec_name} ({self._sub_name})"

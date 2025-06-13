@@ -1,8 +1,8 @@
 from ai.backend.client.session import AsyncSession
-from ai.backend.test.testcases.context import BaseTestContext
+from ai.backend.test.contexts.context import BaseTestContext, ContextName
 
 
 class ClientSessionContext(BaseTestContext[AsyncSession]):
     @classmethod
-    def name(cls) -> str:
-        return "client_session"
+    def name(cls) -> ContextName:
+        return ContextName.CLIENT_SESSION
