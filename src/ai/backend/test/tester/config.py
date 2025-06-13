@@ -68,9 +68,9 @@ class SessionCreation(BaseModel):
         alias="startup-command",
     )
     timeout: float = Field(
-        default=30.0,
+        default=60.0,
         description="The timeout for the session creation in seconds.",
-        examples=[30.0],
+        examples=[60.0],
     )
     # By default, testing is conducted for both single-node and multi-node setups through parametrization,
     # But we'd like to have left room for manually injecting values.

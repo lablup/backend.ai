@@ -110,7 +110,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
                 async for event in events:
                     data = load_json(event.data)
                     assert data["reason"] == "user-requested", (
-                        "Session should be terminated by user request"
+                        f"Session should be terminated by user request, Actual reason: {data['reason']}"
                     )
 
                     collected_events.add(event.event)
