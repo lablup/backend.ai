@@ -145,8 +145,8 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 )
 @main.command()
 @click.pass_obj
-def run_test(cli_ctx: CLIContext, name: str, config_file: str) -> None:
-    config_file_path = Path(config_file)
+def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
+    config_file_path = Path(config_path)
     spec_manager = _spec_manager()
     tester = Tester(
         spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=config_file_path
@@ -164,9 +164,9 @@ def run_test(cli_ctx: CLIContext, name: str, config_file: str) -> None:
 )
 @main.command()
 @click.pass_obj
-def run_all(cli_ctx: CLIContext, config_file: str) -> None:
+def run_all(cli_ctx: CLIContext, config_path: str) -> None:
     spec_manager = _spec_manager()
-    config_file_path = Path(config_file)
+    config_file_path = Path(config_path)
     tester = Tester(
         spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=config_file_path
     )
