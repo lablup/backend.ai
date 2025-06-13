@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any, Final, Mapping, Optional, Tuple
 
 import pkg_resources
-from aiodocker.docker import Docker
+from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
 from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import InitializationError
+from ..types import Container, Port
 from ..utils import closing_async, get_arch_name, update_nested_dict
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -182,3 +183,24 @@ class PersistentServiceContainer:
         async with closing_async(Docker()) as docker:
             c = docker.containers.container(self.container_name)
             await c.start()
+
+
+def container_from_docker_container(src: DockerContainer) -> Container:
+    ports = []
+    for private_port, host_ports in src["NetworkSettings"]["Ports"].items():
+        private_port = int(private_port.split("/")[0])
+        if host_ports is None:
+            host_ip = "127.0.0.1"
+            host_port = 0
+        else:
+            host_ip = host_ports[0]["HostIp"]
+            host_port = int(host_ports[0]["HostPort"])
+        ports.append(Port(host_ip, private_port, host_port))
+    return Container(
+        id=src._id,
+        status=src["State"]["Status"],
+        image=src["Config"]["Image"],
+        labels=src["Config"]["Labels"],
+        ports=ports,
+        backend_obj=src,
+    )

@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple, cast, override
+from typing import Any, Final, FrozenSet, Mapping, Optional, Sequence, Tuple, cast, override
 
 import janus
 import pkg_resources
@@ -21,18 +21,20 @@ from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
+from ai.backend.common.runner import LoopRunner
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..kernel import AbstractCodeRunner, AbstractKernel
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData, KernelOwnershipData
+from ..kernel import AbstractCodeRunner, AbstractKernel, KernelInitArgs
+from ..types import (
+    AgentEventData,
+)
 from ..utils import closing_async, get_arch_name
+from .probe import DockerKernelProbe
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -45,34 +47,12 @@ class DockerKernel(AbstractKernel):
 
     def __init__(
         self,
-        ownership_data: KernelOwnershipData,
-        network_id: str,
-        image: ImageRef,
-        version: int,
+        args: KernelInitArgs,
         network_driver: str,
-        *,
-        agent_config: Mapping[str, Any],
-        resource_spec: KernelResourceSpec,
-        service_ports: Any,  # TODO: type-annotation
-        environ: Mapping[str, Any],
-        data: Dict[str, Any],
     ) -> None:
-        super().__init__(
-            ownership_data,
-            network_id,
-            image,
-            version,
-            agent_config=agent_config,
-            resource_spec=resource_spec,
-            service_ports=service_ports,
-            data=data,
-            environ=environ,
-        )
+        super().__init__(args)
 
         self.network_driver = network_driver
-
-    async def close(self) -> None:
-        pass
 
     def __getstate__(self):
         props = super().__getstate__()
@@ -82,6 +62,16 @@ class DockerKernel(AbstractKernel):
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)
+
+    @override
+    def _init_probe_runner_obj(self) -> LoopRunner:
+        probe = DockerKernelProbe(
+            self.kernel_id,
+            self.get_kernel_lifecycle_state,
+            self.get_container_id,
+            self._event_producer,
+        )
+        return LoopRunner.with_nop_resource_ctx(5.0, [probe])
 
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int

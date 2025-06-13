@@ -193,6 +193,15 @@ class Dispatchers:
             self._agent_event_handler.handle_agent_error,
             name="agent.error",
         )
+        # evd.consume(
+        #     DanglingKernelDetected, self, handle_dangling_kernel, name="api.session.dangling-kernel"
+        # )
+        # evd.consume(
+        #     DanglingContainerDetected,
+        #     self,
+        #     handle_dangling_container,
+        #     name="api.session.dangling-container",
+        # )
 
     def _dispatch_image_events(self, event_dispatcher: EventDispatcher) -> None:
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])

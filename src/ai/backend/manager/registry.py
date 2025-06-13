@@ -64,6 +64,8 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DanglingContainerDetected,
+    DanglingKernelDetected,
     DoAgentResourceCheckEvent,
 )
 from ai.backend.common.events.event_types.image.anycast import (
@@ -4354,6 +4356,20 @@ async def handle_check_agent_resource(
         if not row:
             raise InstanceNotFound(source)
         log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
+
+
+async def handle_dangling_kernel(
+    context: AgentRegistry, source: AgentId, event: DanglingKernelDetected
+) -> None:
+    # TODO: Impl dangling kernel handler
+    pass
+
+
+async def handle_dangling_container(
+    context: AgentRegistry, source: AgentId, event: DanglingContainerDetected
+) -> None:
+    # TODO: Impl dangling container handler
+    pass
 
 
 async def check_scaling_group(

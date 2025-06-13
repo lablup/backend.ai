@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Self, override
 
@@ -6,7 +7,7 @@ from ai.backend.common.events.types import (
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ContainerId, KernelId
 from ai.backend.logging.types import LogLevel
 
 
@@ -158,3 +159,41 @@ class DoAgentResourceCheckEvent(AgentOperationEvent):
     @override
     def event_name(cls) -> str:
         return "do_agent_resource_check"
+
+
+@dataclass
+class DanglingKernelDetected(AgentOperationEvent):
+    kernel_id: KernelId
+
+    def serialize(self) -> tuple:
+        return (str(self.kernel_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            KernelId(uuid.UUID(value[0])),
+        )
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "dangling_kernel_detected"
+
+
+@dataclass
+class DanglingContainerDetected(AgentOperationEvent):
+    container_id: ContainerId
+
+    def serialize(self) -> tuple:
+        return (str(self.container_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            ContainerId(value[0]),
+        )
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "dangling_container_detected"
