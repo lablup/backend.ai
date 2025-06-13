@@ -1,45 +1,39 @@
 import logging
-from collections.abc import Awaitable, Sequence
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Optional, override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentStatusHeartbeat,
     ContainerStatusData,
 )
-from ai.backend.common.types import AgentId, ContainerStatus, KernelId
+from ai.backend.common.observer.types import AbstractObserver
+from ai.backend.common.types import ContainerStatus
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import (
-    Container,
-)
+if TYPE_CHECKING:
+    from ..agent import AbstractAgent
+
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class HeartbeatTask:
+class HeartbeatObserver(AbstractObserver):
     def __init__(
         self,
-        agent_id: AgentId,
-        container_enumerator: Callable[
-            [frozenset[ContainerStatus]], Awaitable[Sequence[tuple[KernelId, Container]]]
-        ],
+        agent: "AbstractAgent",
         event_producer: EventProducer,
     ) -> None:
-        self._agent_id = agent_id
-        self._container_enumerator = container_enumerator
+        self._agent = agent
         self._event_producer = event_producer
 
-    @classmethod
+    @property
+    @override
     def name(cls) -> str:
         return "agent_hearbeat"
 
-    @classmethod
-    def timeout(cls) -> Optional[float]:
-        return 10.0
-
-    async def run(self, resource: None) -> None:
-        containers = await self._container_enumerator(frozenset([ContainerStatus.RUNNING]))
+    @override
+    async def observe(self) -> None:
+        containers = await self._agent.enumerate_containers(frozenset([ContainerStatus.RUNNING]))
         container_data = [
             ContainerStatusData(
                 container.id,
@@ -50,13 +44,20 @@ class HeartbeatTask:
         ]
         await self._event_producer.anycast_event(
             AgentStatusHeartbeat(
-                self._agent_id,
+                self._agent.id,
                 container_data,
             ),
         )
 
-    async def setup(self) -> None:
-        pass
+    @override
+    def observe_interval(self) -> float:
+        return 60.0
 
-    async def teardown(self, resource: None) -> None:
+    @classmethod
+    @override
+    def timeout(cls) -> Optional[float]:
+        return 10.0
+
+    @override
+    async def cleanup(self) -> None:
         pass

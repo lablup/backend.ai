@@ -145,8 +145,8 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
-from ai.backend.common.task_runner.types import TaskProtocol, TaskRunner, TaskRunnerArgs
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
@@ -212,7 +212,7 @@ from .resources import (
     known_slot_types,
 )
 from .stats import StatContext, StatModes
-from .task_runner.heartbeat import HeartbeatTask
+from .task_runner.heartbeat import HeartbeatObserver
 from .types import (
     Container,
     ContainerLifecycleEvent,
@@ -860,15 +860,10 @@ class AbstractAgent(
                 )
             )
 
-        container_observer_task: TaskProtocol[None] = HeartbeatTask(
-            self.id,
-            self.enumerate_containers,
-            self.event_producer,
-        )
-        self._container_observer: TaskRunner[None] = TaskRunner(
-            TaskRunnerArgs(task=container_observer_task, interval=60.0)
-        )
-        await self._container_observer.run()
+        self._container_observer_runner = Runner(resources=[])
+        container_observer = HeartbeatObserver(self, self.event_producer)
+        await self._container_observer_runner.register_observer(container_observer)
+        await self._container_observer_runner.start()
 
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
             log.info(
@@ -943,7 +938,7 @@ class AbstractAgent(
         for result in cancel_results:
             if isinstance(result, Exception):
                 log.error("timer cancellation error: {}", result)
-        await self._container_observer.stop()
+        await self._container_observer_runner.close()
 
         # Stop lifecycle event handler.
         await self.container_lifecycle_queue.put(_sentinel)
