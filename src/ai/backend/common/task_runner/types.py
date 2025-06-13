@@ -105,10 +105,16 @@ class TaskRunner:
                 await asyncio.sleep(0)
             if self._stopped:
                 break
-            await asyncio.sleep(self._interval)
+
+            try:
+                await asyncio.sleep(self._interval)
+            except asyncio.CancelledError:
+                log.debug("Task {} was canceled", self._task.name())
+                break
 
     async def run(self) -> None:
         self._runner_task = asyncio.create_task(self._spawned())
+        # Sleep here to ensure the task is scheduled
         await asyncio.sleep(0)
 
     async def stop(self) -> None:
