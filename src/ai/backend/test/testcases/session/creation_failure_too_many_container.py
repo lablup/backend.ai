@@ -1,17 +1,21 @@
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import keypair_fields, keypair_resource_policy_fields
 from ai.backend.common.types import ClusterMode
-from ai.backend.test.contexts.auth import KeypairContext
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.compute_session import SessionCreationContext
+from ai.backend.test.contexts.config import (
+    ImageConfigContext,
+    KeypairConfigContext,
+    SessionConfigContext,
+)
 from ai.backend.test.templates.template import TestCode
 
 
 class SessionCreationFailureTooManyContainer(TestCode):
     async def test(self) -> None:
-        keypair = KeypairContext.current()
+        keypair = KeypairConfigContext.current()
         client_session = ClientSessionContext.current()
-        creation_args = SessionCreationContext.current()
+        image = ImageConfigContext.current()
+        session_config = SessionConfigContext.current()
         session_name = "test-session-creation-failure"
 
         access_key = keypair.access_key
@@ -26,9 +30,10 @@ class SessionCreationFailureTooManyContainer(TestCode):
 
         try:
             await client_session.ComputeSession.get_or_create(
-                creation_args.image,
+                image.name,
+                architecture=image.architecture,
                 name=session_name,
-                resources=creation_args.resources,
+                resources=session_config.resources,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=max_containers_per_session + 1,  # Exceeding the limit
             )

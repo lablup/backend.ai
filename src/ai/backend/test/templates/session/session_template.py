@@ -2,20 +2,16 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.compute_session import (
+from ai.backend.test.contexts.config import (
     CreatedSessionTemplateIDContext,
-    SessionTemplateContext,
+    SessionTemplateConfigContext,
 )
 from ai.backend.test.templates.template import (
-    TestTemplate,
     WrapperTestTemplate,
 )
 
 
 class SessionTemplateTemplate(WrapperTestTemplate):
-    def __init__(self, template: TestTemplate) -> None:
-        super().__init__(template)
-
     @property
     def name(self) -> str:
         return "session_template"
@@ -24,7 +20,7 @@ class SessionTemplateTemplate(WrapperTestTemplate):
     @actxmgr
     async def _context(self) -> AsyncIterator[None]:
         client_session = ClientSessionContext.current()
-        template = SessionTemplateContext.current()
+        template = SessionTemplateConfigContext.current()
 
         try:
             result = await client_session.SessionTemplate.create(template.content)

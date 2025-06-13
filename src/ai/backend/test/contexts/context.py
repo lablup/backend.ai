@@ -20,14 +20,14 @@ class ContextName(enum.StrEnum):
     ENDPOINT = "endpoint"
     KEYPAIR = "keypair"
     LOGIN_CREDENTIAL = "login_credential"
-
-    SESSION_CREATION = "session_creation"
-    CLUSTER_CONFIGS = "cluster_configs"
-
+    SESSION = "session"
+    SSE = "sse"
+    BATCH_SESSION = "batch_session"
+    CLUSTER_CONFIG = "cluster_config"
     SESSION_TEMPLATE = "session_template"
+
     CREATED_SESSION_ID = "created_session_id"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
-    BATCH_SESSION_COMMAND = "batch_session_command"
 
 
 class BaseTestContext(Generic[T]):

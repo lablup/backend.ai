@@ -1,7 +1,7 @@
 import textwrap
 
 from ai.backend.common.types import ClusterMode
-from ai.backend.test.contexts.compute_session import ClusterConfigArgs
+from ai.backend.test.contexts.config import ClusterConfig
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
@@ -36,16 +36,16 @@ BATCH_SESSION_TEST_SPECS = {
             KeypairAuthTemplate, BatchSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIGS: [
-                ClusterConfigArgs(
+            ContextName.CLUSTER_CONFIG: [
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),
@@ -85,16 +85,16 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             KeypairAuthTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIGS: [
-                ClusterConfigArgs(
+            ContextName.CLUSTER_CONFIG: [
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),
@@ -148,16 +148,16 @@ SESSION_TEMPLATE_TEST_SPECS = {
             KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIGS: [
-                ClusterConfigArgs(
+            ContextName.CLUSTER_CONFIG: [
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),
@@ -179,20 +179,27 @@ SESSION_TEMPLATE_TEST_SPECS = {
             KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIGS: [
-                ClusterConfigArgs(
+            ContextName.CLUSTER_CONFIG: [
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfigArgs(
+                ClusterConfig(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),
-            ]
+            ],
+            # ContextName.CREATED_SESSION: [
+            #     SessionArgs(
+            #         image="ubuntu:latest",
+            #         resources={"cpu": 1, "mem": "512MiB"},
+            #         startup_command="echo 'Hello, World!'",
+            #     )
+            # ],
         },
     ),
 }

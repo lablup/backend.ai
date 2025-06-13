@@ -2,18 +2,18 @@ from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import image_fields
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.compute_session import SessionCreationContext
+from ai.backend.test.contexts.config import ImageConfigContext
 from ai.backend.test.templates.template import TestCode
 
 
 class SessionCreationFailureLowResources(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        creation_args = SessionCreationContext.current()
+        image = ImageConfigContext.current()
         session_name = "test-session-creation-failure"
 
         result = await client_session.Image.get(
-            creation_args.image, creation_args.architecture, fields=[image_fields["labels"]]
+            image.name, image.architecture, fields=[image_fields["labels"]]
         )
         labels = result["labels"]
         min_mem_label = next(
@@ -29,7 +29,8 @@ class SessionCreationFailureLowResources(TestCode):
 
         try:
             await client_session.ComputeSession.get_or_create(
-                creation_args.image,
+                image.name,
+                architecture=image.architecture,
                 name=session_name,
                 # This failed due to the need for additional space for shared memory.
                 resources={"cpu": 1, "mem": min_mem},
