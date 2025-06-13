@@ -1,6 +1,16 @@
 import asyncio
+from contextlib import ExitStack
+from pathlib import Path
+from typing import Type
 
-from ..testcases.testcases import TestSpec, TestSpecManager, TestTag
+import aiofiles
+import aiotools
+import tomli
+
+from ai.backend.test.testcases.context import BaseTestContext
+from ai.backend.test.tester.config import TesterConfig
+
+from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
 from .runner import TestRunner
 
@@ -9,21 +19,45 @@ _DEFAULT_CONCURRENCY = 10
 
 class Tester:
     _spec_manager: TestSpecManager
-    _exporter: TestExporter
+    _exporter_type: Type[TestExporter]
     _semaphore: asyncio.Semaphore
+    _config_file_path: Path
 
-    def __init__(self, spec_manager: TestSpecManager, exporter: TestExporter) -> None:
+    def __init__(
+        self,
+        spec_manager: TestSpecManager,
+        exporter_type: Type[TestExporter],
+        config_file_path: Path,
+    ) -> None:
         self._spec_manager = spec_manager
-        self._exporter = exporter
+        self._exporter_type = exporter_type
+        self._config_file_path = config_file_path
         self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
+
+    @aiotools.lru_cache(maxsize=1)
+    async def _load_tester_config(self, config_path: Path) -> TesterConfig:
+        async with aiofiles.open(config_path, mode="r") as fp:
+            raw_content = await fp.read()
+            content = tomli.loads(raw_content)
+            config = TesterConfig.model_validate(content, by_alias=True)
+            return config
 
     async def _run_spec(self, spec: TestSpec) -> None:
         """
         Run a single test specification.
         """
+        tester_config = await self._load_tester_config(self._config_file_path)
+        ctx_map = BaseTestContext.used_contexts()
+
         async with self._semaphore:
-            runner = TestRunner(spec, self._exporter)
-            await runner.run()
+            with ExitStack() as stack:
+                for key, ctx in ctx_map.items():
+                    if config := getattr(tester_config.context, key, None):
+                        ctx_mgr = ctx.with_current(config)
+                        stack.enter_context(ctx_mgr)
+                exporter = await self._exporter_type.create()
+                runner = TestRunner(spec, exporter)
+                await runner.run()
 
     async def run_all(self) -> None:
         """

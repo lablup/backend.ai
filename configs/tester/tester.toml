@@ -1,0 +1,14 @@
+[context.endpoint]
+api-endpoint = "http://127.0.0.1:8091"
+login-endpoint = "http://127.0.0.1:8090"
+
+[context.keypair]
+access-key = "AKIAIOSFODNN7EXAMPLE"
+secret-key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+[context.login-credential]
+user-id = "admin@lablup.com"
+password = "wJalrXUt"
+
+[context.image]
+name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"
