@@ -25,6 +25,9 @@ class SessionCreationContextArgs:
     image: str
     architecture: str
     resources: dict[str, Any]
+    startup_command: Optional[str]
+    cluster_mode: Optional[ClusterMode]  # Optional for manual injection
+    cluster_size: Optional[int]  # Optional for manual injection
 
 
 class SessionCreationContext(BaseTestContext[SessionCreationContextArgs]):
@@ -54,18 +57,8 @@ class CreatedSessionTemplateIDContext(BaseTestContext[UUID]):
         return ContextName.CREATED_SESSION_TEMPLATE_ID
 
 
-#
-
-
 class CreatedSessionIDContext(BaseTestContext[UUID]):
     @override
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.CREATED_SESSION_ID
-
-
-class BatchSessionCommandContext(BaseTestContext[str]):
-    @override
-    @classmethod
-    def name(cls) -> ContextName:
-        return ContextName.BATCH_SESSION_COMMAND

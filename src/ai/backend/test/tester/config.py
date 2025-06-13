@@ -66,6 +66,14 @@ class SessionCreation(BaseModel):
         description="The resources to allocate for the session.",
         examples=[{"cpu": 2, "mem": "4gb"}],
     )
+    startup_command: Optional[str] = Field(
+        default=None,
+        description="The startup command to run in the batch session.",
+        examples=["ls -la"],
+        alias="startup-command",
+    )
+    # By default, testing is conducted for both single-node and multi-node setups through parametrization,
+    # But we'd like to have left room for manually injecting values.
     cluster_mode: Optional[str] = Field(
         default=None,
         description="The cluster mode for the session.",
@@ -77,6 +85,13 @@ class SessionCreation(BaseModel):
         description="The size of the cluster for the session.",
         examples=[1, 2, 3],
         alias="cluster-size",
+    )
+
+
+class SessionTemplate(BaseModel):
+    content: str = Field(
+        description="The content of the session template.",
+        # examples=[""],  # Skip template since it's too long
     )
 
 
@@ -102,6 +117,11 @@ class TestContextInjectionModel(BaseModel):
         default=None,
         description="The session creation parameters for the test context.",
         alias="session-creation",
+    )
+    session_template: Optional[SessionTemplate] = Field(
+        default=None,
+        description="The session template for the test context.",
+        alias="session-template",
     )
 
 

@@ -72,20 +72,20 @@ class BatchSessionTemplate(WrapperTestTemplate):
             created_session = await client_session.ComputeSession.create_from_template(
                 template,
                 type_="batch",
-                startup_command="ls -la",
+                startup_command=creation_args.startup_command,
                 name=session_name,
-                cluster_mode=cluster_configs.cluster_mode,
-                cluster_size=cluster_configs.cluster_size,
+                cluster_mode=creation_args.cluster_mode or cluster_configs.cluster_mode,
+                cluster_size=creation_args.cluster_size or cluster_configs.cluster_size,
             )
         else:
             created_session = await client_session.ComputeSession.get_or_create(
                 creation_args.image,
                 resources=creation_args.resources,
                 type_="batch",
-                startup_command="ls -la",
+                startup_command=creation_args.startup_command,
                 name=session_name,
-                cluster_mode=cluster_configs.cluster_mode,
-                cluster_size=cluster_configs.cluster_size,
+                cluster_mode=creation_args.cluster_mode or cluster_configs.cluster_mode,
+                cluster_size=creation_args.cluster_size or cluster_configs.cluster_size,
             )
 
         assert created_session.created, "Session should be created successfully"
