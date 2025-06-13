@@ -1,13 +1,12 @@
 import logging
 from collections.abc import Awaitable, Sequence
-from typing import Callable, Optional, override
+from typing import Callable, Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentStatusHeartbeat,
     ContainerStatusData,
 )
-from ai.backend.common.task_runner.types import AbstractTask
 from ai.backend.common.types import AgentId, ContainerStatus, KernelId
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -18,7 +17,8 @@ from ..types import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class HeartbeatTask(AbstractTask):
+# class HeartbeatTask(AbstractTask):
+class HeartbeatTask:
     def __init__(
         self,
         agent_id: AgentId,
@@ -31,18 +31,18 @@ class HeartbeatTask(AbstractTask):
         self._container_enumerator = container_enumerator
         self._event_producer = event_producer
 
-    @override
+    # @override
     @classmethod
     def name(cls) -> str:
         return "agent_hearbeat"
 
-    @override
+    # @override
     @classmethod
     def timeout(cls) -> Optional[float]:
         return 10.0
 
-    @override
-    async def run(self) -> None:
+    # @override
+    async def run(self, resource: None) -> None:
         containers = await self._container_enumerator(frozenset([ContainerStatus.RUNNING]))
         container_data = [
             ContainerStatusData(
@@ -58,3 +58,9 @@ class HeartbeatTask(AbstractTask):
                 container_data,
             ),
         )
+
+    async def setup(self) -> None:
+        pass
+
+    async def teardown(self, resource: None) -> None:
+        pass

@@ -146,7 +146,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
-from ai.backend.common.task_runner.types import TaskRunner, TaskRunnerArgs
+from ai.backend.common.task_runner.types import TaskProtocol, TaskRunner, TaskRunnerArgs
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
@@ -860,12 +860,12 @@ class AbstractAgent(
                 )
             )
 
-        container_observer_task = HeartbeatTask(
+        container_observer_task: TaskProtocol[None] = HeartbeatTask(
             self.id,
             self.enumerate_containers,
             self.event_producer,
         )
-        self._container_observer = TaskRunner(
+        self._container_observer: TaskRunner[None] = TaskRunner(
             TaskRunnerArgs(task=container_observer_task, interval=60.0)
         )
         await self._container_observer.run()
