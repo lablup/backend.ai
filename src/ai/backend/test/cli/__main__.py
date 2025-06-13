@@ -16,7 +16,14 @@ from ai.backend.test.tester.tester import Tester
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
 
-_CONFIG_PATH = Path("tester.toml")
+_DEFAULT_CONFIG_PATH = "tester.toml"
+
+
+def _spec_manager() -> TestSpecManager:
+    """
+    Returns the test specification manager for the CLI.
+    """
+    return TestSpecManager(specs=ROOT_TEST_SPECS)
 
 
 @click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
@@ -120,7 +127,7 @@ def run_cli(
 @main.command()
 @click.pass_obj
 def get_all_specs(cli_ctx: CLIContext) -> None:
-    spec_manager = TestSpecManager(specs=ROOT_TEST_SPECS)
+    spec_manager = _spec_manager()
     print("Available test specifications:")
     print("====================================")
     for spec in spec_manager.all_specs():
@@ -128,22 +135,36 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 
 
 @click.argument("name", type=str)
+@click.option(
+    "--config-file",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
 @main.command()
 @click.pass_obj
-def run_test(cli_ctx: CLIContext, name: str) -> None:
-    spec_manager = TestSpecManager(specs=ROOT_TEST_SPECS)
+def run_test(cli_ctx: CLIContext, name: str, config_file: str) -> None:
+    config_file_path = Path(config_file)
+    spec_manager = _spec_manager()
     tester = Tester(
-        spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=_CONFIG_PATH
+        spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=config_file_path
     )
     asyncio.run(tester.run_by_name(name))
 
 
+@click.option(
+    "--config-file",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
 @main.command()
 @click.pass_obj
-def run_all(cli_ctx: CLIContext) -> None:
-    spec_manager = TestSpecManager(specs=ROOT_TEST_SPECS)
+def run_all(cli_ctx: CLIContext, config_file: str) -> None:
+    spec_manager = _spec_manager()
+    config_file_path = Path(config_file)
     tester = Tester(
-        spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=_CONFIG_PATH
+        spec_manager=spec_manager, exporter=PrintExporter(), config_file_path=config_file_path
     )
     asyncio.run(tester.run_all())
 
