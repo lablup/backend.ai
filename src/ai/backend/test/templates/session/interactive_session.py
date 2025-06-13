@@ -20,8 +20,6 @@ from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
 
-_TEST_TIMEOUT = 30.0  # seconds
-
 
 class InteractiveSessionTemplate(WrapperTestTemplate):
     def __init__(self, template: TestTemplate) -> None:
@@ -58,7 +56,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
                         break
 
         listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=_TEST_TIMEOUT)
+            asyncio.wait_for(collect_events(), timeout=creation_args.timeout)
         )
 
         if template := CreatedSessionTemplateIDContext.current_or_none():
@@ -89,13 +87,14 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
             return created_session.id
         except asyncio.TimeoutError as e:
             raise asyncio.TimeoutError(
-                f"Timed out after {_TEST_TIMEOUT}s; events received so far: {collected_events}"
+                f"Timed out after {creation_args.timeout}s; events received so far: {collected_events}"
             ) from e
 
     async def _verify_session_destruction(
         self,
         client_session: AsyncSession,
         session_name: str,
+        timeout: float,
     ) -> None:
         EXPECTED_EVENTS = {
             "session_terminating",
@@ -119,9 +118,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
                         # print("All expected events received.")
                         break
 
-        listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=_TEST_TIMEOUT)
-        )
+        listener_task = asyncio.create_task(asyncio.wait_for(collect_events(), timeout=timeout))
 
         result = await client_session.ComputeSession(session_name).destroy()
         assert result["stats"]["status"] == "terminated", (
@@ -132,7 +129,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
             await listener_task
         except asyncio.TimeoutError as e:
             raise asyncio.TimeoutError(
-                f"Timed out after {_TEST_TIMEOUT}s; events received so far: {collected_events}"
+                f"Timed out after {timeout}s; events received so far: {collected_events}"
             ) from e
 
     @override
@@ -150,5 +147,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
             with CreatedSessionIDContext.with_current(session_id):
                 yield
         finally:
-            await self._verify_session_destruction(client_session, session_name)
+            await self._verify_session_destruction(
+                client_session, session_name, creation_args.timeout
+            )
             pass

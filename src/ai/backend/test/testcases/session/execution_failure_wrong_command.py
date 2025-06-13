@@ -6,8 +6,6 @@ from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.compute_session import SessionCreationContext
 from ai.backend.test.templates.template import TestCode
 
-_TEST_TIMEOUT = 30.0  # seconds
-
 
 class BatchSessionCreationFailureWrongCommand(TestCode):
     async def test(self) -> None:
@@ -25,7 +23,7 @@ class BatchSessionCreationFailureWrongCommand(TestCode):
                         raise RuntimeError("BatchSession should not succeed with wrong command")
 
         listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=_TEST_TIMEOUT)
+            asyncio.wait_for(collect_events(), timeout=creation_args.timeout)
         )
 
         try:
