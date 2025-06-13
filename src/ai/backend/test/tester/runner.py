@@ -1,6 +1,8 @@
 import uuid
 
-from ..contexts.tester import TestIDContext
+from ai.backend.test.data.tester import TestSpecMeta
+
+from ..contexts.tester import TestSpecMetaContext
 from ..testcases.spec_manager import TestSpec
 from .exporter import TestExporter
 
@@ -14,10 +16,15 @@ class TestRunner:
         self._exporter = exporter
 
     async def run(self) -> None:
-        with TestIDContext.with_current(uuid.uuid4()):
-            await self._exporter.export_start(self._spec.name)
+        with TestSpecMetaContext.with_current(
+            TestSpecMeta(
+                test_id=uuid.uuid4(),
+                spec_name=self._spec.name,
+            )
+        ):
+            await self._exporter.export_start()
             try:
                 await self._spec.template.run_test(self._exporter)
-                await self._exporter.export_done(self._spec.name)
+                await self._exporter.export_done()
             except BaseException as e:
-                await self._exporter.export_exception(self._spec.name, e)
+                await self._exporter.export_exception(e)
