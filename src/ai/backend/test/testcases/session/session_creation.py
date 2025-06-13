@@ -8,8 +8,8 @@ from ai.backend.test.templates.template import TestCode
 class TestSessionCreation(TestCode):
     @override
     async def test(self) -> None:
-        test_id = TestIDContext.get_current()
-        session = ClientSessionContext.get_current()
+        test_id = TestIDContext.current()
+        session = ClientSessionContext.current()
         test_name = f"test-{test_id}"
         try:
             await session.ComputeSession.get_or_create(

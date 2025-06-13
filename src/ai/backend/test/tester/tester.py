@@ -43,7 +43,7 @@ class Tester:
         Run a single test specification.
         """
         tester_config = await self._load_tester_config(self._config_file_path)
-        ctx_map = BaseTestContext.get_used_contexts()
+        ctx_map = BaseTestContext.used_contexts()
 
         async with self._semaphore:
             with ExitStack() as stack:

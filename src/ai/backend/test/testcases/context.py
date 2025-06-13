@@ -36,7 +36,7 @@ class BaseTestContext(Generic[T]):
         )
 
     @classmethod
-    def get_used_contexts(cls) -> Mapping[str, "BaseTestContext"]:
+    def used_contexts(cls) -> Mapping[str, "BaseTestContext"]:
         """
         Get all used contexts
         :return: mapping of context names to context instances
@@ -45,7 +45,7 @@ class BaseTestContext(Generic[T]):
 
     @classmethod
     @final
-    def get_current(cls) -> T:
+    def current(cls) -> T:
         """
         Get the current value from context
         :raises RuntimeError: if no value is set in the context (Tester must set it before using)

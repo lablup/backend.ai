@@ -18,13 +18,13 @@ class KeypairAuthTemplate(WrapperTestTemplate):
     @override
     @actxmgr
     async def _context(self) -> AsyncIterator[None]:
-        keypair_ctx = KeypairContext.get_current()
-        endpoint_ctx = EndpointContext.get_current()
+        keypair = KeypairContext.current()
+        endpoint = EndpointContext.current()
         api_config = APIConfig(
-            endpoint=endpoint_ctx.api_endpoint,
+            endpoint=endpoint.api_endpoint,
             endpoint_type="api",
-            access_key=keypair_ctx.access_key,
-            secret_key=keypair_ctx.secret_key,
+            access_key=keypair.access_key,
+            secret_key=keypair.secret_key,
         )
 
         async with AsyncSession(config=api_config) as session:

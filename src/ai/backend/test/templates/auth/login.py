@@ -22,22 +22,22 @@ class LoginTemplate(WrapperTestTemplate):
     @override
     @actxmgr
     async def _context(self) -> AsyncIterator[None]:
-        test_id = TestIDContext.get_current()
+        test_id = TestIDContext.current()
         test_id_str = str(test_id)
-        credential_ctx = LoginCredentialContext.get_current()
-        endpoint_ctx = EndpointContext.get_current()
+        credential = LoginCredentialContext.current()
+        endpoint = EndpointContext.current()
 
         api_config = APIConfig(
-            endpoint=endpoint_ctx.login_endpoint,
+            endpoint=endpoint.login_endpoint,
             endpoint_type="session",
         )
         async with AsyncSession(config=api_config) as session:
             await _login(
                 session=session,
                 test_id=test_id_str,
-                user_id=credential_ctx.user_id,
-                password=credential_ctx.password,
-                otp=credential_ctx.otp,
+                user_id=credential.user_id,
+                password=credential.password,
+                otp=credential.otp,
             )
             with ClientSessionContext.with_current(session):
                 try:
