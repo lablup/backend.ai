@@ -6,9 +6,9 @@ from typing import AsyncIterator, Optional, override
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
-from ai.backend.test.contexts.auth import EndpointContext, LoginCredentialContext
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.tester import TestSpecMetaContext
+from ai.backend.test.contexts.config import EndpointConfigContext, LoginCredentialConfigContext
+from ai.backend.test.contexts.tester import TestIDContext
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -25,8 +25,8 @@ class LoginTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         test_id_str = str(test_id)
-        credential = LoginCredentialContext.current()
-        endpoint = EndpointContext.current()
+        credential = LoginCredentialConfigContext.current()
+        endpoint = EndpointConfigContext.current()
 
         api_config = APIConfig(
             endpoint=endpoint.login_endpoint,

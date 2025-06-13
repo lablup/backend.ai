@@ -3,14 +3,20 @@ import asyncio
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.compute_session import SessionCreationContext
+from ai.backend.test.contexts.config import (
+    ImageConfigContext,
+    SessionConfigContext,
+    SSEConfigContext,
+)
 from ai.backend.test.templates.template import TestCode
 
 
 class BatchSessionCreationFailureWrongCommand(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        creation_args = SessionCreationContext.current()
+        image = ImageConfigContext.current()
+        sse_config = SSEConfigContext.current()
+        session_config = SessionConfigContext.current()
 
         session_name = "test-batch-session-execution-failure"
 
@@ -23,16 +29,17 @@ class BatchSessionCreationFailureWrongCommand(TestCode):
                         raise RuntimeError("BatchSession should not succeed with wrong command")
 
         listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=creation_args.timeout)
+            asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
         )
 
         try:
             await client_session.ComputeSession.get_or_create(
-                creation_args.image,
+                image.name,
+                architecture=image.architecture,
                 name=session_name,
                 type_="batch",
                 startup_command="some_wrong_command!@#123",
-                resources=creation_args.resources,
+                resources=session_config.resources,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
             )

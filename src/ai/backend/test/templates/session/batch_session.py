@@ -5,25 +5,22 @@ from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.compute_session import (
-    ClusterConfigArgs,
+from ai.backend.test.contexts.config import (
+    BatchSessionConfigContext,
     ClusterConfigContext,
     CreatedSessionIDContext,
     CreatedSessionTemplateIDContext,
-    SessionCreationContext,
-    SessionCreationContextArgs,
+    ImageConfigContext,
+    SessionConfigContext,
+    SSEConfigContext,
 )
 from ai.backend.test.contexts.tester import TestIDContext
 from ai.backend.test.templates.template import (
-    TestTemplate,
     WrapperTestTemplate,
 )
 
 
 class BatchSessionTemplate(WrapperTestTemplate):
-    def __init__(self, template: TestTemplate) -> None:
-        super().__init__(template)
-
     @property
     def name(self) -> str:
         return "batch_session"
@@ -31,10 +28,14 @@ class BatchSessionTemplate(WrapperTestTemplate):
     async def _verify_session_creation(
         self,
         client_session: AsyncSession,
-        creation_args: SessionCreationContextArgs,
-        cluster_configs: ClusterConfigArgs,
         session_name: str,
     ) -> UUID:
+        image_config = ImageConfigContext.current()
+        cluster_configs = ClusterConfigContext.current()
+        sse_config = SSEConfigContext.current()
+        batch_session_config = BatchSessionConfigContext.current()
+        session_config = SessionConfigContext.current()
+
         EXPECTED_EVENTS = {
             "session_enqueued",
             "session_scheduled",
@@ -63,27 +64,28 @@ class BatchSessionTemplate(WrapperTestTemplate):
                         break
 
         listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=creation_args.timeout)
+            asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
         )
 
         if template := CreatedSessionTemplateIDContext.current_or_none():
             created_session = await client_session.ComputeSession.create_from_template(
                 template,
                 type_="batch",
-                startup_command=creation_args.startup_command,
+                startup_command=batch_session_config.startup_command,
                 name=session_name,
-                cluster_mode=creation_args.cluster_mode or cluster_configs.cluster_mode,
-                cluster_size=creation_args.cluster_size or cluster_configs.cluster_size,
+                cluster_mode=cluster_configs.cluster_mode,
+                cluster_size=cluster_configs.cluster_size,
             )
         else:
             created_session = await client_session.ComputeSession.get_or_create(
-                creation_args.image,
-                resources=creation_args.resources,
+                image_config.name,
+                architecture=image_config.architecture,
+                resources=session_config.resources,
                 type_="batch",
-                startup_command=creation_args.startup_command,
+                startup_command=batch_session_config.startup_command,
                 name=session_name,
-                cluster_mode=creation_args.cluster_mode or cluster_configs.cluster_mode,
-                cluster_size=creation_args.cluster_size or cluster_configs.cluster_size,
+                cluster_mode=cluster_configs.cluster_mode,
+                cluster_size=cluster_configs.cluster_size,
             )
 
         assert created_session.created, "Session should be created successfully"
@@ -97,7 +99,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
             return created_session.id
         except asyncio.TimeoutError as e:
             raise asyncio.TimeoutError(
-                f"Timed out after {creation_args.timeout}s; events received so far: {collected_events}"
+                f"Timed out after {sse_config.timeout}s; events received so far: {collected_events}"
             ) from e
 
     @override
@@ -105,12 +107,8 @@ class BatchSessionTemplate(WrapperTestTemplate):
     async def _context(self) -> AsyncIterator[None]:
         test_id = TestIDContext.current()
         client_session = ClientSessionContext.current()
-        creation_args = SessionCreationContext.current()
-        cluster_configs = ClusterConfigContext.current()
         session_name = f"test_session_{str(test_id)}"
 
-        session_id = await self._verify_session_creation(
-            client_session, creation_args, cluster_configs, session_name
-        )
+        session_id = await self._verify_session_creation(client_session, session_name)
         with CreatedSessionIDContext.with_current(session_id):
             yield
