@@ -1437,15 +1437,15 @@ class SessionService:
         new_name = action.new_name
 
         async with self._db.begin_session() as db_sess:
-            session_exists = await SessionRow.get_session(
+            session_with_new_name = await SessionRow.get_session(
                 db_sess,
                 new_name,
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.NONE,
                 allow_stale=True,
             )
-            if session_exists:
-                raise InvalidAPIParameters("Session with new name already exists")
+            if session_with_new_name is not None:
+                raise InvalidAPIParameters(f"Session name of '{new_name}' already exists")
             compute_session = await SessionRow.get_session(
                 db_sess,
                 session_name,
