@@ -1447,7 +1447,6 @@ class SessionService:
             except SessionNotFound:
                 pass
             else:
-                print(f"Session with name {new_name} already exists")
                 raise InvalidAPIParameters(
                     f"Duplicate session name. Session(id:{sess.id}) already has name({sess.name})"
                 )
