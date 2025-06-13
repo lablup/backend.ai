@@ -2,6 +2,13 @@ from abc import ABC
 
 
 class TestExporter(ABC):
+    async def export_start(self, spec_name: str) -> None:
+        """
+        Export the start of a test run.
+        This method can be used to log or notify the start of a test case.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
     async def export_done(self, spec_name: str) -> None:
         """
         Export the result of a test run.
@@ -28,6 +35,9 @@ class TestExporter(ABC):
 
 
 class PrintExporter(TestExporter):
+    async def export_start(self, spec_name: str) -> None:
+        print(f"Starting test '{spec_name}'...")
+
     async def export_done(self, spec_name: str) -> None:
         print(f"Test '{spec_name}' completed successfully.")
 
