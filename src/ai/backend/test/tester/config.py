@@ -56,11 +56,6 @@ class SessionCreation(BaseModel):
         description="The architecture of the session.",
         examples=["x86_64"],
     )
-    template: Optional[str] = Field(
-        default=None,
-        description="The session template to use for the test context.",
-        # examples=[""],  # Skip template since it's too long
-    )
     resources: Optional[dict] = Field(
         default=None,
         description="The resources to allocate for the session.",
@@ -71,6 +66,11 @@ class SessionCreation(BaseModel):
         description="The startup command to run in the batch session.",
         examples=["ls -la"],
         alias="startup-command",
+    )
+    timeout: float = Field(
+        default=30.0,
+        description="The timeout for the session creation in seconds.",
+        examples=[30.0],
     )
     # By default, testing is conducted for both single-node and multi-node setups through parametrization,
     # But we'd like to have left room for manually injecting values.

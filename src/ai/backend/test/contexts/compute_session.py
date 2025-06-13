@@ -26,6 +26,7 @@ class SessionCreationContextArgs:
     architecture: str
     resources: dict[str, Any]
     startup_command: Optional[str]
+    timeout: float
     cluster_mode: Optional[ClusterMode]  # Optional for manual injection
     cluster_size: Optional[int]  # Optional for manual injection
 

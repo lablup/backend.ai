@@ -19,8 +19,6 @@ from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
 
-_TEST_TIMEOUT = 30.0  # seconds
-
 
 class BatchSessionTemplate(WrapperTestTemplate):
     def __init__(self, template: TestTemplate) -> None:
@@ -65,7 +63,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
                         break
 
         listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=_TEST_TIMEOUT)
+            asyncio.wait_for(collect_events(), timeout=creation_args.timeout)
         )
 
         if template := CreatedSessionTemplateIDContext.current_or_none():
@@ -99,7 +97,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
             return created_session.id
         except asyncio.TimeoutError as e:
             raise asyncio.TimeoutError(
-                f"Timed out after {_TEST_TIMEOUT}s; events received so far: {collected_events}"
+                f"Timed out after {creation_args.timeout}s; events received so far: {collected_events}"
             ) from e
 
     @override
