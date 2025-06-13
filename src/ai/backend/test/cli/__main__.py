@@ -137,8 +137,8 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 @click.argument("name", type=str)
 @click.option(
     "-f",
-    "--config",
     "--config-path",
+    "--config",
     type=click.Path(exists=True, dir_okay=False, resolve_path=True),
     default=_DEFAULT_CONFIG_PATH,
     help="The path to the configuration file for the tester",
@@ -156,8 +156,8 @@ def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
 
 @click.option(
     "-f",
-    "--config",
     "--config-path",
+    "--config",
     type=click.Path(exists=True, dir_okay=False, resolve_path=True),
     default=_DEFAULT_CONFIG_PATH,
     help="The path to the configuration file for the tester",
