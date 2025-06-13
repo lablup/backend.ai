@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import ExitStack
 from pathlib import Path
+from typing import Type
 
 import aiofiles
 import aiotools
@@ -18,15 +19,18 @@ _DEFAULT_CONCURRENCY = 10
 
 class Tester:
     _spec_manager: TestSpecManager
-    _exporter: TestExporter
+    _exporter_type: Type[TestExporter]
     _semaphore: asyncio.Semaphore
     _config_file_path: Path
 
     def __init__(
-        self, spec_manager: TestSpecManager, exporter: TestExporter, config_file_path: Path
+        self,
+        spec_manager: TestSpecManager,
+        exporter_type: Type[TestExporter],
+        config_file_path: Path,
     ) -> None:
         self._spec_manager = spec_manager
-        self._exporter = exporter
+        self._exporter_type = exporter_type
         self._config_file_path = config_file_path
         self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
 
@@ -51,8 +55,8 @@ class Tester:
                     if config := getattr(tester_config.context, key, None):
                         ctx_mgr = ctx.with_current(config)
                         stack.enter_context(ctx_mgr)
-
-                runner = TestRunner(spec, self._exporter)
+                exporter = await self._exporter_type.create()
+                runner = TestRunner(spec, exporter)
                 await runner.run()
 
     async def run_all(self) -> None:
