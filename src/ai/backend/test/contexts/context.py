@@ -14,12 +14,13 @@ class ContextName(enum.StrEnum):
     This enum provides a set of predefined context names that can be used to identify different contexts in the testing framework.
     """
 
-    TEST_ID = "test_id"
+    TEST_SPEC_META = "test_spec_meta"
     IMAGE = "image"
     CLIENT_SESSION = "client_session"
     ENDPOINT = "endpoint"
     KEYPAIR = "keypair"
     LOGIN_CREDENTIAL = "login_credential"
+    TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
 
 
 class BaseTestContext(Generic[T]):

@@ -2,14 +2,15 @@ from typing import override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
-from ai.backend.test.contexts.tester import TestIDContext
+from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.template import TestCode
 
 
 class TestSessionCreation(TestCode):
     @override
     async def test(self) -> None:
-        test_id = TestIDContext.current()
+        spec_meta = TestSpecMetaContext.current()
+        test_id = spec_meta.test_id
         session = ClientSessionContext.current()
         image = ImageContext.current()
         test_name = f"test-{test_id}"
