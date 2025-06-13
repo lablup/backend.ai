@@ -1,7 +1,9 @@
 import enum
 from dataclasses import dataclass
-from typing import Mapping
+from itertools import product
+from typing import Any, Mapping, Optional, Sequence
 
+from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.template import (
     TestTemplate,
 )
@@ -26,6 +28,7 @@ class TestSpec:
     description: str
     tags: set[TestTag]
     template: TestTemplate
+    parametrizes: Optional[Mapping[ContextName, Sequence[Any]]] = None
 
     def __hash__(self):
         return hash(self.name)
@@ -35,6 +38,16 @@ class TestSpec:
             return NotImplemented
         # If name is the same, consider them equal
         return self.name == other.name
+
+    def product_parametrizes(self) -> Optional[Sequence[Mapping[ContextName, Any]]]:
+        """
+        Get the product of all parametrizes for the test specification.
+        """
+        if not self.parametrizes:
+            return None
+        keys = list(self.parametrizes.keys())
+        values_product = product(*(self.parametrizes[key] for key in keys))
+        return [dict(zip(keys, combination)) for combination in values_product]
 
 
 class TestSpecManager:

@@ -1,3 +1,4 @@
+import enum
 from abc import abstractmethod
 from collections.abc import Mapping, MutableMapping
 from contextlib import contextmanager
@@ -5,6 +6,20 @@ from contextvars import ContextVar
 from typing import Generic, Iterator, Optional, TypeVar, final
 
 T = TypeVar("T")
+
+
+class ContextName(enum.StrEnum):
+    """
+    Enum for context names used in the test framework.
+    This enum provides a set of predefined context names that can be used to identify different contexts in the testing framework.
+    """
+
+    TEST_ID = "test_id"
+    IMAGE = "image"
+    CLIENT_SESSION = "client_session"
+    ENDPOINT = "endpoint"
+    KEYPAIR = "keypair"
+    LOGIN_CREDENTIAL = "login_credential"
 
 
 class BaseTestContext(Generic[T]):
@@ -16,7 +31,7 @@ class BaseTestContext(Generic[T]):
     """
 
     _ctxvar: Optional[ContextVar[Optional[T]]] = None
-    _used: MutableMapping[str, "BaseTestContext"] = {}
+    _used: MutableMapping[ContextName, "BaseTestContext"] = {}
 
     def __init_subclass__(cls):
         if cls._ctxvar is not None:
@@ -26,7 +41,7 @@ class BaseTestContext(Generic[T]):
 
     @classmethod
     @abstractmethod
-    def name(cls) -> str:
+    def name(cls) -> ContextName:
         """
         Get the name of the context
         :return: name of the context
@@ -36,7 +51,7 @@ class BaseTestContext(Generic[T]):
         )
 
     @classmethod
-    def used_contexts(cls) -> Mapping[str, "BaseTestContext"]:
+    def used_contexts(cls) -> Mapping[ContextName, "BaseTestContext"]:
         """
         Get all used contexts
         :return: mapping of context names to context instances

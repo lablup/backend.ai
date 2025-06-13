@@ -1,13 +1,13 @@
 import asyncio
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Type
+from typing import Any, Mapping, Optional, Type
 
 import aiofiles
 import aiotools
 import tomli
 
-from ai.backend.test.testcases.context import BaseTestContext
+from ai.backend.test.contexts.context import BaseTestContext, ContextName
 from ai.backend.test.tester.config import TesterConfig
 
 from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
@@ -42,22 +42,46 @@ class Tester:
             config = TesterConfig.model_validate(content, by_alias=True)
             return config
 
+    async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
+        async with self._semaphore:
+            exporter = await self._exporter_type.create(sub_name)
+            runner = TestRunner(spec, exporter)
+            await runner.run()
+
+    async def _run_param_spec(self, spec: TestSpec, param: Mapping[ContextName, Any]) -> None:
+        registered_contexts = BaseTestContext.used_contexts()
+        with ExitStack() as local_stack:
+            for ctx_name, value in param.items():
+                if ctx := registered_contexts.get(ctx_name):
+                    # Create a context manager for the parameterized context
+                    ctx_mgr = ctx.with_current(value)
+                    local_stack.enter_context(ctx_mgr)
+            await self._run_single_spec(spec, self._param_to_name(param))
+
+    def _param_to_name(self, param: Mapping[ContextName, Any]) -> Optional[str]:
+        if not param:
+            return None
+        param_str = "_".join(f"{key}={value}" for key, value in sorted(param.items()))
+        return f"({param_str})"
+
     async def _run_spec(self, spec: TestSpec) -> None:
         """
         Run a single test specification.
         """
         tester_config = await self._load_tester_config(self._config_file_path)
-        ctx_map = BaseTestContext.used_contexts()
-
-        async with self._semaphore:
-            with ExitStack() as stack:
-                for key, ctx in ctx_map.items():
-                    if config := getattr(tester_config.context, key, None):
-                        ctx_mgr = ctx.with_current(config)
-                        stack.enter_context(ctx_mgr)
-                exporter = await self._exporter_type.create()
-                runner = TestRunner(spec, exporter)
-                await runner.run()
+        registered_contexts = BaseTestContext.used_contexts()
+        with ExitStack() as global_stack:
+            # global context manager for the tester
+            for key, ctx in registered_contexts.items():
+                if config := getattr(tester_config.context, key, None):
+                    ctx_mgr = ctx.with_current(config)
+                    global_stack.enter_context(ctx_mgr)
+            parametrizes = spec.product_parametrizes()
+            if parametrizes:
+                for param in parametrizes:
+                    await self._run_param_spec(spec, param)
+                return
+            await self._run_single_spec(spec)
 
     async def run_all(self) -> None:
         """

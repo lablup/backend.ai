@@ -1,9 +1,9 @@
 import uuid
 
-from ai.backend.test.testcases.context import BaseTestContext
+from ai.backend.test.contexts.context import BaseTestContext, ContextName
 
 
 class TestIDContext(BaseTestContext[uuid.UUID]):
     @classmethod
-    def name(cls) -> str:
-        return "test_id"
+    def name(cls) -> ContextName:
+        return ContextName.TEST_ID
