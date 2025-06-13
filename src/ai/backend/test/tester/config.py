@@ -45,6 +45,41 @@ class Image(BaseModel):
     )
 
 
+class SessionCreation(BaseModel):
+    image: Optional[str] = Field(
+        default=None,
+        description="The Docker image to use for the test context.",
+        examples=["cr.backend.ai/multiarch/python:3.13-ubuntu24.04"],
+    )
+    architecture: Optional[str] = Field(
+        default=None,
+        description="The architecture of the session.",
+        examples=["x86_64"],
+    )
+    template: Optional[str] = Field(
+        default=None,
+        description="The session template to use for the test context.",
+        # examples=[""],  # Skip template since it's too long
+    )
+    resources: Optional[dict] = Field(
+        default=None,
+        description="The resources to allocate for the session.",
+        examples=[{"cpu": 2, "mem": "4gb"}],
+    )
+    cluster_mode: Optional[str] = Field(
+        default=None,
+        description="The cluster mode for the session.",
+        examples=["single_node", "multi_node"],
+        alias="cluster-mode",
+    )
+    cluster_size: Optional[int] = Field(
+        default=None,
+        description="The size of the cluster for the session.",
+        examples=[1, 2, 3],
+        alias="cluster-size",
+    )
+
+
 class TestContextInjectionModel(BaseModel):
     endpoint: Optional[Endpoint] = Field(
         default=None,
@@ -62,6 +97,11 @@ class TestContextInjectionModel(BaseModel):
     image: Optional[Image] = Field(
         default=None,
         description="The Docker image context for the test.",
+    )
+    session_creation: Optional[SessionCreation] = Field(
+        default=None,
+        description="The session creation parameters for the test context.",
+        alias="session-creation",
     )
 
 

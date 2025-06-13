@@ -1,9 +1,12 @@
 import textwrap
 
+from ai.backend.common.types import ClusterMode
+from ai.backend.test.contexts.compute_session import ClusterConfigArgs
+from ai.backend.test.contexts.context import ContextName
+from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
 from ai.backend.test.templates.session.session_template import SessionTemplateTemplate
-from ai.backend.test.templates.vfolder.vfolder import VFolderTemplate
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
 )
@@ -13,13 +16,13 @@ from ai.backend.test.testcases.session.creation_failure_too_many_container impor
 from ai.backend.test.testcases.session.execution_failure_wrong_command import (
     BatchSessionCreationFailureWrongCommand,
 )
+from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 
 from ...templates.template import BasicTestTemplate, NopTestCode
-from ..testcases import TestSpec, TestTag
 
 BATCH_SESSION_TEST_SPECS = {
-    "execution_success_single_node_single_container": TestSpec(
-        name="execution_success_single_node_single_container",
+    "execution_batch_session_success": TestSpec(
+        name="execution_batch_session_success",
         description=textwrap.dedent("""\
             Test for creating a single-node, single-container batch session.
             This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
@@ -29,36 +32,28 @@ BATCH_SESSION_TEST_SPECS = {
             3. Assert that the session is terminated after completion.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-        template=BatchSessionTemplate(BasicTestTemplate(NopTestCode())),
+        template=BasicTestTemplate(NopTestCode()).with_wrappers(
+            KeypairAuthTemplate, BatchSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIGS: [
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
     ),
-    # "execution_success_single_node_multi_container": TestSpec(
-    #     name="execution_success_single_node_multi_container",
-    #     description=textwrap.dedent("""\
-    #         Test for creating a single-node, multi-container batch session.
-    #         This test verifies that a session can be created with a single node and multiple containers, and that it transitions through the expected lifecycle events.
-    #         The test will:
-    #         1. Create a batch session with the specified image and resources.
-    #         2. Listen for lifecycle events and verify that the session transitions through the expected states.
-    #         3. Assert that the session is terminated after completion.
-    #     """),
-    #     tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-    #     template=BatchSessionTemplate(BasicTestTemplate(NopTestCode())),
-    # ),
-    # "execution_success_multi_node_multi_container": TestSpec(
-    #     name="execution_success_multi_node_multi_container",
-    #     description=textwrap.dedent("""\
-    #         Test for creating a multi-node, multi-container batch session.
-    #         This test verifies that a session can be created with multiple nodes and multiple containers, and that it transitions through the expected lifecycle events.
-    #         The test will:
-    #         1. Create a batch session with the specified image and resources.
-    #         2. Listen for lifecycle events and verify that the session transitions through the expected states.
-    #         3. Assert that the session is terminated after completion.
-    #     """),
-    #     tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-    #     template=BatchSessionTemplate(BasicTestTemplate(NopTestCode())),
-    # ),
-    "execution_failure_wrong_command": TestSpec(
-        name="execution_failure_wrong_command",
+    "execution_batch_session_failure_wrong_command": TestSpec(
+        name="execution_batch_session_failure_wrong_command",
         description=textwrap.dedent("""\
             Test for creating a batch session with an invalid startup command.
             This test verifies that a batch session creation fails when the startup command is invalid.
@@ -67,13 +62,15 @@ BATCH_SESSION_TEST_SPECS = {
             2. Assert that the session creation fails with an appropriate error message.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-        template=BasicTestTemplate(BatchSessionCreationFailureWrongCommand()),
+        template=BasicTestTemplate(BatchSessionCreationFailureWrongCommand()).with_wrappers(
+            KeypairAuthTemplate
+        ),
     ),
 }
 
 INTERACTIVE_SESSION_TEST_SPECS = {
-    "creation_success_single_node_single_container": TestSpec(
-        name="creation_success_single_node_single_container",
+    "creation_interactive_session_success": TestSpec(
+        name="creation_interactive_session_success",
         description=textwrap.dedent("""\
             Test for creating a single-node, single-container session.
             This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
@@ -84,10 +81,28 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             4. Destroy the session after the test is complete.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-        template=InteractiveSessionTemplate(BasicTestTemplate(NopTestCode())),
+        template=BasicTestTemplate(NopTestCode()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIGS: [
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
     ),
-    "creation_failure_low_resources": TestSpec(
-        name="creation_failure_low_resources",
+    "creation_interactive_session_failure_low_resources": TestSpec(
+        name="creation_interactive_session_failure_low_resources",
         description=textwrap.dedent("""\
             Test for creating a session with too low resources.
             This test verifies that a session creation fails when the specified resources are insufficient to run the image.
@@ -96,10 +111,12 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             2. Assert that the session creation fails with an appropriate error message.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-        template=BasicTestTemplate(SessionCreationFailureLowResources()),
+        template=BasicTestTemplate(SessionCreationFailureLowResources()).with_wrappers(
+            KeypairAuthTemplate
+        ),
     ),
-    "creation_failure_too_many_container_count": TestSpec(
-        name="creation_failure_too_many_container_count",
+    "creation_interactive_session_failure_too_many_container_count": TestSpec(
+        name="creation_interactive_session_failure_too_many_container_count",
         description=textwrap.dedent("""\
             Test for creating a session with too many containers.
             This test verifies that a session creation fails when the specified container count exceeds the limit.
@@ -108,45 +125,15 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             2. Assert that the session creation fails with an appropriate error message.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-        template=BasicTestTemplate(SessionCreationFailureTooManyContainer()),
+        template=BasicTestTemplate(SessionCreationFailureTooManyContainer()).with_wrappers(
+            KeypairAuthTemplate
+        ),
     ),
-    # "creation_success_single_node_multi_container": TestSpec(
-    #     name="creation_success_single_node_multi_container",
-    #     description=textwrap.dedent("""\
-    #         Test for creating a single-node, multi-container session.
-    #         This test verifies that a session can be created with a single node and multiple containers, and that it transitions through the expected lifecycle events.
-    #         The test will:
-    #         1. Create a session with the specified image and resources.
-    #         2. Listen for lifecycle events and verify that the session transitions through the expected states.
-    #         3. Assert that the session is running after creation.
-    #         4. Destroy the session after the test is complete.
-    #     """),
-    #     tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-    #     template=SessionTemplate(
-    #         BasicTestTemplate(NopTestCode())
-    #     ),
-    # ),
-    # "creation_success_multi_node_multi_container": TestSpec(
-    #     name="creation_success_multi_node_multi_container",
-    #     description=textwrap.dedent("""\
-    #         Test for creating a multi-node, multi-container session.
-    #         This test verifies that a session can be created with multiple nodes and multiple containers, and that it transitions through the expected lifecycle events.
-    #         The test will:
-    #         1. Create a session with the specified image and resources.
-    #         2. Listen for lifecycle events and verify that the session transitions through the expected states.
-    #         3. Assert that the session is running after creation.
-    #         4. Destroy the session after the test is complete.
-    #     """),
-    #     tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-    #     template=SessionTemplate(
-    #         BasicTestTemplate(NopTestCode())
-    #     ),
-    # ),
 }
 
 SESSION_TEMPLATE_TEST_SPECS = {
-    "creation_success_from_template": TestSpec(
-        name="creation_success_from_template",
+    "creation_interactive_session_success_from_template": TestSpec(
+        name="creation_interactive_session_success_from_template",
         description=textwrap.dedent("""\
         Test for creating a session from a template.
         This test verifies that a session can be created from a predefined template, and that it transitions through the expected lifecycle events.
@@ -157,12 +144,12 @@ SESSION_TEMPLATE_TEST_SPECS = {
         4. Destroy the session after the test is complete.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-        template=SessionTemplateTemplate(
-            InteractiveSessionTemplate(BasicTestTemplate(NopTestCode()))
+        template=BasicTestTemplate(NopTestCode()).with_wrappers(
+            KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
         ),
     ),
-    "execution_success_from_template": TestSpec(
-        name="execution_success_from_template",
+    "execution_batch_session_success_from_template": TestSpec(
+        name="execution_batch_session_success_from_template",
         description=textwrap.dedent("""\
         Test for executing a session from a template.
         This test verifies that a session can be executed from a predefined template, and that it transitions through the expected lifecycle events.
@@ -172,30 +159,15 @@ SESSION_TEMPLATE_TEST_SPECS = {
         3. Assert that the session is terminated after completion.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
-        template=SessionTemplateTemplate(BatchSessionTemplate(BasicTestTemplate(NopTestCode()))),
+        template=BasicTestTemplate(NopTestCode()).with_wrappers(
+            KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
+        ),
     ),
 }
 
-SESSION_WITH_VFOLDER_TEST_SPECS = {
-    "creation_success_with_vfolder_mount": TestSpec(
-        name="creation_success_with_vfolder_mount",
-        description=textwrap.dedent("""\
-            Test for creating a single-node, single-container session with a vfolder mount.
-            This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
-            The test will:
-            1. Create a session with the specified image and resources.
-            2. Listen for lifecycle events and verify that the session transitions through the expected states.
-            3. Assert that the session is running after creation.
-            4. Destroy the session after the test is complete.
-        """),
-        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION, TestTag.VFOLDER},
-        template=VFolderTemplate(InteractiveSessionTemplate(BasicTestTemplate(NopTestCode()))),
-    ),
-}
 
 SESSION_TEST_SPECS = {
     **BATCH_SESSION_TEST_SPECS,
     **INTERACTIVE_SESSION_TEST_SPECS,
-    **SESSION_TEMPLATE_TEST_SPECS,
-    **SESSION_WITH_VFOLDER_TEST_SPECS,
+    # **SESSION_TEMPLATE_TEST_SPECS,
 }

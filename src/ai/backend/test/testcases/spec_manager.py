@@ -56,16 +56,6 @@ class TestSpecManager:
     def __init__(self, specs: Mapping[str, TestSpec]) -> None:
         self._specs = specs
 
-    @classmethod
-    def default(cls) -> Self:
-        # TODO: Resolve cyclic import
-        from ai.backend.test.testcases.session.testspecs import SESSION_TEST_SPECS
-
-        specs = {
-            **SESSION_TEST_SPECS,
-        }
-        return cls(specs)
-
     def all_specs(self) -> set[TestSpec]:
         """
         Get all test specifications.
