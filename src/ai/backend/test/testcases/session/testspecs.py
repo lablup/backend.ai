@@ -19,11 +19,8 @@ SESSION_TEST_SPECS = {
         name="session_status_history",
         description=textwrap.dedent("""
             Tests retrieval of session status history
-            Steps:
-              1. Create a session
-              2. Get the status history of the session.
-              3. Clean up the session.
-        """).strip(),
+            Validate that the status history is not empty and contains valid statuses
+        """),
         tags={TestTag.SESSION, TestTag.MANAGER},
         template=BasicTestTemplate(
             testcode=StatusHistoryRetriever(),
