@@ -102,7 +102,7 @@ class WrapperTestTemplate(TestTemplate, ABC):
         """
         Class method to wrap a test template with this wrapper template.
         :param template: The test template to wrap.
-        :return: An instance of the wrapper template.
+        :return: An instance of the test template.
         """
         return cls(template)
 
