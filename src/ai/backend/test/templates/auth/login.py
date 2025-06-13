@@ -21,7 +21,7 @@ class LoginTemplate(WrapperTestTemplate):
 
     @override
     @actxmgr
-    async def context(self) -> AsyncIterator[None]:
+    async def _context(self) -> AsyncIterator[None]:
         test_id = TestIDContext.get_current()
         test_id_str = str(test_id)
         credential_ctx = LoginCredentialContext.get_current()

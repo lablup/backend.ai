@@ -9,9 +9,8 @@ AUTH_TEST_SPECS = {
         tags={TestTag.WEBSERVER, TestTag.AUTH},
         template=BasicTestTemplate(
             testcode=NopTestCode(),
-            wrapper_templates=[
-                LoginTemplate,
-            ],
+        ).with_wrappers(
+            LoginTemplate,
         ),
     )
 }

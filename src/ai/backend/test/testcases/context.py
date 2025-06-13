@@ -22,11 +22,11 @@ class BaseTestContext(Generic[T]):
         if cls._ctxvar is not None:
             raise RuntimeError(f"{cls.__name__} is already initialized")
         cls._ctxvar = ContextVar[T](f"{cls.__name__}_ctxvar", default=None)
-        cls._used[cls.get_name()] = cls
+        cls._used[cls.name()] = cls
 
     @classmethod
     @abstractmethod
-    def get_name(cls) -> str:
+    def name(cls) -> str:
         """
         Get the name of the context
         :return: name of the context
@@ -54,7 +54,7 @@ class BaseTestContext(Generic[T]):
             raise RuntimeError("Don't use BaseTestContext directly, subclass it instead")
         res = cls._ctxvar.get()
         if res is None:
-            raise RuntimeError(f'No value is set in "{cls.get_name()}" context')
+            raise RuntimeError(f'No value is set in "{cls.name()}" context')
         return res
 
     @classmethod

@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from contextlib import AsyncExitStack
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, Protocol, final
 
@@ -7,34 +6,13 @@ from ai.backend.test.tester.exporter import TestExporter
 
 
 class WrapperTestTemplateProtocol(Protocol):
-    def __call__(
-        self, template: "TestTemplate", wrapper_templates: list["WrapperTestTemplateProtocol"] = []
-    ) -> "WrapperTestTemplate": ...
-
-
-@actxmgr
-async def _apply_wrapper_templates(
-    wrapper_templates: list["WrapperTestTemplateProtocol"], exporter: TestExporter
-) -> AsyncIterator[None]:
-    async with AsyncExitStack() as stack:
-        try:
-            stage_name = "undefined"
-            for w in wrapper_templates:
-                if isinstance(w, WrapperTestTemplate):
-                    wrapper = w
-                else:
-                    empty = BasicTestTemplate(NopTestCode())
-                    # TODO: Improve this type hinting
-                    wrapper = w(empty, [])  # type: ignore
-
-                stage_name = wrapper.name
-                await stack.enter_async_context(wrapper.context())
-                await wrapper._template.run_test(exporter)
-                await exporter.export_stage_done(stage_name)
-            yield
-        except BaseException as e:
-            await exporter.export_stage_exception(stage_name, e)
-            raise
+    @classmethod
+    def wrap(cls, template: "TestTemplate") -> "TestTemplate":
+        """
+        Class method to wrap a test template with a wrapper template.
+        :param template: The test template to wrap.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
 
 
 class TestCode(ABC):
@@ -57,6 +35,18 @@ class NopTestCode(TestCode):
 
 
 class TestTemplate(ABC):
+    @final
+    def with_wrappers(self, *wrappers: WrapperTestTemplateProtocol) -> "TestTemplate":
+        """
+        Create a wrapper test template with the given template and optional wrapper templates.
+        This method is syntactic sugar for wrapping the current template
+        with the provided wrapper templates in reverse order.
+        """
+        current = self
+        for wrapper in wrappers[::-1]:
+            current = wrapper.wrap(current)
+        return current
+
     @property
     @abstractmethod
     def name(self) -> str:
@@ -78,81 +68,76 @@ class TestTemplate(ABC):
 @final
 class BasicTestTemplate(TestTemplate):
     _testcode: TestCode
-    _wrapper_templates: list["WrapperTestTemplateProtocol"]
 
-    def __init__(
-        self, testcode: TestCode, wrapper_templates: list["WrapperTestTemplateProtocol"] = []
-    ) -> None:
+    def __init__(self, testcode: TestCode) -> None:
         """
         Initialize the basic template with a test code function.
 
         :param testcode: The test code function to run.
-        :param wrapper_templates: Optional list of wrapper templates to apply before running the test code.
         """
         self._testcode = testcode
-        self._wrapper_templates = wrapper_templates
 
     @property
     def name(self) -> str:
         return "basic"
 
     async def run_test(self, exporter: TestExporter) -> None:
-        async with _apply_wrapper_templates(self._wrapper_templates, exporter):
-            await self._testcode.test()
+        await self._testcode.test()
 
 
 class WrapperTestTemplate(TestTemplate, ABC):
     _template: TestTemplate
-    _wrapper_templates: list["WrapperTestTemplateProtocol"]
 
-    def __init__(
-        self, template: TestTemplate, wrapper_templates: list["WrapperTestTemplateProtocol"] = []
-    ) -> None:
+    def __init__(self, template: TestTemplate) -> None:
         """
         Initialize the wrapper template with a test template.
 
         :param template: The test template to wrap.
-        :param wrapper_templates: Optional list of additional wrapper templates to apply.
         """
         self._template = template
-        self._wrapper_templates = wrapper_templates
+
+    @final
+    @classmethod
+    def wrap(cls, template: "TestTemplate") -> "TestTemplate":
+        """
+        Class method to wrap a test template with this wrapper template.
+        :param template: The test template to wrap.
+        :return: An instance of the wrapper template.
+        """
+        return cls(template)
 
     @abstractmethod
-    @actxmgr  # type: ignore
-    async def context(self) -> AsyncIterator[None]:
+    @actxmgr
+    async def _context(self) -> AsyncIterator[None]:
         """
         Async Context manager for setup and cleanup operations.
         This method should be overridden by subclasses to implement specific setup and cleanup logic.
         """
         raise NotImplementedError("Subclasses must implement this method.")
-        yield  # Not used, but required for type checking
+        yield  # Not used, but required for type checking (mypy issue)
 
     @final
     async def run_test(self, exporter: TestExporter) -> None:
-        async with _apply_wrapper_templates(self._wrapper_templates, exporter):
-            try:
-                async with self.context():  # type: ignore
-                    await self._template.run_test(exporter)
-                    await exporter.export_stage_done(self.name)
-            except BaseException as e:
-                await exporter.export_stage_exception(self.name, e)
-                raise
+        try:
+            async with self._context():
+                await exporter.export_stage_done(self.name)
+                await self._template.run_test(exporter)
+        except BaseException as e:
+            await exporter.export_stage_exception(self.name, e)
+            raise
 
 
 class SequenceTestTemplate(TestTemplate, ABC):
     def __init__(
         self,
         templates: list[TestTemplate],
-        wrapper_templates: list[WrapperTestTemplateProtocol] = [],
     ) -> None:
         """
         Initialize the sequence template with a list of test templates.
 
         :param templates: The list of test templates to run in sequence.
-        :param wrapper_templates: Optional list of wrapper templates to apply before running the test code.
         """
         self._templates = templates
-        self._wrapper_templates = wrapper_templates
 
     @final
     async def run_test(self, exporter: TestExporter) -> None:
@@ -160,16 +145,10 @@ class SequenceTestTemplate(TestTemplate, ABC):
         Run the test case by executing each template in sequence.
         :param exporter: The exporter to use for exporting test results.
         """
-        async with _apply_wrapper_templates(self._wrapper_templates, exporter):
-            try:
-                for template in self._templates:
-                    try:
-                        await template.run_test(exporter)
-                        await exporter.export_stage_done(self.name)
-                    except BaseException as e:
-                        await exporter.export_stage_exception(self.name, e)
-                        raise
-                await exporter.export_stage_done(self.name)
-            except BaseException as e:
-                await exporter.export_stage_exception(self.name, e)
-                raise
+        try:
+            for template in self._templates:
+                await template.run_test(exporter)
+            await exporter.export_stage_done(self.name)
+        except BaseException as e:
+            await exporter.export_stage_exception(self.name, e)
+            raise

@@ -10,9 +10,6 @@ SESSION_TEST_SPECS = {
         tags={TestTag.SESSION, TestTag.MANAGER},
         template=BasicTestTemplate(
             testcode=TestSessionCreation(),
-            wrapper_templates=[
-                KeypairAuthTemplate,
-            ],
-        ),
+        ).with_wrappers(KeypairAuthTemplate),
     ),
 }

@@ -17,7 +17,7 @@ class KeypairAuthTemplate(WrapperTestTemplate):
 
     @override
     @actxmgr
-    async def context(self) -> AsyncIterator[None]:
+    async def _context(self) -> AsyncIterator[None]:
         keypair_ctx = KeypairContext.get_current()
         endpoint_ctx = EndpointContext.get_current()
         api_config = APIConfig(
