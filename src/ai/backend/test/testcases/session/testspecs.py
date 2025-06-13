@@ -147,6 +147,22 @@ SESSION_TEMPLATE_TEST_SPECS = {
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
         ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIGS: [
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
     ),
     "execution_batch_session_success_from_template": TestSpec(
         name="execution_batch_session_success_from_template",
@@ -162,6 +178,22 @@ SESSION_TEMPLATE_TEST_SPECS = {
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
         ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIGS: [
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterConfigArgs(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
     ),
 }
 
@@ -169,5 +201,5 @@ SESSION_TEMPLATE_TEST_SPECS = {
 SESSION_TEST_SPECS = {
     **BATCH_SESSION_TEST_SPECS,
     **INTERACTIVE_SESSION_TEST_SPECS,
-    # **SESSION_TEMPLATE_TEST_SPECS,
+    **SESSION_TEMPLATE_TEST_SPECS,
 }

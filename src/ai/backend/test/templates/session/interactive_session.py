@@ -66,8 +66,8 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
                 template,
                 type_="interactive",
                 name=session_name,
-                cluster_mode=cluster_configs.cluster_mode,
-                cluster_size=cluster_configs.cluster_size,
+                cluster_mode=creation_args.cluster_mode or cluster_configs.cluster_mode,
+                cluster_size=creation_args.cluster_size or cluster_configs.cluster_size,
             )
         else:
             created_session = await client_session.ComputeSession.get_or_create(
@@ -75,8 +75,8 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
                 resources=creation_args.resources,
                 type_="interactive",
                 name=session_name,
-                cluster_mode=cluster_configs.cluster_mode,
-                cluster_size=cluster_configs.cluster_size,
+                cluster_mode=creation_args.cluster_mode or cluster_configs.cluster_mode,
+                cluster_size=creation_args.cluster_size or cluster_configs.cluster_size,
             )
 
         assert created_session.created, "Session should be created successfully"
