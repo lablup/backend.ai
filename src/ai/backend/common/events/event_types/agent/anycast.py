@@ -168,7 +168,7 @@ class ContainerStatusData:
     kernel_id: KernelId
     status: ContainerStatus
 
-    def to_json(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "container_id": str(self.container_id),
             "kernel_id": str(self.kernel_id),
@@ -176,7 +176,7 @@ class ContainerStatusData:
         }
 
     @classmethod
-    def from_json(cls, data: dict[str, str]) -> Self:
+    def from_dict(cls, data: dict[str, str]) -> Self:
         return cls(
             ContainerId(data["container_id"]),
             KernelId(uuid.UUID(data["kernel_id"])),
@@ -193,7 +193,7 @@ class AgentStatusHeartbeat(AgentOperationEvent):
     def serialize(self) -> tuple:
         return (
             self.agent_id,
-            tuple(cont.to_json() for cont in self.containers),
+            tuple(cont.to_dict() for cont in self.containers),
         )
 
     @classmethod
@@ -201,7 +201,7 @@ class AgentStatusHeartbeat(AgentOperationEvent):
     def deserialize(cls, value: tuple) -> Self:
         return cls(
             AgentId(value[0]),
-            [ContainerStatusData.from_json(val) for val in value[1]],
+            [ContainerStatusData.from_dict(val) for val in value[1]],
         )
 
     @classmethod

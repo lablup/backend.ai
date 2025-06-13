@@ -100,7 +100,7 @@ class TaskRunner(Generic[TResource]):
     _interval: float
     _grace_period: float
     _timeout: Optional[float]
-    _resource: Optional[TResource] = None
+    _resource: Optional[TResource]
 
     _stopped: bool
     _runner_task: Optional[asyncio.Task]
@@ -150,7 +150,7 @@ class TaskRunner(Generic[TResource]):
 
     async def run(self) -> None:
         self._runner_task = asyncio.create_task(self._spawned())
-        # Sleep here to ensure the task is scheduled
+        # Sleep here to start running the task
         await asyncio.sleep(0)
 
     async def _stop_task(self) -> None:
