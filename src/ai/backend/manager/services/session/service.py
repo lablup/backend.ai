@@ -1442,7 +1442,6 @@ class SessionService:
                 new_name,
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.NONE,
-                allow_stale=True,
             )
             if session_with_new_name is not None:
                 raise InvalidAPIParameters(f"Session name of '{new_name}' already exists")
