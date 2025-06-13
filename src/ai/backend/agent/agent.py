@@ -860,13 +860,13 @@ class AbstractAgent(
                 )
             )
 
-        _container_observer_task = HeartbeatTask(
+        container_observer_task = HeartbeatTask(
             self.id,
             self.enumerate_containers,
             self.event_producer,
         )
         self._container_observer = TaskRunner(
-            TaskRunnerArgs(task=_container_observer_task, interval=10, continue_on_error=True)
+            TaskRunnerArgs(task=container_observer_task, interval=60.0)
         )
         await self._container_observer.run()
 

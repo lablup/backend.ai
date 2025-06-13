@@ -2,11 +2,15 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Final, Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+DEFAULT_INTERVAL: Final[float] = 10.0
+DEFAULT_GRACE_PERIOD: Final[float] = 0.0
 
 
 class AbstractTask(ABC):
@@ -19,7 +23,7 @@ class AbstractTask(ABC):
     @abstractmethod
     def timeout(cls) -> Optional[float]:
         """
-        Returns the timeout for the task
+        Returns the timeout for the task in seconds.
         """
         raise NotImplementedError
 
@@ -31,11 +35,8 @@ class AbstractTask(ABC):
 @dataclass
 class TaskRunnerArgs:
     task: AbstractTask
-    interval: float
-    grace_period: float = 0
-    timeout: Optional[float] = None
-
-    continue_on_error: bool = False
+    interval: float = DEFAULT_INTERVAL
+    grace_period: float = DEFAULT_GRACE_PERIOD
 
 
 class TaskRunner:
@@ -46,15 +47,10 @@ class TaskRunner:
     ----------
     task : AbstractTask
         An instance of a class that implements AbstractTask.
-    interval : float
+    interval : float, default=10.0
         The interval in seconds between task runs.
-    grace_period : float
+    grace_period : float, default=0.0
         The initial delay before the first run.
-    timeout : float, optional
-        timeout for the task execution. task.timeout() will override this value if it is set.
-    continue_on_error : bool
-        If True, the runner will continue running
-        even if the task raises an error except asyncio.CancelledError and asyncio.TimeoutError.
 
     Examples
     --------
@@ -71,7 +67,6 @@ class TaskRunner:
     _interval: float
     _grace_period: float
     _timeout: Optional[float]
-    _continue_on_error: bool
 
     _stopped: bool
     _runner_task: Optional[asyncio.Task]
@@ -80,8 +75,7 @@ class TaskRunner:
         self._task = args.task
         self._interval = args.interval
         self._grace_period = args.grace_period
-        self._timeout = args.task.timeout() if args.task.timeout() is not None else args.timeout
-        self._continue_on_error = args.continue_on_error
+        self._timeout = args.task.timeout()
 
         self._stopped = False
         self._runner_task: Optional[asyncio.Task] = None
@@ -107,8 +101,6 @@ class TaskRunner:
                     self._task.name(),
                     e,
                 )
-                if not self._continue_on_error:
-                    raise
             finally:
                 await asyncio.sleep(0)
             if self._stopped:

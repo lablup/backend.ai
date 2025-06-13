@@ -120,4 +120,5 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentStatusHeartbeat,
     ) -> None:
+        # TODO: Implement handling of agent container heartbeat events.
         pass
