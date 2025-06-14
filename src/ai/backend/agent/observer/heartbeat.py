@@ -33,7 +33,7 @@ class HeartbeatObserver(AbstractObserver):
 
     @override
     async def observe(self) -> None:
-        containers = await self._agent.enumerate_containers(frozenset([ContainerStatus.RUNNING]))
+        containers = await self._agent.enumerate_containers(ContainerStatus.active_set())
         container_data = [
             ContainerStatusData(
                 container.id,

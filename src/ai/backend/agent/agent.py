@@ -202,6 +202,7 @@ from .kernel import (
     AbstractKernel,
     match_distro_data,
 )
+from .observer.heartbeat import HeartbeatObserver
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -212,7 +213,6 @@ from .resources import (
     known_slot_types,
 )
 from .stats import StatContext, StatModes
-from .task_runner.heartbeat import HeartbeatObserver
 from .types import (
     Container,
     ContainerLifecycleEvent,

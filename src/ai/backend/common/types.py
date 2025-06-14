@@ -323,6 +323,28 @@ class ContainerStatus(enum.StrEnum):
     DEAD = "dead"
     REMOVING = "removing"
 
+    @classmethod
+    def active_set(cls) -> frozenset[ContainerStatus]:
+        """
+        Returns a set of active container statuses.
+        """
+        return frozenset([
+            cls.RUNNING,
+            cls.RESTARTING,
+            cls.PAUSED,
+        ])
+
+    @classmethod
+    def dead_set(cls) -> frozenset[ContainerStatus]:
+        """
+        Returns a set of dead container statuses.
+        """
+        return frozenset([
+            cls.EXITED,
+            cls.DEAD,
+            cls.REMOVING,
+        ])
+
 
 class AbstractPermission(enum.StrEnum):
     """
