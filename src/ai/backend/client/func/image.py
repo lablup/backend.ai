@@ -158,6 +158,33 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
+    async def purge_image_by_id(
+        cls,
+        image_id: str,
+        remove_from_registry: bool = False,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ):
+        q = _d("""
+            mutation($image_id: String!, $options: PurgeImageOptions) {
+                purge_image_by_id(image_id: $image_id, options: $options) {
+                    image {
+                        $fields
+                    }
+                }
+            }
+        """)
+        variables = {
+            "image_id": image_id,
+            "options": {
+                "remove_from_registry": remove_from_registry,
+            },
+        }
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        data = await api_session.get().Admin._query(q, variables)
+        return data["purge_image_by_id"]
+
+    @api_function
+    @classmethod
     async def untag_image_from_registry(cls, id: str):
         q = _d("""
             mutation($id: String!) {
