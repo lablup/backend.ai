@@ -10,7 +10,7 @@ import click
 
 from ai.backend.test.testcases.spec_manager import TestSpecManager
 from ai.backend.test.testcases.testspecs import ROOT_TEST_SPECS
-from ai.backend.test.tester.exporter import PrintExporter
+from ai.backend.test.tester.exporter import DefaultExporter
 from ai.backend.test.tester.tester import Tester
 
 from .context import CLIContext
@@ -149,7 +149,7 @@ def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
     config_file_path = Path(config_path)
     spec_manager = _spec_manager()
     tester = Tester(
-        spec_manager=spec_manager, exporter_type=PrintExporter, config_file_path=config_file_path
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
     )
     asyncio.run(tester.run_by_name(name))
 
@@ -168,7 +168,7 @@ def run_all(cli_ctx: CLIContext, config_path: str) -> None:
     spec_manager = _spec_manager()
     config_file_path = Path(config_path)
     tester = Tester(
-        spec_manager=spec_manager, exporter_type=PrintExporter, config_file_path=config_file_path
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
     )
     asyncio.run(tester.run_all())
 
