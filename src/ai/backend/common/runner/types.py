@@ -131,3 +131,6 @@ class Runner:
         This will stop all observers and cleanup all resources.
         """
         self._closed_event.set()
+        # Give the event loop a chance to schedule the _run() task
+        # that's waiting on the closed_event
+        await asyncio.sleep(0)
