@@ -43,6 +43,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     ImageConfig,
@@ -68,7 +69,7 @@ from ..agent import (
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, KernelOwnershipData, MountInfo, Port
+from ..types import Container, KernelOwnershipData, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,

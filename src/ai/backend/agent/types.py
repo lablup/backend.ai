@@ -9,8 +9,16 @@ import attrs
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
+from ai.backend.common.docker import LabelName
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
-from ai.backend.common.types import AgentId, ContainerId, KernelId, MountTypes, SessionId
+from ai.backend.common.types import (
+    AgentId,
+    ContainerId,
+    ContainerStatus,
+    KernelId,
+    MountTypes,
+    SessionId,
+)
 
 
 class AgentBackend(enum.StrEnum):
@@ -47,15 +55,6 @@ class AgentEventData:
     data: dict[str, Any]
 
 
-class ContainerStatus(enum.StrEnum):
-    RUNNING = "running"
-    RESTARTING = "restarting"
-    PAUSED = "paused"
-    EXITED = "exited"
-    DEAD = "dead"
-    REMOVING = "removing"
-
-
 @attrs.define(auto_attribs=True, slots=True)
 class Container:
     id: ContainerId
@@ -64,6 +63,16 @@ class Container:
     labels: Mapping[str, str]
     ports: Sequence[Port]
     backend_obj: Any  # used to keep the backend-specific data
+
+    @property
+    def kernel_id(self) -> KernelId:
+        raw_kernel_id = self.labels[LabelName.KERNEL_ID]
+        return KernelId(uuid.UUID(raw_kernel_id))
+
+    @property
+    def session_id(self) -> Optional[SessionId]:
+        raw_session_id = self.labels[LabelName.SESSION_ID]
+        return SessionId(uuid.UUID(raw_session_id))
 
 
 class KernelLifecycleStatus(enum.StrEnum):

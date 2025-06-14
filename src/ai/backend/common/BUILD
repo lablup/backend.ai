@@ -46,6 +46,9 @@ python_distribution(
         "src/ai/backend/common/service_discovery/etcd_discovery:src",
         "src/ai/backend/common/service_discovery/redis_discovery:src",
         "src/ai/backend/common/stage:src",
+        "src/ai/backend/common/observer:src",
+        "src/ai/backend/common/resource:src",
+        "src/ai/backend/common/runner:src",
         "src/ai/backend/common/web/session:src",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
