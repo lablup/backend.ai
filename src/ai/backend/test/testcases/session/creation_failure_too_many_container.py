@@ -1,12 +1,10 @@
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import keypair_fields, keypair_resource_policy_fields
 from ai.backend.common.types import ClusterMode
+from ai.backend.test.contexts.auth import KeypairConfigContext
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.config import (
-    ImageConfigContext,
-    KeypairConfigContext,
-    SessionConfigContext,
-)
+from ai.backend.test.contexts.image import ImageConfigContext
+from ai.backend.test.contexts.session import SessionConfigContext
 from ai.backend.test.templates.template import TestCode
 
 

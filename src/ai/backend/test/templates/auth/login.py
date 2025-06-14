@@ -6,8 +6,8 @@ from typing import AsyncIterator, Optional, override
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
+from ai.backend.test.contexts.auth import EndpointConfigContext, LoginCredentialConfigContext
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.config import EndpointConfigContext, LoginCredentialConfigContext
 from ai.backend.test.contexts.tester import TestIDContext
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,

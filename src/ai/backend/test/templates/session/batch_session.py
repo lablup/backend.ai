@@ -5,13 +5,15 @@ from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.config import (
+from ai.backend.test.contexts.image import ImageConfigContext
+from ai.backend.test.contexts.session import (
     BatchSessionConfigContext,
     ClusterConfigContext,
     CreatedSessionIDContext,
     CreatedSessionTemplateIDContext,
-    ImageConfigContext,
     SessionConfigContext,
+)
+from ai.backend.test.contexts.sse import (
     SSEConfigContext,
 )
 from ai.backend.test.contexts.tester import TestIDContext

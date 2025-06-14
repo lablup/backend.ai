@@ -3,9 +3,9 @@ import asyncio
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.config import (
-    ImageConfigContext,
-    SessionConfigContext,
+from ai.backend.test.contexts.image import ImageConfigContext
+from ai.backend.test.contexts.session import SessionConfigContext
+from ai.backend.test.contexts.sse import (
     SSEConfigContext,
 )
 from ai.backend.test.templates.template import TestCode
