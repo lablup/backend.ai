@@ -1,7 +1,6 @@
 import textwrap
 
 from ai.backend.common.types import ClusterMode
-from ai.backend.test.contexts.config import ClusterConfig
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
@@ -17,6 +16,7 @@ from ai.backend.test.testcases.session.execution_failure_wrong_command import (
     BatchSessionCreationFailureWrongCommand,
 )
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
+from ai.backend.test.tester.config import ClusterConfig
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 

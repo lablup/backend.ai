@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.config import (
+from ai.backend.test.contexts.session import (
     CreatedSessionTemplateIDContext,
     SessionTemplateConfigContext,
 )

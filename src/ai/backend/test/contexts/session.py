@@ -5,32 +5,9 @@ from ai.backend.test.contexts.context import BaseTestContext, ContextName
 from ai.backend.test.tester.config import (
     BatchSessionConfig,
     ClusterConfig,
-    EndpointConfig,
-    ImageConfig,
-    KeyPairConfig,
-    LoginCredentialConfig,
     SessionConfig,
     SessionTemplateConfig,
-    SSEConfig,
 )
-
-
-class KeypairConfigContext(BaseTestContext[KeyPairConfig]):
-    @classmethod
-    def name(cls) -> ContextName:
-        return ContextName.KEYPAIR
-
-
-class LoginCredentialConfigContext(BaseTestContext[LoginCredentialConfig]):
-    @classmethod
-    def name(cls) -> ContextName:
-        return ContextName.LOGIN_CREDENTIAL
-
-
-class EndpointConfigContext(BaseTestContext[EndpointConfig]):
-    @classmethod
-    def name(cls) -> ContextName:
-        return ContextName.ENDPOINT
 
 
 class SessionConfigContext(BaseTestContext[SessionConfig]):
@@ -38,20 +15,6 @@ class SessionConfigContext(BaseTestContext[SessionConfig]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.SESSION
-
-
-class SSEConfigContext(BaseTestContext[SSEConfig]):
-    @override
-    @classmethod
-    def name(cls) -> ContextName:
-        return ContextName.SSE
-
-
-class ImageConfigContext(BaseTestContext[ImageConfig]):
-    @override
-    @classmethod
-    def name(cls) -> ContextName:
-        return ContextName.IMAGE
 
 
 class BatchSessionConfigContext(BaseTestContext[BatchSessionConfig]):
@@ -76,7 +39,7 @@ class SessionTemplateConfigContext(BaseTestContext[SessionTemplateConfig]):
 
 
 # TODO: Move these contexts to the other file
-class CreatedSessionTemplateIDContext(BaseTestContext[UUID]):
+class CreatedSessionTemplateIDContext(BaseTestContext[str]):
     @override
     @classmethod
     def name(cls) -> ContextName:
