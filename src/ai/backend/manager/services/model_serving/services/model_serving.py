@@ -365,7 +365,10 @@ class ModelServingService:
                 query = (
                     sa.update(EndpointRow)
                     .where(EndpointRow.id == service_id)
-                    .values({"lifecycle_stage": EndpointLifecycle.DESTROYED})
+                    .values({
+                        "lifecycle_stage": EndpointLifecycle.DESTROYED,
+                        "destroyed_at": sa.func.now(),
+                    })
                 )
             else:
                 query = (
