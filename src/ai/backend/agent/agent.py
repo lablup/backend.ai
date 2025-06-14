@@ -64,6 +64,7 @@ from tenacity import (
 )
 from trafaret import DataError
 
+from ai.backend.agent.metrics.metric import SyncContainerLifecycleObserver
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
@@ -750,6 +751,7 @@ class AbstractAgent(
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
+        self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
 
     async def __ainit__(self) -> None:
         """
@@ -1345,6 +1347,7 @@ class AbstractAgent(
         ) as tg:
             while True:
                 ev = await self.container_lifecycle_queue.get()
+                log.info("process_lifecycle_events(): received lifecycle event: {!r}", ev)
                 if isinstance(ev, Sentinel):
                     await self.save_last_registry(force=True)
                     return
@@ -1480,6 +1483,10 @@ class AbstractAgent(
         for cases when we miss the container lifecycle events from the underlying implementation APIs
         due to the agent restarts or crashes.
         """
+        self._sync_container_lifecycle_observer.observe_container_lifecycle_triggered(
+            agent_id=self.id
+        )
+
         known_kernels: dict[KernelId, ContainerId | None] = {}
         alive_kernels: dict[KernelId, ContainerId] = {}
         kernel_session_map: dict[KernelId, SessionId] = {}
@@ -1591,13 +1598,25 @@ class AbstractAgent(
 
                     # Set container count
                     await self.set_container_count(len(own_kernels.keys()))
-        except asyncio.CancelledError:
-            pass
-        except asyncio.TimeoutError:
+        except asyncio.CancelledError as e:
+            self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
+                agent_id=self.id, exception=e
+            )
+        except asyncio.TimeoutError as e:
             log.warning("sync_container_lifecycles() timeout, continuing")
+            self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
+                agent_id=self.id, exception=e
+            )
         except Exception as e:
             log.exception(f"sync_container_lifecycles() failure, continuing (detail: {repr(e)})")
+            self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
+                agent_id=self.id, exception=e
+            )
             await self.produce_error_event()
+        else:
+            self._sync_container_lifecycle_observer.observe_container_lifecycle_success(
+                agent_id=self.id
+            )
 
     async def set_container_count(self, container_count: int) -> None:
         await redis_helper.execute(
