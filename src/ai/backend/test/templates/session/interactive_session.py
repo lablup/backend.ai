@@ -7,7 +7,12 @@ from ai.backend.client.session import AsyncSession
 from ai.backend.common.json import load_json
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageConfigContext
-from ai.backend.test.contexts.session import ClusterConfigContext, CreatedSessionIDContext, CreatedSessionTemplateIDContext, SessionConfigContext
+from ai.backend.test.contexts.session import (
+    ClusterConfigContext,
+    CreatedSessionIDContext,
+    CreatedSessionTemplateIDContext,
+    SessionConfigContext,
+)
 from ai.backend.test.contexts.sse import (
     SSEConfigContext,
 )
