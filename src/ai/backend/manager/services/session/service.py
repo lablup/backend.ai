@@ -1317,6 +1317,7 @@ class SessionService:
         resp["tag"] = sess.tag
 
         # Resource occupation
+        resp["kernelId"] = str(sess.main_kernel.id)
         resp["containerId"] = str(sess.main_kernel.container_id)
         resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
         resp["occupyingSlots"] = str(sess.occupying_slots)
