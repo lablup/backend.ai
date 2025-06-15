@@ -16,7 +16,7 @@ from ai.backend.test.contexts.session import (
 from ai.backend.test.contexts.sse import (
     SSEConfigContext,
 )
-from ai.backend.test.contexts.tester import TestIDContext
+from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -138,7 +138,8 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
     @override
     @actxmgr
     async def _context(self) -> AsyncIterator[None]:
-        test_id = TestIDContext.current()
+        spec_meta = TestSpecMetaContext.current()
+        test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
         session_name = f"test_session_{str(test_id)}"
         try:

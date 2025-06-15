@@ -25,6 +25,7 @@ class ContextName(enum.StrEnum):
     BATCH_SESSION = "batch_session"
     CLUSTER_CONFIG = "cluster_config"
     SESSION_TEMPLATE = "session_template"
+    TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
 
     CREATED_SESSION_ID = "created_session_id"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
