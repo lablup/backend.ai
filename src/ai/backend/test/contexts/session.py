@@ -6,7 +6,6 @@ from ai.backend.test.tester.config import (
     BatchSessionConfig,
     ClusterConfig,
     SessionConfig,
-    SessionTemplateConfig,
 )
 
 
@@ -29,13 +28,6 @@ class ClusterConfigContext(BaseTestContext[ClusterConfig]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.CLUSTER_CONFIG
-
-
-class SessionTemplateConfigContext(BaseTestContext[SessionTemplateConfig]):
-    @override
-    @classmethod
-    def name(cls) -> ContextName:
-        return ContextName.SESSION_TEMPLATE
 
 
 # TODO: Move these contexts to the other file

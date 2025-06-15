@@ -95,13 +95,6 @@ class SessionConfig(BaseConfigModel):
     )
 
 
-class SessionTemplateConfig(BaseConfigModel):
-    content: str = Field(
-        description="The content of the session template.",
-        # examples=[""],  # Skip template since it's too long
-    )
-
-
 class TestContextInjectionModel(BaseConfigModel):
     endpoint: Optional[EndpointConfig] = Field(
         default=None,
@@ -137,11 +130,6 @@ class TestContextInjectionModel(BaseConfigModel):
     session: Optional[SessionConfig] = Field(
         default=None,
         description="The session configuration for the test context.",
-    )
-    session_template: Optional[SessionTemplateConfig] = Field(
-        default=None,
-        description="The session template for the test context.",
-        alias="session-template",
     )
 
 
