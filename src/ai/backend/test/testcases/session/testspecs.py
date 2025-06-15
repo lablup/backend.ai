@@ -176,7 +176,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
+            KeypairAuthTemplate, SessionTemplateTemplate, BatchSessionTemplate
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
