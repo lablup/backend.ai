@@ -5,12 +5,11 @@ from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.image import ImageConfigContext
 from ai.backend.test.contexts.session import (
     BatchSessionConfigContext,
     ClusterConfigContext,
     CreatedSessionIDContext,
-    SessionConfigContext,
+    CreatedSessionTemplateIDContext,
 )
 from ai.backend.test.contexts.sse import (
     SSEConfigContext,
@@ -21,21 +20,19 @@ from ai.backend.test.templates.template import (
 )
 
 
-class BatchSessionTemplate(WrapperTestTemplate):
+class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
     @property
     def name(self) -> str:
-        return "batch_session"
+        return "batch_session_from_template"
 
     async def _verify_session_creation(
         self,
         client_session: AsyncSession,
         session_name: str,
     ) -> UUID:
-        image_config = ImageConfigContext.current()
         cluster_configs = ClusterConfigContext.current()
         sse_config = SSEConfigContext.current()
         batch_session_config = BatchSessionConfigContext.current()
-        session_config = SessionConfigContext.current()
 
         EXPECTED_EVENTS = {
             "session_enqueued",
@@ -68,10 +65,9 @@ class BatchSessionTemplate(WrapperTestTemplate):
             asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
         )
 
-        created_session = await client_session.ComputeSession.get_or_create(
-            image_config.name,
-            architecture=image_config.architecture,
-            resources=session_config.resources,
+        template = CreatedSessionTemplateIDContext.current()
+        created_session = await client_session.ComputeSession.create_from_template(
+            template,
             type_="batch",
             startup_command=batch_session_config.startup_command,
             name=session_name,

@@ -10,7 +10,6 @@ from ai.backend.test.contexts.image import ImageConfigContext
 from ai.backend.test.contexts.session import (
     ClusterConfigContext,
     CreatedSessionIDContext,
-    CreatedSessionTemplateIDContext,
     SessionConfigContext,
 )
 from ai.backend.test.contexts.sse import (
@@ -60,23 +59,14 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
             asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
         )
 
-        if template := CreatedSessionTemplateIDContext.current_or_none():
-            created_session = await client_session.ComputeSession.create_from_template(
-                template,
-                type_="interactive",
-                name=session_name,
-                cluster_mode=cluster_configs.cluster_mode,
-                cluster_size=cluster_configs.cluster_size,
-            )
-        else:
-            created_session = await client_session.ComputeSession.get_or_create(
-                image_config.name,
-                resources=session_config.resources,
-                type_="interactive",
-                name=session_name,
-                cluster_mode=cluster_configs.cluster_mode,
-                cluster_size=cluster_configs.cluster_size,
-            )
+        created_session = await client_session.ComputeSession.get_or_create(
+            image_config.name,
+            resources=session_config.resources,
+            type_="interactive",
+            name=session_name,
+            cluster_mode=cluster_configs.cluster_mode,
+            cluster_size=cluster_configs.cluster_size,
+        )
 
         assert created_session.created, "Session should be created successfully"
         assert created_session.name == session_name, "Session name should match the provided name"

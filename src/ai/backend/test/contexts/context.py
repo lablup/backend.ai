@@ -83,19 +83,6 @@ class BaseTestContext(Generic[T]):
 
     @classmethod
     @final
-    def current_or_none(cls) -> Optional[T]:
-        """
-        Get the current value from context if it exists, otherwise return None.
-        """
-        if cls._ctxvar is None:
-            return None
-        res = cls._ctxvar.get()
-        if res is None:
-            return None
-        return res
-
-    @classmethod
-    @final
     @contextmanager
     def with_current(cls, value: T) -> Iterator[None]:
         """Set the current value in the context"""

@@ -4,7 +4,13 @@ from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
+from ai.backend.test.templates.session.batch_session_from_template import (
+    BatchSessionFromTemplateTemplate,
+)
 from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
+from ai.backend.test.templates.session.interactive_session_from_template import (
+    InteractiveSessionFromTemplateTemplate,
+)
 from ai.backend.test.templates.session.session_template import SessionTemplateTemplate
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
@@ -145,7 +151,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionTemplate
+            KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionFromTemplateTemplate
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
@@ -176,7 +182,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, SessionTemplateTemplate, BatchSessionTemplate
+            KeypairAuthTemplate, SessionTemplateTemplate, BatchSessionFromTemplateTemplate
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [

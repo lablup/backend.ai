@@ -23,9 +23,15 @@ class SessionTemplateTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         image = ImageConfigContext.current()
+
+        if image.name is None:
+            raise ValueError("Image name is not set in ImageConfigContext.")
         image_name = image.name.split(":")[0]
         image_tag = image.name.split(":")[1]
         session_config = SessionConfigContext.current()
+
+        if session_config.resources is None:
+            raise ValueError("SessionConfigContext resources are not set.")
 
         return textwrap.dedent(f"""
             [

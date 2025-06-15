@@ -4,13 +4,12 @@ from typing import AsyncIterator, override
 from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
+from ai.backend.common.json import load_json
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.image import ImageConfigContext
 from ai.backend.test.contexts.session import (
-    BatchSessionConfigContext,
     ClusterConfigContext,
     CreatedSessionIDContext,
-    SessionConfigContext,
+    CreatedSessionTemplateIDContext,
 )
 from ai.backend.test.contexts.sse import (
     SSEConfigContext,
@@ -21,21 +20,18 @@ from ai.backend.test.templates.template import (
 )
 
 
-class BatchSessionTemplate(WrapperTestTemplate):
+class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
     @property
     def name(self) -> str:
-        return "batch_session"
+        return "interactive_session_from_template"
 
     async def _verify_session_creation(
         self,
         client_session: AsyncSession,
         session_name: str,
     ) -> UUID:
-        image_config = ImageConfigContext.current()
         cluster_configs = ClusterConfigContext.current()
         sse_config = SSEConfigContext.current()
-        batch_session_config = BatchSessionConfigContext.current()
-        session_config = SessionConfigContext.current()
 
         EXPECTED_EVENTS = {
             "session_enqueued",
@@ -44,11 +40,6 @@ class BatchSessionTemplate(WrapperTestTemplate):
             "kernel_creating",
             "kernel_started",
             "session_started",
-            "session_terminating",
-            "session_terminated",
-            "kernel_terminating",
-            "kernel_terminated",
-            "session_success",
         }
 
         collected_events = set()
@@ -57,9 +48,6 @@ class BatchSessionTemplate(WrapperTestTemplate):
             async with client_session.ComputeSession(session_name).listen_events() as events:
                 async for event in events:
                     collected_events.add(event.event)
-                    if event.event == "session_failure":
-                        raise RuntimeError(f"BatchSession failed with event: {event.event}")
-
                     if collected_events == EXPECTED_EVENTS:
                         # print("All expected events received.")
                         break
@@ -68,12 +56,10 @@ class BatchSessionTemplate(WrapperTestTemplate):
             asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
         )
 
-        created_session = await client_session.ComputeSession.get_or_create(
-            image_config.name,
-            architecture=image_config.architecture,
-            resources=session_config.resources,
-            type_="batch",
-            startup_command=batch_session_config.startup_command,
+        template = CreatedSessionTemplateIDContext.current()
+        created_session = await client_session.ComputeSession.create_from_template(
+            template,
+            type_="interactive",
             name=session_name,
             cluster_mode=cluster_configs.cluster_mode,
             cluster_size=cluster_configs.cluster_size,
@@ -84,10 +70,53 @@ class BatchSessionTemplate(WrapperTestTemplate):
 
         try:
             await listener_task
-            assert created_session.status in ["TERMINATING", "TERMINATED"], (
-                f"Session should be terminiated or terminiating, actual status: {created_session.status}"
-            )
+            assert created_session.status == "RUNNING", "Session should be running"
+
             return created_session.id
+        except asyncio.TimeoutError as e:
+            raise asyncio.TimeoutError(
+                f"Timed out after {sse_config.timeout}s; events received so far: {collected_events}"
+            ) from e
+
+    async def _verify_session_destruction(
+        self,
+        client_session: AsyncSession,
+        session_name: str,
+    ) -> None:
+        sse_config = SSEConfigContext.current()
+        EXPECTED_EVENTS = {
+            "session_terminating",
+            "session_terminated",
+            "kernel_terminating",
+            "kernel_terminated",
+        }
+
+        collected_events = set()
+
+        async def collect_events():
+            async with client_session.ComputeSession(session_name).listen_events() as events:
+                async for event in events:
+                    data = load_json(event.data)
+                    assert data["reason"] == "user-requested", (
+                        f"Session should be terminated by user request, Actual reason: {data['reason']}"
+                    )
+
+                    collected_events.add(event.event)
+                    if collected_events == EXPECTED_EVENTS:
+                        # print("All expected events received.")
+                        break
+
+        listener_task = asyncio.create_task(
+            asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
+        )
+
+        result = await client_session.ComputeSession(session_name).destroy()
+        assert result["stats"]["status"] == "terminated", (
+            f"Session should be terminated, actual reason: {result['stats']['reason']}"
+        )
+
+        try:
+            await listener_task
         except asyncio.TimeoutError as e:
             raise asyncio.TimeoutError(
                 f"Timed out after {sse_config.timeout}s; events received so far: {collected_events}"
@@ -100,7 +129,10 @@ class BatchSessionTemplate(WrapperTestTemplate):
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
         session_name = f"test_session_{str(test_id)}"
-
-        session_id = await self._verify_session_creation(client_session, session_name)
-        with CreatedSessionIDContext.with_current(session_id):
-            yield
+        try:
+            session_id = await self._verify_session_creation(client_session, session_name)
+            with CreatedSessionIDContext.with_current(session_id):
+                yield
+        finally:
+            await self._verify_session_destruction(client_session, session_name)
+            pass
