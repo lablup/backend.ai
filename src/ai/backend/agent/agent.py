@@ -1347,8 +1347,15 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
-    async def purge_container(self, containers_to_destroy: Sequence[KernelIdContainerPair]) -> None:
+    async def purge_container(
+        self, containers_to_destroy: Sequence[KernelIdContainerPair]
+    ) -> list[KernelIdContainerPair]:
+        """
+        Destroy and clean up containers.
+        Returns a list of (kernel_id, container) pairs that were successfully purged.
+        """
         log.info("purge {0} containers", len(containers_to_destroy))
+        purged: list[KernelIdContainerPair] = []
         for kernel_id, container in containers_to_destroy:
             try:
                 await self.destroy_kernel(kernel_id, container.id)
@@ -1381,6 +1388,8 @@ class AbstractAgent(
                 if host_ports is not None:
                     self._restore_ports(host_ports)
             log.info("purged container (kernel:{}, container:{})", kernel_id, container.id)
+            purged.append((kernel_id, container))
+        return purged
 
     async def remove_orphaned_kernel_registry(
         self, containers_to_destroy: Sequence[KernelIdContainerPair]

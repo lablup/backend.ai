@@ -800,12 +800,13 @@ class AgentRPCServer(aobject):
             if cont.id in container_ids_to_destroy
         ]
         try:
-            await self.agent.purge_container(containers_to_destroy)
+            purged_containers = await self.agent.purge_container(containers_to_destroy)
         except Exception as e:
             log.exception("failed to purge containers: {0}", repr(e))
+            purged_containers = []
 
         try:
-            await self.agent.remove_orphaned_kernel_registry(containers_to_destroy)
+            await self.agent.remove_orphaned_kernel_registry(purged_containers)
         except Exception as e:
             log.exception("failed to remove orphaned kernels: {0}", repr(e))
 
