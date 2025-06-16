@@ -7,6 +7,7 @@ from ai.backend.common.metrics.types import (
     DEVICE_UTILIZATION_METRIC_LABEL_NAME,
     UNDEFINED,
 )
+from ai.backend.common.types import AgentId
 
 from .types import FlattenedDeviceMetric, FlattenedKernelMetric
 
@@ -120,3 +121,58 @@ class UtilizationMetricObserver:
                 device_id=metric.device_id,
                 value_type=metric_value_type,
             ).set(float(value))
+
+
+class SyncContainerLifecycleObserver:
+    _instance: Optional[Self] = None
+
+    _task_trigger_count: Counter
+    _task_success_count: Counter
+    _task_failure_count: Counter
+
+    def __init__(self) -> None:
+        self._task_trigger_count = Counter(
+            name="backendai_sync_container_lifecycle_trigger_count",
+            documentation="Number of sync_container_lifecycle() task triggered",
+            labelnames=["agent_id"],
+        )
+        self._task_success_count = Counter(
+            name="backendai_sync_container_lifecycle_success_count",
+            documentation="Number of sync_container_lifecycle() task succeeded",
+            labelnames=["agent_id"],
+        )
+        self._task_failure_count = Counter(
+            name="backendai_sync_container_lifecycle_failure_count",
+            documentation="Number of sync_container_lifecycle() task failed",
+            labelnames=["agent_id", "exception"],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_container_lifecycle_triggered(
+        self,
+        *,
+        agent_id: AgentId,
+    ) -> None:
+        self._task_trigger_count.labels(agent_id=agent_id).inc()
+
+    def observe_container_lifecycle_success(
+        self,
+        *,
+        agent_id: AgentId,
+        num_synced_kernels: int,
+    ) -> None:
+        self._task_success_count.labels(agent_id=agent_id).inc(amount=num_synced_kernels)
+
+    def observe_container_lifecycle_failure(
+        self,
+        *,
+        agent_id: AgentId,
+        exception: BaseException,
+    ) -> None:
+        exception_name = exception.__class__.__name__
+        self._task_failure_count.labels(agent_id=agent_id, exception=exception_name).inc()
