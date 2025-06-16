@@ -25,20 +25,20 @@ class LoginTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         test_id_str = str(test_id)
-        credential = LoginCredentialContext.current()
-        endpoint = EndpointContext.current()
+        credential_dep = LoginCredentialContext.current()
+        endpoint_dep = EndpointContext.current()
 
         api_config = APIConfig(
-            endpoint=endpoint.login_endpoint,
+            endpoint=endpoint_dep.login_endpoint,
             endpoint_type="session",
         )
         async with AsyncSession(config=api_config) as session:
             await _login(
                 session=session,
                 test_id=test_id_str,
-                user_id=credential.user_id,
-                password=credential.password,
-                otp=credential.otp,
+                user_id=credential_dep.user_id,
+                password=credential_dep.password,
+                otp=credential_dep.otp,
             )
             with ClientSessionContext.with_current(session):
                 try:
