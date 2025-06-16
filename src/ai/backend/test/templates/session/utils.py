@@ -18,7 +18,6 @@ async def verify_session_events(
 
     :param client_session: The AsyncSession instance to use for listening to events.
     :param session_name: The name of the session to listen for events.
-    :param timeout: The maximum time to wait for the expected event.
     :param expected_event: The event that is expected to occur.
     :param failure_events: A set of events that indicate a failure in the session.
     :param expected_termination_reason: Optional; if provided, checks that the termination reason matches this value.
