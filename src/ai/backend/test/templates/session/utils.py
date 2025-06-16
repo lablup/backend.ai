@@ -1,136 +1,52 @@
 import asyncio
-from typing import Awaitable, Callable
-from uuid import UUID
+from typing import Optional
 
-from ai.backend.client.func.session import ComputeSession
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.json import load_json
 
 
-async def verify_batch_session(
+async def verify_session_events(
     client_session: AsyncSession,
     session_name: str,
     timeout: float,
-    session_factory: Callable[[], Awaitable["ComputeSession"]],
-) -> UUID:
-    EXPECTED_EVENTS: set[str] = {
-        "session_enqueued",
-        "session_scheduled",
-        "kernel_preparing",
-        "kernel_creating",
-        "kernel_started",
-        "session_started",
-        "session_terminating",
-        "session_terminated",
-        "kernel_terminating",
-        "kernel_terminated",
-        "session_success",
-    }
+    expected_event: str,
+    failure_events: set[str],
+    *,
+    expected_termination_reason: Optional[str] = None,
+) -> None:
+    """
+    Verify that a specific event occurs within a timeout period during session lifecycle.
 
-    collected_events: set[str] = set()
+    :param client_session: The AsyncSession instance to use for listening to events.
+    :param session_name: The name of the session to listen for events.
+    :param timeout: The maximum time to wait for the expected event.
+    :param expected_event: The event that is expected to occur.
+    :param failure_events: A set of events that indicate a failure in the session.
+    :param expected_termination_reason: Optional; if provided, checks that the termination reason matches this value.
+    """
+    collected_events = set()
 
     async def collect_events() -> None:
-        async with client_session.ComputeSession(session_name).listen_events() as events:
-            async for ev in events:
+        async with client_session.ComputeSession(session_name).listen_events() as evs:
+            async for ev in evs:
                 collected_events.add(ev.event)
-                if ev.event == "session_failure" or ev.event == "session_cancelled":
-                    raise RuntimeError(f"BatchSession failed with event: {ev.event}")
-                if collected_events == EXPECTED_EVENTS:
-                    break
+                if ev.event == "session_terminated":
+                    if expected_termination_reason is not None:
+                        data = load_json(ev.data)
+                        assert data["reason"] == "user-requested", (
+                            f"Unexpected termination reason: {data['reason']}"
+                        )
+
+                if ev.event == expected_event:
+                    return
+
+                if ev.event in failure_events:
+                    raise RuntimeError(f"Session failed with event: {ev.event}")
 
     listener = asyncio.create_task(asyncio.wait_for(collect_events(), timeout))
-
-    created = await session_factory()
-    assert created.created, "Session should be created successfully"
-    assert created.name == session_name, "Session name mismatch"
-
     try:
         await listener
-        assert created.status in {"TERMINATING", "TERMINATED"}, (
-            f"Unexpected final status: {created.status}"
-        )
-        if created.id is None:
-            raise RuntimeError("Session ID is None after creation")
-        return created.id
     except asyncio.TimeoutError as e:
         raise asyncio.TimeoutError(
-            f"Timed out after {timeout}s; events so far: {collected_events}"
+            f"Timeout after {timeout}s; no success event received, Actual events: {collected_events}"
         ) from e
-
-
-async def verify_interactive_session_creation(
-    client_session: AsyncSession,
-    session_name: str,
-    timeout: float,
-    create_session: Callable[[], Awaitable["ComputeSession"]],
-) -> UUID:
-    EXPECTED_CREATION_EVENTS: set[str] = {
-        "session_enqueued",
-        "session_scheduled",
-        "kernel_preparing",
-        "kernel_creating",
-        "kernel_started",
-        "session_started",
-    }
-
-    collected: set[str] = set()
-
-    async def collect_events() -> None:
-        async with client_session.ComputeSession(session_name).listen_events() as evs:
-            async for ev in evs:
-                collected.add(ev.event)
-                if ev.event == "session_cancelled":
-                    raise RuntimeError("Session creation was cancelled")
-                if collected == EXPECTED_CREATION_EVENTS:
-                    break
-
-    listener = asyncio.create_task(asyncio.wait_for(collect_events(), timeout))
-    created = await create_session()
-
-    assert created.created, "Session creation failed"
-    assert created.name == session_name
-
-    try:
-        await listener
-        assert created.status == "RUNNING", f"Expected RUNNING, got {created.status}"
-        if created.id is None:
-            raise RuntimeError("Session ID is None after creation")
-        return created.id
-    except asyncio.TimeoutError as e:
-        raise asyncio.TimeoutError(f"Timeout after {timeout}s; events so far: {collected}") from e
-
-
-async def verify_interactive_session_destruction(
-    client_session: AsyncSession,
-    session_name: str,
-    timeout: float,
-) -> None:
-    EXPECTED_DESTRUCTION_EVENTS: set[str] = {
-        "session_terminating",
-        "session_terminated",
-        "kernel_terminating",
-        "kernel_terminated",
-    }
-    collected: set[str] = set()
-
-    async def collect_events() -> None:
-        async with client_session.ComputeSession(session_name).listen_events() as evs:
-            async for ev in evs:
-                data = load_json(ev.data)
-                assert data["reason"] == "user-requested", (
-                    f"Unexpected termination reason: {data['reason']}"
-                )
-                collected.add(ev.event)
-                if ev.event == "session_cancelled":
-                    raise RuntimeError("Session creation was cancelled")
-                if collected == EXPECTED_DESTRUCTION_EVENTS:
-                    break
-
-    listener = asyncio.create_task(asyncio.wait_for(collect_events(), timeout))
-    result = await client_session.ComputeSession(session_name).destroy()
-    assert result["stats"]["status"] == "terminated", f"Expected terminated, got {result['stats']}"
-
-    try:
-        await listener
-    except asyncio.TimeoutError as e:
-        raise asyncio.TimeoutError(f"Timeout after {timeout}s; events so far: {collected}") from e

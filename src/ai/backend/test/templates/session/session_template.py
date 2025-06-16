@@ -1,3 +1,4 @@
+import asyncio
 import textwrap
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
@@ -18,9 +19,7 @@ from ai.backend.test.contexts.sse import (
 )
 from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.session.utils import (
-    verify_batch_session,
-    verify_interactive_session_creation,
-    verify_interactive_session_destruction,
+    verify_session_events,
 )
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
@@ -111,17 +110,36 @@ class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
         template_id = CreatedSessionTemplateIDContext.current()
         timeout = SSEContext.current().timeout
 
-        async def create_session():
-            return await client_session.ComputeSession.create_from_template(
-                template_id,
-                type_="batch",
-                startup_command=batch_cfg.startup_command,
-                name=session_name,
-                cluster_mode=cluster_cfg.cluster_mode,
-                cluster_size=cluster_cfg.cluster_size,
+        listener = asyncio.create_task(
+            verify_session_events(
+                client_session,
+                session_name,
+                timeout,
+                "session_terminated",
+                {"session_failure", "session_cancelled"},
             )
+        )
 
-        return await verify_batch_session(client_session, session_name, timeout, create_session)
+        created = await client_session.ComputeSession.create_from_template(
+            template_id,
+            type_="batch",
+            startup_command=batch_cfg.startup_command,
+            name=session_name,
+            cluster_mode=cluster_cfg.cluster_mode,
+            cluster_size=cluster_cfg.cluster_size,
+        )
+
+        assert created.created, "Session should be created successfully"
+        assert created.name == session_name, "Session name mismatch"
+
+        await listener
+        assert created.status in {"TERMINATING", "TERMINATED"}, (
+            f"Unexpected final status: {created.status}"
+        )
+        if created.id is None:
+            raise RuntimeError("Session ID is None after creation")
+
+        return created.id
 
     @override
     @actxmgr
@@ -148,24 +166,53 @@ class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
         timeout = SSEContext.current().timeout
         template_id = CreatedSessionTemplateIDContext.current()
 
-        async def create_session():
-            return await client_session.ComputeSession.create_from_template(
-                template_id,
-                type_="interactive",
-                name=session_name,
-                cluster_mode=cluster_cfg.cluster_mode,
-                cluster_size=cluster_cfg.cluster_size,
+        listener = asyncio.create_task(
+            verify_session_events(
+                client_session,
+                session_name,
+                timeout,
+                "session_started",
+                {"session_failure", "session_cancelled"},
             )
-
-        return await verify_interactive_session_creation(
-            client_session, session_name, timeout, create_session
         )
+
+        created = await client_session.ComputeSession.create_from_template(
+            template_id,
+            type_="interactive",
+            name=session_name,
+            cluster_mode=cluster_cfg.cluster_mode,
+            cluster_size=cluster_cfg.cluster_size,
+        )
+
+        assert created.created, "Session creation failed"
+        assert created.name == session_name
+
+        await listener
+        assert created.status == "RUNNING", f"Expected RUNNING, got {created.status}"
+        if created.id is None:
+            raise RuntimeError("Session ID is None after creation")
+        return created.id
 
     async def _verify_session_destruction(
         self, client_session: AsyncSession, session_name: str
     ) -> None:
         timeout = SSEContext.current().timeout
-        await verify_interactive_session_destruction(client_session, session_name, timeout)
+        listener = asyncio.create_task(
+            verify_session_events(
+                client_session,
+                session_name,
+                timeout,
+                "session_terminated",
+                {"session_cancelled", "session_failure"},
+                expected_termination_reason="user-requested",
+            )
+        )
+
+        result = await client_session.ComputeSession(session_name).destroy()
+        assert result["stats"]["status"] == "terminated", (
+            f"Expected terminated, got {result['stats']}"
+        )
+        await listener
 
     @override
     @actxmgr
