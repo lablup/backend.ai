@@ -1,5 +1,5 @@
 [runner]
-concurrency = 10
+concurrency = 1
 
 [context.endpoint]
 api-endpoint = "http://127.0.0.1:8091"
