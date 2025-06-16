@@ -21,7 +21,7 @@ from ai.backend.test.testcases.session.execution_failure_wrong_command import (
 )
 from ai.backend.test.testcases.session.execution_success import InteractiveSessionExecuteCodeSuccess
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.tester.config import ClusterDep, CodeExecutionDep
+from ai.backend.test.tester.dependency import ClusterDep, CodeExecutionDep
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 
