@@ -1,3 +1,6 @@
+[runner]
+concurrency = 1
+
 [context.endpoint]
 api-endpoint = "http://127.0.0.1:8091"
 login-endpoint = "http://127.0.0.1:8090"
@@ -12,3 +15,13 @@ password = "wJalrXUt"
 
 [context.image]
 name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"
+architecture = "x86_64"
+
+[context.session]
+resources = { cpu = 1, mem = "512mb" }
+
+[context.batch-session]
+startup-command = "ls -la"
+
+[context.sse]
+timeout = 60.0

@@ -8,20 +8,19 @@ import aiotools
 import tomli
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
-from ai.backend.test.tester.config import TesterConfig
+from ai.backend.test.tester.config import TesterDep
 
 from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
 from .runner import TestRunner
 
-_DEFAULT_CONCURRENCY = 10
-
 
 class Tester:
     _spec_manager: TestSpecManager
     _exporter_type: Type[TestExporter]
-    _semaphore: asyncio.Semaphore
     _config_file_path: Path
+    _config: Optional[TesterDep]
+    _semaphore_instance: Optional[asyncio.Semaphore]
 
     def __init__(
         self,
@@ -32,14 +31,24 @@ class Tester:
         self._spec_manager = spec_manager
         self._exporter_type = exporter_type
         self._config_file_path = config_file_path
-        self._semaphore = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
+        self._config = None
+        self._semaphore_instance = None
+
+    @property
+    def _semaphore(self) -> asyncio.Semaphore:
+        if not self._config:
+            raise RuntimeError("Tester configuration is not loaded")
+
+        if self._semaphore_instance is None:
+            self._semaphore_instance = asyncio.Semaphore(self._config.runner.concurrency)
+        return self._semaphore_instance
 
     @aiotools.lru_cache(maxsize=1)
-    async def _load_tester_config(self, config_path: Path) -> TesterConfig:
+    async def _load_tester_config(self, config_path: Path) -> TesterDep:
         async with aiofiles.open(config_path, mode="r") as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
-            config = TesterConfig.model_validate(content, by_alias=True)
+            config = TesterDep.model_validate(content, by_alias=True, by_name=True)
             return config
 
     async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
@@ -68,12 +77,14 @@ class Tester:
         """
         Run a single test specification.
         """
-        tester_config = await self._load_tester_config(self._config_file_path)
+        if not self._config:
+            raise RuntimeError("Tester configuration is not loaded")
+
         registered_contexts = BaseTestContext.used_contexts()
         with ExitStack() as global_stack:
             # global context manager for the tester
             for key, ctx in registered_contexts.items():
-                if config := getattr(tester_config.context, key, None):
+                if config := getattr(self._config.context, key, None):
                     ctx_mgr = ctx.with_current(config)
                     global_stack.enter_context(ctx_mgr)
             parametrizes = spec.product_parametrizes()
@@ -87,6 +98,7 @@ class Tester:
         """
         Run all test specifications.
         """
+        self._config = await self._load_tester_config(self._config_file_path)
         tasks = []
         for spec in self._spec_manager.all_specs():
             tasks.append(asyncio.create_task(self._run_spec(spec)))
@@ -96,6 +108,7 @@ class Tester:
         """
         Run test specifications by tag.
         """
+        self._config = await self._load_tester_config(self._config_file_path)
         tasks = []
         for spec in self._spec_manager.specs_by_tag(tag):
             tasks.append(asyncio.create_task(self._run_spec(spec)))
@@ -105,5 +118,6 @@ class Tester:
         """
         Run test specification by name.
         """
+        self._config = await self._load_tester_config(self._config_file_path)
         spec = self._spec_manager.spec_by_name(name)
         await self._run_spec(spec)

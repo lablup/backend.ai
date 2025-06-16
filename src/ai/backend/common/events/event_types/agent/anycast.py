@@ -1,12 +1,14 @@
+import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, Self, override
+from typing import Any, Optional, Self, override
 
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ContainerId, ContainerStatus, KernelId
 from ai.backend.logging.types import LogLevel
 
 
@@ -158,3 +160,51 @@ class DoAgentResourceCheckEvent(AgentOperationEvent):
     @override
     def event_name(cls) -> str:
         return "do_agent_resource_check"
+
+
+@dataclass
+class ContainerStatusData:
+    container_id: ContainerId
+    kernel_id: KernelId
+    status: ContainerStatus
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "container_id": str(self.container_id),
+            "kernel_id": str(self.kernel_id),
+            "status": str(self.status),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> Self:
+        return cls(
+            ContainerId(data["container_id"]),
+            KernelId(uuid.UUID(data["kernel_id"])),
+            ContainerStatus(data["status"]),
+        )
+
+
+@dataclass
+class AgentStatusHeartbeat(AgentOperationEvent):
+    agent_id: AgentId
+    containers: list[ContainerStatusData]
+
+    @override
+    def serialize(self) -> tuple:
+        return (
+            self.agent_id,
+            tuple(cont.to_dict() for cont in self.containers),
+        )
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            AgentId(value[0]),
+            [ContainerStatusData.from_dict(val) for val in value[1]],
+        )
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_status_heartbeat"

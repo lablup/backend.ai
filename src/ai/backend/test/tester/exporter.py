@@ -98,28 +98,30 @@ class DefaultExporter(TestExporter):
     async def export_done(self) -> None:
         current = time.perf_counter()
         elapsed = current - self._started
-        print(f"\033[92m✓ '{self._spec_name()}' completed in {elapsed:.2f} seconds.")
+        print(f"\033[92m✓ '{self._spec_name()}' completed in {elapsed:.2f} seconds.\033[0m")
 
     async def export_stage_done(self, stage: str) -> None:
         current = time.perf_counter()
         elapsed = current - self._last_stage_done
         self._last_stage_done = current
         self._last_stage = stage
-        print(f"\033[92m✓ '{self._stage_name(stage)}' completed in {elapsed:.2f} seconds.")
+        print(f"\033[92m✓ '{self._stage_name(stage)}' completed in {elapsed:.2f} seconds.\033[0m")
 
     async def export_stage_exception(self, stage: str, exception: BaseException) -> None:
         current = time.perf_counter()
         elapsed = current - self._last_stage_done
         self._last_stage_done = current
         print(
-            f"\033[91m❌ '{self._stage_name(stage)}' failed after {elapsed:.2f} seconds. {exception.__class__.__name__}"
+            f"\033[91m❌ '{self._stage_name(stage)}' failed after {elapsed:.2f} seconds. "
+            f"{exception.__class__.__name__}\033[0m"
         )
 
     async def export_exception(self, exception: BaseException) -> None:
         current = time.perf_counter()
         elapsed = current - self._started
         print(
-            f"\033[91m❌ '{self._spec_name()}' failed after {elapsed:.2f} seconds. {exception.__class__.__name__}"
+            f"\033[91m❌ '{self._spec_name()}' failed after {elapsed:.2f} seconds. "
+            f"{exception.__class__.__name__}\033[0m"
         )
         self._dump_exception(exception)
 

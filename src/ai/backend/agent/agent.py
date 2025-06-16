@@ -146,6 +146,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -202,6 +203,7 @@ from .kernel import (
     AbstractKernel,
     match_distro_data,
 )
+from .observer.heartbeat import HeartbeatObserver
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -860,6 +862,11 @@ class AbstractAgent(
                 )
             )
 
+        self._agent_runner = Runner(resources=[])
+        container_observer = HeartbeatObserver(self, self.event_producer)
+        await self._agent_runner.register_observer(container_observer)
+        await self._agent_runner.start()
+
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
             log.info(
                 "Monitoring abnormal kernel activities reported by Watcher at {}", abuse_report_path
@@ -933,6 +940,7 @@ class AbstractAgent(
         for result in cancel_results:
             if isinstance(result, Exception):
                 log.error("timer cancellation error: {}", result)
+        await self._agent_runner.close()
 
         # Stop lifecycle event handler.
         await self.container_lifecycle_queue.put(_sentinel)
