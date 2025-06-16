@@ -1355,16 +1355,16 @@ class AbstractAgent(
             (kernel_id, cont) for kernel_id, cont in alive_containers if kernel_id in kernel_ids
         ]
         try:
-            purged_containers = await self.purge_containers(containers_to_destroy)
+            purged_containers = await self._purge_containers(containers_to_destroy)
         except Exception as e:
             log.exception("failed to purge containers: {0}", repr(e))
             purged_containers = []
 
         try:
-            cleaned = await self.clean_kernel_object([kid for kid, _ in purged_containers])
+            cleaned = await self._clean_kernel_objects([kid for kid, _ in purged_containers])
         except Exception as e:
             log.exception("failed to clean kernels: {0}", repr(e))
-            cleaned = []
+            cleaned = set()
         cleaned_kernel_container_pairs = [
             (kernel_id, container)
             for kernel_id, container in purged_containers
@@ -1389,7 +1389,7 @@ class AbstractAgent(
         except Exception as e:
             log.exception("failed to reconstruct resource usage: {0}", repr(e))
 
-    async def purge_containers(
+    async def _purge_containers(
         self, containers_to_destroy: Sequence[KernelIdContainerPair]
     ) -> list[KernelIdContainerPair]:
         """
@@ -1425,13 +1425,13 @@ class AbstractAgent(
             purged.append((kernel_id, container))
         return purged
 
-    async def clean_kernel_object(self, kernel_ids: Iterable[KernelId]) -> list[KernelId]:
+    async def _clean_kernel_objects(self, kernel_ids: Iterable[KernelId]) -> set[KernelId]:
         """
         Clean up kernel objects from the registry.
         Returns a set of kernel IDs that were successfully cleaned up.
         """
         # TODO: Reduce `kernel_registry` dependencies and roles
-        cleaned: list[KernelId] = []
+        cleaned: set[KernelId] = set()
         for kid in kernel_ids:
             if kid in self.kernel_registry:
                 try:
@@ -1451,7 +1451,7 @@ class AbstractAgent(
                         repr(e),
                     )
                     continue
-            cleaned.append(kid)
+            cleaned.add(kid)
         return cleaned
 
     async def process_lifecycle_events(self) -> None:
