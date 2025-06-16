@@ -1379,23 +1379,13 @@ class AbstractAgent(
                 )
                 continue
 
-            kernel_obj = self.kernel_registry.get(kernel_id)
-            if kernel_obj is not None:
-                if kernel_obj.runner is not None:
-                    await kernel_obj.runner.close()
-                await kernel_obj.close()
-                host_ports = kernel_obj.get("host_ports")
-                if host_ports is not None:
-                    self._restore_ports(host_ports)
             log.info("purged container (kernel:{}, container:{})", kernel_id, container.id)
             purged.append((kernel_id, container))
         return purged
 
-    async def remove_orphaned_kernel_registry(
-        self, containers_to_destroy: Sequence[KernelIdContainerPair]
-    ) -> None:
+    async def clean_kernel_object(self, kernel_ids: Sequence[KernelId]) -> None:
         # TODO: Reduce `kernel_registry` dependencies and roles
-        for kid, _ in containers_to_destroy:
+        for kid in kernel_ids:
             if kid in self.kernel_registry:
                 kernel_obj = self.kernel_registry[kid]
                 if kernel_obj.runner is not None:

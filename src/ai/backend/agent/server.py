@@ -806,7 +806,7 @@ class AgentRPCServer(aobject):
             purged_containers = []
 
         try:
-            await self.agent.remove_orphaned_kernel_registry(purged_containers)
+            await self.agent.clean_kernel_object([kid for kid, _ in purged_containers])
         except Exception as e:
             log.exception("failed to remove orphaned kernels: {0}", repr(e))
 
