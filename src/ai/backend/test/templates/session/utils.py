@@ -8,12 +8,11 @@ from ai.backend.common.json import load_json
 async def verify_session_events(
     client_session: AsyncSession,
     session_name: str,
-    timeout: float,
     expected_event: str,
     failure_events: set[str],
     *,
     expected_termination_reason: Optional[str] = None,
-) -> None:
+) -> asyncio.Task:
     """
     Verify that a specific event occurs within a timeout period during session lifecycle.
 
@@ -24,12 +23,10 @@ async def verify_session_events(
     :param failure_events: A set of events that indicate a failure in the session.
     :param expected_termination_reason: Optional; if provided, checks that the termination reason matches this value.
     """
-    collected_events = set()
 
     async def collect_events() -> None:
         async with client_session.ComputeSession(session_name).listen_events() as evs:
             async for ev in evs:
-                collected_events.add(ev.event)
                 if ev.event == "session_terminated":
                     if expected_termination_reason is not None:
                         data = load_json(ev.data)
@@ -45,4 +42,4 @@ async def verify_session_events(
                         f"Session failed with event: {ev.event}, Expected event: {expected_event}"
                     )
 
-    await asyncio.wait_for(collect_events(), timeout)
+    return await collect_events()
