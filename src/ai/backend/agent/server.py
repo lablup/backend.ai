@@ -96,6 +96,7 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
+    ContainerId,
     HardwareMetadata,
     HostPortPair,
     ImageConfig,
@@ -782,6 +783,34 @@ class AgentRPCServer(aobject):
             suppress_events=suppress_events,
         )
         return await done
+
+    @rpc_function_v2
+    @collect_error
+    async def purge_containers(
+        self,
+        container_ids_to_destroy: list[str],
+    ) -> None:
+        log.info("rpc::force_clean_containers(container_ids:{0})", container_ids_to_destroy)
+
+        container_ids = set(ContainerId(cid) for cid in container_ids_to_destroy)
+        try:
+            await self.agent.purge_container(container_ids)
+        except Exception as e:
+            log.exception("force_clean_containers(): failed to purge containers: {0}", repr(e))
+
+        try:
+            await self.agent.remove_orphaned_kernel_registry()
+        except Exception as e:
+            log.exception(
+                "force_clean_containers(): failed to remove orphaned kernels: {0}", repr(e)
+            )
+
+        try:
+            await self.agent.reconstruct_resource_usage()
+        except Exception as e:
+            log.exception(
+                "force_clean_containers(): failed to reconstruct resource usage: {0}", repr(e)
+            )
 
     @rpc_function
     @collect_error
