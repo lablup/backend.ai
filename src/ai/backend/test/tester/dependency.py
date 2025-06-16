@@ -139,7 +139,6 @@ class CodeExecutionDep(BaseDependencyModel):
         examples=["print('Hello, World!')"],
     )
     expected_result: str = Field(
-        default=None,
         description="The expected result of the code execution.",
         examples=["Hello, World!"],
     )

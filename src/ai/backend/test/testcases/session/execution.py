@@ -9,7 +9,7 @@ class InteractiveSessionExecuteCodeSuccess(TestCode):
         session_id = CreatedSessionIDContext.current()
         code_dep = CodeExecutionContext.current()
 
-        result = await client_session.ComputeSession(session_id).execute(
+        result = await client_session.ComputeSession(str(session_id)).execute(
             code=code_dep.code,
         )
 
@@ -23,7 +23,7 @@ class InteractiveSessionExecuteCodeSuccess(TestCode):
             f"Expected console output to match, Actual value: {result['console']}"
         )
 
-        async with client_session.ComputeSession(session_id).stream_execute(
+        async with client_session.ComputeSession(str(session_id)).stream_execute(
             code=code_dep.code
         ) as ws:
             result = await ws.receive_json()
@@ -44,7 +44,7 @@ class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
         session_id = CreatedSessionIDContext.current()
         WRONG_CMD = "some wrong command !@#"
 
-        result = await client_session.ComputeSession(session_id).execute(
+        result = await client_session.ComputeSession(str(session_id)).execute(
             code=WRONG_CMD,
         )
 
@@ -59,7 +59,9 @@ class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
             f"Expected stderr, Actual value: {result['console']}"
         )
 
-        async with client_session.ComputeSession(session_id).stream_execute(code=WRONG_CMD) as ws:
+        async with client_session.ComputeSession(str(session_id)).stream_execute(
+            code=WRONG_CMD
+        ) as ws:
             result = await ws.receive_json()
             assert result["status"] == "finished", (
                 f"Expected status to be finished, Actual status: {result['status']}"
