@@ -33,7 +33,7 @@ async def verify_batch_session(
         async with client_session.ComputeSession(session_name).listen_events() as events:
             async for ev in events:
                 collected_events.add(ev.event)
-                if ev.event == "session_failure":
+                if ev.event == "session_failure" or ev.event == "session_cancelled":
                     raise RuntimeError(f"BatchSession failed with event: {ev.event}")
                 if collected_events == EXPECTED_EVENTS:
                     break
@@ -79,6 +79,8 @@ async def verify_interactive_session_creation(
         async with client_session.ComputeSession(session_name).listen_events() as evs:
             async for ev in evs:
                 collected.add(ev.event)
+                if ev.event == "session_cancelled":
+                    raise RuntimeError("Session creation was cancelled")
                 if collected == EXPECTED_CREATION_EVENTS:
                     break
 
@@ -119,6 +121,8 @@ async def verify_interactive_session_destruction(
                     f"Unexpected termination reason: {data['reason']}"
                 )
                 collected.add(ev.event)
+                if ev.event == "session_cancelled":
+                    raise RuntimeError("Session creation was cancelled")
                 if collected == EXPECTED_DESTRUCTION_EVENTS:
                     break
 

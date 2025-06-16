@@ -25,6 +25,8 @@ class BatchSessionCreationFailureWrongCommand(TestCode):
                 async for event in events:
                     if event.event == "session_failure":
                         break
+                    if event.event == "session_cancelled":
+                        raise RuntimeError("BatchSession was cancelled")
                     if event.event == "session_success":
                         raise RuntimeError("BatchSession should not succeed with wrong command")
 

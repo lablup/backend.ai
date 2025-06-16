@@ -174,10 +174,12 @@ class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
         session_name = f"test_session_{str(test_id)}"
+        session_id = None
         try:
             session_id = await self._verify_session_creation(client_session, session_name)
             with CreatedSessionIDContext.with_current(session_id):
                 yield
         finally:
-            await self._verify_session_destruction(client_session, session_name)
+            if session_id:
+                await self._verify_session_destruction(client_session, session_name)
             pass
