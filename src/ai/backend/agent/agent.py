@@ -1355,7 +1355,7 @@ class AbstractAgent(
         ) as tg:
             while True:
                 ev = await self.container_lifecycle_queue.get()
-                log.info("process_lifecycle_events(): received lifecycle event: {!r}", ev)
+                log.info("process_lifecycle_events(): received lifecycle event: {}", str(ev))
                 if isinstance(ev, Sentinel):
                     await self.save_last_registry(force=True)
                     return
