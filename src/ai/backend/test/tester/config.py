@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class BaseConfigModel(BaseModel):
+class BaseDependencyModel(BaseModel):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -17,12 +17,12 @@ class BaseConfigModel(BaseModel):
     )
 
 
-class KeyPairConfig(BaseConfigModel):
+class KeyPairDep(BaseDependencyModel):
     access_key: str = Field(description="The access key for the API.", examples=["some-access-key"])
     secret_key: str = Field(description="The secret key for the API.", examples=["some-secret-key"])
 
 
-class EndpointConfig(BaseConfigModel):
+class EndpointDep(BaseDependencyModel):
     api_endpoint: Optional[str] = Field(
         default=None,
         description="The API endpoint configuration for the test context.",
@@ -33,7 +33,7 @@ class EndpointConfig(BaseConfigModel):
     )
 
 
-class LoginCredentialConfig(BaseConfigModel):
+class LoginCredentialDep(BaseDependencyModel):
     user_id: str = Field(description="The user ID for login.", examples=["user@example.com"])
     password: str = Field(description="The password for login.", examples=["password123"])
     otp: Optional[str] = Field(
@@ -43,7 +43,7 @@ class LoginCredentialConfig(BaseConfigModel):
     )
 
 
-class ImageConfig(BaseConfigModel):
+class ImageDep(BaseDependencyModel):
     name: Optional[str] = Field(
         default=None,
         description="The Docker image to use for the test context.",
@@ -56,7 +56,7 @@ class ImageConfig(BaseConfigModel):
     )
 
 
-class BatchSessionConfig(BaseConfigModel):
+class BatchSessionDep(BaseDependencyModel):
     startup_command: Optional[str] = Field(
         default=None,
         description="The startup command to run in the batch session.",
@@ -64,7 +64,7 @@ class BatchSessionConfig(BaseConfigModel):
     )
 
 
-class SSEConfig(BaseConfigModel):
+class SSEDep(BaseDependencyModel):
     timeout: float = Field(
         default=60.0,
         description="The timeout for the session creation in seconds.",
@@ -72,7 +72,7 @@ class SSEConfig(BaseConfigModel):
     )
 
 
-class ClusterConfig(BaseConfigModel):
+class ClusterDep(BaseDependencyModel):
     # By default, testing is conducted for both single-node and multi-node setups through parametrization,
     # But we'd like to have left room for manually injecting values.
     cluster_mode: Optional[str] = Field(
@@ -87,7 +87,7 @@ class ClusterConfig(BaseConfigModel):
     )
 
 
-class SessionConfig(BaseConfigModel):
+class SessionDep(BaseDependencyModel):
     resources: Optional[dict] = Field(
         default=None,
         description="The resources to allocate for the session.",
@@ -95,45 +95,45 @@ class SessionConfig(BaseConfigModel):
     )
 
 
-class TestContextInjectionModel(BaseConfigModel):
-    endpoint: Optional[EndpointConfig] = Field(
+class TestContextInjectionModel(BaseDependencyModel):
+    endpoint: Optional[EndpointDep] = Field(
         default=None,
         description="The endpoint configurations for the test context.",
     )
-    keypair: Optional[KeyPairConfig] = Field(
+    keypair: Optional[KeyPairDep] = Field(
         default=None,
         description="The key pair for the test context.",
     )
-    login_credential: Optional[LoginCredentialConfig] = Field(
+    login_credential: Optional[LoginCredentialDep] = Field(
         default=None,
         description="The login credentials for the test context.",
         alias="login-credential",
     )
-    image: Optional[ImageConfig] = Field(
+    image: Optional[ImageDep] = Field(
         default=None,
         description="The Docker image context for the test.",
     )
-    sse: Optional[SSEConfig] = Field(
+    sse: Optional[SSEDep] = Field(
         default=None,
         description="The Server-Sent Events configuration for the test context.",
     )
-    cluster_config: Optional[ClusterConfig] = Field(
+    cluster_config: Optional[ClusterDep] = Field(
         default=None,
         description="The cluster configuration for the test context.",
         alias="cluster-config",
     )
-    batch_session: Optional[BatchSessionConfig] = Field(
+    batch_session: Optional[BatchSessionDep] = Field(
         default=None,
         description="The batch session configuration for the test context.",
         alias="batch-session",
     )
-    session: Optional[SessionConfig] = Field(
+    session: Optional[SessionDep] = Field(
         default=None,
         description="The session configuration for the test context.",
     )
 
 
-class TestRunnerConfig(BaseConfigModel):
+class TestRunnerDep(BaseDependencyModel):
     concurrency: int = Field(
         default=10,
         description="The number of concurrent tests to run.",
@@ -141,12 +141,12 @@ class TestRunnerConfig(BaseConfigModel):
     )
 
 
-class TesterConfig(BaseConfigModel):
+class TesterDep(BaseDependencyModel):
     context: TestContextInjectionModel = Field(
         default_factory=TestContextInjectionModel,
         description="Configurations injected by the tester.",
     )
-    runner: TestRunnerConfig = Field(
-        default_factory=TestRunnerConfig,
+    runner: TestRunnerDep = Field(
+        default_factory=TestRunnerDep,
         description="Configurations for the test runner.",
     )

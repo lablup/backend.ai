@@ -20,7 +20,7 @@ from ai.backend.test.testcases.session.execution_failure_wrong_command import (
     BatchSessionCreationFailureWrongCommand,
 )
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.tester.config import ClusterConfig
+from ai.backend.test.tester.config import ClusterDep
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 
@@ -41,15 +41,15 @@ BATCH_SESSION_TEST_SPECS = {
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),
@@ -90,15 +90,15 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),
@@ -153,15 +153,15 @@ SESSION_TEMPLATE_TEST_SPECS = {
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),
@@ -184,15 +184,15 @@ SESSION_TEMPLATE_TEST_SPECS = {
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=3,
                 ),
-                ClusterConfig(
+                ClusterDep(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
                 ),

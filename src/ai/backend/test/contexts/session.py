@@ -3,27 +3,27 @@ from uuid import UUID
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
 from ai.backend.test.tester.config import (
-    BatchSessionConfig,
-    ClusterConfig,
-    SessionConfig,
+    BatchSessionDep,
+    ClusterDep,
+    SessionDep,
 )
 
 
-class SessionContext(BaseTestContext[SessionConfig]):
+class SessionContext(BaseTestContext[SessionDep]):
     @override
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.SESSION
 
 
-class BatchSessionContext(BaseTestContext[BatchSessionConfig]):
+class BatchSessionContext(BaseTestContext[BatchSessionDep]):
     @override
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.BATCH_SESSION
 
 
-class ClusterContext(BaseTestContext[ClusterConfig]):
+class ClusterContext(BaseTestContext[ClusterDep]):
     @override
     @classmethod
     def name(cls) -> ContextName:

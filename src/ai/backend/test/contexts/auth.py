@@ -1,24 +1,24 @@
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
 from ai.backend.test.tester.config import (
-    EndpointConfig,
-    KeyPairConfig,
-    LoginCredentialConfig,
+    EndpointDep,
+    KeyPairDep,
+    LoginCredentialDep,
 )
 
 
-class KeypairContext(BaseTestContext[KeyPairConfig]):
+class KeypairContext(BaseTestContext[KeyPairDep]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.KEYPAIR
 
 
-class LoginCredentialContext(BaseTestContext[LoginCredentialConfig]):
+class LoginCredentialContext(BaseTestContext[LoginCredentialDep]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.LOGIN_CREDENTIAL
 
 
-class EndpointContext(BaseTestContext[EndpointConfig]):
+class EndpointContext(BaseTestContext[EndpointDep]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.ENDPOINT

@@ -8,7 +8,7 @@ import aiotools
 import tomli
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
-from ai.backend.test.tester.config import TesterConfig
+from ai.backend.test.tester.config import TesterDep
 
 from ..testcases.spec_manager import TestSpec, TestSpecManager, TestTag
 from .exporter import TestExporter
@@ -39,11 +39,11 @@ class Tester:
         return self._semaphore
 
     @aiotools.lru_cache(maxsize=1)
-    async def _load_tester_config(self, config_path: Path) -> TesterConfig:
+    async def _load_tester_config(self, config_path: Path) -> TesterDep:
         async with aiofiles.open(config_path, mode="r") as fp:
             raw_content = await fp.read()
             content = tomli.loads(raw_content)
-            config = TesterConfig.model_validate(content, by_alias=True, by_name=True)
+            config = TesterDep.model_validate(content, by_alias=True, by_name=True)
             return config
 
     async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
