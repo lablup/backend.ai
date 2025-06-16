@@ -96,7 +96,6 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
-    ContainerId,
     HardwareMetadata,
     HostPortPair,
     ImageConfig,
@@ -786,34 +785,15 @@ class AgentRPCServer(aobject):
 
     @rpc_function_v2
     @collect_error
-    async def purge_containers(
+    async def purge_kernels(
         self,
-        container_ids: list[str],
+        kernel_ids: list[str],
+        reason: str,
     ) -> None:
-        log.info("rpc::force_clean_containers(container_ids:{0})", container_ids)
-
-        container_ids_to_destroy = set(ContainerId(cid) for cid in container_ids)
-        alive_containers = await self.agent.enumerate_containers()
-        containers_to_destroy = [
-            (kernel_id, cont)
-            for kernel_id, cont in alive_containers
-            if cont.id in container_ids_to_destroy
-        ]
-        try:
-            purged_containers = await self.agent.purge_container(containers_to_destroy)
-        except Exception as e:
-            log.exception("failed to purge containers: {0}", repr(e))
-            purged_containers = []
-
-        try:
-            await self.agent.clean_kernel_object([kid for kid, _ in purged_containers])
-        except Exception as e:
-            log.exception("failed to remove orphaned kernels: {0}", repr(e))
-
-        try:
-            await self.agent.reconstruct_resource_usage()
-        except Exception as e:
-            log.exception("failed to reconstruct resource usage: {0}", repr(e))
+        log.info("rpc::force_clean_containers(kernel_ids:{0})", kernel_ids)
+        kernel_ids_to_purge = [KernelId(UUID(kid)) for kid in kernel_ids]
+        event_reason = KernelLifecycleEventReason(reason)
+        asyncio.create_task(self.agent.purge_kernels(kernel_ids_to_purge, event_reason))
 
     @rpc_function
     @collect_error

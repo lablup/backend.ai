@@ -1347,7 +1347,49 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
-    async def purge_container(
+    async def purge_kernels(
+        self, kernel_ids: Collection[KernelId], reason: KernelLifecycleEventReason
+    ) -> None:
+        alive_containers = await self.enumerate_containers()
+        containers_to_destroy = [
+            (kernel_id, cont) for kernel_id, cont in alive_containers if kernel_id in kernel_ids
+        ]
+        try:
+            purged_containers = await self.purge_containers(containers_to_destroy)
+        except Exception as e:
+            log.exception("failed to purge containers: {0}", repr(e))
+            purged_containers = []
+
+        try:
+            cleaned = await self.clean_kernel_object([kid for kid, _ in purged_containers])
+        except Exception as e:
+            log.exception("failed to clean kernels: {0}", repr(e))
+            cleaned = []
+        cleaned_kernel_container_pairs = [
+            (kernel_id, container)
+            for kernel_id, container in purged_containers
+            if kernel_id in cleaned
+        ]
+
+        for kernel_id, container in cleaned_kernel_container_pairs:
+            await self.anycast_and_broadcast_event(
+                KernelTerminatedAnycastEvent(
+                    kernel_id,
+                    container.session_id,
+                    reason=reason,
+                ),
+                KernelTerminatedBroadcastEvent(
+                    kernel_id,
+                    container.session_id,
+                    reason=reason,
+                ),
+            )
+        try:
+            await self.reconstruct_resource_usage()
+        except Exception as e:
+            log.exception("failed to reconstruct resource usage: {0}", repr(e))
+
+    async def purge_containers(
         self, containers_to_destroy: Sequence[KernelIdContainerPair]
     ) -> list[KernelIdContainerPair]:
         """
@@ -1383,19 +1425,34 @@ class AbstractAgent(
             purged.append((kernel_id, container))
         return purged
 
-    async def clean_kernel_object(self, kernel_ids: Sequence[KernelId]) -> None:
+    async def clean_kernel_object(self, kernel_ids: Iterable[KernelId]) -> list[KernelId]:
+        """
+        Clean up kernel objects from the registry.
+        Returns a set of kernel IDs that were successfully cleaned up.
+        """
         # TODO: Reduce `kernel_registry` dependencies and roles
+        cleaned: list[KernelId] = []
         for kid in kernel_ids:
             if kid in self.kernel_registry:
-                kernel_obj = self.kernel_registry[kid]
-                if kernel_obj.runner is not None:
-                    await kernel_obj.runner.close()
-                await kernel_obj.close()
-                host_ports = kernel_obj.get("host_ports")
-                if host_ports is not None:
-                    self._restore_ports(host_ports)
-                del self.kernel_registry[kid]
-                log.info("removed orphaned kernel registry (kernel:{})", kid)
+                try:
+                    kernel_obj = self.kernel_registry[kid]
+                    if kernel_obj.runner is not None:
+                        await kernel_obj.runner.close()
+                    await kernel_obj.close()
+                    host_ports = kernel_obj.get("host_ports")
+                    if host_ports is not None:
+                        self._restore_ports(host_ports)
+                    del self.kernel_registry[kid]
+                    log.info("removed orphaned kernel registry (kernel:{})", kid)
+                except Exception as e:
+                    log.exception(
+                        "failed to clean kernel object (kernel:{0}): {1}",
+                        kid,
+                        repr(e),
+                    )
+                    continue
+            cleaned.append(kid)
+        return cleaned
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(

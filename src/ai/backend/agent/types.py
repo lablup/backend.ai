@@ -78,7 +78,7 @@ class Container:
         return KernelId(uuid.UUID(raw_kernel_id))
 
     @property
-    def session_id(self) -> Optional[SessionId]:
+    def session_id(self) -> SessionId:
         raw_session_id = self.labels[LabelName.SESSION_ID]
         return SessionId(uuid.UUID(raw_session_id))
 
