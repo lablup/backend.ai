@@ -197,13 +197,6 @@ SESSION_TEMPLATE_TEST_SPECS = {
                     cluster_size=3,
                 ),
             ],
-            # ContextName.CREATED_SESSION: [
-            #     SessionArgs(
-            #         image="ubuntu:latest",
-            #         resources={"cpu": 1, "mem": "512MiB"},
-            #         startup_command="echo 'Hello, World!'",
-            #     )
-            # ],
         },
     ),
 }
