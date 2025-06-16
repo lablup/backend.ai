@@ -164,8 +164,9 @@ class SyncContainerLifecycleObserver:
         self,
         *,
         agent_id: AgentId,
+        num_synced_kernels: int,
     ) -> None:
-        self._task_success_count.labels(agent_id=agent_id).inc()
+        self._task_success_count.labels(agent_id=agent_id).inc(amount=num_synced_kernels)
 
     def observe_container_lifecycle_failure(
         self,

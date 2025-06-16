@@ -1355,7 +1355,7 @@ class AbstractAgent(
         ) as tg:
             while True:
                 ev = await self.container_lifecycle_queue.get()
-                log.info("process_lifecycle_events(): received lifecycle event: {}", str(ev))
+                log.info("received lifecycle event: {}", str(ev))
                 if isinstance(ev, Sentinel):
                     await self.save_last_registry(force=True)
                     return
@@ -1623,7 +1623,7 @@ class AbstractAgent(
             await self.produce_error_event()
         else:
             self._sync_container_lifecycle_observer.observe_container_lifecycle_success(
-                agent_id=self.id
+                agent_id=self.id, num_synced_kernels=len(terminated_kernels)
             )
 
     async def set_container_count(self, container_count: int) -> None:
