@@ -2,9 +2,10 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
-from ai.backend.test.tester.config import (
+from ai.backend.test.tester.dependency import (
     BatchSessionDep,
     ClusterDep,
+    CodeExecutionDep,
     SessionDep,
 )
 
@@ -28,6 +29,13 @@ class ClusterContext(BaseTestContext[ClusterDep]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.CLUSTER_CONFIG
+
+
+class CodeExecutionContext(BaseTestContext[CodeExecutionDep]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.CODE_EXECUTION
 
 
 class CreatedSessionTemplateIDContext(BaseTestContext[str]):
