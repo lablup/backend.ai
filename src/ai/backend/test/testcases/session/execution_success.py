@@ -20,17 +20,32 @@ class InteractiveSessionExecuteCodeSuccess(TestCode):
             f"Expected exitCode to be 0, Actual exitCode: {result['exitCode']}"
         )
         assert result["console"] == [["stdout", code_dep.expected_result]], (
-            f"Expected console output to match, Actual console: {result['console']}"
+            f"Expected console output to match, Actual value: {result['console']}"
         )
+
+        async with client_session.ComputeSession(session_id).stream_execute(
+            code=code_dep.code
+        ) as ws:
+            result = await ws.receive_json()
+            assert result["status"] == "finished", (
+                f"Expected status to be finished, Actual status: {result['status']}"
+            )
+            assert result["exitCode"] == 0, (
+                f"Expected exitCode to be 0, Actual exitCode: {result['exitCode']}"
+            )
+            assert result["console"] == [["stdout", code_dep.expected_result]], (
+                f"Expected console output to match, Actual value: {result['console']}"
+            )
 
 
 class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         session_id = CreatedSessionIDContext.current()
+        WRONG_CMD = "some wrong command !@#"
 
         result = await client_session.ComputeSession(session_id).execute(
-            code="some wrong command !@#",
+            code=WRONG_CMD,
         )
 
         assert result["status"] == "finished", (
@@ -40,4 +55,18 @@ class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
         assert result["exitCode"] == 0, (
             f"Expected exitCode to be 0, Actual exitCode: {result['exitCode']}"
         )
-        assert result["console"][0] == ["stderr"]
+        assert result["console"][0][0] == "stderr", (
+            f"Expected stderr, Actual value: {result['console']}"
+        )
+
+        async with client_session.ComputeSession(session_id).stream_execute(code=WRONG_CMD) as ws:
+            result = await ws.receive_json()
+            assert result["status"] == "finished", (
+                f"Expected status to be finished, Actual status: {result['status']}"
+            )
+            assert result["exitCode"] == 0, (
+                f"Expected exitCode to be 0, Actual exitCode: {result['exitCode']}"
+            )
+            assert result["console"][0][0] == "stderr", (
+                f"Expected stderr, Actual value: {result['console']}"
+            )
