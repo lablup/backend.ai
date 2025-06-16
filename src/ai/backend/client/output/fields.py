@@ -163,7 +163,7 @@ scaling_group_fields = FieldSet([
 ])
 
 session_node_fields = FieldSet([
-    FieldSpec(field_ref="row_id", field_name="id"),
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
     FieldSpec("tag"),
     FieldSpec("name"),
     FieldSpec("type"),
@@ -202,7 +202,7 @@ session_node_fields = FieldSet([
 ])
 
 kernel_node_fields = FieldSet([
-    FieldSpec(field_ref="row_id", field_name="id"),
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
     FieldSpec("cluster_idx"),
     FieldSpec("local_rank"),
     FieldSpec("cluster_role"),
