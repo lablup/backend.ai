@@ -9,6 +9,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
+    AgentStatusHeartbeat,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
@@ -192,6 +193,12 @@ class Dispatchers:
             None,
             self._agent_event_handler.handle_agent_error,
             name="agent.error",
+        )
+        evd.consume(
+            AgentStatusHeartbeat,
+            None,
+            self._agent_event_handler.handle_agent_container_heartbeat,
+            name="agent.status_heartbeat",
         )
 
     def _dispatch_image_events(self, event_dispatcher: EventDispatcher) -> None:

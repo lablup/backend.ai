@@ -73,6 +73,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     ImageConfig,
@@ -114,7 +115,6 @@ from ..server import get_extra_volumes
 from ..types import (
     AgentEventData,
     Container,
-    ContainerStatus,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
