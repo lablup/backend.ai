@@ -37,6 +37,7 @@ class SessionCreationFailureLowResources(TestCode):
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
             )
+            assert False, "Expected BackendAPIError for low resources was not raised"
         except BackendAPIError as e:
             assert e.status == 400
             assert e.data["error_code"] == "api_generic_invalid-parameters"

@@ -35,5 +35,8 @@ class SessionCreationFailureTooManyContainer(TestCode):
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=max_containers_per_session + 1,  # Exceeding the limit
             )
+            assert False, (
+                "Expected BackendAPIError for exceeding max containers limit was not raised"
+            )
         except BackendAPIError as e:
             assert e.data["error_code"] == "session_create_unavailable"
