@@ -11,15 +11,18 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
+    KernelId,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.exceptions import InstanceNotFound
 from ai.backend.manager.registry import AgentRegistry
 
 from ...models.agent import AgentStatus, agents
+from ...models.kernel import ConditionMerger, KernelRow, KernelStatus, by_agent_id, by_status
 from ...models.utils import (
     ExtendedAsyncSAEngine,
 )
@@ -120,5 +123,24 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentStatusHeartbeat,
     ) -> None:
-        # TODO: Implement handling of agent container heartbeat events.
-        pass
+        status_condition = by_status(KernelStatus.with_containers(), ConditionMerger.AND)
+        agent_condition = by_agent_id(event.agent_id, ConditionMerger.AND)
+        kernel_rows = await KernelRow.get_kernels(
+            [
+                status_condition,
+                agent_condition,
+            ],
+            db=self._db,
+        )
+        alive_kernel_ids: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
+
+        dangling_kernels: list[KernelId] = []
+        for container in event.containers:
+            if container.kernel_id not in alive_kernel_ids:
+                dangling_kernels.append(container.kernel_id)
+
+        await self._registry.purge_kernels(
+            event.agent_id,
+            dangling_kernels,
+            reason=KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+        )
