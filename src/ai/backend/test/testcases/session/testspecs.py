@@ -16,17 +16,21 @@ from ai.backend.test.testcases.session.creation_failure_low_resources import (
 from ai.backend.test.testcases.session.creation_failure_too_many_container import (
     SessionCreationFailureTooManyContainer,
 )
-from ai.backend.test.testcases.session.execution_failure_wrong_command import (
+from ai.backend.test.testcases.session.creation_failure_wrong_command import (
     BatchSessionCreationFailureWrongCommand,
 )
+from ai.backend.test.testcases.session.execution import (
+    InteractiveSessionExecuteCodeFailureWrongCommand,
+    InteractiveSessionExecuteCodeSuccess,
+)
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.tester.config import ClusterDep
+from ai.backend.test.tester.dependency import ClusterDep, CodeExecutionDep
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 
 BATCH_SESSION_TEST_SPECS = {
-    "execution_batch_session_success": TestSpec(
-        name="execution_batch_session_success",
+    "creation_batch_session_success": TestSpec(
+        name="creation_batch_session_success",
         description=textwrap.dedent("""\
             Test for creating a single-node, single-container batch session.
             This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
@@ -56,8 +60,8 @@ BATCH_SESSION_TEST_SPECS = {
             ]
         },
     ),
-    "execution_batch_session_failure_wrong_command": TestSpec(
-        name="execution_batch_session_failure_wrong_command",
+    "creation_batch_session_failure_wrong_command": TestSpec(
+        name="creation_batch_session_failure_wrong_command",
         description=textwrap.dedent("""\
             Test for creating a batch session with an invalid startup command.
             This test verifies that a batch session creation fails when the startup command is invalid.
@@ -103,6 +107,66 @@ INTERACTIVE_SESSION_TEST_SPECS = {
                     cluster_size=3,
                 ),
             ]
+        },
+    ),
+    "execution_command_on_interactive_session_success": TestSpec(
+        name="execution_command_on_interactive_session_success",
+        description=textwrap.dedent("""\
+            Test for executing code in an interactive session.
+            This test verifies that code can be executed in an interactive session, and that the session transitions through the expected lifecycle events.
+            The test will:
+            1. Create an interactive session with the specified image and resources.
+            2. Execute a command in the session and verify the output.
+            3. Assert that the session is running after execution.
+            4. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(InteractiveSessionExecuteCodeSuccess()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ],
+            ContextName.CODE_EXECUTION: [
+                CodeExecutionDep(code='print("Hello, world!")', expected_result="Hello, world!\n"),
+                CodeExecutionDep(code="1 + 1", expected_result="2"),
+            ],
+        },
+    ),
+    "execution_command_on_interactive_session_failure_wrong_command": TestSpec(
+        name="execution_command_on_interactive_session_failure_wrong_command",
+        description=textwrap.dedent("""\
+            Test for executing code in an interactive session.
+            This test verifies that code can be executed in an interactive session, and that the session transitions through the expected lifecycle events.
+            The test will:
+            1. Create an interactive session with the specified image and resources.
+            2. Execute a command in the session and verify the output.
+            3. Assert that the session is running after execution.
+            4. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            InteractiveSessionExecuteCodeFailureWrongCommand()
+        ).with_wrappers(KeypairAuthTemplate, InteractiveSessionTemplate),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
         },
     ),
     "creation_interactive_session_failure_low_resources": TestSpec(
@@ -168,8 +232,8 @@ SESSION_TEMPLATE_TEST_SPECS = {
             ]
         },
     ),
-    "execution_batch_session_success_from_template": TestSpec(
-        name="execution_batch_session_success_from_template",
+    "creation_batch_session_success_from_template": TestSpec(
+        name="creation_batch_session_success_from_template",
         description=textwrap.dedent("""\
         Test for executing a session from a template.
         This test verifies that a session can be executed from a predefined template, and that it transitions through the expected lifecycle events.

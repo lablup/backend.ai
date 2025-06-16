@@ -24,6 +24,7 @@ class ContextName(enum.StrEnum):
     SSE = "sse"
     BATCH_SESSION = "batch_session"
     CLUSTER_CONFIG = "cluster_config"
+    CODE_EXECUTION = "code_execution"
     SESSION_TEMPLATE = "session_template"
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
 
