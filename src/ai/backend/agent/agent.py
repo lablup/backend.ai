@@ -2880,18 +2880,6 @@ class AbstractAgent(
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
-    def get_kernel_obj_from_container_id(
-        self, container_id: ContainerId
-    ) -> Optional[AbstractKernel]:
-        """
-        Get the kernel object from the container ID.
-        Returns None if the container ID is not found in the registry.
-        """
-        for kernel_obj in self.kernel_registry.values():
-            if kernel_obj.container_id == container_id:
-                return kernel_obj
-        return None
-
     @abstractmethod
     async def extract_image_command(self, image: str) -> str | None:
         raise NotImplementedError
