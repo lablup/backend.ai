@@ -1,14 +1,27 @@
 import textwrap
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
+from uuid import UUID
 
+from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import (
+    BatchSessionContext,
+    ClusterContext,
+    CreatedSessionIDContext,
     CreatedSessionTemplateIDContext,
     SessionContext,
 )
+from ai.backend.test.contexts.sse import (
+    SSEContext,
+)
 from ai.backend.test.contexts.tester import TestSpecMetaContext
+from ai.backend.test.templates.session.utils import (
+    verify_batch_session,
+    verify_interactive_session_creation,
+    verify_interactive_session_destruction,
+)
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -19,7 +32,7 @@ class SessionTemplateTemplate(WrapperTestTemplate):
     def name(self) -> str:
         return "session_template"
 
-    def build_json_template(self, session_type: str) -> str:
+    def _build_json_template(self, session_type: str) -> str:
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
         image = ImageContext.current()
@@ -70,8 +83,9 @@ class SessionTemplateTemplate(WrapperTestTemplate):
     async def _context(self) -> AsyncIterator[None]:
         client_session = ClientSessionContext.current()
         # TODO: Inject session type from contextvar
-        template = self.build_json_template(session_type="interactive")
+        template = self._build_json_template(session_type="interactive")
 
+        template_id = None
         try:
             result = await client_session.SessionTemplate.create(template)
             template_id = result.template_id
@@ -79,5 +93,91 @@ class SessionTemplateTemplate(WrapperTestTemplate):
             with CreatedSessionTemplateIDContext.with_current(template_id):
                 yield
         finally:
-            await client_session.SessionTemplate(template_id).delete()
+            if template_id:
+                await client_session.SessionTemplate(template_id).delete()
+            pass
+
+
+class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
+    @property
+    def name(self) -> str:
+        return "batch_session_from_template"
+
+    async def _verify_session_creation(
+        self, client_session: AsyncSession, session_name: str
+    ) -> UUID:
+        cluster_cfg = ClusterContext.current()
+        batch_cfg = BatchSessionContext.current()
+        template_id = CreatedSessionTemplateIDContext.current()
+        timeout = SSEContext.current().timeout
+
+        async def create_session():
+            return await client_session.ComputeSession.create_from_template(
+                template_id,
+                type_="batch",
+                startup_command=batch_cfg.startup_command,
+                name=session_name,
+                cluster_mode=cluster_cfg.cluster_mode,
+                cluster_size=cluster_cfg.cluster_size,
+            )
+
+        return await verify_batch_session(client_session, session_name, timeout, create_session)
+
+    @override
+    @actxmgr
+    async def _context(self) -> AsyncIterator[None]:
+        spec_meta = TestSpecMetaContext.current()
+        test_id = spec_meta.test_id
+        client_session = ClientSessionContext.current()
+        session_name = f"test_session_{str(test_id)}"
+
+        session_id = await self._verify_session_creation(client_session, session_name)
+        with CreatedSessionIDContext.with_current(session_id):
+            yield
+
+
+class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
+    @property
+    def name(self) -> str:
+        return "interactive_session_from_template"
+
+    async def _verify_session_creation(
+        self, client_session: AsyncSession, session_name: str
+    ) -> UUID:
+        cluster_cfg = ClusterContext.current()
+        timeout = SSEContext.current().timeout
+        template_id = CreatedSessionTemplateIDContext.current()
+
+        async def create_session():
+            return await client_session.ComputeSession.create_from_template(
+                template_id,
+                type_="interactive",
+                name=session_name,
+                cluster_mode=cluster_cfg.cluster_mode,
+                cluster_size=cluster_cfg.cluster_size,
+            )
+
+        return await verify_interactive_session_creation(
+            client_session, session_name, timeout, create_session
+        )
+
+    async def _verify_session_destruction(
+        self, client_session: AsyncSession, session_name: str
+    ) -> None:
+        timeout = SSEContext.current().timeout
+        await verify_interactive_session_destruction(client_session, session_name, timeout)
+
+    @override
+    @actxmgr
+    async def _context(self) -> AsyncIterator[None]:
+        spec_meta = TestSpecMetaContext.current()
+        test_id = spec_meta.test_id
+        client_session = ClientSessionContext.current()
+        session_name = f"test_session_{str(test_id)}"
+        try:
+            session_id = await self._verify_session_creation(client_session, session_name)
+            with CreatedSessionIDContext.with_current(session_id):
+                yield
+        finally:
+            await self._verify_session_destruction(client_session, session_name)
             pass

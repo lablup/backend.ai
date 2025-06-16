@@ -1,10 +1,8 @@
-import asyncio
 from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
 from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
-from ai.backend.common.json import load_json
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import (
@@ -16,6 +14,10 @@ from ai.backend.test.contexts.sse import (
     SSEContext,
 )
 from ai.backend.test.contexts.tester import TestSpecMetaContext
+from ai.backend.test.templates.session.utils import (
+    verify_interactive_session_creation,
+    verify_interactive_session_destruction,
+)
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -27,103 +29,32 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         return "interactive_session"
 
     async def _verify_session_creation(
-        self,
-        client_session: AsyncSession,
-        session_name: str,
+        self, client_session: AsyncSession, session_name: str
     ) -> UUID:
-        image_config = ImageContext.current()
-        cluster_configs = ClusterContext.current()
-        sse_config = SSEContext.current()
-        session_config = SessionContext.current()
+        image_cfg = ImageContext.current()
+        cluster_cfg = ClusterContext.current()
+        session_cfg = SessionContext.current()
+        timeout = SSEContext.current().timeout
 
-        EXPECTED_EVENTS = {
-            "session_enqueued",
-            "session_scheduled",
-            "kernel_preparing",
-            "kernel_creating",
-            "kernel_started",
-            "session_started",
-        }
+        async def create_session():
+            return await client_session.ComputeSession.get_or_create(
+                image_cfg.name,
+                resources=session_cfg.resources,
+                type_="interactive",
+                name=session_name,
+                cluster_mode=cluster_cfg.cluster_mode,
+                cluster_size=cluster_cfg.cluster_size,
+            )
 
-        collected_events = set()
-
-        async def collect_events():
-            async with client_session.ComputeSession(session_name).listen_events() as events:
-                async for event in events:
-                    collected_events.add(event.event)
-                    if collected_events == EXPECTED_EVENTS:
-                        # print("All expected events received.")
-                        break
-
-        listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
+        return await verify_interactive_session_creation(
+            client_session, session_name, timeout, create_session
         )
-
-        created_session = await client_session.ComputeSession.get_or_create(
-            image_config.name,
-            resources=session_config.resources,
-            type_="interactive",
-            name=session_name,
-            cluster_mode=cluster_configs.cluster_mode,
-            cluster_size=cluster_configs.cluster_size,
-        )
-
-        assert created_session.created, "Session should be created successfully"
-        assert created_session.name == session_name, "Session name should match the provided name"
-
-        try:
-            await listener_task
-            assert created_session.status == "RUNNING", "Session should be running"
-
-            return created_session.id
-        except asyncio.TimeoutError as e:
-            raise asyncio.TimeoutError(
-                f"Timed out after {sse_config.timeout}s; events received so far: {collected_events}"
-            ) from e
 
     async def _verify_session_destruction(
-        self,
-        client_session: AsyncSession,
-        session_name: str,
+        self, client_session: AsyncSession, session_name: str
     ) -> None:
-        sse_config = SSEContext.current()
-        EXPECTED_EVENTS = {
-            "session_terminating",
-            "session_terminated",
-            "kernel_terminating",
-            "kernel_terminated",
-        }
-
-        collected_events = set()
-
-        async def collect_events():
-            async with client_session.ComputeSession(session_name).listen_events() as events:
-                async for event in events:
-                    data = load_json(event.data)
-                    assert data["reason"] == "user-requested", (
-                        f"Session should be terminated by user request, Actual reason: {data['reason']}"
-                    )
-
-                    collected_events.add(event.event)
-                    if collected_events == EXPECTED_EVENTS:
-                        # print("All expected events received.")
-                        break
-
-        listener_task = asyncio.create_task(
-            asyncio.wait_for(collect_events(), timeout=sse_config.timeout)
-        )
-
-        result = await client_session.ComputeSession(session_name).destroy()
-        assert result["stats"]["status"] == "terminated", (
-            f"Session should be terminated, actual reason: {result['stats']['reason']}"
-        )
-
-        try:
-            await listener_task
-        except asyncio.TimeoutError as e:
-            raise asyncio.TimeoutError(
-                f"Timed out after {sse_config.timeout}s; events received so far: {collected_events}"
-            ) from e
+        timeout = SSEContext.current().timeout
+        await verify_interactive_session_destruction(client_session, session_name, timeout)
 
     @override
     @actxmgr
