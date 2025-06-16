@@ -1311,7 +1311,7 @@ class AbstractAgent(
                     if kernel_obj is not None:
                         host_ports = kernel_obj.get("host_ports")
                         if host_ports is not None:
-                            self.restore_ports(host_ports)
+                            self._restore_ports(host_ports)
                         await kernel_obj.close()
                 finally:
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
@@ -1333,7 +1333,7 @@ class AbstractAgent(
                     if ev.done_future is not None and not ev.done_future.done():
                         ev.done_future.set_result(None)
 
-    def restore_ports(self, host_ports: Iterable[int]) -> None:
+    def _restore_ports(self, host_ports: Iterable[int]) -> None:
         # Restore used ports to the port pool.
         port_range = self.local_config["container"]["port-range"]
         # Exclude out-of-range ports, because when the agent restarts
@@ -1379,7 +1379,7 @@ class AbstractAgent(
                 await kernel_obj.close()
                 host_ports = kernel_obj.get("host_ports")
                 if host_ports is not None:
-                    self.restore_ports(host_ports)
+                    self._restore_ports(host_ports)
             log.info("purged container (kernel:{}, container:{})", kernel_id, container.id)
 
     async def remove_orphaned_kernel_registry(
@@ -1394,7 +1394,7 @@ class AbstractAgent(
                 await kernel_obj.close()
                 host_ports = kernel_obj.get("host_ports")
                 if host_ports is not None:
-                    self.restore_ports(host_ports)
+                    self._restore_ports(host_ports)
                 del self.kernel_registry[kid]
                 log.info("removed orphaned kernel registry (kernel:{})", kid)
 
