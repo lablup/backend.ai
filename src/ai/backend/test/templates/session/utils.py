@@ -41,7 +41,9 @@ async def verify_session_events(
                     return
 
                 if ev.event in failure_events:
-                    raise RuntimeError(f"Session failed with event: {ev.event}")
+                    raise RuntimeError(
+                        f"Session failed with event: {ev.event}, Expected event: {expected_event}"
+                    )
 
     listener = asyncio.create_task(asyncio.wait_for(collect_events(), timeout))
     try:

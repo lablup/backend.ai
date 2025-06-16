@@ -75,7 +75,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
                 session_name,
                 timeout,
                 "session_terminated",
-                {"session_cancelled", "session_failure"},
+                {"session_failure", "session_cancelled"},
                 expected_termination_reason="user-requested",
             )
         )
