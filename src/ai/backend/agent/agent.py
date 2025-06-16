@@ -1349,13 +1349,13 @@ class AbstractAgent(
         containers_to_destroy = [
             (kernel_id, cont) for kernel_id, cont in alive_containers if cont.id in container_ids
         ]
-        log.info("purge_container(): {0} containers", len(containers_to_destroy))
+        log.info("purge {0} containers", len(containers_to_destroy))
         for kernel_id, container in containers_to_destroy:
             try:
                 await self.destroy_kernel(kernel_id, container.id)
             except Exception as e:
                 log.exception(
-                    "purge_container(): failed to destroy kernel (kernel:{}, container:{}): {}",
+                    "failed to destroy kernel (kernel:{}, container:{}): {}",
                     kernel_id,
                     container.human_readable_id,
                     repr(e),
@@ -1366,7 +1366,7 @@ class AbstractAgent(
                 await self.clean_kernel(kernel_id, container.id, restarting=False)
             except Exception as e:
                 log.exception(
-                    "purge_container(): failed to clean kernel (kernel:{}, container:{}): {}",
+                    "failed to clean kernel (kernel:{}, container:{}): {}",
                     kernel_id,
                     container.human_readable_id,
                     repr(e),

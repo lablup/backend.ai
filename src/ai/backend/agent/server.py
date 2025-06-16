@@ -796,21 +796,17 @@ class AgentRPCServer(aobject):
         try:
             await self.agent.purge_container(container_ids)
         except Exception as e:
-            log.exception("force_clean_containers(): failed to purge containers: {0}", repr(e))
+            log.exception("failed to purge containers: {0}", repr(e))
 
         try:
             await self.agent.remove_orphaned_kernel_registry()
         except Exception as e:
-            log.exception(
-                "force_clean_containers(): failed to remove orphaned kernels: {0}", repr(e)
-            )
+            log.exception("failed to remove orphaned kernels: {0}", repr(e))
 
         try:
             await self.agent.reconstruct_resource_usage()
         except Exception as e:
-            log.exception(
-                "force_clean_containers(): failed to reconstruct resource usage: {0}", repr(e)
-            )
+            log.exception("failed to reconstruct resource usage: {0}", repr(e))
 
     @rpc_function
     @collect_error
