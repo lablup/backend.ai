@@ -6,7 +6,7 @@ from ai.backend.test.tester.config import (
 )
 
 
-class ImageConfigContext(BaseTestContext[ImageConfig]):
+class ImageContext(BaseTestContext[ImageConfig]):
     @override
     @classmethod
     def name(cls) -> ContextName:

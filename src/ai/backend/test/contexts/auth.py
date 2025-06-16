@@ -6,19 +6,19 @@ from ai.backend.test.tester.config import (
 )
 
 
-class KeypairConfigContext(BaseTestContext[KeyPairConfig]):
+class KeypairContext(BaseTestContext[KeyPairConfig]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.KEYPAIR
 
 
-class LoginCredentialConfigContext(BaseTestContext[LoginCredentialConfig]):
+class LoginCredentialContext(BaseTestContext[LoginCredentialConfig]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.LOGIN_CREDENTIAL
 
 
-class EndpointConfigContext(BaseTestContext[EndpointConfig]):
+class EndpointContext(BaseTestContext[EndpointConfig]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.ENDPOINT

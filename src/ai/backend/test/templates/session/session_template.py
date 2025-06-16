@@ -3,10 +3,10 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.image import ImageConfigContext
+from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import (
     CreatedSessionTemplateIDContext,
-    SessionConfigContext,
+    SessionContext,
 )
 from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.template import (
@@ -22,13 +22,13 @@ class SessionTemplateTemplate(WrapperTestTemplate):
     def build_json_template(self, session_type: str) -> str:
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        image = ImageConfigContext.current()
+        image = ImageContext.current()
 
         if image.name is None:
             raise ValueError("Image name is not set in ImageConfigContext.")
         image_name = image.name.split(":")[0]
         image_tag = image.name.split(":")[1]
-        session_config = SessionConfigContext.current()
+        session_config = SessionContext.current()
 
         if session_config.resources is None:
             raise ValueError("SessionConfigContext resources are not set.")

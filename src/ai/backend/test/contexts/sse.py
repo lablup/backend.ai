@@ -6,7 +6,7 @@ from ai.backend.test.tester.config import (
 )
 
 
-class SSEConfigContext(BaseTestContext[SSEConfig]):
+class SSEContext(BaseTestContext[SSEConfig]):
     @override
     @classmethod
     def name(cls) -> ContextName:

@@ -6,14 +6,14 @@ from uuid import UUID
 from ai.backend.client.session import AsyncSession
 from ai.backend.common.json import load_json
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.image import ImageConfigContext
+from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import (
-    ClusterConfigContext,
+    ClusterContext,
     CreatedSessionIDContext,
-    SessionConfigContext,
+    SessionContext,
 )
 from ai.backend.test.contexts.sse import (
-    SSEConfigContext,
+    SSEContext,
 )
 from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.template import (
@@ -31,10 +31,10 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         client_session: AsyncSession,
         session_name: str,
     ) -> UUID:
-        image_config = ImageConfigContext.current()
-        cluster_configs = ClusterConfigContext.current()
-        sse_config = SSEConfigContext.current()
-        session_config = SessionConfigContext.current()
+        image_config = ImageContext.current()
+        cluster_configs = ClusterContext.current()
+        sse_config = SSEContext.current()
+        session_config = SessionContext.current()
 
         EXPECTED_EVENTS = {
             "session_enqueued",
@@ -86,7 +86,7 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         client_session: AsyncSession,
         session_name: str,
     ) -> None:
-        sse_config = SSEConfigContext.current()
+        sse_config = SSEContext.current()
         EXPECTED_EVENTS = {
             "session_terminating",
             "session_terminated",

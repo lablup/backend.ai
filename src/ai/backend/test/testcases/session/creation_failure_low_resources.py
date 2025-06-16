@@ -2,14 +2,14 @@ from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import image_fields
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.image import ImageConfigContext
+from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.templates.template import TestCode
 
 
 class SessionCreationFailureLowResources(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        image = ImageConfigContext.current()
+        image = ImageContext.current()
         session_name = "test-session-creation-failure"
 
         result = await client_session.Image.get(

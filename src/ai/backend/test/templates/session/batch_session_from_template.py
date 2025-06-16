@@ -6,13 +6,13 @@ from uuid import UUID
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.session import (
-    BatchSessionConfigContext,
-    ClusterConfigContext,
+    BatchSessionContext,
+    ClusterContext,
     CreatedSessionIDContext,
     CreatedSessionTemplateIDContext,
 )
 from ai.backend.test.contexts.sse import (
-    SSEConfigContext,
+    SSEContext,
 )
 from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.template import (
@@ -30,9 +30,9 @@ class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
         client_session: AsyncSession,
         session_name: str,
     ) -> UUID:
-        cluster_configs = ClusterConfigContext.current()
-        sse_config = SSEConfigContext.current()
-        batch_session_config = BatchSessionConfigContext.current()
+        cluster_configs = ClusterContext.current()
+        sse_config = SSEContext.current()
+        batch_session_config = BatchSessionContext.current()
 
         EXPECTED_EVENTS = {
             "session_enqueued",

@@ -3,10 +3,10 @@ import asyncio
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.image import ImageConfigContext
-from ai.backend.test.contexts.session import SessionConfigContext
+from ai.backend.test.contexts.image import ImageContext
+from ai.backend.test.contexts.session import SessionContext
 from ai.backend.test.contexts.sse import (
-    SSEConfigContext,
+    SSEContext,
 )
 from ai.backend.test.templates.template import TestCode
 
@@ -14,9 +14,9 @@ from ai.backend.test.templates.template import TestCode
 class BatchSessionCreationFailureWrongCommand(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        image = ImageConfigContext.current()
-        sse_config = SSEConfigContext.current()
-        session_config = SessionConfigContext.current()
+        image = ImageContext.current()
+        sse_config = SSEContext.current()
+        session_config = SessionContext.current()
 
         session_name = "test-batch-session-execution-failure"
 
