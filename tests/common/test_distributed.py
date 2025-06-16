@@ -35,6 +35,7 @@ from ai.backend.common.lock import (
     FileLock,
     RedisLock,
 )
+from ai.backend.common.message_queue.queue import BroadcastChannel, QueueStream
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AgentId, HostPortPair, RedisConnectionInfo, RedisTarget
 
@@ -121,9 +122,13 @@ async def run_timer(
     redis_mq = RedisQueue(
         stream_redis,
         RedisMQArgs(
-            stream_key="events",
+            anycast_stream_key=QueueStream.EVENTS,
+            broadcast_channel=BroadcastChannel.ALL,
+            consume_stream_keys=[QueueStream.EVENTS],
+            subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
 
@@ -178,9 +183,13 @@ def etcd_timer_node_process(
         redis_mq = RedisQueue(
             stream_redis,
             RedisMQArgs(
-                stream_key=f"events-{timer_ctx.test_case_ns}",
+                anycast_stream_key=QueueStream.EVENTS,
+                broadcast_channel=BroadcastChannel.ALL,
+                consume_stream_keys=[QueueStream.EVENTS],
+                subscribe_channels=[BroadcastChannel.ALL],
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=node_id,
+                db=REDIS_STREAM_DB,
             ),
         )
 
@@ -262,9 +271,13 @@ class TimerNode(threading.Thread):
         redis_mq = RedisQueue(
             stream_redis,
             RedisMQArgs(
-                stream_key=f"events-{self.test_case_ns}",
+                anycast_stream_key=QueueStream.EVENTS,
+                broadcast_channel=BroadcastChannel.ALL,
+                consume_stream_keys=[QueueStream.EVENTS],
+                subscribe_channels=[BroadcastChannel.ALL],
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=node_id,
+                db=REDIS_STREAM_DB,
             ),
         )
         event_dispatcher = EventDispatcher(
@@ -476,9 +489,13 @@ async def test_global_timer_join_leave(
     redis_mq = RedisQueue(
         stream_redis,
         RedisMQArgs(
-            stream_key=f"events-{test_case_ns}",
+            anycast_stream_key=QueueStream.EVENTS,
+            broadcast_channel=BroadcastChannel.ALL,
+            consume_stream_keys=[QueueStream.EVENTS],
+            subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
     event_dispatcher = EventDispatcher(

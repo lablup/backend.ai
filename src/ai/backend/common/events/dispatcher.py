@@ -28,10 +28,10 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.message_queue.queue import AbstractMessageQueue, MessageId
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import msgpack
+from ..message_queue.queue import AbstractMessageQueue, MessageId
 from ..types import (
     AgentId,
 )
@@ -603,11 +603,11 @@ class EventDispatcher(EventDispatcherGroup):
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:
                 return
-            decoded_event_name = msg.payload[b"name"].decode()
+            decoded_event_name = msg.payload["name"].decode()
             await self.dispatch_subscribers(
                 decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
+                AgentId(msg.payload["source"].decode()),
+                msgpack.unpackb(msg.payload["args"]),
             )
 
 
@@ -649,7 +649,7 @@ class EventProducer:
             b"args": msgpack.packb(event.serialize()),
         }
         # TODO: impl anycast message queue
-        await self._msg_queue.send(raw_event)
+        await self._msg_queue.anycast(raw_event)
 
     async def broadcast_event(
         self,
@@ -663,12 +663,12 @@ class EventProducer:
             source_bytes = source_override.encode()
 
         raw_event = {
-            b"name": event.event_name().encode(),
-            b"source": source_bytes,
-            b"args": msgpack.packb(event.serialize()),
+            "name": event.event_name().encode(),
+            "source": source_bytes,
+            "args": msgpack.packb(event.serialize()),
         }
         # TODO: impl broadcast message queue
-        await self._msg_queue.send(raw_event)
+        await self._msg_queue.broadcast(raw_event)
 
     async def anycast_and_broadcast_event(
         self,

@@ -20,6 +20,7 @@ from ai.backend.common.events.types import (
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
+from ai.backend.common.message_queue.queue import BroadcastChannel, QueueStream
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AgentId, RedisTarget
 
@@ -69,9 +70,13 @@ async def test_dispatch(redis_container) -> None:
     redis_mq = RedisQueue(
         stream_redis,
         RedisMQArgs(
-            stream_key="events",
+            anycast_stream_key=QueueStream.EVENTS,
+            broadcast_channel=BroadcastChannel.ALL,
+            consume_stream_keys=[QueueStream.EVENTS],
+            subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
     dispatcher = EventDispatcher(
@@ -137,9 +142,13 @@ async def test_error_on_dispatch(redis_container) -> None:
     redis_mq = RedisQueue(
         stream_redis,
         RedisMQArgs(
-            stream_key="events",
+            anycast_stream_key=QueueStream.EVENTS,
+            broadcast_channel=BroadcastChannel.ALL,
+            consume_stream_keys=[QueueStream.EVENTS],
+            subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
 

@@ -19,6 +19,24 @@ class RedisRole(StrEnum):
     STREAM = "stream"
     STREAM_LOCK = "stream_lock"
 
+    @property
+    def db_index(self) -> int:
+        match self:
+            case RedisRole.STATISTICS:
+                return REDIS_STATISTICS_DB
+            case RedisRole.RATE_LIMIT:
+                return REDIS_RATE_LIMIT_DB
+            case RedisRole.LIVE:
+                return REDIS_LIVE_DB
+            case RedisRole.IMAGE:
+                return REDIS_IMAGE_DB
+            case RedisRole.STREAM:
+                return REDIS_STREAM_DB
+            case RedisRole.STREAM_LOCK:
+                return REDIS_STREAM_LOCK
+            case _:
+                raise ValueError(f"Unknown Redis role: {self}")
+
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10
 

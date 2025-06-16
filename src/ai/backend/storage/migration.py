@@ -25,6 +25,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.message_queue.queue import BroadcastChannel, QueueStream
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
@@ -241,9 +242,13 @@ async def check_and_upgrade(
     redis_mq = RedisQueue(
         stream_redis,
         RedisMQArgs(
-            stream_key="events",
+            anycast_stream_key=QueueStream.EVENTS,
+            broadcast_channel=BroadcastChannel.ALL,
+            consume_stream_keys=[],
+            subscribe_channels=[],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
+            db=RedisRole.STREAM.db_index,
         ),
     )
     event_producer = EventProducer(

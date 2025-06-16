@@ -1,3 +1,4 @@
+import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import AsyncGenerator
@@ -5,6 +6,14 @@ from typing import AsyncGenerator
 type MessageId = bytes
 _DEFAULT_RETRY_FIELD = b"_retry_count"
 _DEFAULT_MAX_RETRIES = 3
+
+
+class QueueStream(enum.StrEnum):
+    EVENTS = "events"
+
+
+class BroadcastChannel(enum.StrEnum):
+    ALL = "all"
 
 
 @dataclass
@@ -32,9 +41,14 @@ class MQMessage:
         return int(self.payload.get(_DEFAULT_RETRY_FIELD, b"0"))
 
 
+@dataclass
+class BroadcastMessage:
+    payload: dict[bytes, bytes]
+
+
 class AbstractMessageQueue(ABC):
     @abstractmethod
-    async def send(
+    async def anycast(
         self,
         payload: dict[bytes, bytes],
     ) -> None:
@@ -45,6 +59,20 @@ class AbstractMessageQueue(ABC):
         The new message will be added to the end of the queue.
         The message will be delivered to one consumer.
         """
+        raise NotImplementedError("Subclasses must implement the send method.")
+
+    @abstractmethod
+    async def broadcast(
+        self,
+        payload: dict[str, bytes],
+    ) -> None:
+        """
+        Broadcast a message to all subscribers of the queue.
+
+        The message will be delivered to all subscribers.
+        Broadcasted messages can be lost if there are no subscribers at the time of sending.
+        """
+        raise NotImplementedError("Subclasses must implement the send method.")
 
     @abstractmethod
     async def consume_queue(
@@ -57,11 +85,12 @@ class AbstractMessageQueue(ABC):
         This is a normal queue, so the message will be delivered to one consumer.
         Messages are consumed only once by one consumer.
         """
+        raise NotImplementedError("Subclasses must implement the consume_queue method.")
 
     @abstractmethod
     async def subscribe_queue(
         self,
-    ) -> AsyncGenerator[MQMessage, None]:
+    ) -> AsyncGenerator[BroadcastMessage, None]:
         """
         Subscribe to messages from the queue.
         This method will block until a message is available.
@@ -69,6 +98,7 @@ class AbstractMessageQueue(ABC):
         This is a broadcast queue, so the message will be delivered to all subscribers.
         The subscriber should call `done` method to acknowledge the message when it is processed.
         """
+        raise NotImplementedError("Subclasses must implement the subscribe_queue method.")
 
     @abstractmethod
     async def done(
@@ -82,6 +112,7 @@ class AbstractMessageQueue(ABC):
         If the consumer does not call `done`, the message will be re-delivered after the
         some timeout period.
         """
+        raise NotImplementedError("Subclasses must implement the done method.")
 
     @abstractmethod
     async def close(self) -> None:
@@ -91,3 +122,4 @@ class AbstractMessageQueue(ABC):
         This method should be called when the message queue is no longer needed.
         It will close all connections and stop all background tasks.
         """
+        raise NotImplementedError("Subclasses must implement the close method.")

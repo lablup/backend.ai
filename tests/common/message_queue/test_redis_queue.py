@@ -36,7 +36,7 @@ async def redis_conn(redis_container):
 @pytest.fixture
 def queue_args():
     return RedisMQArgs(
-        stream_key="test-stream",
+        anycast_stream_key="test-stream",
         group_name="test-group",
         node_id="test-node",
     )

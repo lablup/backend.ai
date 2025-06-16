@@ -139,9 +139,12 @@ from ai.backend.common.json import (
     load_json,
 )
 from ai.backend.common.lock import FileLock
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
-from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
+from ai.backend.common.message_queue.generator import make_message_queue
+from ai.backend.common.message_queue.queue import (
+    BroadcastChannel,
+    QueueStream,
+)
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -168,9 +171,7 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
-    RedisConnectionInfo,
     RedisProfileTarget,
-    RedisTarget,
     RuntimeVariant,
     Sentinel,
     ServicePort,
@@ -769,7 +770,22 @@ class AbstractAgent(
             name="event_producer.stream",
             db=REDIS_STREAM_DB,
         )
-        mq = self._make_message_queue(stream_redis_target, stream_redis)
+        mq = make_message_queue(
+            redis_profile_target,
+            RedisRole.STREAM,
+            RedisMQArgs(
+                anycast_stream_key=QueueStream.EVENTS,
+                broadcast_channel=BroadcastChannel.ALL,
+                consume_stream_keys=[],  # No need to consume from other streams
+                subscribe_channels=[BroadcastChannel.ALL],
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=self.id,
+                db=RedisRole.STREAM.db_index,
+            ),
+            use_experimental_redis_event_dispatcher=self.local_config["agent"].get(
+                "use-experimental-redis-event-dispatcher"
+            ),
+        )
         self.event_producer = EventProducer(
             mq,
             source=self.id,
@@ -882,32 +898,6 @@ class AbstractAgent(
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
-
-    def _make_message_queue(
-        self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
-    ) -> AbstractMessageQueue:
-        """
-        Returns the message queue object.
-        """
-        node_id = self.local_config["agent"]["id"]
-        if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
-            return HiRedisQueue(
-                stream_redis_target,
-                HiRedisMQArgs(
-                    stream_key="events",
-                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                    node_id=node_id,
-                    db=REDIS_STREAM_DB,
-                ),
-            )
-        return RedisQueue(
-            stream_redis,
-            RedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-            ),
-        )
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         """

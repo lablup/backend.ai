@@ -59,9 +59,12 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import ErrorCode
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
-from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
+from ai.backend.common.message_queue.generator import make_message_queue
+from ai.backend.common.message_queue.queue import (
+    BroadcastChannel,
+    QueueStream,
+)
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
@@ -707,7 +710,27 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.message_queue = _make_message_queue(root_ctx)
+    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+        root_ctx.config_provider.config.redis.model_dump()
+    )
+    root_ctx.message_queue = make_message_queue(
+        redis_profile_target,
+        RedisRole.STREAM,
+        RedisMQArgs(
+            anycast_stream_key=QueueStream.EVENTS,
+            broadcast_channel=BroadcastChannel.ALL,
+            consume_stream_keys=[
+                QueueStream.EVENTS,
+            ],
+            subscribe_channels=[
+                BroadcastChannel.ALL,
+            ],
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=root_ctx.config_provider.config.manager.id,
+            db=RedisRole.STREAM.db_index,
+        ),
+        use_experimental_redis_event_dispatcher=root_ctx.config_provider.config.manager.use_experimental_redis_event_dispatcher,
+    )
     yield
     await root_ctx.message_queue.close()
 
@@ -745,39 +768,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.event_dispatcher.start()
     yield
     await root_ctx.event_dispatcher.close()
-
-
-def _make_message_queue(
-    root_ctx: RootContext,
-) -> AbstractMessageQueue:
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
-    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-    )
-    node_id = root_ctx.config_provider.config.manager.id
-    if root_ctx.config_provider.config.manager.use_experimental_redis_event_dispatcher:
-        return HiRedisQueue(
-            stream_redis_target,
-            HiRedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-                db=REDIS_STREAM_DB,
-            ),
-        )
-    return RedisQueue(
-        stream_redis,
-        RedisMQArgs(
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
-        ),
-    )
 
 
 @actxmgr
