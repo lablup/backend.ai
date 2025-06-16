@@ -4,16 +4,17 @@ from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.templates.template import TestCode
+from ai.backend.test.utils.exceptions import UnexpectedSuccess
 
 
 class SessionCreationFailureLowResources(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        image = ImageContext.current()
+        image_dep = ImageContext.current()
         session_name = "test-session-creation-failure"
 
         result = await client_session.Image.get(
-            image.name, image.architecture, fields=[image_fields["labels"]]
+            image_dep.name, image_dep.architecture, fields=[image_fields["labels"]]
         )
         labels = result["labels"]
         min_mem_label = next(
@@ -29,15 +30,15 @@ class SessionCreationFailureLowResources(TestCode):
 
         try:
             await client_session.ComputeSession.get_or_create(
-                image.name,
-                architecture=image.architecture,
+                image_dep.name,
+                architecture=image_dep.architecture,
                 name=session_name,
                 # This failed due to the need for additional space for shared memory.
                 resources={"cpu": 1, "mem": min_mem},
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
             )
-            assert False, "Expected BackendAPIError for low resources was not raised"
+            raise UnexpectedSuccess("Expected BackendAPIError for low resources was not raised")
         except BackendAPIError as e:
             assert e.status == 400
             assert e.data["error_code"] == "api_generic_invalid-parameters"

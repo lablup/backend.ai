@@ -59,13 +59,12 @@ class BatchSessionTemplate(WrapperTestTemplate):
 
         assert created.created, "Session should be created successfully"
         assert created.name == session_name, "Session name mismatch"
-
-        await listener
         assert created.status in {"TERMINATING", "TERMINATED"}, (
             f"Unexpected final status: {created.status}"
         )
         if created.id is None:
             raise RuntimeError("Session ID is None after creation")
+        await listener
         return created.id
 
     @override

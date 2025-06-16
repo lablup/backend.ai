@@ -40,9 +40,9 @@ class SessionTemplateTemplate(WrapperTestTemplate):
             raise ValueError("Image name is not set in ImageConfigContext.")
         image_name = image.name.split(":")[0]
         image_tag = image.name.split(":")[1]
-        session_config = SessionContext.current()
+        session_dep = SessionContext.current()
 
-        if session_config.resources is None:
+        if session_dep.resources is None:
             raise ValueError("SessionConfigContext resources are not set.")
 
         return textwrap.dedent(f"""
@@ -68,8 +68,8 @@ class SessionTemplateTemplate(WrapperTestTemplate):
                             "scaling_group": "default",
                             "mounts": {{}},
                             "resources": {{
-                                "cpu": "{session_config.resources["cpu"]}",
-                                "mem": "{session_config.resources["mem"]}"
+                                "cpu": "{session_dep.resources["cpu"]}",
+                                "mem": "{session_dep.resources["mem"]}"
                             }}
                         }}
                     }}
@@ -132,13 +132,12 @@ class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
         assert created.created, "Session should be created successfully"
         assert created.name == session_name, "Session name mismatch"
 
-        await listener
         assert created.status in {"TERMINATING", "TERMINATED"}, (
             f"Unexpected final status: {created.status}"
         )
         if created.id is None:
             raise RuntimeError("Session ID is None after creation")
-
+        await listener
         return created.id
 
     @override
@@ -186,11 +185,10 @@ class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
 
         assert created.created, "Session creation failed"
         assert created.name == session_name
-
-        await listener
         assert created.status == "RUNNING", f"Expected RUNNING, got {created.status}"
         if created.id is None:
             raise RuntimeError("Session ID is None after creation")
+        await listener
         return created.id
 
     async def _verify_session_destruction(
@@ -229,4 +227,3 @@ class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
         finally:
             if session_id:
                 await self._verify_session_destruction(client_session, session_name)
-            pass

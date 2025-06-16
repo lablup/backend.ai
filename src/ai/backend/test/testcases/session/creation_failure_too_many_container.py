@@ -6,14 +6,15 @@ from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import SessionContext
 from ai.backend.test.templates.template import TestCode
+from ai.backend.test.utils.exceptions import UnexpectedSuccess
 
 
 class SessionCreationFailureTooManyContainer(TestCode):
     async def test(self) -> None:
         keypair = KeypairContext.current()
         client_session = ClientSessionContext.current()
-        image = ImageContext.current()
-        session_config = SessionContext.current()
+        image_dep = ImageContext.current()
+        session_dep = SessionContext.current()
         session_name = "test-session-creation-failure"
 
         access_key = keypair.access_key
@@ -28,14 +29,14 @@ class SessionCreationFailureTooManyContainer(TestCode):
 
         try:
             await client_session.ComputeSession.get_or_create(
-                image.name,
-                architecture=image.architecture,
+                image_dep.name,
+                architecture=image_dep.architecture,
                 name=session_name,
-                resources=session_config.resources,
+                resources=session_dep.resources,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=max_containers_per_session + 1,  # Exceeding the limit
             )
-            assert False, (
+            raise UnexpectedSuccess(
                 "Expected BackendAPIError for exceeding max containers limit was not raised"
             )
         except BackendAPIError as e:

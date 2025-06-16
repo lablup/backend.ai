@@ -58,10 +58,10 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         assert created.created, "Session creation failed"
         assert created.name == session_name
 
-        await listener
         assert created.status == "RUNNING", f"Expected RUNNING, got {created.status}"
         if created.id is None:
             raise RuntimeError("Session ID is None after creation")
+        await listener
         return created.id
 
     async def _verify_session_destruction(
@@ -101,4 +101,3 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         finally:
             if session_id:
                 await self._verify_session_destruction(client_session, session_name)
-            pass
