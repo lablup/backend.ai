@@ -1345,11 +1345,9 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
-    async def purge_container(
-        self, kernel_id_container_pairs: Sequence[KernelIdContainerPair]
-    ) -> None:
-        log.info("purge {0} containers", len(kernel_id_container_pairs))
-        for kernel_id, container in kernel_id_container_pairs:
+    async def purge_container(self, containers_to_destroy: Sequence[KernelIdContainerPair]) -> None:
+        log.info("purge {0} containers", len(containers_to_destroy))
+        for kernel_id, container in containers_to_destroy:
             try:
                 await self.destroy_kernel(kernel_id, container.id)
             except Exception as e:
@@ -1380,25 +1378,23 @@ class AbstractAgent(
                 host_ports = kernel_obj.get("host_ports")
                 if host_ports is not None:
                     self.restore_ports(host_ports)
+            log.info("purged container (kernel:{}, container:{})", kernel_id, container.id)
 
     async def remove_orphaned_kernel_registry(
-        self, kernel_id_container_pairs: Sequence[KernelIdContainerPair]
+        self, containers_to_destroy: Sequence[KernelIdContainerPair]
     ) -> None:
         # TODO: Reduce `kernel_registry` dependencies and roles
-        alive_kernel_ids = {kid for kid, _ in kernel_id_container_pairs}
-        new_registry: dict[KernelId, AbstractKernel] = {}
-        for kid, kernel_obj in self.kernel_registry.items():
-            if kid not in alive_kernel_ids:
-                log.warning(f"filter_kernel_registry_by_containers(): removing {kid} from registry")
+        for kid, _ in containers_to_destroy:
+            if kid in self.kernel_registry:
+                kernel_obj = self.kernel_registry[kid]
                 if kernel_obj.runner is not None:
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
                 host_ports = kernel_obj.get("host_ports")
                 if host_ports is not None:
                     self.restore_ports(host_ports)
-            else:
-                new_registry[kid] = kernel_obj
-        self.kernel_registry = new_registry
+                del self.kernel_registry[kid]
+                log.info("removed orphaned kernel registry (kernel:{})", kid)
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
@@ -1519,21 +1515,16 @@ class AbstractAgent(
         Enumerate the containers with the given status filter.
         """
 
-    async def reconstruct_resource_usage(
-        self, kernel_id_container_pairs: Optional[Sequence[KernelIdContainerPair]] = None
-    ) -> None:
+    async def reconstruct_resource_usage(self) -> None:
         """
         Reconstruct the resource alloc maps for each compute plugin from
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
         """
-        if kernel_id_container_pairs is None:
-            alive_containers = await self.enumerate_containers()
-        else:
-            alive_containers = kernel_id_container_pairs
+        containers = await self.enumerate_containers()
         async with self.resource_lock:
             for computer_ctx in self.computers.values():
                 computer_ctx.alloc_map.clear()
-            for kernel_id, container in alive_containers:
+            for kernel_id, container in containers:
                 for computer_ctx in self.computers.values():
                     try:
                         await computer_ctx.instance.restore_from_container(

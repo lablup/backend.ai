@@ -788,14 +788,16 @@ class AgentRPCServer(aobject):
     @collect_error
     async def purge_containers(
         self,
-        container_ids_to_destroy: list[str],
+        container_ids: list[str],
     ) -> None:
-        log.info("rpc::force_clean_containers(container_ids:{0})", container_ids_to_destroy)
+        log.info("rpc::force_clean_containers(container_ids:{0})", container_ids)
 
-        container_ids = set(ContainerId(cid) for cid in container_ids_to_destroy)
+        container_ids_to_destroy = set(ContainerId(cid) for cid in container_ids)
         alive_containers = await self.agent.enumerate_containers()
         containers_to_destroy = [
-            (kernel_id, cont) for kernel_id, cont in alive_containers if cont.id in container_ids
+            (kernel_id, cont)
+            for kernel_id, cont in alive_containers
+            if cont.id in container_ids_to_destroy
         ]
         try:
             await self.agent.purge_container(containers_to_destroy)
@@ -808,7 +810,7 @@ class AgentRPCServer(aobject):
             log.exception("failed to remove orphaned kernels: {0}", repr(e))
 
         try:
-            await self.agent.reconstruct_resource_usage(containers_to_destroy)
+            await self.agent.reconstruct_resource_usage()
         except Exception as e:
             log.exception("failed to reconstruct resource usage: {0}", repr(e))
 
