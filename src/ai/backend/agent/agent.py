@@ -860,10 +860,10 @@ class AbstractAgent(
                 )
             )
 
-        self._container_observer_runner = Runner(resources=[])
+        self._agent_runner = Runner(resources=[])
         container_observer = HeartbeatObserver(self, self.event_producer)
-        await self._container_observer_runner.register_observer(container_observer)
-        await self._container_observer_runner.start()
+        await self._agent_runner.register_observer(container_observer)
+        await self._agent_runner.start()
 
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
             log.info(
@@ -938,7 +938,7 @@ class AbstractAgent(
         for result in cancel_results:
             if isinstance(result, Exception):
                 log.error("timer cancellation error: {}", result)
-        await self._container_observer_runner.close()
+        await self._agent_runner.close()
 
         # Stop lifecycle event handler.
         await self.container_lifecycle_queue.put(_sentinel)
