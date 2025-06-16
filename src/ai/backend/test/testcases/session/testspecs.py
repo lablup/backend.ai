@@ -16,10 +16,10 @@ from ai.backend.test.testcases.session.creation_failure_low_resources import (
 from ai.backend.test.testcases.session.creation_failure_too_many_container import (
     SessionCreationFailureTooManyContainer,
 )
-from ai.backend.test.testcases.session.execution_failure_wrong_command import (
+from ai.backend.test.testcases.session.creation_failure_wrong_command import (
     BatchSessionCreationFailureWrongCommand,
 )
-from ai.backend.test.testcases.session.execution_success import (
+from ai.backend.test.testcases.session.execution import (
     InteractiveSessionExecuteCodeFailureWrongCommand,
     InteractiveSessionExecuteCodeSuccess,
 )
@@ -29,8 +29,8 @@ from ai.backend.test.tester.dependency import ClusterDep, CodeExecutionDep
 from ...templates.template import BasicTestTemplate, NopTestCode
 
 BATCH_SESSION_TEST_SPECS = {
-    "execution_batch_session_success": TestSpec(
-        name="execution_batch_session_success",
+    "creation_batch_session_success": TestSpec(
+        name="creation_batch_session_success",
         description=textwrap.dedent("""\
             Test for creating a single-node, single-container batch session.
             This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
@@ -60,8 +60,8 @@ BATCH_SESSION_TEST_SPECS = {
             ]
         },
     ),
-    "execution_batch_session_failure_wrong_command": TestSpec(
-        name="execution_batch_session_failure_wrong_command",
+    "creation_batch_session_failure_wrong_command": TestSpec(
+        name="creation_batch_session_failure_wrong_command",
         description=textwrap.dedent("""\
             Test for creating a batch session with an invalid startup command.
             This test verifies that a batch session creation fails when the startup command is invalid.
@@ -232,8 +232,8 @@ SESSION_TEMPLATE_TEST_SPECS = {
             ]
         },
     ),
-    "execution_batch_session_success_from_template": TestSpec(
-        name="execution_batch_session_success_from_template",
+    "creation_batch_session_success_from_template": TestSpec(
+        name="creation_batch_session_success_from_template",
         description=textwrap.dedent("""\
         Test for executing a session from a template.
         This test verifies that a session can be executed from a predefined template, and that it transitions through the expected lifecycle events.
