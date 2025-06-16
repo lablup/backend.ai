@@ -18,9 +18,9 @@ from .runner import TestRunner
 class Tester:
     _spec_manager: TestSpecManager
     _exporter_type: Type[TestExporter]
-    _semaphore: Optional[asyncio.Semaphore]
     _config_file_path: Path
     _config: Optional[TesterDep]
+    _semaphore_instance: Optional[asyncio.Semaphore]
 
     def __init__(
         self,
@@ -32,15 +32,16 @@ class Tester:
         self._exporter_type = exporter_type
         self._config_file_path = config_file_path
         self._config = None
-        self._semaphore = None
+        self._semaphore_instance = None
 
-    def _get_semaphore(self) -> asyncio.Semaphore:
+    @property
+    def _semaphore(self) -> asyncio.Semaphore:
         if not self._config:
             raise RuntimeError("Tester configuration is not loaded")
 
-        if self._semaphore is None:
-            self._semaphore = asyncio.Semaphore(self._config.runner.concurrency)
-        return self._semaphore
+        if self._semaphore_instance is None:
+            self._semaphore_instance = asyncio.Semaphore(self._config.runner.concurrency)
+        return self._semaphore_instance
 
     @aiotools.lru_cache(maxsize=1)
     async def _load_tester_config(self, config_path: Path) -> TesterDep:
@@ -51,7 +52,7 @@ class Tester:
             return config
 
     async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
-        async with self._get_semaphore():
+        async with self._semaphore:
             exporter = await self._exporter_type.create(sub_name)
             runner = TestRunner(spec, exporter)
             await runner.run()
