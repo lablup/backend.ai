@@ -45,9 +45,4 @@ async def verify_session_events(
                         f"Session failed with event: {ev.event}, Expected event: {expected_event}"
                     )
 
-    try:
-        await asyncio.wait_for(collect_events(), timeout)
-    except asyncio.TimeoutError as e:
-        raise asyncio.TimeoutError(
-            f"Timeout after {timeout}s; no success event received, Actual events: {collected_events}"
-        ) from e
+    await asyncio.wait_for(collect_events(), timeout)
