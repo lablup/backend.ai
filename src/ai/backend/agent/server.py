@@ -793,18 +793,22 @@ class AgentRPCServer(aobject):
         log.info("rpc::force_clean_containers(container_ids:{0})", container_ids_to_destroy)
 
         container_ids = set(ContainerId(cid) for cid in container_ids_to_destroy)
+        alive_containers = await self.agent.enumerate_containers()
+        containers_to_destroy = [
+            (kernel_id, cont) for kernel_id, cont in alive_containers if cont.id in container_ids
+        ]
         try:
-            await self.agent.purge_container(container_ids)
+            await self.agent.purge_container(containers_to_destroy)
         except Exception as e:
             log.exception("failed to purge containers: {0}", repr(e))
 
         try:
-            await self.agent.remove_orphaned_kernel_registry()
+            await self.agent.remove_orphaned_kernel_registry(containers_to_destroy)
         except Exception as e:
             log.exception("failed to remove orphaned kernels: {0}", repr(e))
 
         try:
-            await self.agent.reconstruct_resource_usage()
+            await self.agent.reconstruct_resource_usage(containers_to_destroy)
         except Exception as e:
             log.exception("failed to reconstruct resource usage: {0}", repr(e))
 

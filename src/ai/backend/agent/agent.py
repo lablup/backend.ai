@@ -248,6 +248,7 @@ COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
+KernelIdContainerPair = tuple[KernelId, Container]
 
 
 def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int]) -> None:
@@ -1344,13 +1345,11 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
-    async def purge_container(self, container_ids: Collection[ContainerId]) -> None:
-        alive_containers = await self.enumerate_containers()
-        containers_to_destroy = [
-            (kernel_id, cont) for kernel_id, cont in alive_containers if cont.id in container_ids
-        ]
-        log.info("purge {0} containers", len(containers_to_destroy))
-        for kernel_id, container in containers_to_destroy:
+    async def purge_container(
+        self, kernel_id_container_pairs: Sequence[KernelIdContainerPair]
+    ) -> None:
+        log.info("purge {0} containers", len(kernel_id_container_pairs))
+        for kernel_id, container in kernel_id_container_pairs:
             try:
                 await self.destroy_kernel(kernel_id, container.id)
             except Exception as e:
@@ -1382,10 +1381,11 @@ class AbstractAgent(
                 if host_ports is not None:
                     self.restore_ports(host_ports)
 
-    async def remove_orphaned_kernel_registry(self) -> None:
+    async def remove_orphaned_kernel_registry(
+        self, kernel_id_container_pairs: Sequence[KernelIdContainerPair]
+    ) -> None:
         # TODO: Reduce `kernel_registry` dependencies and roles
-        alive_containers = await self.enumerate_containers()
-        alive_kernel_ids = {kernel_id for kernel_id, _ in alive_containers}
+        alive_kernel_ids = {kid for kid, _ in kernel_id_container_pairs}
         new_registry: dict[KernelId, AbstractKernel] = {}
         for kid, kernel_obj in self.kernel_registry.items():
             if kid not in alive_kernel_ids:
@@ -1514,20 +1514,26 @@ class AbstractAgent(
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
+    ) -> Sequence[KernelIdContainerPair]:
         """
         Enumerate the containers with the given status filter.
         """
 
-    async def reconstruct_resource_usage(self) -> None:
+    async def reconstruct_resource_usage(
+        self, kernel_id_container_pairs: Optional[Sequence[KernelIdContainerPair]] = None
+    ) -> None:
         """
         Reconstruct the resource alloc maps for each compute plugin from
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
         """
+        if kernel_id_container_pairs is None:
+            alive_containers = await self.enumerate_containers()
+        else:
+            alive_containers = kernel_id_container_pairs
         async with self.resource_lock:
             for computer_ctx in self.computers.values():
                 computer_ctx.alloc_map.clear()
-            for kernel_id, container in await self.enumerate_containers():
+            for kernel_id, container in alive_containers:
                 for computer_ctx in self.computers.values():
                     try:
                         await computer_ctx.instance.restore_from_container(
