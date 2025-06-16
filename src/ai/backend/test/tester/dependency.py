@@ -142,22 +142,3 @@ class CodeExecutionDep(BaseDependencyModel):
         description="The expected result of the code execution.",
         examples=["Hello, World!"],
     )
-
-
-class TestRunnerConfig(BaseDependencyModel):
-    concurrency: int = Field(
-        default=10,
-        description="The number of concurrent tests to run.",
-        examples=[1, 2, 4],
-    )
-
-
-class TesterConfig(BaseDependencyModel):
-    context: TestContextInjectionModel = Field(
-        default_factory=TestContextInjectionModel,
-        description="Configurations injected by the tester.",
-    )
-    runner: TestRunnerConfig = Field(
-        default_factory=TestRunnerConfig,
-        description="Configurations for the test runner.",
-    )
