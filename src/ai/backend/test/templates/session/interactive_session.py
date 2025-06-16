@@ -36,14 +36,16 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         session_cfg = SessionContext.current()
         timeout = SSEContext.current().timeout
 
-        listener = asyncio.wait_for(
-            verify_session_events(
-                client_session,
-                session_name,
-                "session_started",
-                {"session_failure", "session_cancelled"},
-            ),
-            timeout,
+        listener = asyncio.create_task(
+            asyncio.wait_for(
+                verify_session_events(
+                    client_session,
+                    session_name,
+                    "session_started",
+                    {"session_failure", "session_cancelled"},
+                ),
+                timeout,
+            )
         )
 
         created = await client_session.ComputeSession.get_or_create(
@@ -69,15 +71,17 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
     ) -> None:
         timeout = SSEContext.current().timeout
 
-        listener = asyncio.wait_for(
-            verify_session_events(
-                client_session,
-                session_name,
-                "session_terminated",
-                {"session_failure", "session_cancelled"},
-                expected_termination_reason="user-requested",
-            ),
-            timeout,
+        listener = asyncio.create_task(
+            asyncio.wait_for(
+                verify_session_events(
+                    client_session,
+                    session_name,
+                    "session_terminated",
+                    {"session_failure", "session_cancelled"},
+                    expected_termination_reason="user-requested",
+                ),
+                timeout,
+            )
         )
 
         result = await client_session.ComputeSession(session_name).destroy()

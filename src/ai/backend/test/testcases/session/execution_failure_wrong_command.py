@@ -19,15 +19,17 @@ class BatchSessionCreationFailureWrongCommand(TestCode):
         sse_dep = SSEContext.current()
 
         session_name = "test-batch-session-execution-failure"
-        listener = asyncio.wait_for(
-            verify_session_events(
-                client_session,
-                session_name,
-                "session_failure",
-                {"session_success", "session_cancelled"},
-                expected_termination_reason="user-requested",
-            ),
-            sse_dep.timeout,
+        listener = asyncio.create_task(
+            asyncio.wait_for(
+                verify_session_events(
+                    client_session,
+                    session_name,
+                    "session_failure",
+                    {"session_success", "session_cancelled"},
+                    expected_termination_reason="user-requested",
+                ),
+                sse_dep.timeout,
+            )
         )
 
         await client_session.ComputeSession.get_or_create(

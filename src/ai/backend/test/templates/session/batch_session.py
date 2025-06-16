@@ -36,14 +36,16 @@ class BatchSessionTemplate(WrapperTestTemplate):
         sess_cfg = SessionContext.current()
         timeout = SSEContext.current().timeout
 
-        listener = asyncio.wait_for(
-            verify_session_events(
-                client_session,
-                session_name,
-                "session_terminated",
-                {"session_failure", "session_cancelled"},
-            ),
-            timeout,
+        listener = asyncio.create_task(
+            asyncio.wait_for(
+                verify_session_events(
+                    client_session,
+                    session_name,
+                    "session_terminated",
+                    {"session_failure", "session_cancelled"},
+                ),
+                timeout,
+            )
         )
 
         created = await client_session.ComputeSession.get_or_create(
