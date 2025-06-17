@@ -160,14 +160,14 @@ class Image(BaseFunction):
     @classmethod
     async def untag_image_from_registry(cls, id: str):
         q = _d("""
-            mutation($id: String!) {
-                untag_image_from_registry(id: $id) {
+            mutation($image_id: String!) {
+                untag_image_from_registry(image_id: $image_id) {
                     ok msg
                 }
             }
         """)
         variables = {
-            "id": id,
+            "image_id": id,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["untag_image_from_registry"]
