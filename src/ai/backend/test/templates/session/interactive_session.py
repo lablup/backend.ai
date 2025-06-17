@@ -26,7 +26,7 @@ from ai.backend.test.templates.template import (
 
 
 class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
-    async def _build_session_params(
+    def _build_session_params(
         self,
         session_name: str,
     ) -> dict[str, Any]:
@@ -66,7 +66,7 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
         )
 
         created = await client_session.ComputeSession.get_or_create(
-            **await self._build_session_params(session_name),
+            **self._build_session_params(session_name),
         )
 
         assert created.created, "Session creation failed"
