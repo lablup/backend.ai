@@ -135,7 +135,7 @@ class AgentEventHandler:
         kernel_should_alive: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
 
         containers_to_purge: list[KernelContainerId] = []
-        kernels_to_clean: list[KernelId] = []
+        kernels_to_clean: set[KernelId] = set()
         for container in event.containers:
             if container.kernel_id not in kernel_should_alive:
                 containers_to_purge.append(
@@ -147,9 +147,9 @@ class AgentEventHandler:
         }
         for kernel_id in event.kernel_registry:
             if kernel_id not in kernel_should_alive:
-                kernels_to_clean.append(kernel_id)
+                kernels_to_clean.add(kernel_id)
             if kernel_id not in kernel_ids_of_living_containers:
-                kernels_to_clean.append(kernel_id)
+                kernels_to_clean.add(kernel_id)
 
         log.info(
             "agent@{0} heartbeat: {1} dangling containers, {2} dangling kernel registries",

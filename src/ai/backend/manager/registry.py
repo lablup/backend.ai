@@ -3770,7 +3770,7 @@ class AgentRegistry:
     async def purge_containers(
         self,
         agent_id: AgentId,
-        kernel_container_ids: list[KernelContainerId],
+        kernel_container_ids: Iterable[KernelContainerId],
     ) -> None:
         serialized = [entry.serialize() for entry in kernel_container_ids]
         async with self.agent_cache.rpc_context(agent_id) as rpc:
@@ -3779,7 +3779,7 @@ class AgentRegistry:
     async def drop_kernel_registry(
         self,
         agent_id: AgentId,
-        kernel_ids: list[KernelId],
+        kernel_ids: Iterable[KernelId],
     ) -> None:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             await rpc.call.drop_kernel_registry(kernel_ids)
