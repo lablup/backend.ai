@@ -346,6 +346,22 @@ class ContainerStatus(enum.StrEnum):
         ])
 
 
+class KernelLifecycleStatus(enum.StrEnum):
+    """
+    The lifecycle status of kernel objects in agent side.
+    This is a duplicate of the `KernelLifecycleStatus` enum in the `ai.backend.agent.types` module.
+
+    By default, the state of a newly created kernel is `PREPARING`.
+    The state of a kernel changes from `PREPARING` to `RUNNING` after the kernel starts a container successfully.
+    It changes from `RUNNING` to `TERMINATING` before destroy kernel.
+    """
+
+    PREPARING = "preparing"
+    RUNNING = "running"
+    TERMINATING = "terminating"
+    NOT_REGISTERED = "not_registered"  # If the kernel is not in agent's kernel registry
+
+
 class AbstractPermission(enum.StrEnum):
     """
     Abstract enum type for permissions
@@ -1250,6 +1266,20 @@ class DeviceModelInfo(TypedDict):
     device_id: DeviceId | str
     model_name: str
     data: ComputedDeviceCapacity  # name kept for backward compat with plugins
+
+
+@dataclass
+class KernelContainerId:
+    kernel_id: KernelId
+    container_id: ContainerId
+
+    @property
+    def human_readable_container_id(self) -> str:
+        """
+        Returns a human-readable version of the container ID.
+        This is useful for logging and debugging purposes.
+        """
+        return str(self.container_id)[:12]
 
 
 class KernelCreationResult(TypedDict):

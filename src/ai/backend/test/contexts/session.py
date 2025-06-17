@@ -1,7 +1,7 @@
 from typing import override
-from uuid import UUID
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
+from ai.backend.test.data.session import CreatedSessionMeta
 from ai.backend.test.tester.dependency import (
     BatchSessionDep,
     ClusterDep,
@@ -45,7 +45,7 @@ class CreatedSessionTemplateIDContext(BaseTestContext[str]):
         return ContextName.CREATED_SESSION_TEMPLATE_ID
 
 
-class CreatedSessionIDContext(BaseTestContext[UUID]):
+class CreatedSessionMetaContext(BaseTestContext[CreatedSessionMeta]):
     @override
     @classmethod
     def name(cls) -> ContextName:

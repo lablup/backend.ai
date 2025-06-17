@@ -9,13 +9,14 @@ from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import (
     BatchSessionContext,
     ClusterContext,
-    CreatedSessionIDContext,
+    CreatedSessionMetaContext,
     SessionContext,
 )
 from ai.backend.test.contexts.sse import (
     SSEContext,
 )
 from ai.backend.test.contexts.tester import TestSpecMetaContext
+from ai.backend.test.data.session import CreatedSessionMeta
 from ai.backend.test.templates.session.utils import verify_session_events
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
@@ -78,5 +79,7 @@ class BatchSessionTemplate(WrapperTestTemplate):
         session_name = f"test_session_{str(test_id)}"
 
         session_id = await self._verify_session_creation(client_session, session_name)
-        with CreatedSessionIDContext.with_current(session_id):
+        with CreatedSessionMetaContext.with_current(
+            CreatedSessionMeta(id=session_id, name=session_name)
+        ):
             yield
