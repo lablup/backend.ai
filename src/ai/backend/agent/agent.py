@@ -138,6 +138,7 @@ from ai.backend.common.types import (
     HardwareMetadata,
     ImageConfig,
     ImageRegistry,
+    KernelContainerId,
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
@@ -1279,6 +1280,45 @@ class AbstractAgent(
             )
         ]
         self.port_pool.update(restored_ports)
+
+    async def purge_containers(self, containers: Iterable[KernelContainerId]) -> None:
+        tasks = [self._purge_container(container) for container in containers]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await self.reconstruct_resource_usage()
+        except Exception as e:
+            log.exception("failed to reconstruct resource usage: {0}", repr(e))
+
+    async def _purge_container(self, container: KernelContainerId) -> None:
+        """
+        Destroy and clean up container.
+        """
+        kernel_id = container.kernel_id
+        container_id = container.container_id
+        log.info("purging container (kernel:{}, container:{})", kernel_id, container_id)
+        try:
+            await self.destroy_kernel(kernel_id, container_id)
+        except Exception as e:
+            log.exception(
+                "failed to destroy kernel (kernel:{}, container:{}): {}",
+                kernel_id,
+                container.human_readable_container_id,
+                repr(e),
+            )
+            raise
+
+        try:
+            await self.clean_kernel(kernel_id, container_id, restarting=False)
+        except Exception as e:
+            log.exception(
+                "failed to clean kernel (kernel:{}, container:{}): {}",
+                kernel_id,
+                container.human_readable_container_id,
+                repr(e),
+            )
+            raise
+
+        log.info("purged container (kernel:{}, container:{})", kernel_id, container_id)
 
     async def _clean_kernel_registry_loop(self) -> None:
         # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
