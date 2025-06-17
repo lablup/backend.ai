@@ -627,6 +627,7 @@ install_editable_webui() {
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
+  pushd ./packages/backend.ai-ui && pnpm install && popd
   pnpm i
   make compile
   cd ../../../..
