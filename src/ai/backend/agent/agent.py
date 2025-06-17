@@ -1424,8 +1424,6 @@ class AbstractAgent(
             host_ports = kernel_obj.get("host_ports")
             if host_ports is not None:
                 self._restore_ports(host_ports)
-            del self.kernel_registry[kernel_id]
-            log.info("removed orphaned kernel registry (kernel:{})", kernel_id)
         except KeyError:
             log.warning(
                 "kernel object already removed (kernel:{})",
@@ -1440,6 +1438,13 @@ class AbstractAgent(
             raise
         else:
             log.info("cleaned kernel object (kernel:{})", kernel_id)
+        finally:
+            try:
+                del self.kernel_registry[kernel_id]
+            except KeyError:
+                # The kernel object may have been already removed
+                # and it is already logged.
+                pass
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
