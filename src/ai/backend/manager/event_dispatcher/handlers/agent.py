@@ -151,6 +151,12 @@ class AgentEventHandler:
             if kernel_id not in kernel_ids_of_living_containers:
                 kernels_to_clean.append(kernel_id)
 
+        log.info(
+            "agent@{0} heartbeat: {1} dangling containers, {2} dangling kernel registries",
+            event.agent_id,
+            len(containers_to_purge),
+            len(kernels_to_clean),
+        )
         if containers_to_purge:
             await self._registry.purge_containers(
                 event.agent_id,
