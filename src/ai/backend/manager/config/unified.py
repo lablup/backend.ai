@@ -2004,7 +2004,7 @@ class ManagerUnifiedConfig(BaseModel):
         """,
     )
 
-    # TODO: Remove me after updating PluginConfig type to pydantic
+    # TODO: Remove me after changing the method of loading the license server address in the plugins
     class Config:
         extra = "allow"
 
