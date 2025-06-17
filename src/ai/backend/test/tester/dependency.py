@@ -95,7 +95,7 @@ class ClusterDep(BaseDependencyModel):
 class BootstrapScriptDep(BaseDependencyModel):
     bootstrap_script: Optional[str] = Field(
         default=None,
-        description="The bootstrap script to run in the session.",
+        description="The bootstrap script to run before the session starts. Used as an argument when creating a compute session.",
         examples=["echo 'Bootstrapping...'"],
     )
 

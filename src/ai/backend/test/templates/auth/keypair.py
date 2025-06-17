@@ -4,7 +4,7 @@ from typing import AsyncIterator, override
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.test.contexts.auth import EndpointContext, KeypairContext
-from ai.backend.test.contexts.client_session import ClientSessionContext, ClientSyncSessionContext
+from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -50,5 +50,5 @@ class KeypairAuthSyncTemplate(WrapperTestTemplate):
         )
 
         with Session(config=api_config) as session:
-            with ClientSyncSessionContext.with_current(session):
+            with ClientSessionContext.with_current(session):
                 yield

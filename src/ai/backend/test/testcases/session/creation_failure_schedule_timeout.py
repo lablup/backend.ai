@@ -1,15 +1,13 @@
-import sys
-
 from ai.backend.client.func.session import ComputeSession
 from ai.backend.common.types import ClusterMode
-from ai.backend.test.contexts.client_session import ClientSyncSessionContext
+from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.templates.template import TestCode
 
 
 class InteractiveSessionCreationFailureScheduleTimeout(TestCode):
     async def test(self) -> None:
-        client_session = ClientSyncSessionContext.current()
+        client_session = ClientSessionContext.current()
 
         image_dep = ImageContext.current()
         # session_name = "test-batch-session-execution-failure"
@@ -22,7 +20,7 @@ class InteractiveSessionCreationFailureScheduleTimeout(TestCode):
             enqueue_only=False,
             max_wait=5,
             resources={
-                "cpu": sys.maxsize  # Intentionally large value to trigger timeout
+                "cpu": 9999999999  # Intentionally large value to trigger timeout
             },
             cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
