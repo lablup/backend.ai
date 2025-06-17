@@ -536,7 +536,9 @@ class SessionService:
                     f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
                 )
             elif len(rescan_result.images) > 1:
-                log.warning("More than two images were rescanned unexpectedly.")
+                log.warning(
+                    f"More than two images were rescanned unexpectedly. Rescanned Images: {rescan_result.images}"
+                )
             return DispatchResult.success(rescan_result.images[0].id)
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
