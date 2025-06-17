@@ -8,13 +8,14 @@ from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import (
     ClusterContext,
-    CreatedSessionIDContext,
+    CreatedSessionMetaContext,
     SessionContext,
 )
 from ai.backend.test.contexts.sse import (
     SSEContext,
 )
 from ai.backend.test.contexts.tester import TestSpecMetaContext
+from ai.backend.test.data.session import CreatedSessionMeta
 from ai.backend.test.templates.session.utils import (
     verify_session_events,
 )
@@ -100,7 +101,9 @@ class InteractiveSessionTemplate(WrapperTestTemplate):
         session_id = None
         try:
             session_id = await self._verify_session_creation(client_session, session_name)
-            with CreatedSessionIDContext.with_current(session_id):
+            with CreatedSessionMetaContext.with_current(
+                CreatedSessionMeta(id=session_id, name=session_name)
+            ):
                 yield
         finally:
             if session_id:

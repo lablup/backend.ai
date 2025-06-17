@@ -1,12 +1,13 @@
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.session import CodeExecutionContext, CreatedSessionIDContext
+from ai.backend.test.contexts.session import CodeExecutionContext, CreatedSessionMetaContext
 from ai.backend.test.templates.template import TestCode
 
 
 class InteractiveSessionExecuteCodeSuccess(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        session_id = CreatedSessionIDContext.current()
+        session_meta = CreatedSessionMetaContext.current()
+        session_id = session_meta.id
         code_dep = CodeExecutionContext.current()
 
         result = await client_session.ComputeSession(str(session_id)).execute(
@@ -41,7 +42,8 @@ class InteractiveSessionExecuteCodeSuccess(TestCode):
 class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        session_id = CreatedSessionIDContext.current()
+        session_meta = CreatedSessionMetaContext.current()
+        session_id = session_meta.id
         WRONG_CMD = "some wrong command !@#"
 
         result = await client_session.ComputeSession(str(session_id)).execute(
