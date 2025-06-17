@@ -1829,23 +1829,6 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
-class LicenseConfig(BaseModel):
-    addr: HostPortPairModel = Field(
-        description="""
-        Address of the license server.
-        """,
-        examples=["license.example.com:443", "localhost:443"],
-    )
-
-    @field_serializer("addr")
-    @classmethod
-    def _serialize_addr(cls, v: HostPortPairModel) -> str:
-        """
-        For legacy plugin config support, serialize HostPortPairModel to "host:port" string.
-        """
-        return f"{v.host}:{v.port}"
-
-
 class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -2018,13 +2001,6 @@ class ManagerUnifiedConfig(BaseModel):
         description="""
         Service discovery configuration.
         Controls how services are discovered and connected within the Backend.AI system.
-        """,
-    )
-    license: Optional[LicenseConfig] = Field(
-        default=None,
-        description="""
-        License server configuration.
-        Controls how the manager connects to the license server for license validation.
         """,
     )
 
