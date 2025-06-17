@@ -1360,20 +1360,19 @@ class AbstractAgent(
             ", ".join(map(str, kernel_ids)),
         )
 
-        async def purge(kernel_container_pair: KernelIdContainerPair) -> KernelIdContainerPair:
-            await self._purge_container(kernel_container_pair)
-            await self._clean_kernel_object(kernel_container_pair[0])
-            return kernel_container_pair
-
-        tasks = [purge(pair) for pair in containers_to_destroy]
+        tasks = [self._purge_kernel(pair) for pair in containers_to_destroy]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         purged_kernel_container_pairs: list[KernelIdContainerPair] = []
         for result in results:
-            if isinstance(result, BaseException):
-                # _purge_container() and _clean_kernel_object() already logged the error
-                continue
-            purged_kernel_container_pairs.append(result)
+            match result:
+                case BaseException():
+                    raise result
+                case Exception():
+                    # _purge_container() and _clean_kernel_object() already logged the error
+                    continue
+                case _:
+                    purged_kernel_container_pairs.append(result)
 
         for kernel_id, container in purged_kernel_container_pairs:
             await self.anycast_and_broadcast_event(
@@ -1397,6 +1396,13 @@ class AbstractAgent(
             await self.reconstruct_resource_usage()
         except Exception as e:
             log.exception("failed to reconstruct resource usage: {0}", repr(e))
+
+    async def _purge_kernel(
+        self, kernel_container_pair: KernelIdContainerPair
+    ) -> KernelIdContainerPair:
+        await self._purge_container(kernel_container_pair)
+        await self._clean_kernel_object(kernel_container_pair[0])
+        return kernel_container_pair
 
     async def _purge_container(self, container_to_destroy: KernelIdContainerPair) -> None:
         """
