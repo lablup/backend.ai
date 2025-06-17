@@ -1398,9 +1398,9 @@ class AbstractAgent(
                 registered_kernel_ids = set(self.kernel_registry.keys())
                 dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
                 log.info("found dangling kernels in registry: {}", dangling_kernel_ids)
-                await asyncio.wait_for(self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0)
-            except TimeoutError:
-                log.warning("timeout while cleaning kernel registry, retrying...")
+                asyncio.create_task(
+                    asyncio.wait_for(self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0)
+                )
             except Exception as e:
                 log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
             finally:
@@ -1411,7 +1411,12 @@ class AbstractAgent(
         Clean up the given kernel objects from the registry.
         """
         tasks = [self._clean_kernel_object(kernel_id) for kernel_id in kernel_ids]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.TimeoutError:
+            log.warning(
+                "clean_kernel_objects() timed out, some kernel objects may not be cleaned up"
+            )
 
     async def _clean_kernel_object(self, kernel_id: KernelId) -> None:
         """
