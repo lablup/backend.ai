@@ -62,6 +62,11 @@ class BatchSessionDep(BaseDependencyModel):
         description="The startup command to run in the batch session.",
         examples=["ls -la"],
     )
+    batch_timeout: Optional[float] = Field(
+        default=None,
+        description="The timeout for the batch session in seconds.",
+        examples=[10.0],
+    )
 
 
 class SSEDep(BaseDependencyModel):

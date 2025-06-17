@@ -19,6 +19,9 @@ from ai.backend.test.testcases.session.container_log_retriever import TestContai
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
 )
+from ai.backend.test.testcases.session.creation_failure_timeout import (
+    BatchSessionCreationFailureTimeout,
+)
 from ai.backend.test.testcases.session.creation_failure_too_many_container import (
     SessionCreationFailureTooManyContainer,
 )
@@ -83,6 +86,20 @@ BATCH_SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(BatchSessionCreationFailureWrongCommand()).with_wrappers(
+            KeypairAuthTemplate
+        ),
+    ),
+    "creation_batch_session_failure_timeout": TestSpec(
+        name="creation_batch_session_failure_timeout",
+        description=textwrap.dedent("""\
+            Test for creating a batch session with an invalid startup command.
+            This test verifies that a batch session creation fails when the startup command is invalid.
+            The test will:
+            1. Attempt to create a batch session with the specified image and an invalid startup command.
+            2. Assert that the session creation fails with an appropriate error message.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(BatchSessionCreationFailureTimeout()).with_wrappers(
             KeypairAuthTemplate
         ),
     ),

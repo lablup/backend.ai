@@ -31,10 +31,10 @@ class BatchSessionTemplate(WrapperTestTemplate):
     async def _verify_session_creation(
         self, client_session: AsyncSession, session_name: str
     ) -> UUID:
-        image_cfg = ImageContext.current()
-        cluster_cfg = ClusterContext.current()
-        batch_cfg = BatchSessionContext.current()
-        sess_cfg = SessionContext.current()
+        image_dep = ImageContext.current()
+        cluster_dep = ClusterContext.current()
+        batch_dep = BatchSessionContext.current()
+        sess_dep = SessionContext.current()
         timeout = SSEContext.current().timeout
 
         listener = asyncio.create_task(
@@ -50,14 +50,15 @@ class BatchSessionTemplate(WrapperTestTemplate):
         )
 
         created = await client_session.ComputeSession.get_or_create(
-            image_cfg.name,
-            architecture=image_cfg.architecture,
-            resources=sess_cfg.resources,
+            image_dep.name,
+            architecture=image_dep.architecture,
+            resources=sess_dep.resources,
             type_="batch",
-            startup_command=batch_cfg.startup_command,
+            startup_command=batch_dep.startup_command,
+            batch_timeout=batch_dep.batch_timeout,
             name=session_name,
-            cluster_mode=cluster_cfg.cluster_mode,
-            cluster_size=cluster_cfg.cluster_size,
+            cluster_mode=cluster_dep.cluster_mode,
+            cluster_size=cluster_dep.cluster_size,
         )
 
         assert created.created, "Session should be created successfully"

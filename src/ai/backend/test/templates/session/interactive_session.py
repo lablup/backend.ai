@@ -74,7 +74,6 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
         assert created.status == "RUNNING", f"Expected RUNNING, got {created.status}"
         if created.id is None:
             raise RuntimeError("Session ID is None after creation")
-
         await listener
         return created.id
 
@@ -100,7 +99,6 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
         assert result["stats"]["status"] == "terminated", (
             f"Expected terminated, got {result['stats']}"
         )
-
         await listener
 
     @override
