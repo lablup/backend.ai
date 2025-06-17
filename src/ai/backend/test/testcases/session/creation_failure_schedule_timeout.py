@@ -12,7 +12,7 @@ class InteractiveSessionCreationFailureScheduleTimeout(TestCode):
         image_dep = ImageContext.current()
         # session_name = "test-batch-session-execution-failure"
 
-        resp: ComputeSession = client_session.ComputeSession.get_or_create(
+        resp: ComputeSession = await client_session.ComputeSession.get_or_create(
             image_dep.name,
             architecture=image_dep.architecture,
             # TODO: Investigate why max_wait does not function properly when session_name is provided.

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
-from ai.backend.test.templates.auth.keypair import KeypairAuthSyncTemplate, KeypairAuthTemplate
+from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.dependent_session import DependentSessionTemplate
 from ai.backend.test.templates.session.interactive_session import (
@@ -271,7 +271,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(
             InteractiveSessionCreationFailureScheduleTimeout()
-        ).with_wrappers(KeypairAuthSyncTemplate),
+        ).with_wrappers(KeypairAuthTemplate),
     ),
 }
 
