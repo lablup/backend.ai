@@ -37,3 +37,10 @@ class PurgeImagesResp(AbstractAgentResp):
     @override
     def as_dict(self) -> dict:
         return asdict(self)
+
+
+@dataclass
+class PurgeKernels(AbstractAgentResp):
+    @override
+    def as_dict(self) -> dict:
+        return {}

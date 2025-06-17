@@ -56,7 +56,7 @@ from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp
+from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp, PurgeKernels
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.event_types.image.anycast import (
@@ -789,10 +789,11 @@ class AgentRPCServer(aobject):
         self,
         kernel_ids: list[str],
         reason: KernelLifecycleEventReason,
-    ) -> None:
+    ) -> PurgeKernels:
         log.info("rpc::force_clean_containers(kernel_ids:{0})", kernel_ids)
         kernel_ids_to_purge = [KernelId(UUID(kid)) for kid in kernel_ids]
         asyncio.create_task(self.agent.purge_kernels(kernel_ids_to_purge, reason))
+        return PurgeKernels()
 
     @rpc_function
     @collect_error
