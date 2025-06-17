@@ -42,10 +42,10 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
             "cluster_mode": cluster_dep.cluster_mode,
             "cluster_size": cluster_dep.cluster_size,
         }
-        params.update(await self._extra_session_params())
+        params.update(self._extra_session_params())
         return params
 
-    async def _extra_session_params(self) -> dict[str, Any]:
+    def _extra_session_params(self) -> dict[str, Any]:
         return {}
 
     async def _verify_session_creation(
@@ -132,6 +132,6 @@ class InteractiveSessionWithBootstrapScriptTemplate(_BaseInteractiveSessionTempl
         return "interactive_session_with_bootstrap_script"
 
     @override
-    async def _extra_session_params(self) -> dict[str, Any]:
+    def _extra_session_params(self) -> dict[str, Any]:
         script_ctx = BootstrapScriptContext.current()
         return {"bootstrap_script": script_ctx.bootstrap_script}
