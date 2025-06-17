@@ -40,6 +40,7 @@ from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
+    DispatchResult,
     ImageAlias,
     ImageRegistry,
     SessionId,
@@ -363,7 +364,9 @@ class SessionService:
 
         base_image_ref = image_row.image_ref
 
-        async def _commit_and_upload(reporter: ProgressReporter) -> None:
+        async def _commit_and_upload(
+            reporter: ProgressReporter,
+        ) -> DispatchResult[uuid.UUID]:
             reporter.total_progress = 3
             await reporter.update(message="Commit started")
             # remove any existing customized related tag from base canonical
@@ -520,13 +523,21 @@ class SessionService:
 
             await reporter.update(increment=1, message="Pushed image to registry")
             # rescan updated image only
-            await rescan_images(
+            rescan_result = await rescan_images(
                 self._db,
                 new_image_ref.canonical,
                 registry_project,
                 reporter=reporter,
             )
             await reporter.update(increment=1, message="Completed")
+            if len(rescan_result.images) == 0:
+                rescan_errors = ",".join(rescan_result.errors)
+                return DispatchResult.error(
+                    f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
+                )
+            elif len(rescan_result.images) > 1:
+                log.warning("More than two images were rescanned unexpectedly.")
+            return DispatchResult.success(rescan_result.images[0].id)
 
         task_id = await self._background_task_manager.start(_commit_and_upload)
 
