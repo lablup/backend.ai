@@ -791,7 +791,7 @@ class AgentRPCServer(aobject):
         reason: KernelLifecycleEventReason,
     ) -> PurgeKernels:
         str_kernel_ids = [str(kid) for kid in kernel_ids]
-        log.info("rpc::force_clean_containers(kernel_ids:{0})", str_kernel_ids)
+        log.info("rpc::purge_kernels(kernel_ids:{0})", str_kernel_ids)
         kernel_ids_to_purge = [KernelId(kid) for kid in kernel_ids]
         asyncio.create_task(self.agent.purge_kernels(kernel_ids_to_purge, reason))
         return PurgeKernels()

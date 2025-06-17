@@ -1354,6 +1354,11 @@ class AbstractAgent(
         containers_to_destroy = [
             (kernel_id, cont) for kernel_id, cont in alive_containers if kernel_id in kernel_ids
         ]
+        log.info(
+            "purging {} containers for kernels: {}",
+            len(containers_to_destroy),
+            ", ".join(map(str, kernel_ids)),
+        )
 
         async def purge(kernel_container_pair: KernelIdContainerPair) -> KernelIdContainerPair:
             await self._purge_container(kernel_container_pair)
@@ -1366,6 +1371,7 @@ class AbstractAgent(
         purged_kernel_container_pairs: list[KernelIdContainerPair] = []
         for result in results:
             if isinstance(result, BaseException):
+                # _purge_container() and _clean_kernel_object() already logged the error
                 continue
             purged_kernel_container_pairs.append(result)
 
@@ -1382,6 +1388,11 @@ class AbstractAgent(
                     reason=reason,
                 ),
             )
+        log.info(
+            "purged {} containers for kernels: {}",
+            len(purged_kernel_container_pairs),
+            ", ".join(map(str, kernel_ids)),
+        )
         try:
             await self.reconstruct_resource_usage()
         except Exception as e:
@@ -1422,8 +1433,7 @@ class AbstractAgent(
         Clean up the given kernel objects from the registry.
         """
         # TODO: Reduce `kernel_registry` dependencies and roles
-        if kernel_id not in self.kernel_registry:
-            return
+        log.info("cleaning kernel object (kernel:{})", kernel_id)
         try:
             kernel_obj = self.kernel_registry[kernel_id]
             if kernel_obj.runner is not None:
@@ -1446,6 +1456,8 @@ class AbstractAgent(
                 repr(e),
             )
             raise
+        else:
+            log.info("cleaned kernel object (kernel:{})", kernel_id)
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
