@@ -26,7 +26,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
                     session_name,
                     "session_failure",
                     {"session_success", "session_cancelled"},
-                    expected_termination_reason="user-requested",
+                    expected_failure_reason="task-timeout",
                 ),
                 sse_dep.timeout,
             )

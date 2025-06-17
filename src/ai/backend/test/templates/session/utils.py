@@ -11,6 +11,7 @@ async def verify_session_events(
     failure_events: set[str],
     *,
     expected_termination_reason: Optional[str] = None,
+    expected_failure_reason: Optional[str] = None,
 ) -> None:
     """
     Verify that a specific event occurs within a timeout period during session lifecycle.
@@ -20,6 +21,7 @@ async def verify_session_events(
     :param expected_event: The event that is expected to occur.
     :param failure_events: A set of events that indicate a failure in the session.
     :param expected_termination_reason: Optional; if provided, checks that the termination reason matches this value.
+    :param expected_failure_reason: Optional; if provided, checks that the failure reason matches this value.
     """
 
     async with client_session.ComputeSession(session_name).listen_events() as evs:
@@ -27,8 +29,15 @@ async def verify_session_events(
             if ev.event == "session_terminated":
                 if expected_termination_reason is not None:
                     data = load_json(ev.data)
-                    assert data["reason"] == "user-requested", (
+                    assert data["reason"] == expected_termination_reason, (
                         f"Unexpected termination reason: {data['reason']}"
+                    )
+
+            if ev.event == "session_failure":
+                if expected_failure_reason is not None:
+                    data = load_json(ev.data)
+                    assert data["reason"] == expected_failure_reason, (
+                        f"Unexpected failure reason: {data['reason']}"
                     )
 
             if ev.event == expected_event:
