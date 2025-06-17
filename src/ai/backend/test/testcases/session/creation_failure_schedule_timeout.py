@@ -1,0 +1,33 @@
+import sys
+
+from ai.backend.client.func.session import ComputeSession
+from ai.backend.common.types import ClusterMode
+from ai.backend.test.contexts.client_session import ClientSyncSessionContext
+from ai.backend.test.contexts.image import ImageContext
+from ai.backend.test.templates.template import TestCode
+
+
+class InteractiveSessionCreationFailureScheduleTimeout(TestCode):
+    async def test(self) -> None:
+        client_session = ClientSyncSessionContext.current()
+
+        image_dep = ImageContext.current()
+        # session_name = "test-batch-session-execution-failure"
+
+        resp: ComputeSession = client_session.ComputeSession.get_or_create(
+            image_dep.name,
+            architecture=image_dep.architecture,
+            # TODO: Investigate why max_wait does not function properly when session_name is provided.
+            # name=session_name,
+            enqueue_only=False,
+            max_wait=5,
+            resources={
+                "cpu": sys.maxsize  # Intentionally large value to trigger timeout
+            },
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+        )
+
+        assert resp.status == "TIMEOUT", (
+            f"Session should have timed out due to scheduling failure, actual status: {resp.status}"
+        )

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
-from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
+from ai.backend.test.templates.auth.keypair import KeypairAuthSyncTemplate, KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.dependent_session import DependentSessionTemplate
 from ai.backend.test.templates.session.interactive_session import (
@@ -16,11 +16,14 @@ from ai.backend.test.templates.session.session_template import (
     SessionTemplateTemplate,
 )
 from ai.backend.test.testcases.session.container_log_retriever import TestContainerLogRetriever
+from ai.backend.test.testcases.session.creation_failure_command_timeout import (
+    BatchSessionCreationFailureTimeout,
+)
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
 )
-from ai.backend.test.testcases.session.creation_failure_timeout import (
-    BatchSessionCreationFailureTimeout,
+from ai.backend.test.testcases.session.creation_failure_schedule_timeout import (
+    InteractiveSessionCreationFailureScheduleTimeout,
 )
 from ai.backend.test.testcases.session.creation_failure_too_many_container import (
     SessionCreationFailureTooManyContainer,
@@ -89,8 +92,8 @@ BATCH_SESSION_TEST_SPECS = {
             KeypairAuthTemplate
         ),
     ),
-    "creation_batch_session_failure_timeout": TestSpec(
-        name="creation_batch_session_failure_timeout",
+    "creation_batch_session_failure_command_timeout": TestSpec(
+        name="creation_batch_session_failure_command_timeout",
         description=textwrap.dedent("""\
             Test for creating a batch session with an invalid startup command.
             This test verifies that a batch session creation fails when the startup command is invalid.
@@ -255,6 +258,20 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         template=BasicTestTemplate(SessionCreationFailureTooManyContainer()).with_wrappers(
             KeypairAuthTemplate
         ),
+    ),
+    "creation_interactive_session_failure_schedule_timeout": TestSpec(
+        name="creation_interactive_session_failure_schedule_timeout",
+        description=textwrap.dedent("""\
+            Test for creating a session with too many containers.
+            This test verifies that a session creation fails when the specified container count exceeds the limit.
+            The test will:
+            1. Attempt to create a session with the specified image and too many containers.
+            2. Assert that the session creation fails with an appropriate error message.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            InteractiveSessionCreationFailureScheduleTimeout()
+        ).with_wrappers(KeypairAuthSyncTemplate),
     ),
 }
 
