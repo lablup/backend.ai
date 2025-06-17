@@ -1444,6 +1444,12 @@ class AbstractAgent(
                         self._restore_ports(host_ports)
                     del self.kernel_registry[kid]
                     log.info("removed orphaned kernel registry (kernel:{})", kid)
+                except KeyError:
+                    log.warning(
+                        "kernel object already removed (kernel:{})",
+                        kid,
+                    )
+                    continue
                 except Exception as e:
                     log.exception(
                         "failed to clean kernel object (kernel:{0}): {1}",

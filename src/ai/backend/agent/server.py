@@ -787,11 +787,12 @@ class AgentRPCServer(aobject):
     @collect_error
     async def purge_kernels(
         self,
-        kernel_ids: list[str],
+        kernel_ids: list[UUID],
         reason: KernelLifecycleEventReason,
     ) -> PurgeKernels:
-        log.info("rpc::force_clean_containers(kernel_ids:{0})", kernel_ids)
-        kernel_ids_to_purge = [KernelId(UUID(kid)) for kid in kernel_ids]
+        str_kernel_ids = [str(kid) for kid in kernel_ids]
+        log.info("rpc::force_clean_containers(kernel_ids:{0})", str_kernel_ids)
+        kernel_ids_to_purge = [KernelId(kid) for kid in kernel_ids]
         asyncio.create_task(self.agent.purge_kernels(kernel_ids_to_purge, reason))
         return PurgeKernels()
 
