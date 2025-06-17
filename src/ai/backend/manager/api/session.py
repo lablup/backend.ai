@@ -61,6 +61,7 @@ from ai.backend.manager.services.session.actions.create_from_template import (
     CreateFromTemplateActionParams,
 )
 from ai.backend.manager.services.session.actions.destory_session import DestroySessionAction
+from ai.backend.manager.services.session.actions.destroy_kernel import DestroyKernelAction
 from ai.backend.manager.services.session.actions.download_file import DownloadFileAction
 from ai.backend.manager.services.session.actions.download_files import DownloadFilesAction
 from ai.backend.manager.services.session.actions.execute_session import (
@@ -1087,6 +1088,40 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         )
     )
     return web.json_response(result.result, status=HTTPStatus.OK)
+
+
+@auth_required
+@check_api_params(
+    t.Dict({
+        t.Key("kernel_ids"): t.List(tx.UUID),
+    })
+)
+async def destroy_kernels(request: web.Request, params: Any) -> web.Response:
+    """
+    Destroy kernels in the session.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    user_role = cast(UserRole, request["user"]["role"])
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    if requester_access_key != owner_access_key and user_role not in (
+        UserRole.ADMIN,
+        UserRole.SUPERADMIN,
+    ):
+        raise InsufficientPrivilege("You are not allowed to destroy others's kernels")
+
+    log.info(
+        "DESTROY_KERNELS (ak:{0}/{1}, kernel_ids:{3})",
+        requester_access_key,
+        owner_access_key,
+        params["kernel_ids"],
+    )
+
+    await root_ctx.processors.session.destroy_kernels.wait_for_complete(
+        DestroyKernelAction(
+            kernel_ids=params["kernel_ids"],
+        )
+    )
+    return web.Response(status=HTTPStatus.ACCEPTED)
 
 
 @server_status_required(READ_ALLOWED)

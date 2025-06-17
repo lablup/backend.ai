@@ -3766,6 +3766,15 @@ class AgentRegistry:
             ):
                 pass
 
+    async def purge_kernels(
+        self,
+        agent_id: AgentId,
+        kernel_ids: Iterable[KernelId],
+        reason: KernelLifecycleEventReason,
+    ) -> None:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            await rpc.call.purge_kernels(kernel_ids, reason)
+
 
 async def handle_image_pull_started(
     context: AgentRegistry,

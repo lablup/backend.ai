@@ -35,6 +35,10 @@ from ai.backend.manager.services.session.actions.destory_session import (
     DestroySessionAction,
     DestroySessionActionResult,
 )
+from ai.backend.manager.services.session.actions.destroy_kernel import (
+    DestroyKernelAction,
+    DestroyKernelActionResult,
+)
 from ai.backend.manager.services.session.actions.download_file import (
     DownloadFileAction,
     DownloadFileActionResult,
@@ -130,6 +134,7 @@ class SessionProcessors(AbstractProcessorPackage):
         CreateFromTemplateActionResult,
     ]
     destroy_session: ActionProcessor[DestroySessionAction, DestroySessionActionResult]
+    destroy_kernels: ActionProcessor[DestroyKernelAction, DestroyKernelActionResult]
     download_file: ActionProcessor[DownloadFileAction, DownloadFileActionResult]
     download_files: ActionProcessor[DownloadFilesAction, DownloadFilesActionResult]
     execute_session: ActionProcessor[ExecuteSessionAction, ExecuteSessionActionResult]
@@ -165,6 +170,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.create_from_params = ActionProcessor(service.create_from_params, action_monitors)
         self.create_from_template = ActionProcessor(service.create_from_template, action_monitors)
         self.destroy_session = ActionProcessor(service.destroy_session, action_monitors)
+        self.destroy_kernels = ActionProcessor(service.purge_kernels, action_monitors)
         self.download_file = ActionProcessor(service.download_file, action_monitors)
         self.download_files = ActionProcessor(service.download_files, action_monitors)
         self.execute_session = ActionProcessor(service.execute_session, action_monitors)

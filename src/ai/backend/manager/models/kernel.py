@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import logging
 import uuid
-from collections.abc import Container, Mapping
+from collections.abc import Callable, Container, Iterable, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
@@ -11,6 +12,7 @@ from typing import (
     Any,
     AsyncIterator,
     Optional,
+    Self,
     Sequence,
     TypedDict,
     cast,
@@ -63,7 +65,13 @@ from .base import (
     URLColumn,
 )
 from .user import users
-from .utils import ExtendedAsyncSAEngine, JSONCoalesceExpr, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    JSONCoalesceExpr,
+    execute_with_retry,
+    execute_with_txn_retry,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -108,6 +116,13 @@ class KernelStatus(CIStrEnum):
     TERMINATED = "TERMINATED"
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
+
+    @classmethod
+    def with_containers(cls) -> set[KernelStatus]:
+        return {
+            cls.CREATING,
+            cls.RUNNING,
+        }
 
 
 # statuses to consider when calculating current resource usage
@@ -574,6 +589,26 @@ class KernelRow(Base):
             )
         return None
 
+    @classmethod
+    async def get_kernels(
+        cls,
+        conditions: Iterable[QueryCondition],
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> list[Self]:
+        stmt = sa.select(KernelRow)
+        condition: Optional[sa.sql.expression.BinaryExpression] = None
+        for cond_callable in conditions:
+            condition = cond_callable(condition)
+        if condition is not None:
+            stmt = stmt.where(condition)
+
+        async def fetch(db_session: SASession) -> list[KernelRow]:
+            return (await db_session.scalars(stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
+
     @staticmethod
     async def batch_load_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
@@ -907,3 +942,70 @@ async def recalc_concurrency_used(
             sftp_concurrency_used,
         ),
     )
+
+
+type QueryConditionCallable = Callable[
+    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
+]
+type QueryCondition = Callable[..., QueryConditionCallable]
+
+
+class ConditionMerger(enum.Enum):
+    AND = "AND"
+    OR = "OR"
+
+    @property
+    def to_sql_operator(self) -> Callable:
+        match self:
+            case ConditionMerger.AND:
+                return sa.and_
+            case ConditionMerger.OR:
+                return sa.or_
+
+
+def _append_condition(
+    condition: Optional[sa.sql.expression.BinaryExpression],
+    new_condition: sa.sql.expression.BinaryExpression,
+    operator: ConditionMerger,
+) -> sa.sql.expression.BinaryExpression:
+    return (
+        operator.to_sql_operator(condition, new_condition)
+        if condition is not None
+        else new_condition
+    )
+
+
+def by_kernel_id(
+    kernel_ids: Iterable[KernelId],
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_kernel_id(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.id.in_(kernel_ids), operator)
+
+    return _by_kernel_id
+
+
+def by_status(
+    status: Iterable[KernelStatus],
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_status(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.status.in_(status), operator)
+
+    return _by_status
+
+
+def by_agent_id(
+    agent_id: str,
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_agent_id(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.agent == agent_id, operator)
+
+    return _by_agent_id
