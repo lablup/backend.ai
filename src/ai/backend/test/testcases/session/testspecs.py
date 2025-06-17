@@ -28,8 +28,8 @@ from ai.backend.test.testcases.session.execution import (
     InteractiveSessionExecuteCodeFailureWrongCommand,
     InteractiveSessionExecuteCodeSuccess,
 )
-from ai.backend.test.testcases.session.filecheck import FileCheckTest
 from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
+from ai.backend.test.testcases.session.filecheck import FileExistenceCheck
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import (
     BootstrapScriptDep,
@@ -134,7 +134,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(
-            FileCheckTest(path=".", expected_filenames=["test-abc"])
+            FileExistenceCheck(path=".", checklist=["test-abc"])
         ).with_wrappers(KeypairAuthTemplate, InteractiveSessionWithBootstrapScriptTemplate),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [

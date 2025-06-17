@@ -6,14 +6,14 @@ from ai.backend.test.contexts.session import CreatedSessionIDContext
 from ai.backend.test.templates.template import TestCode
 
 
-class FileCheckTest(TestCode):
+class FileExistenceCheck(TestCode):
     _path: Path
-    _expected_filenames: list[str]
+    _checklist: list[str]
 
-    def __init__(self, path: Path, expected_filenames: list[str]) -> None:
+    def __init__(self, path: Path, checklist: list[str]) -> None:
         super().__init__()
         self._path = path
-        self._expected_filenames = expected_filenames
+        self._checklist = checklist
 
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
@@ -22,9 +22,7 @@ class FileCheckTest(TestCode):
         response = await client_session.ComputeSession(str(session_id)).list_files(self._path)
         files = load_json(response["files"])
 
-        actual_files = [
-            file["filename"] for file in files if file["filename"] in self._expected_filenames
-        ]
-        assert actual_files == self._expected_filenames, (
-            f"Expected files: {self._expected_filenames}, but got: {actual_files}"
+        actual_files = [file["filename"] for file in files if file["filename"] in self._checklist]
+        assert actual_files == self._checklist, (
+            f"Expected files: {self._checklist}, but got following files: {files}"
         )
