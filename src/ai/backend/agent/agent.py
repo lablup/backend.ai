@@ -1390,18 +1390,21 @@ class AbstractAgent(
         log.info("purged container (kernel:{}, container:{})", kernel_id, container_id)
 
     async def _clean_kernel_registry_loop(self) -> None:
+        # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
         while True:
             try:
                 alive_containers = await self.enumerate_containers()
                 alive_kernel_ids = {kid for kid, _ in alive_containers}
-                log.info("found alive kernel objects: {}", alive_kernel_ids)
-                for kernel_id in self.kernel_registry:
-                    if kernel_id not in alive_kernel_ids:
-                        await self._clean_kernel_object(kernel_id)
+                registered_kernel_ids = set(self.kernel_registry.keys())
+                dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
+                log.info("found dangling kernels in registry: {}", dangling_kernel_ids)
+                await asyncio.wait_for(self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0)
+            except TimeoutError:
+                log.warning("timeout while cleaning kernel registry, retrying...")
             except Exception as e:
                 log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
             finally:
-                await asyncio.sleep(30.0)
+                await asyncio.sleep(60.0)
 
     async def clean_kernel_objects(self, kernel_ids: Iterable[KernelId]) -> None:
         """
