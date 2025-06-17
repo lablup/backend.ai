@@ -65,12 +65,20 @@ class Container:
     backend_obj: Any  # used to keep the backend-specific data
 
     @property
+    def human_readable_id(self) -> str:
+        """
+        Returns a human-readable version of the container ID.
+        This is useful for logging and debugging purposes.
+        """
+        return str(self.id)[:12]
+
+    @property
     def kernel_id(self) -> KernelId:
         raw_kernel_id = self.labels[LabelName.KERNEL_ID]
         return KernelId(uuid.UUID(raw_kernel_id))
 
     @property
-    def session_id(self) -> Optional[SessionId]:
+    def session_id(self) -> SessionId:
         raw_session_id = self.labels[LabelName.SESSION_ID]
         return SessionId(uuid.UUID(raw_session_id))
 

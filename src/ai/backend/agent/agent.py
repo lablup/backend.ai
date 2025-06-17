@@ -164,6 +164,7 @@ from ai.backend.common.types import (
     HardwareMetadata,
     ImageConfig,
     ImageRegistry,
+    KernelContainerId,
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
@@ -249,6 +250,7 @@ COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
+KernelIdContainerPair = tuple[KernelId, Container]
 
 
 def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int]) -> None:
@@ -754,6 +756,7 @@ class AbstractAgent(
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
+        self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
     async def __ainit__(self) -> None:
         """
@@ -941,6 +944,7 @@ class AbstractAgent(
             if isinstance(result, Exception):
                 log.error("timer cancellation error: {}", result)
         await self._agent_runner.close()
+        self._clean_kernel_registry_task.cancel()
 
         # Stop lifecycle event handler.
         await self.container_lifecycle_queue.put(_sentinel)
@@ -1308,19 +1312,9 @@ class AbstractAgent(
                     kernel_obj = self.kernel_registry.pop(ev.kernel_id, None)
                 try:
                     if kernel_obj is not None:
-                        # Restore used ports to the port pool.
-                        port_range = self.local_config["container"]["port-range"]
-                        # Exclude out-of-range ports, because when the agent restarts
-                        # with a different port range, existing containers' host ports
-                        # may not belong to the new port range.
-                        if host_ports := kernel_obj.get("host_ports"):
-                            restored_ports = [
-                                *filter(
-                                    lambda p: port_range[0] <= p <= port_range[1],
-                                    host_ports,
-                                )
-                            ]
-                            self.port_pool.update(restored_ports)
+                        host_ports = kernel_obj.get("host_ports")
+                        if host_ports is not None:
+                            self._restore_ports(host_ports)
                         await kernel_obj.close()
                 finally:
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
@@ -1341,6 +1335,124 @@ class AbstractAgent(
                         kernel_obj.clean_event.set_result(None)
                     if ev.done_future is not None and not ev.done_future.done():
                         ev.done_future.set_result(None)
+
+    def _restore_ports(self, host_ports: Iterable[int]) -> None:
+        # Restore used ports to the port pool.
+        port_range = self.local_config["container"]["port-range"]
+        # Exclude out-of-range ports, because when the agent restarts
+        # with a different port range, existing containers' host ports
+        # may not belong to the new port range.
+        restored_ports = [
+            *filter(
+                lambda p: port_range[0] <= p <= port_range[1],
+                host_ports,
+            )
+        ]
+        self.port_pool.update(restored_ports)
+
+    async def purge_containers(self, containers: Iterable[KernelContainerId]) -> None:
+        tasks = [self._purge_container(container) for container in containers]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await self.reconstruct_resource_usage()
+        except Exception as e:
+            log.exception("failed to reconstruct resource usage: {0}", repr(e))
+
+    async def _purge_container(self, container: KernelContainerId) -> None:
+        """
+        Destroy and clean up container.
+        """
+        kernel_id = container.kernel_id
+        container_id = container.container_id
+        log.info("purging container (kernel:{}, container:{})", kernel_id, container_id)
+        try:
+            await self.destroy_kernel(kernel_id, container_id)
+        except Exception as e:
+            log.exception(
+                "failed to destroy kernel (kernel:{}, container:{}): {}",
+                kernel_id,
+                container.human_readable_container_id,
+                repr(e),
+            )
+            raise
+
+        try:
+            await self.clean_kernel(kernel_id, container_id, restarting=False)
+        except Exception as e:
+            log.exception(
+                "failed to clean kernel (kernel:{}, container:{}): {}",
+                kernel_id,
+                container.human_readable_container_id,
+                repr(e),
+            )
+            raise
+
+        log.info("purged container (kernel:{}, container:{})", kernel_id, container_id)
+
+    async def _clean_kernel_registry_loop(self) -> None:
+        # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
+        while True:
+            try:
+                alive_containers = await self.enumerate_containers()
+                alive_kernel_ids = {kid for kid, _ in alive_containers}
+                registered_kernel_ids = set(self.kernel_registry.keys())
+                dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
+                log.info("found dangling kernels in registry: {}", dangling_kernel_ids)
+                asyncio.create_task(
+                    asyncio.wait_for(self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0)
+                )
+            except Exception as e:
+                log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
+            finally:
+                await asyncio.sleep(60.0)
+
+    async def clean_kernel_objects(self, kernel_ids: Iterable[KernelId]) -> None:
+        """
+        Clean up the given kernel objects from the registry.
+        """
+        tasks = [self._clean_kernel_object(kernel_id) for kernel_id in kernel_ids]
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except asyncio.TimeoutError:
+            log.warning(
+                "clean_kernel_objects() timed out, some kernel objects may not be cleaned up"
+            )
+
+    async def _clean_kernel_object(self, kernel_id: KernelId) -> None:
+        """
+        Clean up the given kernel objects from the registry.
+        """
+        # TODO: Reduce `kernel_registry` dependencies and roles
+        log.info("cleaning kernel object (kernel:{})", kernel_id)
+        try:
+            kernel_obj = self.kernel_registry[kernel_id]
+            if kernel_obj.runner is not None:
+                await kernel_obj.runner.close()
+            await kernel_obj.close()
+            host_ports = kernel_obj.get("host_ports")
+            if host_ports is not None:
+                self._restore_ports(host_ports)
+        except KeyError:
+            log.warning(
+                "kernel object already removed (kernel:{})",
+                kernel_id,
+            )
+        except Exception as e:
+            log.exception(
+                "failed to clean kernel object (kernel:{0}): {1}",
+                kernel_id,
+                repr(e),
+            )
+            raise
+        else:
+            log.info("cleaned kernel object (kernel:{})", kernel_id)
+        finally:
+            try:
+                del self.kernel_registry[kernel_id]
+            except KeyError:
+                # The kernel object may have been already removed
+                # and it is already logged.
+                pass
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
@@ -1457,7 +1569,7 @@ class AbstractAgent(
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
+    ) -> Sequence[KernelIdContainerPair]:
         """
         Enumerate the containers with the given status filter.
         """
@@ -1467,10 +1579,11 @@ class AbstractAgent(
         Reconstruct the resource alloc maps for each compute plugin from
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
         """
+        containers = await self.enumerate_containers()
         async with self.resource_lock:
             for computer_ctx in self.computers.values():
                 computer_ctx.alloc_map.clear()
-            for kernel_id, container in await self.enumerate_containers():
+            for kernel_id, container in containers:
                 for computer_ctx in self.computers.values():
                     try:
                         await computer_ctx.instance.restore_from_container(
