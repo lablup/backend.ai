@@ -199,6 +199,10 @@ class TestContextInjectionModel(BaseDependencyModel):
         default=None,
         description="The key pair for the test context.",
     )
+    keypair_resource_policy: Optional[KeypairResourcePolicyDep] = Field(
+        default=None,
+        description="The keypair resource policy for the test context.",
+    )
     login_credential: Optional[LoginCredentialDep] = Field(
         default=None,
         description="The login credentials for the test context.",
