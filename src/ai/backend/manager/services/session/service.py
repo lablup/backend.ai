@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import functools
-import itertools
 import logging
 import secrets
 import uuid
@@ -25,7 +24,6 @@ from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFea
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
 )
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
 from ai.backend.common.events.types import (
@@ -42,7 +40,6 @@ from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
-    AgentId,
     DispatchResult,
     ImageAlias,
     ImageRegistry,
@@ -77,9 +74,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow, rescan_images
 from ai.backend.manager.models.kernel import (
-    ConditionMerger,
     KernelRow,
-    by_kernel_id,
 )
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
@@ -126,10 +121,6 @@ from ai.backend.manager.services.session.actions.create_from_template import (
 from ai.backend.manager.services.session.actions.destory_session import (
     DestroySessionAction,
     DestroySessionActionResult,
-)
-from ai.backend.manager.services.session.actions.destroy_kernel import (
-    DestroyKernelAction,
-    DestroyKernelActionResult,
 )
 from ai.backend.manager.services.session.actions.download_file import (
     DownloadFileAction,
@@ -1012,24 +1003,6 @@ class SessionService:
             }
 
             return DestroySessionActionResult(result=resp, destroyed_sessions=[session])
-
-    async def purge_kernels(self, action: DestroyKernelAction) -> DestroyKernelActionResult:
-        condition = by_kernel_id(action.kernel_ids, ConditionMerger.AND)
-        kernel_rows = await KernelRow.get_kernels(
-            [condition],
-            db=self._db,
-        )
-
-        def keyfunc(kernel: KernelRow) -> AgentId:
-            return kernel.agent_id
-
-        for agent_id, kernels in itertools.groupby(sorted(kernel_rows, key=keyfunc), key=keyfunc):
-            await self._agent_registry.purge_kernels(
-                agent_id,
-                [k.id for k in kernels],
-                reason=KernelLifecycleEventReason.FORCE_TERMINATED,
-            )
-        return DestroyKernelActionResult()
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name
