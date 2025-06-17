@@ -1395,11 +1395,11 @@ class AbstractAgent(
             try:
                 alive_containers = await self.enumerate_containers()
                 alive_kernel_ids = {kid for kid, _ in alive_containers}
-                registered_kernel_ids = set([
+                registered_kernel_ids = {
                     kid
                     for kid, kernel in self.kernel_registry.items()
                     if kernel.state == KernelLifecycleStatus.RUNNING
-                ])
+                }
                 dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
                 log.info("found dangling kernels in registry: {}", dangling_kernel_ids)
                 asyncio.create_task(
