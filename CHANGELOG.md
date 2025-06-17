@@ -16,6 +16,20 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.10 (2025-06-17)
+
+### Features
+* Add Container purge RPC to agent ([#4710](https://github.com/lablup/backend.ai/issues/4710))
+
+### Fixes
+* Add missing event handler for SessionCheckingPrecondEvent ([#4619](https://github.com/lablup/backend.ai/issues/4619))
+* Support more Accept headers in `BaseContainerRegistry.scan_tag` ([#4627](https://github.com/lablup/backend.ai/issues/4627))
+* Resolve broken image rescanning on macOS due to `aiotools` upstream issue ([#4628](https://github.com/lablup/backend.ai/issues/4628))
+* Update container ports validation to catch omitted or empty list cases, preventing potential `IndexError` ([#4656](https://github.com/lablup/backend.ai/issues/4656))
+* Agent skips failure of code runner initialization ([#4679](https://github.com/lablup/backend.ai/issues/4679))
+* Fix broken `untag_image_from_registry` SDK method ([#4720](https://github.com/lablup/backend.ai/issues/4720))
+
+
 ## 25.6.9 (2025-06-05)
 
 ### Features
