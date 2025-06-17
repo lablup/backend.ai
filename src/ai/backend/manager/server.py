@@ -713,7 +713,7 @@ async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.config_provider.config.redis.model_dump()
     )
-    root_ctx.message_queue = make_message_queue(
+    root_ctx.message_queue = await make_message_queue(
         redis_profile_target,
         RedisRole.STREAM,
         RedisMQArgs(

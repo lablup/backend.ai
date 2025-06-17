@@ -151,7 +151,7 @@ async def server_main(
             log.exception("Unable to read config from etcd")
             raise e
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
-        mq = make_message_queue(
+        mq = await make_message_queue(
             redis_profile_target,
             RedisRole.STREAM,
             RedisMQArgs(

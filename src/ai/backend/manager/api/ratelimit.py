@@ -96,7 +96,7 @@ async def init(app: web.Application) -> None:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.config_provider.config.redis.model_dump()
     )
-    app_ctx.redis_rlim = redis_helper.get_redis_object(
+    app_ctx.redis_rlim = await redis_helper.create_valkey_client(
         redis_profile_target.profile_target(RedisRole.RATE_LIMIT),
         name="ratelimit",
         db=REDIS_RATE_LIMIT_DB,

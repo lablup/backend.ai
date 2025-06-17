@@ -47,6 +47,7 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
+from glide import GlideClient
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
@@ -1407,7 +1408,7 @@ class RedisHelperConfig(TypedDict, total=False):
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis
+    client: Redis | GlideClient
     name: str  # connection pool name
     service_name: Optional[str]
     sentinel: Optional[redis.asyncio.sentinel.Sentinel]

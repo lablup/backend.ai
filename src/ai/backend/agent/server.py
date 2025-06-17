@@ -1255,7 +1255,7 @@ async def server_main(
             await agent.read_agent_config()
             redis_profile_target = RedisProfileTarget.from_dict(local_config["redis"])
             live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-            redis_live = redis_helper.get_redis_object(
+            redis_live = await redis_helper.create_valkey_client(
                 live_redis_target,
                 name="agent.live",
                 db=REDIS_LIVE_DB,

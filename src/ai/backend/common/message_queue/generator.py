@@ -7,7 +7,7 @@ from ai.backend.common.types import RedisProfileTarget
 from .queue import AbstractMessageQueue
 
 
-def make_message_queue(
+async def make_message_queue(
     redis_profile_target: RedisProfileTarget,
     redis_role: RedisRole,
     mq_args: RedisMQArgs,
@@ -19,7 +19,7 @@ def make_message_queue(
             stream_redis_target,
             mq_args,
         )
-    stream_redis = redis_helper.get_redis_object(
+    stream_redis = await redis_helper.create_valkey_client(
         stream_redis_target,
         name="event_producer.stream",
         db=redis_role.db_index,

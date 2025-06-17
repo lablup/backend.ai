@@ -20,6 +20,12 @@ from typing import (
 
 import redis.exceptions
 import yarl
+from glide import (
+    GlideClient,
+    GlideClientConfiguration,
+    NodeAddress,
+    ServerCredentials,
+)
 from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
@@ -28,6 +34,7 @@ from redis.retry import Retry
 
 from ai.backend.logging import BraceStyleAdapter
 
+from .types import HostPortPair as _HostPortPair
 from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -484,7 +491,7 @@ def get_redis_object(
     # for redis-py 5.0+
     # if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
     #     conn_pool_opts["timeout"] = float(connection_ready_timeout)
-    if _sentinel_addresses := redis_target.get("sentinel"):
+    if _sentinel_addresses := redis_target.sentinel:
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
             sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
@@ -544,6 +551,44 @@ def get_redis_object(
             service_name=None,
             redis_helper_config=redis_helper_config,
         )
+
+
+async def create_valkey_client(
+    redis_target: RedisTarget,
+    *,
+    name: str,
+    db: int = 0,
+) -> RedisConnectionInfo:
+    addresses: list[NodeAddress] = []
+    if redis_target.addr:
+        addresses.append(NodeAddress(host=redis_target.addr.host, port=redis_target.addr.port))
+    sentinel_addresses: list[_HostPortPair] = []
+    match type(redis_target.sentinel):
+        case str():
+            sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
+                redis_target.sentinel
+            )
+        case list():
+            sentinel_addresses = redis_target.sentinel
+    if sentinel_addresses:
+        for address in sentinel_addresses:
+            addresses.append(NodeAddress(host=address.host, port=address.port))
+    credentials: Optional[ServerCredentials] = None
+    if redis_target.password:
+        credentials = ServerCredentials(
+            password=redis_target.password,
+        )
+    config = GlideClientConfiguration(
+        addresses, credentials=credentials, database_id=db, client_name=name
+    )
+    client = await GlideClient.create(config)
+    return RedisConnectionInfo(
+        client=client,
+        sentinel=None,
+        name=name,
+        service_name=None,
+        redis_helper_config=cast(RedisHelperConfig, redis_target.redis_helper_config),
+    )
 
 
 async def ping_redis_connection(redis_client: Redis) -> bool:

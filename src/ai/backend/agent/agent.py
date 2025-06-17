@@ -691,8 +691,6 @@ class AbstractAgent(
     images: Mapping[str, ScannedImage]
     port_pool: set[int]
 
-    redis: Redis
-
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
@@ -765,12 +763,12 @@ class AbstractAgent(
             self.local_config["redis"]
         )
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-        stream_redis = redis_helper.get_redis_object(
+        stream_redis = await redis_helper.create_valkey_client(
             stream_redis_target,
             name="event_producer.stream",
             db=REDIS_STREAM_DB,
         )
-        mq = make_message_queue(
+        mq = await make_message_queue(
             redis_profile_target,
             RedisRole.STREAM,
             RedisMQArgs(
@@ -796,12 +794,12 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             event_observer=self._metric_registry.event,
         )
-        self.redis_stream_pool = redis_helper.get_redis_object(
+        self.redis_stream_pool = await redis_helper.create_valkey_client(
             redis_profile_target.profile_target(RedisRole.STREAM),
             name="stream",
             db=REDIS_STREAM_DB,
         )
-        self.redis_stat_pool = redis_helper.get_redis_object(
+        self.redis_stat_pool = await redis_helper.create_valkey_client(
             redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="stat",
             db=REDIS_STATISTICS_DB,
