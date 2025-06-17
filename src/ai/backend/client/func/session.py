@@ -27,7 +27,7 @@ from aiohttp import hdrs
 from faker import Faker
 from tqdm import tqdm
 
-from ai.backend.client.output.fields import session_fields
+from ai.backend.client.output.fields import kernel_node_fields, session_fields, session_node_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode, SessionTypes
@@ -46,7 +46,12 @@ from ..request import (
 )
 from ..session import api_session
 from ..types import set_if_set
-from ..utils import ProgressReportingReader
+from ..utils import (
+    ProgressReportingReader,
+    create_connection_field,
+    flatten_connection,
+    to_global_id,
+)
 from ..utils import dedent as _d
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
@@ -62,6 +67,34 @@ _default_list_fields = (
     session_fields["status_changed"],
     session_fields["result"],
     session_fields["abusing_reports"],
+)
+
+# TODO: Need to add more kernel node fields to the detail fields as not all fields are included
+_default_kernel_node_detail_fields = (
+    kernel_node_fields["row_id"],
+    kernel_node_fields["image_reference"],
+    kernel_node_fields["status"],
+    kernel_node_fields["created_at"],
+    kernel_node_fields["agent_id"],
+)
+
+_default_session_node_detail_fields = (
+    session_node_fields["id"],
+    session_node_fields["tag"],
+    session_node_fields["name"],
+    session_node_fields["type"],
+    session_node_fields["priority"],
+    session_node_fields["cluster_mode"],
+    session_node_fields["domain_name"],
+    session_node_fields["user_id"],
+    session_node_fields["status"],
+    session_node_fields["created_at"],
+    session_node_fields["terminated_at"],
+    session_node_fields["resource_opts"],
+    session_node_fields["scaling_group"],
+    session_node_fields["vfolder_mounts"],
+    session_node_fields["image_references"],
+    create_connection_field("kernel_nodes", _default_kernel_node_detail_fields),  # type: ignore
 )
 
 
@@ -749,6 +782,49 @@ class ComputeSession(BaseFunction):
         )
         async with rqst.fetch() as resp:
             return await resp.json()
+
+    @api_function
+    async def detail(
+        self, fields: Sequence[FieldSpec] = _default_session_node_detail_fields
+    ) -> dict:
+        """
+        Retrieves a detailed information about the compute session.
+        This is similar to :func:`get_info`, but includes more information
+        such as the information about all kernels in the session,
+        the list of vfolders mounted to the session, and so on.
+        """
+        query = _d("""
+            query($id: GlobalIDField!) {
+                compute_session_node(id: $id) {
+                    $fields
+                }
+            }
+        """)
+        if self.id is None:
+            raise ValueError(
+                f"{self!r} must have a valid session ID to invoke the detail() method."
+            )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"id": to_global_id("compute_session_node", self.id)}
+        data = await api_session.get().Admin._query(query, variables)
+        compute_session_data = data["compute_session_node"]
+
+        field_mappings = {
+            "row_id": "id",
+            "kernel_nodes": "kernels",
+        }
+        result = {}
+        for key, value in compute_session_data.items():
+            if key.endswith("_nodes") and isinstance(value, dict):
+                flattened_data = flatten_connection(value)
+                new_key = field_mappings.get(key, key)
+                result[new_key] = flattened_data
+                continue
+
+            new_key = field_mappings.get(key, key)
+            result[new_key] = value
+
+        return result
 
     @api_function
     async def get_logs(self, kernel_id: Optional[UUID] = None):
