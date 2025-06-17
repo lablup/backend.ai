@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ai.backend.common.json import load_json
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.session import CreatedSessionIDContext
+from ai.backend.test.contexts.session import CreatedSessionMetaContext
 from ai.backend.test.templates.template import TestCode
 
 
@@ -17,9 +17,9 @@ class FileExistenceCheck(TestCode):
 
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
-        session_id = CreatedSessionIDContext.current()
+        session_meta = CreatedSessionMetaContext.current()
 
-        response = await client_session.ComputeSession(str(session_id)).list_files(self._path)
+        response = await client_session.ComputeSession(str(session_meta.id)).list_files(self._path)
         files = load_json(response["files"])
 
         actual_files = [file["filename"] for file in files if file["filename"] in self._checklist]
