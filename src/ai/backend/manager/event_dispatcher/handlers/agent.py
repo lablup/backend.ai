@@ -11,10 +11,10 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
+    KernelContainerId,
     KernelId,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -132,15 +132,32 @@ class AgentEventHandler:
             ],
             db=self._db,
         )
-        alive_kernel_ids: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
+        kernel_should_alive: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
 
-        dangling_kernels: list[KernelId] = []
+        containers_to_purge: list[KernelContainerId] = []
+        kernels_to_clean: list[KernelId] = []
         for container in event.containers:
-            if container.kernel_id not in alive_kernel_ids:
-                dangling_kernels.append(container.kernel_id)
+            if container.kernel_id not in kernel_should_alive:
+                containers_to_purge.append(
+                    KernelContainerId(container.kernel_id, container.container_id)
+                )
 
-        await self._registry.purge_kernels(
-            event.agent_id,
-            dangling_kernels,
-            reason=KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
-        )
+        kernel_ids_of_living_containers: set[KernelId] = {
+            container.kernel_id for container in event.containers
+        }
+        for kernel_id in event.kernel_registry:
+            if kernel_id not in kernel_should_alive:
+                kernels_to_clean.append(kernel_id)
+            if kernel_id not in kernel_ids_of_living_containers:
+                kernels_to_clean.append(kernel_id)
+
+        if containers_to_purge:
+            await self._registry.purge_containers(
+                event.agent_id,
+                containers_to_purge,
+            )
+        if kernels_to_clean:
+            await self._registry.drop_kernel_registry(
+                event.agent_id,
+                kernels_to_clean,
+            )

@@ -172,14 +172,12 @@ class ContainerStatusData:
     container_id: ContainerId
     kernel_id: KernelId
     status: ContainerStatus
-    kernel_lifecycle_status: str
 
     def to_dict(self) -> dict[str, str]:
         return {
             "container_id": str(self.container_id),
             "kernel_id": str(self.kernel_id),
             "status": str(self.status),
-            "kernel_lifecycle_status": self.kernel_lifecycle_status,
         }
 
     @classmethod
@@ -188,7 +186,6 @@ class ContainerStatusData:
             ContainerId(data["container_id"]),
             KernelId(uuid.UUID(data["kernel_id"])),
             ContainerStatus(data["status"]),
-            data["kernel_lifecycle_status"],
         )
 
 
@@ -196,12 +193,14 @@ class ContainerStatusData:
 class AgentStatusHeartbeat(AgentOperationEvent):
     agent_id: AgentId
     containers: list[ContainerStatusData]
+    kernel_registry: dict[KernelId, Optional[ContainerId]]
 
     @override
     def serialize(self) -> tuple:
         return (
             self.agent_id,
             tuple(cont.to_dict() for cont in self.containers),
+            {str(k): str(v) if v is not None else None for k, v in self.kernel_registry.items()},
         )
 
     @classmethod
@@ -210,6 +209,10 @@ class AgentStatusHeartbeat(AgentOperationEvent):
         return cls(
             AgentId(value[0]),
             [ContainerStatusData.from_dict(val) for val in value[1]],
+            {
+                KernelId(uuid.UUID(k)): ContainerId(v) if v is not None else None
+                for k, v in value[2].items()
+            },
         )
 
     @classmethod

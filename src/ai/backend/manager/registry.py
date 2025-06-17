@@ -128,6 +128,7 @@ from ai.backend.common.types import (
     ImageAlias,
     ImageConfig,
     ImageRegistry,
+    KernelContainerId,
     KernelCreationConfig,
     KernelEnqueueingConfig,
     KernelId,
@@ -3766,14 +3767,22 @@ class AgentRegistry:
             ):
                 pass
 
-    async def purge_kernels(
+    async def purge_containers(
         self,
         agent_id: AgentId,
-        kernel_ids: Iterable[KernelId],
-        reason: KernelLifecycleEventReason,
+        kernel_container_ids: list[KernelContainerId],
+    ) -> None:
+        serialized = [entry.serialize() for entry in kernel_container_ids]
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            await rpc.call.purge_containers(serialized)
+
+    async def drop_kernel_registry(
+        self,
+        agent_id: AgentId,
+        kernel_ids: list[KernelId],
     ) -> None:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            await rpc.call.purge_kernels(kernel_ids, reason)
+            await rpc.call.drop_kernel_registry(kernel_ids)
 
 
 async def handle_image_pull_started(

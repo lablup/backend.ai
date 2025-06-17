@@ -794,12 +794,13 @@ class AgentRPCServer(aobject):
     @collect_error
     async def purge_containers(
         self,
-        kernel_container_ids: list[tuple[UUID, str]],
+        kernel_container_ids: list[tuple[str, str]],
     ) -> PurgeContainersResp:
         str_kernel_ids = [str(kid) for kid, _ in kernel_container_ids]
         log.info("rpc::purge_containers(kernel_ids:{0})", str_kernel_ids)
         kernel_container_pairs = [
-            KernelContainerId(KernelId(kid), ContainerId(cid)) for kid, cid in kernel_container_ids
+            KernelContainerId(KernelId(UUID(kid)), ContainerId(cid))
+            for kid, cid in kernel_container_ids
         ]
         asyncio.create_task(self.agent.purge_containers(kernel_container_pairs))
         return PurgeContainersResp()

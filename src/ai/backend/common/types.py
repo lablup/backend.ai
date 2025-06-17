@@ -360,6 +360,7 @@ class KernelLifecycleStatus(enum.StrEnum):
     RUNNING = "running"
     TERMINATING = "terminating"
     NOT_REGISTERED = "not_registered"  # If the kernel is not in agent's kernel registry
+    CONTAINER_NOT_FOUND = "container_not_found"  # If there is no kernel's container
 
 
 class AbstractPermission(enum.StrEnum):
@@ -1280,6 +1281,20 @@ class KernelContainerId:
         This is useful for logging and debugging purposes.
         """
         return str(self.container_id)[:12]
+
+    def serialize(self) -> tuple[str, str]:
+        """
+        Serializes the KernelContainerId to a string format.
+        """
+        return (str(self.kernel_id), str(self.container_id))
+
+    @classmethod
+    def deserialize(cls, data: tuple[str, str]) -> Self:
+        """
+        Deserializes a string into a KernelContainerId instance.
+        """
+        kernel_id, container_id = data
+        return cls(KernelId(UUID(kernel_id)), ContainerId(container_id))
 
 
 class KernelCreationResult(TypedDict):
