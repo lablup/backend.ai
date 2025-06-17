@@ -10,6 +10,7 @@ from ai.backend.test.templates.session.session_template import (
     InteractiveSessionFromTemplateTemplate,
     SessionTemplateTemplate,
 )
+from ai.backend.test.testcases.session.container_log_retriever import TestContainerLogRetriever
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
 )
@@ -265,9 +266,46 @@ SESSION_TEMPLATE_TEST_SPECS = {
     ),
 }
 
+SESSION_INFO_RETRIEVER_TEST_SPECS = {
+    "session_container_log_retriever": TestSpec(
+        name="session_container_log_retriever",
+        description=textwrap.dedent("""\
+        Test for retrieving logs from a session's kernel(container).
+        This test ensures that logs can be fetched from a running session's kernel(container).
+        The test will:
+        1. Create a session and start a kernel(container).
+        2. Perform actions that generate logs in the kernel(container).
+        3. Retrieve the logs from the kernel(container).
+        4. Assert that the retrieved logs contain the expected output.
+        5. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(testcode=TestContainerLogRetriever()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ],
+        },
+    ),
+}
+
 
 SESSION_TEST_SPECS = {
     **BATCH_SESSION_TEST_SPECS,
     **INTERACTIVE_SESSION_TEST_SPECS,
     **SESSION_TEMPLATE_TEST_SPECS,
+    **SESSION_INFO_RETRIEVER_TEST_SPECS,
 }
