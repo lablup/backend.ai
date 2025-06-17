@@ -5,7 +5,10 @@ from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.dependent_session import DependentSessionTemplate
-from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
+from ai.backend.test.templates.session.interactive_session import (
+    InteractiveSessionTemplate,
+    InteractiveSessionWithBootstrapScriptTemplate,
+)
 from ai.backend.test.templates.session.session_template import (
     BatchSessionFromTemplateTemplate,
     InteractiveSessionFromTemplateTemplate,
@@ -25,9 +28,14 @@ from ai.backend.test.testcases.session.execution import (
     InteractiveSessionExecuteCodeFailureWrongCommand,
     InteractiveSessionExecuteCodeSuccess,
 )
+from ai.backend.test.testcases.session.filecheck import FileCheckTest
 from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.tester.dependency import ClusterDep, CodeExecutionDep
+from ai.backend.test.tester.dependency import (
+    BootstrapScriptDep,
+    ClusterDep,
+    CodeExecutionDep,
+)
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 
@@ -110,6 +118,36 @@ INTERACTIVE_SESSION_TEST_SPECS = {
                     cluster_size=3,
                 ),
             ]
+        },
+    ),
+    "creation_interactive_session_success_with_bootstrap_script": TestSpec(
+        name="creation_interactive_session_success_with_bootstrap_script",
+        description=textwrap.dedent("""\
+            Test for creating a single-node, single-container session.
+            This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
+            The test will:
+            1. Create a session with the specified image and resources.
+            2. Execute a bootstrap script to create a directory in the session.
+            3. Check that the directory was created successfully.
+            4. Assert that the session is successfully created and running.
+            5. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            FileCheckTest(path=".", expected_filenames=["test-abc"])
+        ).with_wrappers(KeypairAuthTemplate, InteractiveSessionWithBootstrapScriptTemplate),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
+            ContextName.BOOTSTRAP_SCRIPT: [
+                BootstrapScriptDep(
+                    bootstrap_script="mkdir -p /home/work/test-abc",
+                )
+            ],
         },
     ),
     "execution_command_on_interactive_session_success": TestSpec(

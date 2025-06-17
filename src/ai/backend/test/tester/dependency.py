@@ -87,6 +87,14 @@ class ClusterDep(BaseDependencyModel):
     )
 
 
+class BootstrapScriptDep(BaseDependencyModel):
+    bootstrap_script: Optional[str] = Field(
+        default=None,
+        description="The bootstrap script to run in the session.",
+        examples=["echo 'Bootstrapping...'"],
+    )
+
+
 class SessionDep(BaseDependencyModel):
     resources: Optional[dict] = Field(
         default=None,
