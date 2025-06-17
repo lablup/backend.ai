@@ -1,4 +1,5 @@
 import textwrap
+from pathlib import Path
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
@@ -134,7 +135,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(
-            FileExistenceCheck(path=".", checklist=["test-abc"])
+            FileExistenceCheck(path=Path("."), checklist=["test-abc"])
         ).with_wrappers(KeypairAuthTemplate, InteractiveSessionWithBootstrapScriptTemplate),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
