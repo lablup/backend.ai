@@ -56,7 +56,12 @@ from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import AbstractAgentResp, PurgeImagesResp, PurgeKernels
+from ai.backend.common.dto.agent.response import (
+    AbstractAgentResp,
+    DropKernelRegistryResp,
+    PurgeContainersResp,
+    PurgeImagesResp,
+)
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.event_types.image.anycast import (
@@ -96,10 +101,12 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
+    ContainerId,
     HardwareMetadata,
     HostPortPair,
     ImageConfig,
     ImageRegistry,
+    KernelContainerId,
     KernelCreationConfig,
     KernelId,
     QueueSentinel,
@@ -785,16 +792,29 @@ class AgentRPCServer(aobject):
 
     @rpc_function_v2
     @collect_error
-    async def purge_kernels(
+    async def purge_containers(
+        self,
+        kernel_container_ids: list[tuple[UUID, str]],
+    ) -> PurgeContainersResp:
+        str_kernel_ids = [str(kid) for kid, _ in kernel_container_ids]
+        log.info("rpc::purge_containers(kernel_ids:{0})", str_kernel_ids)
+        kernel_container_pairs = [
+            KernelContainerId(KernelId(kid), ContainerId(cid)) for kid, cid in kernel_container_ids
+        ]
+        asyncio.create_task(self.agent.purge_containers(kernel_container_pairs))
+        return PurgeContainersResp()
+
+    @rpc_function_v2
+    @collect_error
+    async def drop_kernel_registry(
         self,
         kernel_ids: list[UUID],
-        reason: KernelLifecycleEventReason,
-    ) -> PurgeKernels:
+    ) -> DropKernelRegistryResp:
         str_kernel_ids = [str(kid) for kid in kernel_ids]
-        log.info("rpc::purge_kernels(kernel_ids:{0})", str_kernel_ids)
+        log.info("rpc::drop_kernel_registry(kernel_ids:{0})", str_kernel_ids)
         kernel_ids_to_purge = [KernelId(kid) for kid in kernel_ids]
-        asyncio.create_task(self.agent.purge_kernels(kernel_ids_to_purge, reason))
-        return PurgeKernels()
+        asyncio.create_task(self.agent.clean_kernel_objects(kernel_ids_to_purge))
+        return DropKernelRegistryResp()
 
     @rpc_function
     @collect_error

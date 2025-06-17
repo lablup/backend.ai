@@ -8,7 +8,12 @@ from ai.backend.common.events.types import (
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.types import AgentId, ContainerId, ContainerStatus, KernelId
+from ai.backend.common.types import (
+    AgentId,
+    ContainerId,
+    ContainerStatus,
+    KernelId,
+)
 from ai.backend.logging.types import LogLevel
 
 
@@ -167,12 +172,14 @@ class ContainerStatusData:
     container_id: ContainerId
     kernel_id: KernelId
     status: ContainerStatus
+    kernel_lifecycle_status: str
 
     def to_dict(self) -> dict[str, str]:
         return {
             "container_id": str(self.container_id),
             "kernel_id": str(self.kernel_id),
             "status": str(self.status),
+            "kernel_lifecycle_status": self.kernel_lifecycle_status,
         }
 
     @classmethod
@@ -181,6 +188,7 @@ class ContainerStatusData:
             ContainerId(data["container_id"]),
             KernelId(uuid.UUID(data["kernel_id"])),
             ContainerStatus(data["status"]),
+            data["kernel_lifecycle_status"],
         )
 
 
