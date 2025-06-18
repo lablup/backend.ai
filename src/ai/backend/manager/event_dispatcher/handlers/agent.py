@@ -136,16 +136,16 @@ class AgentEventHandler:
 
         containers_to_purge: list[ContainerKernelId] = []
         kernels_to_clean: set[KernelId] = set()
-        for container in event.alive_containers:
+        for container in event.active_containers:
             if container.kernel_id not in kernel_should_alive:
                 containers_to_purge.append(
                     ContainerKernelId(container.container_id, container.kernel_id)
                 )
 
         kernel_ids_of_living_containers: set[KernelId] = {
-            container.kernel_id for container in event.alive_containers
+            container.kernel_id for container in event.active_containers
         }
-        for kernel_container_id in event.alive_kernels:
+        for kernel_container_id in event.active_kernels:
             kernel_id = kernel_container_id.kernel_id
             if kernel_id not in kernel_should_alive:
                 kernels_to_clean.add(kernel_id)

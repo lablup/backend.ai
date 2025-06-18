@@ -193,15 +193,15 @@ class ContainerStatusData:
 @dataclass
 class AgentStatusHeartbeat(AgentOperationEvent):
     agent_id: AgentId
-    alive_containers: list[ContainerStatusData]
-    alive_kernels: list[KernelContainerId]
+    active_containers: list[ContainerStatusData]
+    active_kernels: list[KernelContainerId]
 
     @override
     def serialize(self) -> tuple:
         return (
             self.agent_id,
-            tuple(cont.to_dict() for cont in self.alive_containers),
-            tuple(k.serialize() for k in self.alive_kernels),
+            tuple(cont.to_dict() for cont in self.active_containers),
+            tuple(k.serialize() for k in self.active_kernels),
         )
 
     @classmethod
