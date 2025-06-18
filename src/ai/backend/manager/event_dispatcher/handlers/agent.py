@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Collection, Iterable
 
 import sqlalchemy as sa
 
@@ -15,6 +16,7 @@ from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
     ContainerKernelId,
+    KernelContainerId,
     KernelId,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -117,6 +119,37 @@ class AgentEventHandler:
     ) -> None:
         await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
 
+    def _filter_containers_to_purge(
+        self,
+        active_containers: Iterable[ContainerKernelId],
+        kernel_should_alive: Collection[KernelId],
+    ) -> list[ContainerKernelId]:
+        """
+        Helper function to filter containers that should be purged based on the
+        provided kernel status.
+        """
+        containers_to_purge: list[ContainerKernelId] = []
+        for container in active_containers:
+            if container.kernel_id not in kernel_should_alive:
+                containers_to_purge.append(container)
+        return containers_to_purge
+
+    def _filter_kernels_to_clean(
+        self,
+        active_kernels: Iterable[KernelContainerId],
+        kernel_should_alive: Collection[KernelId],
+    ) -> list[KernelId]:
+        """
+        Helper function to filter kernels that should be cleaned based on the
+        provided kernel status.
+        """
+        kernels_to_clean: set[KernelId] = set()
+        for kernel_container_id in active_kernels:
+            kernel_id = kernel_container_id.kernel_id
+            if kernel_id not in kernel_should_alive:
+                kernels_to_clean.add(kernel_id)
+        return list(kernels_to_clean)
+
     async def handle_agent_container_heartbeat(
         self,
         context: None,
@@ -133,24 +166,13 @@ class AgentEventHandler:
             db=self._db,
         )
         kernel_should_alive: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
-
-        containers_to_purge: list[ContainerKernelId] = []
-        kernels_to_clean: set[KernelId] = set()
-        for container in event.active_containers:
-            if container.kernel_id not in kernel_should_alive:
-                containers_to_purge.append(
-                    ContainerKernelId(container.container_id, container.kernel_id)
-                )
-
-        kernel_ids_of_living_containers: set[KernelId] = {
-            container.kernel_id for container in event.active_containers
-        }
-        for kernel_container_id in event.active_kernels:
-            kernel_id = kernel_container_id.kernel_id
-            if kernel_id not in kernel_should_alive:
-                kernels_to_clean.add(kernel_id)
-            if kernel_id not in kernel_ids_of_living_containers:
-                kernels_to_clean.add(kernel_id)
+        active_container_ids = [
+            ContainerKernelId(cont.container_id, cont.kernel_id) for cont in event.active_containers
+        ]
+        containers_to_purge = self._filter_containers_to_purge(
+            active_container_ids, kernel_should_alive
+        )
+        kernels_to_clean = self._filter_kernels_to_clean(event.active_kernels, kernel_should_alive)
 
         log.info(
             "agent@{0} heartbeat: {1} dangling containers, {2} dangling kernel registries",
@@ -158,13 +180,11 @@ class AgentEventHandler:
             len(containers_to_purge),
             len(kernels_to_clean),
         )
-        if containers_to_purge:
-            await self._registry.purge_containers(
-                event.agent_id,
-                containers_to_purge,
-            )
-        if kernels_to_clean:
-            await self._registry.drop_kernel_registry(
-                event.agent_id,
-                kernels_to_clean,
-            )
+        await self._registry.purge_containers(
+            event.agent_id,
+            containers_to_purge,
+        )
+        await self._registry.drop_kernel_registry(
+            event.agent_id,
+            kernels_to_clean,
+        )
