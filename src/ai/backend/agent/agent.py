@@ -2233,9 +2233,8 @@ class AbstractAgent(
                     session_id,
                     ctx.image_ref.canonical,
                 )
-                await self.anycast_and_broadcast_event(
-                    KernelPullingAnycastEvent(kernel_id, session_id, ctx.image_ref.canonical),
-                    KernelPullingBroadcastEvent(kernel_id, session_id, ctx.image_ref.canonical),
+                await self.produce_event(
+                    KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
                 try:
                     await self.pull_image(
@@ -2308,7 +2307,7 @@ class AbstractAgent(
                             kernel_id,
                             session_id,
                         )
-                        await self.anycast_event(DoAgentResourceCheckEvent(ctx.agent_id))
+                        await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
                         raise
                 log.info(
                     "create_kernel(kernel:{}, session:{}) resource allocations done",
@@ -2343,7 +2342,6 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                     )
-                await ctx.inject_additional_device_env_vars(resource_spec, environ)
 
                 # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
                 label_envs_corecount = image_labels.get("ai.backend.envs.corecount", "")
