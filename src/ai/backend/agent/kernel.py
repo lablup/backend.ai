@@ -440,6 +440,7 @@ class RobustSocket:
     _sock: zmq.asyncio.Socket
     _socket_type: int
     _addr: str
+    _closed: bool
 
     def __init__(
         self,
@@ -452,6 +453,7 @@ class RobustSocket:
         self._sock = self._zctx.socket(self._socket_type)
         self._sock.connect(self._addr)
         self._sock.setsockopt(zmq.LINGER, 50)
+        self._closed = False
 
     @property
     def addr(self) -> str:
@@ -461,7 +463,12 @@ class RobustSocket:
     def socket(self) -> zmq.asyncio.Socket:
         return self._sock
 
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     def close(self) -> None:
+        self._closed = True
         try:
             self._sock.close()
         except zmq.ZMQError:
@@ -659,20 +666,27 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def get_repl_out_addr(self) -> str:
         raise NotImplementedError
 
+    async def _close_task(self, task: Optional[asyncio.Task]) -> None:
+        if task is None:
+            return
+        being_canceled = task.cancel()
+        if not being_canceled:
+            # the task is already cancelled or done
+            return
+        await asyncio.sleep(0)  # yield to the event loop
+        if task.done():
+            return
+        await task
+
     async def close(self) -> None:
         if self._closed:
             return
         self._closed = True
         try:
-            if self.watchdog_task and not self.watchdog_task.done():
-                self.watchdog_task.cancel()
-                await self.watchdog_task
-            if self.status_task and not self.status_task.done():
-                self.status_task.cancel()
-                await self.status_task
-            if self.read_task and not self.read_task.done():
-                self.read_task.cancel()
-                await self.read_task
+            await self._close_task(self.watchdog_task)
+            await self._close_task(self.status_task)
+            await self._close_task(self.read_task)
+
             if self._sockets is not None:
                 self._sockets.close()
             # WARNING:
