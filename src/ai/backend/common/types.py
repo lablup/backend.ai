@@ -49,7 +49,6 @@ import typeguard
 from aiohttp import Fingerprint
 from glide import GlideClient
 from pydantic import BaseModel, ConfigDict, Field
-from redis.asyncio import Redis
 
 from .defs import RedisRole
 from .exception import InvalidIpAddressValue
@@ -1408,7 +1407,7 @@ class RedisHelperConfig(TypedDict, total=False):
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis | GlideClient
+    client: GlideClient
     name: str  # connection pool name
     service_name: Optional[str]
     sentinel: Optional[redis.asyncio.sentinel.Sentinel]

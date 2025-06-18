@@ -2,17 +2,18 @@ import asyncio
 import hashlib
 import logging
 import socket
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Self
 
 import hiredis
 from aiotools.server import process_index
 
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs
 from ai.backend.common.redis_client import RedisConnection
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import RedisTarget
+from ..types import RedisProfileTarget, RedisTarget
 from .queue import (
     AbstractMessageQueue,
     BroadcastChannel,
@@ -52,7 +53,7 @@ class HiRedisQueue(AbstractMessageQueue):
 
     def __init__(self, target: RedisTarget, args: RedisMQArgs) -> None:
         self._target = target
-        self._db = args.db
+        self._db = RedisRole.STREAM.db_index
         self._consume_queue = asyncio.Queue()
         self._subscribe_queue = asyncio.Queue()
         self._anycast_stream_key = args.anycast_stream_key
@@ -75,6 +76,18 @@ class HiRedisQueue(AbstractMessageQueue):
             self._loop_tasks.append(
                 asyncio.create_task(self._read_broadcast_messages_loop(args.subscribe_channels))
             )
+
+    @classmethod
+    def start(
+        cls,
+        redis_profile_target: RedisProfileTarget,
+        mq_args: RedisMQArgs,
+    ) -> Self:
+        stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
+        return cls(
+            stream_redis_target,
+            mq_args,
+        )
 
     async def anycast(self, payload: dict[bytes, bytes]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:

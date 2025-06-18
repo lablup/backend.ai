@@ -128,7 +128,6 @@ async def run_timer(
             subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
-            db=REDIS_STREAM_DB,
         ),
     )
 
@@ -189,7 +188,6 @@ def etcd_timer_node_process(
                 subscribe_channels=[BroadcastChannel.ALL],
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=node_id,
-                db=REDIS_STREAM_DB,
             ),
         )
 
@@ -277,7 +275,6 @@ class TimerNode(threading.Thread):
                 subscribe_channels=[BroadcastChannel.ALL],
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=node_id,
-                db=REDIS_STREAM_DB,
             ),
         )
         event_dispatcher = EventDispatcher(
@@ -495,7 +492,6 @@ async def test_global_timer_join_leave(
             subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
-            db=REDIS_STREAM_DB,
         ),
     )
     event_dispatcher = EventDispatcher(

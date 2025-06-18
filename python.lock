@@ -1050,36 +1050,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "46a512b1fbc4c51a9abfef8e2130db0806cb00ef137e161f6f751421c78a7c0c",
-              "url": "https://files.pythonhosted.org/packages/e1/81/cb2504afc314ae60f99f3a14e2417f13086ecfd7055a07a7751595777c22/boto3-1.38.37-py3-none-any.whl"
+              "hash": "6f4163cd9e030afd1059e8a6daa178835165b79eb0b5325a8cd447020b895921",
+              "url": "https://files.pythonhosted.org/packages/e4/dc/43d4ab839b84876bdf7baeba0a3ffcef4c3d52d81f3ce1979b4195c0e213/boto3-1.38.38-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4ccd700a2a36de0cd63bd8c79cca6164cb684e34fc1126de5c41525e4d0bfaee",
-              "url": "https://files.pythonhosted.org/packages/e3/ad/e2ec99e8d7a32286bfcb14fdc3e5452a5c29ad979731cce1686029e64f2b/boto3-1.38.37.tar.gz"
+              "hash": "0fe6b7d1974851588ec1edd39c66d9525d539133e02c7f985f9ebec5e222c0db",
+              "url": "https://files.pythonhosted.org/packages/98/a1/f2b68cba5d1907e004f4d88a028eda35a4f619c1e81d764e5cf58491eb46/boto3-1.38.38.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.39.0,>=1.38.37",
+            "botocore<1.39.0,>=1.38.38",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.14.0,>=0.13.0"
           ],
           "requires_python": ">=3.9",
-          "version": "1.38.37"
+          "version": "1.38.38"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f8ad063b7dcdbf12f2c1b5a4405f390ce52beff3b2861af2e5169816ee0146f2",
-              "url": "https://files.pythonhosted.org/packages/22/37/bc7f691f9e3ea6bf85d8d78398a0e447fb5b757ba1708021ef67a8e03749/botocore-1.38.37-py3-none-any.whl"
+              "hash": "aa5cc63bf885819d862852edb647d6276fe423c60113e8db375bb7ad8d88a5d9",
+              "url": "https://files.pythonhosted.org/packages/7b/c6/74f27ffe941dc1438b7fef620b402b982a9f9ab90a04ee47bd0314a02384/botocore-1.38.38-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "06ce46da5420ea7cf542ece4ff1ec9045922fef977adf4bbec618c96c7a478bf",
-              "url": "https://files.pythonhosted.org/packages/b6/96/2250aa68686a5d1d27224942bc5ab1285e8ddb2848e85f3ded985933f707/botocore-1.38.37.tar.gz"
+              "hash": "acf9ae5b2d99c1f416f94fa5b4f8c044ecb76ffcb7fb1b1daec583f36892a8e2",
+              "url": "https://files.pythonhosted.org/packages/22/f5/d05258ac4ae68769a956779192bfbd322e571ef9fc17a27f02d35c026b4b/botocore-1.38.38.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -1091,7 +1091,7 @@
             "urllib3<1.27,>=1.25.4; python_version < \"3.10\""
           ],
           "requires_python": ">=3.9",
-          "version": "1.38.37"
+          "version": "1.38.38"
         },
         {
           "artifacts": [
@@ -3231,13 +3231,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8139f29aac13e25d502680e9e19963e83f16838d48a0d71c287fe40e7067fbca",
-              "url": "https://files.pythonhosted.org/packages/7e/80/cab10959dc1faead58dc8384a781dfbf93cb4d33d50988f7a69f1b7c9bbe/oauthlib-3.2.2-py3-none-any.whl"
+              "hash": "a2b3a0a2a4ec2feb4b9110f56674a39b2cc2f23e14713f4ed20441dfba14e934",
+              "url": "https://files.pythonhosted.org/packages/e1/3d/760b1456010ed11ce87c0109007f0166078dfdada7597f0091ae76eb7305/oauthlib-3.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9859c40929662bec5d64f34d01c99e093149682a3f38915dc0655d5a633dd918",
-              "url": "https://files.pythonhosted.org/packages/6d/fa/fbf4001037904031639e6bfbfc02badfc7e12f137a8afa254df6c4c8a670/oauthlib-3.2.2.tar.gz"
+              "hash": "4e707cf88d7dfc22a8cce22ca736a2eef9967c1dd3845efc0703fc922353eeb2",
+              "url": "https://files.pythonhosted.org/packages/98/8a/6ea75ff7acf89f43afb157604429af4661a9840b1f2cece602b6a13c1893/oauthlib-3.3.0.tar.gz"
             }
           ],
           "project_name": "oauthlib",
@@ -3247,8 +3247,8 @@
             "cryptography>=3.0.0; extra == \"signedtoken\"",
             "pyjwt<3,>=2.0.0; extra == \"signedtoken\""
           ],
-          "requires_python": ">=3.6",
-          "version": "3.2.2"
+          "requires_python": ">=3.8",
+          "version": "3.3.0"
         },
         {
           "artifacts": [

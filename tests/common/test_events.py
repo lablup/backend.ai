@@ -76,7 +76,6 @@ async def test_dispatch(redis_container) -> None:
             subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
-            db=REDIS_STREAM_DB,
         ),
     )
     dispatcher = EventDispatcher(
@@ -148,7 +147,6 @@ async def test_error_on_dispatch(redis_container) -> None:
             subscribe_channels=[BroadcastChannel.ALL],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
-            db=REDIS_STREAM_DB,
         ),
     )
 

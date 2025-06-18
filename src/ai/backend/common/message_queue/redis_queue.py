@@ -3,16 +3,17 @@ import hashlib
 import logging
 import socket
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Self
 
 import redis
 from aiotools.server import process_index
 
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from .. import redis_helper
-from ..types import RedisConnectionInfo
+from ..types import RedisConnectionInfo, RedisProfileTarget
 from .queue import (
     AbstractMessageQueue,
     BroadcastChannel,
@@ -39,7 +40,6 @@ class RedisMQArgs:
     subscribe_channels: list[BroadcastChannel]
     group_name: str
     node_id: str
-    db: int
     # Optional arguments
     autoclaim_idle_timeout: int = _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT
     autoclaim_start_id: Optional[str] = None
@@ -81,6 +81,21 @@ class RedisQueue(AbstractMessageQueue):
             self._loop_taks.append(
                 asyncio.create_task(self._read_broadcast_messages_loop(args.subscribe_channels))
             )
+
+    @classmethod
+    async def start(
+        cls,
+        redis_profile_target: RedisProfileTarget,
+        mq_args: RedisMQArgs,
+    ) -> Self:
+        stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
+        stream_redis = await redis_helper.create_valkey_client(
+            stream_redis_target,
+            name="event_producer.stream",
+            db=RedisRole.STREAM.db_index,
+            pubsub_channels={channel.value for channel in mq_args.subscribe_channels},
+        )
+        return cls(stream_redis, mq_args)
 
     async def anycast(self, payload: dict[bytes, bytes]) -> None:
         """
@@ -238,19 +253,17 @@ class RedisQueue(AbstractMessageQueue):
         log.info("Reading broadcast messages from channels {}", subscribe_channels)
         while not self._closed:
             try:
-                await self._read_broadcast_messages(subscribe_channels)
+                await self._read_broadcast_messages()
             except Exception as e:
                 log.exception("Error while reading broadcast messages: {}", e)
         log.info("Broadcast messages loop stopped")
 
-    async def _read_broadcast_messages(self, subscribe_channels: list[BroadcastChannel]):
-        pubsub = self._conn.client.pubsub()
-        await pubsub.subscribe(*subscribe_channels)
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                payload = load_json(message["data"])
-                msg = BroadcastMessage(payload)
-                await self._subscribe_queue.put(msg)
+    async def _read_broadcast_messages(self):
+        while not self._closed:
+            pubsub_msg = await self._conn.client.get_pubsub_message()
+            payload = load_json(pubsub_msg.message)
+            msg = BroadcastMessage(payload)
+            await self._subscribe_queue.put(msg)
 
     async def _failover_consumer(
         self, consume_stream_key: QueueStream, e: redis.exceptions.ResponseError

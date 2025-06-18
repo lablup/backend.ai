@@ -21,7 +21,6 @@ def queue_args():
         subscribe_channels=[BroadcastChannel.ALL],
         group_name="test-group",
         node_id="test-node",
-        db=0,
     )
 
 

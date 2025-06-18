@@ -224,32 +224,31 @@ async def execute(
 
     while True:
         try:
-            async with redis_client:
-                aw_or_pipe = func(redis_client)
-                if isinstance(aw_or_pipe, Pipeline):
-                    async with aw_or_pipe:
-                        result = await aw_or_pipe.execute()
-                elif inspect.isawaitable(aw_or_pipe):
-                    result = await aw_or_pipe
-                else:
-                    raise ValueError(
-                        "The redis execute's return value must be an awaitable"
-                        " or redis.asyncio.client.Pipeline object"
-                    )
-                if isinstance(result, Pipeline):
-                    # This happens when func is an async function that returns a pipeline.
-                    async with result:
-                        result = await result.execute()
-                if encoding:
-                    if isinstance(result, bytes):
-                        return result.decode(encoding)
-                    elif isinstance(result, dict):
-                        newdict = {}
-                        for k, v in result.items():
-                            newdict[k.decode(encoding)] = v.decode(encoding)
-                        return newdict
-                else:
-                    return result
+            aw_or_pipe = func(redis_client)
+            if isinstance(aw_or_pipe, Pipeline):
+                async with aw_or_pipe:
+                    result = await aw_or_pipe.execute()
+            elif inspect.isawaitable(aw_or_pipe):
+                result = await aw_or_pipe
+            else:
+                raise ValueError(
+                    "The redis execute's return value must be an awaitable"
+                    " or redis.asyncio.client.Pipeline object"
+                )
+            if isinstance(result, Pipeline):
+                # This happens when func is an async function that returns a pipeline.
+                async with result:
+                    result = await result.execute()
+            if encoding:
+                if isinstance(result, bytes):
+                    return result.decode(encoding)
+                elif isinstance(result, dict):
+                    newdict = {}
+                    for k, v in result.items():
+                        newdict[k.decode(encoding)] = v.decode(encoding)
+                    return newdict
+            else:
+                return result
         except (
             MasterNotFoundError,
             SlaveNotFoundError,
@@ -558,10 +557,13 @@ async def create_valkey_client(
     *,
     name: str,
     db: int = 0,
+    pubsub_channels: Optional[set[str]] = None,
 ) -> RedisConnectionInfo:
     addresses: list[NodeAddress] = []
     if redis_target.addr:
-        addresses.append(NodeAddress(host=redis_target.addr.host, port=redis_target.addr.port))
+        addresses.append(
+            NodeAddress(host=str(redis_target.addr.host), port=int(redis_target.addr.port))
+        )
     sentinel_addresses: list[_HostPortPair] = []
     match type(redis_target.sentinel):
         case str():
@@ -572,14 +574,29 @@ async def create_valkey_client(
             sentinel_addresses = redis_target.sentinel
     if sentinel_addresses:
         for address in sentinel_addresses:
-            addresses.append(NodeAddress(host=address.host, port=address.port))
+            addresses.append(NodeAddress(host=str(address.host), port=int(address.port)))
     credentials: Optional[ServerCredentials] = None
     if redis_target.password:
         credentials = ServerCredentials(
             password=redis_target.password,
         )
+    pubsub_subscriptions: Optional[GlideClientConfiguration.PubSubSubscriptions] = None
+    if pubsub_channels is not None:
+        pubsub_subscriptions = GlideClientConfiguration.PubSubSubscriptions(
+            channels_and_patterns={
+                GlideClientConfiguration.PubSubChannelModes.Exact: pubsub_channels,
+            },
+            callback=None,
+            context=None,
+        )
+    if not addresses:
+        raise ValueError("At least one Redis address is required to create a GlideClient.")
     config = GlideClientConfiguration(
-        addresses, credentials=credentials, database_id=db, client_name=name
+        addresses,
+        credentials=credentials,
+        database_id=db,
+        client_name=name,
+        pubsub_subscriptions=pubsub_subscriptions,
     )
     client = await GlideClient.create(config)
     return RedisConnectionInfo(

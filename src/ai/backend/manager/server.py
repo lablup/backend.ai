@@ -715,7 +715,6 @@ async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     root_ctx.message_queue = await make_message_queue(
         redis_profile_target,
-        RedisRole.STREAM,
         RedisMQArgs(
             anycast_stream_key=QueueStream.EVENTS,
             broadcast_channel=BroadcastChannel.ALL,
@@ -727,7 +726,6 @@ async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             ],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=root_ctx.config_provider.config.manager.id,
-            db=RedisRole.STREAM.db_index,
         ),
         use_experimental_redis_event_dispatcher=root_ctx.config_provider.config.manager.use_experimental_redis_event_dispatcher,
     )

@@ -248,7 +248,6 @@ async def check_and_upgrade(
             subscribe_channels=[],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
-            db=RedisRole.STREAM.db_index,
         ),
     )
     event_producer = EventProducer(

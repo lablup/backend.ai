@@ -50,7 +50,7 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
-from redis.asyncio import Redis
+from glide import GlideClient, Transaction
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from tenacity import (
@@ -770,7 +770,6 @@ class AbstractAgent(
         )
         mq = await make_message_queue(
             redis_profile_target,
-            RedisRole.STREAM,
             RedisMQArgs(
                 anycast_stream_key=QueueStream.EVENTS,
                 broadcast_channel=BroadcastChannel.ALL,
@@ -778,7 +777,6 @@ class AbstractAgent(
                 subscribe_channels=[BroadcastChannel.ALL],
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=self.id,
-                db=RedisRole.STREAM.db_index,
             ),
             use_experimental_redis_event_dispatcher=self.local_config["agent"].get(
                 "use-experimental-redis-event-dispatcher"
@@ -828,15 +826,16 @@ class AbstractAgent(
         log.info("Slot types: {!r}", known_slot_types)
         self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
 
-        async def _pipeline(r: Redis):
-            pipe = r.pipeline()
+        async def _pipeline(r: GlideClient):
+            transaction = Transaction()
             for metadata in metadatas:
-                await pipe.hset(
+                transaction.hset(
                     "computer.metadata",
-                    metadata["slot_name"],
-                    dump_json_str(metadata),
+                    {
+                        metadata["slot_name"]: dump_json_str(metadata),
+                    },
                 )
-            return pipe
+            return await r.exec(transaction)
 
         await redis_helper.execute(self.redis_stat_pool, _pipeline)
 

@@ -153,7 +153,6 @@ async def server_main(
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
         mq = await make_message_queue(
             redis_profile_target,
-            RedisRole.STREAM,
             RedisMQArgs(
                 anycast_stream_key=QueueStream.EVENTS,
                 broadcast_channel=BroadcastChannel.ALL,
@@ -161,7 +160,6 @@ async def server_main(
                 subscribe_channels=[BroadcastChannel.ALL],
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=local_config["storage-proxy"]["node-id"],
-                db=RedisRole.STREAM.db_index,
             ),
             use_experimental_redis_event_dispatcher=local_config["storage-proxy"].get(
                 "use-experimental-redis-event-dispatcher"
