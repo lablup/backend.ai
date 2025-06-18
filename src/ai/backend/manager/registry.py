@@ -123,6 +123,7 @@ from ai.backend.common.types import (
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
     CommitStatus,
+    ContainerKernelId,
     DeviceId,
     HardwareMetadata,
     ImageAlias,
@@ -3765,6 +3766,28 @@ class AgentRegistry:
                 },
             ):
                 pass
+
+    async def purge_containers(
+        self,
+        agent_id: AgentId,
+        container_kernel_ids: Iterable[ContainerKernelId],
+    ) -> None:
+        serialized = [entry.serialize() for entry in container_kernel_ids]
+        if not serialized:
+            return
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            await rpc.call.purge_containers(serialized)
+
+    async def drop_kernel_registry(
+        self,
+        agent_id: AgentId,
+        kernel_ids: Iterable[KernelId],
+    ) -> None:
+        kernel_id_list = list(kernel_ids)  # Parse the iterable to a list for serialization
+        if not kernel_id_list:
+            return
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            await rpc.call.drop_kernel_registry(kernel_id_list)
 
 
 async def handle_image_pull_started(
