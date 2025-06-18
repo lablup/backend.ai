@@ -683,9 +683,12 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return
         self._closed = True
         try:
-            await self._close_task(self.watchdog_task)
-            await self._close_task(self.status_task)
-            await self._close_task(self.read_task)
+            await asyncio.gather(
+                self._close_task(self.watchdog_task),
+                self._close_task(self.status_task),
+                self._close_task(self.read_task),
+                return_exceptions=True,
+            )
 
             if self._sockets is not None:
                 self._sockets.close()
