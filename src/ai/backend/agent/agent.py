@@ -1220,14 +1220,14 @@ class AbstractAgent(
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
         log.info(
-            "Handling start event for kernel {0} in container {1}", ev.kernel_id, ev.container_id
+            "Handling start event for kernel {0} with container {1}", ev.kernel_id, ev.container_id
         )
         async with self.registry_lock:
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.stats_enabled = True
                 kernel_obj.state = KernelLifecycleStatus.RUNNING
-        log.info("Kernel {0} in started", ev.kernel_id)
+        log.info("Kernel {0} started", ev.kernel_id)
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         log.info(
