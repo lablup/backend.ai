@@ -796,14 +796,14 @@ class AgentRPCServer(aobject):
         self,
         container_kernel_ids: list[tuple[str, str]],
     ) -> PurgeContainersResp:
-        str_kernel_ids = [str(kid) for kid, _ in container_kernel_ids]
+        str_kernel_ids = [str(kid) for _, kid in container_kernel_ids]
         log.info("rpc::purge_containers(kernel_ids:{0})", str_kernel_ids)
         kernel_container_pairs = [
             ContainerKernelId(
                 ContainerId(cid),
                 KernelId(UUID(kid)),
             )
-            for kid, cid in container_kernel_ids
+            for cid, kid in container_kernel_ids
         ]
         asyncio.create_task(self.agent.purge_containers(kernel_container_pairs))
         return PurgeContainersResp()
