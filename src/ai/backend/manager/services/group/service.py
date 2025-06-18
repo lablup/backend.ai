@@ -11,8 +11,7 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from dateutil.relativedelta import relativedelta
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
+from glide import GlideClient, Transaction
 
 from ai.backend.common import redis_helper
 from ai.backend.common.exception import InvalidAPIParameters
@@ -413,11 +412,11 @@ class GroupService:
             result = await conn.execute(query)
             rows = result.fetchall()
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for row in rows:
-                await pipe.get(str(row["id"]))
-            return pipe
+                tx.get(str(row["id"]))
+            return await r.exec(tx)
 
         raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
 

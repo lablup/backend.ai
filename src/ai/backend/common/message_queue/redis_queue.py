@@ -7,6 +7,7 @@ from typing import AsyncGenerator, Optional, Self
 
 import redis
 from aiotools.server import process_index
+from glide import StreamAddOptions, TrimByMaxLen
 
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.json import dump_json, load_json
@@ -105,8 +106,11 @@ class RedisQueue(AbstractMessageQueue):
         """
         if self._closed:
             raise RuntimeError("Queue is closed")
+        payload_tuple = tuple((k, v) for k, v in payload.items())
         await self._conn.client.xadd(
-            self._anycast_stream_key, payload, maxlen=_DEFAULT_QUEUE_MAX_LEN
+            self._anycast_stream_key,
+            payload_tuple,
+            StreamAddOptions(trim=TrimByMaxLen(exact=True, threshold=_DEFAULT_QUEUE_MAX_LEN)),
         )
 
     async def broadcast(self, payload: dict[str, bytes]) -> None:

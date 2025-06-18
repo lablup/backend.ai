@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 import socket
 import time
@@ -183,7 +182,7 @@ async def blpop(
 
 async def execute(
     redis_obj: RedisConnectionInfo,
-    func: Callable[[Redis], Awaitable[Any]],
+    func: Callable[[GlideClient], Awaitable[Any]],
     *,
     service_name: Optional[str] = None,
     encoding: Optional[str] = None,
@@ -224,17 +223,7 @@ async def execute(
 
     while True:
         try:
-            aw_or_pipe = func(redis_client)
-            if isinstance(aw_or_pipe, Pipeline):
-                async with aw_or_pipe:
-                    result = await aw_or_pipe.execute()
-            elif inspect.isawaitable(aw_or_pipe):
-                result = await aw_or_pipe
-            else:
-                raise ValueError(
-                    "The redis execute's return value must be an awaitable"
-                    " or redis.asyncio.client.Pipeline object"
-                )
+            result = await func(redis_client)
             if isinstance(result, Pipeline):
                 # This happens when func is an async function that returns a pipeline.
                 async with result:

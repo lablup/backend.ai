@@ -19,9 +19,8 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from glide import GlideClient, Transaction
 from graphql import Undefined, UndefinedType
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
@@ -253,11 +252,11 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         rows: List[ImageRow],
     ) -> AsyncIterator[Image]:
-        async def _pipe(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
+        async def _pipe(r: GlideClient):
+            tx = Transaction()
             for row in rows:
-                await pipe.smembers(row.name)
-            return pipe
+                tx.smembers(row.name)
+            return await r.exec(tx)
 
         results = await redis_helper.execute(ctx.redis_image, _pipe)
         for idx, row in enumerate(rows):

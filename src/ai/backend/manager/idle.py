@@ -34,13 +34,13 @@ import sqlalchemy as sa
 import trafaret as t
 from aiotools import TaskGroupError
 from dateutil.relativedelta import relativedelta
+from glide import GlideClient, Transaction
 from pydantic import (
     BaseModel,
     Field,
     GetCoreSchemaHandler,
 )
 from pydantic_core import core_schema
-from redis.asyncio import Redis
 from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
@@ -397,11 +397,11 @@ class IdleCheckerHost:
 
         key_list = list(key_session_report_map.keys())
 
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for key in key_list:
-                await pipe.get(key)
-            return pipe
+                tx.get(key)
+            return await r.exec(tx)
 
         ret: dict[SessionId, dict[str, ReportInfo]] = {}
         for key, report in zip(

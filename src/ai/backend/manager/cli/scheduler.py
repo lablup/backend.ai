@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING, Literal
 
 import click
 import redis
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
+from glide import GlideClient, Transaction
 from tabulate import tabulate
 
 from ai.backend.common import redis_helper
@@ -71,11 +70,11 @@ def last_execution_time(
                     )
                     return
 
-                def _pipeline(r: Redis) -> Pipeline:
-                    pipe = r.pipeline()
+                async def _pipeline(cli: GlideClient):
+                    tx = Transaction()
                     for k in keys:
-                        pipe.hgetall(k)
-                    return pipe
+                        tx.hgetall(k)
+                    return await cli.exec(tx)
 
                 schedulers = [key.decode().split(".")[-1] for key in keys]
                 encoded_results = await redis_helper.execute(redis_conn_set.live, _pipeline)

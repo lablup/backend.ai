@@ -827,15 +827,15 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
 
         async def _pipeline(r: GlideClient):
-            transaction = Transaction()
+            tx = Transaction()
             for metadata in metadatas:
-                transaction.hset(
+                tx.hset(
                     "computer.metadata",
                     {
                         metadata["slot_name"]: dump_json_str(metadata),
                     },
                 )
-            return await r.exec(transaction)
+            return await r.exec(tx)
 
         await redis_helper.execute(self.redis_stat_pool, _pipeline)
 

@@ -46,6 +46,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from glide import GlideClient, Transaction
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -2983,10 +2984,19 @@ class AgentRegistry:
         async with self.heartbeat_lock:
             instance_rejoin = False
 
+            async def update_last_seen(cli: GlideClient) -> None:
+                # Update "last seen" timestamp for liveness tracking
+                await cli.hset(
+                    "agent.last_seen",
+                    {
+                        agent_id: now.timestamp(),
+                    },
+                )
+
             # Update "last seen" timestamp for liveness tracking
             await redis_helper.execute(
                 self.redis_live,
-                lambda r: r.hset("agent.last_seen", agent_id, now.timestamp()),
+                update_last_seen,
             )
 
             # Check and update status of the agent record in DB
@@ -3129,11 +3139,11 @@ class AgentRegistry:
             images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
             image_canonicals = set(img_info[0] for img_info in images)
 
-            async def _pipe_builder(r: Redis):
-                pipe = r.pipeline()
+            async def _pipe_builder(r: GlideClient):
+                tx = Transaction()
                 for image_canonical in image_canonicals:
-                    await pipe.sadd(image_canonical, agent_id)
-                return pipe
+                    tx.sadd(image_canonical, agent_id)
+                return await r.exec(tx)
 
             await redis_helper.execute(self.redis_image, _pipe_builder)
 
@@ -3145,22 +3155,22 @@ class AgentRegistry:
     async def handle_agent_images_remove(
         self, agent_id: AgentId, image_canonicals: list[str]
     ) -> None:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for image_canonical in image_canonicals:
-                await pipe.srem(image_canonical, agent_id)
-            return pipe
+                tx.srem(image_canonical, agent_id)
+            return await r.exec(tx)
 
         await redis_helper.execute(self.redis_image, _pipe_builder)
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
         await redis_helper.execute(self.redis_live, lambda r: r.hdel("agent.last_seen", agent_id))
 
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             async for imgname in r.scan_iter():
-                await pipe.srem(imgname, agent_id)
-            return pipe
+                tx.srem(imgname, agent_id)
+            return await r.exec(tx)
 
         async def _update() -> None:
             async with self.db.begin() as conn:
@@ -3542,11 +3552,11 @@ class AgentRegistry:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> Mapping[KernelId, str]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            transaction = Transaction()
             for kernel_id in kernel_ids:
-                await pipe.get(f"kernel.{kernel_id}.commit")
-            return pipe
+                transaction.get(f"kernel.{kernel_id}.commit")
+            return await r.exec(transaction)
 
         commit_statuses = await redis_helper.execute(self.redis_stat, _pipe_builder)
 

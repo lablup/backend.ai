@@ -10,8 +10,7 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
+from glide import GlideClient, Transaction
 from sqlalchemy.engine import Result, Row
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
@@ -859,11 +858,11 @@ class UserService:
             for idx in range(stat_length)
         ]
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
+        async def _pipe_builder(cli: GlideClient):
+            tx = Transaction()
             for row in rows:
-                await pipe.get(str(row["id"]))
-            return pipe
+                tx.get(str(row["id"]))
+            return await cli.exec(tx)
 
         raw_stats = await redis_helper.execute(self._redis_stat, _pipe_builder)
 

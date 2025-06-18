@@ -19,8 +19,7 @@ from typing import (
     Union,
 )
 
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
+from glide import GlideClient, Transaction
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.exception import (
@@ -138,20 +137,20 @@ class ProgressReporter:
         # due to interleaving at await statements below.
         current, total = self.current_progress, self.total_progress
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline(transaction=False)
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             tracker_key = f"bgtask.{self._task_id}"
-            await pipe.hset(
+            tx.hset(
                 tracker_key,
-                mapping={
+                field_value_map={
                     "current": str(current),
                     "total": str(total),
                     "msg": message or "",
                     "last_update": str(time.time()),
                 },
             )
-            await pipe.expire(tracker_key, _MAX_BGTASK_ARCHIVE_PERIOD)
-            return pipe
+            tx.expire(tracker_key, _MAX_BGTASK_ARCHIVE_PERIOD)
+            return await r.exec(tx)
 
         await redis_helper.execute(self._redis_client, _pipe_builder)
         await self._event_producer.broadcast_event(
@@ -255,17 +254,17 @@ class BackgroundTaskManager:
     ) -> None:
         tracker_key = _tracker_id(task_id)
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             task_info: BgTaskInfo
             if status.finished():
                 task_info = BgTaskInfo.finished(status=status, msg=msg)
             else:
                 task_info = BgTaskInfo.started(msg=msg)
             mapping = task_info.to_dict()
-            pipe.hset(tracker_key, mapping=mapping)
-            pipe.expire(tracker_key, _MAX_BGTASK_ARCHIVE_PERIOD)
-            return pipe
+            tx.hset(tracker_key, field_value_map=mapping)
+            tx.expire(tracker_key, _MAX_BGTASK_ARCHIVE_PERIOD)
+            return await r.exec(tx)
 
         await redis_helper.execute(self._redis_client, _pipe_builder)
 

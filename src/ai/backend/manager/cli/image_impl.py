@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 import click
 import sqlalchemy as sa
-from redis.asyncio.client import Pipeline, Redis
+from glide import GlideClient, Transaction
 from tabulate import tabulate
 
 from ai.backend.common import redis_helper
@@ -40,24 +40,24 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
             #       until we finish the epic refactoring of image metadata db.
             if installed_only:
 
-                async def _build_scard_pipeline(redis: Redis) -> Pipeline:
-                    pipe = redis.pipeline()
+                async def _build_scard_pipeline(cli: GlideClient):
+                    tx = Transaction()
                     for item in items:
-                        await pipe.scard(item.name)
-                    return pipe
+                        tx.scard(item.name)
+                    return await cli.exec(tx)
 
                 installed_counts = await redis_helper.execute(
                     redis_conn_set.image, _build_scard_pipeline
                 )
                 installed_items = []
 
-                async def _build_smembers_pipeline(redis: Redis) -> Pipeline:
-                    pipe = redis.pipeline()
+                async def _build_smembers_pipeline(cli: GlideClient):
+                    tx = Transaction()
                     for item, installed_count in zip(items, installed_counts):
                         if installed_count > 0:
                             installed_items.append(item)
-                            await pipe.smembers(item.name)
-                    return pipe
+                            tx.smembers(item.name)
+                    return await cli.exec(tx)
 
                 agents_per_installed_items = await redis_helper.execute(
                     redis_conn_set.image,

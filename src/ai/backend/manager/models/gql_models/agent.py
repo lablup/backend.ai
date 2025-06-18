@@ -14,8 +14,8 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from glide import GlideClient, Transaction
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
@@ -235,11 +235,11 @@ class AgentNode(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for agent_id in agent_ids:
-                await pipe.get(agent_id)
-            return pipe
+                tx.get(agent_id)
+            return await r.exec(tx)
 
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
@@ -254,11 +254,11 @@ class AgentNode(graphene.ObjectType):
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(cli: GlideClient):
+            tx = Transaction()
             for agent_id in agent_ids:
-                await pipe.get(f"container_count.{agent_id}")
-            return pipe
+                tx.get(f"container_count.{agent_id}")
+            return await cli.exec(tx)
 
         ret = []
         for cnt in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
@@ -606,11 +606,11 @@ class Agent(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[Any]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for agent_id in agent_ids:
-                await pipe.get(agent_id)
-            return pipe
+                tx.get(agent_id)
+            return await r.exec(tx)
 
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
@@ -655,11 +655,11 @@ class Agent(graphene.ObjectType):
     async def batch_load_container_count(
         cls, ctx: GraphQueryContext, agent_ids: Sequence[str]
     ) -> Sequence[int]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for agent_id in agent_ids:
-                await pipe.get(f"container_count.{agent_id}")
-            return pipe
+                tx.get(f"container_count.{agent_id}")
+            return await r.exec(tx)
 
         ret = []
         for cnt in await redis_helper.execute(ctx.redis_stat, _pipe_builder):

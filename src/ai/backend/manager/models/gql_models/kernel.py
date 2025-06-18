@@ -16,8 +16,8 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from glide import GlideClient, Transaction
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import noload, selectinload
 
@@ -205,11 +205,11 @@ class KernelNode(graphene.ObjectType):
     async def batch_load_live_stat(
         cls, ctx: GraphQueryContext, kernel_ids: Sequence[KernelId]
     ) -> list[dict[str, Any] | None]:
-        async def _pipe_builder(r: Redis):
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for kid in kernel_ids:
-                await pipe.get(str(kid))
-            return pipe
+                tx.get(str(kid))
+            return await r.exec(tx)
 
         ret: list[dict[str, Any] | None] = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):

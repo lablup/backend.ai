@@ -30,8 +30,7 @@ import aiotools
 import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
+from glide import GlideClient, Transaction
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
@@ -381,17 +380,17 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.schedule"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
+        async def _pipeline(r: GlideClient):
+            tx = Transaction()
+            tx.delete(redis_key)
+            tx.hset(
                 redis_key,
-                mapping={
+                field_value_map={
                     "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
-            return pipe
+            return await r.exec(tx)
 
         await redis_helper.execute(
             self.redis_live,
@@ -426,23 +425,33 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
+
+                        async def update_resource_group(cli: GlideClient) -> None:
+                            await cli.hset(
+                                redis_key,
+                                field_value_map={
+                                    "resource_group": sgroup_name,
+                                },
+                            )
+
                         await redis_helper.execute(
                             self.redis_live,
-                            lambda r: r.hset(
-                                redis_key,
-                                "resource_group",
-                                sgroup_name,
-                            ),
+                            update_resource_group,
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
+
+                async def update_finish_time(cli: GlideClient) -> None:
+                    await cli.hset(
+                        redis_key,
+                        field_value_map={
+                            "finish_time": datetime.now(tzutc()).isoformat(),
+                        },
+                    )
+
                 await redis_helper.execute(
                     self.redis_live,
-                    lambda r: r.hset(
-                        redis_key,
-                        "finish_time",
-                        datetime.now(tzutc()).isoformat(),
-                    ),
+                    update_finish_time,
                 )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -803,11 +812,11 @@ class SchedulerDispatcher(aobject):
             return candidate_agents
         max_container_count = int(raw_value)
 
-        async def _pipe_builder(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
             for ag in candidate_agents:
-                await pipe.get(f"container_count.{ag.id}")
-            return pipe
+                tx.get(f"container_count.{ag.id}")
+            return await r.exec(tx)
 
         raw_counts = await redis_helper.execute(self.registry.redis_stat, _pipe_builder)
 
@@ -1290,17 +1299,17 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.check_precondition"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
+        async def _pipeline(cli: GlideClient):
+            tx = Transaction()
+            tx.delete(redis_key)
+            tx.hset(
                 redis_key,
-                mapping={
+                field_value_map={
                     "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
-            return pipe
+            return await cli.exec(tx)
 
         await redis_helper.execute(
             self.redis_live,
@@ -1352,13 +1361,17 @@ class SchedulerDispatcher(aobject):
                 # check_and_pull_images() spawns tasks through PersistentTaskGroup
                 await self.registry.check_and_pull_images(bindings)
 
+            async def update_finish_time(cli: GlideClient) -> None:
+                await cli.hset(
+                    redis_key,
+                    field_value_map={
+                        "finish_time": datetime.now(tzutc()).isoformat(),
+                    },
+                )
+
             await redis_helper.execute(
                 self.redis_live,
-                lambda r: r.hset(
-                    redis_key,
-                    "finish_time",
-                    datetime.now(tzutc()).isoformat(),
-                ),
+                update_finish_time,
             )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1383,17 +1396,17 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.start"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
+        async def _pipeline(cli: GlideClient):
+            tx = Transaction()
+            tx.delete(redis_key)
+            tx.hset(
                 redis_key,
-                mapping={
+                field_value_map={
                     "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
-            return pipe
+            return await cli.exec(tx)
 
         await redis_helper.execute(
             self.redis_live,
@@ -1452,13 +1465,17 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
+            async def update_finish_time(cli: GlideClient) -> None:
+                await cli.hset(
+                    redis_key,
+                    field_value_map={
+                        "finish_time": datetime.now(tzutc()).isoformat(),
+                    },
+                )
+
             await redis_helper.execute(
                 self.redis_live,
-                lambda r: r.hset(
-                    redis_key,
-                    "finish_time",
-                    datetime.now(tzutc()).isoformat(),
-                ),
+                update_finish_time,
             )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
@@ -1636,17 +1653,17 @@ class SchedulerDispatcher(aobject):
         manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.scale_services"
 
-        def _pipeline(r: Redis) -> RedisPipeline:
-            pipe = r.pipeline()
-            pipe.delete(redis_key)
-            pipe.hset(
+        async def _pipeline(r: GlideClient):
+            tx = Transaction()
+            tx.delete(redis_key)
+            tx.hset(
                 redis_key,
-                mapping={
+                field_value_map={
                     "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
-            return pipe
+            return await r.exec(tx)
 
         async def _autoscale_txn() -> None:
             async with self.db.begin_session(commit_on_end=True) as session:
@@ -1764,13 +1781,18 @@ class SchedulerDispatcher(aobject):
             except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
+
+        async def update_down(cli: GlideClient) -> None:
+            await cli.hset(
+                redis_key,
+                field_value_map={
+                    "down": dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
+                },
+            )
+
         await redis_helper.execute(
             self.redis_live,
-            lambda r: r.hset(
-                redis_key,
-                "down",
-                dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
-            ),
+            update_down,
         )
 
         created_routes = []
@@ -1792,15 +1814,19 @@ class SchedulerDispatcher(aobject):
             await db_sess.commit()
         for route_id in created_routes:
             await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
-        await redis_helper.execute(
-            self.redis_live,
-            lambda r: r.hset(
+
+        async def update_up(cli: GlideClient) -> None:
+            await cli.hset(
                 redis_key,
-                mapping={
+                field_value_map={
                     "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
                     "finish_time": datetime.now(tzutc()).isoformat(),
                 },
-            ),
+            )
+
+        await redis_helper.execute(
+            self.redis_live,
+            update_up,
         )
 
         async def _delete():

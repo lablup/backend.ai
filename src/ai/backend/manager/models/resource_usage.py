@@ -8,8 +8,7 @@ from uuid import UUID
 import attrs
 import msgpack
 import sqlalchemy as sa
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
+from glide import GlideClient, Transaction
 from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common import redis_helper
@@ -496,11 +495,11 @@ async def parse_resource_usage_groups(
     stat_map = {k.id: k.last_stat for k in kernels}
     stat_empty_kerns = [k.id for k in kernels if not k.last_stat]
 
-    async def _pipe_builder(r: Redis) -> RedisPipeline:
-        pipe = r.pipeline()
+    async def _pipe_builder(cli: GlideClient):
+        tx = Transaction()
         for kern_id in stat_empty_kerns:
-            await pipe.get(str(kern_id))
-        return pipe
+            tx.get(str(kern_id))
+        return await cli.exec(tx)
 
     raw_stats = await redis_helper.execute(redis_stat, _pipe_builder)
     for kern_id, raw_stat in zip(stat_empty_kerns, raw_stats):

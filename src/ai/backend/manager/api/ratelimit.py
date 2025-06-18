@@ -8,6 +8,7 @@ from typing import Final, Iterable, Tuple
 import attrs
 from aiohttp import web
 from aiotools import apartial
+from glide import GlideClient
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
@@ -101,6 +102,10 @@ async def init(app: web.Application) -> None:
         name="ratelimit",
         db=REDIS_RATE_LIMIT_DB,
     )
+
+    async def script_loader(cli: GlideClient):
+        return cli.script_show(_rlim_script)
+
     app_ctx.redis_rlim_script = await redis_helper.execute(
         app_ctx.redis_rlim, lambda r: r.script_load(_rlim_script)
     )

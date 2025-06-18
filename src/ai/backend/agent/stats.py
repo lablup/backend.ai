@@ -27,8 +27,7 @@ from typing import (
 
 import aiodocker
 import attrs
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
+from glide import GlideClient, Transaction
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
@@ -480,13 +479,13 @@ class StatContext:
             )
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            await pipe.set(self.agent.local_config["agent"]["id"], serialized_agent_updates)
-            await pipe.expire(self.agent.local_config["agent"]["id"], self.cache_lifespan)
-            return pipe
+        async def _redis_operations(r: GlideClient):
+            tx = Transaction()
+            tx.set(self.agent.local_config["agent"]["id"], serialized_agent_updates)
+            tx.expire(self.agent.local_config["agent"]["id"], self.cache_lifespan)
+            await r.exec(tx)
 
-        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _redis_operations)
 
     def observe_container_metric(
         self,
@@ -621,13 +620,13 @@ class StatContext:
 
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline(transaction=False)
+        async def _redis_operations(r: GlideClient):
+            tx = Transaction()
             for kernel_id, update in kernel_serialized_updates:
-                pipe.set(str(kernel_id), update)
-            return pipe
+                tx.set(str(kernel_id), update)
+            await r.exec(tx)
 
-        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _redis_operations)
 
     async def collect_per_container_process_stat(
         self,
@@ -709,8 +708,8 @@ class StatContext:
                         else:
                             self.process_metrics[cid][pid][metric_key].update(measure)
 
-            async def _pipe_builder(r: Redis) -> Pipeline:
-                pipe = r.pipeline(transaction=False)
+            async def _redis_operations(r: GlideClient):
+                tx = Transaction()
                 for cid in updated_cids:
                     serializable_table = {}
                     for pid in self.process_metrics[cid].keys():
@@ -726,7 +725,7 @@ class StatContext:
                             serializable_table,
                         )
                     serialized_metrics = msgpack.packb(serializable_table)
-                    pipe.set(cid, serialized_metrics, ex=8)
-                return pipe
+                    tx.set(cid, serialized_metrics, ex=8)
+                await r.exec(tx)
 
-            await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+            await redis_helper.execute(self.agent.redis_stat_pool, _redis_operations)

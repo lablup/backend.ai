@@ -3,7 +3,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Sequence
 
-from redis.asyncio.client import Pipeline, Redis
+from glide import GlideClient, Transaction
+from redis.asyncio.client import Redis
 
 from ai.backend.common import redis_helper
 from ai.backend.common.json import dump_json_str
@@ -34,12 +35,11 @@ class RedisServiceDiscovery(ServiceDiscovery):
 
     async def _hsetex(self, key: str, mapping: dict[str, Any]) -> None:
         # TODO: Use actual `hsetex` after upgrading to redis-py 8.0
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            await pipe.hset(key, mapping={k: dump_json_str(v) for k, v in mapping.items()})
-            await pipe.expire(key, self._ttl)
-            await pipe.execute()
-            return pipe
+        async def _pipe_builder(r: GlideClient):
+            tx = Transaction()
+            tx.hset(key, field_value_map={k: dump_json_str(v) for k, v in mapping.items()})
+            tx.expire(key, self._ttl)
+            return r.exec(tx)
 
         await redis_helper.execute(self._redis, _pipe_builder)
 

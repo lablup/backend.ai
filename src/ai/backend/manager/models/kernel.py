@@ -18,8 +18,7 @@ from typing import (
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
+from glide import GlideClient, Transaction
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
@@ -808,11 +807,11 @@ class KernelStatistics:
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         """For cases where required to collect kernel metrics in bulk internally"""
 
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
+        async def _build_pipeline(redis: GlideClient):
+            tx = Transaction()
             for sess_id in session_ids:
-                await pipe.get(str(sess_id))
-            return pipe
+                tx.get(str(sess_id))
+            return await redis.exec(tx)
 
         stats = []
         results = await redis_helper.execute(redis_stat, _build_pipeline)
@@ -838,14 +837,14 @@ class KernelStatistics:
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
+        async def _build_pipeline(redis: GlideClient):
+            tx = Transaction()
             for sess_id in session_ids:
-                await pipe.mget([
+                tx.mget([
                     f"session.{sess_id}.requests",
                     f"session.{sess_id}.last_response_time",
                 ])
-            return pipe
+            return await redis.exec(tx)
 
         stats = []
         results = await redis_helper.execute(ctx.redis_live, _build_pipeline)

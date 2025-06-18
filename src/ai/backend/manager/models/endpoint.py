@@ -22,7 +22,7 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 import trafaret as t
 import yarl
-from redis.asyncio import Redis
+from glide import GlideClient, Transaction
 from redis.asyncio.client import Pipeline
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
@@ -939,11 +939,11 @@ class EndpointStatistics:
         redis_stat: RedisConnectionInfo,
         endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
+        async def _build_pipeline(cli: GlideClient) -> Pipeline:
+            tx = Transaction()
             for endpoint_id in endpoint_ids:
-                pipe.get(f"inference.{endpoint_id}.app")
-            return pipe
+                tx.get(f"inference.{endpoint_id}.app")
+            return await cli.exec(tx)
 
         stats = []
         results = await redis_helper.execute(redis_stat, _build_pipeline)
@@ -968,11 +968,11 @@ class EndpointStatistics:
         ctx: GraphQueryContext,
         endpoint_replica_ids: Sequence[tuple[UUID, UUID]],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        async def _build_pipeline(redis: Redis) -> Pipeline:
-            pipe = redis.pipeline()
+        async def _build_pipeline(cli: GlideClient):
+            tx = Transaction()
             for endpoint_id, replica_id in endpoint_replica_ids:
-                pipe.get(f"inference.{endpoint_id}.replica.{replica_id}")
-            return pipe
+                tx.get(f"inference.{endpoint_id}.replica.{replica_id}")
+            return await cli.exec(tx)
 
         stats = []
         results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
