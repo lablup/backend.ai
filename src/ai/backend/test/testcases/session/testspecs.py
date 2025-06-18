@@ -4,6 +4,7 @@ from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
+from ai.backend.test.templates.session.dependent_session import DependentSessionTemplate
 from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
 from ai.backend.test.templates.session.session_template import (
     BatchSessionFromTemplateTemplate,
@@ -24,6 +25,7 @@ from ai.backend.test.testcases.session.execution import (
     InteractiveSessionExecuteCodeFailureWrongCommand,
     InteractiveSessionExecuteCodeSuccess,
 )
+from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep, CodeExecutionDep
 
@@ -282,6 +284,17 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(testcode=TestContainerLogRetriever()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+    ),
+    "session_dependency_graph_retriever": TestSpec(
+        name="session_dependency_graph_retriever",
+        description=textwrap.dedent("""
+            Retrieve and validate the dependency graph of a compute session,
+            ensuring the session name matches and the dependency structure is present.
+        """),
+        tags={TestTag.SESSION, TestTag.MANAGER},
+        template=BasicTestTemplate(testcode=DependencyGraphRetriever()).with_wrappers(
+            KeypairAuthTemplate, BatchSessionTemplate, DependentSessionTemplate
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [

@@ -27,8 +27,9 @@ class ContextName(enum.StrEnum):
     CODE_EXECUTION = "code_execution"
     SESSION_TEMPLATE = "session_template"
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
+    SESSION_DEPENDENCY = "session_dependency"
 
-    CREATED_SESSION_ID = "created_session_id"
+    CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
 
 
