@@ -14,7 +14,7 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from glide import GlideClient, Transaction
+from glide import ExpirySet, ExpiryType, GlideClient, Transaction
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -949,14 +949,21 @@ class RescanGPUAllocMaps(graphene.Mutation):
                 alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
                     AgentId(agent_id)
                 )
-                key = f"gpu_alloc_map.{agent_id}"
-                await redis_helper.execute(
-                    graph_ctx.registry.redis_stat,
-                    lambda r: r.setex(
+
+                async def update_gpu_alloc_map(
+                    r: GlideClient,
+                ) -> None:
+                    # Store the alloc map in Redis with a TTL
+                    key = f"gpu_alloc_map.{agent_id}"
+                    return await r.set(
                         name=key,
                         value=dump_json_str(alloc_map),
-                        time=GPU_ALLOC_MAP_CACHE_PERIOD,
-                    ),
+                        expiry=ExpirySet(ExpiryType.SEC, GPU_ALLOC_MAP_CACHE_PERIOD),
+                    )
+
+                await redis_helper.execute(
+                    graph_ctx.registry.redis_stat,
+                    update_gpu_alloc_map,
                 )
             except Exception as e:
                 reporter_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"

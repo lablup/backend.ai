@@ -233,7 +233,7 @@ async def check_and_upgrade(
     )
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
+    stream_redis = await redis_helper.create_valkey_client(
         stream_redis_target,
         name="event_producer.stream",
         db=REDIS_STREAM_DB,

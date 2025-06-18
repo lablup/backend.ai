@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from glide import GlideClient
 from graphene.types.datetime import DateTime as GQLDateTime
-from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common import redis_helper
@@ -171,13 +171,13 @@ class KeyPair(graphene.ObjectType):
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
             ctx.config_provider.config.redis.model_dump()
         )
-        redis_rlim = redis_helper.get_redis_object(
+        redis_rlim = await redis_helper.create_valkey_client(
             redis_profile_target.profile_target(RedisRole.RATE_LIMIT),
             name="ratelimit",
             db=REDIS_RATE_LIMIT_DB,
         )
 
-        async def _zcard(r: Redis):
+        async def _zcard(r: GlideClient):
             return await r.zcard(self.access_key)
 
         ret = await redis_helper.execute(redis_rlim, _zcard)

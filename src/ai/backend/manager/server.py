@@ -524,28 +524,27 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.config_provider.config.redis.model_dump()
     )
-
-    root_ctx.redis_live = redis_helper.get_redis_object(
+    root_ctx.redis_live = await redis_helper.create_valkey_client(
         redis_profile_target.profile_target(RedisRole.LIVE),
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
-    root_ctx.redis_stat = redis_helper.get_redis_object(
+    root_ctx.redis_stat = await redis_helper.create_valkey_client(
         redis_profile_target.profile_target(RedisRole.STATISTICS),
         name="stat",  # temporary storage for stat snapshots
         db=REDIS_STATISTICS_DB,
     )
-    root_ctx.redis_image = redis_helper.get_redis_object(
+    root_ctx.redis_image = await redis_helper.create_valkey_client(
         redis_profile_target.profile_target(RedisRole.IMAGE),
         name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
-    root_ctx.redis_stream = redis_helper.get_redis_object(
+    root_ctx.redis_stream = await redis_helper.create_valkey_client(
         redis_profile_target.profile_target(RedisRole.STREAM),
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
-    root_ctx.redis_lock = redis_helper.get_redis_object(
+    root_ctx.redis_lock = await redis_helper.create_valkey_client(
         redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,

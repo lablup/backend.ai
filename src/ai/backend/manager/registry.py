@@ -47,7 +47,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from glide import GlideClient, Transaction
-from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
@@ -2140,43 +2139,58 @@ class AgentRegistry:
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
 
         # Update keypair resource usage for keypairs with running containers.
-        async def _update(r: Redis):
+        async def _update(r: GlideClient):
             updates: dict[str, int] = {}
             for concurrency in access_key_to_concurrency_used.values():
                 updates |= concurrency.to_cnt_map()
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        async def _update_by_fullscan(r: Redis):
+        async def _update_by_fullscan(r: GlideClient):
             updates = {}
-            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.compute_session_ids)
-                    if concurrent_sessions is not None
-                    else 0
+            cursor = b"0"
+
+            while True:
+                cursor, scanned = r.scan(
+                    cursor=cursor, match=f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*", count=100
                 )
-                updates[_stat_key] = usage
-            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.system_concurrency_used_key)
-                    if concurrent_sessions is not None
-                    else 0
+                for stat_key in scanned:
+                    if isinstance(stat_key, bytes):
+                        _stat_key = stat_key.decode("utf-8")
+                    else:
+                        _stat_key = cast(str, stat_key)
+                    ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
+                    concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
+                    usage = (
+                        len(concurrent_sessions.compute_session_ids)
+                        if concurrent_sessions is not None
+                        else 0
+                    )
+                    updates[_stat_key] = usage
+                if cursor == b"0":
+                    break
+
+            cursor = b"0"
+            while True:
+                cursor, scanned = r.scan(
+                    cursor=cursor, match=f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*", count=100
                 )
-                updates[_stat_key] = usage
+                for stat_key in scanned:
+                    if isinstance(stat_key, bytes):
+                        _stat_key = stat_key.decode("utf-8")
+                    else:
+                        _stat_key = cast(str, stat_key)
+                    ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
+                    concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
+                    usage = (
+                        len(concurrent_sessions.system_concurrency_used_key)
+                        if concurrent_sessions is not None
+                        else 0
+                    )
+                    updates[_stat_key] = usage
+                if cursor == b"0":
+                    break
+
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
@@ -2988,8 +3002,8 @@ class AgentRegistry:
                 # Update "last seen" timestamp for liveness tracking
                 await cli.hset(
                     "agent.last_seen",
-                    {
-                        agent_id: now.timestamp(),
+                    field_value_map={
+                        agent_id: str(now.timestamp()),
                     },
                 )
 

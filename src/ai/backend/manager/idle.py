@@ -34,7 +34,7 @@ import sqlalchemy as sa
 import trafaret as t
 from aiotools import TaskGroupError
 from dateutil.relativedelta import relativedelta
-from glide import GlideClient, Transaction
+from glide import ExpirySet, ExpiryType, GlideClient, Transaction
 from pydantic import (
     BaseModel,
     Field,
@@ -199,6 +199,8 @@ class IdleCheckerHost:
         config_provider: ManagerConfigProvider,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
+        redis_live: RedisConnectionInfo,
+        redis_stat: RedisConnectionInfo,
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
         self._event_dispatch_checkers: list[AbstractEventDispatcherIdleChecker] = []
@@ -207,22 +209,34 @@ class IdleCheckerHost:
         self._config_provider = config_provider
         self._event_producer = event_producer
         self._lock_factory = lock_factory
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self._config_provider.config.redis.model_dump()
+        self._redis_live = redis_live
+        self._redis_stat = redis_stat
+        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
+            self._redis_live
         )
-        self._redis_live = redis_helper.get_redis_object(
+
+    @classmethod
+    async def create(
+        cls,
+        db: SAEngine,
+        config_provider: ManagerConfigProvider,
+        event_producer: EventProducer,
+        lock_factory: DistributedLockFactory,
+    ) -> Self:
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            config_provider.config.redis.model_dump()
+        )
+        redis_live = await redis_helper.create_valkey_client(
             redis_profile_target.profile_target(RedisRole.LIVE),
             name="idle.live",
             db=REDIS_LIVE_DB,
         )
-        self._redis_stat = redis_helper.get_redis_object(
+        redis_stat = await redis_helper.create_valkey_client(
             redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="idle.stat",
             db=REDIS_STATISTICS_DB,
         )
-        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
-            self._redis_live
-        )
+        return cls(db, config_provider, event_producer, lock_factory, redis_live, redis_stat)
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -473,13 +487,17 @@ class AbstractIdleCheckReporter(ABC):
         pass
 
     async def set_remaining_time_report(self, session_id: SessionId, remaining: float) -> None:
+        async def set_report(r: GlideClient) -> None:
+            key = self.get_report_key(session_id)
+            await r.set(
+                key,
+                msgpack.packb(remaining),
+                expiry=ExpirySet(ExpiryType.SEC, int(DEFAULT_CHECK_INTERVAL) * 10),
+            )
+
         await redis_helper.execute(
             self._redis_live,
-            lambda r: r.set(
-                self.get_report_key(session_id),
-                msgpack.packb(remaining),
-                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-            ),
+            set_report,
         )
 
 
@@ -719,26 +737,38 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
 
     async def _disable_timeout(self, session_id: SessionId) -> None:
         log.debug(f"NetworkTimeoutIdleChecker._disable_timeout({session_id})")
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
+
+        async def set_last_access(r: GlideClient) -> None:
+            await r.set(
                 f"session.{session_id}.last_access",
                 "0",
-                xx=True,
-            ),
+                expiry=ExpirySet(
+                    ExpiryType.SEC, max(86400, int(self._idle_timeout.total_seconds() * 2))
+                ),
+            )
+
+        await redis_helper.execute(
+            self._redis_live,
+            set_last_access,
         )
 
     async def _update_timeout(self, session_id: SessionId) -> None:
         log.debug(f"NetworkTimeoutIdleChecker._update_timeout({session_id})")
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
         t = t[0] + (t[1] / (10**6))
-        await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.set(
+
+        async def set_last_access(r: GlideClient) -> None:
+            await r.set(
                 f"session.{session_id}.last_access",
                 f"{t:.06f}",
-                ex=max(86400, int(self._idle_timeout.total_seconds() * 2)),
-            ),
+                expiry=ExpirySet(
+                    ExpiryType.SEC, max(86400, int(self._idle_timeout.total_seconds() * 2))
+                ),
+            )
+
+        await redis_helper.execute(
+            self._redis_live,
+            set_last_access,
         )
 
 
@@ -1360,7 +1390,7 @@ async def init_idle_checkers(
     Create an instance of session idleness checker
     from the given configuration.
     """
-    checker_host = IdleCheckerHost(
+    checker_host = await IdleCheckerHost.create(
         db,
         config_provider,
         event_producer,

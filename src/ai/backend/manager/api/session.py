@@ -36,8 +36,8 @@ import sqlalchemy.exc
 import trafaret as t
 from aiohttp import web
 from dateutil.tz import tzutc
+from glide import GlideClient
 from pydantic import AliasChoices, Field
-from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
@@ -951,14 +951,32 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.config_provider.config.manager.heartbeat_timeout)
 
-        async def _check_impl(r: Redis):
-            async for agent_id, prev in r.hscan_iter("agent.last_seen"):
-                prev = datetime.fromtimestamp(float(prev), tzutc())
-                if now - prev > timeout:
-                    await root_ctx.event_producer.anycast_event(
-                        AgentTerminatedEvent("agent-lost"),
-                        source_override=agent_id.decode(),
-                    )
+        async def _check_impl(r: GlideClient):
+            # hscan all
+            cursor = b"0"
+            while True:
+                data: list[bytes]
+                cursor, data = await r.hscan("agent.last_seen", cursor=cursor, count=100)
+                if not data or cursor == b"0":
+                    break
+                # 2개씩 묶어서 field, value로 전달됨 (agent_id, prev_byte)
+                # data = [(agent_id, prev_byte), (agent_id, prev_byte), ...
+
+                for i in range(0, len(data), 2):
+                    agent_id = data[i]
+                    prev_byte = data[i + 1]
+                    if not isinstance(agent_id, bytes) or not isinstance(prev_byte, bytes):
+                        log.warning(
+                            "check_agent_lost: Invalid data format in agent.last_seen: %s",
+                            data,
+                        )
+                        continue
+                    prev = datetime.fromtimestamp(float(prev_byte), tzutc())
+                    if now - prev > timeout:
+                        await root_ctx.event_producer.anycast_event(
+                            AgentTerminatedEvent("agent-lost"),
+                            source_override=AgentId(agent_id.decode()),
+                        )
 
         await redis_helper.execute(root_ctx.redis_live, _check_impl)
     except asyncio.CancelledError:

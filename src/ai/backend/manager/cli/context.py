@@ -149,22 +149,22 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     redis_config = RedisConfig(**raw_redis_config)
     etcd_redis_config = RedisProfileTarget.from_dict(redis_config.model_dump())
 
-    redis_live = redis_helper.get_redis_object(
+    redis_live = await redis_helper.create_valkey_client(
         etcd_redis_config.profile_target(RedisRole.LIVE),
         name="mgr_cli.live",
         db=REDIS_LIVE_DB,
     )
-    redis_stat = redis_helper.get_redis_object(
+    redis_stat = await redis_helper.create_valkey_client(
         etcd_redis_config.profile_target(RedisRole.STATISTICS),
         name="mgr_cli.stat",
         db=REDIS_STATISTICS_DB,
     )
-    redis_image = redis_helper.get_redis_object(
+    redis_image = await redis_helper.create_valkey_client(
         etcd_redis_config.profile_target(RedisRole.IMAGE),
         name="mgr_cli.image",
         db=REDIS_IMAGE_DB,
     )
-    redis_stream = redis_helper.get_redis_object(
+    redis_stream = await redis_helper.create_valkey_client(
         etcd_redis_config.profile_target(RedisRole.STREAM),
         name="mgr_cli.stream",
         db=REDIS_STREAM_DB,

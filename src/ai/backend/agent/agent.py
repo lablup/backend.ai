@@ -1095,9 +1095,13 @@ class AbstractAgent(
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
                         stored_chunk = bytes(cb[:chunk_size])
+
+                        async def _store_chunk(cli: GlideClient) -> None:
+                            await cli.rpush(log_key, stored_chunk)
+
                         await redis_helper.execute(
                             self.redis_stream_pool,
-                            lambda r: r.rpush(log_key, stored_chunk),
+                            _store_chunk,
                         )
                         remaining = cb[chunk_size:]
                         chunk_length = len(remaining)
@@ -1108,19 +1112,27 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
+
+                async def _store_last_chunk(cli: GlideClient) -> None:
+                    await cli.rpush(log_key, chunk_buffer.getvalue())
+
                 await redis_helper.execute(
                     self.redis_stream_pool,
-                    lambda r: r.rpush(log_key, chunk_buffer.getvalue()),
+                    _store_last_chunk,
                 )
         finally:
             chunk_buffer.close()
+
         # Keep the log for at most one hour in Redis.
         # This is just a safety measure to prevent memory leak in Redis
         # for cases when the event delivery has failed or processing
         # the log data has failed.
+        async def _set_expire(cli: GlideClient) -> None:
+            await cli.expire(log_key, 3600)
+
         await redis_helper.execute(
             self.redis_stream_pool,
-            lambda r: r.expire(log_key, 3600),
+            _set_expire,
         )
         await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 

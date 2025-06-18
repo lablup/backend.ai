@@ -291,19 +291,6 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
-        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-            self.config_provider.config.redis.model_dump()
-        )
-        self.redis_live = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.LIVE),
-            name="scheduler.live",
-            db=REDIS_LIVE_DB,
-        )
-        self.redis_stat = redis_helper.get_redis_object(
-            redis_profile_target.profile_target(RedisRole.STATISTICS),
-            name="stat",
-            db=REDIS_STATISTICS_DB,
-        )
 
     async def __ainit__(self) -> None:
         self.schedule_timer = GlobalTimer(
@@ -345,6 +332,20 @@ class SchedulerDispatcher(aobject):
             initial_delay=3.0,
             task_name="update_session_status_timer",
         )
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            self.config_provider.config.redis.model_dump()
+        )
+        self.redis_live = await redis_helper.create_valkey_client(
+            redis_profile_target.profile_target(RedisRole.LIVE),
+            name="scheduler.live",
+            db=REDIS_LIVE_DB,
+        )
+        self.redis_stat = await redis_helper.create_valkey_client(
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
+            name="stat",
+            db=REDIS_STATISTICS_DB,
+        )
+
         await self.schedule_timer.join()
         await self.check_precond_timer.join()
         await self.session_start_timer.join()

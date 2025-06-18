@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional, override
 import redis
 import redis.asyncio as aioredis
 from aiohttp import web
+from glide import GlideClient
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -22,7 +23,7 @@ class RedisStorage(AbstractStorage):
 
     def __init__(
         self,
-        redis_pool: aioredis.Redis,
+        redis_pool: GlideClient,
         *,
         cookie_name: str = "AIOHTTP_SESSION",
         domain: Optional[str] = None,
@@ -53,7 +54,7 @@ class RedisStorage(AbstractStorage):
         if lib_version < (4, 3):
             raise RuntimeError("redis<4.3 is not supported")
         self._key_factory = key_factory
-        if not isinstance(redis_pool, aioredis.Redis):
+        if not isinstance(redis_pool, GlideClient):
             raise TypeError(f"Expected redis.asyncio.Redis got {type(redis_pool)}")
         self._redis = redis_pool
 

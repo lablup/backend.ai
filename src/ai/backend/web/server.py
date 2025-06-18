@@ -684,13 +684,11 @@ async def server_main(
     etcd_resdis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
         config["session"]["redis"]
     )
-    app["redis"] = redis_helper.get_redis_object(
+    redis_conn = await redis_helper.create_valkey_client(
         etcd_resdis_config.profile_target(RedisRole.STATISTICS),
         name="web.session",
-        socket_keepalive=True,
-        socket_keepalive_options=keepalive_options,
-    ).client
-
+    )
+    app["redis"] = redis_conn.client
     if pidx == 0 and config["session"]["flush_on_startup"]:
         await app["redis"].flushdb()
         log.info("flushed session storage.")

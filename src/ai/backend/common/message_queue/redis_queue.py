@@ -3,11 +3,17 @@ import hashlib
 import logging
 import socket
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional, Self
+from typing import AsyncGenerator, List, Mapping, Optional, Self
 
 import redis
 from aiotools.server import process_index
-from glide import StreamAddOptions, TrimByMaxLen
+from glide import (
+    GlideClient,
+    StreamAddOptions,
+    StreamGroupOptions,
+    StreamReadGroupOptions,
+    TrimByMaxLen,
+)
 
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.json import dump_json, load_json
@@ -186,25 +192,29 @@ class RedisQueue(AbstractMessageQueue):
     async def _auto_claim(
         self, consume_stream_key: QueueStream, autoclaim_start_id: str, autoclaim_idle_timeout: int
     ) -> tuple[str, bool]:
-        reply = await redis_helper.execute(
-            self._conn,
-            lambda r: r.xautoclaim(
+        async def auto_claim(cli: GlideClient):
+            return await cli.xautoclaim(
                 consume_stream_key,
                 self._group_name,
                 self._consumer_id,
-                min_idle_time=autoclaim_idle_timeout,
-                start_id=autoclaim_start_id,
+                min_idle_time_ms=autoclaim_idle_timeout,
+                start=autoclaim_start_id,
                 count=_DEFAULT_AUTOCLAIM_COUNT,
-            ),
+            )
+
+        reply = await redis_helper.execute(
+            self._conn,
+            auto_claim,
             command_timeout=autoclaim_idle_timeout / 1000,
         )
         if reply[0] == b"0-0":
             return autoclaim_start_id, False
         autoclaim_start_id = reply[0]
-        for msg_id, msg_data in reply[1]:
-            if msg_data is None:
+        for msg_id, msg_data_list in reply[1]:
+            if msg_data_list is None:
                 continue
-            msg = MQMessage(msg_id, msg_data)
+            mst_data = {msg[0]: msg[1] for msg in msg_data_list}
+            msg = MQMessage(msg_id, mst_data)
             if msg.retry():
                 await self._retry_message(consume_stream_key, msg)
             else:
@@ -227,27 +237,35 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(consume_stream_key, e)
             except Exception as e:
-                log.error("Error while reading messages: {}", e)
+                log.exception("Error while reading messages: {}", e)
         log.info("consume messages loop stopped")
 
     async def _read_messages(self, consume_stream_key: QueueStream) -> None:
-        reply = await redis_helper.execute(
-            self._conn,
-            lambda r: r.xreadgroup(
+        async def read_group(cli: GlideClient):
+            return await cli.xreadgroup(
+                {consume_stream_key: ">"},
                 self._group_name,
                 self._consumer_id,
-                {consume_stream_key: ">"},
-                count=1,
-                block=30_000,
-            ),
+                options=StreamReadGroupOptions(
+                    block_ms=30_000,  # 30 seconds
+                    count=1,  # Read one message at a time
+                ),
+            )
+
+        reply: Optional[
+            Mapping[bytes, Mapping[bytes, Optional[List[List[bytes]]]]]
+        ] = await redis_helper.execute(
+            self._conn,
+            read_group,
         )
         if not reply:
             log.debug("No messages to read")
             return
-        for _, events in reply:
-            for msg_id, msg_data in events:
-                if msg_data is None:
+        for _, events in reply.items():
+            for msg_id, msg_data_list in events.items():
+                if msg_data_list is None:
                     continue
+                msg_data = {msg[0]: msg[1] for msg in msg_data_list}
                 msg = MQMessage(msg_id, msg_data)
                 await self._consume_queue.put(msg)
 
@@ -281,9 +299,17 @@ class RedisQueue(AbstractMessageQueue):
                 consume_stream_key,
             )
             try:
+
+                async def create_group(cli: GlideClient):
+                    return await cli.xgroup_create(
+                        consume_stream_key,
+                        self._group_name,
+                        options=StreamGroupOptions(make_stream=True),
+                    )
+
                 await redis_helper.execute(
                     self._conn,
-                    lambda r: r.xgroup_create(consume_stream_key, self._group_name, mkstream=True),
+                    create_group,
                 )
             except Exception as internal_exception:
                 log.warning(
@@ -293,7 +319,7 @@ class RedisQueue(AbstractMessageQueue):
                     internal_exception,
                 )
         else:
-            log.error("Error while reading messages: {}", e)
+            log.exception("Error while reading messages: {}", e)
 
 
 def _generate_consumer_id(node_id: Optional[str]) -> str:

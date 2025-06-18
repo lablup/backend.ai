@@ -294,7 +294,7 @@ async def server_main(
                     service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
                 case ServiceDiscoveryType.REDIS:
                     live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
-                    redis_live = redis_helper.get_redis_object(
+                    redis_live = await redis_helper.create_valkey_client(
                         live_redis_target,
                         name="storage-proxy.live",
                         db=REDIS_LIVE_DB,

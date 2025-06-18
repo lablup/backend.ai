@@ -33,6 +33,7 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from glide import ExpirySet, ExpiryType, GlideClient
 from pydantic import (
     AliasChoices,
     Field,
@@ -570,13 +571,16 @@ async def fetch_exposed_volume_fields(
                     except ZeroDivisionError:
                         volume_usage["percentage"] = 0
 
-            await redis_helper.execute(
-                redis_connection,
-                lambda r: r.set(
+            async def set_volume_usage(r: GlideClient):
+                return await r.set(
                     f"volume.usage.{proxy_name}.{volume_name}",
                     msgpack.packb(volume_usage),
-                    ex=60,
-                ),
+                    expiry=ExpirySet(ExpiryType.SEC, 60),
+                )
+
+            await redis_helper.execute(
+                redis_connection,
+                set_volume_usage,
             )
 
     return volume_usage

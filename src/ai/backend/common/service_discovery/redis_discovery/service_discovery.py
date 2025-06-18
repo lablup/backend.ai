@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from glide import GlideClient, Transaction
-from redis.asyncio.client import Redis
 
 from ai.backend.common import redis_helper
 from ai.backend.common.json import dump_json_str
@@ -39,13 +38,20 @@ class RedisServiceDiscovery(ServiceDiscovery):
             tx = Transaction()
             tx.hset(key, field_value_map={k: dump_json_str(v) for k, v in mapping.items()})
             tx.expire(key, self._ttl)
-            return r.exec(tx)
+            return await r.exec(tx)
 
         await redis_helper.execute(self._redis, _pipe_builder)
 
     async def _scan_keys(self, pattern: str) -> list[str]:
-        async def _run(r: Redis) -> list[str]:
-            return [key.decode() async for key in r.scan_iter(match=pattern, count=100)]
+        async def _run(r: GlideClient) -> list[str]:
+            cursor = b"0"
+            res = []
+            while True:
+                cursor, scanned = await r.scan(cursor=cursor, match=pattern, count=100)
+                res.extend(scanned)
+                if cursor == b"0":
+                    break
+            return res
 
         return await redis_helper.execute(self._redis, _run)
 

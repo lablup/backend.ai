@@ -23,6 +23,7 @@ from glide import (
     GlideClient,
     GlideClientConfiguration,
     NodeAddress,
+    Script,
     ServerCredentials,
 )
 from redis.asyncio import ConnectionPool, Redis
@@ -41,8 +42,6 @@ __all__ = (
     "execute",
     "subscribe",
     "blpop",
-    "read_stream",
-    "read_stream_by_group",
     "get_redis_object",
 )
 
@@ -211,7 +210,7 @@ async def execute(
         nonlocal retry_log_count, last_log_time
         now = time.perf_counter()
         if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
-            log.warning(
+            log.exception(
                 "Retrying due to interruption of Redis connection "
                 "({}, conn-pool: {}, retrying-for: {:.3f}s)",
                 repr(e),
@@ -302,14 +301,15 @@ async def execute_script(
     script_hash = _scripts.get(script_id, "x")
     while True:
         try:
+
+            async def evalsha(
+                r: GlideClient,
+            ) -> Any:
+                await r.invoke_script(Script(script), keys=keys, args=args)
+
             ret = await execute(
                 redis_obj,
-                lambda r: r.evalsha(
-                    script_hash,
-                    len(keys),
-                    *keys,
-                    *args,
-                ),
+                evalsha,
             )
             break
         except redis.exceptions.NoScriptError:
@@ -325,130 +325,6 @@ async def execute_script(
                 raise
             continue
     return ret
-
-
-async def read_stream(
-    r: RedisConnectionInfo,
-    stream_key: str,
-    *,
-    block_timeout: int = 10_000,  # in msec
-) -> AsyncGenerator[tuple[bytes, Any], None]:
-    """
-    A high-level wrapper for the XREAD command.
-    """
-    last_id = b"$"
-    while True:
-        try:
-            reply = await execute(
-                r,
-                lambda r: r.xread(
-                    {stream_key: last_id},
-                    block=block_timeout,
-                ),
-                command_timeout=block_timeout / 1000,
-            )
-            if not reply:
-                continue
-            # Keep some latest messages so that other manager
-            # processes to have chances of fetching them.
-            await execute(
-                r,
-                lambda r: r.xtrim(
-                    stream_key,
-                    maxlen=128,
-                    approximate=True,
-                ),
-            )
-            for msg_id, msg_data in reply[0][1]:
-                try:
-                    yield msg_id, msg_data
-                finally:
-                    last_id = msg_id
-        except asyncio.CancelledError:
-            raise
-
-
-async def read_stream_by_group(
-    r: RedisConnectionInfo,
-    stream_key: str,
-    group_name: str,
-    consumer_id: str,
-    *,
-    autoclaim_idle_timeout: int = 1_000,  # in msec
-    block_timeout: int = 10_000,  # in msec
-) -> AsyncGenerator[tuple[bytes, Any], None]:
-    """
-    A high-level wrapper for the XREADGROUP command
-    combined with XAUTOCLAIM and XGROUP_CREATE.
-    """
-    while True:
-        try:
-            messages = []
-            autoclaim_start_id = b"0-0"
-            while True:
-                reply = await execute(
-                    r,
-                    lambda r: r.execute_command(
-                        "XAUTOCLAIM",
-                        stream_key,
-                        group_name,
-                        consumer_id,
-                        str(autoclaim_idle_timeout),
-                        autoclaim_start_id,
-                    ),
-                    command_timeout=autoclaim_idle_timeout / 1000,
-                )
-                for msg_id, msg_data in reply[1]:
-                    messages.append((msg_id, msg_data))
-                if reply[0] == b"0-0":
-                    break
-                autoclaim_start_id = reply[0]
-            reply = await execute(
-                r,
-                lambda r: r.xreadgroup(
-                    group_name,
-                    consumer_id,
-                    {stream_key: b">"},  # fetch messages not seen by other consumers
-                    block=block_timeout,
-                ),
-                command_timeout=block_timeout / 1000,
-            )
-            if len(reply) == 0:
-                continue
-            assert reply[0][0].decode() == stream_key
-            for msg_id, msg_data in reply[0][1]:
-                messages.append((msg_id, msg_data))
-            await execute(
-                r,
-                lambda r: r.xack(
-                    stream_key,
-                    group_name,
-                    *(msg_id for msg_id, msg_data in reply[0][1]),
-                ),
-            )
-            for msg_id, msg_data in messages:
-                yield msg_id, msg_data
-        except asyncio.CancelledError:
-            raise
-        except redis.exceptions.ResponseError as e:
-            if e.args[0].startswith("NOGROUP "):
-                try:
-                    await execute(
-                        r,
-                        lambda r: r.xgroup_create(
-                            stream_key,
-                            group_name,
-                            "$",
-                            mkstream=True,
-                        ),
-                    )
-                except redis.exceptions.ResponseError as e:
-                    if e.args[0].startswith("BUSYGROUP "):
-                        pass
-                    else:
-                        raise
-                continue
-            raise
 
 
 def get_redis_object(
@@ -597,9 +473,9 @@ async def create_valkey_client(
     )
 
 
-async def ping_redis_connection(redis_client: Redis) -> bool:
+async def ping_redis_connection(cli: GlideClient) -> bool:
     try:
-        return await redis_client.ping()
+        return await cli.ping()
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e
