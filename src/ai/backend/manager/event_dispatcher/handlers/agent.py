@@ -14,7 +14,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
-    KernelContainerId,
+    ContainerKernelId,
     KernelId,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -123,7 +123,7 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentStatusHeartbeat,
     ) -> None:
-        status_condition = by_status(KernelStatus.with_containers(), ConditionMerger.AND)
+        status_condition = by_status(KernelStatus.having_containers(), ConditionMerger.AND)
         agent_condition = by_agent_id(event.agent_id, ConditionMerger.AND)
         kernel_rows = await KernelRow.get_kernels(
             [
@@ -134,18 +134,19 @@ class AgentEventHandler:
         )
         kernel_should_alive: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
 
-        containers_to_purge: list[KernelContainerId] = []
+        containers_to_purge: list[ContainerKernelId] = []
         kernels_to_clean: set[KernelId] = set()
-        for container in event.containers:
+        for container in event.alive_containers:
             if container.kernel_id not in kernel_should_alive:
                 containers_to_purge.append(
-                    KernelContainerId(container.kernel_id, container.container_id)
+                    ContainerKernelId(container.container_id, container.kernel_id)
                 )
 
         kernel_ids_of_living_containers: set[KernelId] = {
-            container.kernel_id for container in event.containers
+            container.kernel_id for container in event.alive_containers
         }
-        for kernel_id in event.kernel_registry:
+        for kernel_container_id in event.alive_kernels:
+            kernel_id = kernel_container_id.kernel_id
             if kernel_id not in kernel_should_alive:
                 kernels_to_clean.add(kernel_id)
             if kernel_id not in kernel_ids_of_living_containers:

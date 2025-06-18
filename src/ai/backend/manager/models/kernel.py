@@ -118,7 +118,7 @@ class KernelStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def with_containers(cls) -> set[KernelStatus]:
+    def having_containers(cls) -> set[KernelStatus]:
         return {
             cls.CREATING,
             cls.RUNNING,

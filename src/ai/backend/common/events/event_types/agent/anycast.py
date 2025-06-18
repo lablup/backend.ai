@@ -12,6 +12,7 @@ from ai.backend.common.types import (
     AgentId,
     ContainerId,
     ContainerStatus,
+    KernelContainerId,
     KernelId,
 )
 from ai.backend.logging.types import LogLevel
@@ -192,15 +193,15 @@ class ContainerStatusData:
 @dataclass
 class AgentStatusHeartbeat(AgentOperationEvent):
     agent_id: AgentId
-    containers: list[ContainerStatusData]
-    kernel_registry: dict[KernelId, Optional[ContainerId]]
+    alive_containers: list[ContainerStatusData]
+    alive_kernels: list[KernelContainerId]
 
     @override
     def serialize(self) -> tuple:
         return (
             self.agent_id,
-            tuple(cont.to_dict() for cont in self.containers),
-            {str(k): str(v) if v is not None else None for k, v in self.kernel_registry.items()},
+            tuple(cont.to_dict() for cont in self.alive_containers),
+            tuple(k.serialize() for k in self.alive_kernels),
         )
 
     @classmethod
@@ -208,11 +209,8 @@ class AgentStatusHeartbeat(AgentOperationEvent):
     def deserialize(cls, value: tuple) -> Self:
         return cls(
             AgentId(value[0]),
-            [ContainerStatusData.from_dict(val) for val in value[1]],
-            {
-                KernelId(uuid.UUID(k)): ContainerId(v) if v is not None else None
-                for k, v in value[2].items()
-            },
+            [ContainerStatusData.from_dict(raw_container) for raw_container in value[1]],
+            [KernelContainerId.deserialize(raw_kernel) for raw_kernel in value[2]],
         )
 
     @classmethod

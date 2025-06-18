@@ -7,7 +7,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     ContainerStatusData,
 )
 from ai.backend.common.observer.types import AbstractObserver
-from ai.backend.common.types import ContainerId, ContainerStatus
+from ai.backend.common.types import ContainerId, ContainerStatus, KernelContainerId
 from ai.backend.logging.utils import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -43,16 +43,18 @@ class HeartbeatObserver(AbstractObserver):
             )
             for kernel_id, container in containers
         ]
+        kernel_data = [
+            KernelContainerId(
+                kernel_id,
+                ContainerId(kernel_obj.container_id) if kernel_obj.container_id else None,
+            )
+            for kernel_id, kernel_obj in self._agent.kernel_registry.items()
+        ]
         await self._event_producer.anycast_event(
             AgentStatusHeartbeat(
                 self._agent.id,
                 container_data,
-                {
-                    kid: ContainerId(kernel_obj.container_id)
-                    if kernel_obj.container_id is not None
-                    else None
-                    for kid, kernel_obj in self._agent.kernel_registry.items()
-                },
+                kernel_data,
             ),
         )
 

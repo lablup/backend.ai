@@ -50,7 +50,7 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
-from .defs import RedisRole
+from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
@@ -1271,8 +1271,53 @@ class DeviceModelInfo(TypedDict):
 
 @dataclass
 class KernelContainerId:
+    """
+    Represents a mapping between a kernel ID and a container ID.
+    Container ID can be None if the kernel is not yet assigned to a container.
+    """
+
     kernel_id: KernelId
+    container_id: Optional[ContainerId]
+
+    @property
+    def human_readable_container_id(self) -> str:
+        """
+        Returns a human-readable version of the container ID.
+        This is useful for logging and debugging purposes.
+        """
+        return (
+            str(self.container_id)[:12] if self.container_id is not None else UNKNOWN_CONTAINER_ID
+        )
+
+    def serialize(self) -> tuple[str, Optional[str]]:
+        """
+        Serializes the KernelContainerId to a string format.
+        """
+        return (
+            str(self.kernel_id),
+            str(self.container_id) if self.container_id is not None else None,
+        )
+
+    @classmethod
+    def deserialize(cls, data: tuple[str, Optional[str]]) -> Self:
+        """
+        Deserializes a string into a KernelContainerId instance.
+        """
+        kernel_id, container_id = data
+        return cls(
+            KernelId(UUID(kernel_id)),
+            ContainerId(container_id) if container_id is not None else None,
+        )
+
+
+@dataclass
+class ContainerKernelId:
+    """
+    Represents a mapping between a container ID and a kernel ID.
+    """
+
     container_id: ContainerId
+    kernel_id: KernelId
 
     @property
     def human_readable_container_id(self) -> str:
@@ -1286,15 +1331,18 @@ class KernelContainerId:
         """
         Serializes the KernelContainerId to a string format.
         """
-        return (str(self.kernel_id), str(self.container_id))
+        return (
+            str(self.container_id),
+            str(self.kernel_id),
+        )
 
     @classmethod
     def deserialize(cls, data: tuple[str, str]) -> Self:
         """
         Deserializes a string into a KernelContainerId instance.
         """
-        kernel_id, container_id = data
-        return cls(KernelId(UUID(kernel_id)), ContainerId(container_id))
+        container_id, kernel_id = data
+        return cls(ContainerId(container_id), KernelId(UUID(kernel_id)))
 
 
 class KernelCreationResult(TypedDict):

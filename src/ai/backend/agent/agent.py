@@ -159,12 +159,12 @@ from ai.backend.common.types import (
     ClusterSSHPortMapping,
     CommitStatus,
     ContainerId,
+    ContainerKernelId,
     DeviceId,
     DeviceName,
     HardwareMetadata,
     ImageConfig,
     ImageRegistry,
-    KernelContainerId,
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
@@ -1350,7 +1350,7 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
-    async def purge_containers(self, containers: Iterable[KernelContainerId]) -> None:
+    async def purge_containers(self, containers: Iterable[ContainerKernelId]) -> None:
         tasks = [self._purge_container(container) for container in containers]
         await asyncio.gather(*tasks, return_exceptions=True)
         try:
@@ -1358,7 +1358,7 @@ class AbstractAgent(
         except Exception as e:
             log.exception("failed to reconstruct resource usage: {0}", repr(e))
 
-    async def _purge_container(self, container: KernelContainerId) -> None:
+    async def _purge_container(self, container: ContainerKernelId) -> None:
         """
         Destroy and clean up container.
         """
