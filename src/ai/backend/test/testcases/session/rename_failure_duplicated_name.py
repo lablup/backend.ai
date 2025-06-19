@@ -23,7 +23,7 @@ class SessionRenameFailureDuplicatedName(TestCode):
         session_cfg = SessionContext.current()
         second_session_name = session_name + "_second"
 
-        # TODO: How can we create a second session as a template while remembering the first session name?
+        # TODO: Make second session creation/deleteion with templat
         await client_session.ComputeSession.get_or_create(
             image_cfg.name,
             resources=session_cfg.resources,
