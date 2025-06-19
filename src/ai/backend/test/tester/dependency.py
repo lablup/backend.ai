@@ -168,7 +168,6 @@ class TestContextInjectionModel(BaseDependencyModel):
     login_credential: Optional[LoginCredentialDep] = Field(
         default=None,
         description="The login credentials for the test context.",
-        alias="login-credential",
     )
     domain: Optional[DomainDep] = Field(
         default=None,
@@ -181,7 +180,6 @@ class TestContextInjectionModel(BaseDependencyModel):
     scaling_group: Optional[ScalingGroupDep] = Field(
         default=None,
         description="The scaling group configuration for the test context.",
-        alias="scaling-group",
     )
     image: Optional[ImageDep] = Field(
         default=None,
@@ -194,12 +192,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     cluster_config: Optional[ClusterDep] = Field(
         default=None,
         description="The cluster configuration for the test context.",
-        alias="cluster-config",
     )
     batch_session: Optional[BatchSessionDep] = Field(
         default=None,
         description="The batch session configuration for the test context.",
-        alias="batch-session",
     )
     session: Optional[SessionDep] = Field(
         default=None,
@@ -212,7 +208,6 @@ class TestContextInjectionModel(BaseDependencyModel):
     model_service: Optional[ModelServiceDep] = Field(
         default=None,
         description="The model service configuration for the test context.",
-        alias="model-service",
     )
 
 
