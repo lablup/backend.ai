@@ -579,11 +579,15 @@ class ComputeSession(BaseFunction):
         return identity_params
 
     def get_session_identifier(self) -> str:
-        if self.id is not None:
+        """
+        Returns the session identifier, preferring the session ID if available,
+        otherwise falling back to the session name.
+        """
+        if self.id:
             return str(self.id)
-        if self.name is None:
-            raise ValueError("Either session name or id must be set.")
-        return self.name
+        if self.name:
+            return self.name
+        raise ValueError("Session must have either an ID or a name.")
 
     @api_function
     async def update(
