@@ -303,11 +303,11 @@ class CPUPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(pid: int) -> Optional[Decimal]:
+        async def psutil_impl(pid: int, cid: str) -> Optional[Decimal]:
             try:
                 p = psutil.Process(pid)
             except psutil.NoSuchProcess:
-                log.warning("psutil cannot found process {0}", pid)
+                log.debug("Process not found for CPU stats (pid:{0}, container id:{1})", pid, cid)
             else:
                 cpu_times = p.cpu_times()
                 cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
@@ -338,8 +338,8 @@ class CPUPlugin(AbstractComputePlugin):
                     results.extend(chunk)
             case _:
                 psutil_tasks = []
-                for pid, _ in pid_map_list:
-                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
+                for pid, cid in pid_map_list:
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
         for (pid, cid), cpu_used in zip(pid_map_list, results):
@@ -793,11 +793,17 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(pid) -> tuple[Optional[int], Optional[int], Optional[int]]:
+        async def psutil_impl(
+            pid: int, cid: str
+        ) -> tuple[Optional[int], Optional[int], Optional[int]]:
             try:
                 p = psutil.Process(pid)
             except psutil.NoSuchProcess:
-                log.warning("psutil cannot found process {0}", pid)
+                log.debug(
+                    "Process not found for memory stats (pid:{0}, container id:{1})",
+                    pid,
+                    cid,
+                )
             else:
                 stats = p.as_dict(attrs=["memory_info", "io_counters"])
                 mem_cur_bytes = io_read_bytes = io_write_bytes = None
@@ -836,8 +842,8 @@ class MemoryPlugin(AbstractComputePlugin):
                     results.extend(chunk)
             case _:
                 psutil_tasks = []
-                for pid, _ in pid_map_list:
-                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
+                for pid, cid in pid_map_list:
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid, cid)))
                 results = await asyncio.gather(*psutil_tasks)
 
         for (pid, _), result in zip(pid_map_list, results):
