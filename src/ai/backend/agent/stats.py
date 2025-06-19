@@ -634,8 +634,6 @@ class StatContext:
     ) -> list[PID]:
         """
         Get the list of PIDs for the given container ID.
-
-        Intended to be used by the agent.
         """
         return_val: list[PID] = []
         try:
