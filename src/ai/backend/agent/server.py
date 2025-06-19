@@ -830,7 +830,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def get_completions(self, kernel_id: str, text: str, opts: dict):
         log.debug("rpc::get_completions(k:{0}, ...)", kernel_id)
-        await self.agent.get_completions(KernelId(UUID(kernel_id)), text, opts)
+        return await self.agent.get_completions(KernelId(UUID(kernel_id)), text, opts)
 
     @rpc_function
     @collect_error

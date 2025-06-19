@@ -571,14 +571,17 @@ class BaseRunner(metaclass=ABCMeta):
             return 127
         return 0
 
-    async def _complete(self, completion_data) -> Sequence[str]:
+    async def _complete(self, completion_data) -> None:
         result: Sequence[str] = []
         try:
             result = await self.complete(completion_data)
         except Exception:
             log.exception("unexpected error")
         finally:
-            return result
+            await self.outsock.send_multipart([
+                b"completion",
+                json.dumps({"suggestions": result}).encode("utf8"),
+            ])
 
     async def complete(self, completion_data) -> Sequence[str]:
         """Return the list of strings to be shown in the auto-complete list.
