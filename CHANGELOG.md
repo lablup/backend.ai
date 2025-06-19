@@ -16,6 +16,49 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.10.0rc1 (2025-06-19)
+
+### Features
+* Add `service-definition.toml` handling logic in the ModelServing creation service ([#4220](https://github.com/lablup/backend.ai/issues/4220))
+* Implement test specification management and execution framework ([#4614](https://github.com/lablup/backend.ai/issues/4614))
+* Add creation wrappers for each session type and test cases for session creation ([#4654](https://github.com/lablup/backend.ai/issues/4654))
+* Add Tester configuration, and template for config injection ([#4661](https://github.com/lablup/backend.ai/issues/4661))
+* Add `ComputeSessionNode` query method in compute session sdk to offer detail info about session ([#4669](https://github.com/lablup/backend.ai/issues/4669))
+* Replace hardcoded bgtask status event codes with `BgtaskStatus` enum values ([#4671](https://github.com/lablup/backend.ai/issues/4671))
+* Agent sends container status through heartbeat ([#4677](https://github.com/lablup/backend.ai/issues/4677))
+* Add parametrize functionality in tester spec ([#4692](https://github.com/lablup/backend.ai/issues/4692))
+* Add session dependency graph retrieval test validating dependency graphs between sessions ([#4698](https://github.com/lablup/backend.ai/issues/4698))
+* Improve Exporter to easily check error information when an error occurs ([#4701](https://github.com/lablup/backend.ai/issues/4701))
+* Add metric for sync container lifecycle task ([#4704](https://github.com/lablup/backend.ai/issues/4704))
+* Add python code execution tests to Tester ([#4709](https://github.com/lablup/backend.ai/issues/4709))
+* Add Container purge RPC to agent ([#4710](https://github.com/lablup/backend.ai/issues/4710))
+* Manager purges kernels and containers with mismatched status between DB and agent heartbeat ([#4717](https://github.com/lablup/backend.ai/issues/4717))
+* Add additional logging to kernel creation and termination ([#4737](https://github.com/lablup/backend.ai/issues/4737))
+
+### Improvements
+* Refactor event dispatchers registration of idle checkers ([#4516](https://github.com/lablup/backend.ai/issues/4516))
+* Differenciate consume and subscribe events ([#4620](https://github.com/lablup/backend.ai/issues/4620))
+
+### Fixes
+* Add missing event handler for SessionCheckingPrecondEvent ([#4619](https://github.com/lablup/backend.ai/issues/4619))
+* Fix manager config models being validated only by alias ([#4624](https://github.com/lablup/backend.ai/issues/4624))
+* Support more Accept headers in `BaseContainerRegistry.scan_tag` ([#4627](https://github.com/lablup/backend.ai/issues/4627))
+* Resolve broken image rescanning on macOS due to `aiotools` upstream issue ([#4628](https://github.com/lablup/backend.ai/issues/4628))
+* Fix container utilization metric service config reload not working ([#4640](https://github.com/lablup/backend.ai/issues/4640))
+* Update container ports validation to catch omitted or empty list cases, preventing potential `IndexError` ([#4656](https://github.com/lablup/backend.ai/issues/4656))
+* Prevent remount NFS path ([#4663](https://github.com/lablup/backend.ai/issues/4663))
+* Agent skips failure of code runner initialization ([#4679](https://github.com/lablup/backend.ai/issues/4679))
+* Fix Session Rename API to block duplicate session names for the same user ([#4690](https://github.com/lablup/backend.ai/issues/4690))
+* Update `endpoints.destroyed_at` column when serving is terminated ([#4696](https://github.com/lablup/backend.ai/issues/4696))
+* Fix license config not included in PluginConfig after Pydantic migration ([#4718](https://github.com/lablup/backend.ai/issues/4718))
+* Fix broken `untag_image_from_registry` SDK method ([#4720](https://github.com/lablup/backend.ai/issues/4720))
+* Include `image_id` to `message` field of `imagify` REST API's bgtask response ([#4723](https://github.com/lablup/backend.ai/issues/4723))
+
+### Miscellaneous
+* Remove `enable2FA` config from webserver ([#4653](https://github.com/lablup/backend.ai/issues/4653))
+* Ensure the `Vite` build tool, required by the `backend.ai-ui` package, is installed before building the WebUI ([#4725](https://github.com/lablup/backend.ai/issues/4725))
+
+
 ## 25.9.1 (2025-06-05)
 
 ### Features
