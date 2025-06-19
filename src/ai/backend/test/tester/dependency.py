@@ -108,6 +108,13 @@ class SessionDep(BaseDependencyModel):
     )
 
 
+class SessionImagifyDep(BaseDependencyModel):
+    new_image_name: str = Field(
+        description="The name of the new image to create from the session.",
+        examples=["my-custom-image"],
+    )
+
+
 class TestContextInjectionModel(BaseDependencyModel):
     endpoint: Optional[EndpointDep] = Field(
         default=None,
@@ -143,6 +150,11 @@ class TestContextInjectionModel(BaseDependencyModel):
     session: Optional[SessionDep] = Field(
         default=None,
         description="The session configuration for the test context.",
+    )
+    session_imagify: Optional[SessionImagifyDep] = Field(
+        default=None,
+        description="The session imagify configuration for the test context.",
+        alias="session-imagify",
     )
 
 

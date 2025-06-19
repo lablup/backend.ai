@@ -20,6 +20,9 @@ architecture = "x86_64"
 [context.session]
 resources = { cpu = 1, mem = "512mb" }
 
+[context.session-imagify]
+new-image-name = "new-customized-image"
+
 [context.batch-session]
 startup-command = "ls -la"
 

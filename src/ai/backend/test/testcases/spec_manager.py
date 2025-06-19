@@ -19,6 +19,7 @@ class TestTag(enum.StrEnum):
     AUTH = "auth"
     VFOLDER = "vfolder"
     IMAGE = "image"
+    CONTAINER_REGISTRY = "container_registry"
     SESSION = "session"
 
 
