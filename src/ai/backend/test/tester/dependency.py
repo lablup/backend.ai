@@ -65,21 +65,18 @@ class ScalingGroupDep(BaseDependencyModel):
 
 
 class ImageDep(BaseDependencyModel):
-    name: Optional[str] = Field(
-        default=None,
+    name: str = Field(
         description="The Docker image to use for the test context.",
         examples=["cr.backend.ai/multiarch/python:3.13-ubuntu24.04"],
     )
-    architecture: Optional[str] = Field(
-        default=None,
+    architecture: str = Field(
         description="The architecture of the session.",
         examples=["x86_64"],
     )
 
 
 class BatchSessionDep(BaseDependencyModel):
-    startup_command: Optional[str] = Field(
-        default=None,
+    startup_command: str = Field(
         description="The startup command to run in the batch session.",
         examples=["ls -la"],
     )
@@ -101,21 +98,18 @@ class SSEDep(BaseDependencyModel):
 class ClusterDep(BaseDependencyModel):
     # By default, testing is conducted for both single-node and multi-node setups through parametrization,
     # But we'd like to have left room for manually injecting values.
-    cluster_mode: Optional[str] = Field(
-        default=None,
+    cluster_mode: str = Field(
         description="The cluster mode for the session.",
-        examples=["single_node", "multi_node"],
+        examples=["single-node", "multi-node"],
     )
-    cluster_size: Optional[int] = Field(
-        default=None,
+    cluster_size: int = Field(
         description="The size of the cluster for the session.",
         examples=[1, 2, 3],
     )
 
 
 class BootstrapScriptDep(BaseDependencyModel):
-    bootstrap_script: Optional[str] = Field(
-        default=None,
+    bootstrap_script: str = Field(
         description="The bootstrap script to run before the session starts. Used as an argument when creating a compute session.",
         examples=["echo 'Bootstrapping...'"],
     )
