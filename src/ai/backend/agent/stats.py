@@ -674,10 +674,11 @@ class StatContext:
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
                     pids = await self._get_processes(cid, docker)
-                    unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
-                    for unused_pid in unused_pids:
-                        log.debug("removing pid_metric for {}: {}", cid, unused_pid)
-                        self.process_metrics[cid].pop(unused_pid, None)
+                    if cid in self.process_metrics:
+                        unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
+                        for unused_pid in unused_pids:
+                            log.debug("removing pid_metric for {}: {}", cid, unused_pid)
+                            self.process_metrics[cid].pop(unused_pid, None)
                     for pid_ in pids:
                         pid_map[pid_] = cid
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
