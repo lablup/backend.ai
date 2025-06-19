@@ -358,6 +358,22 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
         template=BasicTestTemplate(testcode=TestContainerLogRetriever()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
         ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ],
+        },
     ),
     "session_dependency_graph_retriever": TestSpec(
         name="session_dependency_graph_retriever",
