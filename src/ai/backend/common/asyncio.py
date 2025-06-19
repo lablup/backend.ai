@@ -7,6 +7,7 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Optional,
     Sequence,
     Tuple,
     Type,
@@ -37,6 +38,22 @@ async def cancel_tasks(
             task.cancel()
             cancelled_tasks.append(task)
     return await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+
+
+async def cancel_task(task: Optional[asyncio.Task]) -> None:
+    """
+    Cancel the given task and wait for its completion.
+    """
+    if task is None:
+        return
+    being_canceled = task.cancel()
+    if not being_canceled:
+        # the task is already cancelled or done
+        return
+    await asyncio.sleep(0)  # yield to the event loop
+    if task.done():
+        return
+    await task
 
 
 current_loop: Callable[[], asyncio.AbstractEventLoop]

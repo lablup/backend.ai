@@ -36,7 +36,7 @@ import zmq.asyncio
 from async_timeout import timeout
 
 from ai.backend.common import msgpack
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
@@ -592,14 +592,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self._closed = False
 
     async def __ainit__(self) -> None:
-        loop = current_loop()
         await self._get_socket_pair()
-        self.status_task = loop.create_task(self.ping_status())
-        self.read_task = loop.create_task(self.read_output())
-        if self.exec_timeout > 0:
-            self.watchdog_task = loop.create_task(self.watchdog())
-        else:
-            self.watchdog_task = None
+        await self._create_tasks()
 
     async def _create_sockets(self) -> SocketPair:
         input_sock = RobustSocket(zmq.PUSH, await self.get_repl_in_addr())
@@ -666,30 +660,12 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def get_repl_out_addr(self) -> str:
         raise NotImplementedError
 
-    async def _close_task(self, task: Optional[asyncio.Task]) -> None:
-        if task is None:
-            return
-        being_canceled = task.cancel()
-        if not being_canceled:
-            # the task is already cancelled or done
-            return
-        await asyncio.sleep(0)  # yield to the event loop
-        if task.done():
-            return
-        await task
-
     async def close(self) -> None:
         if self._closed:
             return
         self._closed = True
         try:
-            await asyncio.gather(
-                self._close_task(self.watchdog_task),
-                self._close_task(self.status_task),
-                self._close_task(self.read_task),
-                return_exceptions=True,
-            )
-
+            await self._close_tasks()
             if self._sockets is not None:
                 self._sockets.close()
             # WARNING:
@@ -697,6 +673,24 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # may cause deadlocks.
         except Exception:
             log.exception("AbstractCodeRunner.close(): unexpected error")
+
+    async def _create_tasks(self) -> None:
+        # close the previous task if any
+        await self._close_tasks()
+
+        loop = asyncio.get_running_loop()
+        self.status_task = loop.create_task(self.ping_status())
+        self.read_task = loop.create_task(self.read_output())
+        if self.exec_timeout > 0:
+            self.watchdog_task = loop.create_task(self.watchdog())
+
+    async def _close_tasks(self) -> None:
+        await asyncio.gather(
+            cancel_task(self.watchdog_task),
+            cancel_task(self.status_task),
+            cancel_task(self.read_task),
+            return_exceptions=True,
+        )
 
     async def ping(self) -> dict[str, float] | None:
         try:
