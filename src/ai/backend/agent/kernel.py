@@ -685,10 +685,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.watchdog_task = loop.create_task(self.watchdog())
 
     async def _close_tasks(self) -> None:
+        concurrent_safe_tasks: tuple[Optional[asyncio.Task], ...] = (
+            self.status_task,
+            self.read_task,
+            self.watchdog_task,
+        )
         await asyncio.gather(
-            cancel_task(self.watchdog_task),
-            cancel_task(self.status_task),
-            cancel_task(self.read_task),
+            *[cancel_task(task) for task in concurrent_safe_tasks if task is not None],
             return_exceptions=True,
         )
 

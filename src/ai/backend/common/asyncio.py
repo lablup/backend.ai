@@ -7,7 +7,6 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
-    Optional,
     Sequence,
     Tuple,
     Type,
@@ -40,12 +39,10 @@ async def cancel_tasks(
     return await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
 
-async def cancel_task(task: Optional[asyncio.Task]) -> None:
+async def cancel_task(task: asyncio.Task) -> None:
     """
     Cancel the given task and wait for its completion.
     """
-    if task is None:
-        return
     being_canceled = task.cancel()
     if not being_canceled:
         # the task is already cancelled or done
