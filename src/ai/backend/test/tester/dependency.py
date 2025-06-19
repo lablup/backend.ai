@@ -62,6 +62,11 @@ class BatchSessionDep(BaseDependencyModel):
         description="The startup command to run in the batch session.",
         examples=["ls -la"],
     )
+    batch_timeout: Optional[float] = Field(
+        default=None,
+        description="The timeout for the batch session in seconds.",
+        examples=[10.0],
+    )
 
 
 class SSEDep(BaseDependencyModel):
@@ -84,6 +89,14 @@ class ClusterDep(BaseDependencyModel):
         default=None,
         description="The size of the cluster for the session.",
         examples=[1, 2, 3],
+    )
+
+
+class BootstrapScriptDep(BaseDependencyModel):
+    bootstrap_script: Optional[str] = Field(
+        default=None,
+        description="The bootstrap script to run before the session starts. Used as an argument when creating a compute session.",
+        examples=["echo 'Bootstrapping...'"],
     )
 
 

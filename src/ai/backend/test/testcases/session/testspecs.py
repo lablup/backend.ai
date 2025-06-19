@@ -1,19 +1,29 @@
 import textwrap
+from pathlib import Path
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.dependent_session import DependentSessionTemplate
-from ai.backend.test.templates.session.interactive_session import InteractiveSessionTemplate
+from ai.backend.test.templates.session.interactive_session import (
+    InteractiveSessionTemplate,
+    InteractiveSessionWithBootstrapScriptTemplate,
+)
 from ai.backend.test.templates.session.session_template import (
     BatchSessionFromTemplateTemplate,
     InteractiveSessionFromTemplateTemplate,
     SessionTemplateTemplate,
 )
 from ai.backend.test.testcases.session.container_log_retriever import TestContainerLogRetriever
+from ai.backend.test.testcases.session.creation_failure_command_timeout import (
+    BatchSessionCreationFailureTimeout,
+)
 from ai.backend.test.testcases.session.creation_failure_low_resources import (
     SessionCreationFailureLowResources,
+)
+from ai.backend.test.testcases.session.creation_failure_schedule_timeout import (
+    InteractiveSessionCreationFailureScheduleTimeout,
 )
 from ai.backend.test.testcases.session.creation_failure_too_many_container import (
     SessionCreationFailureTooManyContainer,
@@ -25,9 +35,14 @@ from ai.backend.test.testcases.session.execution import (
     InteractiveSessionExecuteCodeFailureWrongCommand,
     InteractiveSessionExecuteCodeSuccess,
 )
+from ai.backend.test.testcases.session.filecheck import FileExistenceCheck
 from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.tester.dependency import ClusterDep, CodeExecutionDep
+from ai.backend.test.tester.dependency import (
+    BootstrapScriptDep,
+    ClusterDep,
+    CodeExecutionDep,
+)
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 
@@ -77,6 +92,20 @@ BATCH_SESSION_TEST_SPECS = {
             KeypairAuthTemplate
         ),
     ),
+    "creation_batch_session_failure_command_timeout": TestSpec(
+        name="creation_batch_session_failure_command_timeout",
+        description=textwrap.dedent("""\
+            Test for creating a batch session with an invalid startup command.
+            This test verifies that a batch session creation fails when the startup command is invalid.
+            The test will:
+            1. Attempt to create a batch session with the specified image and an invalid startup command.
+            2. Assert that the session creation fails with an appropriate error message.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(BatchSessionCreationFailureTimeout()).with_wrappers(
+            KeypairAuthTemplate
+        ),
+    ),
 }
 
 INTERACTIVE_SESSION_TEST_SPECS = {
@@ -110,6 +139,36 @@ INTERACTIVE_SESSION_TEST_SPECS = {
                     cluster_size=3,
                 ),
             ]
+        },
+    ),
+    "creation_interactive_session_success_with_bootstrap_script": TestSpec(
+        name="creation_interactive_session_success_with_bootstrap_script",
+        description=textwrap.dedent("""\
+            Test for creating a single-node, single-container session.
+            This test verifies that a session can be created with a single node and a single container, and that it transitions through the expected lifecycle events.
+            The test will:
+            1. Create a session with the specified image and resources.
+            2. Execute a bootstrap script to create a directory in the session.
+            3. Check that the directory was created successfully.
+            4. Assert that the session is successfully created and running.
+            5. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            FileExistenceCheck(path=Path("."), checklist=["test-abc"])
+        ).with_wrappers(KeypairAuthTemplate, InteractiveSessionWithBootstrapScriptTemplate),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
+            ContextName.BOOTSTRAP_SCRIPT: [
+                BootstrapScriptDep(
+                    bootstrap_script="mkdir -p /home/work/test-abc",
+                )
+            ],
         },
     ),
     "execution_command_on_interactive_session_success": TestSpec(
@@ -199,6 +258,20 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         template=BasicTestTemplate(SessionCreationFailureTooManyContainer()).with_wrappers(
             KeypairAuthTemplate
         ),
+    ),
+    "creation_interactive_session_failure_schedule_timeout": TestSpec(
+        name="creation_interactive_session_failure_schedule_timeout",
+        description=textwrap.dedent("""\
+            Test for creating a session with too many containers.
+            This test verifies that a session creation fails when the specified container count exceeds the limit.
+            The test will:
+            1. Attempt to create a session with the specified image and too many containers.
+            2. Assert that the session creation fails with an appropriate error message.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            InteractiveSessionCreationFailureScheduleTimeout()
+        ).with_wrappers(KeypairAuthTemplate),
     ),
 }
 

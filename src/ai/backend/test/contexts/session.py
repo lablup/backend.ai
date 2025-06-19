@@ -4,6 +4,7 @@ from ai.backend.test.contexts.context import BaseTestContext, ContextName
 from ai.backend.test.data.session import CreatedSessionMeta, SessionDependency
 from ai.backend.test.tester.dependency import (
     BatchSessionDep,
+    BootstrapScriptDep,
     ClusterDep,
     CodeExecutionDep,
     SessionDep,
@@ -22,6 +23,13 @@ class BatchSessionContext(BaseTestContext[BatchSessionDep]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.BATCH_SESSION
+
+
+class BootstrapScriptContext(BaseTestContext[BootstrapScriptDep]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.BOOTSTRAP_SCRIPT
 
 
 class ClusterContext(BaseTestContext[ClusterDep]):

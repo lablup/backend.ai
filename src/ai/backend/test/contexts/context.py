@@ -26,6 +26,7 @@ class ContextName(enum.StrEnum):
     CLUSTER_CONFIG = "cluster_config"
     CODE_EXECUTION = "code_execution"
     SESSION_TEMPLATE = "session_template"
+    BOOTSTRAP_SCRIPT = "bootstrap_script"
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
     SESSION_DEPENDENCY = "session_dependency"
 
