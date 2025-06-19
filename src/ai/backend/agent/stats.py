@@ -673,13 +673,21 @@ class StatContext:
             pid_map: dict[PID, ContainerId] = {}
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
-                    pids = await self._get_processes(cid, docker)
+                    active_pids = await self._get_processes(cid, docker)
                     if cid in self.process_metrics:
-                        unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
-                        for unused_pid in unused_pids:
-                            log.debug("removing pid_metric for {}: {}", cid, unused_pid)
-                            self.process_metrics[cid].pop(unused_pid, None)
-                    for pid_ in pids:
+                        unused_pids = set(self.process_metrics[cid].keys()) - set(active_pids)
+                        if unused_pids:
+                            log.debug(
+                                "removing pid_metric for {}: {}",
+                                cid,
+                                ", ".join([str(p) for p in unused_pids]),
+                            )
+                            self.process_metrics[cid] = {
+                                pid_: metric
+                                for pid_, metric in self.process_metrics[cid].items()
+                                if pid_ in active_pids
+                            }
+                    for pid_ in active_pids:
                         pid_map[pid_] = cid
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
