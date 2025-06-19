@@ -18,6 +18,8 @@ from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
 
+_ENDPOINT_CREATION_TIMEOUT = 30
+
 
 class EndpointTemplate(WrapperTestTemplate):
     @property
@@ -109,7 +111,9 @@ class EndpointTemplate(WrapperTestTemplate):
 
                     await asyncio.sleep(1)
 
-            await asyncio.wait_for(_wait_until_all_inference_sessions_ready(), 30)
+            await asyncio.wait_for(
+                _wait_until_all_inference_sessions_ready(), timeout=_ENDPOINT_CREATION_TIMEOUT
+            )
 
             info = await client_session.Service(endpoint_id).info()
             assert info["service_endpoint"] is not None, "Service endpoint should be initialized."
