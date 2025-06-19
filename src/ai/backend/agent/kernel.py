@@ -36,7 +36,7 @@ import zmq.asyncio
 from async_timeout import timeout
 
 from ai.backend.common import msgpack
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
@@ -440,6 +440,7 @@ class RobustSocket:
     _sock: zmq.asyncio.Socket
     _socket_type: int
     _addr: str
+    _closed: bool
 
     def __init__(
         self,
@@ -452,6 +453,7 @@ class RobustSocket:
         self._sock = self._zctx.socket(self._socket_type)
         self._sock.connect(self._addr)
         self._sock.setsockopt(zmq.LINGER, 50)
+        self._closed = False
 
     @property
     def addr(self) -> str:
@@ -461,7 +463,12 @@ class RobustSocket:
     def socket(self) -> zmq.asyncio.Socket:
         return self._sock
 
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     def close(self) -> None:
+        self._closed = True
         try:
             self._sock.close()
         except zmq.ZMQError:
@@ -585,14 +592,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self._closed = False
 
     async def __ainit__(self) -> None:
-        loop = current_loop()
         await self._get_socket_pair()
-        self.status_task = loop.create_task(self.ping_status())
-        self.read_task = loop.create_task(self.read_output())
-        if self.exec_timeout > 0:
-            self.watchdog_task = loop.create_task(self.watchdog())
-        else:
-            self.watchdog_task = None
+        await self._create_tasks()
 
     async def _create_sockets(self) -> SocketPair:
         input_sock = RobustSocket(zmq.PUSH, await self.get_repl_in_addr())
@@ -664,15 +665,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return
         self._closed = True
         try:
-            if self.watchdog_task and not self.watchdog_task.done():
-                self.watchdog_task.cancel()
-                await self.watchdog_task
-            if self.status_task and not self.status_task.done():
-                self.status_task.cancel()
-                await self.status_task
-            if self.read_task and not self.read_task.done():
-                self.read_task.cancel()
-                await self.read_task
+            await self._close_tasks()
             if self._sockets is not None:
                 self._sockets.close()
             # WARNING:
@@ -680,6 +673,27 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # may cause deadlocks.
         except Exception:
             log.exception("AbstractCodeRunner.close(): unexpected error")
+
+    async def _create_tasks(self) -> None:
+        # close the previous task if any
+        await self._close_tasks()
+
+        loop = asyncio.get_running_loop()
+        self.status_task = loop.create_task(self.ping_status())
+        self.read_task = loop.create_task(self.read_output())
+        if self.exec_timeout > 0:
+            self.watchdog_task = loop.create_task(self.watchdog())
+
+    async def _close_tasks(self) -> None:
+        concurrent_safe_tasks: tuple[Optional[asyncio.Task], ...] = (
+            self.status_task,
+            self.read_task,
+            self.watchdog_task,
+        )
+        await asyncio.gather(
+            *[cancel_task(task) for task in concurrent_safe_tasks if task is not None],
+            return_exceptions=True,
+        )
 
     async def ping(self) -> dict[str, float] | None:
         try:
