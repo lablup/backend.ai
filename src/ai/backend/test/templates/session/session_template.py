@@ -25,6 +25,7 @@ from ai.backend.test.templates.session.utils import (
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
+from ai.backend.test.utils.exceptions import DependencyNotSet
 
 
 class SessionTemplateTemplate(WrapperTestTemplate):
@@ -38,13 +39,13 @@ class SessionTemplateTemplate(WrapperTestTemplate):
         image = ImageContext.current()
 
         if image.name is None:
-            raise ValueError("Image name is not set in ImageConfigContext.")
+            raise DependencyNotSet("Image name is not set in ImageConfigContext.")
         image_name = image.name.split(":")[0]
         image_tag = image.name.split(":")[1]
         session_dep = SessionContext.current()
 
         if session_dep.resources is None:
-            raise ValueError("SessionConfigContext resources are not set.")
+            raise DependencyNotSet("SessionConfigContext resources are not set.")
 
         return textwrap.dedent(f"""
             [
