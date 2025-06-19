@@ -7,13 +7,14 @@ from ai.backend.test.contexts.session import SessionContext
 from ai.backend.test.templates.session.utils import verify_session_events
 from ai.backend.test.templates.template import TestCode
 
+_TASK_TIMEOUT = 15
+
 
 class BatchSessionCreationFailureTimeout(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         image_dep = ImageContext.current()
         session_dep = SessionContext.current()
-        TASK_TIMEOUT = 15
 
         session_name = "test-batch-session-execution-failure"
         listener = asyncio.create_task(
@@ -25,7 +26,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
                     {"session_success", "session_cancelled"},
                     expected_failure_reason="task-timeout",
                 ),
-                TASK_TIMEOUT,
+                _TASK_TIMEOUT,
             )
         )
 

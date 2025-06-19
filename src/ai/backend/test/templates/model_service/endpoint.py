@@ -14,6 +14,7 @@ from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.model_service import ModelServiceContext
 from ai.backend.test.contexts.scaling_group import ScalingGroupContext
 from ai.backend.test.contexts.session import (
+    ClusterContext,
     SessionContext,
 )
 from ai.backend.test.templates.template import (
@@ -41,9 +42,7 @@ class EndpointTemplate(WrapperTestTemplate):
         group_dep = GroupContext.current()
         domain_dep = DomainContext.current()
         model_service_dep = ModelServiceContext.current()
-
-        if image_dep.name is None:
-            raise DependencyNotSet("Image name must be defined in the ImageContext.")
+        cluster_dep = ClusterContext.current()
 
         if not session_dep.resources:
             raise DependencyNotSet("Resources must be defined in the SessionContext.")
@@ -65,6 +64,8 @@ class EndpointTemplate(WrapperTestTemplate):
                 scaling_group=scaling_group_dep.name,
                 model_mount_destination=model_service_dep.model_mount_destination,
                 model_definition_path=model_service_dep.model_definition_path,
+                cluster_mode=cluster_dep.cluster_mode,
+                cluster_size=cluster_dep.cluster_size,
                 # TODO: Make `envs` required.
                 envs={},
             )

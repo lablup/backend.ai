@@ -1,8 +1,11 @@
 import textwrap
 
+from ai.backend.common.types import ClusterMode
+from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.model_service.endpoint import EndpointTemplate
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
+from ai.backend.test.tester.dependency import ClusterDep
 
 from ...templates.template import BasicTestTemplate, NopTestCode
 
@@ -20,5 +23,21 @@ MODEL_SERVICE_TEST_SPECS = {
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, EndpointTemplate
         ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
     ),
 }
