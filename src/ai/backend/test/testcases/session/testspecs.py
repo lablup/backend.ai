@@ -35,8 +35,8 @@ from ai.backend.test.testcases.session.execution import (
     InteractiveSessionExecuteCodeFailureWrongCommand,
     InteractiveSessionExecuteCodeSuccess,
 )
-from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
 from ai.backend.test.testcases.session.filecheck import FileExistenceCheck
+from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import (
     BootstrapScriptDep,
