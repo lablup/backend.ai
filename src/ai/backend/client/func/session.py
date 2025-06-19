@@ -581,7 +581,8 @@ class ComputeSession(BaseFunction):
     def get_session_identifier(self) -> str:
         if self.id is not None:
             return str(self.id)
-        assert self.name is not None, "Either session name or id must be set."
+        if self.name is None:
+            raise ValueError("Either session name or id must be set.")
         return self.name
 
     @api_function
