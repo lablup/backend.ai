@@ -30,6 +30,8 @@ class ContextName(enum.StrEnum):
     SESSION_IMAGIFY = "session_imagify"
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
     SESSION_DEPENDENCY = "session_dependency"
+    VFOLDER = "vfolder"
+    CREATED_VFOLDER_META = "created_vfolder_meta"
 
     CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"

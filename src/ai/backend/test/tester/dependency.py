@@ -115,6 +115,22 @@ class SessionImagifyDep(BaseDependencyModel):
     )
 
 
+class VFolderDep(BaseDependencyModel):
+    group: Optional[str] = Field(
+        default=None,
+        description="The group name for the vfolder.",
+    )
+    unmanaged_path: Optional[str] = Field(
+        default=None, description="The unmanaged path for the vfolder."
+    )
+    permission: str = Field(
+        description="The permission for the vfolder.",
+    )
+    cloneable: bool = Field(
+        description="Whether the vfolder is cloneable.",
+    )
+
+
 class TestContextInjectionModel(BaseDependencyModel):
     endpoint: Optional[EndpointDep] = Field(
         default=None,
@@ -155,6 +171,10 @@ class TestContextInjectionModel(BaseDependencyModel):
         default=None,
         description="The session imagify configuration for the test context.",
         alias="session-imagify",
+    )
+    vfolder: Optional[VFolderDep] = Field(
+        default=None,
+        description="The vfolder configuration for the test context.",
     )
 
 
