@@ -4,6 +4,9 @@ from pathlib import Path
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
+from ai.backend.test.templates.resource_policy.keypair_resource_policy import (
+    KeypairResourcePolicyTemplate,
+)
 from ai.backend.test.templates.session.batch_session import BatchSessionTemplate
 from ai.backend.test.templates.session.dependent_session import DependentSessionTemplate
 from ai.backend.test.templates.session.interactive_session import (
@@ -59,7 +62,7 @@ BATCH_SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, BatchSessionTemplate
+            KeypairAuthTemplate, KeypairResourcePolicyTemplate, BatchSessionTemplate
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
@@ -122,7 +125,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, InteractiveSessionTemplate
+            KeypairAuthTemplate, KeypairResourcePolicyTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
@@ -184,7 +187,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(InteractiveSessionExecuteCodeSuccess()).with_wrappers(
-            KeypairAuthTemplate, InteractiveSessionTemplate
+            KeypairAuthTemplate, KeypairResourcePolicyTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
@@ -289,7 +292,10 @@ SESSION_TEMPLATE_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionFromTemplateTemplate
+            KeypairAuthTemplate,
+            KeypairResourcePolicyTemplate,
+            SessionTemplateTemplate,
+            InteractiveSessionFromTemplateTemplate,
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
@@ -320,7 +326,10 @@ SESSION_TEMPLATE_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, SessionTemplateTemplate, BatchSessionFromTemplateTemplate
+            KeypairAuthTemplate,
+            KeypairResourcePolicyTemplate,
+            SessionTemplateTemplate,
+            BatchSessionFromTemplateTemplate,
         ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
