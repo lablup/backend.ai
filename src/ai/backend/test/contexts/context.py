@@ -29,6 +29,10 @@ class ContextName(enum.StrEnum):
     BOOTSTRAP_SCRIPT = "bootstrap_script"
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
     SESSION_DEPENDENCY = "session_dependency"
+    VFOLDER = "vfolder"
+    CREATED_VFOLDER_META = "created_vfolder_meta"
+    SCALING_GROUP = "scaling_group"
+    SCALING_GROUP_NAME = "scaling_group_name"
 
     CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"

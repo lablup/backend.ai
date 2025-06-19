@@ -108,6 +108,30 @@ class SessionDep(BaseDependencyModel):
     )
 
 
+class VFolderDep(BaseDependencyModel):
+    group: Optional[str] = Field(
+        default=None,
+        description="The group name for the vfolder.",
+    )
+    unmanaged_path: Optional[str] = Field(
+        default=None, description="The unmanaged path for the vfolder."
+    )
+    permission: str = Field(
+        description="The permission for the vfolder.",
+    )
+    cloneable: bool = Field(
+        description="Whether the vfolder is cloneable.",
+    )
+
+
+class ScalingGroupDep(BaseDependencyModel):
+    name: Optional[str] = Field(
+        default=None,
+        description="The name of the scaling group for the test context.",
+        examples=["default", "custom-scaling-group"],
+    )
+
+
 class TestContextInjectionModel(BaseDependencyModel):
     endpoint: Optional[EndpointDep] = Field(
         default=None,
@@ -143,6 +167,15 @@ class TestContextInjectionModel(BaseDependencyModel):
     session: Optional[SessionDep] = Field(
         default=None,
         description="The session configuration for the test context.",
+    )
+    vfolder: Optional[VFolderDep] = Field(
+        default=None,
+        description="The vfolder configuration for the test context.",
+    )
+    scaling_group: Optional[ScalingGroupDep] = Field(
+        default=None,
+        description="The scaling group configuration for the test context.",
+        alias="scaling-group",
     )
 
 

@@ -25,3 +25,6 @@ startup-command = "ls -la"
 
 [context.sse]
 timeout = 60.0
+
+[context.scaling-group]
+name = "default"
