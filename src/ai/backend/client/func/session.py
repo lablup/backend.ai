@@ -578,6 +578,12 @@ class ComputeSession(BaseFunction):
                 identity_params["owner_access_key"] = self.owner_access_key
         return identity_params
 
+    def get_session_identifier(self) -> str:
+        if self.id is not None:
+            return str(self.id)
+        assert self.name is not None, "Either session name or id must be set."
+        return self.name
+
     @api_function
     async def update(
         self,
@@ -629,9 +635,10 @@ class ComputeSession(BaseFunction):
         if recursive:
             params["recursive"] = "true"
 
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "DELETE",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -649,9 +656,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "PATCH",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{session_identifier}",
             params=params,
         )
         async with rqst.fetch():
@@ -666,9 +674,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/rename",
+            f"/{prefix}/{session_identifier}/rename",
             params=params,
         )
         async with rqst.fetch():
@@ -683,9 +692,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/commit",
+            f"/{prefix}/{session_identifier}/commit",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -701,9 +711,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/imagify",
+            f"/{prefix}/{session_identifier}/imagify",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -720,9 +731,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/interrupt",
+            f"/{prefix}/{session_identifier}/interrupt",
             params=params,
         )
         async with rqst.fetch():
@@ -749,9 +761,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/complete",
+            f"/{prefix}/{session_identifier}/complete",
             params=params,
         )
         rqst.set_json({
@@ -775,9 +788,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -837,9 +851,10 @@ class ComputeSession(BaseFunction):
         if kernel_id is not None:
             params["kernel_id"] = str(kernel_id)
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/logs",
+            f"/{prefix}/{session_identifier}/logs",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -857,9 +872,10 @@ class ComputeSession(BaseFunction):
 
         prefix = get_naming(api_session.get().api_version, "path")
 
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/dependency-graph",
+            f"/{prefix}/{session_identifier}/dependency-graph",
             params=params,
         )
 
@@ -875,9 +891,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/status-history",
+            f"/{prefix}/{session_identifier}/status-history",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -919,11 +936,12 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
-        if mode in {"query", "continue", "input"}:
+        session_identifier = self.get_session_identifier()
+        if mode not in {"query", "continue", "input"}:
             assert code is not None, "The code argument must be a valid string even when empty."
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -934,7 +952,7 @@ class ComputeSession(BaseFunction):
         elif mode == "batch":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -951,7 +969,7 @@ class ComputeSession(BaseFunction):
         elif mode == "complete":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -1025,10 +1043,10 @@ class ComputeSession(BaseFunction):
                         file_path, base_path
                     )
                     raise ValueError(msg) from None
-
+            session_identifier = self.get_session_identifier()
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}/upload",
+                f"/{prefix}/{session_identifier}/upload",
                 params=params,
             )
             rqst.attach_files(attachments)
@@ -1055,9 +1073,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/download",
+            f"/{prefix}/{session_identifier}/download",
             params=params,
         )
         rqst.set_json({
@@ -1111,9 +1130,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/files",
+            f"/{prefix}/{session_identifier}/files",
             params=params,
         )
         rqst.set_json({
@@ -1146,9 +1166,10 @@ class ComputeSession(BaseFunction):
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/abusing-report",
+            f"/{prefix}/{session_identifier}/abusing-report",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -1179,9 +1200,10 @@ class ComputeSession(BaseFunction):
             body["login_session_token"] = login_session_token
 
         prefix = get_naming(api_session.get().api_version, "path")
+        session_identifier = self.get_session_identifier()
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/start-service",
+            f"/{prefix}/{session_identifier}/start-service",
         )
         rqst.set_json(body)
         async with rqst.fetch() as resp:
