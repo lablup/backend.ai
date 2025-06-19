@@ -942,7 +942,7 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         session_identifier = self.get_session_identifier()
-        if mode not in {"query", "continue", "input"}:
+        if mode in {"query", "continue", "input"}:
             assert code is not None, "The code argument must be a valid string even when empty."
             rqst = Request(
                 "POST",
