@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import override
 from uuid import UUID
 
+import aiohttp
+
 from ai.backend.client.output.fields import session_node_fields
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.domain import DomainContext
@@ -19,6 +21,7 @@ from ai.backend.test.templates.template import (
 )
 
 _ENDPOINT_CREATION_TIMEOUT = 30
+_ENDPOINT_HEALTH_CHECK_TIMEOUT = 10
 
 
 class EndpointTemplate(WrapperTestTemplate):
@@ -118,6 +121,13 @@ class EndpointTemplate(WrapperTestTemplate):
             info = await client_session.Service(endpoint_id).info()
             assert info["service_endpoint"] is not None, "Service endpoint should be initialized."
 
+            async with aiohttp.ClientSession() as http_sess:
+                resp = await asyncio.wait_for(
+                    http_sess.get(info["service_endpoint"]), timeout=_ENDPOINT_HEALTH_CHECK_TIMEOUT
+                )
+                assert resp.status // 100 == 2, (
+                    f"Service endpoint health check failed with status: {resp.status}"
+                )
             yield
         finally:
             if endpoint_id:
