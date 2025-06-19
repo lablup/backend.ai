@@ -15,6 +15,10 @@ from ai.backend.test.templates.session.session_template import (
     InteractiveSessionFromTemplateTemplate,
     SessionTemplateTemplate,
 )
+from ai.backend.test.testcases.session.commit import (
+    InteractiveSessionCommitSuccess,
+    InteractiveSessionImagifySuccess,
+)
 from ai.backend.test.testcases.session.container_log_retriever import TestContainerLogRetriever
 from ai.backend.test.testcases.session.creation_failure_command_timeout import (
     BatchSessionCreationFailureTimeout,
@@ -272,6 +276,65 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         template=BasicTestTemplate(
             InteractiveSessionCreationFailureScheduleTimeout()
         ).with_wrappers(KeypairAuthTemplate),
+    ),
+    "imagify_interactive_session_success": TestSpec(
+        name="imagify_interactive_session_success",
+        description=textwrap.dedent("""\
+            Test for creating a session with too many containers.
+            This test verifies that a session creation fails when the specified container count exceeds the limit.
+            The test will:
+            1. Create an interactive session with the specified image and resources.
+            2. Imagify the session to create a new image.
+            3. Assert that the new image is created successfully.
+            4. Destroy the session after the test is complete.
+            5. Untag the image from the container registry.
+        """),
+        tags={
+            TestTag.MANAGER,
+            TestTag.AGENT,
+            TestTag.IMAGE,
+            TestTag.CONTAINER_REGISTRY,
+            TestTag.SESSION,
+        },
+        template=BasicTestTemplate(InteractiveSessionImagifySuccess()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
+        },
+    ),
+    "commit_interactive_session_success": TestSpec(
+        name="commit_interactive_session_success",
+        description=textwrap.dedent("""\
+            Test for committing an interactive session.
+            This test verifies that an interactive session can be committed successfully, creating a tarfile of the session's state.
+
+            The test will:
+            1. Create an interactive session with the specified image and resources.
+            2. Commit the session as tarfile.
+        """),
+        tags={
+            TestTag.MANAGER,
+            TestTag.AGENT,
+            TestTag.IMAGE,
+            TestTag.SESSION,
+        },
+        template=BasicTestTemplate(InteractiveSessionCommitSuccess()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
+        },
     ),
 }
 

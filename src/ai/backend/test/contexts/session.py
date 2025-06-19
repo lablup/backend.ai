@@ -8,6 +8,7 @@ from ai.backend.test.tester.dependency import (
     ClusterDep,
     CodeExecutionDep,
     SessionDep,
+    SessionImagifyDep,
 )
 
 
@@ -65,3 +66,10 @@ class SessionDependencyContext(BaseTestContext[SessionDependency]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.SESSION_DEPENDENCY
+
+
+class SessionImagifyContext(BaseTestContext[SessionImagifyDep]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.SESSION_IMAGIFY
