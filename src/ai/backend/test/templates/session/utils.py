@@ -77,3 +77,4 @@ async def verify_bgtask_events(
                 raise RuntimeError(
                     f"Got failure event: {ev.event}, Expected event: {expected_event}"
                 )
+    return None
