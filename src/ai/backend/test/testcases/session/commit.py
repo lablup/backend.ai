@@ -18,7 +18,7 @@ class InteractiveSessionImagifySuccess(TestCode):
             imagify_deps.new_image_name,
         )
 
-        new_image_id = await asyncio.wait_for(
+        customized_image_id = await asyncio.wait_for(
             verify_bgtask_events(
                 client_session,
                 result["task_id"],
@@ -28,10 +28,10 @@ class InteractiveSessionImagifySuccess(TestCode):
             timeout,
         )
 
-        # Legacy manager will not include an image_id in the message.
-        # In that case, skip the image untagging and consider the test successful.
-        if new_image_id:
-            result = await client_session.Image.untag_image_from_registry(new_image_id)
+        # Legacy manager will not include an `image_id` in message of the response.
+        # In that case, just skip the image untagging and consider the test successful.
+        if customized_image_id:
+            result = await client_session.Image.untag_image_from_registry(customized_image_id)
             assert result["ok"], "Failed to untag image from registry"
 
 

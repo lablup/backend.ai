@@ -62,9 +62,8 @@ async def verify_bgtask_events(
     :param bgtask_id: The ID of the background task to listen for events.
     :param expected_event: The event that is expected to occur.
     :param failure_events: A set of events that indicate a failure in the background task.
-    :param expected_message: Optional; if provided, checks that the message in the event matches this value.
 
-    :return: The message from the event if it matches the expected_message, otherwise None.
+    :return: The message of the BgTaskEvent
     """
 
     async with client_session.BackgroundTask(bgtask_id).listen_events() as response:
