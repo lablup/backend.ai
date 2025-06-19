@@ -16,7 +16,6 @@ class TestSessionRename(TestCode):
 
         await session.ComputeSession(name=session_name).rename(new_name)
         renamed_info = await session.ComputeSession.from_session_id(session_id=session_id).detail()
-        print(f"Renamed session info: {renamed_info}")
         assert renamed_info["name"] == new_name
 
         # Clean up by renaming back to original name
