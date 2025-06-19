@@ -1171,13 +1171,11 @@ class AbstractAgent(
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
         try:
-            container_ids = []
-            containers = await self.enumerate_containers()
-            for kernel_id, container in containers:
-                kernel_obj = self.kernel_registry.get(kernel_id)
-                if kernel_obj is None or not kernel_obj.stats_enabled:
+            container_ids: list[ContainerId] = []
+            for kernel_obj in [*self.kernel_registry.values()]:
+                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                     continue
-                container_ids.append(container.id)
+                container_ids.append(ContainerId(kernel_obj.container_id))
                 await self.stat_ctx.collect_container_stat(container_ids)
         except asyncio.CancelledError:
             pass
@@ -1190,12 +1188,10 @@ class AbstractAgent(
             log.debug("collecting process statistics in container")
         try:
             container_ids = []
-            containers = await self.enumerate_containers()
-            for kernel_id, container in containers:
-                kernel_obj = self.kernel_registry.get(kernel_id)
-                if kernel_obj is None or not kernel_obj.stats_enabled:
+            for kernel_obj in [*self.kernel_registry.values()]:
+                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                     continue
-                container_ids.append(container.id)
+                container_ids.append(ContainerId(kernel_obj.container_id))
             await self.stat_ctx.collect_per_container_process_stat(container_ids)
         except asyncio.CancelledError:
             pass
