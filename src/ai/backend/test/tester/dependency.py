@@ -156,9 +156,9 @@ class ModelServiceDep(BaseDependencyModel):
         examples=["models"],
     )
     model_definition_path: str = Field(
-        default="./model-definition.yml",
+        default="./model-definition.yaml",
         description="The path to the model definition file in the model service.",
-        examples=["./model-definition.yml"],
+        examples=["./model-definition.yaml"],
     )
 
 
