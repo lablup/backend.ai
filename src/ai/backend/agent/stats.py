@@ -641,7 +641,7 @@ class StatContext:
             procs = result["Processes"]
         except (KeyError, aiodocker.exceptions.DockerError):
             log.debug(
-                "collect_per_container_process_stat(): cannot found container {}", container_id
+                "collect_per_container_process_stat(): cannot find container {}", container_id
             )
             return return_val
 
