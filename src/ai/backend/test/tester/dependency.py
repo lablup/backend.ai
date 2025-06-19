@@ -135,6 +135,7 @@ class SessionImagifyDep(BaseDependencyModel):
         examples=["my-custom-image"],
     )
 
+
 class ModelServiceDep(BaseDependencyModel):
     model_vfolder_name: str = Field(
         description="The model VFolder name to use for the model service.",
@@ -149,15 +150,15 @@ class ModelServiceDep(BaseDependencyModel):
         description="The group name for the model service.",
         examples=["model-store"],
     )
-    model_mount_destination: Optional[str] = Field(
-        default=None,
+    model_mount_destination: str = Field(
+        default="models",
         description="The destination path for the model mount in the model service.",
-        examples=["./models"],
+        examples=["models"],
     )
-    model_definition_path: Optional[str] = Field(
-        default=None,
+    model_definition_path: str = Field(
+        default="./model-definition.yml",
         description="The path to the model definition file in the model service.",
-        examples=["./models/model-definition.yml"],
+        examples=["./model-definition.yml"],
     )
 
 
