@@ -1,6 +1,5 @@
-import json
-
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.json import load_json
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.session import CreatedSessionMetaContext, SessionImagifyContext
 from ai.backend.test.templates.template import TestCode
@@ -21,7 +20,7 @@ class InteractiveSessionImagifySuccess(TestCode):
         new_image_id = None
         async with bgtask.listen_events() as response:
             async for ev in response:
-                data = json.loads(ev.data)
+                data = load_json(ev.data)
 
                 match ev.event:
                     case BgtaskStatus.UPDATED:
