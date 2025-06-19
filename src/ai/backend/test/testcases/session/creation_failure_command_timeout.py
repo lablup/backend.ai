@@ -4,9 +4,6 @@ from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.session import SessionContext
-from ai.backend.test.contexts.sse import (
-    SSEContext,
-)
 from ai.backend.test.templates.session.utils import verify_session_events
 from ai.backend.test.templates.template import TestCode
 
@@ -16,7 +13,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
         client_session = ClientSessionContext.current()
         image_dep = ImageContext.current()
         session_dep = SessionContext.current()
-        sse_dep = SSEContext.current()
+        TASK_TIMEOUT = 15
 
         session_name = "test-batch-session-execution-failure"
         listener = asyncio.create_task(
@@ -28,7 +25,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
                     {"session_success", "session_cancelled"},
                     expected_failure_reason="task-timeout",
                 ),
-                sse_dep.timeout,
+                TASK_TIMEOUT,
             )
         )
 
@@ -37,7 +34,7 @@ class BatchSessionCreationFailureTimeout(TestCode):
             architecture=image_dep.architecture,
             name=session_name,
             type_="batch",
-            startup_command="sleep 20",
+            startup_command="sleep 10",
             batch_timeout=3,
             resources=session_dep.resources,
             cluster_mode=ClusterMode.SINGLE_NODE,
