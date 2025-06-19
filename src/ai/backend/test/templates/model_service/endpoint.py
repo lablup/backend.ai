@@ -19,6 +19,7 @@ from ai.backend.test.contexts.session import (
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
+from ai.backend.test.utils.exceptions import DependencyNotSet
 
 _ENDPOINT_CREATION_TIMEOUT = 30
 _ENDPOINT_HEALTH_CHECK_TIMEOUT = 10
@@ -42,10 +43,10 @@ class EndpointTemplate(WrapperTestTemplate):
         model_service_dep = ModelServiceContext.current()
 
         if image_dep.name is None:
-            raise ValueError("Image name must be defined in the ImageContext.")
+            raise DependencyNotSet("Image name must be defined in the ImageContext.")
 
         if not session_dep.resources:
-            raise ValueError("Resources must be defined in the SessionContext.")
+            raise DependencyNotSet("Resources must be defined in the SessionContext.")
 
         vfolder_func = client_session.VFolder(name=model_service_dep.model_vfolder_name)
         await vfolder_func.update_id_by_name()
