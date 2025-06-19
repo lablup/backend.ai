@@ -21,6 +21,7 @@ class TestTag(enum.StrEnum):
     IMAGE = "image"
     CONTAINER_REGISTRY = "container_registry"
     SESSION = "session"
+    MODEL_SERVICE = "model_service"
 
 
 @dataclass

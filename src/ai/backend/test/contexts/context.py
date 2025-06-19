@@ -22,6 +22,11 @@ class ContextName(enum.StrEnum):
     LOGIN_CREDENTIAL = "login_credential"
     SESSION = "session"
     SSE = "sse"
+    DOMAIN = "domain"
+    GROUP = "group"
+    SCALING_GROUP = "scaling_group"
+    MODEL_SERVICE = "model_service"
+
     BATCH_SESSION = "batch_session"
     CLUSTER_CONFIG = "cluster_config"
     CODE_EXECUTION = "code_execution"
