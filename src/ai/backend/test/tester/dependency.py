@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,6 +40,27 @@ class LoginCredentialDep(BaseDependencyModel):
         default=None,
         description="The one-time password for login, if required.",
         examples=["123456"],
+    )
+
+
+class DomainDep(BaseDependencyModel):
+    name: str = Field(
+        description="The domain name for the test context.",
+        examples=["default"],
+    )
+
+
+class GroupDep(BaseDependencyModel):
+    name: str = Field(
+        description="The group name for the test context.",
+        examples=["default"],
+    )
+
+
+class ScalingGroupDep(BaseDependencyModel):
+    name: str = Field(
+        description="The scaling group for the test context.",
+        examples=["default"],
     )
 
 
@@ -101,7 +122,7 @@ class BootstrapScriptDep(BaseDependencyModel):
 
 
 class SessionDep(BaseDependencyModel):
-    resources: Optional[dict] = Field(
+    resources: Optional[dict[str, Any]] = Field(
         default=None,
         description="The resources to allocate for the session.",
         examples=[{"cpu": 2, "mem": "4gb"}],
@@ -112,6 +133,31 @@ class SessionImagifyDep(BaseDependencyModel):
     new_image_name: str = Field(
         description="The name of the new image to create from the session.",
         examples=["my-custom-image"],
+    )
+
+class ModelServiceDep(BaseDependencyModel):
+    model_vfolder_name: str = Field(
+        description="The model VFolder name to use for the model service.",
+        examples=["vfolder-name"],
+    )
+    replicas: int = Field(
+        description="The number of replicas for the model service.",
+        examples=[1, 2, 3],
+    )
+    # Separate group is required for the model service, so we placed this independently from the group context.
+    group_name: str = Field(
+        description="The group name for the model service.",
+        examples=["model-store"],
+    )
+    model_mount_destination: Optional[str] = Field(
+        default=None,
+        description="The destination path for the model mount in the model service.",
+        examples=["./models"],
+    )
+    model_definition_path: Optional[str] = Field(
+        default=None,
+        description="The path to the model definition file in the model service.",
+        examples=["./models/model-definition.yml"],
     )
 
 
@@ -145,6 +191,19 @@ class TestContextInjectionModel(BaseDependencyModel):
         description="The login credentials for the test context.",
         alias="login-credential",
     )
+    domain: Optional[DomainDep] = Field(
+        default=None,
+        description="The domain configuration for the test context.",
+    )
+    group: Optional[GroupDep] = Field(
+        default=None,
+        description="The group configuration for the test context.",
+    )
+    scaling_group: Optional[ScalingGroupDep] = Field(
+        default=None,
+        description="The scaling group configuration for the test context.",
+        alias="scaling-group",
+    )
     image: Optional[ImageDep] = Field(
         default=None,
         description="The Docker image context for the test.",
@@ -170,7 +229,11 @@ class TestContextInjectionModel(BaseDependencyModel):
     session_imagify: Optional[SessionImagifyDep] = Field(
         default=None,
         description="The session imagify configuration for the test context.",
-        alias="session-imagify",
+    )
+    model_service: Optional[ModelServiceDep] = Field(
+        default=None,
+        description="The model service configuration for the test context.",
+        alias="model-service",
     )
     vfolder: Optional[VFolderDep] = Field(
         default=None,
