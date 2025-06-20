@@ -162,12 +162,15 @@ class AgentEventHandler:
         agent_condition = by_agent_id(event.agent_id, ConditionMerger.AND)
         kernel_rows = await KernelRow.get_kernels(
             [
-                status_condition,
+                # status_condition,
                 agent_condition,
             ],
             db=self._db,
         )
-        kernel_should_alive: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
+        kernel_rows = [row for row in kernel_rows if row.status not in (KernelStatus.TERMINATED, KernelStatus.CANCELLED)]
+        kernel_should_alive: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows if kernel_row.status in KernelStatus.having_containers()}
+        print(f"Kernel rows ===\n{[(row.id, row.agent, row.status) for row in kernel_rows]}\n")
+        print(f"Kernel should alive ===\n{[(row.id, row.agent, row.status) for row in kernel_should_alive]}")
         active_container_ids = [
             ContainerKernelId(cont.container_id, cont.kernel_id) for cont in event.active_containers
         ]
