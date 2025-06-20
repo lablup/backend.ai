@@ -50,6 +50,7 @@ class HeartbeatObserver(AbstractObserver):
             )
             for kernel_id, kernel_obj in self._agent.kernel_registry.items()
         ]
+        print(f"Heartbeat:\n{container_data = }\n{kernel_data = }\n")
         await self._event_producer.anycast_event(
             AgentStatusHeartbeat(
                 self._agent.id,
