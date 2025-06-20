@@ -635,7 +635,7 @@ class ModelServingService:
                 await self._agent_registry.update_appproxy_endpoint_routes(
                     db_sess,
                     endpoint,
-                    [r for r in endpoint.routes if r.status == RouteStatus.HEALTHY],
+                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY],
                 )
             except aiohttp.ClientError as e:
                 log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
