@@ -22,6 +22,7 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel
@@ -97,10 +98,10 @@ class DockerKernel(AbstractKernel):
             client_features=client_features,
         )
 
-    async def get_completions(self, text: str, opts: Mapping[str, Any]):
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         assert self.runner is not None
         result = await self.runner.feed_and_get_completion(text, opts)
-        return {"status": "finished", "completions": result}
+        return CodeCompletionResp(result=result)
 
     async def check_status(self):
         assert self.runner is not None
