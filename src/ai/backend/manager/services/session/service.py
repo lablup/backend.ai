@@ -1467,7 +1467,6 @@ class SessionService:
                 db_sess,
                 session_name,
                 owner_access_key,
-                allow_stale=True,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
             )
             if compute_session.status != SessionStatus.RUNNING:
