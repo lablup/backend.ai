@@ -283,7 +283,6 @@ class SessionService:
         try:
             await self._agent_registry.increment_session_usage(session)
             resp = await self._agent_registry.get_completions(session, code, opts=options)
-            print(f"service: {resp.as_dict()}")
         except AssertionError:
             raise InvalidAPIParameters
         return CompleteActionResult(
