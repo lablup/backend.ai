@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Collection, Iterable
+from typing import Optional
 
 import sqlalchemy as sa
 
@@ -15,6 +16,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
+    ContainerId,
     ContainerKernelId,
     KernelContainerId,
     KernelId,
@@ -174,15 +176,23 @@ class AgentEventHandler:
         )
         kernels_to_clean = self._filter_kernels_to_clean(event.active_kernels, kernel_should_alive)
 
-        log.info(
+        log.debug(
             "agent@{0} heartbeat: Detected {1} dangling containers, {2} dangling kernel registries",
             event.agent_id,
             len(containers_to_purge),
             len(kernels_to_clean),
         )
         if containers_to_purge:
+            kernels = await KernelRow.get_kernels(
+                [
+                    by_cont_id([c.container_id for c in containers_to_purge], ConditionMerger.AND),
+                ],
+                db=self._db,
+            )
+            kstatus = [(k.id, k.status, k.container_id) for k in kernels]
+            print(f"Purge containers agent@{event.agent_id}, {kstatus = }")
             log.warning(
-                "agent@{0} heartbeat: Purging containers: {1}",
+                "agent@{0} heartbeat: Purging dangling containers: {1}",
                 event.agent_id,
                 ", ".join(c.human_readable_container_id for c in containers_to_purge),
             )
@@ -191,8 +201,16 @@ class AgentEventHandler:
                 containers_to_purge,
             )
         if kernels_to_clean:
+            kernels = await KernelRow.get_kernels(
+                [
+                    by_kernel_id(kernels_to_clean, ConditionMerger.AND),
+                ],
+                db=self._db,
+            )
+            kstatus = [(k.id, k.status) for k in kernels]
+            print(f"Cleaning kernels. agent@{event.agent_id}, {kstatus = }")
             log.warning(
-                "agent@{0} heartbeat: Cleaning kernels: {1}",
+                "agent@{0} heartbeat: Cleaning dangling kernels: {1}",
                 event.agent_id,
                 ", ".join(str(k) for k in kernels_to_clean),
             )
@@ -200,3 +218,39 @@ class AgentEventHandler:
                 event.agent_id,
                 kernels_to_clean,
             )
+
+
+def _append_condition(
+    condition: Optional[sa.sql.expression.BinaryExpression],
+    new_condition: sa.sql.expression.BinaryExpression,
+    operator: ConditionMerger,
+) -> sa.sql.expression.BinaryExpression:
+    return (
+        operator.to_sql_operator(condition, new_condition)
+        if condition is not None
+        else new_condition
+    )
+
+
+def by_kernel_id(
+    ids: list[KernelId],
+    operator: ConditionMerger,
+):
+    def _by_kernel_id(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.id.in_(ids), operator)
+
+    return _by_kernel_id
+
+
+def by_cont_id(
+    cont_ids: list[ContainerId],
+    operator: ConditionMerger,
+):
+    def _by_cont_id(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.container_id.in_(cont_ids), operator)
+
+    return _by_cont_id

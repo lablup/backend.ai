@@ -215,7 +215,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.last_used = time.monotonic()
         self.termination_reason = None
         self.clean_event = None
-        self.stats_enabled = False
+        self.stats_enabled = True
         self.environ = environ
         self.runner = None
         self.container_id = None
@@ -223,6 +223,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.session_type = session_type
 
     async def init(self, event_producer: EventProducer) -> None:
+        self.stats_enabled = True
         log.debug(
             "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,

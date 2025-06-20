@@ -60,7 +60,7 @@ class HeartbeatObserver(AbstractObserver):
 
     @override
     def observe_interval(self) -> float:
-        return 60.0
+        return 1
 
     @classmethod
     @override
