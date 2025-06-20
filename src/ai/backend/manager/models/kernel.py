@@ -120,6 +120,7 @@ class KernelStatus(CIStrEnum):
     @classmethod
     def having_containers(cls) -> set[KernelStatus]:
         return {
+            cls.PULLING,
             cls.CREATING,
             cls.RUNNING,
         }
