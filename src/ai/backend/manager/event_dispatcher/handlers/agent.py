@@ -173,7 +173,7 @@ class AgentEventHandler:
         print(f"Kernel should alive ===\n{[(row.id, row.agent, row.status) for row in kernel_should_alive_]}\n\n")
         print(f"Event active kernels ===\n{[(k.kernel_id, k.container_id) for k in event.active_kernels]}\n")
         print(f"Event active containers ===\n{[(c.container_id, c.kernel_id) for c in event.active_containers]}\n")
-        kernel_should_alive = {k[0] for k in kernel_should_alive_}
+        kernel_should_alive = {k.id for k in kernel_should_alive_}
         active_container_ids = [
             ContainerKernelId(cont.container_id, cont.kernel_id) for cont in event.active_containers
         ]
