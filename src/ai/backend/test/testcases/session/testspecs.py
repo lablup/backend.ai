@@ -15,6 +15,10 @@ from ai.backend.test.templates.session.session_template import (
     InteractiveSessionFromTemplateTemplate,
     SessionTemplateTemplate,
 )
+from ai.backend.test.testcases.session.commit import (
+    InteractiveSessionCommitSuccess,
+    InteractiveSessionImagifySuccess,
+)
 from ai.backend.test.testcases.session.container_log_retriever import TestContainerLogRetriever
 from ai.backend.test.testcases.session.creation_failure_command_timeout import (
     BatchSessionCreationFailureTimeout,
@@ -37,6 +41,10 @@ from ai.backend.test.testcases.session.execution import (
 )
 from ai.backend.test.testcases.session.filecheck import FileExistenceCheck
 from ai.backend.test.testcases.session.graph_dependency_retriever import DependencyGraphRetriever
+from ai.backend.test.testcases.session.rename_failure_duplicated_name import (
+    SessionRenameFailureDuplicatedName,
+)
+from ai.backend.test.testcases.session.session_rename import TestSessionRename
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import (
     BootstrapScriptDep,
@@ -273,6 +281,65 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             InteractiveSessionCreationFailureScheduleTimeout()
         ).with_wrappers(KeypairAuthTemplate),
     ),
+    "imagify_interactive_session_success": TestSpec(
+        name="imagify_interactive_session_success",
+        description=textwrap.dedent("""\
+            Test for creating a session with too many containers.
+            This test verifies that a session creation fails when the specified container count exceeds the limit.
+            The test will:
+            1. Create an interactive session with the specified image and resources.
+            2. Imagify the session to create a new image.
+            3. Assert that the new image is created successfully.
+            4. Destroy the session after the test is complete.
+            5. Untag the image from the container registry.
+        """),
+        tags={
+            TestTag.MANAGER,
+            TestTag.AGENT,
+            TestTag.IMAGE,
+            TestTag.CONTAINER_REGISTRY,
+            TestTag.SESSION,
+        },
+        template=BasicTestTemplate(InteractiveSessionImagifySuccess()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
+        },
+    ),
+    "commit_interactive_session_success": TestSpec(
+        name="commit_interactive_session_success",
+        description=textwrap.dedent("""\
+            Test for committing an interactive session.
+            This test verifies that an interactive session can be committed successfully, creating a tarfile of the session's state.
+
+            The test will:
+            1. Create an interactive session with the specified image and resources.
+            2. Commit the session as tarfile.
+        """),
+        tags={
+            TestTag.MANAGER,
+            TestTag.AGENT,
+            TestTag.IMAGE,
+            TestTag.SESSION,
+        },
+        template=BasicTestTemplate(InteractiveSessionCommitSuccess()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
+        },
+    ),
 }
 
 SESSION_TEMPLATE_TEST_SPECS = {
@@ -404,10 +471,78 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
     ),
 }
 
+SESSION_RENAME_TEST_SPECS = {
+    "session_rename_success": TestSpec(
+        name="session_rename_success",
+        description=textwrap.dedent("""\
+        Test for renaming a session.
+        This test verifies that a session can be renamed successfully
+        The test will:
+        1. Create a session with a specific name.
+        2. Rename the session to a new name.
+        3. Assert that the session's name has been updated correctly.
+        4. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(testcode=TestSessionRename()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ],
+        },
+    ),
+    "session_rename_fail_duplicated_name": TestSpec(
+        name="session_rename_fail_duplicated_name",
+        description=textwrap.dedent("""\
+        Test for renaming a session to a name that is already taken.
+        This test verifies that renaming a session to a duplicate name fails as expected.
+        The test will:
+        1. Create two sessions with different names.
+        2. Attempt to rename the second session to the name of the first session.
+        3. Assert that an error is raised due to the name conflict.
+        4. Destroy both sessions after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(testcode=SessionRenameFailureDuplicatedName()).with_wrappers(
+            KeypairAuthTemplate, InteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ],
+        },
+    ),
+}
+
 
 SESSION_TEST_SPECS = {
     **BATCH_SESSION_TEST_SPECS,
     **INTERACTIVE_SESSION_TEST_SPECS,
     **SESSION_TEMPLATE_TEST_SPECS,
     **SESSION_INFO_RETRIEVER_TEST_SPECS,
+    **SESSION_RENAME_TEST_SPECS,
 }
