@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 
 from ai.backend.manager.data.image.types import ImageStatus
@@ -13,6 +15,7 @@ from ...fixtures import (
     CONTAINER_REGISTRY_FIXTURE_DATA,
     CONTAINER_REGISTRY_FIXTURE_DICT,
     CONTAINER_REGISTRY_ROW_FIXTURE,
+    IMAGE_FIXTURE_DATA,
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
@@ -28,7 +31,12 @@ from ...test_utils import TestScenario
                 registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name,
                 project=CONTAINER_REGISTRY_ROW_FIXTURE.project,
             ),
-            ClearImagesActionResult(registry=CONTAINER_REGISTRY_FIXTURE_DATA),
+            ClearImagesActionResult(
+                registry=CONTAINER_REGISTRY_FIXTURE_DATA,
+                cleared_images=[
+                    dataclasses.replace(IMAGE_FIXTURE_DATA, status=ImageStatus.DELETED)
+                ],
+            ),
         ),
     ],
 )

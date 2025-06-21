@@ -668,7 +668,7 @@ class ImageRow(Base):
         return self.image_ref.canonical + f" ({self.image_ref.architecture})"
 
     def __repr__(self) -> str:
-        return self.__str__()
+        return f"ImageRow({self.image_ref.canonical!r}, {self.image_ref.architecture!r})"
 
     @property
     def resources(self) -> Resources:
