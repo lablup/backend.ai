@@ -113,6 +113,7 @@ class Service(BaseFunction):
         owner_access_key: Optional[str] = None,
         model_definition_path: Optional[str] = None,
         expose_to_public: bool = False,
+        runtime_variant: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Creates an inference service.
@@ -142,6 +143,7 @@ class Service(BaseFunction):
         :param model_definition_path: Relative path to model definition file. Defaults to `model-definition.yaml`.
         :param expose_to_public: Visibility of API Endpoint which serves inference workload.
             If set to true, no authentication will be required to access the endpoint.
+        :param runtime_variant: The runtime variant to use for the service.
 
         :returns: The :class:`ComputeSession` instance.
         """
@@ -201,6 +203,7 @@ class Service(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "owner_access_key": owner_access_key,
             "open_to_public": expose_to_public,
+            "runtime_variant": runtime_variant,
             "config": model_config,
         })
         async with rqst.fetch() as resp:
