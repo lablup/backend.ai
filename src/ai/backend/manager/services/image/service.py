@@ -197,6 +197,9 @@ class ImageService:
                 if not image_row.is_owned_by(action.user_id):
                     raise PurgeImageActionByIdGenericForbiddenError()
             try:
+                for alias in image_row.aliases:
+                    await db_session.delete(alias)
+
                 await db_session.delete(image_row)
             except sa.exc.DBAPIError as e:
                 raise PurgeImageActionByIdObjectDBError(e)
