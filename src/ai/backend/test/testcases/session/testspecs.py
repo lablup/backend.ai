@@ -15,6 +15,7 @@ from ai.backend.test.templates.session.session_template import (
     InteractiveSessionFromTemplateTemplate,
     SessionTemplateTemplate,
 )
+from ai.backend.test.templates.template import BasicTestTemplate, NopTestCode
 from ai.backend.test.testcases.session.commit import (
     InteractiveSessionCommitSuccess,
     InteractiveSessionImagifySuccess,
@@ -45,14 +46,15 @@ from ai.backend.test.testcases.session.rename_failure_duplicated_name import (
     SessionRenameFailureDuplicatedName,
 )
 from ai.backend.test.testcases.session.session_rename import TestSessionRename
+from ai.backend.test.testcases.session.session_status_history_retriever import (
+    SessionStatusHistoryRetriever,
+)
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import (
     BootstrapScriptDep,
     ClusterDep,
     CodeExecutionDep,
 )
-
-from ...templates.template import BasicTestTemplate, NopTestCode
 
 BATCH_SESSION_TEST_SPECS = {
     "creation_batch_session_success": TestSpec(
@@ -452,6 +454,33 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
         template=BasicTestTemplate(testcode=DependencyGraphRetriever()).with_wrappers(
             KeypairAuthTemplate, BatchSessionTemplate, DependentSessionTemplate
         ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ],
+        },
+    ),
+    "session_status_history": TestSpec(
+        name="session_status_history",
+        description=textwrap.dedent("""
+            Tests retrieval of session status history
+            Validate that the status history is not empty and contains valid statuses
+        """),
+        tags={TestTag.SESSION, TestTag.MANAGER},
+        template=BasicTestTemplate(
+            testcode=SessionStatusHistoryRetriever(),
+        ).with_wrappers(KeypairAuthTemplate, InteractiveSessionTemplate),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
                 ClusterDep(
