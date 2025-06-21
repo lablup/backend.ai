@@ -27,9 +27,9 @@ class DependentSessionTemplate(WrapperTestTemplate):
     async def _verify_session_creation(
         self, client_session: AsyncSession, session_name: str, dependencies: list[str]
     ) -> UUID:
-        image_cfg = ImageContext.current()
-        cluster_cfg = ClusterContext.current()
-        session_cfg = SessionContext.current()
+        image_dep = ImageContext.current()
+        cluster_dep = ClusterContext.current()
+        session_dep = SessionContext.current()
         timeout = SSEContext.current().timeout
 
         listener = asyncio.create_task(
@@ -45,12 +45,12 @@ class DependentSessionTemplate(WrapperTestTemplate):
         )
 
         created = await client_session.ComputeSession.get_or_create(
-            image_cfg.name,
-            resources=session_cfg.resources,
+            image_dep.name,
+            resources=session_dep.resources,
             type_="interactive",
             name=session_name,
-            cluster_mode=cluster_cfg.cluster_mode,
-            cluster_size=cluster_cfg.cluster_size,
+            cluster_mode=cluster_dep.cluster_mode,
+            cluster_size=cluster_dep.cluster_size,
             dependencies=dependencies,
         )
 
