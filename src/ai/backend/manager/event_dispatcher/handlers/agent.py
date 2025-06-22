@@ -183,7 +183,7 @@ class AgentEventHandler:
         )
         kernels_to_clean = self._filter_kernels_to_clean(event.active_kernels, kernel_should_alive)
 
-        log.info(
+        log.debug(
             "agent@{0} heartbeat: Detected {1} dangling containers, {2} dangling kernel registries",
             event.agent_id,
             len(containers_to_purge),
