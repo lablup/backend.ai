@@ -160,6 +160,8 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentStatusHeartbeat,
     ) -> None:
+        # Do not query Agent id from the event because Agent id can change
+        # during the lifetime of the agent, e.g. when it is restarted.
         all_kernel_ids: set[KernelId] = set([
             *(k.kernel_id for k in event.active_kernels),
             *(c.kernel_id for c in event.active_containers),
@@ -181,7 +183,8 @@ class AgentEventHandler:
         containers_to_purge = self._filter_containers_to_purge(
             active_container_ids, kernel_should_alive
         )
-        kernels_to_clean = self._filter_kernels_to_clean(event.active_kernels, kernel_should_alive)
+        active_kernel_ids = event.active_kernels
+        kernels_to_clean = self._filter_kernels_to_clean(active_kernel_ids, kernel_should_alive)
 
         log.debug(
             "agent@{0} heartbeat: Detected {1} dangling containers, {2} dangling kernel registries",
