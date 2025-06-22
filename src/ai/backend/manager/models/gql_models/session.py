@@ -75,18 +75,19 @@ from ..session import (
     SESSION_PRIORITY_MIN,
     QueryCondition,
     QueryOption,
-    RelatedFields,
     SessionDependencyRow,
     SessionQueryConditions,
     SessionRow,
     SessionStatus,
     SessionTypes,
-    and_domain_name,
-    and_raw_filter,
-    and_resource_group_name,
-    and_status,
+    by_domain_name,
+    by_raw_filter,
+    by_resource_group_name,
+    by_status,
     get_permission_ctx,
-    join_related_field,
+)
+from ..types import (
+    join_by_related_field,
     load_related_field,
 )
 from ..user import UserRole, UserRow
@@ -275,15 +276,15 @@ class ComputeSessionNode(graphene.ObjectType):
         cls, stmt: sa.sql.Select, is_count: bool = False
     ) -> sa.sql.Select:
         options = [
-            join_related_field(RelatedFields.USER),
-            join_related_field(RelatedFields.PROJECT),
+            join_by_related_field(SessionRow.user),
+            join_by_related_field(SessionRow.group),
         ]
         if not is_count:
             options = [
                 *options,
-                load_related_field(RelatedFields.KERNEL),
-                load_related_field(RelatedFields.USER, already_joined=True),
-                load_related_field(RelatedFields.PROJECT, already_joined=True),
+                load_related_field(SessionRow.kernel_load_option()),
+                load_related_field(SessionRow.user_load_option(already_joined=True)),
+                load_related_field(SessionRow.project_load_option(already_joined=True)),
             ]
         for option in options:
             stmt = option(stmt)
@@ -677,18 +678,18 @@ class TotalResourceSlot(graphene.ObjectType):
     ) -> Self:
         query_conditions: list[QueryCondition] = []
         if conditions.raw_filter is not None:
-            query_conditions.append(and_raw_filter(_queryfilter_fieldspec, conditions.raw_filter))
+            query_conditions.append(by_raw_filter(_queryfilter_fieldspec, conditions.raw_filter))
         if conditions.statuses is not None:
-            query_conditions.append(and_status(conditions.statuses))
+            query_conditions.append(by_status(conditions.statuses))
         if conditions.domain_name is not None:
-            query_conditions.append(and_domain_name(conditions.domain_name))
+            query_conditions.append(by_domain_name(conditions.domain_name))
         if conditions.resource_group_name is not None:
-            query_conditions.append(and_resource_group_name(conditions.resource_group_name))
+            query_conditions.append(by_resource_group_name(conditions.resource_group_name))
 
         query_options: list[QueryOption] = [
-            load_related_field(RelatedFields.KERNEL),
-            join_related_field(RelatedFields.USER),
-            join_related_field(RelatedFields.PROJECT),
+            load_related_field(SessionRow.kernel_load_option()),
+            join_by_related_field(SessionRow.user),
+            join_by_related_field(SessionRow.group),
         ]
 
         session_rows = await SessionRow.list_session_by_condition(

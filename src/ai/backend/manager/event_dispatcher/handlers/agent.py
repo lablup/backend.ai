@@ -164,10 +164,6 @@ class AgentEventHandler:
         all_kernel_ids: set[KernelId] = {k.kernel_id for k in event.active_kernels} | {
             c.kernel_id for c in event.active_containers
         }
-        kernel_condition = by_kernel_ids(
-            all_kernel_ids,
-            ConditionMerger.AND,
-        )
         kernel_rows = await KernelRow.get_kernels(
             [by_kernel_ids(all_kernel_ids)],
             db=self._db,
