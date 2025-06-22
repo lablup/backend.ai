@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Optional, Self, TypeAlias, cast, override
 
@@ -34,6 +34,7 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
+from .types import QueryCondition
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 __all__: Sequence[str] = (
@@ -116,14 +117,11 @@ class AgentRow(Base):
 
     @classmethod
     async def get_agents_by_condition(
-        cls, conditions: Iterable[QueryCondition], *, db: ExtendedAsyncSAEngine
+        cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
     ) -> list[Self]:
         query_stmt = sa.select(AgentRow)
-        condition: Optional[sa.sql.expression.BinaryExpression] = None
-        for cond_callable in conditions:
-            condition = cond_callable(condition)
-        if condition is not None:
-            query_stmt = query_stmt.where(condition)
+        for cond in conditions:
+            query_stmt = cond(query_stmt)
 
         async def fetch(db_session: SASession) -> list[AgentRow]:
             return (await db_session.scalars(query_stmt)).all()
@@ -137,76 +135,44 @@ class AgentRow(Base):
     ) -> list[Self]:
         return await cls.get_agents_by_condition(
             [
-                by_scaling_group(sgroup_name, ConditionMerger.AND),
-                by_schedulable(True, ConditionMerger.AND),
-                by_status(AgentStatus.ALIVE, ConditionMerger.AND),
+                by_scaling_group(sgroup_name),
+                by_schedulable(True),
+                by_status(AgentStatus.ALIVE),
             ],
             db=db,
         )
 
 
-type QueryConditionCallable = Callable[
-    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
-]
-type QueryCondition = Callable[..., QueryConditionCallable]
-
-
-class ConditionMerger(enum.Enum):
-    AND = "AND"
-    OR = "OR"
-
-
-_COND_SQL_OPERATOR_MAP: Mapping[ConditionMerger, Callable] = {
-    ConditionMerger.AND: sa.and_,
-    ConditionMerger.OR: sa.or_,
-}
-
-
-def _append_condition(
-    condition: Optional[sa.sql.expression.BinaryExpression],
-    new_condition: sa.sql.expression.BinaryExpression,
-    operator: ConditionMerger,
-) -> sa.sql.expression.BinaryExpression:
-    return (
-        _COND_SQL_OPERATOR_MAP[operator](condition, new_condition)
-        if condition is not None
-        else new_condition
-    )
-
-
 def by_scaling_group(
     scaling_group: str,
-    operator: ConditionMerger,
 ) -> QueryCondition:
     def _by_scaling_group(
-        condition: Optional[sa.sql.expression.BinaryExpression],
+        query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, AgentRow.scaling_group == scaling_group, operator)
+        return query_stmt.where(AgentRow.scaling_group == scaling_group)
 
     return _by_scaling_group
 
 
 def by_status(
     status: AgentStatus,
-    operator: ConditionMerger,
 ) -> QueryCondition:
     def _by_status(
-        condition: Optional[sa.sql.expression.BinaryExpression],
+        query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
-        return _append_condition(condition, AgentRow.status == status, operator)
+        return query_stmt.where(AgentRow.status == status)
 
     return _by_status
 
 
 def by_schedulable(
     schedulable: bool,
-    operator: ConditionMerger,
 ) -> QueryCondition:
     def _by_schedulable(
-        condition: Optional[sa.sql.expression.BinaryExpression],
+        query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
         schedulable_ = true() if schedulable else false()
-        return _append_condition(condition, AgentRow.schedulable == schedulable_, operator)
+        return query_stmt.where(AgentRow.schedulable == schedulable_)
 
     return _by_schedulable
 
