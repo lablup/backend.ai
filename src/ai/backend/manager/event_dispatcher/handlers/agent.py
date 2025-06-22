@@ -162,10 +162,9 @@ class AgentEventHandler:
     ) -> None:
         # Do not query Agent id from the event because Agent id can change
         # during the lifetime of the agent, e.g. when it is restarted.
-        all_kernel_ids: set[KernelId] = set([
-            *(k.kernel_id for k in event.active_kernels),
-            *(c.kernel_id for c in event.active_containers),
-        ])
+        all_kernel_ids: set[KernelId] = {k.kernel_id for k in event.active_kernels} | {
+            c.kernel_id for c in event.active_containers
+        }
         kernel_condition = by_kernel_ids(
             all_kernel_ids,
             ConditionMerger.AND,
