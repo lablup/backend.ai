@@ -34,7 +34,6 @@ from .exceptions import ObjectNotFound
 from .types import (
     QueryCondition,
     QueryOption,
-    QuerySingleCondition,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
@@ -222,7 +221,7 @@ class UserRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        condition: QueryCondition,
+        conditions: Sequence[QueryCondition],
         options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
@@ -238,7 +237,9 @@ class UserRow(Base):
         Raises:
             EmptySQLCondition: If condition is empty.
         """
-        query_stmt = sa.select(UserRow).where(condition.final_sql_condition)
+        query_stmt = sa.select(UserRow)
+        for cond in conditions:
+            query_stmt = cond(query_stmt)
 
         for option in options:
             query_stmt = option(query_stmt)
@@ -271,7 +272,7 @@ class UserRow(Base):
             ObjectNotFound: If user not found.
         """
         rows = await cls.query_by_condition(
-            QueryCondition.single(by_user_uuid(user_uuid)),
+            [by_user_uuid(user_uuid)],
             [
                 load_related_field(cls.load_keypairs),
                 load_related_field(cls.load_main_keypair),
@@ -332,20 +333,35 @@ class UserRow(Base):
 
 def by_user_uuid(
     user_uuid: UUID,
-) -> QuerySingleCondition:
-    return UserRow.uuid == user_uuid
+) -> QueryCondition:
+    def _by_user_uuid(
+        query_stmt: sa.sql.Select,
+    ) -> sa.sql.Select:
+        return query_stmt.where(UserRow.uuid == user_uuid)
+
+    return _by_user_uuid
 
 
 def by_username(
     username: str,
-) -> QuerySingleCondition:
-    return UserRow.username == username
+) -> QueryCondition:
+    def _by_username(
+        query_stmt: sa.sql.Select,
+    ) -> sa.sql.Select:
+        return query_stmt.where(UserRow.username == username)
+
+    return _by_username
 
 
 def by_user_email(
     email: str,
-) -> QuerySingleCondition:
-    return UserRow.email == email
+) -> QueryCondition:
+    def _by_email(
+        query_stmt: sa.sql.Select,
+    ) -> sa.sql.Select:
+        return query_stmt.where(UserRow.email == email)
+
+    return _by_email
 
 
 def _hash_password(password: str) -> str:
