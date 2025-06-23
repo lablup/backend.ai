@@ -2882,7 +2882,7 @@ input PurgeImageOptions {
 }
 
 """
-Deprecated since 25.10.0. Use `purge_image_by_id`, and `remove_from_registry` option instead.
+Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
 """
 type UntagImageFromRegistry {
   ok: Boolean
