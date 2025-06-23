@@ -984,15 +984,11 @@ class AbstractAgent(
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
         try:
-            container_ids = []
-            async with self.registry_lock:
-                for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if (
-                        not kernel_obj.stats_enabled
-                        or kernel_obj.state != KernelLifecycleStatus.RUNNING
-                    ):
-                        continue
-                    container_ids.append(kernel_obj["container_id"])
+            container_ids: list[ContainerId] = []
+            for kernel_obj in [*self.kernel_registry.values()]:
+                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
+                    continue
+                container_ids.append(ContainerId(kernel_obj.container_id))
                 await self.stat_ctx.collect_container_stat(container_ids)
         except asyncio.CancelledError:
             pass
@@ -1004,18 +1000,12 @@ class AbstractAgent(
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting process statistics in container")
         try:
-            updated_kernel_ids = []
             container_ids = []
-            async with self.registry_lock:
-                for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
-                    if (
-                        not kernel_obj.stats_enabled
-                        or kernel_obj.state != KernelLifecycleStatus.RUNNING
-                    ):
-                        continue
-                    updated_kernel_ids.append(kernel_id)
-                    container_ids.append(kernel_obj["container_id"])
-                await self.stat_ctx.collect_per_container_process_stat(container_ids)
+            for kernel_obj in [*self.kernel_registry.values()]:
+                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
+                    continue
+                container_ids.append(ContainerId(kernel_obj.container_id))
+            await self.stat_ctx.collect_per_container_process_stat(container_ids)
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1035,7 +1025,6 @@ class AbstractAgent(
         async with self.registry_lock:
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
-                kernel_obj.stats_enabled = True
                 kernel_obj.state = KernelLifecycleStatus.RUNNING
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1067,7 +1056,6 @@ class AbstractAgent(
                         return
                 else:
                     kernel_obj.state = KernelLifecycleStatus.TERMINATING
-                    kernel_obj.stats_enabled = False
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()

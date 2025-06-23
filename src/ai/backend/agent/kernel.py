@@ -177,7 +177,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     last_used: float
     termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
-    stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     status: KernelLifecycleStatus
@@ -212,8 +211,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.last_used = time.monotonic()
         self.termination_reason = None
         self.clean_event = None
-        self.stats_enabled = False
-        self._tasks = set()
         self.environ = environ
         self.runner = None
         self.container_id = None
@@ -241,6 +238,17 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
+        if "ownership_data" not in props:
+            props["ownership_data"] = KernelOwnershipData(
+                props["kernel_id"],
+                props["session_id"],
+                props["agent_id"],
+            )
+        if "session_type" not in props:
+            props["session_type"] = SessionTypes.INTERACTIVE
+        if "stats_enabled" in props:
+            # stats_enabled is a property, not an attribute.
+            del props["stats_enabled"]
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
@@ -267,6 +275,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         """
         for accel_key, accel_alloc in self.resource_spec.allocations.items():
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
+
+    @property
+    def stats_enabled(self) -> bool:
+        """
+        Returns True if the kernel supports statistics gathering.
+        """
+        return self.state == KernelLifecycleStatus.RUNNING
 
     @abstractmethod
     async def create_code_runner(
