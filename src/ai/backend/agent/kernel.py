@@ -238,14 +238,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
-        if "ownership_data" not in props:
-            props["ownership_data"] = KernelOwnershipData(
-                props["kernel_id"],
-                props["session_id"],
-                props["agent_id"],
-            )
-        if "session_type" not in props:
-            props["session_type"] = SessionTypes.INTERACTIVE
         if "stats_enabled" in props:
             # stats_enabled is a property, not an attribute.
             del props["stats_enabled"]
