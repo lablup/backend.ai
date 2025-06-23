@@ -1,4 +1,5 @@
 import uuid
+from http import HTTPStatus
 from typing import Optional, Protocol
 
 from ai.backend.common.api_handlers import (
@@ -86,7 +87,7 @@ class VFolderHandler:
             )
 
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=VFolderCreateResponse(item=created_vfolder.to_field()),
         )
 
@@ -102,7 +103,7 @@ class VFolderHandler:
         )
 
         return APIResponse.build(
-            status_code=200,
+            status_code=HTTPStatus.OK,
             response_model=VFolderListResponse(
                 items=[vfolder.to_field() for vfolder in vfolder_list]
             ),
@@ -127,7 +128,7 @@ class VFolderHandler:
             vfolder_id=vfolder_id,
             new_name=new_name,
         )
-        return APIResponse.no_content(status_code=201)
+        return APIResponse.no_content(status_code=HTTPStatus.CREATED)
 
     @api_handler
     async def delete_vfolder(
@@ -145,4 +146,4 @@ class VFolderHandler:
             keypair=keypair,
             vfolder_id=parsed_path.vfolder_id,
         )
-        return APIResponse.no_content(status_code=204)
+        return APIResponse.no_content(status_code=HTTPStatus.NO_CONTENT)

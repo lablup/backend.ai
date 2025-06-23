@@ -1,5 +1,7 @@
 import asyncio
 import enum
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
 
@@ -7,8 +9,16 @@ import attrs
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.common.events import KernelLifecycleEventReason
-from ai.backend.common.types import ContainerId, KernelId, MountTypes, SessionId
+from ai.backend.common.docker import LabelName
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
+from ai.backend.common.types import (
+    AgentId,
+    ContainerId,
+    ContainerStatus,
+    KernelId,
+    MountTypes,
+    SessionId,
+)
 
 
 class AgentBackend(enum.StrEnum):
@@ -45,15 +55,6 @@ class AgentEventData:
     data: dict[str, Any]
 
 
-class ContainerStatus(enum.StrEnum):
-    RUNNING = "running"
-    RESTARTING = "restarting"
-    PAUSED = "paused"
-    EXITED = "exited"
-    DEAD = "dead"
-    REMOVING = "removing"
-
-
 @attrs.define(auto_attribs=True, slots=True)
 class Container:
     id: ContainerId
@@ -62,6 +63,24 @@ class Container:
     labels: Mapping[str, str]
     ports: Sequence[Port]
     backend_obj: Any  # used to keep the backend-specific data
+
+    @property
+    def human_readable_id(self) -> str:
+        """
+        Returns a human-readable version of the container ID.
+        This is useful for logging and debugging purposes.
+        """
+        return str(self.id)[:12]
+
+    @property
+    def kernel_id(self) -> KernelId:
+        raw_kernel_id = self.labels[LabelName.KERNEL_ID]
+        return KernelId(uuid.UUID(raw_kernel_id))
+
+    @property
+    def session_id(self) -> SessionId:
+        raw_session_id = self.labels[LabelName.SESSION_ID]
+        return SessionId(uuid.UUID(raw_session_id))
 
 
 class KernelLifecycleStatus(enum.StrEnum):
@@ -107,6 +126,30 @@ class ContainerLifecycleEvent:
             f"c:{cid}, "
             f"reason:{self.reason!r})"
         )
+
+
+@dataclass
+class KernelOwnershipData:
+    kernel_id: KernelId
+    session_id: SessionId
+    agent_id: AgentId
+    owner_user_id: Optional[uuid.UUID] = None
+    owner_project_id: Optional[uuid.UUID] = None
+
+    def __post_init__(self):
+        def to_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
+            return uuid.UUID(value) if value is not None else None
+
+        self.owner_user_id = to_uuid(self.owner_user_id)
+        self.owner_project_id = to_uuid(self.owner_project_id)
+
+    @property
+    def owner_user_id_to_str(self) -> Optional[str]:
+        return str(self.owner_user_id) if self.owner_user_id is not None else None
+
+    @property
+    def owner_project_id_to_str(self) -> Optional[str]:
+        return str(self.owner_project_id) if self.owner_project_id is not None else None
 
 
 WebMiddleware = Callable[

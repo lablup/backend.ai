@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Mapping, Optional, override
 
-from ai.backend.common.events import AgentErrorEvent
+from ai.backend.common.events.dispatcher import AbstractEvent
+from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent
+from ai.backend.common.plugin.event import AbstractEventDispatcherPlugin
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
@@ -30,13 +32,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         else:
             self.enabled = True
         root_ctx: RootContext = context["_root.context"]  # type: ignore
-        self.event_dispatcher = root_ctx.event_dispatcher
-        self._evh = self.event_dispatcher.consume(AgentErrorEvent, None, self.handle_agent_error)
         self.db = root_ctx.db
-
-    async def cleanup(self) -> None:
-        if self.enabled:
-            self.event_dispatcher.unconsume(self._evh)
 
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
@@ -91,15 +87,36 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
             message,
         )
 
-    async def handle_agent_error(
+
+class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
+    async def init(self, context: Optional[Any] = None) -> None:
+        if context is None:
+            log.warning(
+                "manager.plugin.error_event_dispatcher is initialized without the root context. "
+                "The plugin is disabled.",
+            )
+            self.enabled = False
+            return
+        else:
+            self.enabled = True
+        root_ctx: RootContext = context
+        self._db = root_ctx.db
+
+    @override
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        pass
+
+    @override
+    async def handle_event(
         self,
-        context: None,
         source: AgentId,
-        event: AgentErrorEvent,
+        event: AbstractEvent,
     ) -> None:
+        if not isinstance(event, AgentErrorEvent):
+            return
         if not self.enabled:
             return
-        async with self.db.begin() as conn:
+        async with self._db.begin() as conn:
             query = error_logs.insert().values({
                 "severity": event.severity.value.lower(),
                 "source": source,

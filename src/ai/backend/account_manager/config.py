@@ -47,7 +47,7 @@ class TransactionIsolationLevel(enum.StrEnum):
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(
-        populate_by_name=True,
+        validate_by_name=True,
         from_attributes=True,
         use_enum_values=True,
         extra="allow",
@@ -292,6 +292,13 @@ class AccountManagerConfig(BaseSchema):
         Field(
             description="Address of account-manager service.",
             examples=[HostPortPair(host="127.0.0.1", port=8099)],
+        ),
+    ]
+    internal_addr: Annotated[
+        HostPortPair,
+        Field(
+            description="Address of account-manager internal service for internal infra communication.",
+            examples=[HostPortPair(host="127.0.0.1", port=18098)],
         ),
     ]
     ipc_base_path: Annotated[

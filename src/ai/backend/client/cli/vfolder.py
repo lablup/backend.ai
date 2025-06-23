@@ -19,6 +19,7 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.func.vfolder import _default_list_fields
 from ai.backend.client.session import Session
+from ai.backend.common.bgtask.types import BgtaskStatus
 
 from ..compat import asyncio_run
 from ..session import AsyncSession
@@ -585,13 +586,13 @@ def ls(name, path):
             if "error_msg" in result and result["error_msg"]:
                 print_fail(result["error_msg"])
                 return
-            files = json.loads(result["files"])
+            files = result["items"]
             table = []
             headers = ["file name", "size", "modified", "mode"]
             for file in files:
-                mdt = datetime.fromtimestamp(file["mtime"])
+                mdt = datetime.fromisoformat(file["modified"])
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
-                row = [file["filename"], file["size"], mtime, file["mode"]]
+                row = [file["name"], file["size"], mtime, file["mode"]]
                 table.append(row)
             print_done("Retrieved.")
             print(tabulate(table, headers=headers))
@@ -651,7 +652,11 @@ def invitations():
                     perm = "read-only"
                 else:
                     perm = inv["perm"]
-                print("[{}] {}, {}, {}".format(cnt + 1, inv["inviter"], inv["vfolder_id"], perm))
+                print(
+                    "[{}] {}, {}, {}".format(
+                        cnt + 1, inv["inviter_user_email"], inv["vfolder_id"], perm
+                    )
+                )
 
             selection = input("Choose invitation number to manage: ")
             if selection.isdigit():
@@ -839,31 +844,32 @@ def clone(name, target_name, target_host, usage_mode, permission):
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
-                        if ev.event == "bgtask_updated":
-                            if viewer.tqdm is None:
-                                pbar = await viewer.to_tqdm()
-                            else:
-                                pbar.total = data["total_progress"]
-                                pbar.write(data["message"])
-                                pbar.update(data["current_progress"] - pbar.n)
-                        elif ev.event == "bgtask_failed":
-                            error_msg = data["message"]
-                            completion_msg_func = lambda: print_fail(
-                                f"Error during the operation: {error_msg}",
-                            )
-                        elif ev.event == "bgtask_cancelled":
-                            completion_msg_func = lambda: print_warn(
-                                "The operation has been cancelled in the middle. "
-                                "(This may be due to server shutdown.)",
-                            )
-                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            issues = data.get("issues")
-                            if issues:
-                                for issue in issues:
-                                    print_fail(f"Issue reported: {issue}")
-                                completion_msg_func = lambda: print_warn(
-                                    f"Task finished with {len(issues)} issues."
+                        match ev.event:
+                            case BgtaskStatus.UPDATED:
+                                if viewer.tqdm is None:
+                                    pbar = await viewer.to_tqdm()
+                                else:
+                                    pbar.total = data["total_progress"]
+                                    pbar.write(data["message"])
+                                    pbar.update(data["current_progress"] - pbar.n)
+                            case BgtaskStatus.FAILED:
+                                error_msg = data["message"]
+                                completion_msg_func = lambda: print_fail(
+                                    f"Error during the operation: {error_msg}",
                                 )
+                            case BgtaskStatus.CANCELLED:
+                                completion_msg_func = lambda: print_warn(
+                                    "The operation has been cancelled in the middle. "
+                                    "(This may be due to server shutdown.)",
+                                )
+                            case BgtaskStatus.PARTIAL_SUCCESS | BgtaskStatus.DONE:
+                                errors = data.get("errors")
+                                if errors:
+                                    for error in errors:
+                                        print_fail(f"Error reported: {error}")
+                                    completion_msg_func = lambda: print_warn(
+                                        f"Task finished with {len(errors)} issues."
+                                    )
             finally:
                 completion_msg_func()
 

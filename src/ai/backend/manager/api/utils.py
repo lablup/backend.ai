@@ -38,21 +38,23 @@ import trafaret as t
 import yaml
 from aiohttp import web
 from aiohttp.typedefs import Handler
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.json import load_json
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import UserRole, users
-from ..utils import (
-    check_if_requester_is_eligible_to_act_as_target_access_key,
-    check_if_requester_is_eligible_to_act_as_target_user_uuid,
-)
-from .exceptions import (
+from ..errors.exceptions import (
     DeprecatedAPI,
     GenericForbidden,
     InvalidAPIParameters,
     NotImplementedAPI,
+)
+from ..models import UserRole, users
+from ..utils import (
+    check_if_requester_is_eligible_to_act_as_target_access_key,
+    check_if_requester_is_eligible_to_act_as_target_user_uuid,
 )
 
 if TYPE_CHECKING:
@@ -216,13 +218,16 @@ def check_api_params(
     return wrap
 
 
-class BaseResponseModel(BaseModel):
+LegacyBaseRequestModel: TypeAlias = BaseRequestModel
+
+
+class LegacyBaseResponseModel(BaseResponseModel):
     status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
-TParamModel = TypeVar("TParamModel", bound=BaseModel, contravariant=True)
-TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseModel, covariant=True)
+TParamModel = TypeVar("TParamModel", bound=LegacyBaseRequestModel, contravariant=True)
+TQueryModel = TypeVar("TQueryModel", bound=LegacyBaseRequestModel)
+TResponseModel = TypeVar("TResponseModel", bound=LegacyBaseResponseModel, covariant=True)
 
 TPydanticResponse: TypeAlias = TResponseModel | list[TResponseModel]
 
@@ -247,19 +252,22 @@ class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
 
 
 def ensure_stream_response_type(
-    response: BaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
+    response: LegacyBaseResponseModel
+    | BaseResponseModel
+    | list[TResponseModel]
+    | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
-        case BaseResponseModel(status=status):
+        case LegacyBaseResponseModel(status=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
-        case BaseModel():
+        case BaseResponseModel():
             return web.json_response(response.model_dump(mode="json"))
         case list():
             return web.json_response(TypeAdapter(type(response)).dump_python(response, mode="json"))
         case web.StreamResponse():
             return response
         case _:
-            raise RuntimeError(f"Unsupported response type ({type(response)})")
+            raise RuntimeError(f"Unsupported response type ({type(response).__mro__})")
 
 
 def pydantic_response_api_handler(
@@ -328,7 +336,7 @@ def pydantic_params_api_handler(
                 ]
                 msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
                 # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
-                raise InvalidAPIParameters(msg, extra_data=json.loads(ex.json()))
+                raise InvalidAPIParameters(msg, extra_data=load_json(ex.json()))
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

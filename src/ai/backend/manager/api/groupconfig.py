@@ -11,6 +11,14 @@ from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors.exceptions import (
+    DotfileAlreadyExists,
+    DotfileCreationFailed,
+    DotfileNotFound,
+    GenericForbidden,
+    GroupNotFound,
+    InvalidAPIParameters,
+)
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
     groups,
@@ -20,14 +28,6 @@ from ..models import (
 )
 from ..models import association_groups_users as agus
 from .auth import admin_required, auth_required
-from .exceptions import (
-    DotfileAlreadyExists,
-    DotfileCreationFailed,
-    DotfileNotFound,
-    GenericForbidden,
-    GroupNotFound,
-    InvalidAPIParameters,
-)
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params

@@ -9,11 +9,11 @@ import enum
 import logging
 import sys
 import time
+import uuid
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Callable,
-    Dict,
     FrozenSet,
     List,
     Mapping,
@@ -34,19 +34,30 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.types import (
     PID,
+    AgentId,
     ContainerId,
     DeviceId,
     KernelId,
     MetricKey,
     MetricValue,
     MovingStatValue,
+    SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .metrics.metric import UtilizationMetricObserver
+from .metrics.types import (
+    CAPACITY_METRIC_KEY,
+    CURRENT_METRIC_KEY,
+    PCT_METRIC_KEY,
+    FlattenedDeviceMetric,
+    FlattenedKernelMetric,
+)
 from .utils import remove_exponent
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
+    from .kernel import AbstractKernel
 
 __all__ = (
     "StatContext",
@@ -253,7 +264,7 @@ class MovingStatistics:
 
 @attrs.define(auto_attribs=True, slots=True)
 class Metric:
-    key: str
+    key: str  # MetricKey
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
@@ -305,6 +316,7 @@ class StatContext:
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
     kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
+    _utilization_metric_observer: UtilizationMetricObserver
 
     def __init__(
         self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
@@ -320,6 +332,7 @@ class StatContext:
 
         self._lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
+        self._utilization_metric_observer = UtilizationMetricObserver.instance()
 
     def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
         """
@@ -336,6 +349,43 @@ class StatContext:
         if last is None:
             return now, 0.0
         return now, now - last
+
+    def _get_ownership_info_from_kernel(
+        self,
+        kernel_id: KernelId,
+    ) -> tuple[Optional[SessionId], Optional[uuid.UUID], Optional[uuid.UUID]]:
+        kernel_obj = self.agent.kernel_registry.get(kernel_id)
+        if kernel_obj is not None:
+            ownership_data = kernel_obj.ownership_data
+            session_id = ownership_data.session_id
+            owner_user_id = ownership_data.owner_user_id
+            owner_project_id = ownership_data.owner_project_id
+        else:
+            session_id = None
+            owner_user_id = None
+            owner_project_id = None
+        return session_id, owner_user_id, owner_project_id
+
+    def observe_node_metric(
+        self,
+        device_id: DeviceId,
+        metric_key: MetricKey,
+        measure: Measurement,
+    ) -> None:
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        value_pairs = [
+            (CURRENT_METRIC_KEY, str(measure.value)),
+        ]
+        if measure.capacity is not None:
+            value_pairs.append((CAPACITY_METRIC_KEY, str(measure.capacity)))
+        self._utilization_metric_observer.observe_device_metric(
+            metric=FlattenedDeviceMetric(
+                agent_id=agent_id,
+                device_id=device_id,
+                key=metric_key,
+                value_pairs=value_pairs,
+            )
+        )
 
     async def collect_node_stat(self) -> None:
         """
@@ -373,6 +423,11 @@ class StatContext:
                         self.node_metrics[metric_key].update(node_measure.per_node)
                     # update per-device metric
                     for dev_id, measure in node_measure.per_device.items():
+                        self.observe_node_metric(
+                            device_id=dev_id,
+                            metric_key=metric_key,
+                            measure=measure,
+                        )
                         if metric_key not in self.device_metrics:
                             self.device_metrics[metric_key] = {}
                         if dev_id not in self.device_metrics[metric_key]:
@@ -388,16 +443,34 @@ class StatContext:
                             )
                         else:
                             self.device_metrics[metric_key][dev_id].update(measure)
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        device_metrics: dict[MetricKey, dict[DeviceId, MetricValue]] = {}
+        flattened_metrics: list[FlattenedDeviceMetric] = []
+        for metric_key, per_device in self.device_metrics.items():
+            if metric_key not in device_metrics:
+                device_metrics[metric_key] = {}
+            for device_id, obj in per_device.items():
+                metric_value = obj.to_serializable_dict()
+                device_metrics[metric_key][device_id] = metric_value
+                value_pairs = [
+                    (CURRENT_METRIC_KEY, metric_value["current"]),
+                    (PCT_METRIC_KEY, metric_value["pct"]),
+                ]
+                if (capacity := metric_value["capacity"]) is not None:
+                    value_pairs.append((CAPACITY_METRIC_KEY, capacity))
+                flattened_metrics.append(
+                    FlattenedDeviceMetric(
+                        agent_id,
+                        device_id,
+                        metric_key,
+                        value_pairs,
+                    )
+                )
 
         # push to the Redis server
         redis_agent_updates = {
             "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
-            "devices": {
-                metric_key: {
-                    str(dev_id): obj.to_serializable_dict() for dev_id, obj in per_device.items()
-                }
-                for metric_key, per_device in self.device_metrics.items()
-            },
+            "devices": device_metrics,
         }
         if self.agent.local_config["debug"]["log-stats"]:
             log.debug(
@@ -415,6 +488,31 @@ class StatContext:
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
 
+    def observe_container_metric(
+        self,
+        kernel_id: KernelId,
+        metric_key: MetricKey,
+        measure: Measurement,
+    ) -> None:
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        value_pairs = [
+            (CURRENT_METRIC_KEY, str(measure.value)),
+        ]
+        if measure.capacity is not None:
+            value_pairs.append((CAPACITY_METRIC_KEY, str(measure.capacity)))
+        self._utilization_metric_observer.observe_container_metric(
+            metric=FlattenedKernelMetric(
+                agent_id=agent_id,
+                kernel_id=kernel_id,
+                session_id=session_id,
+                owner_user_id=owner_user_id,
+                project_id=project_id,
+                key=metric_key,
+                value_pairs=value_pairs,
+            )
+        )
+
     async def collect_container_stat(
         self,
         container_ids: Sequence[ContainerId],
@@ -425,7 +523,8 @@ class StatContext:
         Intended to be used by the agent and triggered by container cgroup synchronization processes.
         """
         async with self._lock:
-            kernel_id_map: Dict[ContainerId, KernelId] = {}
+            kernel_id_map: dict[ContainerId, KernelId] = {}
+            kernel_obj_map: dict[KernelId, AbstractKernel] = {}
             for kid, info in self.agent.kernel_registry.items():
                 try:
                     cid = info["container_id"]
@@ -433,6 +532,7 @@ class StatContext:
                     log.warning("collect_container_stat(): no container for kernel {}", kid)
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
+                    kernel_obj_map[kid] = info
             unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
             for unused_kernel_id in unused_kernel_ids:
                 log.debug("removing kernel_metric for {}", unused_kernel_id)
@@ -467,6 +567,11 @@ class StatContext:
                             kernel_id = kernel_id_map[ContainerId(cid)]
                         except KeyError:
                             continue
+                        self.observe_container_metric(
+                            kernel_id,
+                            metric_key,
+                            measure,
+                        )
                         updated_kernel_ids.add(kernel_id)
                         if kernel_id not in self.kernel_metrics:
                             self.kernel_metrics[kernel_id] = {}
@@ -484,20 +589,72 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
+        kernel_updates: list[FlattenedKernelMetric] = []
+        kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        for kernel_id in updated_kernel_ids:
+            session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+            metrics = self.kernel_metrics[kernel_id]
+            serializable_metrics: dict[MetricKey, MetricValue] = {}
+            for key, obj in metrics.items():
+                metric_value = obj.to_serializable_dict()
+                serializable_metrics[key] = metric_value
+                value_pairs = [
+                    (CURRENT_METRIC_KEY, metric_value["current"]),
+                    (PCT_METRIC_KEY, metric_value["pct"]),
+                ]
+                if (capacity := metric_value["capacity"]) is not None:
+                    value_pairs.append((CAPACITY_METRIC_KEY, capacity))
+                kernel_updates.append(
+                    FlattenedKernelMetric(
+                        agent_id,
+                        kernel_id,
+                        session_id,
+                        owner_user_id,
+                        project_id,
+                        key,
+                        value_pairs,
+                    )
+                )
+            if self.agent.local_config["debug"]["log-stats"]:
+                log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
+
+            kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
+
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
-            for kernel_id in updated_kernel_ids:
-                metrics = self.kernel_metrics[kernel_id]
-                serializable_metrics = {
-                    str(key): obj.to_serializable_dict() for key, obj in metrics.items()
-                }
-                if self.agent.local_config["debug"]["log-stats"]:
-                    log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
-                serialized_metrics = msgpack.packb(serializable_metrics)
-                pipe.set(str(kernel_id), serialized_metrics)
+            for kernel_id, update in kernel_serialized_updates:
+                pipe.set(str(kernel_id), update)
             return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
+
+    async def _get_processes(
+        self, container_id: ContainerId, docker: aiodocker.Docker
+    ) -> list[PID]:
+        """
+        Get the list of PIDs for the given container ID.
+        """
+        return_val: list[PID] = []
+        try:
+            result = await docker._query_json(f"containers/{container_id}/top", method="GET")
+            procs = result["Processes"]
+        except (KeyError, aiodocker.exceptions.DockerError):
+            log.debug(
+                "collect_per_container_process_stat(): cannot find container {}", container_id
+            )
+            return return_val
+
+        for proc in procs:
+            try:
+                return_val.append(PID(int(proc[1])))
+            except (ValueError, KeyError):
+                log.debug(
+                    "collect_per_container_process_stat(): cannot parse PID from {}",
+                    proc,
+                )
+                continue
+        return return_val
 
     async def collect_per_container_process_stat(
         self,
@@ -513,26 +670,25 @@ class StatContext:
             return
 
         async with self._lock:
-            pid_map = {}
-            pids = []
+            pid_map: dict[PID, ContainerId] = {}
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
-                    try:
-                        result = await docker._query_json(f"containers/{cid}/top", method="GET")
-                        procs = result["Processes"]
-                        pids = [PID(int(proc[1])) for proc in procs]
-                        unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
-                    except (KeyError, aiodocker.exceptions.DockerError):
-                        log.debug(
-                            "collect_per_container_process_stat(): cannot found container {}", cid
-                        )
-                    else:
-                        for unused_pid in unused_pids:
-                            log.debug("removing pid_metric for {}: {}", cid, unused_pid)
-                            self.process_metrics[cid].pop(unused_pid, None)
-                    for pid in pids:
-                        pid_map[pid] = cid
-
+                    active_pids = await self._get_processes(cid, docker)
+                    if cid in self.process_metrics:
+                        unused_pids = set(self.process_metrics[cid].keys()) - set(active_pids)
+                        if unused_pids:
+                            log.debug(
+                                "removing pid_metric for {}: {}",
+                                cid,
+                                ", ".join([str(p) for p in unused_pids]),
+                            )
+                            self.process_metrics[cid] = {
+                                pid_: metric
+                                for pid_, metric in self.process_metrics[cid].items()
+                                if pid_ in active_pids
+                            }
+                    for pid_ in active_pids:
+                        pid_map[pid_] = cid
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.

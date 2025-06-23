@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
-from enum import Enum
+from datetime import datetime, tzinfo
+from enum import StrEnum
 from typing import Any, Mapping, Optional, Sequence
 from uuid import UUID
 
 import attrs
 import msgpack
 import sqlalchemy as sa
-from dateutil.tz.tz import tzfile
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.orm import joinedload, load_only
@@ -33,7 +32,7 @@ __all__: Sequence[str] = (
 )
 
 
-class ResourceGroupUnit(str, Enum):
+class ResourceGroupUnit(StrEnum):
     KERNEL = "kernel"
     SESSION = "session"
     PROJECT = "project"
@@ -492,7 +491,7 @@ def parse_resource_usage(
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
     redis_stat: RedisConnectionInfo,
-    local_tz: tzfile,
+    local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
     stat_map = {k.id: k.last_stat for k in kernels}
     stat_empty_kerns = [k.id for k in kernels if not k.last_stat]
@@ -523,8 +522,8 @@ async def parse_resource_usage_groups(
             user_id=kern.session.user_uuid,
             user_email=kern.session.user.email,
             access_key=kern.session.access_key,
-            project_id=kern.session.group.id,
-            project_name=kern.session.group.name,
+            project_id=kern.session.group.id if kern.session.group is not None else None,
+            project_name=kern.session.group.name if kern.session.group is not None else None,
             kernel_id=kern.id,
             container_ids={kern.container_id},
             session_id=kern.session_id,

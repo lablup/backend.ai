@@ -27,6 +27,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .affinity_map import AffinityHint, AffinityPolicy
 from .exception import (
+    FractionalResourceFragmented,
     InsufficientResource,
     InvalidResourceArgument,
     InvalidResourceCombination,
@@ -458,6 +459,7 @@ class FractionAllocMap(AbstractAllocMap):
         affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal("0.01"),
+        allow_resource_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # prune zero alloc slots
         requested_slots = {k: v for k, v in slots.items() if v > 0}
@@ -476,6 +478,7 @@ class FractionAllocMap(AbstractAllocMap):
             affinity_hint=affinity_hint,
             context_tag=context_tag,
             min_memory=min_memory,
+            allow_slot_fragmentation=allow_resource_fragmentation,
         )
         actual_alloc_map: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, alloc in calculated_alloc_map.items():
@@ -496,6 +499,35 @@ class FractionAllocMap(AbstractAllocMap):
 
         return actual_alloc_map
 
+    def ensure_slot_not_fragmented(
+        self,
+        slot_name: SlotName,
+        sorted_dev_allocs: Sequence[tuple[DeviceId, Decimal]],
+        alloc: Decimal,
+        *,
+        context_tag: Optional[str] = None,
+    ) -> None:
+        if len(sorted_dev_allocs) == 0:
+            raise FractionalResourceFragmented(
+                "FractionAllocMap: no device left for allocation!",
+                context_tag=context_tag,
+                slot_name=slot_name,
+                requested_alloc=alloc,
+                dev_allocs=sorted_dev_allocs,
+            )
+        most_free_dev_id, most_free_device_alloc = sorted_dev_allocs[0]
+        most_free_device_allocatable = (
+            self.device_slots[most_free_dev_id].amount - most_free_device_alloc
+        )
+        if most_free_device_allocatable < alloc:
+            raise FractionalResourceFragmented(
+                "FractionAllocMap: refusing to create kernel with fractional resource fragmented!",
+                context_tag=context_tag,
+                slot_name=slot_name,
+                requested_alloc=alloc,
+                dev_allocs=sorted_dev_allocs,
+            )
+
     def _allocate_by_filling(
         self,
         requested_slots: Mapping[SlotName, Decimal],
@@ -503,6 +535,7 @@ class FractionAllocMap(AbstractAllocMap):
         affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
+        allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, alloc in requested_slots.items():
@@ -510,6 +543,13 @@ class FractionAllocMap(AbstractAllocMap):
 
             # fill up starting from the most free devices
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
+            if not allow_slot_fragmentation:
+                self.ensure_slot_not_fragmented(
+                    slot_name,
+                    sorted_dev_allocs,
+                    alloc,
+                    context_tag=context_tag,
+                )
 
             if log_alloc_map:
                 log.debug("FractionAllocMap(FILL): allocating {} {}", slot_name, alloc)
@@ -560,6 +600,7 @@ class FractionAllocMap(AbstractAllocMap):
         affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
+        allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # higher value means more even with 0 being the highest value
         def measure_evenness(
@@ -637,6 +678,13 @@ class FractionAllocMap(AbstractAllocMap):
             slot_allocation: dict[DeviceId, Decimal] = {}
             remaining_alloc = Decimal(alloc).normalize()
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
+            if not allow_slot_fragmentation:
+                self.ensure_slot_not_fragmented(
+                    slot_name,
+                    sorted_dev_allocs,
+                    alloc,
+                    context_tag=context_tag,
+                )
 
             # do not consider devices whose remaining resource under min_memory
             sorted_dev_allocs = list(

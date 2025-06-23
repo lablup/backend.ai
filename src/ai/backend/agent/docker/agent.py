@@ -12,6 +12,7 @@ import signal
 import struct
 import sys
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -48,10 +49,22 @@ from async_timeout import timeout
 
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponses
-from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
+from ai.backend.common.docker import (
+    MAX_KERNELSPEC,
+    MIN_KERNELSPEC,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
+from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
+from ai.backend.common.json import (
+    dump_json,
+    load_json,
+)
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -60,6 +73,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     ImageConfig,
@@ -76,20 +90,36 @@ from ai.backend.common.types import (
     SlotName,
     current_resource_slots,
 )
-from ai.backend.common.utils import AsyncFileWriter, current_loop
+from ai.backend.common.utils import (
+    AsyncFileWriter,
+    current_loop,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
-from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
+from ..agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ComputerContext,
+    ScanImagesResult,
+)
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel, KernelFeatures
+from ..kernel import AbstractKernel
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
 from ..server import get_extra_volumes
-from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
+from ..types import (
+    AgentEventData,
+    Container,
+    KernelOwnershipData,
+    LifecycleEvent,
+    MountInfo,
+    Port,
+)
 from ..utils import (
     closing_async,
     container_pid_to_host_pid,
@@ -182,6 +212,13 @@ def _DockerContainerError_reduce(self):
     )
 
 
+@dataclass
+class DockerPurgeImageReq:
+    image: str
+    force: bool
+    noprune: bool
+
+
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     scratch_dir: Path
     tmp_dir: Path
@@ -200,9 +237,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         event_producer: EventProducer,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
@@ -218,9 +253,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         gwbridge_subnet: Optional[str] = None,
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             event_producer,
             kernel_image,
             kernel_config,
@@ -229,6 +262,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             computers,
             restarting=restarting,
         )
+        kernel_id = ownership_data.kernel_id
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
 
@@ -650,7 +684,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 priv_key_path.chmod(0o600)
                 if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
                     port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
-                    port_mapping_json_path.write_text(json.dumps(cluster_ssh_port_mapping))
+                    port_mapping_json_path.write_bytes(dump_json(cluster_ssh_port_mapping))
             except Exception:
                 log.exception("error while writing cluster keypair")
 
@@ -766,8 +800,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if docker_creds:
             await loop.run_in_executor(
                 None,
-                (self.config_dir / "docker-creds.json").write_text,
-                json.dumps(docker_creds),
+                (self.config_dir / "docker-creds.json").write_bytes,
+                dump_json(docker_creds),
             )
 
         # Create SSH keypair only if ssh_keypair internal_data exists and
@@ -824,7 +858,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
+
+            dotfile_content = dotfile["data"]
+            if not dotfile_content.endswith("\n"):
+                dotfile_content += "\n"
+            await loop.run_in_executor(None, file_path.write_text, dotfile_content)
 
             tmp = Path(file_path)
             tmp_paths: list[Path] = []
@@ -843,9 +881,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
 
         kernel_obj = DockerKernel(
-            self.kernel_id,
-            self.session_id,
-            self.agent_id,
+            self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
@@ -883,7 +919,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             return
 
         async with aiofiles.open(default_seccomp_path, mode="r") as fp:
-            seccomp_profile = json.loads(await fp.read())
+            seccomp_profile = load_json(await fp.read())
 
             additional_allowed_syscalls = self.additional_allowed_syscalls
             additional_allowed_syscall_rule = {
@@ -987,10 +1023,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "WorkingDir": "/home/work",
             "Hostname": self.kernel_config["cluster_hostname"],
             "Labels": {
-                "ai.backend.kernel-id": str(self.kernel_id),
-                "ai.backend.session-id": str(self.session_id),
-                "ai.backend.owner": str(self.agent_id),
-                "ai.backend.internal.block-service-ports": (
+                LabelName.KERNEL_ID: str(self.kernel_id),
+                LabelName.SESSION_ID: str(self.session_id),
+                LabelName.OWNER_USER: self.ownership_data.owner_user_id_to_str,
+                LabelName.OWNER_PROJECT: self.ownership_data.owner_project_id_to_str,
+                LabelName.OWNER_AGENT: str(self.agent_id),
+                LabelName.BLOCK_SERVICE_PORTS: (
                     "1" if self.internal_data.get("block_service_ports", False) else "0"
                 ),
             },
@@ -1045,10 +1083,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
         service_ports_label: list[str] = []
-        service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
+        service_ports_label += image_labels.get(LabelName.SERVICE_PORTS, "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+        container_config["Labels"][LabelName.SERVICE_PORTS] = ",".join([
             label for label in service_ports_label if label
         ])
         update_nested_dict(container_config, self.computer_docker_args)
@@ -1063,7 +1101,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         ]:
             if extra_container_opts_file.is_file():
                 try:
-                    extra_container_opts = json.loads(extra_container_opts_file.read_bytes())
+                    extra_container_opts = load_json(extra_container_opts_file.read_bytes())
                     update_nested_dict(container_config, extra_container_opts)
                 except IOError:
                     pass
@@ -1151,7 +1189,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await network.connect({"Container": container._id})
 
             kernel_obj.container_id = container._id
-            container_network_info: ContainerNetworkInfo | None = None
+            container_network_info: Optional[ContainerNetworkInfo] = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
@@ -1191,8 +1229,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 stdin_port = 0
                 stdout_port = 0
                 for idx, port in enumerate(exposed_ports):
-                    ports: list[PortInfo] | None = await container.port(port)
-                    if ports is None:
+                    ports: Optional[list[PortInfo]] = await container.port(port)
+                    if not ports:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
                         )
@@ -1240,7 +1278,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
-    scan_images_timer: asyncio.Task
     metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
@@ -1399,7 +1436,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> Optional[str]:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
             return result["Config"].get("Cmd")
@@ -1421,7 +1458,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             return
                         if container["State"]["Status"] in status_filter:
                             owner_id = AgentId(
-                                container["Config"]["Labels"].get("ai.backend.owner", "")
+                                container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
                             )
                             if self.id == owner_id:
                                 await container.show()
@@ -1447,7 +1484,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def resolve_image_distro(self, image: ImageConfig) -> str:
         image_labels = image["labels"]
-        distro = image_labels.get("ai.backend.base-distro")
+        distro = image_labels.get(LabelName.BASE_DISTRO)
         if distro:
             return distro
 
@@ -1502,10 +1539,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
             return distro
 
-    async def scan_images(self) -> Mapping[str, str]:
+    async def scan_images(self) -> ScanImagesResult:
         async with closing_async(Docker()) as docker:
             all_images = await docker.images.list()
-            updated_images = {}
+            scanned_images, removed_images = {}, {}
             for image in all_images:
                 if image["RepoTags"] is None:
                     continue
@@ -1525,17 +1562,23 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
-                    labels = img_detail["Config"]["Labels"]
+                    labels = img_detail.get("Config", {}).get("Labels")
                     if labels is None:
                         continue
-                    kernelspec = int(labels.get("ai.backend.kernelspec", "1"))
+                    kernelspec = int(labels.get(LabelName.KERNEL_SPEC, "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
-                        updated_images[repo_tag] = img_detail["Id"]
-            for added_image in updated_images.keys() - self.images.keys():
+                        scanned_images[repo_tag] = img_detail["Id"]
+            for added_image in scanned_images.keys() - self.images.keys():
                 log.debug("found kernel image: {0}", added_image)
-            for removed_image in self.images.keys() - updated_images.keys():
+
+            for removed_image in self.images.keys() - scanned_images.keys():
                 log.debug("removed kernel image: {0}", removed_image)
-            return updated_images
+                removed_images[removed_image] = self.images[removed_image]
+
+            return ScanImagesResult(
+                scanned_images=scanned_images,
+                removed_images=removed_images,
+            )
 
     async def handle_agent_socket(self):
         """
@@ -1632,7 +1675,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout: Optional[float] | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
             return
@@ -1664,7 +1707,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout: Optional[float],
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
@@ -1687,25 +1730,35 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResponse:
+    async def _purge_image(self, docker: Docker, request: DockerPurgeImageReq) -> PurgeImageResp:
         try:
-            await docker.images.delete(image)
-            return PurgeImageResponse.success(image=image)
+            await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
+            return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error(f'Failed to purge image "{image}": {e}')
-            return PurgeImageResponse.failure(image=image, error=str(e))
+            log.error(f'Failed to purge image "{request.image}": {e}')
+            return PurgeImageResp.failure(image=request.image, error=str(e))
 
-    async def purge_images(self, images: list[str]) -> PurgeImageResponses:
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
-                tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
+                tasks = [
+                    tg.create_task(
+                        self._purge_image(
+                            docker,
+                            DockerPurgeImageReq(
+                                image=image, force=request.force, noprune=request.noprune
+                            ),
+                        )
+                    )
+                    for image in request.images
+                ]
 
         results = []
         for task in tasks:
             deleted_info = task.result()
             results.append(deleted_info)
 
-        return PurgeImageResponses(responses=results)
+        return PurgeImagesResp(responses=results)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -1731,8 +1784,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def init_kernel_context(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
@@ -1741,9 +1793,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     ) -> DockerKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return DockerKernelCreationContext(
-            kernel_id,
-            session_id,
-            self.id,
+            ownership_data,
             self.event_producer,
             kernel_image,
             kernel_config,
@@ -2006,7 +2056,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                     evdata["Actor"],
                                 )
                             session_id = SessionId(
-                                UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"])
+                                UUID(evdata["Actor"]["Attributes"][LabelName.SESSION_ID])
                             )
                             match evdata["Action"]:
                                 case "start":

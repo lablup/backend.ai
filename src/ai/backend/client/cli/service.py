@@ -15,7 +15,8 @@ from ai.backend.client.cli.session.execute import (
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 from ..exceptions import BackendError
 from ..output.fields import routing_fields, service_fields
@@ -268,6 +269,16 @@ def info(ctx: CLIContext, service_name_or_id: str) -> None:
         "If set to true, no authentication will be required to access the endpoint."
     ),
 )
+@click.option(
+    "--runtime-variant",
+    metavar="RUNTIME_VARIANT",
+    type=click.Choice([*RuntimeVariant], case_sensitive=False),
+    default=RuntimeVariant.CUSTOM,
+    help=(
+        "Runtime variant of the service. "
+        "Control which runtime environment is used for the service. Default is `custom`."
+    ),
+)
 def create(
     ctx: CLIContext,
     image: str,
@@ -293,6 +304,7 @@ def create(
     owner: Optional[str],
     model_definition_path: Optional[str],
     public: bool,
+    runtime_variant: RuntimeVariant,
 ) -> None:
     """
     Create a service endpoint with a backing inference session.
@@ -323,6 +335,7 @@ def create(
         "scaling_group": scaling_group,
         "expose_to_public": public,
         "model_definition_path": model_definition_path,
+        "runtime_variant": runtime_variant,
     }
     if model_mount_destination:
         body["model_mount_destination"] = model_mount_destination
@@ -546,32 +559,33 @@ def try_start(
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
-                        if ev.event == "bgtask_updated":
-                            print(data["message"])
-                            if viewer.tqdm is None:
-                                pbar = await viewer.to_tqdm()
-                            else:
-                                pbar.total = data["total_progress"]
-                                pbar.update(data["current_progress"] - pbar.n)
-                        elif ev.event == "bgtask_failed":
-                            error_msg = data["message"]
-                            completion_msg_func = lambda: print_fail(
-                                f"Error during the operation: {error_msg}",
-                            )
-                        elif ev.event == "bgtask_cancelled":
-                            completion_msg_func = lambda: print_warn(
-                                "The operation has been cancelled in the middle. "
-                                "(This may be due to server shutdown.)",
-                            )
-                        # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
-                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
-                            issues = data.get("issues")
-                            if issues:
-                                for issue in issues:
-                                    print_fail(f"Issue reported: {issue}")
-                                completion_msg_func = lambda: print_warn(
-                                    f"Task finished with {len(issues)} issues."
+                        match ev.event:
+                            case BgtaskStatus.UPDATED:
+                                print(data["message"])
+                                if viewer.tqdm is None:
+                                    pbar = await viewer.to_tqdm()
+                                else:
+                                    pbar.total = data["total_progress"]
+                                    pbar.update(data["current_progress"] - pbar.n)
+                            case BgtaskStatus.FAILED:
+                                error_msg = data["message"]
+                                completion_msg_func = lambda: print_fail(
+                                    f"Error during the operation: {error_msg}",
                                 )
+                            case BgtaskStatus.CANCELLED:
+                                completion_msg_func = lambda: print_warn(
+                                    "The operation has been cancelled in the middle. "
+                                    "(This may be due to server shutdown.)",
+                                )
+                            # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
+                            case BgtaskStatus.PARTIAL_SUCCESS | BgtaskStatus.DONE:
+                                errors = data.get("errors")
+                                if errors:
+                                    for error in errors:
+                                        print_fail(f"Error reported: {error}")
+                                    completion_msg_func = lambda: print_warn(
+                                        f"Task finished with {len(errors)} issues."
+                                    )
             finally:
                 completion_msg_func()
 

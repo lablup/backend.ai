@@ -13,6 +13,7 @@ from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
+from ai.backend.common.json import pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
 
 from .context import etcd_ctx
@@ -144,7 +145,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
             try:
                 if prefix:
                     data = await etcd.get_prefix(key, scope=scope)
-                    print(json.dumps(dict(data), indent=4))
+                    print(pretty_json_str(dict(data)))
                 else:
                     val = await etcd.get(key, scope=scope)
                     if val is None:

@@ -12,7 +12,7 @@ from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import (
+from ai.backend.manager.errors.exceptions import (
     ContainerRegistryGroupsAssociationNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow

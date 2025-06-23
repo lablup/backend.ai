@@ -41,7 +41,7 @@ class BaseConfigModel(BaseModel):
         return string.replace("_", "-")
 
     model_config = ConfigDict(
-        populate_by_name=True,
+        validate_by_name=True,
         from_attributes=True,
         use_enum_values=True,
         extra="allow",

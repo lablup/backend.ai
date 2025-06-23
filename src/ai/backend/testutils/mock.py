@@ -1,3 +1,5 @@
+import json
+from http import HTTPStatus
 from typing import Any, Callable
 from unittest import mock
 from unittest.mock import AsyncMock
@@ -178,6 +180,61 @@ def mock_aioresponses_sequential_payloads(
 
         data = mock_responses[cb_call_counter]
         cb_call_counter += 1
-        return CallbackResult(status=200, payload=data)
+        return CallbackResult(status=HTTPStatus.OK, payload=data)
 
     return _callback
+
+
+def setup_dockerhub_mocking(
+    aiohttp_request_mock, registry_url: str, dockerhub_responses_mock: dict[str, Any]
+):
+    # /v2/ endpoint
+    aiohttp_request_mock.get(
+        f"{registry_url}/v2/",
+        status=HTTPStatus.OK,
+        payload=dockerhub_responses_mock["get_token"],
+        repeat=True,
+    )
+
+    # catalog
+    aiohttp_request_mock.get(
+        f"{registry_url}/v2/_catalog?n=30",
+        status=HTTPStatus.OK,
+        payload=dockerhub_responses_mock["get_catalog"],
+        repeat=True,
+    )
+
+    repositories = dockerhub_responses_mock["get_catalog"]["repositories"]
+
+    for repo in repositories:
+        # tags
+        mock_value = dockerhub_responses_mock["get_tags"]
+        params = {
+            "status": HTTPStatus.OK,
+            "callback" if callable(mock_value) else "payload": mock_value,
+        }
+
+        aiohttp_request_mock.get(f"{registry_url}/v2/{repo}/tags/list?n=10", **params)
+
+        # manifest
+        aiohttp_request_mock.get(
+            f"{registry_url}/v2/{repo}/manifests/latest",
+            status=HTTPStatus.OK,
+            payload=dockerhub_responses_mock["get_manifest"],
+            headers={
+                "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
+            },
+            repeat=True,
+        )
+
+        config_data = dockerhub_responses_mock["get_manifest"]["config"]
+        image_digest = config_data["digest"]
+
+        # config blob (JSON)
+        aiohttp_request_mock.get(
+            f"{registry_url}/v2/{repo}/blobs/{image_digest}",
+            status=HTTPStatus.OK,
+            body=json.dumps(dockerhub_responses_mock["get_config"]).encode("utf-8"),
+            payload=dockerhub_responses_mock["get_config"],
+            repeat=True,
+        )

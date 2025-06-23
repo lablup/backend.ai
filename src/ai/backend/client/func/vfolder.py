@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence, TypeAlias, TypeVar, Union
+from uuid import UUID
 
 import aiohttp
 import janus
@@ -55,9 +55,9 @@ class ResponseFailed(Exception):
 
 class VFolderByName(BaseFunction):
     name: str
-    id: Optional[uuid.UUID] = None
+    id: Optional[UUID] = None
 
-    def __init__(self, name: str, id: Optional[uuid.UUID] = None):
+    def __init__(self, name: str, id: Optional[UUID] = None) -> None:
         self.name = name
         self.id = id
 
@@ -213,14 +213,14 @@ class VFolderByName(BaseFunction):
             page_size=page_size,
         )
 
-    async def _get_id_by_name(self) -> uuid.UUID:
+    async def _get_id_by_name(self) -> UUID:
         rqst = Request("GET", "/folders/_/id")
         rqst.set_json({
             "name": self.name,
         })
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return uuid.UUID(data["id"])
+            return UUID(data["id"])
 
     @api_function
     @classmethod
@@ -294,6 +294,13 @@ class VFolderByName(BaseFunction):
         rqst.set_json({
             "id": self.request_key,
         })
+        async with rqst.fetch():
+            return {}
+
+    @api_function
+    async def force_delete(self) -> dict[str, Any]:
+        await self.update_id_by_name()
+        rqst = Request("DELETE", "/folders/{0}/force".format(self.request_key))
         async with rqst.fetch():
             return {}
 

@@ -6,6 +6,7 @@ import io
 import json as modjson
 import logging
 import sys
+import uuid
 from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
@@ -91,6 +92,8 @@ async def _coro_return(val: _T) -> _T:
 
 class ExtendedJSONEncoder(modjson.JSONEncoder):
     def default(self, obj: Any) -> Any:
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
         if isinstance(obj, Path):
             return str(obj)
         if isinstance(obj, Decimal):

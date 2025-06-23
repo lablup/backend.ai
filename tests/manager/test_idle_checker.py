@@ -19,11 +19,11 @@ from ai.backend.manager.idle import (
 )
 from ai.backend.manager.server import (
     background_task_ctx,
+    config_provider_ctx,
     database_ctx,
     distributed_lock_ctx,
     event_dispatcher_ctx,
     redis_ctx,
-    shared_config_ctx,
 )
 
 
@@ -87,7 +87,7 @@ async def new_user_grace_period_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -110,11 +110,10 @@ async def new_user_grace_period_checker(
     }
     kernel = {"user_created_at": user_created_at}
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -136,7 +135,7 @@ async def network_timeout_idle_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -171,11 +170,10 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -189,7 +187,9 @@ async def network_timeout_idle_checker(
         )
 
         should_alive = await network_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            kernel,
+            checker_host._db,
+            policy,
         )
         remaining = await network_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -224,11 +224,10 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -242,7 +241,9 @@ async def network_timeout_idle_checker(
         )
 
         should_alive = await network_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            kernel,
+            checker_host._db,
+            policy,
         )
         remaining = await network_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -281,11 +282,10 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -303,7 +303,6 @@ async def network_timeout_idle_checker(
             kernel,
             checker_host._db,
             policy,
-            checker_host._redis_live,
             grace_period_end=grace_period_end,
         )
         remaining = await network_idle_checker.get_checker_result(
@@ -343,11 +342,10 @@ async def network_timeout_idle_checker(
         "idle_timeout": threshold,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -365,7 +363,6 @@ async def network_timeout_idle_checker(
             kernel,
             checker_host._db,
             policy,
-            checker_host._redis_live,
             grace_period_end=grace_period_end,
         )
         remaining = await network_idle_checker.get_checker_result(
@@ -387,7 +384,7 @@ async def session_lifetime_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -418,11 +415,10 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -434,7 +430,6 @@ async def session_lifetime_checker(
             kernel,
             checker_host._db,
             policy,
-            checker_host._redis_live,
         )
         remaining = await session_lifetime_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -465,11 +460,10 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -481,7 +475,6 @@ async def session_lifetime_checker(
             kernel,
             checker_host._db,
             policy,
-            checker_host._redis_live,
         )
         remaining = await session_lifetime_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -517,11 +510,10 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -534,7 +526,6 @@ async def session_lifetime_checker(
             kernel,
             checker_host._db,
             policy,
-            checker_host._redis_live,
             grace_period_end=grace_period_end,
         )
         remaining = await session_lifetime_checker.get_checker_result(
@@ -571,11 +562,10 @@ async def session_lifetime_checker(
         "max_session_lifetime": max_session_lifetime,
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -588,7 +578,6 @@ async def session_lifetime_checker(
             kernel,
             checker_host._db,
             policy,
-            checker_host._redis_live,
             grace_period_end=grace_period_end,
         )
         remaining = await session_lifetime_checker.get_checker_result(
@@ -610,7 +599,7 @@ async def utilization_idle_checker__utilization(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -659,11 +648,10 @@ async def utilization_idle_checker__utilization(
         "enabled": "utilization",
     }
 
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -694,7 +682,7 @@ async def utilization_idle_checker(
 ) -> None:
     test_app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            config_provider_ctx,
             redis_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
@@ -758,11 +746,10 @@ async def utilization_idle_checker(
         },
         "enabled": "utilization",
     }
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -775,7 +762,9 @@ async def utilization_idle_checker(
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
 
         should_alive = await utilization_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            kernel,
+            checker_host._db,
+            policy,
         )
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -842,11 +831,10 @@ async def utilization_idle_checker(
         },
         "enabled": "utilization",
     }
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -859,7 +847,7 @@ async def utilization_idle_checker(
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
 
         should_alive = await utilization_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            kernel, checker_host._db, policy
         )
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
@@ -926,11 +914,10 @@ async def utilization_idle_checker(
         },
         "enabled": "utilization",
     }
-    await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
+    await root_ctx.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
     checker_host = await init_idle_checkers(
         root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
+        root_ctx.config_provider,
         root_ctx.event_producer,
         root_ctx.distributed_lock_factory,
     )
@@ -943,7 +930,9 @@ async def utilization_idle_checker(
         utilization_idle_checker = get_checker_from_host(checker_host, UtilizationIdleChecker)
 
         should_alive = await utilization_idle_checker.check_idleness(
-            kernel, checker_host._db, policy, checker_host._redis_live
+            kernel,
+            checker_host._db,
+            policy,
         )
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id

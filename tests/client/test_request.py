@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+from http import HTTPStatus
 from unittest import mock
 
 import aiohttp
@@ -128,14 +129,14 @@ async def test_fetch(dummy_endpoint):
         body = b"hello world"
         m.post(
             dummy_endpoint + "function",
-            status=200,
+            status=HTTPStatus.OK,
             body=body,
             headers={"Content-Type": "text/plain; charset=utf-8", "Content-Length": str(len(body))},
         )
         rqst = Request("POST", "function")
         async with rqst.fetch() as resp:
             assert isinstance(resp, Response)
-            assert resp.status == 200
+            assert resp.status == HTTPStatus.OK
             assert resp.content_type == "text/plain"
             assert await resp.text() == body.decode()
             assert resp.content_length == len(body)
@@ -144,7 +145,7 @@ async def test_fetch(dummy_endpoint):
         body = b'{"a": 1234, "b": null}'
         m.post(
             dummy_endpoint + "function",
-            status=200,
+            status=HTTPStatus.OK,
             body=body,
             headers={
                 "Content-Type": "application/json; charset=utf-8",
@@ -154,7 +155,7 @@ async def test_fetch(dummy_endpoint):
         rqst = Request("POST", "function")
         async with rqst.fetch() as resp:
             assert isinstance(resp, Response)
-            assert resp.status == 200
+            assert resp.status == HTTPStatus.OK
             assert resp.content_type == "application/json"
             assert await resp.text() == body.decode()
             assert await resp.json() == {"a": 1234, "b": None}
@@ -168,13 +169,13 @@ async def test_streaming_fetch(dummy_endpoint):
         body = b"hello world"
         m.post(
             dummy_endpoint + "function",
-            status=200,
+            status=HTTPStatus.OK,
             body=body,
             headers={"Content-Type": "text/plain; charset=utf-8", "Content-Length": str(len(body))},
         )
         rqst = Request("POST", "function")
         async with rqst.fetch() as resp:
-            assert resp.status == 200
+            assert resp.status == HTTPStatus.OK
             assert resp.content_type == "text/plain"
             assert await resp.read(3) == b"hel"
             assert await resp.read(2) == b"lo"
@@ -192,7 +193,7 @@ async def test_invalid_requests(dummy_endpoint):
         }).encode("utf8")
         m.post(
             dummy_endpoint,
-            status=404,
+            status=HTTPStatus.NOT_FOUND,
             body=body,
             headers={
                 "Content-Type": "application/problem+json; charset=utf-8",
@@ -203,7 +204,7 @@ async def test_invalid_requests(dummy_endpoint):
         with pytest.raises(BackendAPIError) as e:
             async with rqst.fetch():
                 pass
-            assert e.status == 404
+            assert e.status == HTTPStatus.NOT_FOUND
             assert e.data["type"] == "https://api.backend.ai/probs/kernel-not-found"
             assert e.data["title"] == "Kernel Not Found"
 
@@ -258,7 +259,7 @@ async def test_response_async(defconfig, dummy_endpoint):
     with aioresponses() as m:
         m.post(
             dummy_endpoint + "function",
-            status=200,
+            status=HTTPStatus.OK,
             body=body,
             headers={"Content-Type": "application/json", "Content-Length": str(len(body))},
         )

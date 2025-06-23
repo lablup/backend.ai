@@ -1,9 +1,12 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from graphene import Schema
 from graphene.test import Client
 
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -27,31 +30,23 @@ def client() -> Client:
     return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
 
 
-def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
-    mock_shared_config = MagicMock()
-    mock_shared_config_api_mock = MagicMock()
+async def get_graphquery_context(
+    database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
+) -> GraphQueryContext:
+    mock_loader = MagicMock()
+    mock_loader.load = AsyncMock()
+    mock_loader.load.return_value = unified_config.model_dump()
 
-    def mock_shared_config_getitem(key):
-        if key == "api":
-            return mock_shared_config_api_mock
-        else:
-            return None
-
-    def mock_shared_config_api_getitem(key):
-        if key == "max-gql-connection-page-size":
-            return None
-        else:
-            return MagicMock()
-
-    mock_shared_config.__getitem__.side_effect = mock_shared_config_getitem
-    mock_shared_config_api_mock.__getitem__.side_effect = mock_shared_config_api_getitem
-
+    config_provider = await ManagerConfigProvider.create(
+        loader=mock_loader,
+        etcd_watcher=MagicMock(),
+        legacy_etcd_config_loader=MagicMock(),  # type: ignore
+    )
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=mock_shared_config,  # type: ignore
-        etcd=None,  # type: ignore
+        config_provider=config_provider,
+        etcd=MagicMock(),  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=database_engine,  # type: ignore
@@ -66,13 +61,17 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
         services_ctx=None,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
+        processors=None,  # type: ignore
     )
 
 
 @pytest.mark.dependency()
 @pytest.mark.asyncio
-async def test_create_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = get_graphquery_context(database_engine)
+async def test_create_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
+):
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
             mutation CreateContainerRegistryNode($type: ContainerRegistryTypeField!, $registry_name: String!, $url: String!, $project: String!, $username: String!, $password: String!, $ssl_verify: Boolean!, $is_global: Boolean!) {
@@ -119,8 +118,10 @@ async def test_create_container_registry(client: Client, database_engine: Extend
 
 @pytest.mark.dependency(depends=["test_create_container_registry"])
 @pytest.mark.asyncio
-async def test_modify_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = get_graphquery_context(database_engine)
+async def test_modify_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
+):
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -140,6 +141,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
+    print("response!!#W!#", response)
 
     target_container_registries = list(
         filter(
@@ -202,9 +204,9 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_empty_string(
-    client: Client, database_engine: ExtendedAsyncSAEngine
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):
-    context = get_graphquery_context(database_engine)
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -267,9 +269,9 @@ async def test_modify_container_registry_allows_empty_string(
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
 @pytest.mark.asyncio
 async def test_modify_container_registry_allows_null_for_unset(
-    client: Client, database_engine: ExtendedAsyncSAEngine
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
 ):
-    context = get_graphquery_context(database_engine)
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {
@@ -331,8 +333,10 @@ async def test_modify_container_registry_allows_null_for_unset(
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
 @pytest.mark.asyncio
-async def test_delete_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
-    context = get_graphquery_context(database_engine)
+async def test_delete_container_registry(
+    client: Client, database_engine: ExtendedAsyncSAEngine, unified_config: ManagerUnifiedConfig
+):
+    context = await get_graphquery_context(database_engine, unified_config)
 
     query = """
         query ContainerRegistryNodes($filter: String!) {

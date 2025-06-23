@@ -11,7 +11,7 @@ from sqlalchemy.orm import load_only
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import (
+from ai.backend.manager.errors.exceptions import (
     ContainerRegistryNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow

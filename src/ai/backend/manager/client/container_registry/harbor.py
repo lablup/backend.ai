@@ -8,7 +8,11 @@ import aiohttp
 import yarl
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import GenericBadRequest, InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.exceptions import (
+    GenericBadRequest,
+    InternalServerError,
+    ObjectNotFound,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.service.container_registry.harbor import (

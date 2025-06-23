@@ -32,7 +32,7 @@ password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 # lock-conn-timeout = 30
 
 # This setting causes the pool to recycle connections after the given number of seconds has passed.
-# Default is -1, which means infinite. 
+# Default is -1, which means infinite.
 # https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
 # https://docs.sqlalchemy.org/en/14/core/pooling.html#setting-pool-recycle
 # pool-recycle = -1
@@ -73,6 +73,9 @@ group = "nobody"
 
 # Set the service hostname/port to accept API requests.
 service-addr = { host = "0.0.0.0", port = 8080 }
+
+# Set the internal hostname/port to accept internal API requests.
+internal-addr = { host = "0.0.0.0", port = 8082 }
 # env: BACKEND_SERVICE_IP, BACKEND_SERVICE_PORT
 
 # Set the SSL certificate chain and the private keys used for serving the API requests.
@@ -236,6 +239,69 @@ certfile = ""
 "ai.backend" = "INFO"
 "alembic" = "INFO"
 "sqlalchemy" = "WARNING"
+
+
+[reporter]
+
+# Config for the audit log reporter.
+[[reporter.audit-log]]
+name = "audit_log"
+
+# Config for the SMTP reporter.
+# This reporter sends an email to the recipients when the trigger policy is met.
+[[reporter.smtp]]
+name = "smtp"
+host = "smtp.example.com"
+port = 587
+username = "user@example.com"
+password = "some_password"
+sender = "user@example.com"
+recipients = ["user@example.com", "user2@example.com"]
+use-tls = true
+trigger-policy = "ON_ERROR"
+max-workers = 5
+
+template = """
+Action type: {{ action_type }}
+Entity ID: {{ entity_id }}
+Status: {{ status }}
+Description: {{ description }}
+Started at: {{ created_at }}
+Finished at: {{ ended_at }}
+Duration: {{ duration }} seconds
+
+This email is sent from Backend.AI SMTP Reporter.
+"""
+
+
+# The list of actions to be monitored by the audit log reporter.
+[[reporter.action-monitors]]
+subscribed-actions = [
+    "session:create_from_params",
+    "session:create_from_template",
+    "session:create_cluster",
+    "session:commit",
+    "session:convert_to_image",
+    "session:destroy",
+    "session:destroy_multi",
+    "container_registry:rescan"
+]
+reporter = "audit_log"
+
+
+# The list of actions to be monitored by the SMTP reporter.
+[[reporter.action-monitors]]
+subscribed-actions = [
+    "session:create_from_params",
+    "session:create_from_template",
+    "session:create_cluster",
+    "session:commit",
+    "session:convert_to_image",
+    "session:destroy",
+    "session:destroy_multi",
+    "container_registry:rescan"
+]
+reporter = "smtp"
 
 
 [debug]

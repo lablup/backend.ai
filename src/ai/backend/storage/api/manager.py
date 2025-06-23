@@ -5,12 +5,12 @@ Manager-facing API
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import weakref
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
+from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -33,17 +33,30 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
-from ai.backend.common.events import (
-    DoVolumeMountEvent,
-    DoVolumeUnmountEvent,
+from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
-    VolumeMountableNodeType,
+)
+from ai.backend.common.events.event_types.volume.broadcast import (
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.metrics.http import build_api_metric_middleware
-from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
+from ai.backend.common.json import dump_json_str
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.types import (
+    AgentId,
+    BinarySize,
+    ItemResult,
+    QuotaScopeID,
+    ResultSet,
+    VolumeMountableNodeType,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
@@ -105,13 +118,6 @@ async def check_status(request: web.Request) -> web.Response:
         )
 
 
-@skip_token_auth
-async def prometheus_metrics_handler(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app["ctx"]
-    metrics = root_ctx.metric_registry.to_prometheus()
-    return web.Response(text=metrics, content_type="text/plain")
-
-
 @ctxmgr
 def handle_fs_errors(
     volume: AbstractVolume,
@@ -134,7 +140,7 @@ def handle_fs_errors(
         if e.filename2:
             _append_fpath(e.filename2)
         raise web.HTTPBadRequest(
-            body=json.dumps(
+            text=dump_json_str(
                 {
                     "msg": msg,
                     "errno": e.errno,
@@ -151,7 +157,7 @@ def handle_external_errors() -> Iterator[None]:
         yield
     except ExternalError as e:
         raise web.HTTPInternalServerError(
-            body=json.dumps({
+            text=dump_json_str({
                 "msg": str(e),
             }),
             content_type="application/json",
@@ -237,9 +243,9 @@ async def create_quota_scope(request: web.Request) -> web.Response:
             except QuotaScopeAlreadyExists:
                 return web.json_response(
                     {"msg": "Volume already exists with given quota scope."},
-                    status=409,
+                    status=HTTPStatus.CONFLICT,
                 )
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def get_quota_scope(request: web.Request) -> web.Response:
@@ -306,9 +312,9 @@ async def update_quota_scope(request: web.Request) -> web.Response:
                     except InvalidQuotaConfig:
                         return web.json_response(
                             {"msg": "Invalid quota config option"},
-                            status=400,
+                            status=HTTPStatus.BAD_REQUEST,
                         )
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def unset_quota(request: web.Request) -> web.Response:
@@ -336,7 +342,7 @@ async def unset_quota(request: web.Request) -> web.Response:
             if not quota_usage:
                 raise QuotaScopeNotFoundError
             await volume.quota_model.unset_quota(params["qsid"])
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def create_vfolder(request: web.Request) -> web.Response:
@@ -385,7 +391,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                     await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
                     raise ExternalError("Failed to create vfolder due to quota scope not found.")
-            return web.Response(status=204)
+            return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def delete_vfolder(request: web.Request) -> web.Response:
@@ -424,7 +430,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 msg = str(e) if e.strerror is None else e.strerror
                 msg = f"{msg} (errno:{e.errno})"
                 log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
-                await ctx.event_producer.produce_event(
+                await ctx.event_producer.anycast_event(
                     VFolderDeletionFailureEvent(
                         vfid,
                         msg,
@@ -432,7 +438,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 )
             except Exception as e:
                 log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
-                await ctx.event_producer.produce_event(
+                await ctx.event_producer.anycast_event(
                     VFolderDeletionFailureEvent(
                         vfid,
                         str(e),
@@ -442,7 +448,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                 log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
             else:
                 log.info(f"VFolder deletion task successed. (vfid:{vfid})")
-                await ctx.event_producer.produce_event(VFolderDeletionSuccessEvent(vfid))
+                await ctx.event_producer.anycast_event(VFolderDeletionSuccessEvent(vfid))
 
         try:
             async with ctx.get_volume(params["volume"]) as volume:
@@ -451,13 +457,13 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             ongoing_task = app_ctx.deletion_tasks.get(vfid)
             if ongoing_task is not None:
                 ongoing_task.cancel()
-            return web.Response(status=410)
+            return web.Response(status=HTTPStatus.GONE)
         else:
             ongoing_task = app_ctx.deletion_tasks.get(vfid)
             if ongoing_task is None or ongoing_task.done():
                 asyncio.create_task(_delete_vfolder(app_ctx.deletion_tasks))
 
-    return web.Response(status=202)
+    return web.Response(status=HTTPStatus.ACCEPTED)
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
@@ -494,7 +500,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                 params["src_vfid"],
                 params["dst_vfid"],
             )
-        return web.Response(status=204)
+        return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def get_vfolder_mount(request: web.Request) -> web.Response:
@@ -526,7 +532,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                 )
             except VFolderNotFoundError:
                 raise web.HTTPBadRequest(
-                    body=json.dumps(
+                    text=dump_json_str(
                         {
                             "msg": "VFolder not found",
                             "vfid": str(params["vfid"]),
@@ -536,7 +542,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                 )
             except InvalidSubpathError as e:
                 raise web.HTTPBadRequest(
-                    body=json.dumps(
+                    text=dump_json_str(
                         {
                             "msg": "Invalid vfolder subpath",
                             "vfid": str(params["vfid"]),
@@ -604,7 +610,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
     ) as params:
         await log_manager_api_entry(log, "fetch_file", params)
         ctx: RootContext = request.app["ctx"]
-        response = web.StreamResponse(status=200)
+        response = web.StreamResponse(status=HTTPStatus.OK)
         response.headers[hdrs.CONTENT_TYPE] = "application/octet-stream"
         prepared = False
         try:
@@ -621,7 +627,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
                             prepared = True
                         await response.write(chunk)
         except FileNotFoundError:
-            response = web.Response(status=404, reason="Log data not found")
+            response = web.Response(status=HTTPStatus.NOT_FOUND, reason="Log data not found")
         finally:
             if prepared:
                 await response.write_eof()
@@ -737,7 +743,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                 )
         except ExecutionError:
             return web.Response(
-                status=500,
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
             )
 
@@ -771,7 +777,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
                 )
         except ExecutionError:
             return web.Response(
-                status=500,
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
             )
 
@@ -795,7 +801,7 @@ async def get_quota(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "get_quota", params)
         return web.Response(
-            status=400,
+            status=HTTPStatus.BAD_REQUEST,
             reason="get_quota (for individual vfolder) is a deprecated API",
         )
 
@@ -821,7 +827,7 @@ async def set_quota(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "update_quota", params)
         return web.Response(
-            status=400,
+            status=HTTPStatus.BAD_REQUEST,
             reason="set_quota (for individual vfolder) is a deprecated API",
         )
 
@@ -982,7 +988,7 @@ async def rename_file(request: web.Request) -> web.Response:
                     params["relpath"],
                     params["relpath"].with_name(params["new_name"]),
                 )
-        return web.Response(status=204)
+        return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def move_file(request: web.Request) -> web.Response:
@@ -1015,7 +1021,7 @@ async def move_file(request: web.Request) -> web.Response:
                     params["src_relpath"],
                     params["dst_relpath"],
                 )
-        return web.Response(status=204)
+        return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 async def create_download_session(request: web.Request) -> web.Response:
@@ -1165,37 +1171,43 @@ def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
     app.router.add_route("GET", "/volumes", handler.get_volumes)
     app.router.add_route("GET", "/volumes/{volume_id}", handler.get_volume)
     app.router.add_route(
-        "GET", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.get_quota_scope
+        "GET",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
+        handler.get_quota_scope,
     )
     app.router.add_route(
-        "POST", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.create_quota_scope
+        "POST",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
+        handler.create_quota_scope,
     )
     app.router.add_route(
-        "PUT", "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}", handler.update_quota_scope
+        "PUT",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
+        handler.update_quota_scope,
     )
     app.router.add_route(
         "DELETE",
-        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}",
         handler.delete_quota_scope,
     )
     app.router.add_route(
         "POST",
-        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
         handler.create_vfolder,
     )
     app.router.add_route(
         "GET",
-        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
         handler.get_vfolder_info,
     )
     app.router.add_route(
         "PUT",
-        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}/clone",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}/clone",
         handler.clone_vfolder,
     )
     app.router.add_route(
         "DELETE",
-        "/volumes/{volume_id}/quotas/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        "/volumes/{volume_id}/quota-scope/{quota_scope_type}/{quota_scope_uuid}/vfolder/{folder_uuid}",
         handler.delete_vfolder,
     )
 
@@ -1214,7 +1226,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app["app_ctx"] = app_ctx
     app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
-    app.router.add_route("GET", "/metrics", prometheus_metrics_handler)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
@@ -1251,6 +1262,13 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     return app
 
 
+def init_internal_app() -> web.Application:
+    app = web.Application()
+    metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
+    return app
+
+
 async def handle_volume_mount(
     context: RootContext,
     source: AgentId,
@@ -1271,7 +1289,7 @@ async def handle_volume_mount(
         # Produce volume mounted event with error message.
         # And skip chown.
         err_msg = resp.body
-        await context.event_producer.produce_event(
+        await context.event_producer.broadcast_event(
             VolumeMounted(
                 str(context.node_id),
                 VolumeMountableNodeType.STORAGE_PROXY,
@@ -1287,7 +1305,7 @@ async def handle_volume_mount(
     resp = await context.watcher.request_task(chown_task)
     if not resp.succeeded:
         err_msg = resp.body
-    await context.event_producer.produce_event(
+    await context.event_producer.broadcast_event(
         VolumeMounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
@@ -1322,7 +1340,7 @@ async def handle_volume_umount(
     err_msg = resp.body if not resp.succeeded else None
     if resp.body:
         log.warning(resp.body)
-    await context.event_producer.produce_event(
+    await context.event_producer.broadcast_event(
         VolumeUnmounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,

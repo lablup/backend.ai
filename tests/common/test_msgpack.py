@@ -56,6 +56,16 @@ def test_msgpack_uuid_as_map_key():
     assert unpacked[device_id] == 1234
 
 
+def test_msgpack_uuid_to_str():
+    device_id = uuid.uuid4()
+    str_device_id = str(device_id)
+    data = {device_id: 1234}
+    packed = msgpack.packb(data)
+    unpacked = msgpack.unpackb(packed, ext_hook_mapping=msgpack.uuid_to_str)
+    assert isinstance(next(iter(unpacked.keys())), str)
+    assert unpacked[str_device_id] == 1234
+
+
 def test_msgpack_datetime():
     now = datetime.now(tzutc())
     data = {"timestamp": now}

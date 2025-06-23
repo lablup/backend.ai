@@ -3,7 +3,6 @@ from typing import Optional, Sequence
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
 
-from ..request import Request
 from ..session import api_session
 from ..utils import dedent as _d
 from .base import BaseFunction, api_function
@@ -66,7 +65,7 @@ class Image(BaseFunction):
         q = _d("""
             query($reference: String!, $architecture: String!) {
                 image(reference: $reference, architecture: $architecture) {
-                    $fields"
+                    $fields
                 }
             }
         """)
@@ -159,16 +158,46 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def untag_image_from_registry(cls, id: str):
+    async def purge_image_by_id(
+        cls,
+        image_id: str,
+        remove_from_registry: bool = False,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ):
         q = _d("""
-            mutation($id: String!) {
-                untag_image_from_registry(id: $id) {
+            mutation($image_id: String!, $options: PurgeImageOptions) {
+                purge_image_by_id(image_id: $image_id, options: $options) {
+                    image {
+                        $fields
+                    }
+                }
+            }
+        """)
+        variables = {
+            "image_id": image_id,
+            "options": {
+                "remove_from_registry": remove_from_registry,
+            },
+        }
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        data = await api_session.get().Admin._query(q, variables)
+        return data["purge_image_by_id"]
+
+    @api_function
+    @classmethod
+    async def untag_image_from_registry(cls, image_id: str):
+        """
+        Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
+        """
+        q = _d("""
+            mutation($image_id: String!) {
+                untag_image_from_registry(image_id: $image_id) {
                     ok msg
                 }
             }
         """)
         variables = {
-            "id": id,
+            "image_id": image_id,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["untag_image_from_registry"]
@@ -229,20 +258,3 @@ class Image(BaseFunction):
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["dealias_image"]
-
-    @api_function
-    @classmethod
-    async def get_image_import_form(cls) -> dict:
-        rqst = Request("GET", "/image/import")
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-        return data
-
-    @api_function
-    @classmethod
-    async def build(cls, **kwargs) -> dict:
-        rqst = Request("POST", "/image/import")
-        rqst.set_json(kwargs)
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-        return data

@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import hashlib
 import hmac
 import json
@@ -10,7 +11,7 @@ import tempfile
 import textwrap
 import uuid
 from datetime import datetime
-from functools import partial
+from functools import partial, update_wrapper
 from pathlib import Path
 from typing import (
     Any,
@@ -35,14 +36,16 @@ import pytest
 import sqlalchemy as sa
 from aiohttp import web
 from dateutil.tz import tzutc
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
+from ai.backend.common.config import ConfigurationError
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
@@ -50,8 +53,10 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
-from ai.backend.manager.config import LocalConfig, SharedConfig
-from ai.backend.manager.config import load as load_config
+from ai.backend.manager.config.bootstrap import BootstrapConfig
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -76,11 +81,12 @@ from ai.backend.manager.models.base import (
     populate_fixture,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.image import ImageAliasRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.server import build_root_app
+from ai.backend.manager.server import build_root_app, config_provider_ctx, etcd_ctx
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -91,6 +97,30 @@ from ai.backend.testutils.pants import get_parallel_slot
 here = Path(__file__).parent
 
 log = logging.getLogger("tests.manager.conftest")
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--rescan-cr-backend-ai",
+        action="store_true",
+        default=False,
+        help="Enable tests marked as rescan_cr_backend_ai",
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "rescan_cr_backend_ai: mark test to run only when --rescan-cr-backend-ai is set",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--rescan-cr-backend-ai"):
+        skip_flag = pytest.mark.skip(reason="--rescan-cr-backend-ai not set")
+        for item in items:
+            if "rescan_cr_backend_ai" in item.keywords:
+                item.add_marker(skip_flag)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -161,7 +191,7 @@ def ipc_base_path() -> Path:
 
 
 @pytest.fixture(scope="session")
-def local_config(
+def bootstrap_config(
     test_id,
     ipc_base_path: Path,
     logging_config,
@@ -169,44 +199,18 @@ def local_config(
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
     test_db,
-) -> Iterator[LocalConfig]:
+) -> Iterator[BootstrapConfig]:
     etcd_addr = etcd_container[1]
-    redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
     # Establish a self-contained config.
-    cfg = LocalConfig({
-        **etcd_config_iv.check({
-            "etcd": {
-                "namespace": test_id,
-                "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
-            },
-        }),
-        "redis": redis_config_iv.check({
-            "addr": {
-                "host": redis_addr.host,
-                "port": redis_addr.port,
-            },
-            "redis_helper_config": config.redis_helper_default_config,
-            "override_configs": {
-                "stat": {
-                    "addr": {
-                        "host": redis_addr.host,
-                        "port": redis_addr.port,
-                    },
-                    "redis_helper_config": config.redis_helper_default_config,
-                },
-                "stream": {
-                    "addr": {
-                        "host": redis_addr.host,
-                        "port": redis_addr.port,
-                    },
-                    "redis_helper_config": config.redis_helper_default_config,
-                },
-            },
-        }),
+    cfg = BootstrapConfig.model_validate({
+        "etcd": {
+            "namespace": test_id,
+            "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
+        },
         "db": {
             "addr": postgres_addr,
             "name": test_db,
@@ -223,7 +227,9 @@ def local_config(
             "num-proc": 1,
             "distributed-lock": "filelock",
             "ipc-base-path": ipc_base_path,
-            "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+            "service-addr": HostPortPairModel(
+                host="127.0.0.1", port=29100 + get_parallel_slot() * 10
+            ),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
             "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
@@ -243,22 +249,19 @@ def local_config(
         "logging": logging_config,
     })
 
-    def _override_if_exists(src: dict, dst: dict, key: str) -> None:
-        sentinel = object()
-        if (val := src.get(key, sentinel)) is not sentinel:
-            dst[key] = val
+    def _override_if_exists(src: BaseModel, dst: BaseModel, key: str) -> None:
+        if key in src.model_fields_set:
+            setattr(dst, key, getattr(src, key))
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config = load_config()
-        cfg["etcd"]["addr"] = fs_local_config["etcd"]["addr"]
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "user")
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "password")
-        cfg["redis"]["addr"] = fs_local_config["redis"]["addr"]
-        _override_if_exists(fs_local_config["redis"], cfg["redis"], "password")
-        cfg["db"]["addr"] = fs_local_config["db"]["addr"]
-        _override_if_exists(fs_local_config["db"], cfg["db"], "user")
-        _override_if_exists(fs_local_config["db"], cfg["db"], "password")
+        fs_boostrap_config = asyncio.run(BootstrapConfig.load_from_file(Path("dummy-manager.toml")))
+        cfg.etcd.addr = fs_boostrap_config.etcd.addr
+        _override_if_exists(fs_boostrap_config.etcd, cfg.etcd, "user")
+        _override_if_exists(fs_boostrap_config.etcd, cfg.etcd, "password")
+        cfg.db.addr = fs_boostrap_config.db.addr
+        _override_if_exists(fs_boostrap_config.db, cfg.db, "user")
+        _override_if_exists(fs_boostrap_config.db, cfg.db, "password")
     except ConfigurationError:
         pass
     yield cfg
@@ -269,16 +272,62 @@ def local_config(
 
 
 @pytest.fixture(scope="session")
+def mock_etcd_ctx(
+    bootstrap_config: BootstrapConfig,
+) -> Any:
+    argument_binding_ctx = partial(etcd_ctx, etcd_config=bootstrap_config.etcd.to_dataclass())
+    update_wrapper(argument_binding_ctx, etcd_ctx)
+    return argument_binding_ctx
+
+
+@pytest.fixture
+def event_dispatcher_test_ctx():
+    # TODO: Remove this fixture when the root context is refactored
+    from contextlib import asynccontextmanager as actxmgr
+
+    @actxmgr
+    async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+        root_ctx.event_dispatcher = EventDispatcher(
+            root_ctx.message_queue,
+            log_events=root_ctx.config_provider.config.debug.log_events,
+            event_observer=root_ctx.metrics.event,
+        )
+        await root_ctx.event_dispatcher.start()
+        yield
+        await root_ctx.event_dispatcher.close()
+
+    return event_dispatcher_ctx
+
+
+@pytest.fixture(scope="session")
+def mock_config_provider_ctx(
+    bootstrap_config: BootstrapConfig,
+) -> Any:
+    base_cfg = bootstrap_config.model_dump()
+    argument_binding_ctx = partial(
+        config_provider_ctx, log_level=LogLevel.DEBUG, config_path=None, extra_config=base_cfg
+    )
+    update_wrapper(argument_binding_ctx, config_provider_ctx)
+    return argument_binding_ctx
+
+
+@pytest.fixture(scope="session")
 def etcd_fixture(
-    test_id, local_config, vfolder_mount, vfolder_fsprefix, vfolder_host
+    test_id,
+    bootstrap_config,
+    redis_container,  # noqa: F811
+    vfolder_mount,
+    vfolder_fsprefix,
+    vfolder_host,
 ) -> Iterator[None]:
     # Clear and reset etcd namespace using CLI functions.
-    redis_addr = local_config["redis"]["addr"]
+    redis_addr = redis_container[1]
+
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
         log_level=LogLevel.DEBUG,
     )
-    cli_ctx._local_config = local_config  # override the lazy-loaded config
+    cli_ctx._bootstrap_config = bootstrap_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
             "manager": {"status": "running"},
@@ -329,28 +378,28 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
+async def unified_config(
+    app, bootstrap_config: BootstrapConfig, etcd_fixture
+) -> AsyncIterator[ManagerUnifiedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    shared_config = SharedConfig(
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
-    )
-    await shared_config.reload()
-    root_ctx.shared_config = shared_config
-    yield shared_config
+    etcd = AsyncEtcd.initialize(bootstrap_config.etcd.to_dataclass())
+    root_ctx.etcd = etcd
+    etcd_loader = LegacyEtcdLoader(root_ctx.etcd)
+    raw_config = await etcd_loader.load()
+    merged_config = {**bootstrap_config.model_dump(), **raw_config}
+    unified_config = ManagerUnifiedConfig(**merged_config)
+    yield unified_config
 
 
 @pytest.fixture(scope="session")
-def database(request, local_config, test_db) -> None:
+def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
     """
     Create a new database for the current test session
     and install the table schema using alembic.
     """
-    db_addr = local_config["db"]["addr"]
-    db_user = local_config["db"]["user"]
-    db_pass = local_config["db"]["password"]
+    db_addr = bootstrap_config.db.addr.to_legacy()
+    db_user = bootstrap_config.db.user
+    db_pass = bootstrap_config.db.password
 
     # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
@@ -433,7 +482,7 @@ def database(request, local_config, test_db) -> None:
         config_path=Path.cwd() / "dummy-manager.toml",
         log_level=LogLevel.DEBUG,
     )
-    cli_ctx._local_config = local_config  # override the lazy-loaded config
+    cli_ctx._bootstrap_config = bootstrap_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
@@ -450,8 +499,8 @@ def database(request, local_config, test_db) -> None:
 
 
 @pytest.fixture()
-async def database_engine(local_config, database):
-    async with connect_database(local_config) as db:
+async def database_engine(bootstrap_config, database):
+    async with connect_database(bootstrap_config.db) as db:
         yield db
 
 
@@ -461,14 +510,14 @@ def extra_fixtures():
 
 
 @pytest.fixture()
-def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterator[None]:
+def database_fixture(bootstrap_config, test_db, database, extra_fixtures) -> Iterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
     """
-    db_addr = local_config["db"]["addr"]
-    db_user = local_config["db"]["user"]
-    db_pass = local_config["db"]["password"]
+    db_addr = bootstrap_config.db.addr.to_legacy()
+    db_user = bootstrap_config.db.user
+    db_pass = bootstrap_config.db.password
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
@@ -476,8 +525,18 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
     extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
     extra_fixture_file_path = Path(extra_fixture_file.name)
 
+    def fixture_json_encoder(obj: Any):
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return str(obj)
+        if isinstance(obj, enum.Enum) or isinstance(obj, enum.StrEnum):
+            return obj.value
+
+        raise TypeError(f'Fixture type "{type(obj)}" not serializable')
+
     with open(extra_fixture_file_path, "w") as f:
-        json.dump(extra_fixtures, f)
+        json.dump(extra_fixtures, f, default=fixture_json_encoder)
 
     fixture_paths = [
         build_root / "fixtures" / "manager" / "example-users.json",
@@ -526,6 +585,7 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ImageAliasRow.__table__.delete()))
                 await conn.execute((ImageRow.__table__.delete()))
                 await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
@@ -599,20 +659,20 @@ class Client:
 
 
 @pytest.fixture
-async def app(local_config):
+async def app(bootstrap_config):
     """
     Create an empty application with the test configuration.
     """
     return build_root_app(
         0,
-        local_config,
+        bootstrap_config,
         cleanup_contexts=[],
         subapp_pkgs=[],
     )
 
 
 @pytest.fixture
-async def create_app_and_client(local_config) -> AsyncIterator:
+async def create_app_and_client(bootstrap_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
@@ -633,13 +693,13 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         if cleanup_contexts is not None:
             for ctx in cleanup_contexts:
                 # if isinstance(ctx, AsyncContextManager):
-                if ctx.__name__ in ["shared_config_ctx", "webapp_plugins_ctx"]:
+                if ctx.__name__ in ["webapp_plugins_ctx"]:
                     _outer_ctx_classes.append(ctx)  # type: ignore
                 else:
                     _cleanup_ctxs.append(ctx)
         app = build_root_app(
             0,
-            local_config,
+            bootstrap_config,
             cleanup_contexts=_cleanup_ctxs,
             subapp_pkgs=subapp_pkgs,
             scheduler_opts={
@@ -656,12 +716,12 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            str(root_ctx.local_config["manager"]["service-addr"].host),
-            root_ctx.local_config["manager"]["service-addr"].port,
+            root_ctx.config_provider.config.manager.service_addr.host,
+            root_ctx.config_provider.config.manager.service_addr.port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.local_config["manager"]["service-addr"].port
+        port = root_ctx.config_provider.config.manager.service_addr.port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client
@@ -710,7 +770,7 @@ def monitor_keypair():
 
 
 @pytest.fixture
-def get_headers(app, default_keypair):
+def get_headers(app, default_keypair, bootstrap_config):
     def create_header(
         method,
         url,
@@ -722,8 +782,7 @@ def get_headers(app, default_keypair):
         keypair=default_keypair,
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
-        root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{bootstrap_config.manager.service_addr.port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -832,11 +891,23 @@ class DummyEtcd:
 
 @pytest.fixture
 async def registry_ctx(mocker):
-    mock_local_config = MagicMock()
-    mock_shared_config = MagicMock()
-    mock_shared_config.update_resource_slots = AsyncMock()
     mocked_etcd = DummyEtcd()
-    mock_shared_config.etcd = mocked_etcd
+    mock_etcd_config_loader = MagicMock()
+    mock_etcd_config_loader.update_resource_slots = AsyncMock()
+    mock_etcd_config_loader._etcd = mocked_etcd
+
+    mock_loader = MagicMock()
+    mock_loader.load = AsyncMock(
+        return_value={
+            "db": {"name": "test_db", "user": "postgres", "password": "develove"},
+            "logging": {},
+        }
+    )
+    mock_config_provider = await ManagerConfigProvider.create(
+        loader=mock_loader,
+        etcd_watcher=MagicMock(),
+        legacy_etcd_config_loader=mock_etcd_config_loader,
+    )
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
     mock_dbsess = MagicMock()
@@ -863,20 +934,20 @@ async def registry_ctx(mocker):
     mock_redis_stream = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
-    mock_event_producer.produce_event = AsyncMock()
+    mock_event_producer.anycast_event = AsyncMock()
+    mock_event_producer.broadcast_event = AsyncMock()
+    mock_event_producer.anycast_and_broadcast_event = AsyncMock()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
-        local_config=mock_local_config,
-        shared_config=mock_shared_config,
+        config_provider=mock_config_provider,
         db=mock_db,
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,
         redis_image=mock_redis_image,
         redis_stream=mock_redis_stream,
-        event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
@@ -892,7 +963,7 @@ async def registry_ctx(mocker):
             mock_dbconn,
             mock_dbsess,
             mock_dbresult,
-            mock_shared_config,
+            mock_config_provider,
             mock_event_dispatcher,
             mock_event_producer,
         )

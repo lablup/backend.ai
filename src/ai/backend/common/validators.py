@@ -485,6 +485,8 @@ class VFolderID(t.Trafaret):
                     converted = (None, UUID().check(pieces[0]))
                 else:
                     converted = tuple_t.check((pieces[0], pieces[2]))
+            case uuid.UUID():
+                converted = (None, UUID().check(value))
             case tuple():
                 converted = tuple_t.check(value)
             case _:
@@ -503,6 +505,9 @@ class TimeZone(t.Trafaret):
         if tz is None:
             self._failure("value is not a known timezone", value=value)
         return tz
+
+
+TimeDelta = datetime.timedelta | relativedelta
 
 
 class TimeDuration(t.Trafaret):
@@ -533,7 +538,7 @@ class TimeDuration(t.Trafaret):
     def __init__(self, *, allow_negative: bool = False) -> None:
         self._allow_negative = allow_negative
 
-    def check_and_return(self, value: Any) -> Union[datetime.timedelta, relativedelta]:
+    def check_and_return(self, value: Any) -> TimeDelta:
         if not isinstance(value, (int, float, str)):
             self._failure("value must be a number or string", value=value)
         if isinstance(value, (int, float)):

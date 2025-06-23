@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 import uuid
 from datetime import datetime
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
 
 import aiohttp_cors
@@ -15,7 +16,8 @@ from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
 from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
+from ai.backend.common.events.dispatcher import EventHandler
+from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
@@ -31,10 +33,6 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class DoLogCleanupEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_log_cleanup"
 
 
 @server_status_required(READ_ALLOWED)
@@ -167,7 +165,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
                 .where(error_logs.c.id.in_([x["log_id"] for x in resp["logs"]]))
             )
             await conn.execute(read_update_query)
-        return web.json_response(resp, status=200)
+        return web.json_response(resp, status=HTTPStatus.OK)
 
 
 @auth_required
@@ -205,13 +203,12 @@ async def mark_cleared(request: web.Request) -> web.Response:
         result = await conn.execute(update_query)
         assert result.rowcount == 1
 
-        return web.json_response({"success": True}, status=200)
+        return web.json_response({"success": True}, status=HTTPStatus.OK)
 
 
 async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogCleanupEvent) -> None:
     root_ctx: RootContext = app["_root.context"]
-    etcd = root_ctx.shared_config.etcd
-    raw_lifetime = await etcd.get("config/logs/error/retention")
+    raw_lifetime = await root_ctx.etcd.get("config/logs/error/retention")
     if raw_lifetime is None:
         raw_lifetime = "90d"
     lifetime: dt.timedelta | relativedelta

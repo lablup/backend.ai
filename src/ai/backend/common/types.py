@@ -50,7 +50,7 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
-from .defs import RedisRole
+from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
@@ -59,9 +59,7 @@ __all__ = (
     "Sentinel",
     "QueueSentinel",
     "CIStrEnum",
-    "CIUpperStrEnum",
     "CIStrEnumTrafaret",
-    "CIUpperStrEnumTrafaret",
     "JSONSerializableMixin",
     "check_typed_tuple",
     "check_typed_dict",
@@ -125,7 +123,7 @@ __all__ = (
     "ClusterMode",
     "ClusterSSHKeyPair",
     "ClusterSSHPortMapping",
-    "EtcdRedisConfig",
+    "RedisProfileTarget",
     "ReadableCIDR",
     "RedisConnectionInfo",
     "RedisHelperConfig",
@@ -144,11 +142,13 @@ __all__ = (
     "MODEL_SERVICE_RUNTIME_PROFILES",
     "ItemResult",
     "ResultSet",
-    "safe_print_redis_config",
+    "safe_print_redis_target",
 )
 
 
 if TYPE_CHECKING:
+    from ai.backend.common.data.vfolder.types import VFolderMountData
+
     from .docker import ImageRef
 
 
@@ -205,8 +205,8 @@ class QueueSentinel(enum.Enum):
 
 class CIStrEnum(enum.StrEnum):
     """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    lowercased.
+    A StrEnum variant that allows case-insensitive matching of its members.
+    All enum values are converted to lowercase for comparison, ensuring they are treated equally regardless of case.
     """
 
     @override
@@ -217,7 +217,7 @@ class CIStrEnum(enum.StrEnum):
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
         for member in cls:
-            if member.value == value:
+            if member.value.lower() == value:
                 return member
         return None
 
@@ -226,32 +226,6 @@ class CIStrEnum(enum.StrEnum):
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
         return CIStrEnumTrafaret(cls)
-
-
-class CIUpperStrEnum(CIStrEnum):
-    """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    UPPERCASED.
-    """
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
-        value = value.upper()
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
-
-    @override
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return name.upper()
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return CIUpperStrEnumTrafaret(cls)
 
 
 T_enum = TypeVar("T_enum", bound=enum.Enum)
@@ -269,22 +243,6 @@ class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
         try:
             # Assume that the enum values are lowercases.
             return self.enum_cls(value.lower())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
-
-
-class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
-    """
-    A case-insensitive version of trafaret to parse StrEnum values.
-    """
-
-    def __init__(self, enum_cls: type[T_enum]) -> None:
-        self.enum_cls = enum_cls
-
-    def check_and_return(self, value: str) -> T_enum:
-        try:
-            # Assume that the enum values are lowercases.
-            return self.enum_cls(value.upper())
         except (KeyError, ValueError):
             self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
@@ -346,6 +304,8 @@ ArchName = NewType("ArchName", str)
 
 ResourceGroupID = NewType("ResourceGroupID", str)
 AgentId = NewType("AgentId", str)
+AGENTID_MANAGER = AgentId("manager")
+AGENTID_STORAGE = AgentId("storage")
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
 SlotName = NewType("SlotName", str)
@@ -353,6 +313,54 @@ MetricKey = NewType("MetricKey", str)
 
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
+
+
+class ContainerStatus(enum.StrEnum):
+    RUNNING = "running"
+    RESTARTING = "restarting"
+    PAUSED = "paused"
+    EXITED = "exited"
+    DEAD = "dead"
+    REMOVING = "removing"
+
+    @classmethod
+    def active_set(cls) -> frozenset[ContainerStatus]:
+        """
+        Returns a set of active container statuses.
+        """
+        return frozenset([
+            cls.RUNNING,
+            cls.RESTARTING,
+            cls.PAUSED,
+        ])
+
+    @classmethod
+    def dead_set(cls) -> frozenset[ContainerStatus]:
+        """
+        Returns a set of dead container statuses.
+        """
+        return frozenset([
+            cls.EXITED,
+            cls.DEAD,
+            cls.REMOVING,
+        ])
+
+
+class KernelLifecycleStatus(enum.StrEnum):
+    """
+    The lifecycle status of kernel objects in agent side.
+    This is a duplicate of the `KernelLifecycleStatus` enum in the `ai.backend.agent.types` module.
+
+    By default, the state of a newly created kernel is `PREPARING`.
+    The state of a kernel changes from `PREPARING` to `RUNNING` after the kernel starts a container successfully.
+    It changes from `RUNNING` to `TERMINATING` before destroy kernel.
+    """
+
+    PREPARING = "preparing"
+    RUNNING = "running"
+    TERMINATING = "terminating"
+    NOT_REGISTERED = "not_registered"  # If the kernel is not in agent's kernel registry
+    CONTAINER_NOT_FOUND = "container_not_found"  # If there is no kernel's container
 
 
 class AbstractPermission(enum.StrEnum):
@@ -401,14 +409,14 @@ class ServicePortProtocols(enum.StrEnum):
     INTERNAL = "internal"
 
 
-class SessionTypes(enum.StrEnum):
+class SessionTypes(CIStrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
 
 
-class SessionResult(enum.StrEnum):
+class SessionResult(CIStrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
@@ -422,6 +430,18 @@ class ResourceGroupType(enum.StrEnum):
 class ClusterMode(enum.StrEnum):
     SINGLE_NODE = "single-node"
     MULTI_NODE = "multi-node"
+
+    @override
+    @classmethod
+    def _missing_(cls, value: object) -> Optional[ClusterMode]:
+        assert isinstance(value, str)
+        # This implementation ensures compatibility with both cases, as we are mixing the use of enum names and values in DB, GraphQL, REST, etc.
+        match value.lower():
+            case "single-node" | "single_node":
+                return cls.SINGLE_NODE
+            case "multi-node" | "multi_node":
+                return cls.MULTI_NODE
+        return None
 
 
 class CommitStatus(enum.StrEnum):
@@ -513,12 +533,15 @@ class MountTypes(enum.StrEnum):
 
 
 class MountPoint(BaseModel):
+    model_config = ConfigDict(
+        validate_by_name=True,
+        protected_namespaces=(),
+    )
+
     type: MountTypes = Field(default=MountTypes.BIND)
     source: Path
     target: Path | None = Field(default=None)
     permission: MountPermission | None = Field(alias="perm", default=None)
-
-    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
 
 class MountExpression:
@@ -918,17 +941,19 @@ class ResourceSlot(UserDict):
         obj: Mapping[str, Any],
         slot_types: Optional[Mapping[SlotName, SlotTypes]],
     ) -> "ResourceSlot":
+        pruned_obj = {k: v for k, v in obj.items() if v != 0}
+
         try:
             if slot_types is None:
                 data = {
                     k: cls._normalize_value(k, v, cls._guess_slot_type(k))
-                    for k, v in obj.items()
+                    for k, v in pruned_obj.items()
                     if v is not None
                 }
             else:
                 data = {
                     k: cls._normalize_value(k, v, slot_types[SlotName(k)])
-                    for k, v in obj.items()
+                    for k, v in pruned_obj.items()
                     if v is not None
                 }
                 # fill missing
@@ -960,6 +985,9 @@ class ResourceSlot(UserDict):
     def to_json(self) -> Mapping[str, str]:
         return {k: _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None}
 
+    def has_intrinsic_slots(self) -> bool:
+        return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
+
 
 class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
@@ -976,7 +1004,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-type VolumeID = uuid.UUID
+VolumeID: TypeAlias = uuid.UUID
 
 
 @attrs.define(slots=True, frozen=True)
@@ -1053,7 +1081,7 @@ class VFolderID:
         return hash((qsid, self.folder_id))
 
 
-class VFolderUsageMode(enum.StrEnum):
+class VFolderUsageMode(CIStrEnum):
     """
     Usage mode of virtual folder.
 
@@ -1089,8 +1117,33 @@ class VFolderMount(JSONSerializableMixin):
         }
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> VFolderMount:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def from_dataclass(cls, obj: VFolderMountData) -> Self:
+        return cls(
+            name=obj.name,
+            vfid=obj.vfid,
+            vfsubpath=obj.vfsubpath,
+            host_path=obj.host_path,
+            kernel_path=obj.kernel_path,
+            mount_perm=obj.mount_perm,
+            usage_mode=obj.usage_mode,
+        )
+
+    def to_dataclass(self) -> VFolderMountData:
+        from ai.backend.common.data.vfolder.types import VFolderMountData
+
+        return VFolderMountData(
+            name=self.name,
+            vfid=self.vfid,
+            vfsubpath=self.vfsubpath,
+            host_path=self.host_path,
+            kernel_path=self.kernel_path,
+            mount_perm=self.mount_perm,
+            usage_mode=self.usage_mode,
+        )
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
@@ -1216,6 +1269,82 @@ class DeviceModelInfo(TypedDict):
     data: ComputedDeviceCapacity  # name kept for backward compat with plugins
 
 
+@dataclass
+class KernelContainerId:
+    """
+    Represents a mapping between a kernel ID and a container ID.
+    Container ID can be None if the kernel is not yet assigned to a container.
+    """
+
+    kernel_id: KernelId
+    container_id: Optional[ContainerId]
+
+    @property
+    def human_readable_container_id(self) -> str:
+        """
+        Returns a human-readable version of the container ID.
+        This is useful for logging and debugging purposes.
+        """
+        return (
+            str(self.container_id)[:12] if self.container_id is not None else UNKNOWN_CONTAINER_ID
+        )
+
+    def serialize(self) -> tuple[str, Optional[str]]:
+        """
+        Serializes the KernelContainerId to a string format.
+        """
+        return (
+            str(self.kernel_id),
+            str(self.container_id) if self.container_id is not None else None,
+        )
+
+    @classmethod
+    def deserialize(cls, data: tuple[str, Optional[str]]) -> Self:
+        """
+        Deserializes a string into a KernelContainerId instance.
+        """
+        kernel_id, container_id = data
+        return cls(
+            KernelId(UUID(kernel_id)),
+            ContainerId(container_id) if container_id is not None else None,
+        )
+
+
+@dataclass
+class ContainerKernelId:
+    """
+    Represents a mapping between a container ID and a kernel ID.
+    """
+
+    container_id: ContainerId
+    kernel_id: KernelId
+
+    @property
+    def human_readable_container_id(self) -> str:
+        """
+        Returns a human-readable version of the container ID.
+        This is useful for logging and debugging purposes.
+        """
+        return str(self.container_id)[:12]
+
+    def serialize(self) -> tuple[str, str]:
+        """
+        Serializes the KernelContainerId to a string format.
+        """
+        return (
+            str(self.container_id),
+            str(self.kernel_id),
+        )
+
+    @classmethod
+    def deserialize(cls, data: tuple[str, str]) -> Self:
+        """
+        Deserializes a string into a KernelContainerId instance.
+        """
+        container_id, kernel_id = data
+        return cls(ContainerId(container_id), KernelId(UUID(kernel_id)))
+
+
 class KernelCreationResult(TypedDict):
     id: KernelId
     container_id: ContainerId
@@ -1244,7 +1373,7 @@ class KernelCreationConfig(TypedDict):
     main_gid: Optional[int]
     supplementary_gids: list[int]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
-    resource_opts: Mapping[str, str]  # json form of resource options
+    resource_opts: Mapping[str, Any]  # json form of resource options
     environ: Mapping[str, str]
     mounts: Sequence[Mapping[str, Any]]  # list of serialized VFolderMount
     package_directory: Sequence[str]
@@ -1299,26 +1428,12 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 
 
 @dataclass
-class RedisConfig:
+class RedisTarget:
     addr: Optional[HostPortPair] = None
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
-
-    def __init__(
-        self,
-        addr: Optional[HostPortPair] = None,
-        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
-        service_name: Optional[str] = None,
-        password: Optional[str] = None,
-        redis_helper_config: Optional[RedisHelperConfig] = None,
-    ) -> None:
-        self.addr = addr
-        self.sentinel = sentinel
-        self.service_name = service_name
-        self.password = password
-        self.redis_helper_config = redis_helper_config
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1332,8 +1447,8 @@ class RedisConfig:
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
 
-    def copy(self) -> "RedisConfig":
-        return RedisConfig(
+    def copy(self) -> RedisTarget:
+        return RedisTarget(
             addr=self.addr,
             sentinel=self.sentinel,
             service_name=self.service_name,
@@ -1343,9 +1458,9 @@ class RedisConfig:
 
 
 @dataclass
-class EtcdRedisConfig:
-    _base_config: RedisConfig
-    _override_configs: Optional[Mapping[str, RedisConfig]]
+class RedisProfileTarget:
+    _base_target: RedisTarget
+    _override_targets: Optional[Mapping[str, RedisTarget]]
 
     def __init__(
         self,
@@ -1355,60 +1470,51 @@ class EtcdRedisConfig:
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
-        override_configs: Optional[Mapping[str, RedisConfig]] = None,
+        override_targets: Optional[Mapping[str, RedisTarget]] = None,
     ) -> None:
-        self._base_config = RedisConfig(
+        self._base_target = RedisTarget(
             addr=addr,
             sentinel=sentinel,
             service_name=service_name,
             password=password,
             redis_helper_config=redis_helper_config,
         )
-        self._override_configs = override_configs
+        self._override_targets = override_targets
 
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self._base_config, key)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        setattr(self._base_config, key, value)
-
-    def __contains__(self, key: str) -> bool:
-        return hasattr(self._base_config, key)
-
-    def get_override_config(self, role: RedisRole) -> Any:
-        if self._override_configs and (role in self._override_configs):
-            return self._override_configs[role]
-        return self._base_config
-
-    def copy(self) -> "EtcdRedisConfig":
-        return EtcdRedisConfig(
-            addr=self._base_config.get("addr"),
-            sentinel=self._base_config.get("sentinel"),
-            service_name=self._base_config.get("service_name"),
-            password=self._base_config.get("password"),
-            redis_helper_config=self._base_config.get("redis_helper_config"),
-            override_configs=dict(self._override_configs) if self._override_configs else None,
-        )
+    def profile_target(self, role: RedisRole) -> RedisTarget:
+        if self._override_targets and (role in self._override_targets):
+            return self._override_targets[role]
+        return self._base_target
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
-        override_configs = None
+        override_targets = None
         if data.get("override_configs"):
-            override_configs = {
-                target: RedisConfig(**cfg) for target, cfg in data["override_configs"].items()
+            override_targets = {
+                target: RedisTarget(**cfg) for target, cfg in data["override_configs"].items()
             }
 
+        addr = None
+        # TODO: Remove this match statement after pydantic migration done.
+        if addr_data := data.get("addr"):
+            if isinstance(addr_data, HostPortPair):
+                addr = HostPortPair(addr_data.host, addr_data.port)
+            elif isinstance(addr_data, Mapping):
+                addr = HostPortPair(addr_data["host"], addr_data["port"])
+            else:
+                addr_data = addr_data.split(":")
+                addr = HostPortPair(addr_data[0], int(addr_data[1]))
         return cls(
-            addr=data.get("addr"),
+            addr=addr,
             sentinel=data.get("sentinel"),
             service_name=data.get("service_name"),
             password=data.get("password"),
             redis_helper_config=data.get("redis_helper_config"),
-            override_configs=override_configs,
+            override_targets=override_targets,
         )
 
 
-def safe_print_redis_config(config: RedisConfig) -> str:
+def safe_print_redis_target(config: RedisTarget) -> str:
     safe_config = config.copy()
     if "password" in safe_config:
         safe_config["password"] = "********"
@@ -1567,12 +1673,12 @@ class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
         return result
 
 
-class AutoScalingMetricSource(CIUpperStrEnum):
+class AutoScalingMetricSource(CIStrEnum):
     KERNEL = enum.auto()
     INFERENCE_FRAMEWORK = enum.auto()
 
 
-class AutoScalingMetricComparator(CIUpperStrEnum):
+class AutoScalingMetricComparator(CIStrEnum):
     LESS_THAN = enum.auto()
     LESS_THAN_OR_EQUAL = enum.auto()
     GREATER_THAN = enum.auto()
@@ -1601,8 +1707,38 @@ class DispatchResult(Generic[ResultType]):
         else:
             return "errors: " + "\n".join(self.errors)
 
+    @classmethod
+    def success(cls, result_type: ResultType) -> DispatchResult[ResultType]:
+        return cls(result=result_type)
+
+    @classmethod
+    def error(cls, error_message: str) -> DispatchResult[ResultType]:
+        return cls(errors=[error_message])
+
+    @classmethod
+    def partial_success(
+        cls, result_type: ResultType, errors: list[str]
+    ) -> DispatchResult[ResultType]:
+        return cls(result=result_type, errors=errors)
+
 
 class PurgeImageResult(TypedDict):
     image: str
     result: Optional[list[Any]]
     error: Optional[str]
+
+
+class ServiceDiscoveryType(enum.StrEnum):
+    ETCD = "etcd"
+    REDIS = "redis"
+
+
+class SessionExecutionStatus(enum.StrEnum):
+    """
+    Status of the session execution.
+    """
+
+    STARTED = "started"
+    FINISHED = "finished"
+    CANCELED = "canceled"
+    TIMEOUT = "timeout"

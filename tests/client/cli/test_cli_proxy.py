@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import aiohttp
 import pytest
 from aiohttp import web
@@ -28,7 +30,7 @@ async def api_app_fixture(unused_tcp_port_factory):
 
     async def echo_web(request):
         body = await request.read()
-        resp = web.Response(status=200, reason="Good", body=body)
+        resp = web.Response(status=HTTPStatus.OK, reason="Good", body=body)
         resp.headers["Content-Type"] = request.content_type
         return resp
 
@@ -80,7 +82,7 @@ async def test_proxy_web(
         proxy_url = "http://127.0.0.1:{}".format(proxy_port)
         data = {"test": 1234}
         async with proxy_client.request("POST", proxy_url + "/echo", json=data) as resp:
-            assert resp.status == 200
+            assert resp.status == HTTPStatus.OK
             assert resp.reason == "Good"
             ret = await resp.json()
             assert ret["test"] == 1234
@@ -109,7 +111,7 @@ async def test_proxy_web_502(
         proxy_url = "http://127.0.0.1:{}".format(proxy_port)
         data = {"test": 1234}
         async with proxy_client.request("POST", proxy_url + "/echo", json=data) as resp:
-            assert resp.status == 502
+            assert resp.status == HTTPStatus.BAD_GATEWAY
             assert resp.reason == "Bad Gateway"
 
 

@@ -209,7 +209,7 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, ruff's executable path is
-``dist/export/python/virtualenvs/ruff/3.12.8/bin/ruff``.
+``dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -259,7 +259,7 @@ Set the workspace settings for the Python extension for code navigation and auto
    * - ``python.analysis.autoSearchPaths``
      - true
    * - ``python.analysis.extraPaths``
-     - ``["dist/export/python/virtualenvs/python-default/3.12.8/lib/python3.12/site-packages"]``
+     - ``["dist/export/python/virtualenvs/python-default/3.13.3/lib/python3.12/site-packages"]``
    * - ``python.analysis.importFormat``
      - ``"relative"``
    * - ``editor.formatOnSave``
@@ -275,11 +275,11 @@ Set the following keys in the workspace settings to configure Python tools:
    * - Setting ID
      - Example value
    * - ``mypy-type-checker.interpreter``
-     - ``["dist/export/python/virtualenvs/mypy/3.12.8/bin/python"]``
+     - ``["dist/export/python/virtualenvs/mypy/3.13.3/bin/python"]``
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/ruff/3.12.8/bin/python"]``
+     - ``["dist/export/python/virtualenvs/ruff/3.13.3/bin/python"]``
    * - ``ruff.importStrategy``
      - ``"fromEnvironment"``
 
@@ -309,8 +309,8 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.12.8/bin/mypy'
-   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.12.8/bin/ruff'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.3/bin/mypy'
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
    let g:ale_fix_on_save = 1
@@ -328,11 +328,11 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "ruff.enabled": true,
      "ruff.autoFixOnSave": true,
      "ruff.useDetectRuffCommand": false,
-     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.12.8/bin/python",
-     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.12.8/bin/ruff-lsp",
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.12.8/bin/python",
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.13.3/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.13.3/bin/ruff-lsp",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.3/bin/python",
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.12.8/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.3/bin/mypy",
    }
 
 To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``
@@ -642,7 +642,7 @@ In this case, we recommend to do it as follows:
 
       $ pants --tag=wheel package src/ai/backend/client:dist
 
-   This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``.
+   This will generate ``dist/backend_ai_client-{VERSION}-py3-none-any.whl``.
 
 2. Run ``pip install -U {MONOREPO_PATH}/dist/{WHEEL_FILE}`` in the target environment.
 
@@ -703,12 +703,19 @@ Making a new release
   line, e.g., using ``set noeol`` in Vim.  This is also configured in
   ``./editorconfig``)
 
-* Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
+* Run ``LOCKSET=towncrier/3.13.3 ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
     actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
+
+  - Alternatively, you can use the following command to automatically fetch the Python interpreter version
+    from ``pants.toml`` and generate the changelog:
+
+    .. code-block:: console
+
+       $ ./py -m towncrier --version $(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml)
 
 * Make a new git commit with the commit message: "release: <version>".
 

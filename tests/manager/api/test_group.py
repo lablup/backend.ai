@@ -1,4 +1,5 @@
 import json
+from http import HTTPStatus
 from urllib.parse import urlencode
 
 import pytest
@@ -10,7 +11,6 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     redis_ctx,
     services_ctx,
-    shared_config_ctx,
 )
 from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
@@ -50,13 +50,16 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 async def test_harbor_create_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -77,7 +80,7 @@ async def test_harbor_create_project_quota(
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
         mocked.get(
             get_project_id_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_project_id"],
         )
 
@@ -85,7 +88,7 @@ async def test_harbor_create_project_quota(
         get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_quotas"],
         )
 
@@ -93,7 +96,7 @@ async def test_harbor_create_project_quota(
         put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
         )
 
         resp = await client.post(url, data=req_bytes, headers=headers)
@@ -115,7 +118,7 @@ async def test_harbor_create_project_quota(
                     }
                 ],
             },
-            "expected_code": 200,
+            "expected_code": HTTPStatus.OK,
         },
         {
             "mock_harbor_responses": {
@@ -127,7 +130,7 @@ async def test_harbor_create_project_quota(
                     }
                 ],
             },
-            "expected_code": 404,
+            "expected_code": HTTPStatus.NOT_FOUND,
         },
     ],
     ids=["Normal case", "Project Quota doesn't exist"],
@@ -135,13 +138,16 @@ async def test_harbor_create_project_quota(
 async def test_harbor_read_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -155,13 +161,17 @@ async def test_harbor_read_project_quota(
 
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        mocked.get(
+            get_project_id_url,
+            status=HTTPStatus.OK,
+            payload=mock_harbor_responses["get_project_id"],
+        )
         harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
         get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_quotas"],
         )
 
@@ -189,7 +199,7 @@ async def test_harbor_read_project_quota(
                     }
                 ],
             },
-            "expected_code": 204,
+            "expected_code": HTTPStatus.NO_CONTENT,
         },
         {
             "mock_harbor_responses": {
@@ -201,7 +211,7 @@ async def test_harbor_read_project_quota(
                     }
                 ],
             },
-            "expected_code": 404,
+            "expected_code": HTTPStatus.NOT_FOUND,
         },
     ],
     ids=["Normal case", "Project Quota not found"],
@@ -209,13 +219,16 @@ async def test_harbor_read_project_quota(
 async def test_harbor_update_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -234,13 +247,17 @@ async def test_harbor_update_project_quota(
 
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        mocked.get(
+            get_project_id_url,
+            status=HTTPStatus.OK,
+            payload=mock_harbor_responses["get_project_id"],
+        )
         harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
         get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_quotas"],
         )
         harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
@@ -248,7 +265,7 @@ async def test_harbor_update_project_quota(
         put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
         )
 
         resp = await client.patch(url, data=req_bytes, headers=headers)
@@ -270,7 +287,7 @@ async def test_harbor_update_project_quota(
                     }
                 ],
             },
-            "expected_code": 204,
+            "expected_code": HTTPStatus.NO_CONTENT,
         },
         {
             "mock_harbor_responses": {
@@ -282,7 +299,7 @@ async def test_harbor_update_project_quota(
                     }
                 ],
             },
-            "expected_code": 404,
+            "expected_code": HTTPStatus.NOT_FOUND,
         },
     ],
     ids=["Normal case", "Project Quota not found"],
@@ -290,13 +307,16 @@ async def test_harbor_update_project_quota(
 async def test_harbor_delete_project_quota(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
     database_fixture,
     create_app_and_client,
     get_headers,
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -315,13 +335,17 @@ async def test_harbor_delete_project_quota(
 
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        mocked.get(
+            get_project_id_url,
+            status=HTTPStatus.OK,
+            payload=mock_harbor_responses["get_project_id"],
+        )
         harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
         get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
             payload=mock_harbor_responses["get_quotas"],
         )
         harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
@@ -329,7 +353,7 @@ async def test_harbor_delete_project_quota(
         put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
-            status=200,
+            status=HTTPStatus.OK,
         )
 
         resp = await client.delete(url, data=req_bytes, headers=headers)

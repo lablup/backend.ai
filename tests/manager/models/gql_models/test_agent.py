@@ -1,14 +1,16 @@
 import asyncio
 import json
+from dataclasses import asdict
 from unittest.mock import AsyncMock, patch
 
-import attr
 import pytest
 from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.event_types.bgtask.broadcast import BgtaskDoneEvent
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.agent import AgentStatus
@@ -17,12 +19,15 @@ from ai.backend.manager.server import (
     agent_registry_ctx,
     background_task_ctx,
     database_ctx,
-    event_dispatcher_ctx,
+    event_dispatcher_plugin_ctx,
+    event_hub_ctx,
+    event_producer_ctx,
     hook_plugin_ctx,
+    message_queue_ctx,
     monitoring_ctx,
     network_plugin_ctx,
     redis_ctx,
-    shared_config_ctx,
+    services_ctx,
     storage_manager_ctx,
 )
 
@@ -36,8 +41,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
-        local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
+        config_provider=None,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -53,6 +57,8 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
         services_ctx=None,  # type: ignore
+        metric_observer=GraphQLMetricObserver.instance(),
+        processors=None,  # type: ignore
     )
 
 
@@ -105,24 +111,36 @@ EXTRA_FIXTURES = {
 )
 async def test_scan_gpu_alloc_maps(
     mock_agent_responses,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
     client,
-    local_config,
+    bootstrap_config,
     etcd_fixture,
     database_fixture,
+    event_dispatcher_test_ctx,
     create_app_and_client,
     test_case,
     extra_fixtures,
 ):
     test_app, _ = await create_app_and_client(
         [
-            shared_config_ctx,
+            event_hub_ctx,
+            mock_etcd_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             redis_ctx,
-            monitoring_ctx,
-            hook_plugin_ctx,
-            event_dispatcher_ctx,
+            message_queue_ctx,
+            event_producer_ctx,
             storage_manager_ctx,
+            monitoring_ctx,
             network_plugin_ctx,
+            hook_plugin_ctx,
+            event_dispatcher_plugin_ctx,
+            agent_registry_ctx,
+            event_dispatcher_test_ctx,
+            services_ctx,
+            network_plugin_ctx,
+            storage_manager_ctx,
             agent_registry_ctx,
             background_task_ctx,
         ],
@@ -139,7 +157,7 @@ async def test_scan_gpu_alloc_maps(
         source: AgentId,
         event: BgtaskDoneEvent,
     ) -> None:
-        update_body = attr.asdict(event)  # type: ignore
+        update_body = asdict(event)
         done_handler_ctx.update(**update_body)
         done_event.set()
 

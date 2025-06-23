@@ -13,9 +13,11 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Callable,
     Final,
     List,
     Optional,
+    Self,
     TypeAlias,
     Union,
     cast,
@@ -24,28 +26,34 @@ from typing import (
 from uuid import UUID
 
 import aiotools
-import graphene
 import redis.exceptions
 import sqlalchemy as sa
-from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
-from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
+from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events import (
-    DoStartSessionEvent,
-    EventDispatcher,
+from ai.backend.common.events.dispatcher import (
     EventProducer,
-    SessionStartedEvent,
-    SessionTerminatedEvent,
+)
+from ai.backend.common.events.event_types.schedule.anycast import (
+    DoStartSessionEvent,
+)
+from ai.backend.common.events.event_types.session.anycast import (
+    DoUpdateSessionStatusEvent,
+    SessionStartedAnycastEvent,
+    SessionTerminatedAnycastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionStartedBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AccessKey,
+    CIStrEnum,
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
@@ -56,8 +64,10 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionData
 
-from ..api.exceptions import (
+from ..defs import DEFAULT_ROLE
+from ..errors.exceptions import (
     AgentError,
     BackendError,
     KernelCreationFailed,
@@ -70,29 +80,21 @@ from ..api.exceptions import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ..defs import DEFAULT_ROLE
 from .base import (
     GUID,
     Base,
-    BigInt,
     EnumType,
     ForeignKeyIDColumn,
-    Item,
-    PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
-    batch_multiresult_in_session,
-    batch_result_in_session,
 )
 from .group import GroupRow
 from .image import ImageRow
-from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang import ArrayFieldItem, JSONFieldItem
-from .minilang.ordering import ColumnMapType, QueryOrderParser
-from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
+from .kernel import KernelRow, KernelStatus
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .network import NetworkRow, NetworkType
 from .rbac import (
     AbstractPermissionContext,
@@ -107,21 +109,16 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ComputeSessionPermission
-from .user import UserRow
 from .utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
-    agg_to_array,
     execute_with_retry,
     execute_with_txn_retry,
     sql_json_merge,
 )
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import Row
-
     from ..registry import AgentRegistry
-    from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -138,17 +135,13 @@ __all__ = (
     "SessionRow",
     "SessionDependencyRow",
     "check_all_dependencies",
-    "ComputeSession",
-    "ComputeSessionList",
-    "InferenceSession",
-    "InferenceSessionList",
     "KernelLoadingStrategy",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
 
 
-class SessionStatus(enum.StrEnum):
+class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     # ---
@@ -169,6 +162,15 @@ class SessionStatus(enum.StrEnum):
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
 
+    @classmethod
+    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
+        return {
+            cls.PREPARING,
+            cls.PULLING,
+            cls.CREATING,
+            cls.TERMINATING,
+        }
+
 
 FOLLOWING_SESSION_STATUSES = (
     # Session statuses that need to wait all kernels belonging to the session
@@ -183,10 +185,10 @@ LEADING_SESSION_STATUSES = tuple(
     if s not in FOLLOWING_SESSION_STATUSES
 )
 
-DEAD_SESSION_STATUSES = (
+DEAD_SESSION_STATUSES = frozenset([
     SessionStatus.CANCELLED,
     SessionStatus.TERMINATED,
-)
+])
 
 # statuses to consider when calculating current resource usage
 AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
@@ -812,6 +814,54 @@ class SessionRow(Base):
     Use `get_network_ref()` method to reveal actual network ref (generated by network plugin).
     """
 
+    @classmethod
+    def from_dataclass(cls, session_data: SessionData) -> SessionRow:
+        vfolder_mounts = None
+        if session_data.vfolder_mounts:
+            vfolder_mounts = [
+                VFolderMount.from_dataclass(mount) for mount in session_data.vfolder_mounts
+            ]
+
+        return cls(
+            id=session_data.id,
+            name=session_data.name,
+            session_type=session_data.session_type,
+            priority=session_data.priority,
+            cluster_mode=session_data.cluster_mode,
+            cluster_size=session_data.cluster_size,
+            agent_ids=session_data.agent_ids,
+            scaling_group_name=session_data.scaling_group_name,
+            target_sgroup_names=session_data.target_sgroup_names,
+            domain_name=session_data.domain_name,
+            group_id=session_data.group_id,
+            user_uuid=session_data.user_uuid,
+            access_key=session_data.access_key,
+            images=session_data.images,
+            tag=session_data.tag,
+            occupying_slots=session_data.occupying_slots,
+            requested_slots=session_data.requested_slots,
+            vfolder_mounts=vfolder_mounts,
+            environ=session_data.environ or {},
+            bootstrap_script=session_data.bootstrap_script or "",
+            use_host_network=session_data.use_host_network or False,
+            timeout=session_data.timeout or 0,
+            batch_timeout=session_data.batch_timeout or 0,
+            status_history={},
+            status=session_data.status,
+            status_info=session_data.status_info,
+            status_data=session_data.status_data,
+            callback_url=session_data.callback_url,
+            startup_command=session_data.startup_command,
+            result=session_data.result,
+            num_queries=session_data.num_queries,
+            last_stat=session_data.last_stat,
+            network_type=session_data.network_type,
+            network_id=session_data.network_id,
+            created_at=session_data.created_at,
+            terminated_at=session_data.terminated_at,
+            starts_at=session_data.starts_at,
+        )
+
     routing = relationship("RoutingRow", back_populates="session_row")
 
     __table_args__ = (
@@ -909,24 +959,15 @@ class SessionRow(Base):
 
     @classmethod
     async def get_session_to_determine_status(
-        cls, db_session: SASession, session_id: SessionId
+        cls,
+        db_session: SASession,
+        session_id: SessionId,
     ) -> SessionRow:
         stmt = (
             sa.select(SessionRow)
             .where(SessionRow.id == session_id)
-            .options(
-                selectinload(SessionRow.kernels).options(
-                    load_only(
-                        KernelRow.agent,
-                        KernelRow.agent_addr,
-                        KernelRow.startup_command,
-                        KernelRow.status,
-                        KernelRow.cluster_role,
-                        KernelRow.status_info,
-                        KernelRow.occupied_slots,
-                    )
-                ),
-            )
+            # TODO: Add kernel loading strategy?
+            .options(selectinload(SessionRow.kernels))
         )
         session_row = cast(SessionRow | None, await db_session.scalar(stmt))
         if session_row is None:
@@ -952,6 +993,30 @@ class SessionRow(Base):
 
         self.set_status(determined_status, status_info, status_data, status_changed_at)
         return True
+
+    @classmethod
+    async def list_session_by_condition(
+        cls,
+        conditions: Iterable[QueryCondition],
+        options: Iterable[QueryOption] = tuple(),
+        *,
+        db: ExtendedAsyncSAEngine,
+    ) -> list[Self]:
+        stmt = sa.select(SessionRow)
+        condition: Optional[sa.sql.expression.BinaryExpression] = None
+        for cond_callable in conditions:
+            condition = cond_callable(condition)
+        if condition is not None:
+            stmt = stmt.where(condition)
+
+        for option in options:
+            stmt = option(stmt)
+
+        async def fetch(db_session: SASession) -> list[SessionRow]:
+            return (await db_session.scalars(stmt)).all()
+
+        async with db.connect() as db_conn:
+            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
     def set_status(
         self,
@@ -981,6 +1046,17 @@ class SessionRow(Base):
             _status_info = status_info
         if _status_info is not None:
             self.status_info = _status_info
+
+    def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
+        self.user_uuid = user_uuid
+        self.access_key = access_key
+        for kernel_row in cast(list[KernelRow], self.kernels):
+            kernel_row.delegate_ownership(user_uuid, access_key)
+
+    @staticmethod
+    async def delete_by_user_id(user_uuid: UUID, *, db_session: SASession) -> None:
+        await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == user_uuid))
+        await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
 
     @staticmethod
     async def set_session_status(
@@ -1293,6 +1369,133 @@ class SessionRow(Base):
             case _:
                 return None
 
+    @classmethod
+    def get_status_elapsed_time(
+        cls, status: SessionStatus, until: datetime
+    ) -> sa.sql.elements.BinaryExpression:
+        return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
+
+
+@dataclass
+class SessionQueryConditions:
+    statuses: Optional[Iterable[SessionStatus]] = None
+    user_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
+    domain_name: Optional[str] = None
+    resource_group_name: Optional[str] = None
+    raw_filter: Optional[str] = None
+
+
+type QueryConditionCallable = Callable[
+    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
+]
+type QueryCondition = Callable[..., QueryConditionCallable]
+
+
+def and_status(statuses: Iterable[SessionStatus]) -> QueryConditionCallable:
+    def _and_status(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.status.in_(statuses)
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_status
+
+
+def and_user_id(user_id: UUID) -> QueryConditionCallable:
+    def _and_user_id(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.user_uuid == user_id
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_user_id
+
+
+def and_project_id(project_id: UUID) -> QueryConditionCallable:
+    def _and_project_id(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.group_id == project_id
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_project_id
+
+
+def and_domain_name(domain_name: str) -> QueryConditionCallable:
+    def _and_domain_name(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return (
+            sa.and_(cond, SessionRow.domain_name == domain_name)
+            if cond is not None
+            else SessionRow.domain_name == domain_name
+        )
+
+    return _and_domain_name
+
+
+def and_resource_group_name(resource_group_name: str) -> QueryConditionCallable:
+    def _and_resource_group_name(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        new_cond = SessionRow.scaling_group_name == resource_group_name
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_resource_group_name
+
+
+def and_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryConditionCallable:
+    def _and_raw_filter(
+        cond: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        qfparser = QueryFilterParser(filter_spec)
+        new_cond = qfparser.parse_filter(SessionRow, raw_filter)
+        return sa.and_(cond, new_cond) if cond is not None else new_cond
+
+    return _and_raw_filter
+
+
+type QueryOptionCallable = Callable[[sa.sql.Select], sa.sql.Select]
+type QueryOption = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
+
+
+class RelatedFields(enum.StrEnum):
+    KERNEL = enum.auto()
+    USER = enum.auto()
+    PROJECT = enum.auto()
+
+    def loading_option(self, already_joined: bool = False) -> Callable:
+        match self:
+            case RelatedFields.KERNEL:
+                return selectinload(SessionRow.kernels)
+            case RelatedFields.USER:
+                if already_joined:
+                    return contains_eager(SessionRow.user)
+                return joinedload(SessionRow.user)
+            case RelatedFields.PROJECT:
+                if already_joined:
+                    return contains_eager(SessionRow.group)
+                return joinedload(SessionRow.group)
+
+    @property
+    def orm_field(self) -> sa.orm.attributes.InstrumentedAttribute:
+        match self:
+            case RelatedFields.KERNEL:
+                return SessionRow.kernels
+            case RelatedFields.USER:
+                return SessionRow.user
+            case RelatedFields.PROJECT:
+                return SessionRow.group
+
+
+def load_related_field(field: RelatedFields, already_joined: bool = False) -> QueryOptionCallable:
+    return lambda stmt: stmt.options(field.loading_option(already_joined))
+
+
+def join_related_field(field: RelatedFields) -> QueryOptionCallable:
+    return lambda stmt: stmt.join(field.orm_field)
+
 
 class SessionLifecycleManager:
     status_set_key = "session_status_update"
@@ -1301,14 +1504,12 @@ class SessionLifecycleManager:
         self,
         db: ExtendedAsyncSAEngine,
         redis_obj: RedisConnectionInfo,
-        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
         registry: AgentRegistry,
     ) -> None:
         self.db = db
         self.redis_obj = redis_obj
-        self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.hook_plugin_ctx = hook_plugin_ctx
         self.registry = registry
@@ -1364,15 +1565,16 @@ class SessionLifecycleManager:
     ) -> None:
         match session_row.status:
             case SessionStatus.PREPARED:
-                await self.event_producer.produce_event(DoStartSessionEvent())
+                await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
                 log.debug(
                     "Producing SessionStartedEvent({}, {})",
                     session_row.id,
                     session_row.creation_id,
                 )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                await self.event_producer.anycast_and_broadcast_event(
+                    SessionStartedAnycastEvent(session_row.id, session_row.creation_id),
+                    SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
@@ -1385,8 +1587,13 @@ class SessionLifecycleManager:
                 if session_row.session_type == SessionTypes.BATCH:
                     await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
-                await self.event_producer.produce_event(
-                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                await self.event_producer.anycast_and_broadcast_event(
+                    SessionTerminatedAnycastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
+                    SessionTerminatedBroadcastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
                 )
             case _:
                 pass
@@ -1395,8 +1602,6 @@ class SessionLifecycleManager:
         self,
         session_ids: Iterable[SessionId],
         status_changed_at: datetime | None = None,
-        *,
-        db_conn: Optional[SAConnection] = None,
     ) -> list[tuple[SessionRow, bool]]:
         if not session_ids:
             return []
@@ -1407,16 +1612,14 @@ class SessionLifecycleManager:
             for sid in session_ids:
                 row, is_transited = await self._transit_session_status(_db_conn, sid, now)
                 result.append((row, is_transited))
-            for row, is_transited in result:
-                if is_transited:
-                    await self._post_status_transition(row)
             return result
 
-        if db_conn is not None:
-            return await _transit(db_conn)
-        else:
-            async with self.db.connect() as db_conn:
-                return await _transit(db_conn)
+        async with self.db.connect() as db_conn:
+            result = await _transit(db_conn)
+        for session_row, is_transited in result:
+            if is_transited:
+                await self._post_status_transition(session_row)
+        return result
 
     async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
         if not session_ids:
@@ -1441,8 +1644,9 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
+        await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
-    async def get_status_updatable_sessions(self) -> list[SessionId]:
+    async def get_status_updatable_sessions(self) -> set[SessionId]:
         pop_all_session_id_script = textwrap.dedent("""
         local key = KEYS[1]
         local count = redis.call('SCARD', key)
@@ -1462,7 +1666,7 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
-            return []
+            raw_result = []
         raw_result = cast(list[bytes], raw_result)
         result: list[SessionId] = []
         for raw_session_id in raw_result:
@@ -1471,7 +1675,14 @@ class SessionLifecycleManager:
             except (ValueError, SyntaxError):
                 log.warning(f"Cannot parse session id, skip. (id:{raw_session_id})")
                 continue
-        return result
+
+        async with self.db.begin_readonly_session() as db_session:
+            session_query = sa.select(SessionRow).where(
+                SessionRow.status.in_(SessionStatus.kernel_awaiting_statuses())
+            )
+            session_rows = await db_session.scalars(session_query)
+            session_ids = [row.id for row in session_rows]
+        return {*result, *session_ids}
 
     async def deregister_status_updatable_session(
         self,
@@ -1543,7 +1754,7 @@ async def check_all_dependencies(
     result = await db_session.execute(query)
     rows = result.scalars().all()
     pending_dependencies = [
-        sess_row for sess_row in rows if sess_row.result != SessionResult.SUCCESS
+        sess_row for sess_row in rows if SessionResult(sess_row.result) != SessionResult.SUCCESS
     ]
     return pending_dependencies
 
@@ -1556,465 +1767,6 @@ DEFAULT_SESSION_ORDERING = [
         )
     ),
 ]
-
-
-class ComputeSession(graphene.ObjectType):
-    class Meta:
-        interfaces = (Item,)
-
-    # identity
-    session_id = graphene.UUID()  # identical to `id`
-    main_kernel_id = graphene.UUID()
-    tag = graphene.String()
-    name = graphene.String()
-    type = graphene.String()
-    main_kernel_role = graphene.String()
-    priority = graphene.Int(
-        description="Added in 24.09.0.",
-    )
-
-    # image
-    image = graphene.String()  # image for the main container
-    architecture = graphene.String()  # image architecture for the main container
-    registry = graphene.String()  # image registry for the main container
-    cluster_template = graphene.String()
-    cluster_mode = graphene.String()
-    cluster_size = graphene.Int()
-
-    # ownership
-    domain_name = graphene.String()
-    group_name = graphene.String()
-    group_id = graphene.UUID()
-    user_email = graphene.String()
-    full_name = graphene.String()
-    user_id = graphene.UUID()
-    access_key = graphene.String()
-    created_user_email = graphene.String()
-    created_user_id = graphene.UUID()
-
-    # status
-    status = graphene.String()
-    status_changed = GQLDateTime()
-    status_info = graphene.String()
-    status_data = graphene.JSONString()
-    status_history = graphene.JSONString()
-    created_at = GQLDateTime()
-    terminated_at = GQLDateTime()
-    starts_at = GQLDateTime()
-    scheduled_at = GQLDateTime()
-    startup_command = graphene.String()
-    result = graphene.String()
-    commit_status = graphene.String()
-    abusing_reports = graphene.List(lambda: graphene.JSONString)
-    idle_checks = graphene.JSONString()
-
-    # resources
-    agent_ids = graphene.List(lambda: graphene.String)
-    agents = graphene.List(lambda: graphene.String)
-    resource_opts = graphene.JSONString()
-    scaling_group = graphene.String()
-    service_ports = graphene.JSONString()
-    mounts = graphene.List(lambda: graphene.String)
-    vfolder_mounts = graphene.List(lambda: graphene.String)
-    occupying_slots = graphene.JSONString()
-    occupied_slots = graphene.JSONString()  # legacy
-    requested_slots = graphene.JSONString(description="Added in 24.03.0.")
-
-    # statistics
-    num_queries = BigInt()
-
-    # owned containers (aka kernels)
-    containers = graphene.List(lambda: ComputeContainer)
-
-    # relations
-    dependencies = graphene.List(lambda: ComputeSession)
-
-    inference_metrics = graphene.JSONString()
-
-    @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
-        assert row is not None
-        email = getattr(row, "email")
-        full_name = getattr(row, "full_name")
-        group_name = getattr(row, "group_name")
-        row = row.SessionRow
-        status_history = row.status_history or {}
-        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
-        # TODO: Deprecate 'mounts' and replace it with a list of VirtualFolderNodes
-        mounts_set: set[str] = set()
-        mounts: list[str] = []
-        vfolder_mounts = cast(list[VFolderMount], row.vfolders_sorted_by_id)
-        for mount in vfolder_mounts:
-            if mount.name not in mounts_set:
-                mounts.append(mount.name)
-                mounts_set.add(mount.name)
-        return {
-            # identity
-            "id": row.id,
-            "session_id": row.id,
-            "main_kernel_id": row.main_kernel.id,
-            "tag": row.tag,
-            "name": row.name,
-            "type": row.session_type.name,
-            "main_kernel_role": row.session_type.name,  # legacy
-            "priority": row.priority,
-            # image
-            "image": row.images[0] if row.images is not None else "",
-            "architecture": row.main_kernel.architecture,
-            "registry": row.main_kernel.registry,
-            "cluster_template": None,  # TODO: implement
-            "cluster_mode": row.cluster_mode,
-            "cluster_size": row.cluster_size,
-            # ownership
-            "domain_name": row.domain_name,
-            "group_name": group_name[0],
-            "group_id": row.group_id,
-            "user_email": email,
-            "full_name": full_name,
-            "user_id": row.user_uuid,
-            "access_key": row.access_key,
-            "created_user_email": None,  # TODO: implement
-            "created_user_id": None,  # TODO: implement
-            # status
-            "status": row.status.name,
-            "status_changed": row.status_changed,
-            "status_info": row.status_info,
-            "status_data": row.status_data,
-            "status_history": status_history,
-            "created_at": row.created_at,
-            "terminated_at": row.terminated_at,
-            "starts_at": row.starts_at,
-            "scheduled_at": (
-                datetime.fromisoformat(raw_scheduled_at) if raw_scheduled_at is not None else None
-            ),
-            "startup_command": row.startup_command,
-            "result": row.result.name,
-            # resources
-            "agent_ids": row.agent_ids,
-            "agents": row.agent_ids,  # for backward compatibility
-            "scaling_group": row.scaling_group_name,
-            "service_ports": row.main_kernel.service_ports,
-            # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
-            "mounts": mounts,
-            "vfolder_mounts": [vf.vfid.folder_id for vf in vfolder_mounts],
-            "occupying_slots": row.occupying_slots.to_json(),
-            "occupied_slots": row.occupying_slots.to_json(),
-            "requested_slots": row.requested_slots.to_json(),
-            # statistics
-            "num_queries": row.num_queries,
-        }
-
-    @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
-        if row is None:
-            return None
-        props = cls.parse_row(ctx, row)
-        return cls(**props)
-
-    async def resolve_inference_metrics(
-        self, info: graphene.ResolveInfo
-    ) -> Optional[Mapping[str, Any]]:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(
-            graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
-        )
-        return await loader.load(self.id)
-
-    async def resolve_containers(
-        self,
-        info: graphene.ResolveInfo,
-    ) -> Iterable[ComputeContainer]:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        return await loader.load(self.session_id)
-
-    async def resolve_dependencies(
-        self,
-        info: graphene.ResolveInfo,
-    ) -> Iterable[ComputeSession]:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
-        return await loader.load(self.id)
-
-    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(
-            graph_ctx, "ComputeSession.commit_statuses"
-        )
-        return await loader.load(self.main_kernel_id)
-
-    async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
-        containers = self.containers
-        if containers is None:
-            containers = await self.resolve_containers(info)
-        if containers is None:
-            return {}
-        self.containers = containers
-        return {cntr.cluster_hostname: cntr.resource_opts for cntr in containers}
-
-    async def resolve_abusing_reports(
-        self, info: graphene.ResolveInfo
-    ) -> Iterable[Optional[Mapping[str, Any]]]:
-        containers = self.containers
-        if containers is None:
-            containers = await self.resolve_containers(info)
-        if containers is None:
-            return []
-        self.containers = containers
-        return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
-
-    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
-        graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
-
-    _queryfilter_fieldspec: FieldSpecType = {
-        "id": ("sessions_id", None),
-        "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
-        "name": ("sessions_name", None),
-        "priority": ("sessions_priority", None),
-        "image": (ArrayFieldItem("sessions_images"), None),
-        "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
-        "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
-        "agents": (ArrayFieldItem("sessions_agent_ids"), None),  # for backward compatibility
-        "domain_name": ("sessions_domain_name", None),
-        "group_name": ("group_name", None),
-        "user_email": ("users_email", None),
-        "user_id": ("sessions_user_uuid", None),
-        "full_name": ("users_full_name", None),
-        "access_key": ("sessions_access_key", None),
-        "scaling_group": ("sessions_scaling_group_name", None),
-        "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
-        "cluster_size": ("sessions_cluster_size", None),
-        "status": ("sessions_status", enum_field_getter(SessionStatus)),
-        "status_info": ("sessions_status_info", None),
-        "result": ("sessions_result", enum_field_getter(SessionResult)),
-        "created_at": ("sessions_created_at", dtparse),
-        "terminated_at": ("sessions_terminated_at", dtparse),
-        "starts_at": ("sessions_starts_at", dtparse),
-        "scheduled_at": (
-            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
-            dtparse,
-        ),
-        "startup_command": ("sessions_startup_command", None),
-    }
-
-    _queryorder_colmap: ColumnMapType = {
-        "id": ("sessions_id", None),
-        "type": ("sessions_session_type", None),
-        "name": ("sessions_name", None),
-        "image": ("sessions_images", None),
-        "priority": ("sessions_priority", None),
-        "agent_ids": ("sessions_agent_ids", None),
-        "agent_id": ("sessions_agent_ids", None),
-        "agents": ("sessions_agent_ids", None),
-        "domain_name": ("sessions_domain_name", None),
-        "group_name": ("group_name", None),
-        "user_email": ("users_email", None),
-        "user_id": ("sessions_user_uuid", None),
-        "full_name": ("users_full_name", None),
-        "access_key": ("sessions_access_key", None),
-        "scaling_group": ("sessions_scaling_group_name", None),
-        "cluster_mode": ("sessions_cluster_mode", None),
-        # "cluster_template": "cluster_template",
-        "cluster_size": ("sessions_cluster_size", None),
-        "status": ("sessions_status", None),
-        "status_info": ("sessions_status_info", None),
-        "result": ("sessions_result", None),
-        "created_at": ("sessions_created_at", None),
-        "terminated_at": ("sessions_terminated_at", None),
-        "starts_at": ("sessions_starts_at", None),
-        "scheduled_at": (
-            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
-            None,
-        ),
-    }
-
-    @classmethod
-    async def load_count(
-        cls,
-        ctx: GraphQueryContext,
-        *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        access_key: Optional[str] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
-    ) -> int:
-        if isinstance(status, str):
-            status_list = [SessionStatus[s] for s in status.split(",")]
-        elif isinstance(status, SessionStatus):
-            status_list = [status]
-        j = (
-            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
-            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
-            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
-            .join(KernelRow, SessionRow.id == KernelRow.session_id)
-        )
-        query = sa.select([sa.func.count(sa.distinct(SessionRow.id))]).select_from(j)
-        if domain_name is not None:
-            query = query.where(SessionRow.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(SessionRow.group_id == group_id)
-        if access_key is not None:
-            query = query.where(SessionRow.access_key == access_key)
-        if status is not None:
-            query = query.where(SessionRow.status.in_(status_list))
-        if filter is not None:
-            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = qfparser.append_filter(query, filter)
-        async with ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            return result.scalar()
-
-    @classmethod
-    async def load_slice(
-        cls,
-        ctx: GraphQueryContext,
-        limit: int,
-        offset: int,
-        *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        access_key: Optional[str] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> Sequence[ComputeSession | None]:
-        if status is None:
-            status_list = None
-        elif isinstance(status, str):
-            status_list = [SessionStatus[s] for s in status.split(",")]
-        elif isinstance(status, SessionStatus):
-            status_list = [status]
-        j = (
-            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
-            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-                UserRow, SessionRow.user_uuid == UserRow.uuid
-            )
-        )
-        query = (
-            sa.select(
-                SessionRow,
-                agg_to_array(GroupRow.name).label("group_name"),
-                UserRow.email,
-                UserRow.full_name,
-            )
-            .select_from(j)
-            .options(selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)))
-            .group_by(SessionRow, UserRow.email, UserRow.full_name)
-            .limit(limit)
-            .offset(offset)
-        )
-        if domain_name is not None:
-            query = query.where(SessionRow.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(SessionRow.group_id == group_id)
-        if access_key is not None:
-            query = query.where(SessionRow.access_key == access_key)
-        if status is not None:
-            query = query.where(SessionRow.status.in_(status_list))
-        if filter is not None:
-            parser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = parser.append_filter(query, filter)
-        if order is not None:
-            qoparser = QueryOrderParser(cls._queryorder_colmap)
-            query = qoparser.append_ordering(query, order)
-        else:
-            query = query.order_by(*DEFAULT_SESSION_ORDERING)
-        async with ctx.db.begin_readonly_session() as db_sess:
-            return [cls.from_row(ctx, r) async for r in (await db_sess.stream(query))]
-
-    @classmethod
-    async def batch_load_detail(
-        cls,
-        ctx: GraphQueryContext,
-        session_ids: Sequence[SessionId],
-        *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[str] = None,
-    ) -> Sequence[ComputeSession | None]:
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.user_uuid == UserRow.uuid
-        )
-        query = (
-            sa.select(
-                SessionRow,
-                GroupRow.name.label("group_name"),
-                UserRow.email,
-                UserRow.full_name,
-            )
-            .select_from(j)
-            .where(SessionRow.id.in_(session_ids))
-            .options(selectinload(SessionRow.kernels))
-        )
-        if domain_name is not None:
-            query = query.where(SessionRow.domain_name == domain_name)
-        if access_key is not None:
-            query = query.where(SessionRow.access_key == access_key)
-        async with ctx.db.begin_readonly_session() as db_sess:
-            return await batch_result_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.SessionRow.id,
-            )
-
-    @classmethod
-    async def batch_load_by_dependency(
-        cls,
-        ctx: GraphQueryContext,
-        session_ids: Sequence[SessionId],
-    ) -> Sequence[Sequence[ComputeSession]]:
-        j = sa.join(
-            SessionRow,
-            SessionDependencyRow,
-            SessionRow.id == SessionDependencyRow.depends_on,
-        )
-        query = (
-            sa.select(SessionRow)
-            .select_from(j)
-            .where(SessionDependencyRow.session_id.in_(session_ids))
-            .options(selectinload(SessionRow.kernels))
-        )
-        async with ctx.db.begin_readonly_session() as db_sess:
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.SessionRow.id,
-            )
-
-    @classmethod
-    async def batch_load_commit_statuses(
-        cls,
-        ctx: GraphQueryContext,
-        kernel_ids: Sequence[KernelId],
-    ) -> Sequence[str]:
-        commit_statuses = await ctx.registry.get_commit_status(kernel_ids)
-        return [commit_statuses[kernel_id] for kernel_id in kernel_ids]
-
-
-class ComputeSessionList(graphene.ObjectType):
-    class Meta:
-        interfaces = (PaginatedList,)
-
-    items = graphene.List(ComputeSession, required=True)
-
-
-class InferenceSession(graphene.ObjectType):
-    class Meta:
-        interfaces = (Item,)
-
-
-class InferenceSessionList(graphene.ObjectType):
-    class Meta:
-        interfaces = (PaginatedList,)
-
-    items = graphene.List(InferenceSession, required=True)
 
 
 ALL_COMPUTE_SESSION_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset([
@@ -2148,7 +1900,9 @@ class ComputeSessionPermissionContextBuilder(
         scope: ProjectScope,
     ) -> ComputeSessionPermissionContext:
         permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
-        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        _user_perm_ctx = await self._build_at_user_scope_in_project(
+            ctx, ctx.user_id, scope.project_id
+        )
         permission_ctx.merge(_user_perm_ctx)
         return permission_ctx
 
@@ -2183,6 +1937,27 @@ class ComputeSessionPermissionContextBuilder(
         _vfolder_stmt = (
             sa.select(SessionRow)
             .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
+            .options(load_only(SessionRow.id))
+        )
+        own_folder_map = {
+            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
+        }
+        result = ComputeSessionPermissionContext(
+            object_id_to_additional_permission_map=own_folder_map
+        )
+        return result
+
+    async def _build_at_user_scope_in_project(
+        self,
+        ctx: ClientContext,
+        user_id: UUID,
+        project_id: UUID,
+    ) -> ComputeSessionPermissionContext:
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
+
+        _vfolder_stmt = (
+            sa.select(SessionRow)
+            .where((SessionRow.user_uuid == user_id) & (SessionRow.group_id == project_id))
             .options(load_only(SessionRow.id))
         )
         own_folder_map = {

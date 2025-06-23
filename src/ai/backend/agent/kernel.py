@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import codecs
 import io
-import json
 import logging
 import math
 import os
@@ -12,6 +11,10 @@ import secrets
 import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict, UserDict
+from collections.abc import (
+    Mapping,
+    Sequence,
+)
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -19,10 +22,8 @@ from typing import (
     FrozenSet,
     List,
     Literal,
-    Mapping,
     NotRequired,
     Optional,
-    Sequence,
     Set,
     Tuple,
     TypedDict,
@@ -35,14 +36,23 @@ import zmq.asyncio
 from async_timeout import timeout
 
 from ai.backend.common import msgpack
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.enum_extension import StringSetFlag
-from ai.backend.common.events import (
-    EventProducer,
-    KernelLifecycleEventReason,
-    ModelServiceStatusEvent,
+from ai.backend.common.dto.agent.response import (
+    CodeCompletionResp,
+    CodeCompletionResult,
 )
+from ai.backend.common.enum_extension import StringSetFlag
+from ai.backend.common.events.dispatcher import (
+    EventProducer,
+)
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelLifecycleEventReason,
+)
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
+)
+from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -50,13 +60,14 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     ServicePort,
     SessionId,
+    SessionTypes,
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .exception import UnsupportedBaseDistroError
+from .exception import InvalidSocket, UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
-from .types import AgentEventData, KernelLifecycleStatus
+from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -92,14 +103,6 @@ ResultType = Union[
 ]
 
 
-class KernelFeatures(StringSetFlag):
-    UID_MATCH = "uid-match"
-    USER_INPUT = "user-input"
-    BATCH_MODE = "batch"
-    QUERY_MODE = "query"
-    TTY_MODE = "tty"
-
-
 class ClientFeatures(StringSetFlag):
     INPUT = "input"
     CONTINUATION = "continuation"
@@ -111,6 +114,7 @@ default_client_features = frozenset({
     ClientFeatures.CONTINUATION.value,
 })
 default_api_version = 4
+RUN_ID_FOR_BATCH_JOB = "batch-job"  # TODO: Deprecate usage of run-id
 
 
 class RunEvent(Exception):
@@ -163,6 +167,7 @@ class NextResult(TypedDict):
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     version: int
+    ownership_data: KernelOwnershipData
     agent_config: Mapping[str, Any]
     session_id: SessionId
     kernel_id: KernelId
@@ -176,10 +181,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     last_used: float
     termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
-    stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
-    status: KernelLifecycleStatus
+    state: KernelLifecycleStatus
+    session_type: SessionTypes
 
     _tasks: Set[asyncio.Task]
 
@@ -187,9 +192,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         network_id: str,
         image: ImageRef,
         version: int,
@@ -199,11 +202,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         service_ports: Any,  # TODO: type-annotation
         data: Dict[Any, Any],
         environ: Mapping[str, Any],
+        session_type: SessionTypes = SessionTypes.INTERACTIVE,
     ) -> None:
         self.agent_config = agent_config
-        self.kernel_id = kernel_id
-        self.session_id = session_id
-        self.agent_id = agent_id
+        self.ownership_data = ownership_data
+        self.kernel_id = ownership_data.kernel_id
+        self.session_id = ownership_data.session_id
+        self.agent_id = ownership_data.agent_id
         self.network_id = network_id
         self.image = image
         self.version = version
@@ -213,12 +218,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.last_used = time.monotonic()
         self.termination_reason = None
         self.clean_event = None
-        self.stats_enabled = False
-        self._tasks = set()
         self.environ = environ
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
+        self.session_type = session_type
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -227,25 +231,41 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             default_api_version,
             default_client_features,
         )
-        self.runner = await self.create_code_runner(
-            event_producer, client_features=default_client_features, api_version=default_api_version
-        )
+        try:
+            self.runner = await self.create_code_runner(
+                event_producer,
+                client_features=default_client_features,
+                api_version=default_api_version,
+            )
+        except Exception as e:
+            log.error("kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e)
+            self.runner = None
+            raise
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["agent_config"]
         del props["clean_event"]
-        del props["_tasks"]
         return props
 
     def __setstate__(self, props) -> None:
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
+        if "ownership_data" not in props:
+            props["ownership_data"] = KernelOwnershipData(
+                props["kernel_id"],
+                props["session_id"],
+                props["agent_id"],
+            )
+        if "session_type" not in props:
+            props["session_type"] = SessionTypes.INTERACTIVE
+        if "stats_enabled" in props:
+            # stats_enabled is a property, not an attribute.
+            del props["stats_enabled"]
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
-        self._tasks = set()
 
     @abstractmethod
     async def close(self) -> None:
@@ -269,6 +289,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         for accel_key, accel_alloc in self.resource_spec.allocations.items():
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
 
+    @property
+    def stats_enabled(self) -> bool:
+        """
+        Returns True if the kernel supports statistics gathering.
+        """
+        return self.state == KernelLifecycleStatus.RUNNING
+
     @abstractmethod
     async def create_code_runner(
         self,
@@ -284,7 +311,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts):
+    async def get_completions(self, text, opts) -> CodeCompletionResp:
         raise NotImplementedError
 
     @abstractmethod
@@ -328,7 +355,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def accept_file(self, container_path: os.PathLike | str, filedata) -> None:
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         """
         Put the uploaded file to the designated container path.
         The path should be inside /home/work of the container.
@@ -392,10 +419,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         api_version: int,
         flush_timeout: float,
     ) -> NextResult:
-        myself = asyncio.current_task()
-        assert myself is not None
         assert self.runner is not None
-        self._tasks.add(myself)
         try:
             await self.runner.attach_output_queue(run_id)
             try:
@@ -418,11 +442,98 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             await self.runner.close()
             raise
-        finally:
-            self._tasks.remove(myself)
 
 
 _zctx = None
+
+
+class RobustSocket:
+    _zctx: zmq.asyncio.Context
+    _sock: zmq.asyncio.Socket
+    _socket_type: int
+    _addr: str
+    _closed: bool
+
+    def __init__(
+        self,
+        socket_type: int,
+        addr: str,
+    ) -> None:
+        self._init_zctx()
+        self._socket_type = socket_type
+        self._addr = addr
+        self._sock = self._zctx.socket(self._socket_type)
+        self._sock.connect(self._addr)
+        self._sock.setsockopt(zmq.LINGER, 50)
+        self._closed = False
+
+    @property
+    def addr(self) -> str:
+        return self._addr
+
+    @property
+    def socket(self) -> zmq.asyncio.Socket:
+        return self._sock
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def close(self) -> None:
+        self._closed = True
+        try:
+            self._sock.close()
+        except zmq.ZMQError:
+            pass
+
+    def _init_zctx(self) -> None:
+        global _zctx
+        if _zctx is None:
+            _zctx = zmq.asyncio.Context()
+        self._zctx = _zctx
+
+    def recreate_socket(self):
+        self._init_zctx()
+        self._sock = self._zctx.socket(self._socket_type)
+        self._sock.connect(self._addr)
+        self._sock.setsockopt(zmq.LINGER, 50)
+
+
+class SocketPair:
+    input_sock: RobustSocket
+    output_sock: RobustSocket
+
+    def __init__(self, input_sock: RobustSocket, output_sock: RobustSocket):
+        self.input_sock = input_sock
+        self.output_sock = output_sock
+
+    async def send_multipart(self, msg_parts: Sequence[bytes]) -> None:
+        try:
+            await self.input_sock.socket.send_multipart(msg_parts)
+        except zmq.ZMQError as e:
+            if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
+                log.warning(
+                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {repr(e)})"
+                )
+                self.input_sock.recreate_socket()
+                self.output_sock.recreate_socket()
+                await self.input_sock.socket.send_multipart(msg_parts)
+            else:
+                raise
+
+    async def recv_multipart(self) -> list[bytes]:
+        try:
+            return await self.output_sock.socket.recv_multipart()
+        except zmq.ZMQError as e:
+            if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
+                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {repr(e)})")
+                raise InvalidSocket
+            else:
+                raise
+
+    def close(self) -> None:
+        self.input_sock.close()
+        self.output_sock.close()
 
 
 class AbstractCodeRunner(aobject, metaclass=ABCMeta):
@@ -436,14 +547,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
     event_producer: EventProducer
 
-    input_sock: zmq.asyncio.Socket
-    output_sock: zmq.asyncio.Socket
+    _sockets: Optional[SocketPair]
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
     model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
+    _is_socket_invalid: bool
     output_queue: Optional[asyncio.Queue[ResultRecord]]
     current_run_id: Optional[str]
     pending_queues: OrderedDict[str, Tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
@@ -477,8 +588,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         if _zctx is None:
             _zctx = zmq.asyncio.Context()
         self.zctx = _zctx  # share the global context
-        self.input_sock = self.zctx.socket(zmq.PUSH)
-        self.output_sock = self.zctx.socket(zmq.PULL)
+        self._sockets = None
+        self._is_socket_invalid = False
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
@@ -493,23 +604,31 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self._closed = False
 
     async def __ainit__(self) -> None:
+        await self._get_socket_pair()
+        await self._create_tasks()
+
+    async def _create_sockets(self) -> SocketPair:
+        input_sock = RobustSocket(zmq.PUSH, await self.get_repl_in_addr())
+        output_sock = RobustSocket(zmq.PULL, await self.get_repl_out_addr())
+        return SocketPair(input_sock, output_sock)
+
+    async def _get_socket_pair(self) -> SocketPair:
+        if self._sockets is None:
+            self._sockets = await self._create_sockets()
+        return self._sockets
+
+    async def refresh_sockets(self) -> None:
+        if self.read_task is not None:
+            self.read_task.cancel()
+        self._sockets = await self._create_sockets()
         loop = current_loop()
-        self.input_sock.connect(await self.get_repl_in_addr())
-        self.input_sock.setsockopt(zmq.LINGER, 50)
-        self.output_sock.connect(await self.get_repl_out_addr())
-        self.output_sock.setsockopt(zmq.LINGER, 50)
-        self.status_task = loop.create_task(self.ping_status())
         self.read_task = loop.create_task(self.read_output())
-        if self.exec_timeout > 0:
-            self.watchdog_task = loop.create_task(self.watchdog())
-        else:
-            self.watchdog_task = None
 
     def __getstate__(self):
         props = self.__dict__.copy()
         del props["zctx"]
-        del props["input_sock"]
-        del props["output_sock"]
+        del props["_sockets"]
+        del props["_is_socket_invalid"]
         del props["completion_queue"]
         del props["service_queue"]
         del props["model_service_queue"]
@@ -530,8 +649,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         if _zctx is None:
             _zctx = zmq.asyncio.Context()
         self.zctx = _zctx  # share the global context
-        self.input_sock = self.zctx.socket(zmq.PUSH)
-        self.output_sock = self.zctx.socket(zmq.PULL)
+        self._sockets = None
+        self._is_socket_invalid = False
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
@@ -558,24 +677,35 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return
         self._closed = True
         try:
-            if self.watchdog_task and not self.watchdog_task.done():
-                self.watchdog_task.cancel()
-                await self.watchdog_task
-            if self.status_task and not self.status_task.done():
-                self.status_task.cancel()
-                await self.status_task
-            if self.read_task and not self.read_task.done():
-                self.read_task.cancel()
-                await self.read_task
-            if self.input_sock:
-                self.input_sock.close()
-            if self.output_sock:
-                self.output_sock.close()
+            await self._close_tasks()
+            if self._sockets is not None:
+                self._sockets.close()
             # WARNING:
             # destroying zmq contexts here with possibility of re-entrance
             # may cause deadlocks.
         except Exception:
             log.exception("AbstractCodeRunner.close(): unexpected error")
+
+    async def _create_tasks(self) -> None:
+        # close the previous task if any
+        await self._close_tasks()
+
+        loop = asyncio.get_running_loop()
+        self.status_task = loop.create_task(self.ping_status())
+        self.read_task = loop.create_task(self.read_output())
+        if self.exec_timeout > 0:
+            self.watchdog_task = loop.create_task(self.watchdog())
+
+    async def _close_tasks(self) -> None:
+        concurrent_safe_tasks: tuple[Optional[asyncio.Task], ...] = (
+            self.status_task,
+            self.read_task,
+            self.watchdog_task,
+        )
+        await asyncio.gather(
+            *[cancel_task(task) for task in concurrent_safe_tasks if task is not None],
+            return_exceptions=True,
+        )
 
     async def ping(self) -> dict[str, float] | None:
         try:
@@ -601,58 +731,52 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             log.exception("AbstractCodeRunner.ping_status(): unexpected error")
 
     async def feed_batch(self, opts):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
+        sock = await self._get_socket_pair()
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
             clean_cmd = ""
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"clean",
             clean_cmd.encode("utf8"),
         ])
         build_cmd = opts.get("build", "")
         if build_cmd is None:
             build_cmd = ""
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"build",
             build_cmd.encode("utf8"),
         ])
         exec_cmd = opts.get("exec", "")
         if exec_cmd is None:
             exec_cmd = ""
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"exec",
             exec_cmd.encode("utf8"),
         ])
 
     async def feed_code(self, text: str):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"code", text.encode("utf8")])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"code", text.encode("utf8")])
 
     async def feed_input(self, text: str):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"input", text.encode("utf8")])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"input", text.encode("utf8")])
 
     async def feed_event(self, evdata: AgentEventData):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
+        sock = await self._get_socket_pair()
         data = {
             "type": evdata.type,
             "data": evdata.data,
         }
-        await self.input_sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
+        await sock.send_multipart([b"event", dump_json(data)])
 
     async def feed_interrupt(self):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"interrupt", b""])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"interrupt", b""])
 
     async def feed_and_get_status(self) -> dict[str, float] | None:
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"status", b""])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"status", b""])
         try:
             result = await self.status_queue.get()
             self.status_queue.task_done()
@@ -660,30 +784,28 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return None
 
-    async def feed_and_get_completion(self, code_text, opts):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
+    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
+        sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
         }
         payload.update(opts)
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"complete",
-            json.dumps(payload).encode("utf8"),
+            dump_json(payload),
         ])
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
-            return json.loads(result)
+            return CodeCompletionResult.success(load_json(result))
         except asyncio.CancelledError:
-            return []
+            return CodeCompletionResult.failure()
 
     async def feed_start_model_service(self, model_info):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"start-model-service",
-            json.dumps(model_info).encode("utf8"),
+            dump_json(model_info),
         ])
         if health_check_info := model_info.get("service", {}).get("health_check"):
             timeout_seconds = (
@@ -695,39 +817,38 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             async with timeout(timeout_seconds):
                 result = await self.model_service_queue.get()
             self.model_service_queue.task_done()
-            return json.loads(result)
+            return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"start-service",
-            json.dumps(service_info).encode("utf8"),
+            dump_json(service_info),
         ])
         try:
             with timeout(10):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
-            return json.loads(result)
+            return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
     async def feed_shutdown_service(self, service_name: str):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"shutdown-service",
-            json.dumps(service_name).encode("utf8"),
+            dump_json(service_name),
         ])
 
     async def feed_service_apps(self):
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"get-apps",
             "".encode("utf8"),
         ])
@@ -735,7 +856,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
-            return json.loads(result)
+            return load_json(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
@@ -766,7 +887,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 elif rec.msg_type == "stderr":
                     stderr_items.append(rec.data or "")
                 elif rec.msg_type == "media" and rec.data is not None:
-                    o = json.loads(rec.data)
+                    o = load_json(rec.data)
                     media_items.append((o["type"], o["data"]))
                 elif rec.msg_type == "html":
                     html_items.append(rec.data)
@@ -796,7 +917,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 elif rec.msg_type == "stderr":
                     last_stderr.write(rec.data or "")
                 elif rec.msg_type == "media" and rec.data is not None:
-                    o = json.loads(rec.data)
+                    o = load_json(rec.data)
                     console_items.append(("media", (o["type"], o["data"])))
                 elif rec.msg_type in outgoing_msg_types:
                     # FIXME: currently mypy cannot handle dynamic specialization of literals.
@@ -828,16 +949,16 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         records.append(rec)
                     self.output_queue.task_done()
                     if rec.msg_type == "finished":
-                        data = json.loads(rec.data) if rec.data else {}
+                        data = load_json(rec.data) if rec.data else {}
                         raise RunFinished(data)
                     elif rec.msg_type == "clean-finished":
-                        data = json.loads(rec.data) if rec.data else {}
+                        data = load_json(rec.data) if rec.data else {}
                         raise CleanFinished(data)
                     elif rec.msg_type == "build-finished":
-                        data = json.loads(rec.data) if rec.data else {}
+                        data = load_json(rec.data) if rec.data else {}
                         raise BuildFinished(data)
                     elif rec.msg_type == "waiting-input":
-                        opts = json.loads(rec.data) if rec.data else {}
+                        opts = load_json(rec.data) if rec.data else {}
                         raise InputRequestPending(opts)
                     elif rec.msg_type == "exec-timeout":
                         raise ExecTimeout
@@ -971,9 +1092,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             codecs.getincrementaldecoder("utf8")(errors="replace"),
             codecs.getincrementaldecoder("utf8")(errors="replace"),
         )
+        sock = await self._get_socket_pair()
         while True:
             try:
-                msg_type, msg_data = await self.output_sock.recv_multipart()
+                data = await sock.recv_multipart()
+                if len(data) != 2:
+                    log.warning(f"Invalid data from output socket, skip. (data: {data})")
+                    continue
+                msg_type, msg_data = data
                 try:
                     match msg_type:
                         case b"status":
@@ -985,8 +1111,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         case b"model-service-result":
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
-                            response = json.loads(msg_data)
-                            event = ModelServiceStatusEvent(
+                            response = load_json(msg_data)
+                            event = ModelServiceStatusAnycastEvent(
                                 self.kernel_id,
                                 self.session_id,
                                 response["model_name"],
@@ -996,7 +1122,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                                     else ModelServiceStatus.UNHEALTHY
                                 ),
                             )
-                            await self.event_producer.produce_event(event)
+                            await self.event_producer.anycast_event(event)
                         case b"apps-result":
                             await self.service_apps_info_queue.put(msg_data)
                         case b"stdout":
@@ -1043,6 +1169,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     decoders[0].decode(b"", True)
                     decoders[1].decode(b"", True)
                     self.finished_at = time.monotonic()
+            except InvalidSocket:
+                self._is_socket_invalid = True
+                break
             except (asyncio.CancelledError, GeneratorExit):
                 break
             except Exception:

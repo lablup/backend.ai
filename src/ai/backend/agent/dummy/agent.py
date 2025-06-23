@@ -15,14 +15,15 @@ from typing import (
 
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImageResponses
-from ai.backend.common.events import EventProducer
+from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import (
-    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     ImageConfig,
@@ -39,11 +40,17 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 
-from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
+from ..agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ComputerContext,
+    ScanImagesResult,
+)
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, MountInfo
+from ..types import Container, KernelOwnershipData, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
 from .resources import load_resources, scan_available_resources
@@ -54,9 +61,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         event_producer: EventProducer,
         kenrel_image: ImageRef,
         kernel_config: KernelCreationConfig,
@@ -68,9 +73,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             event_producer,
             kenrel_image,
             kernel_config,
@@ -173,9 +176,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
         return DummyKernel(
-            self.kernel_id,
-            self.session_id,
-            self.agent_id,
+            self.ownership_data,
             self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
@@ -280,10 +281,10 @@ class DummyAgent(
         await asyncio.sleep(delay)
         return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
 
-    async def scan_images(self) -> Mapping[str, str]:
+    async def scan_images(self) -> ScanImagesResult:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
-        return {}
+        return ScanImagesResult(scanned_images={}, removed_images={})
 
     async def pull_image(
         self,
@@ -305,13 +306,10 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["push-image"]
         await asyncio.sleep(delay)
 
-    async def purge_images(
-        self,
-        images: list[str],
-    ) -> PurgeImageResponses:
+    async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         delay = self.dummy_agent_cfg["delay"]["purge-images"]
         await asyncio.sleep(delay)
-        return PurgeImageResponses([])
+        return PurgeImagesResp([])
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -324,8 +322,7 @@ class DummyAgent(
 
     async def init_kernel_context(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
+        ownership_data: KernelOwnershipData,
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
@@ -334,9 +331,7 @@ class DummyAgent(
     ) -> DummyKernelCreationContext:
         distro = await self.resolve_image_distro(kernel_config["image"])
         return DummyKernelCreationContext(
-            kernel_id,
-            session_id,
-            self.id,
+            ownership_data,
             self.event_producer,
             kernel_image,
             kernel_config,

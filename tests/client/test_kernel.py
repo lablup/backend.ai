@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from http import HTTPStatus
 from unittest import mock
 
 import pytest
@@ -27,7 +28,7 @@ def api_version(request):
 def test_create_with_config(mocker, api_version):
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(
-        status=201,
+        status=HTTPStatus.CREATED,
         json=AsyncMock(
             return_value={
                 "sessionId": str(uuid.uuid4()),
@@ -62,7 +63,7 @@ def test_create_with_config(mocker, api_version):
 def test_create_kernel_url(mocker):
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(
-        status=201,
+        status=HTTPStatus.CREATED,
         json=AsyncMock(
             return_value={
                 "sessionId": str(uuid.uuid4()),
@@ -81,7 +82,7 @@ def test_create_kernel_url(mocker):
 
 def test_destroy_kernel_url(mocker):
     mock_req_obj = mock.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=204)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
     mock_req = mocker.patch("ai.backend.client.func.session.Request", return_value=mock_req_obj)
     with Session() as session:
         prefix = get_naming(session.api_version, "path")
@@ -94,7 +95,7 @@ def test_destroy_kernel_url(mocker):
 
 def test_restart_kernel_url(mocker):
     mock_req_obj = mock.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=204)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
     mock_req = mocker.patch("ai.backend.client.func.session.Request", return_value=mock_req_obj)
     with Session() as session:
         prefix = get_naming(session.api_version, "path")
@@ -109,7 +110,7 @@ def test_get_kernel_info_url(mocker):
     return_value = {}
     mock_json_coro = AsyncMock(return_value=return_value)
     mock_req_obj = mock.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=200, json=mock_json_coro)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.OK, json=mock_json_coro)
     mock_req = mocker.patch("ai.backend.client.func.session.Request", return_value=mock_req_obj)
     with Session() as session:
         prefix = get_naming(session.api_version, "path")
@@ -125,7 +126,7 @@ def test_execute_code_url(mocker):
     return_value = {"result": "hi"}
     mock_json_coro = AsyncMock(return_value=return_value)
     mock_req_obj = mock.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=200, json=mock_json_coro)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.OK, json=mock_json_coro)
     mock_req = mocker.patch("ai.backend.client.func.session.Request", return_value=mock_req_obj)
     with Session() as session:
         prefix = get_naming(session.api_version, "path")

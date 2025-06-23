@@ -4,8 +4,10 @@ from collections.abc import Iterable, Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Optional,
     Self,
+    Sequence,
     cast,
 )
 
@@ -14,15 +16,40 @@ import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
+from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from ai.backend.common.types import ResourceSlot, Sentinel
+from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
+from ai.backend.manager.services.domain.actions.create_domain_node import (
+    CreateDomainNodeAction,
+    CreateDomainNodeActionResult,
+)
+from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
+from ai.backend.manager.services.domain.actions.modify_domain import ModifyDomainAction
+from ai.backend.manager.services.domain.actions.modify_domain_node import (
+    ModifyDomainNodeAction,
+    ModifyDomainNodeActionResult,
+)
+from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainModifier,
+    DomainNodeModifier,
+    UserInfo,
+)
+from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
+    batch_result,
     generate_sql_info_for_gql_connection,
 )
-from ..domain import DomainRow, get_domains, get_permission_ctx
+from ..domain import DomainRow, domains, get_permission_ctx
 from ..gql_relay import (
     AsyncNode,
     Connection,
@@ -38,16 +65,32 @@ from ..rbac import (
     SystemScope,
 )
 from ..rbac.permission_defs import DomainPermission, ScalingGroupPermission
-from ..scaling_group import ScalingGroupForDomainRow, get_scaling_groups
+from ..scaling_group import get_scaling_groups
 from ..user import UserRole
-from ..utils import execute_with_txn_retry
 from .base import Bytes
-from .scaling_group import ScalinGroupConnection
+from .scaling_group import ScalingGroup, ScalinGroupConnection
 
 if TYPE_CHECKING:
     from ..domain import DomainModel
     from ..gql import GraphQueryContext
     from .scaling_group import ScalingGroupNode
+
+
+__all__ = (
+    "DomainNode",
+    "DomainConnection",
+    "DomainPermissionValueField",
+    "CreateDomainNodeInput",
+    "CreateDomainNode",
+    "ModifyDomainNodeInput",
+    "ModifyDomainNode",
+    "Domain",
+    "DomainInput",
+    "CreateDomain",
+    "ModifyDomain",
+    "DeleteDomain",
+    "PurgeDomain",
+)
 
 
 class DomainPermissionValueField(graphene.Scalar):
@@ -144,6 +187,22 @@ class DomainNode(graphene.ObjectType):
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
+        )
+
+    @classmethod
+    def from_dto(cls, dto: DomainData) -> Self:
+        return cls(
+            id=dto.name,
+            name=dto.name,
+            description=dto.description,
+            is_active=dto.is_active,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            total_resource_slots=dto.total_resource_slots,
+            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
+            allowed_docker_registries=dto.allowed_docker_registries,
+            dotfiles=dto.dotfiles,
+            integration_id=dto.integration_id,
         )
 
     async def resolve_scaling_groups(
@@ -298,6 +357,27 @@ class CreateDomainNodeInput(graphene.InputObjectType):
 
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
+    def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
+        def value_or_none(value):
+            return value if value is not graphql.Undefined else None
+
+        return CreateDomainNodeAction(
+            creator=DomainCreator(
+                name=self.name,
+                description=value_or_none(self.description),
+                is_active=value_or_none(self.is_active),
+                total_resource_slots=ResourceSlot.from_user_input(self.total_resource_slots, None)
+                if self.total_resource_slots is not graphql.Undefined
+                else None,
+                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                integration_id=value_or_none(self.integration_id),
+                dotfiles=value_or_none(self.dotfiles),
+            ),
+            user_info=user_info,
+            scaling_groups=value_or_none(self.scaling_groups),
+        )
+
 
 class CreateDomainNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -322,38 +402,23 @@ class CreateDomainNode(graphene.Mutation):
     ) -> CreateDomainNode:
         graph_ctx: GraphQueryContext = info.context
 
-        if (raw_scaling_groups := input.pop("scaling_groups")) is not None:
-            scaling_groups = cast(list[str], raw_scaling_groups)
-        else:
-            scaling_groups = None
+        user_info: UserInfo = UserInfo(
+            id=graph_ctx.user["uuid"],
+            role=graph_ctx.user["role"],
+            domain_name=graph_ctx.user["domain_name"],
+        )
 
-        async def _insert(db_session: AsyncSession) -> DomainRow:
-            if scaling_groups is not None:
-                await _ensure_sgroup_permission(graph_ctx, scaling_groups, db_session=db_session)
-            _insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(**input).returning(DomainRow)
+        res: CreateDomainNodeActionResult = (
+            await graph_ctx.processors.domain.create_domain_node.wait_for_complete(
+                input.to_action(user_info)
             )
-            domain_row = await db_session.scalar(_insert_and_returning)
-            if scaling_groups is not None:
-                await db_session.execute(
-                    sa.insert(ScalingGroupForDomainRow),
-                    [
-                        {"scaling_group": sgroup_name, "domain": input.name}
-                        for sgroup_name in scaling_groups
-                    ],
-                )
-            return domain_row
+        )
 
-        async with graph_ctx.db.connect() as db_conn:
-            try:
-                domain_row = await execute_with_txn_retry(
-                    _insert, graph_ctx.db.begin_session, db_conn
-                )
-            except sa.exc.IntegrityError as e:
-                raise ValueError(
-                    f"Cannot create the domain with given arguments. (arg:{input}, e:{str(e)})"
-                )
-        return CreateDomainNode(True, "", DomainNode.from_orm_model(graph_ctx, domain_row))
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return CreateDomainNode(
+            ok=True, msg="", item=DomainNode.from_dto(domain_data) if domain_data else None
+        )
 
 
 class ModifyDomainNodeInput(graphene.InputObjectType):
@@ -371,6 +436,50 @@ class ModifyDomainNodeInput(graphene.InputObjectType):
     sgroups_to_add = graphene.List(lambda: graphene.String, required=False)
     sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
     client_mutation_id = graphene.String(required=False)
+
+    def _convert_field(
+        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+    ) -> Any | Sentinel:
+        if field_value is graphql.Undefined:
+            return Sentinel.TOKEN
+        if converter is not None:
+            return converter(field_value)
+        return field_value
+
+    def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
+        return ModifyDomainNodeAction(
+            name=name,
+            user_info=user_info,
+            modifier=DomainNodeModifier(
+                description=TriState[str].from_graphql(
+                    self.description,
+                ),
+                is_active=OptionalState[bool].from_graphql(self.is_active),
+                total_resource_slots=TriState[ResourceSlot].from_graphql(
+                    graphql.Undefined
+                    if self.total_resource_slots is graphql.Undefined
+                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
+                ),
+                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                    self.allowed_vfolder_hosts,
+                ),
+                allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                    self.allowed_vfolder_hosts,
+                ),
+                integration_id=TriState[str].from_graphql(
+                    self.integration_id,
+                ),
+                dotfiles=OptionalState[bytes].from_graphql(
+                    self.dotfiles,
+                ),
+            ),
+            sgroups_to_add=set(self.sgroups_to_add)
+            if self.sgroups_to_add is not Undefined
+            else None,
+            sgroups_to_remove=set(self.sgroups_to_remove)
+            if self.sgroups_to_remove is not Undefined
+            else None,
+        )
 
 
 class ModifyDomainNode(graphene.Mutation):
@@ -393,79 +502,302 @@ class ModifyDomainNode(graphene.Mutation):
         info: graphene.ResolveInfo,
         input: ModifyDomainNodeInput,
     ) -> ModifyDomainNode:
-        graph_ctx: GraphQueryContext = info.context
         _, domain_name = cast(ResolvedGlobalID, input["id"])
-
-        if (raw_sgroups_to_add := input.pop("sgroups_to_add")) is not None:
-            sgroups_to_add = set(raw_sgroups_to_add)
-        else:
-            sgroups_to_add = None
-        if (raw_sgroups_to_remove := input.pop("sgroups_to_remove")) is not None:
-            sgroups_to_remove = set(raw_sgroups_to_remove)
-        else:
-            sgroups_to_remove = None
-
-        if sgroups_to_add is not None and sgroups_to_remove is not None:
-            if union := sgroups_to_add | sgroups_to_remove:
-                raise ValueError(
-                    "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
-                    f"(sg:{union})."
-                )
-
-        async def _update(db_session: AsyncSession) -> Optional[DomainRow]:
-            user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
-            domain_models = await get_domains(
-                SystemScope(),
-                DomainPermission.UPDATE_ATTRIBUTE,
-                [domain_name],
-                ctx=client_ctx,
-                db_session=db_session,
-            )
-            if not domain_models:
-                raise ValueError(f"Not allowed to update domain (id:{domain_name})")
-
-            if sgroups_to_add is not None:
-                await _ensure_sgroup_permission(graph_ctx, sgroups_to_add, db_session=db_session)
-                await db_session.execute(
-                    sa.insert(ScalingGroupForDomainRow),
-                    [
-                        {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
-                    ],
-                )
-            if sgroups_to_remove is not None:
-                await _ensure_sgroup_permission(graph_ctx, sgroups_to_remove, db_session=db_session)
-                await db_session.execute(
-                    sa.delete(ScalingGroupForDomainRow).where(
-                        (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
-                    ),
-                )
-            _update_stmt = (
-                sa.update(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .values(input)
-                .returning(DomainRow)
-            )
-            _stmt = sa.select(DomainRow).from_statement(_update_stmt)
-
-            return await db_session.scalar(_stmt)
-
-        async with graph_ctx.db.connect() as db_conn:
-            try:
-                domain_row = await execute_with_txn_retry(
-                    _update, graph_ctx.db.begin_session, db_conn
-                )
-            except sa.exc.IntegrityError as e:
-                raise ValueError(
-                    f"Cannot modify the domain with given arguments. (arg:{input}, e:{str(e)})"
-                )
-        if domain_row is None:
-            raise ValueError(f"Domain not found (id:{domain_name})")
-        return ModifyDomainNode(
-            DomainNode.from_orm_model(graph_ctx, domain_row),
-            input.get("client_mutation_id"),
+        graph_ctx: GraphQueryContext = info.context
+        user_info: UserInfo = UserInfo(
+            id=graph_ctx.user["uuid"],
+            role=graph_ctx.user["role"],
+            domain_name=graph_ctx.user["domain_name"],
         )
+        res: ModifyDomainNodeActionResult = (
+            await graph_ctx.processors.domain.modify_domain_node.wait_for_complete(
+                input.to_action(name=domain_name, user_info=user_info)
+            )
+        )
+
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return ModifyDomainNode(
+            item=DomainNode.from_dto(domain_data) if domain_data else None,
+            client_mutation_id=input.get("client_mutation_id"),
+        )
+
+
+class Domain(graphene.ObjectType):
+    name = graphene.String()
+    description = graphene.String()
+    is_active = graphene.Boolean()
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
+    total_resource_slots = graphene.JSONString()
+    allowed_vfolder_hosts = graphene.JSONString()
+    allowed_docker_registries = graphene.List(lambda: graphene.String)
+    integration_id = graphene.String()
+
+    # Dynamic fields.
+    scaling_groups = graphene.List(lambda: graphene.String)
+
+    async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[str]:
+        sgroups = await ScalingGroup.load_by_domain(info.context, self.name)
+        return [sg.name for sg in sgroups]
+
+    @classmethod
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[Domain]:
+        if row is None:
+            return None
+        return cls(
+            name=row["name"],
+            description=row["description"],
+            is_active=row["is_active"],
+            created_at=row["created_at"],
+            modified_at=row["modified_at"],
+            total_resource_slots=(
+                row["total_resource_slots"].to_json()
+                if row["total_resource_slots"] is not None
+                else {}
+            ),
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
+            allowed_docker_registries=row["allowed_docker_registries"],
+            integration_id=row["integration_id"],
+        )
+
+    @classmethod
+    def from_data(cls, dto: DomainData) -> Domain:
+        return cls(
+            name=dto.name,
+            description=dto.description,
+            is_active=dto.is_active,
+            created_at=dto.created_at,
+            modified_at=dto.modified_at,
+            total_resource_slots=dto.total_resource_slots.to_json()
+            if dto.total_resource_slots
+            else {},
+            allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
+            allowed_docker_registries=dto.allowed_docker_registries,
+            integration_id=dto.integration_id,
+        )
+
+    @classmethod
+    async def load_all(
+        cls,
+        ctx: GraphQueryContext,
+        *,
+        is_active: Optional[bool] = None,
+    ) -> Sequence[Domain]:
+        async with ctx.db.begin_readonly() as conn:
+            query = sa.select([domains]).select_from(domains)
+            if is_active is not None:
+                query = query.where(domains.c.is_active == is_active)
+            return [
+                obj
+                async for row in (await conn.stream(query))
+                if (obj := cls.from_row(ctx, row)) is not None
+            ]
+
+    @classmethod
+    async def batch_load_by_name(
+        cls,
+        ctx: GraphQueryContext,
+        names: Sequence[str],
+        *,
+        is_active: Optional[bool] = None,
+    ) -> Sequence[Optional[Domain]]:
+        async with ctx.db.begin_readonly() as conn:
+            query = sa.select([domains]).select_from(domains).where(domains.c.name.in_(names))
+            if is_active is not None:
+                query = query.where(domains.c.is_active == is_active)
+            return await batch_result(
+                ctx,
+                conn,
+                query,
+                cls,
+                names,
+                lambda row: row["name"],
+            )
+
+
+class DomainInput(graphene.InputObjectType):
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
+    total_resource_slots = graphene.JSONString(required=False, default_value={})
+    allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
+    allowed_docker_registries = graphene.List(
+        lambda: graphene.String, required=False, default_value=[]
+    )
+    integration_id = graphene.String(required=False, default_value=None)
+
+    def to_action(self, domain_name: str) -> CreateDomainAction:
+        def value_or_none(value):
+            return value if value is not Undefined else None
+
+        return CreateDomainAction(
+            creator=DomainCreator(
+                name=domain_name,
+                description=value_or_none(self.description),
+                is_active=value_or_none(self.is_active),
+                total_resource_slots=value_or_none(self.total_resource_slots),
+                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+                allowed_docker_registries=value_or_none(self.allowed_docker_registries),
+                integration_id=value_or_none(self.integration_id),
+            ),
+        )
+
+
+class ModifyDomainInput(graphene.InputObjectType):
+    name = graphene.String(required=False)
+    description = graphene.String(required=False)
+    is_active = graphene.Boolean(required=False)
+    total_resource_slots = graphene.JSONString(required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
+    allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
+    integration_id = graphene.String(required=False)
+
+    def _convert_field(
+        self, field_value: Any, converter: Optional[Callable[[Any], Any]] = None
+    ) -> Any | Sentinel:
+        if field_value is Undefined:
+            return Sentinel.TOKEN
+        if converter is not None:
+            return converter(field_value)
+        return field_value
+
+    def to_action(self, domain_name: str) -> ModifyDomainAction:
+        return ModifyDomainAction(
+            domain_name=domain_name,
+            modifier=DomainModifier(
+                name=OptionalState[str].from_graphql(self.name),
+                description=TriState[str].from_graphql(
+                    self.description,
+                ),
+                is_active=OptionalState[bool].from_graphql(
+                    self.is_active,
+                ),
+                total_resource_slots=TriState[ResourceSlot].from_graphql(
+                    Undefined
+                    if self.total_resource_slots is Undefined
+                    else ResourceSlot.from_user_input(self.total_resource_slots, None),
+                ),
+                allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
+                    self.allowed_vfolder_hosts,
+                ),
+                allowed_docker_registries=OptionalState[list[str]].from_graphql(
+                    self.allowed_docker_registries,
+                ),
+                integration_id=TriState[str].from_graphql(self.integration_id),
+            ),
+        )
+
+
+class CreateDomain(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+        props = DomainInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    domain = graphene.Field(lambda: Domain, required=False)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+        props: DomainInput,
+    ) -> CreateDomain:
+        ctx: GraphQueryContext = info.context
+
+        action: CreateDomainAction = props.to_action(name)
+        res = await ctx.processors.domain.create_domain.wait_for_complete(action)
+
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return cls(
+            ok=res.success,
+            msg=res.description,
+            domain=Domain.from_data(domain_data) if domain_data else None,
+        )
+
+
+class ModifyDomain(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+        props = ModifyDomainInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    domain = graphene.Field(lambda: Domain, required=False)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+        props: ModifyDomainInput,
+    ) -> ModifyDomain:
+        ctx: GraphQueryContext = info.context
+
+        action = props.to_action(name)
+        res = await ctx.processors.domain.modify_domain.wait_for_complete(action)
+
+        domain_data: Optional[DomainData] = res.domain_data
+
+        return cls(
+            ok=res.success,
+            msg=res.description,
+            domain=Domain.from_data(domain_data) if domain_data else None,
+        )
+
+
+class DeleteDomain(graphene.Mutation):
+    """
+    Instead of deleting the domain, just mark it as inactive.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
+        ctx: GraphQueryContext = info.context
+
+        action = DeleteDomainAction(name)
+        res = await ctx.processors.domain.delete_domain.wait_for_complete(action)
+
+        return cls(ok=res.success, msg=res.description)
+
+
+class PurgeDomain(graphene.Mutation):
+    """
+    Completely delete domain from DB.
+
+    Domain-bound kernels will also be all deleted.
+    To purge domain, there should be no users and groups in the target domain.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
+        ctx: GraphQueryContext = info.context
+
+        action = PurgeDomainAction(name)
+        res = await ctx.processors.domain.purge_domain.wait_for_complete(action)
+
+        return cls(ok=res.success, msg=res.description)

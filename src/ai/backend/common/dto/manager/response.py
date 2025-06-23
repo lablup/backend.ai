@@ -1,7 +1,7 @@
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.field import VFolderItemField
+from ...api_handlers import BaseResponseModel
+from .field import VFolderItemField
 
 
 class VFolderCreateResponse(BaseResponseModel):

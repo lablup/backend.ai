@@ -5,6 +5,7 @@ import sys
 import types
 import typing
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Any, Optional
@@ -220,6 +221,10 @@ class WSProxyConfig(BaseConfigModel):
     bind_api_port: int = Field(
         default=5050,
         description="Port number to bind for API server",
+    )
+    internal_api_port: int = Field(
+        default=15050,
+      description="Port number to bind for internal API server"
     )
     advertised_api_port: Optional[int] = Field(
         default=None,

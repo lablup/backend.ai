@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import copy
 import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
@@ -24,7 +24,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 
-from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import (
     ImageRef,
     arch_name_aliases,
@@ -36,12 +36,16 @@ from ai.backend.common.exception import (
     InvalidImageTag,
     ProjectMismatchWithCanonical,
 )
-from ai.backend.common.types import DispatchResult, SlotName, SSLContextType
+from ai.backend.common.json import read_json
+from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.image.types import ImageData, RescanImagesResult
+from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 
-from ..defs import INTRINSIC_SLOTS_MIN
-from ..models.image import ImageIdentifier, ImageRow, ImageStatus, ImageType
+from ..data.image.types import ImageStatus, ImageType
+from ..exceptions import ScanImageError, ScanTagError
+from ..models.image import ImageIdentifier, ImageRow
 from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -95,7 +99,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self.registry_url = yarl.URL(registry_info.url)
         self.max_concurrency_per_registry = max_concurrency_per_registry
         self.base_hdrs = {
-            "Accept": "application/vnd.docker.distribution.manifest.v2+json",
+            "Accept": self.MEDIA_TYPE_DOCKER_MANIFEST,
         }
         self.credentials = {}
         self.ssl_verify = ssl_verify
@@ -112,7 +116,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter | None = None,
-    ) -> DispatchResult[list[ImageRow]]:
+    ) -> RescanImagesResult:
         log.info("rescan_single_registry()")
         errors: list[str] = []
 
@@ -128,22 +132,25 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, client_session):
                 self.registry_url = url
-                async with aiotools.TaskGroup() as tg:
+
+                tasks = []
+                async for image in self.fetch_repositories(client_session):
+                    task = asyncio.create_task(self._scan_image(client_session, image))
+                    tasks.append(task)
+
+                for fut in asyncio.as_completed(tasks):
                     try:
-                        async for image in self.fetch_repositories(client_session):
-                            tg.create_task(self._scan_image(client_session, image))
+                        await fut
                     except Exception as e:
-                        error_msg = f"Failed to fetch repositories! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
-                        log.error(error_msg)
-                        errors.append(error_msg)
+                        errors.append(f"Failed to scan image! Detail: {str(e)}")
 
             scanned_images = await self.commit_rescan_result()
-            return DispatchResult(result=scanned_images, errors=errors)
+            return RescanImagesResult(images=scanned_images, errors=errors)
         finally:
             all_updates.reset(all_updates_token)
 
-    async def commit_rescan_result(self) -> list[ImageRow]:
-        scanned_images: list[ImageRow] = []
+    async def commit_rescan_result(self) -> list[ImageData]:
+        scanned_images: list[ImageData] = []
         _all_updates = all_updates.get()
         if not _all_updates:
             log.info("No images found in registry {0}", self.registry_url)
@@ -165,9 +172,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.size_bytes = update["size_bytes"]
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
-                        image_row.resources = update["resources"]
                         image_row.is_local = is_local
-                        scanned_images.append(image_row)
+                        scanned_images.append(image_row.to_dataclass())
 
                         if image_row.status == ImageStatus.DELETED:
                             image_row.status = ImageStatus.ALIVE
@@ -208,11 +214,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         type=ImageType.COMPUTE,
                         accelerators=update.get("accels"),
                         labels=update["labels"],
-                        resources=update["resources"],
                         status=ImageStatus.ALIVE,
                     )
                     session.add(image_row)
-                    scanned_images.append(image_row)
+                    scanned_images.append(image_row.to_dataclass())
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
@@ -222,7 +227,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 await session.flush()
         return scanned_images
 
-    async def scan_single_ref(self, image: str) -> DispatchResult[list[ImageRow]]:
+    async def scan_single_ref(self, image: str) -> RescanImagesResult:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
@@ -240,10 +245,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     self.credentials,
                     f"repository:{project_and_image_name}:pull",
                 )
-                rqst_args["headers"].update(**self.base_hdrs)
                 await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
             scanned_images = await self.commit_rescan_result()
-            return DispatchResult(result=scanned_images)
+            return RescanImagesResult(images=scanned_images)
         finally:
             concurrency_sema.reset(sema_token)
             all_updates.reset(all_updates_token)
@@ -268,7 +272,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         )
         while tag_list_url is not None:
             async with sess.get(tag_list_url, **rqst_args) as resp:
-                data = json.loads(await resp.read())
+                data = await read_json(resp)
                 tags_data = data.get("tags", [])
                 # sometimes there are dangling image names in the hub.
                 if not tags_data:
@@ -284,9 +288,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     )
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(tags)
-        async with aiotools.TaskGroup() as tg:
-            for tag in tags:
-                tg.create_task(self._scan_tag(sess, rqst_args, image, tag))
+
+        try:
+            async with aiotools.TaskGroup() as tg:
+                for tag in tags:
+                    tg.create_task(self._scan_tag(sess, rqst_args, image, tag))
+        except aiotools.TaskGroupError as e:
+            raise ScanImageError(
+                f"Image scan failed, Details: {cast(ExceptionGroup, e).exceptions}"
+            ) from e
 
     async def _scan_tag(
         self,
@@ -296,7 +306,16 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         tag: str,
     ) -> None:
         async with concurrency_sema.get():
-            rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST_LIST
+            rqst_args = copy.deepcopy(rqst_args)
+            acceptables = [
+                self.MEDIA_TYPE_DOCKER_MANIFEST_LIST,
+                self.MEDIA_TYPE_DOCKER_MANIFEST,
+                self.MEDIA_TYPE_OCI_INDEX,
+                self.MEDIA_TYPE_OCI_MANIFEST,
+                self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON,
+                self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS,
+            ]
+            rqst_args["headers"]["Accept"] = ",".join(acceptables)
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
             ) as resp:
@@ -306,46 +325,51 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     return
                 content_type = resp.headers["Content-Type"]
                 resp.raise_for_status()
-                resp_json = json.loads(await resp.read())
+                resp_json = await read_json(resp)
 
-                async with aiotools.TaskGroup() as tg:
-                    match content_type:
-                        case self.MEDIA_TYPE_DOCKER_MANIFEST:
-                            await self._process_docker_v2_image(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
-                        case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
-                            await self._process_docker_v2_multiplatform_image(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
-                        case self.MEDIA_TYPE_OCI_INDEX:
-                            await self._process_oci_index(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
-                        case self.MEDIA_TYPE_OCI_MANIFEST:
-                            await self._process_oci_manifest(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
-                        case (
-                            self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS
-                            | self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON
-                        ):
-                            await self._process_docker_v1_image(
-                                tg, sess, rqst_args, image, tag, resp_json
-                            )
+                try:
+                    async with aiotools.TaskGroup() as tg:
+                        match content_type:
+                            case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                                await self._process_docker_v2_image(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
+                            case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                                await self._process_docker_v2_multiplatform_image(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
+                            case self.MEDIA_TYPE_OCI_INDEX:
+                                await self._process_oci_index(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
+                            case self.MEDIA_TYPE_OCI_MANIFEST:
+                                await self._process_oci_manifest(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
+                            case (
+                                self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS
+                                | self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON
+                            ):
+                                await self._process_docker_v1_image(
+                                    tg, sess, rqst_args, image, tag, resp_json
+                                )
 
-                        case _:
-                            log.warning("Unknown content type: {}", content_type)
-                            raise RuntimeError(
-                                "The registry does not support the standard way of "
-                                "listing multiarch images."
-                            )
+                            case _:
+                                log.warning("Unknown content type: {}", content_type)
+                                raise RuntimeError(
+                                    "The registry does not support the standard way of "
+                                    "listing multiarch images."
+                                )
+                except aiotools.TaskGroupError as e:
+                    raise ScanTagError(
+                        f"Tag scan failed, Details: {cast(ExceptionGroup, e).exceptions}"
+                    ) from e
 
     async def _read_manifest_list(
         self,
         sess: aiohttp.ClientSession,
         manifest_list: Sequence[Any],
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
     ) -> None:
@@ -387,7 +411,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         sess: aiohttp.ClientSession,
         manifest: Mapping[str, Any],
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
     ) -> dict[str, Any]:
         """
@@ -402,7 +426,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
         ) as resp:
             resp.raise_for_status()
-            data = json.loads(await resp.read())
+            data = await read_json(resp)
         labels = {}
 
         # we should favor `config` instead of `container_config` since `config` can contain additional datas
@@ -422,7 +446,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
@@ -432,6 +456,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             for item in image_info["manifests"]
             if "annotations" not in item  # skip attestation manifests
         ]
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_OCI_MANIFEST
 
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
@@ -440,12 +465,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = {**rqst_args}
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"] = rqst_args.get("headers", {})
         rqst_args["headers"].update({
             "Accept": self.MEDIA_TYPE_OCI_MANIFEST,
@@ -465,7 +490,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 **rqst_args,
             ) as resp:
                 resp.raise_for_status()
-                config_data = json.loads(await resp.read())
+                config_data = await read_json(resp)
 
         labels = {}
         if _config_labels := config_data.get("config", {}).get("Labels"):
@@ -503,12 +528,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         manifest_list = image_info["manifests"]
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
         await self._read_manifest_list(
@@ -523,12 +549,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         config_digest = image_info["config"]["digest"]
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
 
         async with sess.get(
@@ -536,7 +563,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             **rqst_args,
         ) as resp:
             resp.raise_for_status()
-            blob_data = json.loads(await resp.read())
+            blob_data = await read_json(resp)
 
         manifest_arch = blob_data["architecture"]
         architecture = arch_name_aliases.get(manifest_arch, manifest_arch)
@@ -550,7 +577,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        rqst_args: Mapping[str, Any],
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
@@ -569,8 +596,29 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             }
         ]
 
+        rqst_args = copy.deepcopy(rqst_args)
         rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
         await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
+
+    def _read_supported_accelerators_from_labels(self, labels: Mapping[str, Any]) -> set[str]:
+        """Returns set of accelerators, represented by the slot name, supported by the image (excluding cpu and mem)."""
+
+        accels = set()
+        if _accels_str := labels.get("ai.backend.accelerators"):
+            accels |= set(_accels_str.split(","))
+        for key in labels.keys():
+            if key.startswith("ai.backend.resource.min") or key.startswith(
+                "ai.backend.resource.max"
+            ):
+                accel = key.split(
+                    "."
+                )[
+                    4
+                ]  # "ai" "backend" "resource" "min" "cuda/cpu/mem/..." "device/shares/...(if necessary)"
+                if SlotName(accel) not in INTRINSIC_SLOTS_MIN:
+                    accels.add(accel)
+
+        return accels
 
     async def _read_manifest(
         self,
@@ -591,7 +639,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 await reporter.update(1, message=progress_msg)
             return
 
-        assert ImageRow.resources is not None
         for architecture, manifest in manifests.items():
             try:
                 try:
@@ -620,24 +667,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     "labels": manifest["labels"],  # keep the original form
                 }
                 if "ai.backend.kernelspec" in manifest["labels"]:
-                    accels = manifest["labels"].get("ai.backend.accelerators")
+                    accels = self._read_supported_accelerators_from_labels(manifest["labels"])
                     if accels:
-                        updates["accels"] = accels
+                        updates["accels"] = ",".join(accels)
                 else:
                     # allow every accelerators for non-backend.ai image
                     updates["accels"] = "*"
 
-                resources = {  # default fallback if not defined
-                    "cpu": {"min": INTRINSIC_SLOTS_MIN[SlotName("cpu")], "max": None},
-                    "mem": {"min": INTRINSIC_SLOTS_MIN[SlotName("mem")], "max": None},
-                }
-                res_prefix = "ai.backend.resource.min."
-                for k, v in filter(
-                    lambda pair: pair[0].startswith(res_prefix), manifest["labels"].items()
-                ):
-                    res_key = k[len(res_prefix) :]
-                    resources[res_key] = {"min": v}
-                updates["resources"] = ImageRow.resources.type._schema.check(resources)
                 all_updates.get().update({
                     update_key: updates,
                 })

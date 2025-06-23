@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+import uuid
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,38 +25,40 @@ from aiotools import adefer
 from sqlalchemy.orm import load_only
 
 from ai.backend.common import validators as tx
-from ai.backend.common.events import (
-    BgtaskCancelledEvent,
-    BgtaskDoneEvent,
-    BgtaskFailedEvent,
-    BgtaskPartialSuccessEvent,
-    BgtaskUpdatedEvent,
+from ai.backend.common.events.dispatcher import (
     EventDispatcher,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
 )
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelCancelledBroadcastEvent,
+    KernelCreatingBroadcastEvent,
+    KernelPreparingBroadcastEvent,
+    KernelPullingBroadcastEvent,
+    KernelStartedBroadcastEvent,
+    KernelTerminatedBroadcastEvent,
+    KernelTerminatingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionFailureBroadcastEvent,
+    SessionScheduledBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionSuccessBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
+    SessionTerminatingBroadcastEvent,
+)
+from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.types import EventDomain
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
+from ..errors.exceptions import GenericForbidden, GroupNotFound
 from ..models import UserRole, groups, kernels
 from ..models.session import SessionRow
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
-from .exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
 
@@ -69,13 +71,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 sentinel: Final = Sentinel.token
 
 SessionEventInfo = Tuple[str, dict, str, Optional[int]]
-BgtaskEvents = (
-    BgtaskUpdatedEvent
-    | BgtaskDoneEvent
-    | BgtaskCancelledEvent
-    | BgtaskFailedEvent
-    | BgtaskPartialSuccessEvent
-)
 
 
 @server_status_required(READ_ALLOWED)
@@ -166,7 +161,7 @@ async def push_session_events(
                         response_data["clusterRole"] = cluster_role
                     if cluster_idx := row.get("cluster_idx"):
                         response_data["clusterIdx"] = cluster_idx
-                    await resp.send(json.dumps(response_data), event=event_name)
+                    await resp.send(dump_json_str(response_data), event=event_name)
                 finally:
                     my_queue.task_done()
         finally:
@@ -185,19 +180,41 @@ async def push_background_task_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    task_id = params["task_id"]
+    task_id: uuid.UUID = params["task_id"]
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
-    try:
-        return await root_ctx.background_task_manager.push_bgtask_events(request, task_id)
-    except ValueError as e:
-        raise ObjectNotFound(extra_data=str(e), object_name="background task")
+    async with sse_response(request) as resp:
+        propagator = BgtaskPropagator(root_ctx.background_task_manager)
+        root_ctx.event_hub.register_event_propagator(
+            propagator, [(EventDomain.BGTASK, str(task_id))]
+        )
+        try:
+            async for event in propagator.receive(task_id):
+                user_event = event.user_event()
+                if user_event is None:
+                    log.warning(
+                        "Received unsupported user event: {}",
+                        event.event_name(),
+                    )
+                    continue
+                await resp.send(
+                    dump_json_str(user_event.user_event_mapping()),
+                    event=user_event.event_name(),
+                    retry=user_event.retry_count(),
+                )
+            await resp.send(dump_json_str({}), event="server_close")
+        finally:
+            root_ctx.event_hub.unregister_event_propagator(propagator.id())
+    return resp
 
 
 async def enqueue_kernel_creation_status_update(
     app: web.Application,
     source: AgentId,
-    event: KernelPreparingEvent | KernelPullingEvent | KernelCreatingEvent | KernelStartedEvent,
+    event: KernelPreparingBroadcastEvent
+    | KernelPullingBroadcastEvent
+    | KernelCreatingBroadcastEvent
+    | KernelStartedBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -228,13 +245,15 @@ async def enqueue_kernel_creation_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason, None))
+        q.put_nowait((event.event_name(), row._mapping, event.reason, None))
 
 
 async def enqueue_kernel_termination_status_update(
     app: web.Application,
     agent_id: AgentId,
-    event: KernelCancelledEvent | KernelTerminatingEvent | KernelTerminatedEvent,
+    event: KernelCancelledBroadcastEvent
+    | KernelTerminatingBroadcastEvent
+    | KernelTerminatedBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -267,17 +286,20 @@ async def enqueue_kernel_termination_status_update(
     for q in app_ctx.session_event_queues:
         exit_code = (
             event.exit_code
-            if isinstance(event, (KernelTerminatingEvent, KernelTerminatedEvent))
+            if isinstance(event, (KernelTerminatingBroadcastEvent, KernelTerminatedBroadcastEvent))
             else None
         )
-        q.put_nowait((event.name, row._mapping, event.reason, exit_code))
+        q.put_nowait((event.event_name(), row._mapping, event.reason, exit_code))
 
 
 async def enqueue_session_creation_status_update(
     app: web.Application,
     source: AgentId,
     event: (
-        SessionEnqueuedEvent | SessionScheduledEvent | SessionStartedEvent | SessionCancelledEvent
+        SessionEnqueuedBroadcastEvent
+        | SessionScheduledBroadcastEvent
+        | SessionStartedBroadcastEvent
+        | SessionCancelledBroadcastEvent
     ),
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
@@ -313,13 +335,13 @@ async def enqueue_session_creation_status_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, None))
+        q.put_nowait((event.event_name(), row_map, event.reason, None))
 
 
 async def enqueue_session_termination_status_update(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionTerminatingEvent | SessionTerminatedEvent,
+    event: SessionTerminatingBroadcastEvent | SessionTerminatedBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -354,13 +376,13 @@ async def enqueue_session_termination_status_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, None))
+        q.put_nowait((event.event_name(), row_map, event.reason, None))
 
 
 async def enqueue_batch_task_result_update(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionSuccessEvent | SessionFailureEvent,
+    event: SessionSuccessBroadcastEvent | SessionFailureBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -395,7 +417,7 @@ async def enqueue_batch_task_result_update(
         "access_key": row.access_key,
     }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row_map, event.reason, event.exit_code))
+        q.put_nowait((event.event_name(), row_map, event.reason, event.exit_code))
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -408,28 +430,47 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx: PrivateContext = app["events.context"]
     app_ctx.session_event_queues = set()
     event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
-    event_dispatcher.subscribe(SessionEnqueuedEvent, app, enqueue_session_creation_status_update)
-    event_dispatcher.subscribe(SessionScheduledEvent, app, enqueue_session_creation_status_update)
-    event_dispatcher.subscribe(KernelPreparingEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(KernelPullingEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(KernelCreatingEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(KernelStartedEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(SessionStartedEvent, app, enqueue_session_creation_status_update)
     event_dispatcher.subscribe(
-        KernelTerminatingEvent, app, enqueue_kernel_termination_status_update
-    )
-    event_dispatcher.subscribe(KernelTerminatedEvent, app, enqueue_kernel_termination_status_update)
-    event_dispatcher.subscribe(KernelCancelledEvent, app, enqueue_kernel_termination_status_update)
-    event_dispatcher.subscribe(
-        SessionTerminatingEvent, app, enqueue_session_termination_status_update
+        SessionEnqueuedBroadcastEvent, app, enqueue_session_creation_status_update
     )
     event_dispatcher.subscribe(
-        SessionTerminatedEvent, app, enqueue_session_termination_status_update
+        SessionScheduledBroadcastEvent, app, enqueue_session_creation_status_update
     )
-    event_dispatcher.subscribe(SessionCancelledEvent, app, enqueue_session_creation_status_update)
-    event_dispatcher.subscribe(SessionSuccessEvent, app, enqueue_batch_task_result_update)
-    event_dispatcher.subscribe(SessionFailureEvent, app, enqueue_batch_task_result_update)
-    root_ctx.background_task_manager.register_event_handlers(event_dispatcher)
+    event_dispatcher.subscribe(
+        KernelPreparingBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelPullingBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelCreatingBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelStartedBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionStartedBroadcastEvent, app, enqueue_session_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelTerminatingBroadcastEvent, app, enqueue_kernel_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelTerminatedBroadcastEvent, app, enqueue_kernel_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelCancelledBroadcastEvent, app, enqueue_kernel_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionTerminatingBroadcastEvent, app, enqueue_session_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionTerminatedBroadcastEvent, app, enqueue_session_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionCancelledBroadcastEvent, app, enqueue_session_creation_status_update
+    )
+    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, enqueue_batch_task_result_update)
+    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, enqueue_batch_task_result_update)
     yield
 
 

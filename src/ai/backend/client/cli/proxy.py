@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from http import HTTPStatus
 from typing import AsyncIterator, Tuple, Union
 
 import aiohttp
@@ -148,16 +149,22 @@ async def web_handler(request):
         return web.Response(body=json.dumps(e.data), status=e.status, reason=e.reason)
     except BackendClientError:
         return web.Response(
-            body="The proxy target server is inaccessible.", status=502, reason="Bad Gateway"
+            body="The proxy target server is inaccessible.",
+            status=HTTPStatus.BAD_GATEWAY,
+            reason="Bad Gateway",
         )
     except asyncio.CancelledError:
         return web.Response(
-            body="The proxy is being shut down.", status=503, reason="Service Unavailable"
+            body="The proxy is being shut down.",
+            status=HTTPStatus.SERVICE_UNAVAILABLE,
+            reason="Service Unavailable",
         )
     except Exception as e:
         print_error(e)
         return web.Response(
-            body="Something has gone wrong.", status=500, reason="Internal Server Error"
+            body="Something has gone wrong.",
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            reason="Internal Server Error",
         )
 
 
@@ -182,16 +189,22 @@ async def websocket_handler(request):
         return web.Response(body=json.dumps(e.data), status=e.status, reason=e.reason)
     except BackendClientError:
         return web.Response(
-            body="The proxy target server is inaccessible.", status=502, reason="Bad Gateway"
+            body="The proxy target server is inaccessible.",
+            status=HTTPStatus.BAD_GATEWAY,
+            reason="Bad Gateway",
         )
     except asyncio.CancelledError:
         return web.Response(
-            body="The proxy is being shut down.", status=503, reason="Service Unavailable"
+            body="The proxy is being shut down.",
+            status=HTTPStatus.SERVICE_UNAVAILABLE,
+            reason="Service Unavailable",
         )
     except Exception as e:
         print_error(e)
         return web.Response(
-            body="Something has gone wrong.", status=500, reason="Internal Server Error"
+            body="Something has gone wrong.",
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            reason="Internal Server Error",
         )
 
 

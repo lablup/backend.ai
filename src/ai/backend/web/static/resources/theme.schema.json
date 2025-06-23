@@ -15,35 +15,27 @@
       "type": "object",
       "description": "Properties to customize the site's logo, considering both light and dark modes.",
       "properties": {
-        "src": { 
+        "src": {
           "type": "string",
           "description": "The source of the logo image."
         },
-        "srcCollapsed": { 
+        "srcCollapsed": {
           "type": "string",
           "description": "The source of the collapsed logo image."
         },
-        "srcDark": { 
+        "srcDark": {
           "type": "string",
           "description": "The source of the logo image in dark mode."
         },
-        "srcCollapsedDark": { 
+        "srcCollapsedDark": {
           "type": "string",
           "description": "The source of the collapsed logo image in dark mode."
         },
-        "logoTitle": { 
-          "type": "string",
-          "description": "The title on the bottom of the logo"
-        },
-        "logoTitleCollapsed": { 
-          "type": "string",
-          "description": "The title on the bottom of the logo in collapsed sider."
-        },
-        "alt": { 
+        "alt": {
           "type": "string",
           "description": "The alt text for the logo image."
         },
-        "href": { 
+        "href": {
           "type": "string",
           "description": "The URL that the logo links to."
         },
@@ -72,14 +64,25 @@
     "sider": {
       "type": "object",
       "properties": {
-        "theme": { "type": ["string"], "enum": ["dark","light","auto"], "default":"auto", "description": "The theme of the sider. If it's set to 'dark' or 'light', the entered theme will be applied to the sider regardless of the site's dark mode status." }
+        "theme": {
+          "type": ["string"],
+          "enum": ["dark", "light", "auto"],
+          "default": "auto",
+          "description": "The theme of the sider. If it's set to 'dark' or 'light', the entered theme will be applied to the sider regardless of the site's dark mode status."
+        }
       }
     },
     "branding": {
       "type": "object",
       "properties": {
-        "companyName": { "type": "string", "description": "The name of the company or organization." },
-        "brandName": { "type": "string", "description": "The name of the brand or product." }
+        "companyName": {
+          "type": "string",
+          "description": "The name of the company or organization."
+        },
+        "brandName": {
+          "type": "string",
+          "description": "The name of the brand or product."
+        }
       }
     }
   },

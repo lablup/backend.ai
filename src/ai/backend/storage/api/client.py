@@ -5,11 +5,11 @@ Client-facing API
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import urllib.parse
 from datetime import datetime
+from http import HTTPStatus
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -31,6 +31,7 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
@@ -108,7 +109,7 @@ async def check_status(request: web.Request) -> web.StreamResponse:
         ),
     ) as _:
         return web.json_response(
-            status=200,
+            status=HTTPStatus.OK,
             data={
                 "status": "ok",
                 "type": "client-facing",
@@ -161,7 +162,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     raise FileNotFoundError
             except (ValueError, FileNotFoundError):
                 raise web.HTTPNotFound(
-                    body=json.dumps(
+                    body=dump_json_str(
                         {
                             "title": "File not found",
                             "type": "https://api.backend.ai/probs/storage/file-not-found",
@@ -371,7 +372,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 except OSError:
                     pass
             headers["Upload-Offset"] = str(current_size)
-    return web.Response(status=204, headers=headers)
+    return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
 async def tus_options(request: web.Request) -> web.Response:
@@ -406,7 +407,7 @@ async def prepare_tus_session_headers(
     upload_temp_path = vfpath / ".upload" / token_data["session"]
     if not Path(upload_temp_path).exists():
         raise web.HTTPNotFound(
-            body=json.dumps(
+            body=dump_json_str(
                 {
                     "title": "No such upload session",
                     "type": "https://api.backend.ai/probs/storage/no-such-upload-session",

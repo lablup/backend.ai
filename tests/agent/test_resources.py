@@ -10,11 +10,12 @@ from unittest import mock
 import pytest
 from aioresponses import aioresponses
 
+from ai.backend.accelerator.mock.plugin import MockPlugin
 from ai.backend.agent import resources
 from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
 from ai.backend.agent.agent import ComputerContext
 from ai.backend.agent.dummy.intrinsic import CPUPlugin, MemoryPlugin
-from ai.backend.agent.exception import InsufficientResource
+from ai.backend.agent.exception import FractionalResourceFragmented, InsufficientResource
 from ai.backend.agent.resources import scan_resource_usage_per_slot
 from ai.backend.agent.vendor import linux
 from ai.backend.common.types import DeviceId, DeviceName, KernelId, ResourceSlot, SlotName
@@ -188,6 +189,194 @@ async def test_scan_resource_usage_per_slot():
             mock.side_effect = ValueError("parsing error")
             with pytest.raises(ExceptionGroup):
                 await scan_resource_usage_per_slot(kernel_ids, tmpdir)
+
+
+@pytest.mark.asyncio
+async def test_allow_fractional_resource_fragmentation(monkeypatch):
+    def mock_read_from_file(path, daemon_name):
+        return {
+            "slot_name": "cuda",
+            "device_plugin_name": "CUDADevice",
+            "devices": [
+                {
+                    "mother_uuid": "c59395cd-ac91-4cd3-a1b0-3d2568aa2d01",
+                    "model_name": "NVIDIA B200",
+                    "numa_node": 0,
+                    "subproc_count": 216,
+                    "memory_size": "192G",
+                    "is_mig_device": False,
+                },
+                {
+                    "mother_uuid": "c59395cd-ac91-4cd3-a1b0-3d2568aa2d02",
+                    "model_name": "NVIDIA B200",
+                    "numa_node": 1,
+                    "subproc_count": 216,
+                    "memory_size": "192G",
+                    "is_mig_device": False,
+                },
+            ],
+            "attributes": {"nvidia_driver": "570.0.0", "cuda_runtime": "12.8"},
+            "formats": {
+                "shares": {
+                    "human_readable_name": "fGPU",
+                    "description": "CUDA-capable GPU (fractional)",
+                    "display_unit": "fGPU",
+                    "number_format": {
+                        "binary": False,
+                        "round_length": 0,
+                    },
+                    "display_icon": "gpu1",
+                }
+            },
+        }, Path("/resolved/mock-accelerator.toml")
+
+    monkeypatch.setattr("ai.backend.common.config.read_from_file", mock_read_from_file)
+    plugin_config = {
+        "allocation_mode": "fractional",
+        "unit_proc": 216,
+        "unit_mem": "192G",
+    }
+    local_config = {}
+    cuda_plugin = MockPlugin(plugin_config, local_config)
+    await cuda_plugin.init()
+
+    cpu_plugin = CPUPlugin(
+        {},
+        local_config,
+        {
+            "agent": {"resource": {"cpu": {"num-core": 4}}},
+        },
+    )
+    mem_plugin = MemoryPlugin(
+        {},
+        local_config,
+        {
+            "agent": {"resource": {"memory": {"size": 4096}}},
+        },
+    )
+    cuda_devices = await cuda_plugin.list_devices()
+    cpu_devices = await cpu_plugin.list_devices()
+    mem_devices = await mem_plugin.list_devices()
+    computers = {
+        DeviceName("cpu"): ComputerContext(
+            cpu_plugin, cpu_devices, await cpu_plugin.create_alloc_map()
+        ),
+        DeviceName("mem"): ComputerContext(
+            mem_plugin, mem_devices, await mem_plugin.create_alloc_map()
+        ),
+        DeviceName("cuda"): ComputerContext(
+            cuda_plugin, cuda_devices, await cuda_plugin.create_alloc_map()
+        ),
+    }
+    alloc_order = [DeviceName("cuda"), DeviceName("cpu"), DeviceName("mem")]
+    affinity_map = AffinityMap.build(list(cuda_devices) + list(cpu_devices) + list(mem_devices))
+    affinity_policy = AffinityPolicy.PREFER_SINGLE_NODE
+
+    resource_spec = resources.KernelResourceSpec(
+        ResourceSlot.from_json({
+            "cpu": "1",
+            "mem": "512",
+            "cuda.shares": "0.8",
+        }),
+        allocations={},
+        scratch_disk_size=0,
+        mounts=[],
+    )
+    resources.allocate(computers, resource_spec, alloc_order, affinity_map, affinity_policy)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(0)
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(512)
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d01")
+    ] == Decimal(0)
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d02")
+    ] == Decimal("0.8")
+
+    resources.allocate(computers, resource_spec, alloc_order, affinity_map, affinity_policy)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(1)
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(1024)
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d01")
+    ] == Decimal("0.8")
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d02")
+    ] == Decimal("0.8")
+
+    resource_spec = resources.KernelResourceSpec(
+        ResourceSlot.from_json({
+            "cpu": "1",
+            "mem": "512",
+            "cuda.shares": "0.4",
+        }),
+        allocations={},
+        scratch_disk_size=0,
+        mounts=[],
+    )
+    with pytest.raises(FractionalResourceFragmented):
+        resources.allocate(
+            computers,
+            resource_spec,
+            alloc_order,
+            affinity_map,
+            affinity_policy,
+            allow_fractional_resource_fragmentation=False,
+        )
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(1)
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(1024)
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d01")
+    ] == Decimal("0.8")
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d02")
+    ] == Decimal("0.8")
+
+    resources.allocate(
+        computers,
+        resource_spec,
+        alloc_order,
+        affinity_map,
+        affinity_policy,
+        allow_fractional_resource_fragmentation=True,
+    )
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("2")
+    ] == Decimal(1)
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(1536)
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d01")
+    ] == Decimal("1.0")
+    assert computers[DeviceName("cuda")].alloc_map.allocations[SlotName("cuda.shares")][
+        DeviceId("c59395cd-ac91-4cd3-a1b0-3d2568aa2d02")
+    ] == Decimal("1.0")
 
 
 @pytest.mark.asyncio

@@ -7,7 +7,6 @@ from ai.backend.manager.server import (
     hook_plugin_ctx,
     monitoring_ctx,
     redis_ctx,
-    shared_config_ctx,
 )
 
 FIXTURES_WITH_NOASSOC = [
@@ -71,6 +70,8 @@ FIXTURES_WITH_ASSOC = [
 async def test_associate_container_registry_with_group(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
     extra_fixtures,
     database_fixture,
     create_app_and_client,
@@ -78,7 +79,8 @@ async def test_associate_container_registry_with_group(
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,
@@ -124,6 +126,8 @@ async def test_associate_container_registry_with_group(
 async def test_disassociate_container_registry_with_group(
     test_case,
     etcd_fixture,
+    mock_etcd_ctx,
+    mock_config_provider_ctx,
     extra_fixtures,
     database_fixture,
     create_app_and_client,
@@ -131,7 +135,8 @@ async def test_disassociate_container_registry_with_group(
 ):
     app, client = await create_app_and_client(
         [
-            shared_config_ctx,
+            mock_etcd_ctx,
+            mock_config_provider_ctx,
             database_ctx,
             monitoring_ctx,
             hook_plugin_ctx,

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 from ai.backend.common import msgpack
 from ai.backend.common.types import VFolderMount
 
-from ..api.exceptions import BackendError
+from ..errors.exceptions import DotfileVFolderPathConflict
 from ..types import UserScope
 from .domain import query_domain_dotfiles
 from .group import query_group_dotfiles
@@ -75,8 +75,8 @@ async def prepare_dotfiles(
         if not dotfile_path.is_absolute():
             dotfile_path = PurePosixPath("/home/work", dotfile["path"])
         if dotfile_path in vfolder_kernel_paths:
-            raise BackendError(
-                "There is a kernel-side path from vfolders that conflicts with "
+            raise DotfileVFolderPathConflict(
+                f"There is a kernel-side path from vfolders that conflicts with "
                 f"a dotfile '{dotfile['path']}'.",
             )
 

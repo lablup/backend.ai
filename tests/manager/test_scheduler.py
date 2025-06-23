@@ -575,6 +575,9 @@ class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
 
+    async def get(self, key: str) -> Any:
+        return None
+
 
 @pytest.mark.asyncio
 async def test_manually_assign_agent_available(
@@ -586,14 +589,13 @@ async def test_manually_assign_agent_available(
 ) -> None:
     example_agents = create_example_agents()
     example_pending_sessions = create_example_pending_sessions()
-    mock_local_config = MagicMock()
 
     (
         registry,
         mock_dbconn,
         mock_dbsess,
         mock_dbresult,
-        mock_shared_config,
+        mock_config_provider,
         mock_event_dispatcher,
         mock_event_producer,
     ) = registry_ctx
@@ -614,11 +616,11 @@ async def test_manually_assign_agent_available(
     candidate_agents = example_agents
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
     sess_ctx = example_pending_sessions[0]
+    mock_etcd = DummyEtcd()
 
     dispatcher = SchedulerDispatcher(
-        local_config=mock_local_config,
-        shared_config=mock_shared_config,
-        event_dispatcher=mock_event_dispatcher,
+        config_provider=mock_config_provider,
+        etcd=mock_etcd,  # type: ignore
         event_producer=mock_event_producer,
         lock_factory=file_lock_factory,
         registry=registry,

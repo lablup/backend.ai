@@ -1,28 +1,32 @@
 import asyncio
+import random
+from dataclasses import dataclass
 from types import TracebackType
-from typing import Type
+from typing import Optional, Type
 
 import aiotools
-import attrs
 import pytest
 
 from ai.backend.common import config, redis_helper
-from ai.backend.common.events import (
-    AbstractEvent,
+from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
     CoalescingState,
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.types import AgentId, RedisConfig
+from ai.backend.common.events.types import (
+    AbstractBroadcastEvent,
+    EventDomain,
+)
+from ai.backend.common.events.user_event.user_event import UserEvent
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
+from ai.backend.common.types import AgentId, RedisTarget
 
 
-@attrs.define(slots=True, frozen=True)
-class DummyEvent(AbstractEvent):
-    name = "testing"
-
-    value: int = attrs.field()
+@dataclass
+class DummyBroadcastEvent(AbstractBroadcastEvent):
+    value: int
 
     def serialize(self) -> tuple:
         return (self.value + 1,)
@@ -31,64 +35,86 @@ class DummyEvent(AbstractEvent):
     def deserialize(cls, value: tuple):
         return cls(value[0] + 1)
 
+    @classmethod
+    def event_domain(self) -> EventDomain:
+        return EventDomain.AGENT
+
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+    @classmethod
+    def event_name(self) -> str:
+        return "testing"
+
 
 EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
-async def test_dispatch(
-    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher], redis_container
-) -> None:
+async def test_dispatch(redis_container) -> None:
     app = object()
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
-    dispatcher = await dispatcher_cls.new(
+    stream_redis = redis_helper.get_redis_object(
         redis_config,
-        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
     )
-    producer = await EventProducer.new(redis_config)
+    node_id = f"test-{random.randint(0, 1000)}"
+    redis_mq = RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
+    dispatcher = EventDispatcher(
+        redis_mq,
+    )
+    producer = EventProducer(redis_mq, source=AgentId(node_id))
 
     records = set()
 
-    async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
+    async def acb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
-        assert event.name == "testing"
+        assert isinstance(event, DummyBroadcastEvent)
+        assert event.event_name() == "testing"
         assert event.value == 1001
         await asyncio.sleep(0.01)
         records.add("async")
 
-    def scb(context: object, source: AgentId, event: DummyEvent) -> None:
+    def scb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
-        assert event.name == "testing"
+        assert isinstance(event, DummyBroadcastEvent)
+        assert event.event_name() == "testing"
         assert event.value == 1001
         records.add("sync")
 
-    dispatcher.subscribe(DummyEvent, app, acb)
-    dispatcher.subscribe(DummyEvent, app, scb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, acb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, scb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
     # Dispatch the event
-    await producer.produce_event(DummyEvent(999), source="i-test")
+    await producer.broadcast_event(DummyBroadcastEvent(999), source_override=AgentId("i-test"))
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(stream_redis, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
-async def test_error_on_dispatch(
-    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher], redis_container
-) -> None:
+async def test_error_on_dispatch(redis_container) -> None:
     app = object()
     exception_log: list[str] = []
 
@@ -99,40 +125,55 @@ async def test_error_on_dispatch(
     ) -> None:
         exception_log.append(type(exc).__name__)
 
-    redis_config = RedisConfig(
+    redis_config = RedisTarget(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
-    dispatcher = await dispatcher_cls.new(
+    stream_redis = redis_helper.get_redis_object(
         redis_config,
-        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
-        consumer_exception_handler=handle_exception,
-        subscriber_exception_handler=handle_exception,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
     )
-    producer = await EventProducer.new(redis_config)
+    node_id = f"test-{random.randint(0, 1000)}"
+    redis_mq = RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
 
-    async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
+    dispatcher = EventDispatcher(
+        redis_mq,
+        consumer_exception_handler=handle_exception,  # type: ignore
+        subscriber_exception_handler=handle_exception,  # type: ignore
+    )
+    producer = EventProducer(redis_mq, source=AgentId(node_id))
+
+    async def acb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
+        assert isinstance(event, DummyBroadcastEvent)
         raise ZeroDivisionError
 
-    def scb(context: object, source: AgentId, event: DummyEvent) -> None:
+    def scb(context: object, source: AgentId, event: DummyBroadcastEvent) -> None:
         assert context is app
         assert source == AgentId("i-test")
-        assert isinstance(event, DummyEvent)
+        assert isinstance(event, DummyBroadcastEvent)
         raise OverflowError
 
-    dispatcher.subscribe(DummyEvent, app, scb)
-    dispatcher.subscribe(DummyEvent, app, acb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, scb)
+    dispatcher.subscribe(DummyBroadcastEvent, app, acb)
+    await dispatcher.start()
     await asyncio.sleep(0.1)
 
-    await producer.produce_event(DummyEvent(0), source="i-test")
+    await producer.broadcast_event(DummyBroadcastEvent(0), source_override=AgentId("i-test"))
     await asyncio.sleep(0.5)
     assert len(exception_log) == 2
     assert "ZeroDivisionError" in exception_log
     assert "OverflowError" in exception_log
 
-    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(stream_redis, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 

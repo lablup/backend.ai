@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 import pytest
 from aioresponses import aioresponses
 
@@ -42,7 +44,8 @@ def test_session_command(
         new_session_name = test_case["new_session_name"]
 
         mocked.post(
-            f"{api_url}/session/{session_id_or_name}/rename?name={new_session_name}", status=204
+            f"{api_url}/session/{session_id_or_name}/rename?name={new_session_name}",
+            status=HTTPStatus.NO_CONTENT,
         )
 
         result = runner.invoke(

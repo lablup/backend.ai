@@ -76,7 +76,7 @@ async def _calculate_role_in_scope_for_suadmin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
     from ..domain import DomainRow
-    from ..group import GroupRow
+    from ..group import AssocGroupUserRow, GroupRow
     from ..user import UserRow
 
     match scope:
@@ -95,15 +95,22 @@ async def _calculate_role_in_scope_for_suadmin(
                 return _EMPTY_FSET
         case ProjectScope(project_id):
             stmt = (
-                sa.select(GroupRow).where(GroupRow.id == project_id).options(load_only(GroupRow.id))
+                sa.select(GroupRow)
+                .where(GroupRow.id == project_id)
+                .options(
+                    selectinload(GroupRow.users),
+                    with_loader_criteria(
+                        AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
+                    ),
+                )
             )
             project_row = cast(GroupRow | None, await db_session.scalar(stmt))
             if project_row is None:
                 return _EMPTY_FSET
-            if project_row is not None:
-                return frozenset([PredefinedRole.ADMIN])
-            else:
-                return _EMPTY_FSET
+            result = frozenset([PredefinedRole.ADMIN])
+            if project_row.users:
+                result = frozenset([PredefinedRole.OWNER])
+            return result
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
@@ -208,7 +215,7 @@ async def _calculate_role_in_scope_for_admin(
             else:
                 return _EMPTY_FSET
             if project_row.users:
-                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
+                result = frozenset([PredefinedRole.OWNER])
             return result
         case UserScope(user_id, domain_name):
             if ctx.user_id == user_id:

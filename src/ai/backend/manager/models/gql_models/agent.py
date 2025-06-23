@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -21,7 +20,8 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -31,6 +31,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..agent import (
+    ADMIN_PERMISSIONS,
     AgentRow,
     AgentStatus,
     agents,
@@ -48,12 +49,12 @@ from ..base import (
     set_if_set,
     simple_db_mutate,
 )
+from ..gql_models.kernel import ComputeContainer, KernelStatus
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import AssocGroupUserRow
-from ..kernel import ComputeContainer, KernelStatus
 from ..keypair import keypairs
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..rbac import (
     ScopeType,
 )
@@ -73,11 +74,16 @@ __all__ = (
     "Agent",
     "AgentNode",
     "AgentConnection",
+    "AgentSummary",
+    "AgentList",
+    "AgentSummaryList",
+    "ModifyAgent",
+    "ModifyAgentInput",
 )
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
     "id": ("id", None),
-    "status": ("status", enum_field_getter(AgentStatus)),
+    "status": ("status", AgentStatus),
     "status_changed": ("status_changed", dtparse),
     "region": ("region", None),
     "scaling_group": ("scaling_group", None),
@@ -112,7 +118,7 @@ async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> d
     )
 
     if raw_alloc_map:
-        alloc_map = json.loads(raw_alloc_map)
+        alloc_map = load_json(raw_alloc_map)
         return UUIDFloatMap.parse_value({k: float(v) for k, v in alloc_map.items()})
     return {}
 
@@ -238,7 +244,7 @@ class AgentNode(graphene.ObjectType):
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
             if stat is not None:
-                ret.append(msgpack.unpackb(stat))
+                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
             else:
                 ret.append(None)
 
@@ -305,21 +311,28 @@ class AgentNode(graphene.ObjectType):
         )
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
-            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope, permission)
-            cond = permission_ctx.query_condition
-            if cond is None:
-                return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-            query = query.where(cond)
-            cnt_query = cnt_query.where(cond)
+            if user["role"] != UserRole.SUPERADMIN:
+                client_ctx = ClientContext(
+                    graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+                )
+                permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope, permission)
+                cond = permission_ctx.query_condition
+                if cond is None:
+                    return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
+                permission_getter = permission_ctx.calculate_final_permission
+                query = query.where(cond)
+                cnt_query = cnt_query.where(cond)
+            else:
+
+                async def all_permissions(row):
+                    return ADMIN_PERMISSIONS
+
+                permission_getter = all_permissions
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 agent_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
         result: list[AgentNode] = [
-            cls.parse(info, row, await permission_ctx.calculate_final_permission(row))
-            for row in agent_rows
+            cls.parse(info, row, await permission_getter(row)) for row in agent_rows
         ]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
@@ -459,7 +472,7 @@ class Agent(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", enum_field_getter(AgentStatus)),
+        "status": ("status", AgentStatus),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
@@ -602,7 +615,7 @@ class Agent(graphene.ObjectType):
         ret = []
         for stat in await redis_helper.execute(ctx.redis_stat, _pipe_builder):
             if stat is not None:
-                ret.append(msgpack.unpackb(stat))
+                ret.append(msgpack.unpackb(stat, ext_hook_mapping=msgpack.uuid_to_str))
             else:
                 ret.append(None)
 
@@ -744,7 +757,7 @@ class AgentSummary(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", enum_field_getter(AgentStatus)),
+        "status": ("status", AgentStatus),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulable", None),
     }
@@ -941,7 +954,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
                     graph_ctx.registry.redis_stat,
                     lambda r: r.setex(
                         name=key,
-                        value=json.dumps(alloc_map),
+                        value=dump_json_str(alloc_map),
                         time=GPU_ALLOC_MAP_CACHE_PERIOD,
                     ),
                 )

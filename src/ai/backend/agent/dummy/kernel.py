@@ -6,12 +6,13 @@ from collections import OrderedDict
 from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
-from ai.backend.common.types import AgentId, CommitStatus, KernelId, SessionId
+from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.types import CommitStatus
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ..types import AgentEventData, KernelOwnershipData
 
 
 class DummyKernel(AbstractKernel):
@@ -19,9 +20,7 @@ class DummyKernel(AbstractKernel):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         network_id: str,
         image: ImageRef,
         version: int,
@@ -34,9 +33,7 @@ class DummyKernel(AbstractKernel):
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             network_id,
             image,
             version,
@@ -88,10 +85,10 @@ class DummyKernel(AbstractKernel):
         await asyncio.sleep(delay)
         return {}
 
-    async def get_completions(self, text, opts):
+    async def get_completions(self, text, opts) -> CodeCompletionResp:
         delay = self.dummy_kernel_cfg["delay"]["get-completions"]
         await asyncio.sleep(delay)
-        return {"status": "finished", "completions": []}
+        return CodeCompletionResp(result=CodeCompletionResult.success({"suggestions": []}))
 
     async def get_logs(self):
         delay = self.dummy_kernel_cfg["delay"]["get-logs"]

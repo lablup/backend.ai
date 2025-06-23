@@ -1,7 +1,6 @@
 import asyncio
 import importlib
 import inspect
-import json
 import textwrap
 from collections import defaultdict
 from pathlib import Path
@@ -16,6 +15,7 @@ from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
+from ai.backend.common.json import pretty_json_str
 from ai.backend.manager import __version__
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.session import UndefChecker
@@ -75,6 +75,15 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Enum):
         enum_values = scheme.variants  # type: ignore[attr-defined]
         return {"type": "string", "enum": enum_values}
+    if isinstance(scheme, tx.DelimiterSeperatedList):
+        return {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "List of items separated by a delimiter (default: comma). "
+                "Items may contain spaces, but not the delimiter."
+            ),
+        }
     if isinstance(scheme, t.Float):
         resp = {"type": "integer"}
         if gte := scheme.gte:  # type: ignore[attr-defined]
@@ -408,10 +417,10 @@ def main(output: Path) -> None:
     """
     openapi = asyncio.run(generate())
     if output == "-" or output is None:
-        print(json.dumps(openapi, ensure_ascii=False, indent=2))
+        print(pretty_json_str(openapi))
     else:
         with open(output, mode="w") as fw:
-            fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+            fw.write(pretty_json_str(openapi))
 
 
 if __name__ == "__main__":

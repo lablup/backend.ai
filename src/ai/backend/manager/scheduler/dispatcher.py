@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import itertools
-import json
 import logging
+import uuid
 from collections import defaultdict
 from collections.abc import (
     Awaitable,
@@ -12,12 +12,14 @@ from collections.abc import (
     Sequence,
 )
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
+    Iterable,
     Optional,
     Union,
     cast,
@@ -37,25 +39,35 @@ from sqlalchemy.orm import noload, selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.events import (
-    AgentStartedEvent,
-    CoalescingOptions,
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import (
+    EventProducer,
+)
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelLifecycleEventReason,
+)
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    RouteCreatedAnycastEvent,
+)
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
-    DoUpdateSessionStatusEvent,
-    EventDispatcher,
-    EventProducer,
-    KernelLifecycleEventReason,
-    RouteCreatedEvent,
-    SessionCancelledEvent,
-    SessionCheckingPrecondEvent,
-    SessionEnqueuedEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
-    SessionTerminatedEvent,
 )
+from ai.backend.common.events.event_types.session.anycast import (
+    DoUpdateSessionStatusEvent,
+    SessionCancelledAnycastEvent,
+    SessionCheckingPrecondAnycastEvent,
+    SessionPreparingAnycastEvent,
+    SessionScheduledAnycastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionPreparingBroadcastEvent,
+    SessionScheduledBroadcastEvent,
+)
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
@@ -64,25 +76,29 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
-    EtcdRedisConfig,
     KernelId,
     RedisConnectionInfo,
+    RedisProfileTarget,
     ResourceSlot,
     SessionId,
+    SessionTypes,
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..api.exceptions import (
+from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
+from ..errors.exceptions import (
     GenericBadRequest,
     GenericForbidden,
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -136,7 +152,6 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from ..config import LocalConfig, SharedConfig
     from ..registry import AgentRegistry
 
 __all__ = (
@@ -170,14 +185,14 @@ def load_agent_selector(
     sgroup_opts: ScalingGroupOpts,
     selector_config: Mapping[str, Any],
     agent_selection_resource_priority: list[str],
-    shared_config: SharedConfig,
+    legacy_etcd_loader: LegacyEtcdLoader,
 ) -> AbstractAgentSelector[AbstractResourceGroupState]:
     def create_agent_selector(
         selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
     ) -> AbstractAgentSelector[T_ResourceGroupState]:
         # An extra inner function to parametrize the generic type arguments
         state_cls = selector_cls.get_state_cls()
-        state_store = DefaultResourceGroupStateStore(state_cls, shared_config)
+        state_store = DefaultResourceGroupStateStore(state_cls, legacy_etcd_loader)
         return selector_cls(
             sgroup_opts,
             selector_config,
@@ -194,13 +209,65 @@ def load_agent_selector(
     raise ImportError("Cannot load the agent-selector plugin", name)
 
 
+async def get_kernel_count_per_agent_at_endpoint(
+    db_sess: SASession,
+    endpoint_id: uuid.UUID,
+    filter_by_statuses: Iterable[KernelStatus],
+) -> dict[AgentId, int]:
+    """
+    Query the agents to which the kernels of each session belong,
+    and calculate the number of kernels for each agent at a specific endpoint.
+    """
+
+    routing_rows: list[RoutingRow] = (
+        await db_sess.scalars(
+            sa.select(RoutingRow)
+            .options(selectinload(RoutingRow.session_row).options(selectinload(SessionRow.kernels)))
+            .where(
+                RoutingRow.endpoint == endpoint_id,
+            )
+        )
+    ).all()
+
+    kernel_count_per_agent: dict[AgentId, int] = {}
+
+    for routing_row in routing_rows:
+        session_row: SessionRow = routing_row.session_row
+        kernels: list[KernelRow] = session_row.kernels
+
+        for kernel in kernels:
+            if kernel.status in filter_by_statuses:
+                if agent_id := kernel.agent:
+                    kernel_count_per_agent[agent_id] = kernel_count_per_agent.get(agent_id, 0) + 1
+
+    log.debug(
+        'kernel counts at endpoint {0}: "{1}"',
+        endpoint_id,
+        repr(kernel_count_per_agent),
+    )
+
+    return kernel_count_per_agent
+
+
+@dataclass
+class LoadSchedulerArgs:
+    scheduler_name: str
+    sgroup_opts: ScalingGroupOpts
+
+
+@dataclass
+class LoadAgentSelectorArgs:
+    sgroup_opts: ScalingGroupOpts
+    pending_session_id: uuid.UUID
+    pending_session_type: SessionTypes
+
+
 class SchedulerDispatcher(aobject):
-    config: LocalConfig
-    shared_config: SharedConfig
+    config_provider: ManagerConfigProvider
     registry: AgentRegistry
     db: SAEngine
+    etcd: AsyncEtcd
 
-    event_dispatcher: EventDispatcher
     event_producer: EventProducer
     schedule_timer: GlobalTimer
     check_precond_timer: GlobalTimer
@@ -213,53 +280,33 @@ class SchedulerDispatcher(aobject):
 
     def __init__(
         self,
-        local_config: LocalConfig,
-        shared_config: SharedConfig,
-        event_dispatcher: EventDispatcher,
+        config_provider: ManagerConfigProvider,
+        etcd: AsyncEtcd,
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
         registry: AgentRegistry,
     ) -> None:
-        self.local_config = local_config
-        self.shared_config = shared_config
-        self.event_dispatcher = event_dispatcher
+        self.config_provider = config_provider
+        self.etcd = etcd
         self.event_producer = event_producer
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
-        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
-            self.shared_config.data["redis"]
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
+            self.config_provider.config.redis.model_dump()
         )
         self.redis_live = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.LIVE),
+            redis_profile_target.profile_target(RedisRole.LIVE),
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
         self.redis_stat = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
+            redis_profile_target.profile_target(RedisRole.STATISTICS),
             name="stat",
             db=REDIS_STATISTICS_DB,
         )
 
     async def __ainit__(self) -> None:
-        coalescing_opts: CoalescingOptions = {
-            "max_wait": 0.5,
-            "max_batch_size": 32,
-        }
-        # coalescing_opts = None
-        evd = self.registry.event_dispatcher
-        evd.consume(
-            SessionEnqueuedEvent, None, self.schedule, coalescing_opts, name="dispatcher.enq"
-        )
-        evd.consume(
-            SessionTerminatedEvent, None, self.schedule, coalescing_opts, name="dispatcher.term"
-        )
-        evd.consume(AgentStartedEvent, None, self.schedule)
-        evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
-        evd.consume(DoStartSessionEvent, None, self.start)
-        evd.consume(DoCheckPrecondEvent, None, self.check_precond)
-        evd.consume(DoScaleEvent, None, self.scale_services)
-        evd.consume(DoUpdateSessionStatusEvent, None, self.update_session_status)
         self.schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,
@@ -318,9 +365,7 @@ class SchedulerDispatcher(aobject):
 
     async def schedule(
         self,
-        context: None,
-        source: AgentId,
-        event: SessionEnqueuedEvent | SessionTerminatedEvent | AgentStartedEvent | DoScheduleEvent,
+        event_name: str,
     ) -> None:
         """
         Trigger the scheduler to scan pending sessions and mark them scheduled if they fulfill
@@ -333,7 +378,7 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.schedule"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -342,7 +387,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -352,13 +397,13 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        known_slot_types = await self.shared_config.get_resource_slots()
+        known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
             known_slot_types=known_slot_types,
         )
 
-        lock_lifetime = self.local_config["manager"]["session_schedule_lock_lifetime"]
+        lock_lifetime = self.config_provider.config.manager.session_schedule_lock_lifetime
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
@@ -408,25 +453,45 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
 
-    async def _load_scheduler(
-        self,
-        db_sess: SASession,
-        sgroup_name: str,
-    ) -> tuple[AbstractScheduler, AbstractAgentSelector]:
-        query = sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
-            ScalingGroupRow.name == sgroup_name
-        )
-        result = await db_sess.execute(query)
-        row = result.first()
-        scheduler_name = row.scheduler
-        sgroup_opts: ScalingGroupOpts = row.scheduler_opts
+    def _load_scheduler(self, args: LoadSchedulerArgs) -> AbstractScheduler:
+        global_scheduler_opts = {}
+        if self.config_provider.config.plugins.scheduler:
+            global_scheduler_opts = self.config_provider.config.plugins.scheduler.get(
+                args.scheduler_name, {}
+            )
+        scheduler_config = {**global_scheduler_opts, **args.sgroup_opts.config}
+
+        return load_scheduler(args.scheduler_name, args.sgroup_opts, scheduler_config)
+
+    async def _load_agent_selector(self, args: LoadAgentSelectorArgs) -> AbstractAgentSelector:
+        sgroup_opts = args.sgroup_opts
+
+        # TODO: Remove "dynamic_config after refactoring.
+        dynamic_config: dict[str, Any] = {}
+
         match sgroup_opts.agent_selection_strategy:
-            # The names correspond to the entrypoint names (backendai_agentselector_v10).
             case AgentSelectionStrategy.LEGACY:
                 agselector_name = "legacy"
             case AgentSelectionStrategy.ROUNDROBIN:
                 agselector_name = "roundrobin"
             case AgentSelectionStrategy.CONCENTRATED:
+                async with self.db.begin_readonly_session() as db_sess:
+                    if (
+                        sgroup_opts.enforce_spreading_endpoint_replica
+                        and SessionTypes(args.pending_session_type) == SessionTypes.INFERENCE
+                    ):
+                        endpoint_id = await db_sess.scalar(
+                            sa.select(RoutingRow.endpoint).where(
+                                RoutingRow.session == args.pending_session_id
+                            )
+                        )
+
+                        dynamic_config[
+                            "kernel_counts_at_same_endpoint"
+                        ] = await get_kernel_count_per_agent_at_endpoint(
+                            db_sess, endpoint_id, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+                        )
+
                 agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
                 agselector_name = "dispersed"
@@ -435,35 +500,28 @@ class SchedulerDispatcher(aobject):
                     f"Unknown agent selection strategy: {unknown!r}. Possible values: {[*AgentSelectionStrategy.__members__.keys()]}"
                 )
 
-        global_scheduler_opts = {}
         global_agselector_opts = {}
-        if self.shared_config["plugins"]["scheduler"]:
-            global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
-                scheduler_name, {}
-            )
-        scheduler_config = {**global_scheduler_opts, **sgroup_opts.config}
-        if self.shared_config["plugins"]["agent-selector"]:
-            global_agselector_opts = self.shared_config["plugins"]["agent-selector"].get(
+        if self.config_provider.config.plugins.agent_selector:
+            global_agselector_opts = self.config_provider.config.plugins.agent_selector.get(
                 agselector_name, {}
             )
-        agselector_config = {**global_agselector_opts, **sgroup_opts.agent_selector_config}
-        agent_selection_resource_priority = self.local_config["manager"][
-            "agent-selection-resource-priority"
-        ]
+        agselector_config = {
+            **global_agselector_opts,
+            **sgroup_opts.agent_selector_config,
+            **dynamic_config,
+        }
 
-        scheduler = load_scheduler(
-            scheduler_name,
-            sgroup_opts,
-            scheduler_config,
+        agent_selection_resource_priority = (
+            self.config_provider.config.manager.agent_selection_resource_priority
         )
-        agent_selector = load_agent_selector(
+
+        return load_agent_selector(
             agselector_name,
             sgroup_opts,
             agselector_config,
             agent_selection_resource_priority,
-            self.shared_config,
+            self.config_provider.legacy_etcd_config_loader,
         )
-        return scheduler, agent_selector
 
     async def _schedule_in_sgroup(
         self,
@@ -471,9 +529,17 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
     ) -> None:
         # Part 0: Load the scheduler and the agent selector.
-
         async with self.db.begin_readonly_session() as db_sess:
-            scheduler, agent_selector = await self._load_scheduler(db_sess, sgroup_name)
+            result = await db_sess.execute(
+                sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
+                    ScalingGroupRow.name == sgroup_name
+                )
+            )
+            row = result.first()
+            if row is None:
+                raise ValueError(f'Scaling group "{sgroup_name}" not found!')
+            scheduler_name, sgroup_opts = row.scheduler, row.scheduler_opts
+            scheduler = self._load_scheduler(LoadSchedulerArgs(scheduler_name, sgroup_opts))
             existing_sessions, pending_sessions, cancelled_sessions = await _list_managed_sessions(
                 db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout
             )
@@ -512,6 +578,14 @@ class SchedulerDispatcher(aobject):
                 raise RuntimeError("should not reach here")
             pending_sess = pending_sessions.pop(picked_idx)
             log_fmt = "schedule(s:{}, prio:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
+            agent_selector = await self._load_agent_selector(
+                LoadAgentSelectorArgs(
+                    sgroup_opts,
+                    pending_sess.id,
+                    pending_sess.session_type,
+                )
+            )
+
             log_args = (
                 pending_sess.id,
                 pending_sess.priority,
@@ -606,12 +680,17 @@ class SchedulerDispatcher(aobject):
                         await db_sess.execute(query)
                         if pending_sess.is_private:
                             await _apply_cancellation(db_sess, [pending_sess.id])
-                            await self.event_producer.produce_event(
-                                SessionCancelledEvent(
+                            await self.event_producer.anycast_and_broadcast_event(
+                                SessionCancelledAnycastEvent(
                                     pending_sess.id,
                                     pending_sess.creation_id,
                                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
-                                )
+                                ),
+                                SessionCancelledBroadcastEvent(
+                                    pending_sess.id,
+                                    pending_sess.creation_id,
+                                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                                ),
                             )
 
                 await execute_with_retry(_cancel_failed_system_session)
@@ -665,7 +744,7 @@ class SchedulerDispatcher(aobject):
                 )
 
             try:
-                match schedulable_sess.cluster_mode:
+                match ClusterMode(schedulable_sess.cluster_mode):
                     case ClusterMode.SINGLE_NODE:
                         await self._schedule_single_node_session(
                             sched_ctx,
@@ -714,12 +793,12 @@ class SchedulerDispatcher(aobject):
                 continue
             num_scheduled += 1
         if num_scheduled > 0:
-            await self.event_producer.produce_event(DoCheckPrecondEvent())
+            await self.event_producer.anycast_event(DoCheckPrecondEvent())
 
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
     ) -> list[AgentRow]:
-        raw_value = await self.shared_config.etcd.get("config/agent/max-container-count")
+        raw_value = await self.etcd.get("config/agent/max-container-count")
         if raw_value is None:
             return candidate_agents
         max_container_count = int(raw_value)
@@ -882,7 +961,7 @@ class SchedulerDispatcher(aobject):
                 log_fmt + "unexpected-error, during agent allocation",
                 *log_args,
             )
-            exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
+            exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
 
             async def _update_generic_failure() -> None:
                 async with self.db.begin_session() as kernel_db_sess:
@@ -954,8 +1033,9 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.produce_event(
-            SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
+        await self.registry.event_producer.anycast_and_broadcast_event(
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
     async def _schedule_multi_node_session(
@@ -1111,7 +1191,7 @@ class SchedulerDispatcher(aobject):
                         log_fmt + "unexpected-error, during agent allocation",
                         *log_args,
                     )
-                    exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
+                    exc_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
 
                     async def _update_generic_failure() -> None:
                         async with self.db.begin_session() as kernel_db_sess:
@@ -1190,15 +1270,14 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.produce_event(
-            SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
+        await self.registry.event_producer.anycast_and_broadcast_event(
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
     async def check_precond(
         self,
-        context: None,
-        source: AgentId,
-        event: DoCheckPrecondEvent,
+        event_name: str,
     ) -> None:
         """
         Scan the scheduled sessions and perform the agent RPC calls to check and pull required images.
@@ -1208,7 +1287,7 @@ class SchedulerDispatcher(aobject):
         Let event handlers transit session and kernel status from
         `ImagePullStartedEvent` and `ImagePullFinishedEvent` events.
         """
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.check_precondition"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1217,7 +1296,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1227,7 +1306,7 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        lock_lifetime = self.local_config["manager"]["session_check_precondition_lock_lifetime"]
+        lock_lifetime = self.config_provider.config.manager.session_check_precondition_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
@@ -1264,8 +1343,8 @@ class SchedulerDispatcher(aobject):
                                 allocated_host_ports=set(),
                             )
                         )
-                    await self.registry.event_producer.produce_event(
-                        SessionCheckingPrecondEvent(
+                    await self.registry.event_producer.anycast_event(
+                        SessionCheckingPrecondAnycastEvent(
                             scheduled_session.id,
                             scheduled_session.creation_id,
                         ),
@@ -1294,16 +1373,14 @@ class SchedulerDispatcher(aobject):
 
     async def start(
         self,
-        context: None,
-        source: AgentId,
-        event: DoStartSessionEvent,
+        event_name: str,
     ) -> None:
         """
         Scan the sessions ready to create and perform the agent RPC calls to create kernels.
 
         Session status transition: PREPARED -> CREATING
         """
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.start"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1312,7 +1389,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1322,11 +1399,13 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
+        lock_lifetime = self.config_provider.config.manager.session_start_lock_lifetime
         try:
             async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
-                known_slot_types = await self.shared_config.get_resource_slots()
+                known_slot_types = (
+                    await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
+                )
                 sched_ctx = SchedulingContext(
                     self.registry,
                     known_slot_types,
@@ -1356,8 +1435,12 @@ class SchedulerDispatcher(aobject):
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
-                        await self.registry.event_producer.produce_event(
-                            SessionPreparingEvent(
+                        await self.registry.event_producer.anycast_and_broadcast_event(
+                            SessionPreparingAnycastEvent(
+                                scheduled_session.id,
+                                scheduled_session.creation_id,
+                            ),
+                            SessionPreparingBroadcastEvent(
                                 scheduled_session.id,
                                 scheduled_session.creation_id,
                             ),
@@ -1546,13 +1629,11 @@ class SchedulerDispatcher(aobject):
 
     async def scale_services(
         self,
-        context: None,
-        source: AgentId,
-        event: DoScaleEvent,
+        event_name: str,
     ) -> None:
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by invoking this method
-        manager_id = self.local_config["manager"]["id"]
+        manager_id = self.config_provider.config.manager.id
         redis_key = f"manager.{manager_id}.scale_services"
 
         def _pipeline(r: Redis) -> RedisPipeline:
@@ -1561,7 +1642,7 @@ class SchedulerDispatcher(aobject):
             pipe.hset(
                 redis_key,
                 mapping={
-                    "trigger_event": event.__class__.name,
+                    "trigger_event": event_name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
             )
@@ -1610,7 +1691,7 @@ class SchedulerDispatcher(aobject):
             )
         for endpoint in endpoints:
             active_routings = [
-                r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
+                r for r in endpoint.routings if r.status in RouteStatus.active_route_statuses()
             ]
             replicas = endpoint.replicas
             if (
@@ -1688,7 +1769,7 @@ class SchedulerDispatcher(aobject):
             lambda r: r.hset(
                 redis_key,
                 "down",
-                json.dumps([str(s.id) for s in target_sessions_to_destroy]),
+                dump_json_str([str(s.id) for s in target_sessions_to_destroy]),
             ),
         )
 
@@ -1710,13 +1791,13 @@ class SchedulerDispatcher(aobject):
                     created_routes.append(route_id)
             await db_sess.commit()
         for route_id in created_routes:
-            await self.event_producer.produce_event(RouteCreatedEvent(route_id))
+            await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
         await redis_helper.execute(
             self.redis_live,
             lambda r: r.hset(
                 redis_key,
                 mapping={
-                    "up": json.dumps([str(e.id) for e in endpoints_to_expand.keys()]),
+                    "up": dump_json_str([str(e.id) for e in endpoints_to_expand.keys()]),
                     "finish_time": datetime.now(tzutc()).isoformat(),
                 },
             ),
@@ -1752,9 +1833,6 @@ class SchedulerDispatcher(aobject):
 
     async def update_session_status(
         self,
-        context: None,
-        source: AgentId,
-        event: DoUpdateSessionStatusEvent,
     ) -> None:
         log.debug("update_session_status(): triggered")
         candidates = await self.registry.session_lifecycle_mgr.get_status_updatable_sessions()
@@ -1775,7 +1853,7 @@ class SchedulerDispatcher(aobject):
             assert len(session.kernels) > 0
             await self.registry.start_session(sched_ctx, session)
         except (asyncio.CancelledError, Exception) as e:
-            status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
+            status_data = convert_to_status_data(e, self.config_provider.config.debug.enabled)
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
             #       SCHEDULED and retry within some limit using status_data.
@@ -1829,8 +1907,13 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
                 await execute_with_retry(_mark_session_cancelled)
-                await self.registry.event_producer.produce_event(
-                    SessionCancelledEvent(
+                await self.registry.event_producer.anycast_and_broadcast_event(
+                    SessionCancelledAnycastEvent(
+                        session.id,
+                        session.creation_id,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                    ),
+                    SessionCancelledBroadcastEvent(
                         session.id,
                         session.creation_id,
                         KernelLifecycleEventReason.FAILED_TO_START,
@@ -1873,8 +1956,13 @@ class SchedulerDispatcher(aobject):
                 async with self.db.begin_session() as db_sess:
                     await _apply_cancellation(db_sess, session_ids)
         for item in cancelled_sessions:
-            await self.event_producer.produce_event(
-                SessionCancelledEvent(
+            await self.event_producer.anycast_and_broadcast_event(
+                SessionCancelledAnycastEvent(
+                    item.id,
+                    item.creation_id,
+                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                ),
+                SessionCancelledBroadcastEvent(
                     item.id,
                     item.creation_id,
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,

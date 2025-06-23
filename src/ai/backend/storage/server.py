@@ -5,12 +5,13 @@ import logging
 import multiprocessing
 import os
 import pwd
+import signal
 import ssl
 import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import Any, AsyncIterator, Sequence
+from typing import Any, AsyncGenerator, AsyncIterator, Sequence
 
 import aiomonitor
 import aiotools
@@ -18,18 +19,41 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.common import redis_helper
 from ai.backend.common.config import (
     ConfigurationError,
     override_key,
     redis_config_iv,
 )
-from ai.backend.common.defs import REDIS_STREAM_DB
-from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, RedisRole
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import safe_print_redis_config
+from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
+    ETCDServiceDiscovery,
+    ETCDServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    RedisServiceDiscovery,
+    RedisServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscovery,
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
+from ai.backend.common.types import (
+    AGENTID_STORAGE,
+    HostPortPair,
+    RedisProfileTarget,
+    ServiceDiscoveryType,
+    safe_print_redis_target,
+)
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -50,7 +74,7 @@ async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
     _args: Sequence[Any],
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
     try:
         asyncio.get_child_watcher()
@@ -118,40 +142,35 @@ async def server_main(
             log.info(
                 "PID: {0} - configured redis_config: {1}",
                 pidx,
-                safe_print_redis_config(redis_config),
+                safe_print_redis_target(redis_config),
             )
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
-
-        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-        if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
-            event_dispatcher_cls = ExperimentalEventDispatcher
-        else:
-            event_dispatcher_cls = EventDispatcher
-
-        event_producer = await EventProducer.new(
-            redis_config,
-            db=REDIS_STREAM_DB,
+        redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
+        mq = _make_message_queue(
+            local_config,
+            redis_profile_target,
+        )
+        event_producer = EventProducer(
+            mq,
+            source=AGENTID_STORAGE,
             log_events=local_config["debug"]["log-events"],
         )
         log.info(
             "PID: {0} - Event producer created. (redis_config: {1})",
             pidx,
-            safe_print_redis_config(redis_config),
+            safe_print_redis_target(redis_config),
         )
-        event_dispatcher = await event_dispatcher_cls.new(
-            redis_config,
-            db=REDIS_STREAM_DB,
+        event_dispatcher = EventDispatcher(
+            mq,
             log_events=local_config["debug"]["log-events"],
-            node_id=local_config["storage-proxy"]["node-id"],
-            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
-            event_observer=metric_registry,
+            event_observer=metric_registry.event,
         )
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
             pidx,
-            safe_print_redis_config(redis_config),
+            safe_print_redis_target(redis_config),
         )
         if local_config["storage-proxy"]["use-watcher"]:
             if not _is_root():
@@ -206,10 +225,13 @@ async def server_main(
                 )
             client_api_runner = web.AppRunner(ctx.client_api_app)
             manager_api_runner = web.AppRunner(ctx.manager_api_app)
+            internal_api_runner = web.AppRunner(ctx.internal_api_app)
             await client_api_runner.setup()
             await manager_api_runner.setup()
+            await internal_api_runner.setup()
             client_service_addr = local_config["api"]["client"]["service-addr"]
-            manager_service_addr = local_config["api"]["manager"]["service-addr"]
+            manager_service_addr: HostPortPair = local_config["api"]["manager"]["service-addr"]
+            internal_addr = local_config["api"]["manager"]["internal-addr"]
             client_api_site = web.TCPSite(
                 client_api_runner,
                 str(client_service_addr.host),
@@ -226,8 +248,16 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=manager_ssl_ctx,
             )
+            internal_api_site = web.TCPSite(
+                internal_api_runner,
+                str(internal_addr.host),
+                internal_addr.port,
+                backlog=1024,
+                reuse_port=True,
+            )
             await client_api_site.start()
             await manager_api_site.start()
+            await internal_api_site.start()
             if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]
@@ -238,6 +268,44 @@ async def server_main(
                 os.setuid(uid)
                 log.info("Changed process uid:gid to {}:{}", uid, gid)
             log.info("Started service.")
+            announce_addr: HostPortPair = local_config["api"]["manager"]["announce-addr"]
+            announce_internal_addr: HostPortPair = local_config["api"]["manager"][
+                "announce-internal-addr"
+            ]
+
+            sd_type = local_config["service-discovery"]["type"]
+
+            service_discovery: ServiceDiscovery
+            match sd_type:
+                case ServiceDiscoveryType.ETCD:
+                    service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
+                case ServiceDiscoveryType.REDIS:
+                    live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+                    redis_live = redis_helper.get_redis_object(
+                        live_redis_target,
+                        name="storage-proxy.live",
+                        db=REDIS_LIVE_DB,
+                    )
+                    service_discovery = RedisServiceDiscovery(
+                        args=RedisServiceDiscoveryArgs(redis=redis_live)
+                    )
+
+            sd_loop = ServiceDiscoveryLoop(
+                sd_type,
+                service_discovery,
+                ServiceMetadata(
+                    display_name=f"storage-{local_config['storage-proxy']['node-id']}",
+                    service_group="storage-proxy",
+                    version=VERSION,
+                    endpoint=ServiceEndpoint(
+                        address=str(announce_addr),
+                        port=announce_addr.port,
+                        protocol="http",
+                        prometheus_address=str(announce_internal_addr),
+                    ),
+                ),
+            )
+            await event_dispatcher.start()
             try:
                 yield
             finally:
@@ -248,9 +316,42 @@ async def server_main(
                 await event_dispatcher.close()
                 if watcher_client is not None:
                     await watcher_client.close()
+                sd_loop.close()
     finally:
         if aiomon_started:
             m.close()
+
+
+def _make_message_queue(
+    local_config: dict[str, Any],
+    redis_profile_target: RedisProfileTarget,
+) -> AbstractMessageQueue:
+    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
+    stream_redis = redis_helper.get_redis_object(
+        stream_redis_target,
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
+    node_id = local_config["storage-proxy"]["node-id"]
+    if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
+        return HiRedisQueue(
+            stream_redis_target,
+            HiRedisMQArgs(
+                stream_key="events",
+                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+                node_id=node_id,
+                db=REDIS_STREAM_DB,
+            ),
+        )
+
+    return RedisQueue(
+        stream_redis,
+        RedisMQArgs(
+            stream_key="events",
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+        ),
+    )
 
 
 @click.group(invoke_without_command=True)

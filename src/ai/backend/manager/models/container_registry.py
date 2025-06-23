@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, cast
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Optional, Self, cast
 
 import graphene
 import sqlalchemy as sa
@@ -15,6 +15,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 
 from ..defs import PASSWORD_PLACEHOLDER
 from .base import (
@@ -75,6 +76,28 @@ class ContainerRegistryRow(Base):
         back_populates="container_registry_row",
         primaryjoin="ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)",
     )
+
+    def __init__(
+        self,
+        url: str,
+        registry_name: str,
+        type: ContainerRegistryType,
+        project: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ssl_verify: Optional[bool] = None,
+        is_global: Optional[bool] = None,
+        extra: Optional[dict] = None,
+    ) -> None:
+        self.url = url
+        self.registry_name = registry_name
+        self.type = type
+        self.project = project
+        self.username = username
+        self.password = password
+        self.ssl_verify = ssl_verify
+        self.is_global = is_global
+        self.extra = extra
 
     @classmethod
     async def get(
@@ -151,6 +174,36 @@ class ContainerRegistryRow(Base):
                 result[project] = {}
             result[project][registry_name] = yarl.URL(url)
         return result
+
+    @classmethod
+    def from_dataclass(cls, data: ContainerRegistryData) -> Self:
+        instance = cls(
+            url=data.url,
+            registry_name=data.registry_name,
+            type=data.type,
+            project=data.project,
+            username=data.username,
+            password=data.password,
+            ssl_verify=data.ssl_verify,
+            is_global=data.is_global,
+            extra=data.extra,
+        )
+        instance.id = data.id
+        return instance
+
+    def to_dataclass(self) -> ContainerRegistryData:
+        return ContainerRegistryData(
+            id=self.id,
+            url=self.url,
+            registry_name=self.registry_name,
+            type=self.type,
+            project=self.project,
+            username=self.username,
+            password=self.password,
+            ssl_verify=self.ssl_verify,
+            is_global=self.is_global,
+            extra=self.extra,
+        )
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):

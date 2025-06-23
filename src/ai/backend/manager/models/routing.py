@@ -1,7 +1,7 @@
 import logging
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -13,7 +13,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import RoutingNotFound
+from ..errors.exceptions import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
 
 if TYPE_CHECKING:
@@ -33,6 +33,10 @@ class RouteStatus(Enum):
     TERMINATING = "terminating"
     PROVISIONING = "provisioning"
     FAILED_TO_START = "failed_to_start"
+
+    @classmethod
+    def active_route_statuses(cls) -> set["RouteStatus"]:
+        return {RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.PROVISIONING}
 
 
 class RoutingRow(Base):
@@ -88,7 +92,7 @@ class RoutingRow(Base):
         cls,
         db_sess: AsyncSession,
         session_id: uuid.UUID,
-        load_endpoint=False,
+        load_endpoint: bool = False,
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -116,7 +120,7 @@ class RoutingRow(Base):
         cls,
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
-        load_endpoint=False,
+        load_endpoint: bool = False,
         status_filter: list[RouteStatus] = [
             RouteStatus.HEALTHY,
             RouteStatus.UNHEALTHY,
@@ -152,8 +156,8 @@ class RoutingRow(Base):
         cls,
         db_sess: AsyncSession,
         route_id: uuid.UUID,
-        load_session=False,
-        load_endpoint=False,
+        load_session: bool = False,
+        load_endpoint: bool = False,
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -198,6 +202,9 @@ class RoutingRow(Base):
         self.status = status
         self.traffic_ratio = traffic_ratio
 
+    def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
+        self.session_owner = user_uuid
+
 
 class Routing(graphene.ObjectType):
     class Meta:
@@ -215,6 +222,20 @@ class Routing(graphene.ObjectType):
     live_stat = graphene.JSONString(description="Added in 24.12.0.")
 
     _endpoint_row: "EndpointRow"
+
+    @classmethod
+    def from_dto(cls, dto) -> Optional[Self]:  # type: ignore
+        if dto is None:
+            return None
+        return cls(
+            routing_id=dto.id,
+            endpoint=dto.endpoint,
+            session=dto.session,
+            status=dto.status.name,
+            traffic_ratio=dto.traffic_ratio,
+            created_at=dto.created_at,
+            error_data=dto.error_data,
+        )
 
     @classmethod
     async def from_row(

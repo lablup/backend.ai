@@ -14,10 +14,11 @@ import graphene
 import graphql
 import sqlalchemy as sa
 import trafaret as t
-import yaml
 from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from sqlalchemy.orm import joinedload
 
 from ai.backend.common.config import model_definition_iv
@@ -26,11 +27,11 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ...api.exceptions import (
-    VFolderOperationFailed,
-)
 from ...defs import (
     DEFAULT_CHUNK_SIZE,
+)
+from ...errors.exceptions import (
+    VFolderOperationFailed,
 )
 from ..base import (
     BigInt,
@@ -42,7 +43,7 @@ from ..base import (
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import GroupRow, ProjectType
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..rbac import (
     ScopeType,
     SystemScope,
@@ -128,15 +129,15 @@ class VirtualFolderNode(graphene.ObjectType):
         "unmanaged_path": ("unmanaged_path", None),
         "usage_mode": (
             "usage_mode",
-            enum_field_getter(VFolderUsageMode),
+            VFolderUsageMode,
         ),
         "permission": (
             "permission",
-            enum_field_getter(VFolderPermission),
+            VFolderPermission,
         ),
         "ownership_type": (
             "ownership_type",
-            enum_field_getter(VFolderOwnershipType),
+            VFolderOwnershipType,
         ),
         "max_files": ("max_files", None),
         "max_size": ("max_size", None),
@@ -145,7 +146,7 @@ class VirtualFolderNode(graphene.ObjectType):
         "cloneable": ("cloneable", None),
         "status": (
             "status",
-            enum_field_getter(VFolderOperationStatus),
+            VFolderOperationStatus,
         ),
     }
 
@@ -448,15 +449,15 @@ class ModelCard(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            enum_field_getter(VFolderUsageMode),
+            VFolderUsageMode,
         ),
         "permission": (
             "vfolders_permission",
-            enum_field_getter(VFolderPermission),
+            VFolderPermission,
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            enum_field_getter(VFolderOwnershipType),
+            VFolderOwnershipType,
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -465,7 +466,7 @@ class ModelCard(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            enum_field_getter(VFolderOperationStatus),
+            VFolderOperationStatus,
         ),
     }
 
@@ -642,8 +643,9 @@ class ModelCard(graphene.ObjectType):
                 )
             model_definition_yaml = chunks.decode("utf-8")
             try:
-                model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-            except yaml.error.YAMLError as e:
+                yaml = YAML()
+                model_definition_dict = yaml.load(model_definition_yaml)
+            except YAMLError as e:
                 raise ModelCardProcessError(
                     f"Invalid YAML syntax (data:{model_definition_yaml}, detail:{str(e)})"
                 )

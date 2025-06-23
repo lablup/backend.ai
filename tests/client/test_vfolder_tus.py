@@ -1,4 +1,5 @@
 import secrets
+from http import HTTPStatus
 from pathlib import Path
 from time import time
 from unittest import mock
@@ -51,7 +52,7 @@ async def test_upload_jwt_generation(tmp_path):
             m.post(
                 build_url(session.config, "/folders/{}/request-upload".format(vfolder_name)),
                 payload=payload,
-                status=200,
+                status=HTTPStatus.OK,
             )
 
             rqst = Request("POST", "/folders/{}/request-upload".format(vfolder_name))
@@ -63,7 +64,7 @@ async def test_upload_jwt_generation(tmp_path):
             async with rqst.fetch() as resp:
                 res = await resp.json()
                 assert isinstance(resp, Response)
-                assert resp.status == 200
+                assert resp.status == HTTPStatus.OK
                 assert resp.content_type == "application/json"
                 assert res == payload
                 assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" in res["token"]
@@ -108,12 +109,12 @@ async def test_tus_upload(tmp_path: Path):
         upload_url = "http://127.0.0.1:6021/upload?token={}".format(token)
         m.head(
             "http://127.0.0.1:6021/folders/{}/upload?token={}".format(vfolder_name, token),
-            status=200,
+            status=HTTPStatus.OK,
         )
         m.patch(
             "http://127.0.0.1:6021/upload?token={}".format(token),
             payload=storage_proxy_payload,
-            status=204,
+            status=HTTPStatus.NO_CONTENT,
             headers={
                 "upload-offset": "1024",
                 "Content-Type": "application/offset+octet-stream",
@@ -163,7 +164,7 @@ async def test_vfolder_download(mocker):
             source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
             m.get(
                 build_url(session.config, "/folders/_/id"),
-                status=200,
+                status=HTTPStatus.OK,
                 payload={"id": source_vfolder_uuid.hex},
             )
             # 1. Client to Manager throught Request
@@ -172,7 +173,7 @@ async def test_vfolder_download(mocker):
                     session.config, "/folders/{}/request-download".format(source_vfolder_uuid.hex)
                 ),
                 payload=payload,
-                status=200,
+                status=HTTPStatus.OK,
                 headers={
                     "User-Agent": "Backend.AI Client for Python 20.09.0a1.dev0",
                     "X-BackendAI-Domain": "default",
@@ -194,7 +195,7 @@ async def test_vfolder_download(mocker):
                     "Content-Length": "527",
                     "Last-Modified": str(today_timestamp),
                 },
-                status=200,
+                status=HTTPStatus.OK,
             )
             await session.VFolder(vfolder_name).download([mock_file])
             assert Path("fake-file1").exists() == 1

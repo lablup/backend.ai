@@ -39,7 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
-from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderPermissionField,
 )
 from ai.backend.common.types import (
+    CIStrEnum,
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
@@ -59,17 +60,17 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..api.exceptions import (
+from ..defs import (
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+    VFOLDER_DSTPATHS_MAP,
+)
+from ..errors.exceptions import (
     InvalidAPIParameters,
     ObjectNotFound,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
-)
-from ..defs import (
-    RESERVED_VFOLDER_PATTERNS,
-    RESERVED_VFOLDERS,
-    VFOLDER_DSTPATHS_MAP,
 )
 from ..types import UserScope
 from .base import (
@@ -88,7 +89,7 @@ from .base import (
 )
 from .group import GroupRow
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -155,7 +156,7 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderOwnershipType(enum.StrEnum):
+class VFolderOwnershipType(CIStrEnum):
     """
     Ownership type of virtual folder.
     """
@@ -168,6 +169,8 @@ class VFolderOwnershipType(enum.StrEnum):
 
 
 class VFolderPermission(enum.StrEnum):
+    # TODO: Replace this class with VFolderRBACPermission
+    # Or rename this class to VFolderMountPermission
     """
     Permissions for a virtual folder given to a specific access key.
     RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
@@ -180,6 +183,21 @@ class VFolderPermission(enum.StrEnum):
 
     def to_field(self) -> VFolderPermissionField:
         return VFolderPermissionField(self)
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[VFolderPermission]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "RO" | "READ_ONLY":
+                return cls.READ_ONLY
+            case "RW" | "READ_WRITE":
+                return cls.READ_WRITE
+            case "RW_DELETE":
+                return cls.RW_DELETE
+            case "WD" | "OWNER_PERM":
+                return cls.OWNER_PERM
+        return None
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -215,6 +233,31 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
     DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[VFolderOperationStatus]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "READY":
+                return cls.READY
+            case "PERFORMING":
+                return cls.PERFORMING
+            case "CLONING":
+                return cls.CLONING
+            case "MOUNTED":
+                return cls.MOUNTED
+            case "ERROR":
+                return cls.ERROR
+            case "DELETE_PENDING" | "DELETE-PENDING":
+                return cls.DELETE_PENDING
+            case "DELETE_ONGOING" | "DELETE-ONGOING":
+                return cls.DELETE_ONGOING
+            case "DELETE_COMPLETE" | "DELETE-COMPLETE":
+                return cls.DELETE_COMPLETE
+            case "DELETE_ERROR" | "DELETE-ERROR":
+                return cls.DELETE_ERROR
+        return None
 
     def is_deletable(self, force: bool = False) -> bool:
         if force:
@@ -888,27 +931,32 @@ async def prepare_vfolder_mounts(
     requested_mounts: list[str] = [
         name for name in requested_mount_references if isinstance(name, str)
     ]
-    requested_mount_map: dict[str, str] = {
+    requested_mount_name_map: dict[str, str] = {
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
     }
-    requested_mount_options: dict[str, dict[str, Any]] = {
+    requested_mount_map: dict[uuid.UUID, str] = {
+        vfolder_uuid: path
+        for vfolder_uuid, path in requested_mount_reference_map.items()
+        if isinstance(vfolder_uuid, uuid.UUID)
+    }
+    requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
         name: options
         for name, options in requested_mount_reference_options.items()
         if isinstance(name, str)
     }
 
-    vfolder_ids_to_resolve = [
-        vfid for vfid in requested_mount_references if isinstance(vfid, uuid.UUID)
-    ]
-
-    requested_vfolder_names: dict[str, str] = {}
-    requested_vfolder_subpaths: dict[str, str] = {}
-    requested_vfolder_dstpaths: dict[str, str] = {}
+    requested_vfolder_names: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_ids: set[uuid.UUID] = set()
+    requested_vfolder_subpaths: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_dstpaths: dict[str | uuid.UUID, str] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
     _already_resolved: set[str] = set()
 
     # Split the vfolder name and subpaths
-    for key in requested_mounts:
+    for key in requested_mount_references:
+        if isinstance(key, uuid.UUID):
+            requested_vfolder_ids.add(key)
+            continue
         name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
@@ -917,7 +965,10 @@ async def prepare_vfolder_mounts(
         requested_vfolder_names[key] = name
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
         _already_resolved.add(name)
-    for key, value in requested_mount_map.items():
+    for vfolder_uuid, value in requested_mount_map.items():
+        requested_vfolder_subpaths[vfolder_uuid] = "."
+        requested_vfolder_dstpaths[vfolder_uuid] = value
+    for key, value in requested_mount_name_map.items():
         requested_vfolder_dstpaths[key] = value
 
     # Check if there are overlapping mount sources
@@ -938,10 +989,15 @@ async def prepare_vfolder_mounts(
         extra_vf_conds = sa.or_(
             extra_vf_conds, vfolders.c.name.in_(requested_vfolder_names.values())
         )
-    if vfolder_ids_to_resolve:
+    if requested_mount_map:
         extra_vf_conds = sa.or_(
             extra_vf_conds,
-            VFolderRow.id.in_(vfolder_ids_to_resolve),
+            VFolderRow.id.in_(requested_mount_map.keys()),
+        )
+    if requested_vfolder_ids:
+        extra_vf_conds = sa.or_(
+            extra_vf_conds,
+            VFolderRow.id.in_(requested_vfolder_ids),
         )
     extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
     accessible_vfolders = await query_accessible_vfolders(
@@ -959,16 +1015,24 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound("There is no accessible vfolders at all.")
         else:
             return []
+
+    requested_names = set(requested_vfolder_names.values())
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
+        if vfid in requested_vfolder_ids:
+            requested_vfolder_names[vfid] = name
+            requested_vfolder_subpaths[vfid] = "."
         if name in _already_resolved:
             continue
+        if name not in requested_names:
+            requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
         if path := requested_mount_reference_map.get(vfid):
-            requested_mount_map[name] = path
+            requested_mount_name_map[name] = path
         if options := requested_mount_reference_options.get(vfid):
             requested_mount_options[name] = options
+            requested_mount_options[vfid] = options
 
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)
@@ -977,12 +1041,12 @@ async def prepare_vfolder_mounts(
     # and requested_vfolder_subpath
     for _vfolder in accessible_vfolders:
         if _vfolder["name"].startswith("."):
-            requested_vfolder_names.setdefault(_vfolder["name"], _vfolder["name"])
-            requested_vfolder_subpaths.setdefault(_vfolder["name"], ".")
+            requested_vfolder_names.setdefault(_vfolder["id"], _vfolder["name"])
+            requested_vfolder_subpaths.setdefault(_vfolder["id"], ".")
 
     # for vfolder in accessible_vfolders:
     accessible_vfolders_map = {vfolder["name"]: vfolder for vfolder in accessible_vfolders}
-    for key, vfolder_name in requested_vfolder_names.items():
+    for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         await ensure_host_permission_allowed(
@@ -996,7 +1060,11 @@ async def prepare_vfolder_mounts(
             permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
-            kernel_path_raw = requested_vfolder_dstpaths.get(key)
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(".")
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
+                continue
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
             else:
@@ -1004,8 +1072,8 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    vfsubpath=PurePosixPath("."),
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
                     host_path=PurePosixPath(unmanaged_path),
                     kernel_path=kernel_path,
                     mount_perm=vfolder["permission"],
@@ -1022,7 +1090,7 @@ async def prepare_vfolder_mounts(
                 await storage_manager.get_mount_path(
                     vfolder["host"],
                     VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    PurePosixPath(requested_vfolder_subpaths[key]),
+                    PurePosixPath(requested_vfolder_subpaths[requested_key]),
                 ),
             )
         except VFolderOperationFailed as e:
@@ -1030,6 +1098,10 @@ async def prepare_vfolder_mounts(
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
             requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
         if vfolder["name"] == ".local" and vfolder["group"] is not None:
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
+                continue
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(
                 vfolder["host"],
@@ -1037,8 +1109,8 @@ async def prepare_vfolder_mounts(
                 "folder/file/mkdir",
                 params={
                     "volume": storage_manager.get_proxy_and_volume(vfolder["host"])[1],
-                    "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
-                    "relpaths": [str(user_scope.user_uuid.hex)],
+                    "vfid": str(vfid),
+                    "relpaths": [vfsubpath.as_posix()],
                     "exist_ok": True,
                 },
             ):
@@ -1057,14 +1129,20 @@ async def prepare_vfolder_mounts(
             )
         else:
             # Normal vfolders
-            kernel_path_raw = requested_vfolder_dstpaths.get(key)
+            vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
+            vfsubpath = PurePosixPath(requested_vfolder_subpaths[requested_key])
+            if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):
+                continue
+            kernel_path_raw = requested_vfolder_dstpaths.get(requested_key)
             if kernel_path_raw is None:
                 kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            match requested_perm := requested_mount_options.get(key, {}).get("permission"):
+            match requested_perm := requested_mount_options.get(requested_key, {}).get(
+                "permission"
+            ):
                 case MountPermission.READ_ONLY:
                     mount_perm = MountPermission.READ_ONLY
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
@@ -1079,9 +1157,9 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
-                    vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
-                    host_path=mount_base_path / requested_vfolder_subpaths[key],
+                    vfid=vfid,
+                    vfsubpath=vfsubpath,
+                    host_path=mount_base_path / vfsubpath,
                     kernel_path=kernel_path,
                     mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
@@ -1592,15 +1670,15 @@ class VirtualFolder(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            enum_field_getter(VFolderUsageMode),
+            lambda s: VFolderUsageMode(s),
         ),
         "permission": (
             "vfolders_permission",
-            enum_field_getter(VFolderPermission),
+            lambda s: VFolderPermission(s),
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            enum_field_getter(VFolderOwnershipType),
+            lambda s: VFolderOwnershipType(s),
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -1980,7 +2058,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "permission": ("vfolder_permissions_permission", enum_field_getter(VFolderPermission)),
+        "permission": ("vfolder_permissions_permission", VFolderPermission),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),
         "user": ("vfolder_permissions_user", None),
@@ -2257,11 +2335,7 @@ WhereClauseType: TypeAlias = (
 OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     perm for perm in VFolderRBACPermission
 ])
-ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.UPDATE_ATTRIBUTE,
-    VFolderRBACPermission.DELETE_VFOLDER,
-])
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
 MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,
@@ -2289,7 +2363,6 @@ LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
     VFolderPermission.READ_WRITE: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,
         VFolderRBACPermission.UPDATE_ATTRIBUTE,
-        VFolderRBACPermission.DELETE_VFOLDER,
         VFolderRBACPermission.READ_CONTENT,
         VFolderRBACPermission.WRITE_CONTENT,
         VFolderRBACPermission.DELETE_CONTENT,
@@ -2299,7 +2372,6 @@ LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
     VFolderPermission.RW_DELETE: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,
         VFolderRBACPermission.UPDATE_ATTRIBUTE,
-        VFolderRBACPermission.DELETE_VFOLDER,
         VFolderRBACPermission.READ_CONTENT,
         VFolderRBACPermission.WRITE_CONTENT,
         VFolderRBACPermission.DELETE_CONTENT,
@@ -2737,11 +2809,23 @@ async def get_permission_ctx(
     requested_permission: VFolderRBACPermission,
 ) -> VFolderPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
-        host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
-            ctx, target_scope, host_permission
-        )
         builder = VFolderPermissionContextBuilder(db_session)
         permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        permission_ctx.apply_host_permission_ctx(host_permission_ctx)
+        # TODO: Plan how to check storage host permission with recursive scopes
+        # host_permission = _VFOLDER_PERMISSION_TO_STORAGE_HOST_PERMISSION_MAP[requested_permission]
+        # host_permission_ctx = await StorageHostPermissionContextBuilder(db_session).build(
+        #     ctx, target_scope, host_permission
+        # )
+        # permission_ctx.apply_host_permission_ctx(host_permission_ctx)
     return permission_ctx
+
+
+def is_mount_duplicate(
+    folder_id: VFolderID, subpath: PurePosixPath, mounts: Iterable[VFolderMount]
+) -> bool:
+    for mount in mounts:
+        if mount.vfid != folder_id:
+            continue
+        if subpath.is_relative_to(mount.vfsubpath) or mount.vfsubpath.is_relative_to(subpath):
+            return True
+    return False

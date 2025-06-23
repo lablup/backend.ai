@@ -5,7 +5,7 @@ import trafaret as t
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.types import ResourceGroupType
+from ai.backend.common.types import ResourceGroupType, ServiceDiscoveryType
 
 from .affinity_map import AffinityPolicy
 from .stats import StatModes
@@ -30,12 +30,23 @@ _default_pyroscope_config: dict[str, Any] = {
     "sample-rate": None,
 }
 
+_default_otel_config: dict[str, Any] = {
+    "enabled": False,
+    "log-level": "INFO",
+    "endpoint": "http://127.0.0.1:4317",
+}
+
+_default_service_discovery_config: dict[str, Any] = {
+    "type": ServiceDiscoveryType.REDIS,
+}
+
 agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
             tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
             t.Key("service-addr", default=("0.0.0.0", 6003)): tx.HostPortPair,
+            t.Key("announce-addr", default=("host.docker.internal", 6003)): tx.HostPortPair,
             t.Key("ssl-enabled", default=False): t.Bool,
             t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
             t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
@@ -131,6 +142,16 @@ agent_local_config_iv = (
                 use_name=True,
             ),
         }).allow_extra("*"),
+        t.Key("otel", default=_default_otel_config): t.Dict({
+            t.Key("enabled", default=_default_otel_config["enabled"]): t.ToBool,
+            t.Key("log-level", default=_default_otel_config["log-level"]): t.Enum(
+                "CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"
+            ),
+            t.Key("endpoint", default=_default_otel_config["endpoint"]): t.String,
+        }).allow_extra("*"),
+        t.Key("service-discovery", default=_default_service_discovery_config): t.Dict({
+            t.Key("type", default=ServiceDiscoveryType.REDIS): tx.Enum(ServiceDiscoveryType),
+        }).allow_extra("*"),
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,
             t.Key("asyncio", default=False): t.ToBool,
@@ -173,11 +194,13 @@ DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
 DEFAULT_PUSH_TIMEOUT = None  # Infinite
 DEFAULT_KERNEL_INIT_POLLING_ATTEMPT = 10
 DEFAULT_KERNEL_INIT_POLLING_TIMEOUT = 60.0  # 60 seconds
+DEFAULT_KERNEL_INIT_TIMEOUT = 60.0  # 60 seconds
 
 default_api_config = {"pull-timeout": DEFAULT_PULL_TIMEOUT, "push-timeout": DEFAULT_PUSH_TIMEOUT}
 default_kernel_lifecycles = {
     "init-polling-attempt": DEFAULT_KERNEL_INIT_POLLING_ATTEMPT,
     "init-polling-timeout-sec": DEFAULT_KERNEL_INIT_POLLING_TIMEOUT,
+    "init-timeout-sec": DEFAULT_KERNEL_INIT_TIMEOUT,
 }
 
 
@@ -202,6 +225,10 @@ agent_etcd_config_iv = t.Dict({
         t.Key(
             "init-polling-timeout-sec",
             default=default_kernel_lifecycles["init-polling-timeout-sec"],
+        ): t.ToFloat,
+        t.Key(
+            "init-timeout-sec",
+            default=default_kernel_lifecycles["init-timeout-sec"],
         ): t.ToFloat,
     }),
 }).allow_extra("*")

@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass, field
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp
@@ -10,7 +11,7 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ObjectNotFound, ServerMisconfiguredError
+from ai.backend.manager.errors.exceptions import ObjectNotFound, ServerMisconfiguredError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..models import query_allowed_sgroups
@@ -61,7 +62,7 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
             {
                 "scaling_groups": [{"name": sgroup["name"]} for sgroup in sgroups],
             },
-            status=200,
+            status=HTTPStatus.OK,
         )
 
 

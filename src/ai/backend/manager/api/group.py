@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp_cors
@@ -38,7 +39,7 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
     quota = int(params["quota"])
 
     await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(scope_id, quota)
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @server_status_required(READ_ALLOWED)
@@ -55,7 +56,7 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
     await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(scope_id)
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @server_status_required(READ_ALLOWED)
@@ -74,7 +75,7 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
     quota = int(params["quota"])
 
     await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(scope_id, quota)
-    return web.Response(status=204)
+    return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
 @server_status_required(READ_ALLOWED)

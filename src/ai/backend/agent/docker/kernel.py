@@ -22,16 +22,17 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
+from ai.backend.common.dto.agent.response import CodeCompletionResp
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ..types import AgentEventData, KernelOwnershipData
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -45,9 +46,7 @@ class DockerKernel(AbstractKernel):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         network_id: str,
         image: ImageRef,
         version: int,
@@ -60,9 +59,7 @@ class DockerKernel(AbstractKernel):
         data: Dict[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             network_id,
             image,
             version,
@@ -101,10 +98,10 @@ class DockerKernel(AbstractKernel):
             client_features=client_features,
         )
 
-    async def get_completions(self, text: str, opts: Mapping[str, Any]):
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         assert self.runner is not None
         result = await self.runner.feed_and_get_completion(text, opts)
-        return {"status": "finished", "completions": result}
+        return CodeCompletionResp(result=result)
 
     async def check_status(self):
         assert self.runner is not None
@@ -273,15 +270,10 @@ class DockerKernel(AbstractKernel):
     @override
     async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         loop = current_loop()
-        container_home_path = PurePosixPath("/home/work")
-        try:
-            home_relpath = PurePosixPath(container_path).relative_to(container_home_path)
-        except ValueError:
-            raise PermissionError("Not allowed to upload files outside /home/work")
         host_work_dir: Path = (
             self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
         )
-        host_abspath = (host_work_dir / home_relpath).resolve(strict=False)
+        host_abspath = (host_work_dir / container_path).resolve(strict=False)
         if not host_abspath.is_relative_to(host_work_dir):
             raise PermissionError("Not allowed to upload files outside /home/work")
 

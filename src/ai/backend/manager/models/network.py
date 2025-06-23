@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Final, Mapping, overload
 
 import graphene
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..api.exceptions import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
+from ..errors.exceptions import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
 from .base import (
     GUID,
     Base,
@@ -164,8 +165,8 @@ class NetworkNode(graphene.ObjectType):
         "driver": ("driver", None),
         "project": ("project", uuid.UUID),
         "domain_name": ("domain_name", None),
-        "created_at": ("created_at", None),
-        "updated_at": ("updated_at", None),
+        "created_at": ("created_at", dtparse),
+        "updated_at": ("updated_at", dtparse),
         "options": ("options", None),
     }
 
@@ -318,14 +319,16 @@ class CreateNetwork(graphene.Mutation):
         driver: str | None,
     ) -> "CreateNetwork":
         graph_ctx: GraphQueryContext = info.context
-        network_config = graph_ctx.shared_config["network"]["inter-container"]
-        if not network_config.get("enabled", False):
+        network_config = graph_ctx.config_provider.config.network.inter_container
+        if network_config.enabled:
             return CreateNetwork(
                 ok=False, msg="Inter-container networking disabled on this cluster", network=None
             )
-        if not network_config.get("plugin"):
+        if not network_config.plugin:
             return CreateNetwork(ok=False, msg="No network plugin configured", network=None)
-        _driver = network_config["default-driver"]
+        _driver = network_config.default_driver
+        if not _driver:
+            return CreateNetwork(ok=False, msg="No network driver configured", network=None)
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
@@ -347,14 +350,6 @@ class CreateNetwork(graphene.Mutation):
                 raise GenericForbidden(
                     "Cannot create more networks on this project (restricted by project resource policy)"
                 )
-
-        network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
-        try:
-            network_info = await network_plugin.create_network()
-            network_name = network_info.network_id
-        except Exception:
-            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
-            raise
 
         network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
         try:

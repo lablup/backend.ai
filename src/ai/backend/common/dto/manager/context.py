@@ -3,7 +3,7 @@ from typing import Any, Mapping, Self
 
 from aiohttp import web
 
-from ai.backend.common.api_handlers import MiddlewareParam
+from ...api_handlers import MiddlewareParam
 
 
 class UserIdentityCtx(MiddlewareParam):

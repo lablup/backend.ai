@@ -1,18 +1,41 @@
 # ruff: noqa: E402
 from __future__ import annotations
 
+import logging
+import time
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
 from graphene.types.inputobjecttype import set_input_object_type_default_value
-from graphql import OperationType, Undefined
+from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    PermissionDeniedError,
+)
+from ai.backend.common.metrics.metric import GraphQLMetricObserver
+from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.gql_models.audit_log import (
+    AuditLogConnection,
+    AuditLogNode,
+    AuditLogSchema,
+)
+from ai.backend.manager.models.gql_models.service_config import (
+    AvailableServiceConnection,
+    AvailableServiceNode,
+    ModifyServiceConfigNode,
+    ServiceConfigConnection,
+    ServiceConfigNode,
+)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.processors import Processors
 
 from .gql_models.container_registry import (
     ContainerRegistryConnection,
@@ -48,7 +71,7 @@ from .container_registry import (
 from .rbac import ContainerRegistryScope
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask import BackgroundTaskManager
+    from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.types import (
         AccessKey,
@@ -59,13 +82,13 @@ if TYPE_CHECKING:
     )
 
     from ..api.manager import ManagerStatus
-    from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
     from .storage import StorageSessionManager
 
-from ..api.exceptions import (
+from ..data.image.types import ImageStatus
+from ..errors.exceptions import (
     ImageNotFound,
     InsufficientPrivilege,
     InvalidAPIParameters,
@@ -74,8 +97,6 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
-from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
-from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.agent import (
     Agent,
     AgentConnection,
@@ -92,23 +113,43 @@ from .gql_models.container_registry import (
     UpdateContainerRegistryQuota,
 )
 from .gql_models.domain import (
+    CreateDomain,
     CreateDomainNode,
+    DeleteDomain,
+    Domain,
     DomainConnection,
     DomainNode,
     DomainPermissionValueField,
+    ModifyDomain,
     ModifyDomainNode,
+    PurgeDomain,
 )
 from .gql_models.endpoint import (
     CreateEndpointAutoScalingRuleNode,
     DeleteEndpointAutoScalingRuleNode,
+    Endpoint,
     EndpointAutoScalingRuleConnection,
     EndpointAutoScalingRuleNode,
+    EndpointList,
+    EndpointToken,
+    EndpointTokenList,
+    ModifyEndpoint,
     ModifyEndpointAutoScalingRuleNode,
 )
 from .gql_models.fields import AgentPermissionField, ScopeField
-from .gql_models.group import GroupConnection, GroupNode, GroupPermissionField
+from .gql_models.group import (
+    CreateGroup,
+    DeleteGroup,
+    Group,
+    GroupConnection,
+    GroupNode,
+    GroupPermissionField,
+    ModifyGroup,
+    PurgeGroup,
+)
 from .gql_models.image import (
     AliasImage,
+    ClearImageCustomResourceLimit,
     ClearImages,
     DealiasImage,
     ForgetImage,
@@ -126,14 +167,61 @@ from .gql_models.image import (
     UnloadImage,
     UntagImageFromRegistry,
 )
+from .gql_models.kernel import (
+    ComputeContainer,
+    ComputeContainerList,
+    LegacyComputeSession,
+    LegacyComputeSessionList,
+)
+from .gql_models.keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .gql_models.metric.base import ContainerUtilizationMetricMetadata
+from .gql_models.metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
+from .gql_models.resource_preset import (
+    CreateResourcePreset,
+    DeleteResourcePreset,
+    ModifyResourcePreset,
+    ResourcePreset,
+)
+from .gql_models.scaling_group import (
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
+    AssociateScalingGroupWithDomain,
+    AssociateScalingGroupWithKeyPair,
+    AssociateScalingGroupWithUserGroup,
+    CreateScalingGroup,
+    DeleteScalingGroup,
+    DisassociateAllScalingGroupsWithDomain,
+    DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
+    DisassociateScalingGroupWithDomain,
+    DisassociateScalingGroupWithKeyPair,
+    DisassociateScalingGroupWithUserGroup,
+    ModifyScalingGroup,
+    ScalingGroup,
+)
 from .gql_models.session import (
     CheckAndTransitStatus,
+    ComputeSession,
     ComputeSessionConnection,
+    ComputeSessionList,
     ComputeSessionNode,
     ModifyComputeSession,
     SessionPermissionValueField,
+    TotalResourceSlot,
 )
-from .gql_models.user import UserConnection, UserNode
+from .gql_models.user import (
+    CreateUser,
+    DeleteUser,
+    ModifyUser,
+    PurgeUser,
+    User,
+    UserConnection,
+    UserList,
+    UserNode,
+)
 from .gql_models.vfolder import (
     ModelCard,
     ModelCardConnection,
@@ -142,25 +230,12 @@ from .gql_models.vfolder import (
     VirtualFolderNode,
 )
 from .group import (
-    CreateGroup,
-    DeleteGroup,
-    Group,
-    ModifyGroup,
     ProjectType,
-    PurgeGroup,
 )
 from .image import (
     ImageLoadFilter,
-    ImageStatus,
     PublicImageLoadFilter,
 )
-from .kernel import (
-    ComputeContainer,
-    ComputeContainerList,
-    LegacyComputeSession,
-    LegacyComputeSessionList,
-)
-from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import (
@@ -185,42 +260,18 @@ from .resource_policy import (
     ProjectResourcePolicy,
     UserResourcePolicy,
 )
-from .resource_preset import (
-    CreateResourcePreset,
-    DeleteResourcePreset,
-    ModifyResourcePreset,
-    ResourcePreset,
-)
 from .routing import Routing, RoutingList
 from .scaling_group import (
-    AssociateScalingGroupsWithDomain,
-    AssociateScalingGroupsWithKeyPair,
-    AssociateScalingGroupsWithUserGroup,
-    AssociateScalingGroupWithDomain,
-    AssociateScalingGroupWithKeyPair,
-    AssociateScalingGroupWithUserGroup,
-    CreateScalingGroup,
-    DeleteScalingGroup,
-    DisassociateAllScalingGroupsWithDomain,
-    DisassociateAllScalingGroupsWithGroup,
-    DisassociateScalingGroupsWithDomain,
-    DisassociateScalingGroupsWithKeyPair,
-    DisassociateScalingGroupsWithUserGroup,
-    DisassociateScalingGroupWithDomain,
-    DisassociateScalingGroupWithKeyPair,
-    DisassociateScalingGroupWithUserGroup,
-    ModifyScalingGroup,
-    ScalingGroup,
+    ScalingGroupRow,
+    and_names,
+    query_allowed_sgroups,
 )
-from .session import ComputeSession, ComputeSessionList
+from .session import (
+    SessionQueryConditions,
+    SessionStatus,
+)
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
-    CreateUser,
-    DeleteUser,
-    ModifyUser,
-    PurgeUser,
-    User,
-    UserList,
     UserRole,
     UserStatus,
 )
@@ -235,13 +286,22 @@ from .vfolder import (
     ensure_quota_scope_accessible_by_user,
 )
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _is_legacy_mutation(mutation_cls: Any) -> bool:
+    """
+    Checks whether the GraphQL mutation is in the legacy format with the fields `ok` and `msg`.
+    """
+    fields = getattr(mutation_cls, "_meta").fields
+    return {"ok", "msg"}.issubset(fields)
+
 
 @attrs.define(auto_attribs=True, slots=True)
 class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
-    local_config: LocalConfig
-    shared_config: SharedConfig
+    config_provider: ManagerConfigProvider
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
@@ -257,6 +317,8 @@ class GraphQueryContext:
     storage_manager: StorageSessionManager
     registry: AgentRegistry
     idle_checker_host: IdleCheckerHost
+    metric_observer: GraphQLMetricObserver
+    processors: Processors
 
 
 class Mutations(graphene.ObjectType):
@@ -299,6 +361,9 @@ class Mutations(graphene.ObjectType):
     preload_image = PreloadImage.Field()
     unload_image = UnloadImage.Field()
     modify_image = ModifyImage.Field()
+    clear_image_custom_resource_limit = ClearImageCustomResourceLimit.Field(
+        description="Added in 25.6.0"
+    )
     forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
     forget_image = ForgetImage.Field(
         deprecation_reason="Deprecated since 25.4.0. Use `forget_image_by_id` instead."
@@ -332,6 +397,9 @@ class Mutations(graphene.ObjectType):
     create_resource_preset = CreateResourcePreset.Field()
     modify_resource_preset = ModifyResourcePreset.Field()
     delete_resource_preset = DeleteResourcePreset.Field()
+
+    # super-admin only
+    modify_service_config = ModifyServiceConfigNode.Field()
 
     # super-admin only
     create_scaling_group = CreateScalingGroup.Field()
@@ -434,6 +502,35 @@ class Queries(graphene.ObjectType):
     """
 
     node = AsyncNode.Field()
+
+    # super-admin only
+    audit_log_schema = graphene.Field(
+        AuditLogSchema,
+        description="Added in 25.6.0.",
+    )
+    audit_log_nodes = PaginatedConnectionField(
+        AuditLogConnection,
+        description="Added in 25.6.0.",
+        filter=graphene.String(
+            description="Specifies the criteria used to narrow down the query results based on certain conditions."
+        ),
+        order=graphene.String(description="Specifies the sorting order of the query result."),
+        offset=graphene.Int(
+            description="Specifies how many items to skip before beginning to return result."
+        ),
+        before=graphene.String(
+            description="If this value is provided, the query will be limited to that value."
+        ),
+        after=graphene.String(
+            description="Queries the `last` number of results from the query result from last."
+        ),
+        first=graphene.Int(
+            description="Queries the `first` number of results from the query result from first."
+        ),
+        last=graphene.Int(
+            description="If the given value is provided, the query will start from that value."
+        ),
+    )
 
     # super-admin only
     agent = graphene.Field(
@@ -716,9 +813,20 @@ class Queries(graphene.ObjectType):
         ResourcePreset,
         name=graphene.String(),
     )
+    resource_preset_by_id = graphene.Field(
+        ResourcePreset,
+        description="Added in 25.4.0.",
+        id=graphene.UUID(),
+    )
 
     resource_presets = graphene.List(
         ResourcePreset,
+        filter=graphene.String(
+            description="Added in 25.4.0.",
+        ),
+        order=graphene.String(
+            description="Added in 25.4.0.",
+        ),
     )
 
     # super-admin only
@@ -732,6 +840,16 @@ class Queries(graphene.ObjectType):
         ScalingGroup,
         name=graphene.String(),
         is_active=graphene.Boolean(),
+    )
+
+    accessible_scaling_groups = graphene.List(
+        ScalingGroup,
+        description=(
+            "Added in 25.5.0. This query is available for all users. "
+            "It returns the resource groups(=scaling groups) that the user has access to. "
+            "Only name, is_active, own_session_occupied_resource_slots and accelerator_quantum_size fields are returned."
+        ),
+        project_id=graphene.UUID(required=True),
     )
 
     # super-admin only
@@ -937,6 +1055,31 @@ class Queries(graphene.ObjectType):
         access_key=graphene.String(),
     )
 
+    total_resource_slot = graphene.Field(
+        TotalResourceSlot,
+        description="Added in 25.5.0.",
+        statuses=graphene.List(
+            graphene.String,
+            default_value=None,
+            description=(
+                "`statuses` argument is an array of session statuses. "
+                "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
+                f"The argument should be an array of the following valid status values: {[s.name for s in SessionStatus]}.\n"
+                f"Default value is null."
+            ),
+        ),
+        filter=graphene.String(
+            description=(
+                "`filter` argument is a string that is parsed into query conditions. "
+                "It works in the same way as the `filter` argument in the `compute_session` query schema, "
+                "meaning the values are parsed into an identical SQL query expression.\n"
+                "Default value is `null`."
+            ),
+        ),
+        domain_name=graphene.String(),
+        resource_group_name=graphene.String(),
+    )
+
     vfolder_host_permissions = graphene.Field(
         PredefinedAtomicPermission,
     )
@@ -1039,6 +1182,36 @@ class Queries(graphene.ObjectType):
         description="Added in 25.1.0.",
     )
 
+    user_utilization_metric = graphene.Field(
+        UserUtilizationMetric,
+        description="Added in 25.6.0.",
+        user_id=graphene.UUID(required=True),
+        props=UserUtilizationMetricQueryInput(required=True),
+    )
+    container_utilization_metric_metadata = graphene.Field(
+        ContainerUtilizationMetricMetadata,
+        description="Added in 25.6.0.",
+    )
+
+    available_service = graphene.Field(
+        AvailableServiceNode,
+        description="Added in 25.8.0.",
+    )
+    available_services = PaginatedConnectionField(
+        AvailableServiceConnection,
+        description="Added in 25.8.0.",
+    )
+    service_config = graphene.Field(
+        ServiceConfigNode,
+        service=graphene.String(required=True),
+        description="Added in 25.8.0.",
+    )
+    service_configs = PaginatedConnectionField(
+        ServiceConfigConnection,
+        services=graphene.List(graphene.String, required=True),
+        description="Added in 25.8.0.",
+    )
+
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent(
@@ -1111,7 +1284,7 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
+        if ctx.config_provider.config.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         loader = ctx.dataloader_manager.get_loader_by_func(
@@ -1140,7 +1313,7 @@ class Queries(graphene.ObjectType):
         status: str | None = None,
     ) -> AgentSummaryList:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
+        if ctx.config_provider.config.manager.hide_agents:
             raise ObjectNotFound(object_name="agent")
 
         total_count = await AgentSummary.load_count(
@@ -1470,7 +1643,7 @@ class Queries(graphene.ObjectType):
             info.context,
             domain_name=domain_name,
             is_active=is_active,
-            type=[ProjectType[t] for t in type],
+            type=[ProjectType(t) for t in type],
         )
 
     @staticmethod
@@ -1990,11 +2163,24 @@ class Queries(graphene.ObjectType):
         return await loader.load(name)
 
     @staticmethod
+    async def resolve_resource_preset_by_id(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: uuid.UUID,
+    ) -> ResourcePreset:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(ctx, "ResourcePreset.by_id")
+        return await loader.load(id)
+
+    @staticmethod
     async def resolve_resource_presets(
         root: Any,
         info: graphene.ResolveInfo,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[ResourcePreset]:
-        return await ResourcePreset.load_all(info.context)
+        return await ResourcePreset.load_all(info.context, filter=filter, order=order)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2018,6 +2204,25 @@ class Queries(graphene.ObjectType):
         is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_all(info.context, is_active=is_active)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_accessible_scaling_groups(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        domain_name: Optional[str],
+        project_id: uuid.UUID,
+        group_id: uuid.UUID,  # Not used. `scoped_query()` injects this parameter.
+        access_key: AccessKey,
+    ) -> Sequence[ScalingGroup]:
+        ctx: GraphQueryContext = info.context
+        domain_name = domain_name or ctx.user["domain_name"]
+        async with ctx.db.begin() as db_conn:
+            sgroup_rows = await query_allowed_sgroups(db_conn, domain_name, project_id, access_key)
+        conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
+        sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
+        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2298,11 +2503,19 @@ class Queries(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[ComputeSessionNode]:
-        if scope_id is None:
-            scope_id = SystemScope()
+        final_scope_id: ScopeType
+        if project_id is not None:
+            # for backward compatibility.
+            # TODO: remove this part after `project_id` argument is fully deprecated
+            final_scope_id = ProjectScope(project_id)
+        else:
+            if scope_id is None:
+                final_scope_id = SystemScope()
+            else:
+                final_scope_id = scope_id
         return await ComputeSessionNode.get_accessible_connection(
             info,
-            scope_id,
+            final_scope_id,
             permission,
             filter,
             order,
@@ -2502,6 +2715,32 @@ class Queries(graphene.ObjectType):
             return matches[0]
         else:
             raise TooManyKernelsFound
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_total_resource_slot(
+        root: Any,
+        info: graphene.ResolveInfo,
+        statuses: Optional[list[str]] = None,
+        filter: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        resource_group_name: Optional[str] = None,
+    ) -> TotalResourceSlot:
+        graph_ctx: GraphQueryContext = info.context
+
+        if statuses is not None:
+            status_list = [SessionStatus[s] for s in statuses]
+        else:
+            status_list = None
+        return await TotalResourceSlot.get_data(
+            graph_ctx,
+            SessionQueryConditions(
+                statuses=status_list,
+                domain_name=domain_name,
+                resource_group_name=resource_group_name,
+                raw_filter=filter,
+            ),
+        )
 
     @staticmethod
     async def resolve_vfolder_host_permissions(
@@ -2749,6 +2988,83 @@ class Queries(graphene.ObjectType):
             last,
         )
 
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_audit_log_schema(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> AuditLogSchema:
+        return AuditLogSchema()
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_audit_log_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult:
+        return await AuditLogNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_available_service(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> AuditLogSchema:
+        return AvailableServiceNode()
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_service_config(
+        root: Any,
+        info: graphene.ResolveInfo,
+        service: str,
+    ) -> ServiceConfigNode:
+        return await ServiceConfigNode.load(info, service)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_service_configs(
+        root: Any,
+        info: graphene.ResolveInfo,
+        services: list[str],
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult:
+        return await ServiceConfigNode.get_connection(
+            info,
+            services,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
     async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2846,6 +3162,32 @@ class Queries(graphene.ObjectType):
             last=last,
         )
 
+    @staticmethod
+    async def resolve_user_utilization_metric(
+        root: Any,
+        info: graphene.ResolveInfo,
+        user_id: uuid.UUID,
+        *,
+        props: UserUtilizationMetricQueryInput,
+    ) -> UserUtilizationMetric:
+        graph_ctx = cast(GraphQueryContext, info.context)
+        user = graph_ctx.user
+        if user["role"] not in (UserRole.SUPERADMIN, UserRole.MONITOR):
+            if user["uuid"] != user_id:
+                raise RuntimeError("Permission denied.")
+        return await UserUtilizationMetric.get_object(
+            info,
+            user_id,
+            props.metric_query_param(),
+        )
+
+    @staticmethod
+    async def resolve_container_utilization_metric_metadata(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> ContainerUtilizationMetricMetadata:
+        return await ContainerUtilizationMetricMetadata.get_object(info)
+
 
 class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
@@ -2858,5 +3200,80 @@ class GQLMutationPrivilegeCheckMiddleware:
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                if _is_legacy_mutation(mutation_cls):
+                    return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
+                raise PermissionDeniedError()
         return next(root, info, **args)
+
+
+class GQLExceptionMiddleware:
+    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+        try:
+            res = next(root, info, **args)
+        except BackendAIError as e:
+            if e.status_code // 100 == 4:
+                log.debug("GraphQL client error: {}", e)
+            elif e.status_code // 100 == 5:
+                log.exception("GraphQL Server error: {}", e)
+            raise GraphQLError(
+                message=str(e),
+                extensions={
+                    "code": str(e.error_code()),
+                },
+            )
+        except Exception as e:
+            log.exception("GraphQL unexpected error: {}", e)
+            raise GraphQLError(
+                message=str(e),
+                extensions={
+                    "code": str(ErrorCode.default()),
+                },
+            )
+        return res
+
+
+class GQLMetricMiddleware:
+    def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
+        graph_ctx: GraphQueryContext = info.context
+        operation_type = info.operation.operation
+        field_name = info.field_name
+        parent_type = info.parent_type.name
+        operation_name = (
+            info.operation.name.value if info.operation.name is not None else "anonymous"
+        )
+        start = time.perf_counter()
+        try:
+            info.field_name
+            res = next(root, info, **args)
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                error_code=None,
+                success=True,
+                duration=time.perf_counter() - start,
+            )
+        except BackendAIError as e:
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                error_code=e.error_code(),
+                success=False,
+                duration=time.perf_counter() - start,
+            )
+            raise e
+        except BaseException as e:
+            graph_ctx.metric_observer.observe_request(
+                operation_type=operation_type,
+                field_name=field_name,
+                parent_type=parent_type,
+                operation_name=operation_name,
+                error_code=ErrorCode.default(),
+                success=False,
+                duration=time.perf_counter() - start,
+            )
+            raise e
+        return res

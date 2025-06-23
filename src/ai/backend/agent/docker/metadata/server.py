@@ -1,4 +1,5 @@
 import logging
+from http import HTTPStatus
 from typing import Any, Iterable, List, Mapping, MutableMapping
 from uuid import UUID
 
@@ -10,7 +11,9 @@ from aiohttp.typedefs import Handler, Middleware
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.utils import closing_async
+from ai.backend.common.docker import LabelName
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 from ai.backend.logging import BraceStyleAdapter
@@ -52,11 +55,14 @@ async def container_resolver_middleware(
     elif remote_ip := request.remote:
         container_ip = remote_ip
     else:
-        return web.Response(status=403)
+        return web.Response(status=HTTPStatus.FORBIDDEN)
     async with closing_async(Docker()) as docker:
-        containers = await docker.containers.list(
-            filters='{"label":["ai.backend.kernel-id"],"network":["bridge"],"status":["running"]}',
-        )
+        filters = dump_json_str({
+            "label": [LabelName.KERNEL_ID],
+            "network": ["bridge"],
+            "status": ["running"],
+        })
+        containers = await docker.containers.list(filters=filters)
     target_container = list(
         filter(
             lambda x: x["NetworkSettings"]["Networks"].get("bridge", {}).get("IPAddress")
@@ -66,11 +72,11 @@ async def container_resolver_middleware(
     )
 
     if len(target_container) == 0:
-        return web.Response(status=403)
+        return web.Response(status=HTTPStatus.FORBIDDEN)
     request["container-ip"] = container_ip
     request["container"] = target_container[0]
     request["kernel"] = request.app["kernel-registry"].get(
-        UUID(target_container[0]["Labels"]["ai.backend.kernel-id"])
+        UUID(target_container[0]["Labels"][LabelName.KERNEL_ID])
     )
     return await handler(request)
 

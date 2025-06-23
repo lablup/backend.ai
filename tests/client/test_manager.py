@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from unittest import mock
 
 import pytest
@@ -19,7 +20,7 @@ def test_status(mocker):
     return_value = {"status": "running", "active_sessions": 3}
     mock_json_coro = AsyncMock(return_value=return_value)
     mock_req_obj = mocker.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=200, json=mock_json_coro)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.OK, json=mock_json_coro)
     mocker.patch("ai.backend.client.func.manager.Request", return_value=mock_req_obj)
 
     with Session() as session:
@@ -31,7 +32,7 @@ def test_status(mocker):
 
 def test_freeze(mocker):
     mock_req_obj = mocker.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=204)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
     mocker.patch("ai.backend.client.func.manager.Request", return_value=mock_req_obj)
 
     with Session() as session:
@@ -41,7 +42,7 @@ def test_freeze(mocker):
 
 def test_freeze_opt_force_kill(mocker):
     mock_req_obj = mock.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=204)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
     mocker.patch("ai.backend.client.func.manager.Request", return_value=mock_req_obj)
 
     with Session() as session:
@@ -51,7 +52,7 @@ def test_freeze_opt_force_kill(mocker):
 
 def test_unfreeze(mocker):
     mock_req_obj = mock.Mock()
-    mock_req_obj.fetch.return_value = AsyncContextMock(status=204)
+    mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
     mocker.patch("ai.backend.client.func.manager.Request", return_value=mock_req_obj)
 
     with Session() as session:
