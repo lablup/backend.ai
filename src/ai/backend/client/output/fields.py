@@ -147,6 +147,15 @@ keypair_resource_policy_fields = FieldSet([
 ])
 
 
+user_resource_policy_fields = FieldSet([
+    FieldSpec("name"),
+    FieldSpec("max_vfolder_count"),
+    FieldSpec("max_quota_scope_size"),
+    FieldSpec("max_session_count_per_model_session"),
+    FieldSpec("max_customized_image_count"),
+])
+
+
 scaling_group_fields = FieldSet([
     FieldSpec("name"),
     FieldSpec("description"),
