@@ -1253,7 +1253,11 @@ class AbstractAgent(
                                 ),
                             )
                         if ev.done_future is not None:
-                            ev.done_future.set_result(None)
+                            try:
+                                ev.done_future.set_result(None)
+                            except asyncio.InvalidStateError:
+                                # done_future is already set.
+                                pass
                         return
                 else:
                     kernel_obj.state = KernelLifecycleStatus.TERMINATING
@@ -1265,7 +1269,11 @@ class AbstractAgent(
                     await self.destroy_kernel(ev.kernel_id, ev.container_id)
                 except Exception as e:
                     if ev.done_future is not None:
-                        ev.done_future.set_exception(e)
+                        try:
+                            ev.done_future.set_exception(e)
+                        except asyncio.InvalidStateError:
+                            # done_future is already set.
+                            pass
                     raise
                 else:
                     log.info("Kernel {0} destroyed", ev.kernel_id)
@@ -1315,7 +1323,11 @@ class AbstractAgent(
             except Exception as e:
                 log.exception("unhandled exception while processing CLEAN event: {0}", repr(e))
                 if ev.done_future is not None:
-                    ev.done_future.set_exception(e)
+                    try:
+                        ev.done_future.set_exception(e)
+                    except asyncio.InvalidStateError:
+                        # done_future is already set.
+                        pass
                 await self.produce_error_event()
             else:
                 log.info("Kernel {0} cleaned", ev.kernel_id)
