@@ -113,13 +113,8 @@ def purge(reference_or_id: str, arch: str, remove_from_registry: bool):
                 )
             sys.exit(ExitCode.FAILURE)
         try:
-            result = session.Image.purge_image_by_id(
-                image_id, remove_from_registry=remove_from_registry
-            )
+            session.Image.purge_image_by_id(image_id, remove_from_registry=remove_from_registry)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
-        if result["ok"]:
-            print_done(f"Image purged: {reference_or_id}")
-        else:
-            print_fail("Image purge has failed: {0}".format(result["msg"]))
+        print_done(f"Image purged: {reference_or_id}")
