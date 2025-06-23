@@ -1,6 +1,8 @@
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from ai.backend.common.types import ClusterMode
 
 
 class BaseDependencyModel(BaseModel):
@@ -43,22 +45,40 @@ class LoginCredentialDep(BaseDependencyModel):
     )
 
 
+class DomainDep(BaseDependencyModel):
+    name: str = Field(
+        description="The domain name for the test context.",
+        examples=["default"],
+    )
+
+
+class GroupDep(BaseDependencyModel):
+    name: str = Field(
+        description="The group name for the test context.",
+        examples=["default"],
+    )
+
+
+class ScalingGroupDep(BaseDependencyModel):
+    name: str = Field(
+        description="The scaling group for the test context.",
+        examples=["default"],
+    )
+
+
 class ImageDep(BaseDependencyModel):
-    name: Optional[str] = Field(
-        default=None,
+    name: str = Field(
         description="The Docker image to use for the test context.",
         examples=["cr.backend.ai/multiarch/python:3.13-ubuntu24.04"],
     )
-    architecture: Optional[str] = Field(
-        default=None,
+    architecture: str = Field(
         description="The architecture of the session.",
         examples=["x86_64"],
     )
 
 
 class BatchSessionDep(BaseDependencyModel):
-    startup_command: Optional[str] = Field(
-        default=None,
+    startup_command: str = Field(
         description="The startup command to run in the batch session.",
         examples=["ls -la"],
     )
@@ -80,28 +100,25 @@ class SSEDep(BaseDependencyModel):
 class ClusterDep(BaseDependencyModel):
     # By default, testing is conducted for both single-node and multi-node setups through parametrization,
     # But we'd like to have left room for manually injecting values.
-    cluster_mode: Optional[str] = Field(
-        default=None,
+    cluster_mode: ClusterMode = Field(
         description="The cluster mode for the session.",
-        examples=["single_node", "multi_node"],
+        examples=["single-node", "multi-node"],
     )
-    cluster_size: Optional[int] = Field(
-        default=None,
+    cluster_size: int = Field(
         description="The size of the cluster for the session.",
         examples=[1, 2, 3],
     )
 
 
 class BootstrapScriptDep(BaseDependencyModel):
-    bootstrap_script: Optional[str] = Field(
-        default=None,
+    bootstrap_script: str = Field(
         description="The bootstrap script to run before the session starts. Used as an argument when creating a compute session.",
         examples=["echo 'Bootstrapping...'"],
     )
 
 
 class SessionDep(BaseDependencyModel):
-    resources: Optional[dict] = Field(
+    resources: Optional[dict[str, Any]] = Field(
         default=None,
         description="The resources to allocate for the session.",
         examples=[{"cpu": 2, "mem": "4gb"}],
@@ -112,6 +129,32 @@ class SessionImagifyDep(BaseDependencyModel):
     new_image_name: str = Field(
         description="The name of the new image to create from the session.",
         examples=["my-custom-image"],
+    )
+
+
+class ModelServiceDep(BaseDependencyModel):
+    model_vfolder_name: str = Field(
+        description="The model VFolder name to use for the model service.",
+        examples=["vfolder-name"],
+    )
+    replicas: int = Field(
+        description="The number of replicas for the model service.",
+        examples=[1, 2, 3],
+    )
+    # Separate group is required for the model service, so we placed this independently from the group context.
+    group_name: str = Field(
+        description="The group name for the model service.",
+        examples=["model-store"],
+    )
+    model_mount_destination: str = Field(
+        default="models",
+        description="The destination path for the model mount in the model service.",
+        examples=["models"],
+    )
+    model_definition_path: str = Field(
+        default="./model-definition.yaml",
+        description="The path to the model definition file in the model service.",
+        examples=["./model-definition.yaml"],
     )
 
 
@@ -143,7 +186,18 @@ class TestContextInjectionModel(BaseDependencyModel):
     login_credential: Optional[LoginCredentialDep] = Field(
         default=None,
         description="The login credentials for the test context.",
-        alias="login-credential",
+    )
+    domain: Optional[DomainDep] = Field(
+        default=None,
+        description="The domain configuration for the test context.",
+    )
+    group: Optional[GroupDep] = Field(
+        default=None,
+        description="The group configuration for the test context.",
+    )
+    scaling_group: Optional[ScalingGroupDep] = Field(
+        default=None,
+        description="The scaling group configuration for the test context.",
     )
     image: Optional[ImageDep] = Field(
         default=None,
@@ -156,12 +210,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     cluster_config: Optional[ClusterDep] = Field(
         default=None,
         description="The cluster configuration for the test context.",
-        alias="cluster-config",
     )
     batch_session: Optional[BatchSessionDep] = Field(
         default=None,
         description="The batch session configuration for the test context.",
-        alias="batch-session",
     )
     session: Optional[SessionDep] = Field(
         default=None,
@@ -170,7 +222,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     session_imagify: Optional[SessionImagifyDep] = Field(
         default=None,
         description="The session imagify configuration for the test context.",
-        alias="session-imagify",
+    )
+    model_service: Optional[ModelServiceDep] = Field(
+        default=None,
+        description="The model service configuration for the test context.",
     )
     vfolder: Optional[VFolderDep] = Field(
         default=None,

@@ -1,6 +1,8 @@
 import asyncio
+from abc import abstractmethod
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import Any, AsyncIterator, Optional, override
+from typing import Any, Optional, override
 from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
@@ -45,8 +47,9 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
         params.update(self._extra_session_params())
         return params
 
+    @abstractmethod
     def _extra_session_params(self) -> dict[str, Any]:
-        return {}
+        raise NotImplementedError("Subclasses must implement the _extra_session_params method.")
 
     async def _verify_session_creation(
         self, client_session: AsyncSession, session_name: str
@@ -124,6 +127,10 @@ class InteractiveSessionTemplate(_BaseInteractiveSessionTemplate):
     @property
     def name(self) -> str:
         return "interactive_session"
+
+    @override
+    def _extra_session_params(self) -> dict[str, Any]:
+        return {}
 
 
 class InteractiveSessionWithBootstrapScriptTemplate(_BaseInteractiveSessionTemplate):
