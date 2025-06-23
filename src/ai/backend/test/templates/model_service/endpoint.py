@@ -108,7 +108,8 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
                     ready_session_cnt += 1
 
             if ready_session_cnt >= replicas:
-                break
+                if result["service_endpoint"] is not None:
+                    break
 
             await asyncio.sleep(1)
 
@@ -157,7 +158,6 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
 
             info = await client_session.Service(endpoint_id).info()
             model_service_endpoint = info["service_endpoint"]
-            assert model_service_endpoint is not None, "Service endpoint should be initialized."
 
             with CreatedModelServiceEndpointContext.with_current(model_service_endpoint):
                 yield

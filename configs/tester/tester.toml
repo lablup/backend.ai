@@ -23,11 +23,11 @@ name = "default"
 name = "default"
 
 [context.model-service]
-model-vfolder-name = "abc"
+model-vfolder-name = "enter_model_vfolder_name_here"
 runtime-variant = "custom"
 replicas = 1
 group-name = "model-store"
-model-mount-destination = "models"
+model-mount-destination = "/models"
 model-definition-path = "./model-definition.yaml"
 
 [context.image]

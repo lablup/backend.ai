@@ -7,7 +7,7 @@ from ai.backend.test.templates.model_service.endpoint import (
     EndpointTemplate,
     PublicEndpointTemplate,
 )
-from ai.backend.test.testcases.model_service.pingcheck import PingCheck
+from ai.backend.test.testcases.model_service.health_check import EndpointHealthCheck
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep
 
@@ -55,7 +55,7 @@ MODEL_SERVICE_TEST_SPECS = {
             3. Clean up the endpoint after verification.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
-        template=BasicTestTemplate(PingCheck()).with_wrappers(
+        template=BasicTestTemplate(EndpointHealthCheck()).with_wrappers(
             KeypairAuthTemplate, PublicEndpointTemplate
         ),
         parametrizes={
