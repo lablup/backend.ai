@@ -6,7 +6,7 @@ import secrets
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Union, cast
+from typing import Any, Iterable, Mapping, MutableMapping, Optional, Union, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -273,12 +273,6 @@ class SessionService:
         code = action.code
         options = action.options or {}
 
-        resp = {
-            "result": {
-                "status": "finished",
-                "completions": [],
-            },
-        }
         async with self._db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
@@ -288,10 +282,7 @@ class SessionService:
             )
         try:
             await self._agent_registry.increment_session_usage(session)
-            resp["result"] = cast(
-                Dict[str, Any],
-                await self._agent_registry.get_completions(session, code, opts=options),
-            )
+            resp = await self._agent_registry.get_completions(session, code, opts=options)
         except AssertionError:
             raise InvalidAPIParameters
         return CompleteActionResult(
@@ -1128,7 +1119,8 @@ class SessionService:
                 opts = {}  # noqa
             if mode == "complete":
                 # For legacy
-                resp["result"] = await self._agent_registry.get_completions(session, code, opts)
+                completion_resp = await self._agent_registry.get_completions(session, code, opts)
+                resp["result"] = completion_resp.as_dict()
             else:
                 run_id = cast(str, run_id)
                 raw_result = await self._agent_registry.execute(
