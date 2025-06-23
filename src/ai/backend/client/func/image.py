@@ -185,7 +185,7 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def untag_image_from_registry(cls, id: str):
+    async def untag_image_from_registry(cls, image_id: str):
         """
         Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
         """
@@ -197,7 +197,7 @@ class Image(BaseFunction):
             }
         """)
         variables = {
-            "image_id": id,
+            "image_id": image_id,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["untag_image_from_registry"]
