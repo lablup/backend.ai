@@ -2,6 +2,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ai.backend.common.types import ClusterMode
+
 
 class BaseDependencyModel(BaseModel):
     @staticmethod
@@ -98,7 +100,7 @@ class SSEDep(BaseDependencyModel):
 class ClusterDep(BaseDependencyModel):
     # By default, testing is conducted for both single-node and multi-node setups through parametrization,
     # But we'd like to have left room for manually injecting values.
-    cluster_mode: str = Field(
+    cluster_mode: ClusterMode = Field(
         description="The cluster mode for the session.",
         examples=["single-node", "multi-node"],
     )

@@ -1,4 +1,5 @@
 import asyncio
+from abc import abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from typing import Any, override
@@ -63,8 +64,9 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
         params.update(self._extra_service_params())
         return params
 
+    @abstractmethod
     def _extra_service_params(self) -> dict[str, Any]:
-        return {}
+        raise NotImplementedError("Subclasses must implement the _extra_service_params method.")
 
     @override
     @actxmgr
@@ -150,13 +152,16 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             if endpoint_id:
                 response = await client_session.Service(endpoint_id).delete()
                 assert response["success"], f"Model Service deletion failed!, response: {response}"
-                pass
 
 
 class EndpointTemplate(_BaseEndpointTemplate):
     @property
     def name(self) -> str:
         return "endpoint_template"
+
+    @override
+    def _extra_service_params(self) -> dict[str, Any]:
+        return {}
 
 
 class EndpointWithBootstrapScriptTemplate(_BaseEndpointTemplate):
