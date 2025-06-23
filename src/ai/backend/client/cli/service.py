@@ -15,7 +15,6 @@ from ai.backend.client.cli.session.execute import (
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 from ..exceptions import BackendError
