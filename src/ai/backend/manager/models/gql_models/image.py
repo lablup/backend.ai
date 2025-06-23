@@ -857,7 +857,7 @@ class PurgeImageById(graphene.Mutation):
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Deprecated since 25.10.0. Use `purge_image_by_id`, and `remove_from_registry` option instead."""
+    """Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,

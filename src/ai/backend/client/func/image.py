@@ -186,6 +186,9 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def untag_image_from_registry(cls, id: str):
+        """
+        Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
+        """
         q = _d("""
             mutation($image_id: String!) {
                 untag_image_from_registry(image_id: $image_id) {
