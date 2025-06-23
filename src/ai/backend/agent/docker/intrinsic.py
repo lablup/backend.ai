@@ -608,9 +608,16 @@ class MemoryPlugin(AbstractComputePlugin):
                         mem_max_bytes = read_sysfs(mem_path / "memory.limit_in_bytes", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
-                            key, value = line.split(" ")
+                            line = cast(str, line)
+                            key, _, value = line.partition(" ")
                             if key == "total_inactive_file":
-                                mem_cur_bytes -= int(value)
+                                try:
+                                    mem_cur_bytes -= int(value)
+                                except ValueError:
+                                    log.warning(
+                                        "MemoryPlugin: cannot parse inactive stat. container: {0}",
+                                        container_id[:7],
+                                    )
                                 break
 
                         # example data:
@@ -635,17 +642,26 @@ class MemoryPlugin(AbstractComputePlugin):
                         mem_max_bytes = read_sysfs(mem_path / "memory.max", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
-                            key, value = line.split(" ")
+                            line = cast(str, line)
+                            key, _, value = line.partition(" ")
                             if key == "inactive_file":
-                                mem_cur_bytes -= int(value)
+                                try:
+                                    mem_cur_bytes -= int(value)
+                                except ValueError:
+                                    log.warning(
+                                        "MemoryPlugin: cannot parse inactive stat. container: {0}",
+                                        container_id[:7],
+                                    )
                                 break
 
                         # example data:
                         # 8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353 dbytes=0 dios=0
                         # 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
+                        # 253:0 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
                         for line in (io_path / "io.stat").read_text().splitlines():
-                            for io_stat in line.split()[1:]:
-                                stat, value = io_stat.split("=")
+                            line = cast(str, line)
+                            for io_stat in line.split():
+                                stat, _, value = io_stat.partition("=")
                                 if stat == "rbytes":
                                     io_read_bytes += int(value)
                                 if stat == "wbytes":
