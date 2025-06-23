@@ -499,6 +499,33 @@ class StatContext:
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
 
+    async def _get_processes(
+        self, container_id: ContainerId, docker: aiodocker.Docker
+    ) -> list[PID]:
+        """
+        Get the list of PIDs for the given container ID.
+        """
+        return_val: list[PID] = []
+        try:
+            result = await docker._query_json(f"containers/{container_id}/top", method="GET")
+            procs = result["Processes"]
+        except (KeyError, aiodocker.exceptions.DockerError):
+            log.debug(
+                "collect_per_container_process_stat(): cannot find container {}", container_id
+            )
+            return return_val
+
+        for proc in procs:
+            try:
+                return_val.append(PID(int(proc[1])))
+            except (ValueError, KeyError):
+                log.debug(
+                    "collect_per_container_process_stat(): cannot parse PID from {}",
+                    proc,
+                )
+                continue
+        return return_val
+
     async def collect_per_container_process_stat(
         self,
         container_ids: Sequence[ContainerId],
@@ -513,26 +540,25 @@ class StatContext:
             return
 
         async with self._lock:
-            pid_map = {}
-            pids = []
+            pid_map: dict[PID, ContainerId] = {}
             async with aiodocker.Docker() as docker:
                 for cid in container_ids:
-                    try:
-                        result = await docker._query_json(f"containers/{cid}/top", method="GET")
-                        procs = result["Processes"]
-                        pids = [PID(int(proc[1])) for proc in procs]
-                        unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
-                    except (KeyError, aiodocker.exceptions.DockerError):
-                        log.debug(
-                            "collect_per_container_process_stat(): cannot found container {}", cid
-                        )
-                    else:
-                        for unused_pid in unused_pids:
-                            log.debug("removing pid_metric for {}: {}", cid, unused_pid)
-                            self.process_metrics[cid].pop(unused_pid, None)
-                    for pid in pids:
-                        pid_map[pid] = cid
-
+                    active_pids = await self._get_processes(cid, docker)
+                    if cid in self.process_metrics:
+                        unused_pids = set(self.process_metrics[cid].keys()) - set(active_pids)
+                        if unused_pids:
+                            log.debug(
+                                "removing pid_metric for {}: {}",
+                                cid,
+                                ", ".join([str(p) for p in unused_pids]),
+                            )
+                            self.process_metrics[cid] = {
+                                pid_: metric
+                                for pid_, metric in self.process_metrics[cid].items()
+                                if pid_ in active_pids
+                            }
+                    for pid_ in active_pids:
+                        pid_map[pid_] = cid
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
