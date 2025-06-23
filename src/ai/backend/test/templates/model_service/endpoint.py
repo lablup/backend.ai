@@ -18,7 +18,6 @@ from ai.backend.test.contexts.model_service import (
 )
 from ai.backend.test.contexts.scaling_group import ScalingGroupContext
 from ai.backend.test.contexts.session import (
-    BootstrapScriptContext,
     ClusterContext,
     SessionContext,
 )
@@ -59,7 +58,9 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             "cluster_mode": cluster_dep.cluster_mode,
             "cluster_size": cluster_dep.cluster_size,
             # TODO: Make `envs` required.
-            "envs": {},
+            "envs": {
+                "TEST_KEY": "test_value",
+            },
         }
         params.update(self._extra_service_params())
         return params
@@ -162,24 +163,3 @@ class EndpointTemplate(_BaseEndpointTemplate):
     @override
     def _extra_service_params(self) -> dict[str, Any]:
         return {}
-
-
-class EndpointWithBootstrapScriptTemplate(_BaseEndpointTemplate):
-    @property
-    def name(self) -> str:
-        return "endpoint_template_with_bootstrap_script"
-
-    @override
-    def _extra_service_params(self) -> dict[str, Any]:
-        script_ctx = BootstrapScriptContext.current()
-        return {"bootstrap_script": script_ctx.bootstrap_script}
-
-
-class PublicEndpointTemplate(_BaseEndpointTemplate):
-    @property
-    def name(self) -> str:
-        return "public_endpoint_template"
-
-    @override
-    def _extra_service_params(self) -> dict[str, Any]:
-        return {"expose_to_public": True}
