@@ -15,7 +15,11 @@ from ai.backend.test.templates.session.session_template import (
     InteractiveSessionFromTemplateTemplate,
     SessionTemplateTemplate,
 )
+from ai.backend.test.templates.session.vfolder_mounted_interactive_session import (
+    VFolderMountedInteractiveSessionTemplate,
+)
 from ai.backend.test.templates.template import BasicTestTemplate, NopTestCode
+from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
 from ai.backend.test.testcases.session.commit import (
     InteractiveSessionCommitSuccess,
     InteractiveSessionImagifySuccess,
@@ -49,6 +53,7 @@ from ai.backend.test.testcases.session.session_rename import TestSessionRename
 from ai.backend.test.testcases.session.session_status_history_retriever import (
     SessionStatusHistoryRetriever,
 )
+from ai.backend.test.testcases.session.vfolder_mount import FileHandlingInMountedVFolderSuccess
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import (
     BootstrapScriptDep,
@@ -567,6 +572,42 @@ SESSION_RENAME_TEST_SPECS = {
     ),
 }
 
+SESSION_VFOLDER_TEST_SPECS = {
+    "session_with_vfolder_mount_works_successfully": TestSpec(
+        name="session_with_vfolder_mount_works_successfully",
+        description=textwrap.dedent("""
+        Test for mounting a virtual folder in a session.
+        This test verifies the ability to mount a virtual folder (vfolder) into a session and perform file operations.
+        The test will:
+        1. Create a session with a vfolder mounted.
+        2. Upload a dummy file to the mounted vfolder.
+        3. List files in the vfolder and verify the uploaded file exists.
+        4. Download the file from the vfolder and verify its content matches the original.
+        5. Clean up the session and test files after completion.
+        """),
+        tags={TestTag.SESSION, TestTag.VFOLDER},
+        template=BasicTestTemplate(testcode=FileHandlingInMountedVFolderSuccess()).with_wrappers(
+            KeypairAuthTemplate, GeneralVFolderTemplate, VFolderMountedInteractiveSessionTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
+    ),
+}
+
 
 SESSION_TEST_SPECS = {
     **BATCH_SESSION_TEST_SPECS,
@@ -574,4 +615,5 @@ SESSION_TEST_SPECS = {
     **SESSION_TEMPLATE_TEST_SPECS,
     **SESSION_INFO_RETRIEVER_TEST_SPECS,
     **SESSION_RENAME_TEST_SPECS,
+    **SESSION_VFOLDER_TEST_SPECS,
 }

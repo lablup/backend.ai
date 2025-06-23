@@ -28,3 +28,9 @@ startup-command = "ls -la"
 
 [context.sse]
 timeout = 60.0
+
+[context.vfolder]
+group = "default"
+usage_mode = "general"
+permission = "rw"
+cloneable = "False"
