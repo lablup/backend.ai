@@ -15,7 +15,8 @@ from ai.backend.client.cli.session.execute import (
 from ai.backend.client.compat import asyncio_run
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 from ..exceptions import BackendError
 from ..output.fields import routing_fields, service_fields
@@ -268,6 +269,16 @@ def info(ctx: CLIContext, service_name_or_id: str) -> None:
         "If set to true, no authentication will be required to access the endpoint."
     ),
 )
+@click.option(
+    "--runtime-variant",
+    metavar="RUNTIME_VARIANT",
+    type=click.Choice([*RuntimeVariant], case_sensitive=False),
+    default=RuntimeVariant.CUSTOM,
+    help=(
+        "Runtime variant of the service. "
+        "Control which runtime environment is used for the service. Default is `custom`."
+    ),
+)
 def create(
     ctx: CLIContext,
     image: str,
@@ -293,6 +304,7 @@ def create(
     owner: Optional[str],
     model_definition_path: Optional[str],
     public: bool,
+    runtime_variant: RuntimeVariant,
 ) -> None:
     """
     Create a service endpoint with a backing inference session.
@@ -323,6 +335,7 @@ def create(
         "scaling_group": scaling_group,
         "expose_to_public": public,
         "model_definition_path": model_definition_path,
+        "runtime_variant": runtime_variant,
     }
     if model_mount_destination:
         body["model_mount_destination"] = model_mount_destination
