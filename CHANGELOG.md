@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.11 (2025-06-23)
+
+### Fixes
+* Fix Backend.AI agent to gracefully handle missing `Config.Labels` field in Docker image inspection ([#4576](https://github.com/lablup/backend.ai/issues/4576))
+* Include endpoint loading in route retrieval for delete_route function ([#4595](https://github.com/lablup/backend.ai/issues/4595))
+* Replace assert statements in `load_model_definition` with raising exception ([#4599](https://github.com/lablup/backend.ai/issues/4599))
+* Support more Accept headers in `BaseContainerRegistry.scan_tag` ([#4627](https://github.com/lablup/backend.ai/issues/4627))
+* Update container ports validation to catch omitted or empty list cases, preventing potential `IndexError` ([#4656](https://github.com/lablup/backend.ai/issues/4656))
+* Fix broken `untag_image_from_registry` SDK method ([#4720](https://github.com/lablup/backend.ai/issues/4720))
+* Skip gathering metrics of non-existent processes ([#4753](https://github.com/lablup/backend.ai/issues/4753))
+
+
 ## 24.09.10 (2025-06-03)
 
 ### Fixes
