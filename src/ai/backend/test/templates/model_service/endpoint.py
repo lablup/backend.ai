@@ -11,7 +11,10 @@ from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.domain import DomainContext
 from ai.backend.test.contexts.group import GroupContext
 from ai.backend.test.contexts.image import ImageContext
-from ai.backend.test.contexts.model_service import ModelServiceContext
+from ai.backend.test.contexts.model_service import (
+    CreatedModelServiceEndpointContext,
+    ModelServiceContext,
+)
 from ai.backend.test.contexts.scaling_group import ScalingGroupContext
 from ai.backend.test.contexts.session import (
     BootstrapScriptContext,
@@ -130,20 +133,24 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             )
 
             info = await client_session.Service(endpoint_id).info()
-            assert info["service_endpoint"] is not None, "Service endpoint should be initialized."
+            model_service_endpoint = info["service_endpoint"]
+            assert model_service_endpoint is not None, "Service endpoint should be initialized."
 
             async with aiohttp.ClientSession() as http_sess:
                 resp = await asyncio.wait_for(
-                    http_sess.get(info["service_endpoint"]), timeout=_ENDPOINT_HEALTH_CHECK_TIMEOUT
+                    http_sess.get(model_service_endpoint), timeout=_ENDPOINT_HEALTH_CHECK_TIMEOUT
                 )
                 assert resp.status // 100 == 2, (
                     f"Service endpoint health check failed with status: {resp.status}"
                 )
-            yield
+
+            with CreatedModelServiceEndpointContext.with_current(model_service_endpoint):
+                yield
         finally:
             if endpoint_id:
                 response = await client_session.Service(endpoint_id).delete()
                 assert response["success"], f"Model Service deletion failed!, response: {response}"
+                pass
 
 
 class EndpointTemplate(_BaseEndpointTemplate):
