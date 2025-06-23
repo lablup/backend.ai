@@ -7,6 +7,7 @@ from typing_extensions import deprecated
 
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
+from ai.backend.common.types import RuntimeVariant
 
 from ..exceptions import BackendClientError
 from ..output.fields import service_fields
@@ -113,7 +114,7 @@ class Service(BaseFunction):
         owner_access_key: Optional[str] = None,
         model_definition_path: Optional[str] = None,
         expose_to_public: bool = False,
-        runtime_variant: Optional[str] = None,
+        runtime_variant: Optional[RuntimeVariant] = None,
     ) -> dict[str, Any]:
         """
         Creates an inference service.
