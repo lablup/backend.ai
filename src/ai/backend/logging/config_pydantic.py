@@ -1,4 +1,4 @@
-import enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
@@ -16,14 +16,14 @@ default_pkg_ns = {
 }
 
 
-class LogDriver(str, enum.Enum):
+class LogDriver(StrEnum):
     CONSOLE = "console"
     LOGSTASH = "logstash"
     FILE = "file"
     GRAYLOG = "graylog"
 
 
-class LogstashProtocol(str, enum.Enum):
+class LogstashProtocol(StrEnum):
     ZMQ_PUSH = "zmq.push"
     ZMQ_PUB = "zmq.pub"
     TCP = "tcp"
