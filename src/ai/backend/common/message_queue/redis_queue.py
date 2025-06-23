@@ -123,6 +123,8 @@ class RedisQueue(AbstractMessageQueue):
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except AttributeError:
+                # Skip handling this error
+                # as AttributeError frequently occurs due to improper type handling within redis-py
                 pass
             except Exception as e:
                 log.exception("Error while auto claiming messages: {}", e)
