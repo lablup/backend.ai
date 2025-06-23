@@ -3,15 +3,12 @@ import logging
 
 import sqlalchemy as sa
 
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.errors.exceptions import ImageNotFound
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
@@ -197,6 +194,9 @@ class ImageService:
                 if not image_row.is_owned_by(action.user_id):
                     raise PurgeImageActionByIdGenericForbiddenError()
             try:
+                for alias in image_row.aliases:
+                    await db_session.delete(alias)
+
                 await db_session.delete(image_row)
             except sa.exc.DBAPIError as e:
                 raise PurgeImageActionByIdObjectDBError(e)
@@ -213,19 +213,7 @@ class ImageService:
                 if not image_row.is_owned_by(action.user_id):
                     raise UntagImageFromRegistryActionGenericForbiddenError()
 
-            query = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == image_row.image_ref.registry
-            )
-            if image_row.image_ref.project:
-                query = query.where(ContainerRegistryRow.project == image_row.image_ref.project)
-
-            registry_info = (await db_session.execute(query)).scalar()
-
-            if registry_info.type != ContainerRegistryType.HARBOR2:
-                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
-
-        scanner = HarborRegistry_v2(self._db, image_row.image_ref.registry, registry_info)
-        await scanner.untag(image_row.image_ref)
+            await image_row.untag_image_from_registry(self._db, db_session)
         return UntagImageFromRegistryActionResult(image=image_row.to_dataclass())
 
     async def purge_image(self, action: PurgeImageAction) -> PurgeImageActionResult:

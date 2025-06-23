@@ -59,10 +59,13 @@ def forget(cli_ctx, canonical_or_alias, architecture) -> None:
 @cli.command()
 @click.argument("canonical_or_alias")
 @click.argument("architecture")
+@click.option("--remove-from-registry", is_flag=True, help="Remove the image from the registry.")
 @click.pass_obj
-def purge(cli_ctx, canonical_or_alias, architecture) -> None:
+def purge(
+    cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
+) -> None:
     """Purge (hard-delete) a specific image."""
-    asyncio.run(purge_image_impl(cli_ctx, canonical_or_alias, architecture))
+    asyncio.run(purge_image_impl(cli_ctx, canonical_or_alias, architecture, remove_from_registry))
 
 
 @cli.command()

@@ -158,7 +158,37 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def untag_image_from_registry(cls, id: str):
+    async def purge_image_by_id(
+        cls,
+        image_id: str,
+        remove_from_registry: bool = False,
+        fields: Sequence[FieldSpec] = _default_list_fields_admin,
+    ):
+        q = _d("""
+            mutation($image_id: String!, $options: PurgeImageOptions) {
+                purge_image_by_id(image_id: $image_id, options: $options) {
+                    image {
+                        $fields
+                    }
+                }
+            }
+        """)
+        variables = {
+            "image_id": image_id,
+            "options": {
+                "remove_from_registry": remove_from_registry,
+            },
+        }
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        data = await api_session.get().Admin._query(q, variables)
+        return data["purge_image_by_id"]
+
+    @api_function
+    @classmethod
+    async def untag_image_from_registry(cls, image_id: str):
+        """
+        Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
+        """
         q = _d("""
             mutation($image_id: String!) {
                 untag_image_from_registry(image_id: $image_id) {
@@ -167,7 +197,7 @@ class Image(BaseFunction):
             }
         """)
         variables = {
-            "image_id": id,
+            "image_id": image_id,
         }
         data = await api_session.get().Admin._query(q, variables)
         return data["untag_image_from_registry"]
