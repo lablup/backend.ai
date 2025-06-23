@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.11a (2025-06-23)
+
+### Features
+* Add additional logging to kernel creation and termination ([#4737](https://github.com/lablup/backend.ai/issues/4737))
+* Add `runtime_variant` parameter to Service creation SDK function and CLI command ([#4749](https://github.com/lablup/backend.ai/issues/4749))
+
+### Fixes
+* Close code runner of agent gracefully ([#4740](https://github.com/lablup/backend.ai/issues/4740))
+* Skip gathering metrics of non-existent processes ([#4753](https://github.com/lablup/backend.ai/issues/4753))
+
+
 ## 25.6.10 (2025-06-17)
 
 ### Features
