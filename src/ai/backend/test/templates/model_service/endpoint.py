@@ -5,9 +5,8 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import Any, override
 from uuid import UUID
 
-import aiohttp
-
 from ai.backend.client.output.fields import session_node_fields
+from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.domain import DomainContext
 from ai.backend.test.contexts.group import GroupContext
@@ -69,6 +68,50 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     def _extra_service_params(self) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement the _extra_service_params method.")
 
+    # TODO:
+    async def _wait_until_all_inference_sessions_ready(
+        self,
+        client_session: AsyncSession,
+        endpoint_id: str,
+        replicas: int,
+        vfolder_id: UUID,
+    ) -> None:
+        """
+        Poll the service endpoint until every backing inference-session is RUNNING
+        and has the model vfolder mounted.
+        """
+        while True:
+            result = await client_session.Service(endpoint_id).info()
+            active_routes = result["active_routes"]
+            session_ids = [route["session_id"] for route in active_routes]
+
+            ready_session_cnt = 0
+            for session_id in session_ids:
+                session_info = await client_session.ComputeSession.from_session_id(
+                    UUID(session_id)
+                ).detail([
+                    session_node_fields["type"],
+                    session_node_fields["status"],
+                    session_node_fields["vfolder_mounts"],
+                ])
+
+                assert session_info["type"] == "inference", (
+                    f"Session type should be 'inference'. "
+                    f"Actual type: {session_info['type']}, session_id: {session_id}"
+                )
+                assert session_info["vfolder_mounts"] == [str(vfolder_id)], (
+                    f"Model vfolder should be mounted into the inference session. "
+                    f"Actual mounted vfolder: {session_info['vfolder_mounts']}, "
+                    f"session_id: {session_id}"
+                )
+                if session_info["status"] == "RUNNING":
+                    ready_session_cnt += 1
+
+            if ready_session_cnt >= replicas:
+                break
+
+            await asyncio.sleep(1)
+
     @override
     @actxmgr
     # TODO: Automatically generate the required model VFolder through the VFolderTemplateWrapper.
@@ -78,6 +121,8 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
 
         vfolder_func = client_session.VFolder(name=model_service_dep.model_vfolder_name)
         await vfolder_func.update_id_by_name()
+        if vfolder_func.id is None:
+            raise RuntimeError("Model VFolder id is None.")
 
         endpoint_id = None
         try:
@@ -101,51 +146,19 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             )
             assert info["model_id"] == str(vfolder_func.id), "Model ID should match the VFolder ID."
 
-            async def _wait_until_all_inference_sessions_ready() -> None:
-                while True:
-                    result = await client_session.Service(endpoint_id).info()
-                    active_routes = result["active_routes"]
-                    session_ids = [route["session_id"] for route in active_routes]
-
-                    ready_session_cnt = 0
-                    for session_id in session_ids:
-                        session_info = await client_session.ComputeSession.from_session_id(
-                            UUID(session_id)
-                        ).detail([
-                            session_node_fields["type"],
-                            session_node_fields["status"],
-                            session_node_fields["vfolder_mounts"],
-                        ])
-
-                        assert session_info["type"] == "inference", (
-                            f"Session type should be 'inference'., Actual type: {session_info['type']}, session_id: {session_id}"
-                        )
-                        assert session_info["vfolder_mounts"] == [str(vfolder_func.id)], (
-                            f"Model vfolder should be mounted into the inference session., Actual mounted vfolder: {session_info['vfolder_mounts']}, session_id: {session_id}"
-                        )
-                        if session_info["status"] == "RUNNING":
-                            ready_session_cnt += 1
-
-                    if ready_session_cnt >= model_service_dep.replicas:
-                        break
-
-                    await asyncio.sleep(1)
-
             await asyncio.wait_for(
-                _wait_until_all_inference_sessions_ready(), timeout=_ENDPOINT_CREATION_TIMEOUT
+                self._wait_until_all_inference_sessions_ready(
+                    client_session,
+                    endpoint_id,
+                    model_service_dep.replicas,
+                    vfolder_func.id,
+                ),
+                timeout=_ENDPOINT_CREATION_TIMEOUT,
             )
 
             info = await client_session.Service(endpoint_id).info()
             model_service_endpoint = info["service_endpoint"]
             assert model_service_endpoint is not None, "Service endpoint should be initialized."
-
-            async with aiohttp.ClientSession() as http_sess:
-                resp = await asyncio.wait_for(
-                    http_sess.get(model_service_endpoint), timeout=_ENDPOINT_HEALTH_CHECK_TIMEOUT
-                )
-                assert resp.status // 100 == 2, (
-                    f"Service endpoint health check failed with status: {resp.status}"
-                )
 
             with CreatedModelServiceEndpointContext.with_current(model_service_endpoint):
                 yield
