@@ -11,6 +11,8 @@ from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
 
+_TOKEN_DURATION = "3600"  # 1 hour
+
 
 class ModelServiceTokenTemplate(WrapperTestTemplate):
     @property
@@ -24,7 +26,7 @@ class ModelServiceTokenTemplate(WrapperTestTemplate):
         service_meta = CreatedModelServiceEndpointMetaContext.current()
 
         result = await client_session.Service(service_meta.service_id).generate_api_token(
-            duration="3600"
+            duration=_TOKEN_DURATION
         )
         assert "token" in result, (
             f"Token generation failed, 'token' not in result, Actual result: {result}"
