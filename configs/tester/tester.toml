@@ -23,11 +23,12 @@ name = "default"
 name = "default"
 
 [context.model-service]
-model_vfolder_name = "enter_model_vfolder_name_here"
+model-vfolder-name = "abc"
+runtime-variant = "custom"
 replicas = 1
-group_name = "model-store"
-model_mount_destination = "models"
-model_definition_path = "./model-definition.yaml"
+group-name = "model-store"
+model-mount-destination = "models"
+model-definition-path = "./model-definition.yaml"
 
 [context.image]
 name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"

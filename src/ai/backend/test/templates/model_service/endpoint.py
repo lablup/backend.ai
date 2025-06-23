@@ -26,7 +26,6 @@ from ai.backend.test.templates.template import (
 from ai.backend.test.utils.exceptions import DependencyNotSet
 
 _ENDPOINT_CREATION_TIMEOUT = 30
-_ENDPOINT_HEALTH_CHECK_TIMEOUT = 10
 
 
 class _BaseEndpointTemplate(WrapperTestTemplate):
@@ -56,6 +55,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             "model_definition_path": model_service_dep.model_definition_path,
             "cluster_mode": cluster_dep.cluster_mode,
             "cluster_size": cluster_dep.cluster_size,
+            "runtime_variant": model_service_dep.runtime_variant,
             # TODO: Make `envs` required.
             "envs": {
                 "TEST_KEY": "test_value",
@@ -134,7 +134,6 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             assert response["replicas"] == model_service_dep.replicas, (
                 "Replicas count does not match the expected value."
             )
-            assert not response["is_public"], "Service should not be public by default."
 
             info = await client_session.Service(endpoint_id).info()
             assert info["service_endpoint"] is None, "Service endpoint should not be given yet."
@@ -176,3 +175,13 @@ class EndpointTemplate(_BaseEndpointTemplate):
     @override
     def _extra_service_params(self) -> dict[str, Any]:
         return {}
+
+
+class PublicEndpointTemplate(_BaseEndpointTemplate):
+    @property
+    def name(self) -> str:
+        return "public_endpoint_template"
+
+    @override
+    def _extra_service_params(self) -> dict[str, Any]:
+        return {"expose_to_public": True}

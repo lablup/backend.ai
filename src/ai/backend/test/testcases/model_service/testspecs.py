@@ -5,7 +5,9 @@ from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.model_service.endpoint import (
     EndpointTemplate,
+    PublicEndpointTemplate,
 )
+from ai.backend.test.testcases.model_service.pingcheck import PingCheck
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep
 
@@ -19,8 +21,7 @@ MODEL_SERVICE_TEST_SPECS = {
             This test verifies that an endpoint can be created successfully.
             The test will:
             1. Create an endpoint with a specified name and resources.
-            2. Verify that the endpoint is created and available.
-            3. Clean up the endpoint after verification.
+            2. Clean up the endpoint after verification.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
@@ -39,6 +40,29 @@ MODEL_SERVICE_TEST_SPECS = {
                 ClusterDep(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
+                ),
+            ]
+        },
+    ),
+    "creation_public_endpoint_success": TestSpec(
+        name="creation_public_endpoint_success",
+        description=textwrap.dedent("""\
+            Test for successful creation of an endpoint.
+            This test verifies that an endpoint can be created successfully.
+            The test will:
+            1. Create an endpoint with a specified name and resources.
+            2. Verify that the endpoint is created and available.
+            3. Clean up the endpoint after verification.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
+        template=BasicTestTemplate(PingCheck()).with_wrappers(
+            KeypairAuthTemplate, PublicEndpointTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
                 ),
             ]
         },
