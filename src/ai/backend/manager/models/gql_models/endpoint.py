@@ -33,7 +33,6 @@ from ai.backend.manager.models.gql_models.base import ImageRefType
 from ai.backend.manager.models.gql_models.image import ImageNode
 from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.routing import RouteStatus, Routing
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
@@ -644,7 +643,7 @@ class Endpoint(graphene.ObjectType):
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
-        "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "lifecycle_stage": ("endpoints_lifecycle_stage", EndpointLifecycle),
         "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
