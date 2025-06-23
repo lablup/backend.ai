@@ -12,7 +12,7 @@ from ai.backend.test.contexts.domain import DomainContext
 from ai.backend.test.contexts.group import GroupContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.model_service import (
-    CreatedModelServiceEndpointContext,
+    CreatedModelServiceEndpointMetaContext,
     ModelServiceContext,
 )
 from ai.backend.test.contexts.scaling_group import ScalingGroupContext
@@ -20,6 +20,7 @@ from ai.backend.test.contexts.session import (
     ClusterContext,
     SessionContext,
 )
+from ai.backend.test.data.model_service import ModelServiceEndpointMeta
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -157,9 +158,15 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             )
 
             info = await client_session.Service(endpoint_id).info()
+            print("Service info:", info)
             model_service_endpoint = info["service_endpoint"]
 
-            with CreatedModelServiceEndpointContext.with_current(model_service_endpoint):
+            with CreatedModelServiceEndpointMetaContext.with_current(
+                ModelServiceEndpointMeta(
+                    service_id=UUID(endpoint_id),
+                    endpoint_url=model_service_endpoint,
+                )
+            ):
                 yield
         finally:
             if endpoint_id:
