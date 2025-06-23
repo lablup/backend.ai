@@ -24,7 +24,11 @@ from ai.backend.manager.errors.exceptions import InstanceNotFound
 from ai.backend.manager.registry import AgentRegistry
 
 from ...models.agent import AgentStatus, agents
-from ...models.kernel import ConditionMerger, KernelRow, KernelStatus, by_agent_id, by_status
+from ...models.kernel import (
+    ConditionMerger,
+    KernelRow,
+    by_kernel_ids,
+)
 from ...models.utils import (
     ExtendedAsyncSAEngine,
 )
@@ -156,25 +160,32 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentStatusHeartbeat,
     ) -> None:
-        status_condition = by_status(KernelStatus.having_containers(), ConditionMerger.AND)
-        agent_condition = by_agent_id(event.agent_id, ConditionMerger.AND)
+        # Do not query Agent id from the event because Agent id can change
+        # during the lifetime of the agent, e.g. when it is restarted.
+        all_kernel_ids: set[KernelId] = {k.kernel_id for k in event.active_kernels} | {
+            c.kernel_id for c in event.active_containers
+        }
+        kernel_condition = by_kernel_ids(
+            all_kernel_ids,
+            ConditionMerger.AND,
+        )
         kernel_rows = await KernelRow.get_kernels(
-            [
-                status_condition,
-                agent_condition,
-            ],
+            [kernel_condition],
             db=self._db,
         )
-        kernel_should_alive: set[KernelId] = {kernel_row.id for kernel_row in kernel_rows}
+        kernel_should_alive: set[KernelId] = {
+            kernel_row.id for kernel_row in kernel_rows if kernel_row.status.have_container()
+        }
         active_container_ids = [
             ContainerKernelId(cont.container_id, cont.kernel_id) for cont in event.active_containers
         ]
         containers_to_purge = self._filter_containers_to_purge(
             active_container_ids, kernel_should_alive
         )
-        kernels_to_clean = self._filter_kernels_to_clean(event.active_kernels, kernel_should_alive)
+        active_kernel_ids = event.active_kernels
+        kernels_to_clean = self._filter_kernels_to_clean(active_kernel_ids, kernel_should_alive)
 
-        log.info(
+        log.debug(
             "agent@{0} heartbeat: Detected {1} dangling containers, {2} dangling kernel registries",
             event.agent_id,
             len(containers_to_purge),

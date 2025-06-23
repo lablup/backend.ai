@@ -578,6 +578,18 @@ class ComputeSession(BaseFunction):
                 identity_params["owner_access_key"] = self.owner_access_key
         return identity_params
 
+    @property
+    def session_identifier(self) -> str:
+        """
+        Returns the session identifier, preferring the session ID if available,
+        otherwise falling back to the session name.
+        """
+        if self.id:
+            return str(self.id)
+        if self.name:
+            return self.name
+        raise ValueError("Session must have either an ID or a name.")
+
     @api_function
     async def update(
         self,
@@ -631,7 +643,7 @@ class ComputeSession(BaseFunction):
 
         rqst = Request(
             "DELETE",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -651,7 +663,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "PATCH",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch():
@@ -668,7 +680,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/rename",
+            f"/{prefix}/{self.session_identifier}/rename",
             params=params,
         )
         async with rqst.fetch():
@@ -685,7 +697,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/commit",
+            f"/{prefix}/{self.session_identifier}/commit",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -703,7 +715,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/imagify",
+            f"/{prefix}/{self.session_identifier}/imagify",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -722,7 +734,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/interrupt",
+            f"/{prefix}/{self.session_identifier}/interrupt",
             params=params,
         )
         async with rqst.fetch():
@@ -751,7 +763,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/complete",
+            f"/{prefix}/{self.session_identifier}/complete",
             params=params,
         )
         rqst.set_json({
@@ -777,7 +789,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}",
+            f"/{prefix}/{self.session_identifier}",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -839,7 +851,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/logs",
+            f"/{prefix}/{self.session_identifier}/logs",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -859,7 +871,7 @@ class ComputeSession(BaseFunction):
 
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/dependency-graph",
+            f"/{prefix}/{self.session_identifier}/dependency-graph",
             params=params,
         )
 
@@ -877,7 +889,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/status-history",
+            f"/{prefix}/{self.session_identifier}/status-history",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -923,7 +935,7 @@ class ComputeSession(BaseFunction):
             assert code is not None, "The code argument must be a valid string even when empty."
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -934,7 +946,7 @@ class ComputeSession(BaseFunction):
         elif mode == "batch":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -951,7 +963,7 @@ class ComputeSession(BaseFunction):
         elif mode == "complete":
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}",
+                f"/{prefix}/{self.session_identifier}",
                 params=params,
             )
             rqst.set_json({
@@ -1025,10 +1037,9 @@ class ComputeSession(BaseFunction):
                         file_path, base_path
                     )
                     raise ValueError(msg) from None
-
             rqst = Request(
                 "POST",
-                f"/{prefix}/{self.name}/upload",
+                f"/{prefix}/{self.session_identifier}/upload",
                 params=params,
             )
             rqst.attach_files(attachments)
@@ -1057,7 +1068,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/download",
+            f"/{prefix}/{self.session_identifier}/download",
             params=params,
         )
         rqst.set_json({
@@ -1113,7 +1124,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/files",
+            f"/{prefix}/{self.session_identifier}/files",
             params=params,
         )
         rqst.set_json({
@@ -1148,7 +1159,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
-            f"/{prefix}/{self.name}/abusing-report",
+            f"/{prefix}/{self.session_identifier}/abusing-report",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -1181,7 +1192,7 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "POST",
-            f"/{prefix}/{self.name}/start-service",
+            f"/{prefix}/{self.session_identifier}/start-service",
         )
         rqst.set_json(body)
         async with rqst.fetch() as resp:

@@ -120,9 +120,16 @@ class KernelStatus(CIStrEnum):
     @classmethod
     def having_containers(cls) -> set[KernelStatus]:
         return {
+            cls.PULLING,
             cls.CREATING,
             cls.RUNNING,
         }
+
+    def have_container(self) -> bool:
+        """
+        Check if the current status is one of the statuses that have containers.
+        """
+        return self in KernelStatus.having_containers()
 
 
 # statuses to consider when calculating current resource usage
@@ -997,3 +1004,15 @@ def by_agent_id(
         return _append_condition(condition, KernelRow.agent == agent_id, operator)
 
     return _by_agent_id
+
+
+def by_kernel_ids(
+    kernel_ids: Iterable[KernelId],
+    operator: ConditionMerger,
+) -> QueryCondition:
+    def _by_kernel_ids(
+        condition: Optional[sa.sql.expression.BinaryExpression],
+    ) -> sa.sql.expression.BinaryExpression:
+        return _append_condition(condition, KernelRow.id.in_(kernel_ids), operator)
+
+    return _by_kernel_ids

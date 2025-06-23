@@ -38,6 +38,10 @@ from async_timeout import timeout
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import (
+    CodeCompletionResp,
+    CodeCompletionResult,
+)
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
     EventProducer,
@@ -299,7 +303,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts):
+    async def get_completions(self, text, opts) -> CodeCompletionResp:
         raise NotImplementedError
 
     @abstractmethod
@@ -772,7 +776,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return None
 
-    async def feed_and_get_completion(self, code_text, opts):
+    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
         sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
@@ -785,9 +789,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
-            return load_json(result)
+            return CodeCompletionResult.success(load_json(result))
         except asyncio.CancelledError:
-            return []
+            return CodeCompletionResult.failure()
 
     async def feed_start_model_service(self, model_info):
         sock = await self._get_socket_pair()
