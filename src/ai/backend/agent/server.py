@@ -58,6 +58,7 @@ from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
     AbstractAgentResp,
+    CodeCompletionResp,
     DropKernelRegistryResp,
     PurgeContainersResp,
     PurgeImagesResp,
@@ -826,11 +827,11 @@ class AgentRPCServer(aobject):
         log.info("rpc::interrupt_kernel(k:{0})", kernel_id)
         await self.agent.interrupt_kernel(KernelId(UUID(kernel_id)))
 
-    @rpc_function
+    @rpc_function_v2
     @collect_error
-    async def get_completions(self, kernel_id: str, text: str, opts: dict):
+    async def get_completions(self, kernel_id: str, text: str, opts: dict) -> CodeCompletionResp:
         log.debug("rpc::get_completions(k:{0}, ...)", kernel_id)
-        await self.agent.get_completions(KernelId(UUID(kernel_id)), text, opts)
+        return await self.agent.get_completions(KernelId(UUID(kernel_id)), text, opts)
 
     @rpc_function
     @collect_error

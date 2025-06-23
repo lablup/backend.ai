@@ -82,7 +82,7 @@ from ai.backend.common.docker import (
     KernelFeatures,
     LabelName,
 )
-from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import (
     AbstractAnycastEvent,
@@ -3343,7 +3343,9 @@ class AbstractAgent(
             "files": [],  # kept for API backward-compatibility
         }
 
-    async def get_completions(self, kernel_id: KernelId, text: str, opts: dict):
+    async def get_completions(
+        self, kernel_id: KernelId, text: str, opts: dict
+    ) -> CodeCompletionResp:
         return await self.kernel_registry[kernel_id].get_completions(text, opts)
 
     async def get_logs(self, kernel_id: KernelId):
