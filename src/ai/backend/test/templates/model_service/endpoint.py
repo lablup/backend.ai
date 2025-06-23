@@ -158,7 +158,6 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             )
 
             info = await client_session.Service(endpoint_id).info()
-            print("Service info:", info)
             model_service_endpoint = info["service_endpoint"]
 
             with CreatedModelServiceEndpointMetaContext.with_current(

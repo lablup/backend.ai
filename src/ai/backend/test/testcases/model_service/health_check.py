@@ -12,6 +12,7 @@ from ai.backend.test.templates.template import TestCode
 _ENDPOINT_HEALTH_CHECK_TIMEOUT = 10
 
 
+# TODO: Consider health check points for each runtime variant (See MODEL_SERVICE_RUNTIME_PROFILES)
 def _make_endpoint_health_check_url(endpoint_url: str) -> str:
     """
     Constructs the health check URL for the given endpoint URL.
