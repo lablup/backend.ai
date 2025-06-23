@@ -222,8 +222,7 @@ class WSProxyConfig(BaseConfigModel):
         description="Port number to bind for API server",
     )
     internal_api_port: int = Field(
-        default=15050,
-      description="Port number to bind for internal API server"
+        default=15050, description="Port number to bind for internal API server"
     )
     advertised_api_port: Optional[int] = Field(
         default=None,
