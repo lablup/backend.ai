@@ -5,7 +5,6 @@ import sys
 import types
 import typing
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Any, Optional
