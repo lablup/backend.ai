@@ -56,7 +56,7 @@ class MountOption:
 @dataclass
 class RouteInfo:
     route_id: uuid.UUID
-    session_id: uuid.UUID
+    session_id: Optional[uuid.UUID]
     traffic_ratio: float
 
 
