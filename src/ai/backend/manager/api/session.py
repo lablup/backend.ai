@@ -1266,7 +1266,7 @@ async def complete(request: web.Request) -> web.Response:
         )
     )
 
-    return web.json_response(action_result.result, status=HTTPStatus.OK)
+    return web.json_response(action_result.result.as_dict(), status=HTTPStatus.OK)
 
 
 @server_status_required(READ_ALLOWED)

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, override
 
+from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.models.session import SessionRow
@@ -31,8 +32,7 @@ class CompleteActionResult(BaseActionResult):
     # TODO: Add SessionData type
     session_row: SessionRow
 
-    # TODO: Add proper type
-    result: dict[str, Any]
+    result: CodeCompletionResp
 
     @override
     def entity_id(self) -> Optional[str]:

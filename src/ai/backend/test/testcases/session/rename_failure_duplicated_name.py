@@ -18,19 +18,19 @@ class SessionRenameFailureDuplicatedName(TestCode):
         session_meta = CreatedSessionMetaContext.current()
         session_name = session_meta.name
 
-        image_cfg = ImageContext.current()
-        cluster_cfg = ClusterContext.current()
-        session_cfg = SessionContext.current()
+        image_dep = ImageContext.current()
+        cluster_dep = ClusterContext.current()
+        session_dep = SessionContext.current()
         second_session_name = session_name + "_second"
 
         # TODO: Make second session creation/deletion with template
         await client_session.ComputeSession.get_or_create(
-            image_cfg.name,
-            resources=session_cfg.resources,
+            image_dep.name,
+            resources=session_dep.resources,
             type_="interactive",
             name=second_session_name,
-            cluster_mode=cluster_cfg.cluster_mode,
-            cluster_size=cluster_cfg.cluster_size,
+            cluster_mode=cluster_dep.cluster_mode,
+            cluster_size=cluster_dep.cluster_size,
         )
         try:
             await client_session.ComputeSession(name=second_session_name).rename(session_name)

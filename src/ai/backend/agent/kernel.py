@@ -38,6 +38,10 @@ from async_timeout import timeout
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import (
+    CodeCompletionResp,
+    CodeCompletionResult,
+)
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
     EventProducer,
@@ -177,7 +181,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     last_used: float
     termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
-    stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
@@ -215,7 +218,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.last_used = time.monotonic()
         self.termination_reason = None
         self.clean_event = None
-        self.stats_enabled = False
         self.environ = environ
         self.runner = None
         self.container_id = None
@@ -258,6 +260,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             )
         if "session_type" not in props:
             props["session_type"] = SessionTypes.INTERACTIVE
+        if "stats_enabled" in props:
+            # stats_enabled is a property, not an attribute.
+            del props["stats_enabled"]
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
@@ -284,6 +289,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         for accel_key, accel_alloc in self.resource_spec.allocations.items():
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
 
+    @property
+    def stats_enabled(self) -> bool:
+        """
+        Returns True if the kernel supports statistics gathering.
+        """
+        return self.state == KernelLifecycleStatus.RUNNING
+
     @abstractmethod
     async def create_code_runner(
         self,
@@ -299,7 +311,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts):
+    async def get_completions(self, text, opts) -> CodeCompletionResp:
         raise NotImplementedError
 
     @abstractmethod
@@ -772,7 +784,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return None
 
-    async def feed_and_get_completion(self, code_text, opts):
+    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
         sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
@@ -785,9 +797,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
-            return load_json(result)
+            return CodeCompletionResult.success(load_json(result))
         except asyncio.CancelledError:
-            return []
+            return CodeCompletionResult.failure()
 
     async def feed_start_model_service(self, model_info):
         sock = await self._get_socket_pair()

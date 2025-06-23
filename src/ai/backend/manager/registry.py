@@ -57,7 +57,7 @@ from yarl import URL
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef, LabelName
-from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
+from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentHeartbeatEvent,
@@ -2840,14 +2840,16 @@ class AgentRegistry:
         session: SessionRow,
         text: str,
         opts: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
+    ) -> CodeCompletionResp:
         async with handle_session_exception(self.db, "execute", session.id):
             async with self.agent_cache.rpc_context(
                 session.main_kernel.agent,
                 invoke_timeout=10,
                 order_key=session.main_kernel.id,
             ) as rpc:
-                return await rpc.call.get_completions(str(session.main_kernel.id), text, opts)
+                # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
+                result = await rpc.call.get_completions(str(session.main_kernel.id), text, opts)
+                return CodeCompletionResp.from_dict(result)
 
     async def start_service(
         self,

@@ -22,6 +22,11 @@ class ContextName(enum.StrEnum):
     LOGIN_CREDENTIAL = "login_credential"
     SESSION = "session"
     SSE = "sse"
+    DOMAIN = "domain"
+    GROUP = "group"
+    SCALING_GROUP = "scaling_group"
+    MODEL_SERVICE = "model_service"
+
     BATCH_SESSION = "batch_session"
     CLUSTER_CONFIG = "cluster_config"
     CODE_EXECUTION = "code_execution"
@@ -30,9 +35,12 @@ class ContextName(enum.StrEnum):
     SESSION_IMAGIFY = "session_imagify"
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
     SESSION_DEPENDENCY = "session_dependency"
+    VFOLDER = "vfolder"
+    CREATED_VFOLDER_META = "created_vfolder_meta"
 
     CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
+    CREATED_MODEL_SERVICE_ENDPOINT = "created_model_service_endpoint"
 
 
 class BaseTestContext(Generic[T]):
