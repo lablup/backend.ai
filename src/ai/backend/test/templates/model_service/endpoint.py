@@ -78,8 +78,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
         vfolder_id: UUID,
     ) -> None:
         """
-        Poll the service endpoint until every backing inference-session is RUNNING
-        and has the model vfolder mounted.
+        Poll the model service endpoint until the every inference sessions become RUNNING, and the service endpoint is available
         """
         while True:
             result = await client_session.Service(endpoint_id).info()
