@@ -471,8 +471,14 @@ class ImageNode(graphene.ObjectType):
     )
 
     @property
-    def _full_name(self) -> str:
-        return f"{self.registry}/{self.namespace}:{self.tag}"
+    def _canonical(self) -> str:
+        return ImageRef.from_image_str(
+            self.humanized_name,
+            self.project,
+            self.registry,
+            architecture=self.architecture,
+            is_local=self.is_local,
+        ).canonical
 
     @classmethod
     async def _batch_load_installed_agents(
@@ -493,7 +499,7 @@ class ImageNode(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self._batch_load_installed_agents
         )
-        agent_ids = await loader.load(self._full_name)
+        agent_ids = await loader.load(self._canonical)
         agent_ids = cast(Optional[set[AgentId]], agent_ids)
         return agent_ids is not None and len(agent_ids) > 0
 
