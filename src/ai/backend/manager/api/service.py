@@ -306,9 +306,9 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         default={},
     )
 
-    environ: Optional[dict[str, str]] = Field(
+    environ: dict[str, str] = Field(
         description="Environment variables to be set inside the inference session",
-        default=None,
+        default={},
     )
     scaling_group: str = Field(
         description="Name of the resource group to spawn inference sessions",
