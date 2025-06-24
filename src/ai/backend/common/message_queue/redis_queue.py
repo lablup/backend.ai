@@ -117,14 +117,18 @@ class RedisQueue(AbstractMessageQueue):
                 next_start_id, claimed = await self._auto_claim(
                     autoclaim_start_id, autoclaim_idle_timeout
                 )
-                if not claimed:
-                    await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
+                if claimed:
+                    autoclaim_start_id = next_start_id
                     continue
-                autoclaim_start_id = next_start_id
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
+            except AttributeError:
+                # Skip handling this error
+                # as AttributeError frequently occurs due to improper type handling within redis-py
+                pass
             except Exception as e:
                 log.exception("Error while auto claiming messages: {}", e)
+            await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
 
     async def _auto_claim(
         self, autoclaim_start_id: str, autoclaim_idle_timeout: int

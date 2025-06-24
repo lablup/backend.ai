@@ -2269,7 +2269,12 @@ type Mutations {
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
-  purge_image_by_id(image_id: String!): PurgeImageById
+  purge_image_by_id(
+    image_id: String!
+
+    """Added in 25.10.0."""
+    options: PurgeImageOptions = {remove_from_registry: false}
+  ): PurgeImageById
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
@@ -2871,7 +2876,17 @@ type PurgeImageById {
   image: ImageNode
 }
 
-"""Added in 24.03.1"""
+"""Added in 25.10.0."""
+input PurgeImageOptions {
+  """
+  Untag the deleted image from the registry. Only available in the HarborV2 registry.
+  """
+  remove_from_registry: Boolean = false
+}
+
+"""
+Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
+"""
 type UntagImageFromRegistry {
   ok: Boolean
   msg: String

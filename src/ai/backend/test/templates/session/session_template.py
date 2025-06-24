@@ -25,6 +25,7 @@ from ai.backend.test.templates.session.utils import (
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
+from ai.backend.test.utils.exceptions import DependencyNotSet
 
 
 class SessionTemplateTemplate(WrapperTestTemplate):
@@ -35,16 +36,13 @@ class SessionTemplateTemplate(WrapperTestTemplate):
     def _build_json_template(self, session_type: str) -> str:
         spec_meta = TestSpecMetaContext.current()
         test_id = spec_meta.test_id
-        image = ImageContext.current()
-
-        if image.name is None:
-            raise ValueError("Image name is not set in ImageConfigContext.")
-        image_name = image.name.split(":")[0]
-        image_tag = image.name.split(":")[1]
+        image_dep = ImageContext.current()
+        image_name = image_dep.name.split(":")[0]
+        image_tag = image_dep.name.split(":")[1]
         session_dep = SessionContext.current()
 
         if session_dep.resources is None:
-            raise ValueError("SessionConfigContext resources are not set.")
+            raise DependencyNotSet("SessionConfigContext resources are not set.")
 
         return textwrap.dedent(f"""
             [
@@ -62,9 +60,9 @@ class SessionTemplateTemplate(WrapperTestTemplate):
                         "spec": {{
                             "session_type": "{session_type}",
                             "kernel": {{
-                                "image": "{image.name}",
+                                "image": "{image_dep.name}",
                                 "environ": {{}},
-                                "architecture": "{image.architecture}"
+                                "architecture": "{image_dep.architecture}"
                             }},
                             "scaling_group": "default",
                             "mounts": {{}},
