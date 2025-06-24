@@ -554,7 +554,7 @@ async def create_valkey_client(
     name: str,
     db: int = 0,
     pubsub_channels: Optional[set[str]] = None,
-) -> RedisConnectionInfo:
+) -> GlideClient:
     addresses: list[NodeAddress] = []
     if redis_target.addr:
         addresses.append(
@@ -594,14 +594,7 @@ async def create_valkey_client(
         client_name=name,
         pubsub_subscriptions=pubsub_subscriptions,
     )
-    client = await GlideClient.create(config)
-    return RedisConnectionInfo(
-        client=client,
-        sentinel=None,
-        name=name,
-        service_name=None,
-        redis_helper_config=cast(RedisHelperConfig, redis_target.redis_helper_config),
-    )
+    return await GlideClient.create(config)
 
 
 async def ping_redis_connection(redis_client: Redis) -> bool:

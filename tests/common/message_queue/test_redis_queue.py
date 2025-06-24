@@ -34,8 +34,9 @@ async def redis_conn(redis_container):
 
 
 @pytest.fixture
-def queue_args():
+def queue_args(test_valkey_stream):
     return RedisMQArgs(
+        client=test_valkey_stream,
         stream_key="test-stream",
         group_name="test-group",
         node_id="test-node",
@@ -43,17 +44,15 @@ def queue_args():
 
 
 @pytest.fixture
-async def redis_queue(redis_conn, queue_args):
+async def redis_queue(test_valkey_stream, queue_args):
     # Create consumer group if not exists
     try:
-        await redis_conn.client.xgroup_create(
-            queue_args.stream_key, queue_args.group_name, mkstream=True
-        )
+        await test_valkey_stream.make_consumer_group(queue_args.stream_key, queue_args.group_name)
     except Exception:
         # Group may already exist
         pass
 
-    queue = RedisQueue(redis_conn, queue_args)
+    queue = RedisQueue(queue_args)
     yield queue
     await queue.close()
 

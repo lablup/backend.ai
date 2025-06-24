@@ -18,6 +18,7 @@ python_requirements(
         "zipstream-new": ["zipstream"],
         "etcd-client-py": ["etcd_client"],
         "ruamel.yaml": ["ruamel.yaml"],
+        "valkey-glide": ["glide"],
     },
     type_stubs_module_mapping={
         "types-aiofiles": ["aiofiles"],

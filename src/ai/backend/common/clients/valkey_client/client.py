@@ -2,7 +2,6 @@ from typing import final
 
 from glide import (
     Batch,
-    ClusterBatch,
     GlideClient,
 )
 
@@ -22,8 +21,5 @@ class ValkeyClient:
         """
         await self._client.ping()
 
-    @final
-    def _create_batch(self, is_atomic: bool = False) -> Batch | ClusterBatch:
-        if self._is_cluster_mode:
-            return ClusterBatch(is_atomic=is_atomic)
+    def _create_batch(self, is_atomic: bool = False) -> Batch:
         return Batch(is_atomic=is_atomic)
