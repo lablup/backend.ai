@@ -67,6 +67,7 @@ from trafaret import DataError
 from ai.backend.agent.metrics.metric import SyncContainerLifecycleObserver
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import (
     REDIS_STATISTICS_DB,
@@ -781,7 +782,7 @@ class AbstractAgent(
             name="event_producer.stream",
             db=REDIS_STREAM_DB,
         )
-        mq = self._make_message_queue(stream_redis_target, stream_redis)
+        mq = await self._make_message_queue(stream_redis_target, stream_redis)
         self.event_producer = EventProducer(
             mq,
             source=self.id,
@@ -900,7 +901,7 @@ class AbstractAgent(
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
 
-    def _make_message_queue(
+    async def _make_message_queue(
         self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
     ) -> AbstractMessageQueue:
         """
@@ -917,9 +918,14 @@ class AbstractAgent(
                     db=REDIS_STREAM_DB,
                 ),
             )
+        client = await ValkeyStreamClient.create(
+            stream_redis_target,
+            name="event_producer.stream",
+            db=REDIS_STREAM_DB,
+        )
         return RedisQueue(
-            stream_redis,
             RedisMQArgs(
+                client=client,
                 stream_key="events",
                 group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
                 node_id=node_id,
