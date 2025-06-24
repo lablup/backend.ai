@@ -303,12 +303,12 @@ class ServiceConfigModel(LegacyBaseRequestModel):
             "Specifications about extra VFolders mounted to model service session. "
             "MODEL type VFolders are not allowed to be attached to model service session with this option."
         ),
-        default={},
+        default_factory=dict,
     )
 
     environ: dict[str, str] = Field(
         description="Environment variables to be set inside the inference session",
-        default={},
+        default_factory=dict,
     )
     scaling_group: str = Field(
         description="Name of the resource group to spawn inference sessions",
