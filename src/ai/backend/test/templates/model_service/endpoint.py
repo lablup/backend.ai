@@ -69,7 +69,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     def _extra_service_params(self) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement the _extra_service_params method.")
 
-    # TODO: Remove the polling loop below after the SSE API is added to the model service API,
+    # TODO: Remove the polling loop below after the SSE API is added to the model service API
     async def _wait_until_all_inference_sessions_ready(
         self,
         client_session: AsyncSession,
@@ -109,6 +109,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
                     ready_session_cnt += 1
 
             if ready_session_cnt >= replicas:
+                # It may take additional time for the endpoint to become available even after all sessions have transitioned to the RUNNING state.
                 if result["service_endpoint"] is not None:
                     break
 
