@@ -20,6 +20,7 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import (
     ConfigurationError,
     override_key,
@@ -148,7 +149,7 @@ async def server_main(
             log.exception("Unable to read config from etcd")
             raise e
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
-        mq = _make_message_queue(
+        mq = await _make_message_queue(
             local_config,
             redis_profile_target,
         )
@@ -322,16 +323,11 @@ async def server_main(
             m.close()
 
 
-def _make_message_queue(
+async def _make_message_queue(
     local_config: dict[str, Any],
     redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-    )
     node_id = local_config["storage-proxy"]["node-id"]
     if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
         return HiRedisQueue(
@@ -343,10 +339,14 @@ def _make_message_queue(
                 db=REDIS_STREAM_DB,
             ),
         )
-
+    client = await ValkeyStreamClient.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
     return RedisQueue(
-        stream_redis,
         RedisMQArgs(
+            client=client,
             stream_key="events",
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,

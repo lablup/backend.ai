@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import random
 import tempfile
 import threading
 import time
@@ -16,7 +15,8 @@ import aiotools
 import pytest
 from redis.asyncio import Redis
 
-from ai.backend.common import config, redis_helper
+from ai.backend.common import config
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -42,8 +42,9 @@ from ai.backend.common.types import AgentId, HostPortPair, RedisConnectionInfo, 
 @dataclass
 class TimerNodeContext:
     test_case_ns: str
-    redis_addr: HostPortPair
     interval: float
+    valkey_stream_mq: RedisQueue
+    node_id: str
 
 
 @dataclass
@@ -112,15 +113,15 @@ async def run_timer(
     redis_config = RedisTarget(
         addr=redis_addr, redis_helper_config=config.redis_helper_default_config
     )
-    stream_redis = redis_helper.get_redis_object(
+    node_id = f"{test_case_ns}-node-{threading.get_ident()}"
+    client = await ValkeyStreamClient.create(
         redis_config,
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
     )
-    node_id = f"{test_case_ns}-node-{threading.get_ident()}"
     redis_mq = RedisQueue(
-        stream_redis,
         RedisMQArgs(
+            client=client,
             stream_key="events",
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
@@ -166,30 +167,12 @@ def etcd_timer_node_process(
             print("_tick")
             queue.put(time.monotonic())
 
-        redis_config = RedisTarget(
-            addr=timer_ctx.redis_addr, redis_helper_config=config.redis_helper_default_config
-        )
-        stream_redis = redis_helper.get_redis_object(
-            redis_config,
-            name="event_producer.stream",
-            db=REDIS_STREAM_DB,
-        )
-        node_id = f"test-{random.randint(0, 1000)}"
-        redis_mq = RedisQueue(
-            stream_redis,
-            RedisMQArgs(
-                stream_key=f"events-{timer_ctx.test_case_ns}",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-            ),
-        )
-
         event_dispatcher = EventDispatcher(
-            redis_mq,
+            timer_ctx.valkey_stream_mq,
         )
         event_producer = EventProducer(
-            redis_mq,
-            source=AgentId(node_id),
+            timer_ctx.valkey_stream_mq,
+            source=AgentId(timer_ctx.node_id),
         )
         event_dispatcher.consume(NoopAnycastEvent, None, _tick)
         await event_dispatcher.start()
@@ -240,7 +223,8 @@ class TimerNode(threading.Thread):
         self.thread_idx = thread_idx
         self.interval = timer_ctx.interval
         self.test_case_ns = timer_ctx.test_case_ns
-        self.redis_addr = timer_ctx.redis_addr
+        self.valkey_stream_mq = timer_ctx.valkey_stream_mq
+        self.node_id = timer_ctx.node_id
 
     async def timer_node_async(self) -> None:
         self.loop = asyncio.get_running_loop()
@@ -250,29 +234,12 @@ class TimerNode(threading.Thread):
             print("_tick")
             self.event_records.append(time.monotonic())
 
-        redis_config = RedisTarget(
-            addr=self.redis_addr, redis_helper_config=config.redis_helper_default_config
-        )
-        stream_redis = redis_helper.get_redis_object(
-            redis_config,
-            name="event_producer.stream",
-            db=REDIS_STREAM_DB,
-        )
-        node_id = f"test-{random.randint(0, 1000)}"
-        redis_mq = RedisQueue(
-            stream_redis,
-            RedisMQArgs(
-                stream_key=f"events-{self.test_case_ns}",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-            ),
-        )
         event_dispatcher = EventDispatcher(
-            redis_mq,
+            self.valkey_stream_mq,
         )
         event_producer = EventProducer(
-            redis_mq,
-            source=AgentId(node_id),
+            self.valkey_stream_mq,
+            source=AgentId(self.node_id),
         )
         event_dispatcher.consume(NoopAnycastEvent, None, _tick)
         await event_dispatcher.start()
@@ -299,7 +266,8 @@ class TimerNode(threading.Thread):
 async def test_global_timer_filelock(
     request,
     test_case_ns,
-    redis_container,
+    test_valkey_stream_mq,
+    test_node_id,
 ) -> None:
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
@@ -319,8 +287,9 @@ async def test_global_timer_filelock(
             thread_idx,
             TimerNodeContext(
                 test_case_ns=test_case_ns,
-                redis_addr=redis_container[1],
                 interval=interval,
+                valkey_stream_mq=test_valkey_stream_mq,
+                node_id=test_node_id,
             ),
         )
         threads.append(timer_node)
@@ -399,8 +368,9 @@ async def test_gloal_timer_redlock(
 async def test_global_timer_etcdlock(
     test_case_ns,
     etcd_container,
-    redis_container,
     etcd_client,
+    test_valkey_stream_mq,
+    test_node_id,
 ) -> None:
     lock_name = f"{test_case_ns}lock"
     event_records_queue: Queue = Queue()
@@ -425,8 +395,9 @@ async def test_global_timer_etcdlock(
                 ),
                 TimerNodeContext(
                     test_case_ns=test_case_ns,
-                    redis_addr=redis_container[1],
                     interval=interval,
+                    valkey_stream_mq=test_valkey_stream_mq,
+                    node_id=test_node_id,
                 ),
                 etcd_client,
             ),
@@ -456,7 +427,8 @@ async def test_global_timer_etcdlock(
 async def test_global_timer_join_leave(
     request,
     test_case_ns,
-    redis_container,
+    test_valkey_stream_mq,
+    test_node_id,
 ) -> None:
     event_records = []
 
@@ -464,29 +436,12 @@ async def test_global_timer_join_leave(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = RedisTarget(
-        addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
-    )
-    stream_redis = redis_helper.get_redis_object(
-        redis_config,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-    )
-    node_id = f"test-{random.randint(0, 1000)}"
-    redis_mq = RedisQueue(
-        stream_redis,
-        RedisMQArgs(
-            stream_key=f"events-{test_case_ns}",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
-        ),
-    )
     event_dispatcher = EventDispatcher(
-        redis_mq,
+        test_valkey_stream_mq,
     )
     event_producer = EventProducer(
-        redis_mq,
-        source=AgentId(node_id),
+        test_valkey_stream_mq,
+        source=AgentId(test_node_id),
     )
     event_dispatcher.consume(NoopAnycastEvent, None, _tick)
     await event_dispatcher.start()

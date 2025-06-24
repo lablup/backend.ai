@@ -18,7 +18,7 @@ import more_itertools
 import tqdm
 import yarl
 
-from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
@@ -231,16 +231,15 @@ async def check_and_upgrade(
         await etcd.get_prefix("config/redis"),
     )
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
-    stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
+    node_id = local_config["storage-proxy"]["node-id"]
+    client = await ValkeyStreamClient.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
     )
-    node_id = local_config["storage-proxy"]["node-id"]
     redis_mq = RedisQueue(
-        stream_redis,
         RedisMQArgs(
+            client=client,
             stream_key="events",
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,

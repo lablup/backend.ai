@@ -44,6 +44,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -707,7 +708,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.message_queue = _make_message_queue(root_ctx)
+    root_ctx.message_queue = await _make_message_queue(root_ctx)
     yield
     await root_ctx.message_queue.close()
 
@@ -747,18 +748,13 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.event_dispatcher.close()
 
 
-def _make_message_queue(
+async def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
         root_ctx.config_provider.config.redis.model_dump()
     )
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-    )
     node_id = root_ctx.config_provider.config.manager.id
     if root_ctx.config_provider.config.manager.use_experimental_redis_event_dispatcher:
         return HiRedisQueue(
@@ -770,9 +766,14 @@ def _make_message_queue(
                 db=REDIS_STREAM_DB,
             ),
         )
+    client = await ValkeyStreamClient.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
+        name="event_producer.stream",
+        db=REDIS_STREAM_DB,
+    )
     return RedisQueue(
-        stream_redis,
         RedisMQArgs(
+            client=client,
             stream_key="events",
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,

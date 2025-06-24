@@ -1,10 +1,15 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Mapping
 
 type MessageId = bytes
 _DEFAULT_RETRY_FIELD = b"_retry_count"
 _DEFAULT_MAX_RETRIES = 3
+
+
+@dataclass
+class BroadcastMessage:
+    payload: Mapping[bytes, bytes]
 
 
 @dataclass
