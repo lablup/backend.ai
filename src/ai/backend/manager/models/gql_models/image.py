@@ -502,7 +502,6 @@ class ImageNode(graphene.ObjectType):
             graph_ctx, self._batch_load_installed_agents
         )
         agent_ids = await loader.load(self._canonical)
-        print("agent_ids!", agent_ids)
         agent_ids = cast(Optional[set[AgentId]], agent_ids)
         return agent_ids is not None and len(agent_ids) > 0
 
