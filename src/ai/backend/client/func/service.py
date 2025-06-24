@@ -189,8 +189,9 @@ class Service(BaseFunction):
         }
         if model_version:
             model_config["model_version"] = model_version
+        model_config = {k: v for k, v in model_config.items() if v is not None}
         rqst = Request("POST", "/services")
-        rqst.set_json({
+        rqst_body = {
             "name": service_name,
             "replicas": initial_session_count,
             "image": image,
@@ -206,7 +207,9 @@ class Service(BaseFunction):
             "open_to_public": expose_to_public,
             "runtime_variant": runtime_variant,
             "config": model_config,
-        })
+        }
+        rqst_body = {k: v for k, v in rqst_body.items() if v is not None}
+        rqst.set_json(rqst_body)
         async with rqst.fetch() as resp:
             body = await resp.json()
             return {
