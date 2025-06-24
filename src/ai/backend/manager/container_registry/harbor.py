@@ -264,6 +264,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                                     skip_reason = "no tag"
                                     continue
                                 tags = [item["name"] for item in image_info["tags"]]
+
                                 for tag in tags:
                                     match image_info["manifest_media_type"]:
                                         case self.MEDIA_TYPE_OCI_INDEX:
