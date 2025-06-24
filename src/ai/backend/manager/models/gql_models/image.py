@@ -128,7 +128,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "name": ("name", None),
     "namespace": ("image", None),
     "tag": ("tag", None),
-    "status": ("status", None),
+    "status": ("status", ImageStatus),
     "project": ("project", None),
     "image": ("image", None),
     "created_at": ("created_at", dtparse),
