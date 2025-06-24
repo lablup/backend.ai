@@ -10,12 +10,31 @@ from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
+CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
+    url="https://registry.example.com",
+    registry_name="registry.example.com",
+    type=ContainerRegistryType.DOCKER,
+    project="test_project",
+    username=None,
+    password=None,
+    ssl_verify=True,
+    is_global=True,
+    extra=None,
+)
+
+CONTAINER_REGISTRY_ROW_FIXTURE.id = uuid.uuid4()
+CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
+CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
+    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
+)
+
+
 IMAGE_ROW_FIXTURE = ImageRow(
     name="registry.example.com/test_project/python:3.9-ubuntu20.04",
     image="test_project/python",
     project="test_project",
     registry="registry.example.com",
-    registry_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+    registry_id=CONTAINER_REGISTRY_ROW_FIXTURE.id,
     architecture="x86_64",
     accelerators="cuda",
     config_digest="sha256:abcdefgh0123456789abcdefgh0123456789abcdefgh0123456789abcd".ljust(
@@ -51,24 +70,6 @@ IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
 IMAGE_ALIAS_DATA = IMAGE_ALIAS_ROW_FIXTURE.to_dataclass()
 IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
 IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
-
-CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
-    url="https://registry.example.com",
-    registry_name="registry.example.com",
-    type=ContainerRegistryType.DOCKER,
-    project="test_project",
-    username=None,
-    password=None,
-    ssl_verify=True,
-    is_global=True,
-    extra=None,
-)
-
-CONTAINER_REGISTRY_ROW_FIXTURE.id = uuid.uuid4()
-CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
-CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
-    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
-)
 
 
 DOCKERHUB_RESPONSE_MOCK = {

@@ -795,6 +795,17 @@ class ForgetImage(graphene.Mutation):
         )
 
 
+class PurgeImageOptions(graphene.InputObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    remove_from_registry = graphene.Boolean(
+        default_value=False,
+        description="Untag the deleted image from the registry. Only available in the HarborV2 registry.",
+    )
+
+
 class PurgeImageById(graphene.Mutation):
     """Added in 25.4.0."""
 
@@ -806,6 +817,11 @@ class PurgeImageById(graphene.Mutation):
 
     class Arguments:
         image_id = graphene.String(required=True)
+        options = PurgeImageOptions(
+            required=False,
+            default_value={"remove_from_registry": False},
+            description="Added in 25.10.0.",
+        )
 
     image = graphene.Field(ImageNode)
 
@@ -814,6 +830,7 @@ class PurgeImageById(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         image_id: str,
+        options: PurgeImageOptions,
     ) -> PurgeImageById:
         log.info("purge image row {0} by API request", image_id)
         image_uuid = extract_object_uuid(info, image_id, "image")
@@ -827,11 +844,20 @@ class PurgeImageById(graphene.Mutation):
             )
         )
 
+        if options.remove_from_registry:
+            await ctx.processors.image.untag_image_from_registry.wait_for_complete(
+                UntagImageFromRegistryAction(
+                    user_id=ctx.user["uuid"],
+                    client_role=ctx.user["role"],
+                    image_id=image_uuid,
+                )
+            )
+
         return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
-    """Added in 24.03.1"""
+    """Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
