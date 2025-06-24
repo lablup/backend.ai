@@ -495,8 +495,10 @@ class BaseRunner(metaclass=ABCMeta):
 
         assert self.kernel_client is not None
         log.debug("executing in query mode...")
+        exec_failed = False
 
         async def output_hook(msg):
+            nonlocal exec_failed
             content = msg.get("content", "")
             if msg["msg_type"] == "stream":
                 # content['name'] will be 'stdout' or 'stderr'.
@@ -505,6 +507,7 @@ class BaseRunner(metaclass=ABCMeta):
                     content["text"].encode("utf-8"),
                 ])
             elif msg["msg_type"] == "error":
+                exec_failed = True
                 tbs = "\n".join(content["traceback"])
                 await self.outsock.send_multipart([b"stderr", tbs.encode("utf-8")])
             elif msg["msg_type"] in ["execute_result", "display_data"]:
@@ -569,6 +572,8 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception as e:
             log.exception(str(e))
             return 127
+        if exec_failed:
+            return -1
         return 0
 
     async def _complete(self, completion_data) -> None:
