@@ -573,7 +573,7 @@ class BaseRunner(metaclass=ABCMeta):
             log.exception(str(e))
             return 127
         if exec_failed:
-            return -1
+            return 1
         return 0
 
     async def _complete(self, completion_data) -> None:

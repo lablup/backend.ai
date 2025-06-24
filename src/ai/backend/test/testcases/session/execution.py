@@ -53,7 +53,7 @@ class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
         assert result["status"] == "finished", (
             f"Expected status to be finished, Actual status: {result['status']}"
         )
-        assert result["exitCode"] == -1, (
+        assert result["exitCode"] == 1, (
             f"Expected exitCode to be 0, Actual exitCode: {result['exitCode']}"
         )
         assert result["console"][0][0] == "stderr", (
