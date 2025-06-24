@@ -126,6 +126,8 @@ __all__ = (
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
     "name": ("name", None),
+    "namespace": ("namespace", None),
+    "tag": ("tag", None),
     "project": ("project", None),
     "image": ("image", None),
     "created_at": ("created_at", dtparse),
@@ -140,6 +142,8 @@ _queryfilter_fieldspec: FieldSpecType = {
 _queryorder_colmap: ColumnMapType = {
     "id": ("id", None),
     "name": ("name", None),
+    "namespace": ("namespace", None),
+    "tag": ("tag", None),
     "project": ("project", None),
     "image": ("image", None),
     "created_at": ("created_at", None),
