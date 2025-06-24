@@ -15,6 +15,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import RedisTarget
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
+    redis_container,
     sync_file_lock,
 )
 
@@ -83,7 +84,7 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
 
 
 @pytest.fixture
-async def test_valkey_stream(redis_container):
+async def test_valkey_stream(redis_container):  # noqa: F811
     redis_config = RedisTarget(
         addr=redis_container[1],
         redis_helper_config={

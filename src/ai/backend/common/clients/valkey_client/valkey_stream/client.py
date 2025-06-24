@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Mapping, Optional, Self
+from typing import List, Mapping, Optional, Self, cast
 
 from glide import (
     GlideClient,
@@ -162,7 +162,7 @@ class ValkeyStreamClient(ValkeyClient):
         values = [(k, v) for k, v in payload.items()]
         await self._client.xadd(
             stream_key,
-            values,
+            cast(list[tuple[str | bytes, str | bytes]], values),
             StreamAddOptions(
                 make_stream=True, trim=TrimByMaxLen(exact=False, threshold=_MAX_STREAM_LENGTH)
             ),
@@ -189,7 +189,7 @@ class ValkeyStreamClient(ValkeyClient):
         values = [(k, v) for k, v in payload.items()]
         tx.xadd(
             stream_key,
-            values,
+            cast(list[tuple[str | bytes, str | bytes]], values),
             StreamAddOptions(
                 make_stream=True, trim=TrimByMaxLen(exact=False, threshold=_MAX_STREAM_LENGTH)
             ),
@@ -227,9 +227,10 @@ class ValkeyStreamClient(ValkeyClient):
         )
         if len(res) < 2:
             return None
-        next_start_id: bytes = res[0]
+        next_start_id = cast(bytes, res[0])
+        msgs = cast(Mapping[bytes, List[List[bytes]]], res[1])
         messages = [
-            StreamMessage.from_list(msg_id=key, list_payload=msg) for key, msg in res[1].items()
+            StreamMessage.from_list(msg_id=key, list_payload=msg) for key, msg in msgs.items()
         ]
         return AutoClaimMessage(
             next_start_id=next_start_id,
@@ -270,7 +271,7 @@ class ValkeyStreamClient(ValkeyClient):
         tx = self._create_batch()
         tx.hset(
             cache_id,
-            field_value_map=payload,
+            field_value_map=cast(Mapping[str | bytes, str | bytes], payload),
         )
         tx.expire(
             cache_id,
@@ -374,7 +375,7 @@ class ValkeyStreamClient(ValkeyClient):
         :raises: GlideClientError if the logs cannot be cleared.
         """
         key = self._container_log_key(container_id)
-        await self._client.delete(key)
+        await self._client.delete([key])
 
     def _container_log_key(self, container_id: str) -> str:
         return f"containerlog.{container_id}"
