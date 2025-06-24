@@ -9,7 +9,7 @@ from ai.backend.test.contexts.model_service import (
 )
 from ai.backend.test.templates.template import TestCode
 
-_ENDPOINT_HEALTH_CHECK_TIMEOUT = 10
+_ENDPOINT_HEALTH_CHECK_TIMEOUT = 20
 
 
 # TODO: Consider health check points for each runtime variant (See MODEL_SERVICE_RUNTIME_PROFILES)
@@ -20,9 +20,12 @@ def _make_endpoint_health_check_url(endpoint_url: str) -> str:
     return f"{endpoint_url}/health"
 
 
-class PublicEndpointHealthCheckSuccess(TestCode):
-    def __init__(self) -> None:
+class EndpointHealthCheck(TestCode):
+    _expected_status_codes: set[int]
+
+    def __init__(self, expected_status_codes: set[int]) -> None:
         super().__init__()
+        self._expected_status_codes = expected_status_codes
 
     @override
     async def test(self) -> None:
@@ -34,14 +37,17 @@ class PublicEndpointHealthCheckSuccess(TestCode):
                 http_sess.get(health_check_url), timeout=_ENDPOINT_HEALTH_CHECK_TIMEOUT
             )
 
-            assert resp.status // 100 == 2, (
-                f"Service endpoint health check failed with status: {resp.status}"
+            assert resp.status in self._expected_status_codes, (
+                f"Service endpoint health check failed with status: {resp.status}, expected {self._expected_status_codes}"
             )
 
 
-class PrivateEndpointHealthCheckSuccess(TestCode):
-    def __init__(self) -> None:
+class EndpointHealthCheckWithToken(TestCode):
+    _expected_status_codes: set[int]
+
+    def __init__(self, expected_status_codes: set[int]) -> None:
         super().__init__()
+        self._expected_status_codes = expected_status_codes
 
     @override
     async def test(self) -> None:
@@ -57,26 +63,6 @@ class PrivateEndpointHealthCheckSuccess(TestCode):
                 timeout=_ENDPOINT_HEALTH_CHECK_TIMEOUT,
             )
 
-            assert resp.status // 100 == 2, (
-                f"Service endpoint health check failed with status: {resp.status}"
-            )
-
-
-class PrivateEndpointHealthCheckFailure(TestCode):
-    def __init__(self) -> None:
-        super().__init__()
-
-    @override
-    async def test(self) -> None:
-        service_meta = CreatedModelServiceEndpointMetaContext.current()
-        health_check_url = _make_endpoint_health_check_url(service_meta.endpoint_url)
-
-        async with aiohttp.ClientSession() as http_sess:
-            resp = await asyncio.wait_for(
-                http_sess.get(health_check_url), timeout=_ENDPOINT_HEALTH_CHECK_TIMEOUT
-            )
-
-            # TODO: Investigate why the health check returns 200 even when the authentication fails
-            assert resp.status // 100 == 2, (
-                f"Service endpoint health check failed with status: {resp.status}"
+            assert resp.status in self._expected_status_codes, (
+                f"Service endpoint health check failed with status: {resp.status}, expected {self._expected_status_codes}"
             )

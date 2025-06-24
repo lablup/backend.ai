@@ -69,11 +69,11 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     def _extra_service_params(self) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement the _extra_service_params method.")
 
-    # TODO:
+    # TODO: Remove the polling loop below after the SSE API is added to the model service API,
     async def _wait_until_all_inference_sessions_ready(
         self,
         client_session: AsyncSession,
-        endpoint_id: str,
+        endpoint_id: UUID,
         replicas: int,
         vfolder_id: UUID,
     ) -> None:
@@ -132,15 +132,17 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
                 **self._build_service_params(),
             )
 
-            endpoint_id = response["endpoint_id"]
+            endpoint_id = UUID(response["endpoint_id"])
             assert response["replicas"] == model_service_dep.replicas, (
                 "Replicas count does not match the expected value."
             )
 
             info = await client_session.Service(endpoint_id).info()
-            assert info["service_endpoint"] is None, "Service endpoint should not be given yet."
-            assert info["runtime_variant"] == "custom", (
-                "Default runtime variant should be 'custom'."
+            assert info["service_endpoint"] is None, (
+                "Service endpoint should not be initialized yet."
+            )
+            assert info["runtime_variant"] == model_service_dep.runtime_variant, (
+                f"Runtime variant should be '{model_service_dep.runtime_variant}'."
             )
             assert info["desired_session_count"] == model_service_dep.replicas, (
                 "Desired session count should match the replicas."
@@ -162,7 +164,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
 
             with CreatedModelServiceEndpointMetaContext.with_current(
                 ModelServiceEndpointMeta(
-                    service_id=UUID(endpoint_id),
+                    service_id=endpoint_id,
                     endpoint_url=model_service_endpoint,
                 )
             ):

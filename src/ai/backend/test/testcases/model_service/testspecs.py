@@ -9,9 +9,8 @@ from ai.backend.test.templates.model_service.endpoint import (
 )
 from ai.backend.test.templates.model_service.jwt_token import ModelServiceTokenTemplate
 from ai.backend.test.testcases.model_service.health_check import (
-    PrivateEndpointHealthCheckFailure,
-    PrivateEndpointHealthCheckSuccess,
-    PublicEndpointHealthCheckSuccess,
+    EndpointHealthCheck,
+    EndpointHealthCheckWithToken,
 )
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep
@@ -31,9 +30,9 @@ MODEL_SERVICE_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
         # Endpoint health check failure is expected.
-        template=BasicTestTemplate(PrivateEndpointHealthCheckFailure()).with_wrappers(
-            KeypairAuthTemplate, EndpointTemplate
-        ),
+        template=BasicTestTemplate(
+            EndpointHealthCheck(expected_status_codes={400, 401})
+        ).with_wrappers(KeypairAuthTemplate, EndpointTemplate),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
                 ClusterDep(
@@ -62,7 +61,7 @@ MODEL_SERVICE_TEST_SPECS = {
             3. Clean up the endpoint after verification.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
-        template=BasicTestTemplate(PublicEndpointHealthCheckSuccess()).with_wrappers(
+        template=BasicTestTemplate(EndpointHealthCheck(expected_status_codes={200})).with_wrappers(
             KeypairAuthTemplate, PublicEndpointTemplate
         ),
         parametrizes={
@@ -86,9 +85,9 @@ MODEL_SERVICE_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
         # Endpoint health check success is expected since we're inject JWT token into the request.
-        template=BasicTestTemplate(PrivateEndpointHealthCheckSuccess()).with_wrappers(
-            KeypairAuthTemplate, EndpointTemplate, ModelServiceTokenTemplate
-        ),
+        template=BasicTestTemplate(
+            EndpointHealthCheckWithToken(expected_status_codes={200})
+        ).with_wrappers(KeypairAuthTemplate, EndpointTemplate, ModelServiceTokenTemplate),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
                 ClusterDep(
