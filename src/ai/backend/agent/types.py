@@ -108,6 +108,22 @@ class ContainerLifecycleEvent:
             f"reason:{self.reason!r})"
         )
 
+    def set_done_future_result(self, result: Any):
+        if self.done_future is not None:
+            try:
+                self.done_future.set_result(result)
+            except asyncio.InvalidStateError:
+                # The future is already done, ignore the error
+                pass
+
+    def set_done_future_exception(self, exception: Exception):
+        if self.done_future is not None:
+            try:
+                self.done_future.set_exception(exception)
+            except asyncio.InvalidStateError:
+                # The future is already done, ignore the error
+                pass
+
 
 WebMiddleware = Callable[
     [web.Request, Handler],
