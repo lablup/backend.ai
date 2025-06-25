@@ -860,12 +860,20 @@
             "type": "object"
           },
           "environ": {
-            "additionalProperties": {
-              "type": "string"
-            },
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Environment variables to be set inside the inference session",
-            "title": "Environ",
-            "type": "object"
+            "title": "Environ"
           },
           "scalingGroup": {
             "description": "Name of the resource group to spawn inference sessions",
