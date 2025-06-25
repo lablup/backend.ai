@@ -5,27 +5,6 @@ from .user_event import UserEvent
 
 
 @dataclass
-class UserBgTaskEvent(UserEvent):  # TODO: Need to separate UserPartialSuccessEvent
-    task_id: str
-    message: str
-    status: str
-    current_progress: str
-    total_progress: str
-
-    @override
-    def event_name(self) -> Optional[str]:
-        return self.status
-
-    @override
-    def retry_count(self) -> Optional[int]:
-        return None
-
-    @override
-    def user_event_mapping(self) -> Mapping[str, Any]:
-        return asdict(self)
-
-
-@dataclass
 class UserBgtaskUpdatedEvent(UserEvent):
     task_id: str
     message: str
@@ -44,6 +23,10 @@ class UserBgtaskUpdatedEvent(UserEvent):
     def user_event_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
 
+    @override
+    def is_close_event(self) -> bool:
+        return False
+
 
 @dataclass
 class UserBgtaskDoneEvent(UserEvent):
@@ -61,6 +44,10 @@ class UserBgtaskDoneEvent(UserEvent):
     @override
     def user_event_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
+
+    @override
+    def is_close_event(self) -> bool:
+        return True
 
 
 @dataclass
@@ -81,6 +68,10 @@ class UserBgtaskPartialSuccessEvent(UserEvent):
     def user_event_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
 
+    @override
+    def is_close_event(self) -> bool:
+        return True
+
 
 @dataclass
 class UserBgtaskCancelledEvent(UserEvent):
@@ -98,6 +89,10 @@ class UserBgtaskCancelledEvent(UserEvent):
     @override
     def user_event_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
+
+    @override
+    def is_close_event(self) -> bool:
+        return True
 
 
 @dataclass
@@ -117,22 +112,6 @@ class UserBgtaskFailedEvent(UserEvent):
     def user_event_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
 
-
-@dataclass
-class UserBgtaskAlreadyDoneEvent(UserEvent):
-    task_id: str
-    message: str
-    current_progress: float
-    total_progress: float
-
     @override
-    def event_name(self) -> Optional[str]:
-        return "bgtask_already_done"
-
-    @override
-    def retry_count(self) -> Optional[int]:
-        return None
-
-    @override
-    def user_event_mapping(self) -> Mapping[str, Any]:
-        return asdict(self)
+    def is_close_event(self) -> bool:
+        return True

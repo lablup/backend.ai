@@ -182,7 +182,6 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     MountPermission,
     MountTypes,
-    RedisConnectionInfo,
     RedisProfileTarget,
     RedisTarget,
     RuntimeVariant,
@@ -814,12 +813,7 @@ class AbstractAgent(
             self.local_config["redis"]
         )
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-        stream_redis = redis_helper.get_redis_object(
-            stream_redis_target,
-            name="event_producer.stream",
-            db=REDIS_STREAM_DB,
-        )
-        mq = await self._make_message_queue(stream_redis_target, stream_redis)
+        mq = await self._make_message_queue(stream_redis_target)
         self.event_producer = EventProducer(
             mq,
             source=self.id,
@@ -830,9 +824,9 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             event_observer=self._metric_registry.event,
         )
-        self.redis_stream_pool = redis_helper.get_redis_object(
+        self.redis_stream_pool = await ValkeyStreamClient.create(
             redis_profile_target.profile_target(RedisRole.STREAM),
-            name="stream",
+            name="event_producer.stream",
             db=REDIS_STREAM_DB,
         )
         self.redis_stat_pool = redis_helper.get_redis_object(
@@ -842,7 +836,6 @@ class AbstractAgent(
         )
 
         self.background_task_manager = BackgroundTaskManager(
-            stream_redis,
             self.event_producer,
             bgtask_observer=self._metric_registry.bgtask,
         )
@@ -938,9 +931,7 @@ class AbstractAgent(
         evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
         await self.event_dispatcher.start()
 
-    async def _make_message_queue(
-        self, stream_redis_target: RedisTarget, stream_redis: RedisConnectionInfo
-    ) -> AbstractMessageQueue:
+    async def _make_message_queue(self, stream_redis_target: RedisTarget) -> AbstractMessageQueue:
         """
         Returns the message queue object.
         """
@@ -1174,9 +1165,9 @@ class AbstractAgent(
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
                         stored_chunk = bytes(cb[:chunk_size])
-                        await redis_helper.execute(
-                            self.redis_stream_pool,
-                            lambda r: r.rpush(log_key, stored_chunk),
+                        await self.redis_stream_pool.enqueue_container_logs(
+                            container_id,
+                            stored_chunk,
                         )
                         remaining = cb[chunk_size:]
                         chunk_length = len(remaining)
@@ -1187,20 +1178,12 @@ class AbstractAgent(
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await redis_helper.execute(
-                    self.redis_stream_pool,
-                    lambda r: r.rpush(log_key, chunk_buffer.getvalue()),
+                await self.redis_stream_pool.enqueue_container_logs(
+                    container_id,
+                    chunk_buffer.getvalue(),
                 )
         finally:
             chunk_buffer.close()
-        # Keep the log for at most one hour in Redis.
-        # This is just a safety measure to prevent memory leak in Redis
-        # for cases when the event delivery has failed or processing
-        # the log data has failed.
-        await redis_helper.execute(
-            self.redis_stream_pool,
-            lambda r: r.expire(log_key, 3600),
-        )
         await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 
     @_observe_stat_task(stat_scope=StatScope.NODE)

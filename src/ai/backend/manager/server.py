@@ -57,6 +57,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import ErrorCode
 from ai.backend.common.json import dump_json_str
@@ -636,6 +637,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 config_provider=root_ctx.config_provider,
                 storage_manager=root_ctx.storage_manager,
                 redis_stat=root_ctx.redis_stat,
+                event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
                 agent_registry=root_ctx.registry,
@@ -715,6 +717,7 @@ async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.event_fetcher = EventFetcher(root_ctx.message_queue)
     root_ctx.event_producer = EventProducer(
         root_ctx.message_queue,
         source=AGENTID_MANAGER,
@@ -960,7 +963,6 @@ class background_task_ctx:
 
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
-            self.root_ctx.redis_stream,
             self.root_ctx.event_producer,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )

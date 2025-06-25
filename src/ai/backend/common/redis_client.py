@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import socket
-from typing import Any, AsyncContextManager, Final, Optional, Sequence
+from typing import Any, AsyncContextManager, AsyncIterator, Final, Optional, Sequence
 
 import hiredis
 
@@ -75,6 +75,22 @@ class RedisClient(aobject):
                 command_timeout=command_timeout,
             )
         )[0]
+
+    async def subscribe_reader(
+        self,
+    ) -> AsyncIterator[Any]:
+        hiredis_reader = hiredis.Reader(notEnoughData=ellipsis)
+        while True:
+            data = await self.reader.read(BUF_SIZE)
+            if not data:
+                break
+            hiredis_reader.feed(data)
+            msg = hiredis_reader.gets()
+            if msg == ellipsis and self.reader.at_eof():
+                raise EOFError
+            if msg is None:
+                continue
+            yield msg
 
     async def pipeline(
         self,

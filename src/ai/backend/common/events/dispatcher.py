@@ -614,6 +614,7 @@ class EventDispatcher(EventDispatcherGroup):
 class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
+    _source_bytes: bytes
     _log_events: bool
 
     def __init__(
@@ -667,8 +668,27 @@ class EventProducer:
             b"source": source_bytes,
             b"args": msgpack.packb(event.serialize()),
         }
-        # TODO: impl broadcast message queue
-        await self._msg_queue.send(raw_event)
+        await self._msg_queue.broadcast(raw_event)
+
+    async def broadcast_event_with_cache(
+        self,
+        cache_id: str,
+        event: AbstractBroadcastEvent,
+    ) -> None:
+        """
+        Broadcast a message to all subscribers with cache.
+        The message will be delivered to all subscribers.
+        """
+        source_bytes = self._source_bytes
+        raw_event = {
+            b"name": event.event_name().encode(),
+            b"source": source_bytes,
+            b"args": msgpack.packb(event.serialize()),
+        }
+        await self._msg_queue.broadcast_with_cache(
+            cache_id,
+            raw_event,
+        )
 
     async def anycast_and_broadcast_event(
         self,
