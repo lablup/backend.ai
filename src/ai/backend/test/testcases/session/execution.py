@@ -53,9 +53,8 @@ class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
         assert result["status"] == "finished", (
             f"Expected status to be finished, Actual status: {result['status']}"
         )
-        # TODO: Is 0 correct exitcode when the command fails?
-        assert result["exitCode"] == 0, (
-            f"Expected exitCode to be 0, Actual exitCode: {result['exitCode']}"
+        assert result["exitCode"] == 1, (
+            f"Expected exitCode to be 1, Actual exitCode: {result['exitCode']}"
         )
         assert result["console"][0][0] == "stderr", (
             f"Expected stderr, Actual value: {result['console']}"
@@ -68,9 +67,31 @@ class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
             assert result["status"] == "finished", (
                 f"Expected status to be finished, Actual status: {result['status']}"
             )
-            assert result["exitCode"] == 0, (
-                f"Expected exitCode to be 0, Actual exitCode: {result['exitCode']}"
+            assert result["exitCode"] == 1, (
+                f"Expected exitCode to be 1, Actual exitCode: {result['exitCode']}"
             )
             assert result["console"][0][0] == "stderr", (
                 f"Expected stderr, Actual value: {result['console']}"
             )
+
+
+class InteractiveSessionExecuteCodeFailureWithCustomExitCode(TestCode):
+    async def test(self) -> None:
+        client_session = ClientSessionContext.current()
+        session_meta = CreatedSessionMetaContext.current()
+        session_id = session_meta.id
+        CMD = "import sys; sys.exit(2)"
+
+        result = await client_session.ComputeSession(str(session_id)).execute(
+            code=CMD,
+        )
+
+        assert result["status"] == "finished", (
+            f"Expected status to be finished, Actual status: {result['status']}"
+        )
+        assert result["exitCode"] == 2, (
+            f"Expected exitCode to be 2, Actual exitCode: {result['exitCode']}"
+        )
+        assert result["console"][0][0] == "stderr", (
+            f"Expected stderr, Actual value: {result['console']}"
+        )
