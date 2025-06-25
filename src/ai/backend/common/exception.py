@@ -477,3 +477,16 @@ class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class InvalidResourceLimit(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/invalid-resource-limit"
+    error_title = "Resource Limit Value Invalid"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
