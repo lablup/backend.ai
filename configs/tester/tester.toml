@@ -1,6 +1,21 @@
 [runner]
 concurrency = 1
 
+[[context.container_registries]]
+name = "cr.backend.ai"
+url = "https://cr.backend.ai"
+project = "stable"
+
+[[context.container_registries]]
+name = "cr.backend.ai"
+url = "https://cr.backend.ai"
+project = "multiarch"
+
+[[context.container_registries]]
+name = "cr.backend.ai"
+url = "https://cr.backend.ai"
+project = "community"
+
 [context.endpoint]
 api-endpoint = "http://127.0.0.1:8091"
 login-endpoint = "http://127.0.0.1:8090"

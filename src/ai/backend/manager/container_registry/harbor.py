@@ -6,7 +6,6 @@ import urllib.parse
 from typing import Any, AsyncIterator, Mapping, Optional, cast, override
 
 import aiohttp
-import aiohttp.client_exceptions
 import aiotools
 import yarl
 

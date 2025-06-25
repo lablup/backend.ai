@@ -174,6 +174,31 @@ class VFolderDep(BaseDependencyModel):
     )
 
 
+class ContainerRegistryDep(BaseDependencyModel):
+    name: str = Field(
+        description="The name of the container registry.",
+        examples=["cr.backend.ai"],
+    )
+    url: str = Field(
+        description="The URL of the container registry.",
+        examples=["https://my-container-registry.example.com"],
+    )
+    project: str = Field(
+        description="The project name in the container registry.",
+        examples=["stable", "community"],
+    )
+    username: Optional[str] = Field(
+        default=None,
+        description="The username for the container registry, if required.",
+        examples=["my-username"],
+    )
+    password: Optional[str] = Field(
+        default=None,
+        description="The password for the container registry, if required.",
+        examples=["my-password"],
+    )
+
+
 class TestContextInjectionModel(BaseDependencyModel):
     endpoint: Optional[EndpointDep] = Field(
         default=None,
@@ -230,6 +255,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     vfolder: Optional[VFolderDep] = Field(
         default=None,
         description="The vfolder configuration for the test context.",
+    )
+    container_registries: Optional[list[ContainerRegistryDep]] = Field(
+        default=None,
+        description="The container registries for the test context.",
     )
 
 

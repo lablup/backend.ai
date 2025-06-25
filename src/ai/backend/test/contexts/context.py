@@ -16,6 +16,8 @@ class ContextName(enum.StrEnum):
 
     TEST_SPEC_META = "test_spec_meta"
     IMAGE = "image"
+    CONTAINER_REGISTRY = "container_registries"
+    RESCANNED_IMAGES = "rescanned_images"
     CLIENT_SESSION = "client_session"
     ENDPOINT = "endpoint"
     KEYPAIR = "keypair"

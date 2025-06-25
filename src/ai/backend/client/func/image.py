@@ -11,6 +11,7 @@ __all__ = ("Image",)
 
 _default_list_fields_admin = (
     image_fields["name"],
+    image_fields["project"],
     image_fields["registry"],
     image_fields["architecture"],
     image_fields["tag"],
