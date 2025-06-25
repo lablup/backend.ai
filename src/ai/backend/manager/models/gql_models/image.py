@@ -11,6 +11,7 @@ from typing import (
     List,
     Optional,
     Self,
+    cast,
     overload,
 )
 from uuid import UUID
@@ -29,6 +30,7 @@ from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
+    AgentId,
     DispatchResult,
     ImageAlias,
 )
@@ -470,6 +472,44 @@ class ImageNode(graphene.ObjectType):
         ImagePermissionValueField,
         description=f"Added in 25.3.0. One of {[val.value for val in ImagePermission]}.",
     )
+    installed = graphene.Boolean(
+        description="Added in 25.11.0. Indicates if the image is installed on any Agent."
+    )
+
+    @property
+    def _canonical(self) -> str:
+        image_ref = ImageRef(
+            self.base_image_name,
+            self.project,
+            self.tag,
+            self.registry,
+            self.architecture,
+            self.is_local,
+        )
+        return image_ref.canonical
+
+    @classmethod
+    async def _batch_load_installed_agents(
+        cls, ctx: GraphQueryContext, full_names: Sequence[str]
+    ) -> list[set[AgentId]]:
+        async def pipe_builder(r: Redis) -> Pipeline:
+            pipe = r.pipeline()
+            for name in full_names:
+                pipe.smembers(name)
+            return pipe
+
+        result = await redis_helper.execute(ctx.redis_image, pipe_builder)
+        result = cast(list[set[bytes]], result)
+        return [{AgentId(agent_id.decode()) for agent_id in agents} for agents in result]
+
+    async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, self._batch_load_installed_agents
+        )
+        agent_ids = await loader.load(self._canonical)
+        agent_ids = cast(Optional[set[AgentId]], agent_ids)
+        return agent_ids is not None and len(agent_ids) > 0
 
     @classmethod
     async def batch_load_by_name_and_arch(
