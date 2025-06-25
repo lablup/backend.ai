@@ -3,6 +3,7 @@ from ai.backend.client.output.fields import image_fields
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.image import ImageContext
+from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.template import TestCode
 from ai.backend.test.utils.exceptions import UnexpectedSuccess
 
@@ -11,7 +12,9 @@ class SessionCreationFailureLowResources(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         image_dep = ImageContext.current()
-        session_name = "test-session-creation-failure"
+        spec_meta = TestSpecMetaContext.current()
+        test_id = spec_meta.test_id
+        session_name = f"test_session_{str(test_id)}"
 
         result = await client_session.Image.get(
             image_dep.name, image_dep.architecture, fields=[image_fields["labels"]]
