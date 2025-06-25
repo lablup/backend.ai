@@ -283,12 +283,12 @@ class ValkeyStreamClient(ValkeyClient):
         )
         await self._client.exec(tx, raise_on_error=True)
 
-    async def get_cached_broadcast_message(
+    async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
     ) -> Optional[Mapping[bytes, bytes]]:
         """
-        Get a cached broadcast message by its ID.
+        Fetch a cached broadcast message by its ID.
 
         :param cache_id: The ID of the cached message.
         :return: The cached message payload or None if not found.

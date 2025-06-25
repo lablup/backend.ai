@@ -1,44 +1,33 @@
 import asyncio
 import logging
 import uuid
-from typing import AsyncIterator, Optional, Protocol
+from typing import AsyncIterator, Optional
 
-from ai.backend.common.bgtask.bgtask import BgTaskInfo
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ...dispatcher import AbstractEvent
-from ...event_types.bgtask.broadcast import BgtaskAlreadyDoneEvent
 from ..hub import EventPropagator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class BgtaskLastDoneEventFetcher(Protocol):
-    async def fetch_bgtask_info(
-        self,
-        task_id: uuid.UUID,
-    ) -> BgTaskInfo:
-        """
-        Fetch the background task information for a given task ID.
-        This method is used to retrieve the last status of a background task.
-        """
-        ...
-
-
-class BgtaskPropagator(EventPropagator):
+class WithCachePropagator(EventPropagator):
     """
-    Background task propagator that uses an asyncio queue to propagate events.
-    This propagator is used to handle events related to background tasks.
+    WithCachePropagator is an event propagator that handles broadcast events.
+    It fetches the last event for a given task ID from the cache and propagates events
+    to a queue for broadcasted events.
+    It allows to prevent timing issues by ensuring that the last event is fetched before yielding new events.
     """
 
     _id: uuid.UUID
-    _last_done_event_fetcher: BgtaskLastDoneEventFetcher
+    _event_fetcher: EventFetcher
     _queue: asyncio.Queue[Optional[AbstractEvent]]
     _closed: bool = False
 
-    def __init__(self, last_done_event_fetcher: BgtaskLastDoneEventFetcher) -> None:
+    def __init__(self, event_fetcher: EventFetcher) -> None:
         self._id = uuid.uuid4()
-        self._last_done_event_fetcher = last_done_event_fetcher
+        self._event_fetcher = event_fetcher
         self._queue = asyncio.Queue()
         self._closed = False
 
@@ -48,27 +37,15 @@ class BgtaskPropagator(EventPropagator):
         """
         return self._id
 
-    async def receive(self, task_id: uuid.UUID) -> AsyncIterator[AbstractEvent]:
+    async def receive(self, cache_id: str) -> AsyncIterator[AbstractEvent]:
         """
-        Receive background task events from the queue.
-        First, it fetches the last finished event for a given task ID.
+        First, it fetches the last event for a given cache ID using the event fetcher.
         If the last event is not None, it yields that event.
         Then, it enters a loop to receive events from the queue until closed.
         """
-        bgtask_info = await self._last_done_event_fetcher.fetch_bgtask_info(task_id)
-        if bgtask_info.status.finished():
-            log.debug(
-                "Yielding already finished event: {}",
-                bgtask_info,
-            )
-            yield BgtaskAlreadyDoneEvent(
-                task_id=task_id,
-                message=bgtask_info.msg,
-                task_status=bgtask_info.status,
-                current=bgtask_info.current,
-                total=bgtask_info.total,
-            )
-            return
+        cached_event = await self._event_fetcher.fetch_cached_event(cache_id)
+        if cached_event is not None:
+            yield cached_event
         while not self._closed:
             event = await self._queue.get()
             try:

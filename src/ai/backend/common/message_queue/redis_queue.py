@@ -3,7 +3,7 @@ import hashlib
 import logging
 import socket
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Mapping, Optional
 
 import redis
 from aiotools.server import process_index
@@ -19,7 +19,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT = 300_000  # 5 minutes
 _DEFAULT_AUTOCLAIM_INTERVAL = 60_000
 _DEFAULT_AUTOCLAIM_COUNT = 64
-_DEFAULT_QUEUE_MAX_LEN = 128
 
 
 @dataclass
@@ -40,6 +39,7 @@ class RedisQueue(AbstractMessageQueue):
     _consume_queue: asyncio.Queue[MQMessage]
     _subscribe_queue: asyncio.Queue[BroadcastMessage]
     _stream_key: str
+    _broadcast_channel: str
     _group_name: str
     _consumer_id: str
     _closed: bool
@@ -53,6 +53,7 @@ class RedisQueue(AbstractMessageQueue):
         self._consume_queue = asyncio.Queue()
         self._subscribe_queue = asyncio.Queue()
         self._stream_key = args.stream_key
+        self._broadcast_channel
         self._group_name = args.group_name
         self._consumer_id = _generate_consumer_id(args.node_id)
         self._closed = False
@@ -74,6 +75,35 @@ class RedisQueue(AbstractMessageQueue):
         if self._closed:
             raise RuntimeError("Queue is closed")
         await self._client.enqueue_stream_message(self._stream_key, payload)
+
+    async def broadcast(self, payload: dict[bytes, bytes]) -> None:
+        """
+        Broadcast a message to all subscribers.
+        The message will be delivered to all subscribers.
+        """
+        if self._closed:
+            raise RuntimeError("Queue is closed")
+        await self._client.broadcast(self._broadcast_channel, payload)
+
+    async def broadcast_with_cache(self, cache_id: str, payload: dict[bytes, bytes]) -> None:
+        """
+        Broadcast a message to all subscribers with cache.
+        The message will be delivered to all subscribers.
+        """
+        if self._closed:
+            raise RuntimeError("Queue is closed")
+        await self._client.broadcast_with_cache(self._broadcast_channel, cache_id, payload)
+
+    async def fetch_cached_broadcast_message(
+        self, cache_id: str
+    ) -> Optional[Mapping[bytes, bytes]]:
+        """
+        Fetch a cached broadcast message by cache_id.
+        This method retrieves the cached message from the broadcast channel.
+        """
+        if self._closed:
+            raise RuntimeError("Queue is closed")
+        return await self._client.fetch_cached_broadcast_message(cache_id)
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
         """
