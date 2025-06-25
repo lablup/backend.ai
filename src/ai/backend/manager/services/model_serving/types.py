@@ -473,3 +473,12 @@ class ModelServiceDefinition(BaseModel):
             {"cpu": 1, "mem": "2gb"},
         ],
     )
+    environ: Optional[dict[str, str]] = Field(
+        default=None,
+        description="""
+        Environment variables to set for the model service.
+        """,
+        examples=[
+            {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
+        ],
+    )

@@ -205,6 +205,11 @@ class ModelServingService:
                     if variant_def.environment:
                         action.creator.image = variant_def.environment.image
                         action.creator.architecture = variant_def.environment.architecture
+                    if variant_def.environ:
+                        if action.creator.config.environ:
+                            action.creator.config.environ.update(variant_def.environ)
+                        else:
+                            action.creator.config.environ = variant_def.environ
 
             image_row = await ImageRow.resolve(
                 db_sess,
