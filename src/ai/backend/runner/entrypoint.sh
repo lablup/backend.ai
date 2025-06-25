@@ -35,10 +35,14 @@ if [ $USER_ID -eq 0 ]; then
   export HOME="/home/work"
 
   # Invoke image-specific bootstrap hook.
-  if [ -x "/opt/container/bootstrap.sh" ]; then
-    echo 'Executing image bootstrap... '
-    . /opt/container/bootstrap.sh
-    echo 'Image bootstrap executed.'
+  if [ -f "/opt/container/bootstrap.sh" ]; then
+    if [ -x "/opt/container/bootstrap.sh" ]; then
+      echo 'Executing image bootstrap…'
+      . /opt/container/bootstrap.sh
+      echo 'Image bootstrap executed.'
+    else
+      echo 'WARNING: /opt/container/bootstrap.sh exists but is not executable; bootstrap.sh excution was skipped.'
+    fi
   fi
 
   # Extract dotfiles
