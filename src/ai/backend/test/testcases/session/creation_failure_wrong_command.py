@@ -7,6 +7,7 @@ from ai.backend.test.contexts.session import SessionContext
 from ai.backend.test.contexts.sse import (
     SSEContext,
 )
+from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.templates.session.utils import verify_session_events
 from ai.backend.test.templates.template import TestCode
 
@@ -17,8 +18,10 @@ class BatchSessionCreationFailureWrongCommand(TestCode):
         image_dep = ImageContext.current()
         session_dep = SessionContext.current()
         sse_dep = SSEContext.current()
+        spec_meta = TestSpecMetaContext.current()
+        test_id = spec_meta.test_id
+        session_name = f"test_failure_{str(test_id)}"
 
-        session_name = "test-batch-session-execution-failure"
         listener = asyncio.create_task(
             asyncio.wait_for(
                 verify_session_events(
