@@ -513,7 +513,7 @@ class BaseRunner(metaclass=ABCMeta):
                 if ename == "SystemExit":
                     try:
                         exit_code = int(evalue) if evalue not in (None, "") else 0
-                    except ValueError:
+                    except Exception:
                         exit_code = 1
                 else:
                     exit_code = 1
