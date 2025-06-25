@@ -594,10 +594,10 @@ class MemoryPlugin(AbstractComputePlugin):
             #         total_size += path.stat().st_size
             # return total_size
 
-        async def sysfs_impl(container_id):
+        async def sysfs_impl(container_id: str):
             mem_path = ctx.agent.get_cgroup_path("memory", container_id)
             io_path = ctx.agent.get_cgroup_path("blkio", container_id)
-            version = ctx.agent.docker_info["CgroupVersion"]
+            version = ctx.agent.get_cgroup_version()
 
             try:
                 io_read_bytes = 0
@@ -608,7 +608,6 @@ class MemoryPlugin(AbstractComputePlugin):
                         mem_max_bytes = read_sysfs(mem_path / "memory.limit_in_bytes", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
-                            line = cast(str, line)
                             key, _, value = line.partition(" ")
                             if key == "total_inactive_file":
                                 try:
@@ -642,7 +641,6 @@ class MemoryPlugin(AbstractComputePlugin):
                         mem_max_bytes = read_sysfs(mem_path / "memory.max", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
-                            line = cast(str, line)
                             key, _, value = line.partition(" ")
                             if key == "inactive_file":
                                 try:
@@ -659,7 +657,6 @@ class MemoryPlugin(AbstractComputePlugin):
                         # 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
                         # 253:0 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
                         for line in (io_path / "io.stat").read_text().splitlines():
-                            line = cast(str, line)
                             for io_stat in line.split():
                                 stat, _, value = io_stat.partition("=")
                                 if stat == "rbytes":
@@ -697,7 +694,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz,
             )
 
-        async def api_impl(container_id):
+        async def api_impl(container_id: str):
             async with closing_async(Docker()) as docker:
                 container = DockerContainer(docker, id=container_id)
                 try:

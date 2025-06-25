@@ -1787,6 +1787,18 @@ class AbstractAgent(
             await asyncio.gather(*waiters)
 
     @abstractmethod
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        """
+        Get the cgroup path for the given controller and container ID.
+        This is used to read/write cgroup files for resource management.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_cgroup_version(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
     async def load_resources(
         self,
     ) -> Mapping[DeviceName, AbstractComputePlugin]:
