@@ -111,12 +111,16 @@ else
   export HOME="/home/$USER_NAME"
 
   # Invoke image-specific bootstrap hook.
-  if [ -x "/opt/container/bootstrap.sh" ]; then
-    echo 'Executing image bootstrap... '
-    export LOCAL_USER_ID=$USER_ID
-    export LOCAL_GROUP_ID=$GROUP_ID
-    . /opt/container/bootstrap.sh
-    echo 'Image bootstrap executed.'
+  if [ -f "/opt/container/bootstrap.sh" ]; then
+    if [ -x "/opt/container/bootstrap.sh" ]; then
+      echo 'Executing image bootstrap... '
+      export LOCAL_USER_ID=$USER_ID
+      export LOCAL_GROUP_ID=$GROUP_ID
+      . /opt/container/bootstrap.sh
+      echo 'Image bootstrap executed.'
+    else
+      echo 'WARNING: /opt/container/bootstrap.sh exists but is not executable; bootstrap.sh excution was skipped.'
+    fi
   fi
 
   # Correct the ownership of agent socket.
