@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 
 class BaseDependencyModel(BaseModel):
@@ -155,6 +155,11 @@ class ModelServiceDep(BaseDependencyModel):
         default="./model-definition.yaml",
         description="The path to the model definition file in the model service.",
         examples=["./model-definition.yaml"],
+    )
+    runtime_variant: RuntimeVariant = Field(
+        default=RuntimeVariant.CUSTOM,
+        description="The runtime variant for the model service.",
+        examples=[v.name for v in RuntimeVariant],
     )
 
 

@@ -3,16 +3,13 @@ from abc import abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from typing import Any, override
-from uuid import UUID
 
-from ai.backend.client.output.fields import session_node_fields
-from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.domain import DomainContext
 from ai.backend.test.contexts.group import GroupContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.model_service import (
-    CreatedModelServiceEndpointContext,
+    CreatedModelServiceMetaContext,
     ModelServiceContext,
 )
 from ai.backend.test.contexts.scaling_group import ScalingGroupContext
@@ -20,6 +17,8 @@ from ai.backend.test.contexts.session import (
     ClusterContext,
     SessionContext,
 )
+from ai.backend.test.data.model_service import CreatedModelServiceMeta
+from ai.backend.test.templates.model_service.utils import wait_until_all_inference_sessions_ready
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -56,6 +55,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             "model_definition_path": model_service_dep.model_definition_path,
             "cluster_mode": cluster_dep.cluster_mode,
             "cluster_size": cluster_dep.cluster_size,
+            "runtime_variant": model_service_dep.runtime_variant,
             # TODO: Make `envs` required.
             "envs": {
                 "TEST_KEY": "test_value",
@@ -67,50 +67,6 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     @abstractmethod
     def _extra_service_params(self) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement the _extra_service_params method.")
-
-    # TODO:
-    async def _wait_until_all_inference_sessions_ready(
-        self,
-        client_session: AsyncSession,
-        endpoint_id: str,
-        replicas: int,
-        vfolder_id: UUID,
-    ) -> None:
-        """
-        Poll the service endpoint until every backing inference-session is RUNNING
-        and has the model vfolder mounted.
-        """
-        while True:
-            result = await client_session.Service(endpoint_id).info()
-            active_routes = result["active_routes"]
-            session_ids = [route["session_id"] for route in active_routes]
-
-            ready_session_cnt = 0
-            for session_id in session_ids:
-                session_info = await client_session.ComputeSession.from_session_id(
-                    UUID(session_id)
-                ).detail([
-                    session_node_fields["type"],
-                    session_node_fields["status"],
-                    session_node_fields["vfolder_mounts"],
-                ])
-
-                assert session_info["type"] == "inference", (
-                    f"Session type should be 'inference'. "
-                    f"Actual type: {session_info['type']}, session_id: {session_id}"
-                )
-                assert session_info["vfolder_mounts"] == [str(vfolder_id)], (
-                    f"Model vfolder should be mounted into the inference session. "
-                    f"Actual mounted vfolder: {session_info['vfolder_mounts']}, "
-                    f"session_id: {session_id}"
-                )
-                if session_info["status"] == "RUNNING":
-                    ready_session_cnt += 1
-
-            if ready_session_cnt >= replicas:
-                break
-
-            await asyncio.sleep(1)
 
     @override
     @actxmgr
@@ -147,11 +103,11 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             assert info["model_id"] == str(vfolder_func.id), "Model ID should match the VFolder ID."
 
             await asyncio.wait_for(
-                self._wait_until_all_inference_sessions_ready(
-                    client_session,
-                    endpoint_id,
-                    model_service_dep.replicas,
-                    vfolder_func.id,
+                wait_until_all_inference_sessions_ready(
+                    client_session=client_session,
+                    endpoint_id=endpoint_id,
+                    replicas=model_service_dep.replicas,
+                    vfolder_id=vfolder_func.id,
                 ),
                 timeout=_ENDPOINT_CREATION_TIMEOUT,
             )
@@ -160,7 +116,12 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             model_service_endpoint = info["service_endpoint"]
             assert model_service_endpoint is not None, "Service endpoint should be initialized."
 
-            with CreatedModelServiceEndpointContext.with_current(model_service_endpoint):
+            with CreatedModelServiceMetaContext.with_current(
+                CreatedModelServiceMeta(
+                    endpoint_id=endpoint_id,
+                    service_endpoint=model_service_endpoint,
+                )
+            ):
                 yield
         finally:
             if endpoint_id:
