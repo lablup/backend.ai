@@ -79,5 +79,5 @@ keyfile = ""
 certfile = ""
 
 [debug]
-debug = false
+enabled = false
 skip-container-deletion = false
