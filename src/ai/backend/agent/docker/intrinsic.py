@@ -677,11 +677,11 @@ class MemoryPlugin(AbstractComputePlugin):
             net_rx_bytes = 0
             net_tx_bytes = 0
             nstat = await netstat_ns(sandbox_key)
-            for name, stat in nstat.items():
+            for name, net_stat in nstat.items():
                 if name == "lo":
                     continue
-                net_rx_bytes += stat.bytes_recv
-                net_tx_bytes += stat.bytes_sent
+                net_rx_bytes += net_stat.bytes_recv
+                net_tx_bytes += net_stat.bytes_sent
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (
