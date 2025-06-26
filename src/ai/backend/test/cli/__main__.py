@@ -4,15 +4,26 @@ import asyncio
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import click
 
-from ai.backend.test.testcases.testcases import TestSpecManager
-from ai.backend.test.tester.exporter import PrintExporter
+from ai.backend.test.testcases.spec_manager import TestSpecManager
+from ai.backend.test.testcases.testspecs import ROOT_TEST_SPECS
+from ai.backend.test.tester.exporter import DefaultExporter
 from ai.backend.test.tester.tester import Tester
 
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
+
+_DEFAULT_CONFIG_PATH = "configs/tester/tester.toml"
+
+
+def _spec_manager() -> TestSpecManager:
+    """
+    Returns the test specification manager for the CLI.
+    """
+    return TestSpecManager(specs=ROOT_TEST_SPECS)
 
 
 @click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
@@ -116,7 +127,7 @@ def run_cli(
 @main.command()
 @click.pass_obj
 def get_all_specs(cli_ctx: CLIContext) -> None:
-    spec_manager = TestSpecManager.default()
+    spec_manager = _spec_manager()
     print("Available test specifications:")
     print("====================================")
     for spec in spec_manager.all_specs():
@@ -124,24 +135,40 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 
 
 @click.argument("name", type=str)
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
 @main.command()
 @click.pass_obj
-def run_test(cli_ctx: CLIContext, name: str) -> None:
-    spec_manager = TestSpecManager.default()
+def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
+    config_file_path = Path(config_path)
+    spec_manager = _spec_manager()
     tester = Tester(
-        spec_manager=spec_manager,
-        exporter=PrintExporter(),
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
     )
     asyncio.run(tester.run_by_name(name))
 
 
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
 @main.command()
 @click.pass_obj
-def run_all(cli_ctx: CLIContext) -> None:
-    spec_manager = TestSpecManager.default()
+def run_all(cli_ctx: CLIContext, config_path: str) -> None:
+    spec_manager = _spec_manager()
+    config_file_path = Path(config_path)
     tester = Tester(
-        spec_manager=spec_manager,
-        exporter=PrintExporter(),
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
     )
     asyncio.run(tester.run_all())
 

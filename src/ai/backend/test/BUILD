@@ -4,6 +4,7 @@ python_sources(
         ":resources",
         "//:reqs#pytest",
         "//:reqs#pytest-dependency",
+        "src/ai/backend/client:src",
     ],
 )
 

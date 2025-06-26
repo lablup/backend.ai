@@ -59,3 +59,5 @@ DEFAULT_DOMAIN_NAME: Final[str] = "default"
 
 NOOP_STORAGE_VOLUME_NAME: Final[str] = "noop"
 NOOP_STORAGE_BACKEND_TYPE: Final[str] = "noop"
+
+UNKNOWN_CONTAINER_ID: Final[str] = "unknown"

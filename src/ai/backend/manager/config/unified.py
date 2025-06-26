@@ -2004,5 +2004,9 @@ class ManagerUnifiedConfig(BaseModel):
         """,
     )
 
+    # TODO: Remove me after changing the method of loading the license server address in the plugins
+    class Config:
+        extra = "allow"
+
     def __repr__(self):
         return pformat(self.model_dump())

@@ -321,12 +321,14 @@ async def mount(
     edit_fstab: bool = False,
     fstab_path: str | None = None,
     mount_prefix: str | None = None,
-) -> None:
+) -> bool:
     if mount_prefix is None:
         mount_prefix = "/"
     if fstab_path is None:
         fstab_path = "/etc/fstab"
     mountpoint = Path(mount_prefix) / mount_path
+    if mountpoint.is_mount():
+        return False
     mountpoint.mkdir(exist_ok=True)
     if cmd_options is not None:
         cmd = [
@@ -358,6 +360,7 @@ async def mount(
                 fs_type,
                 cmd_options,
             )
+    return True
 
 
 async def umount(

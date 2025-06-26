@@ -46,7 +46,7 @@ from sqlalchemy.engine import Row
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
-from ai.backend.common.config import BaseSchema, config_key_to_snake_case
+from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import (
@@ -54,12 +54,12 @@ from ai.backend.common.events.dispatcher import (
     EventHandler,
     EventProducer,
 )
-from ai.backend.common.events.idle import (
+from ai.backend.common.events.event_types.idle.anycast import (
     DoIdleCheckEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    KernelLifecycleEventReason,
 )
 from ai.backend.common.types import (
     AccessKey,
@@ -600,7 +600,7 @@ class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
 
     @override
     async def callback_idle_session(self, session_id: SessionId) -> None:
-        await self._event_producer.produce_event(
+        await self._event_producer.anycast_event(
             DoTerminateSessionEvent(session_id, self.terminate_reason())
         )
 
@@ -968,7 +968,7 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
         )
 
 
-class UtilizationConfig(BaseSchema):
+class UtilizationConfig(BaseConfigModel):
     time_window: tv.TimeDuration
     initial_grace_period: tv.TimeDuration
     thresholds_check_operator: Annotated[

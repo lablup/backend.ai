@@ -21,7 +21,7 @@ from aiotools import aclosing
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
@@ -268,7 +268,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
                 raise InstanceNotFound()
         if schedulable:
             # trigger scheduler
-            await root_ctx.event_producer.produce_event(DoScheduleEvent())
+            await root_ctx.event_producer.anycast_event(DoScheduleEvent())
     else:
         raise GenericBadRequest("Unknown scheduler operation")
     return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -284,13 +284,13 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     match params["event"]:
         case SchedulerEvent.SCHEDULE:
-            await root_ctx.event_producer.produce_event(DoScheduleEvent())
+            await root_ctx.event_producer.anycast_event(DoScheduleEvent())
         case SchedulerEvent.CHECK_PRECOND:
-            await root_ctx.event_producer.produce_event(DoCheckPrecondEvent())
+            await root_ctx.event_producer.anycast_event(DoCheckPrecondEvent())
         case SchedulerEvent.START_SESSION:
-            await root_ctx.event_producer.produce_event(DoStartSessionEvent())
+            await root_ctx.event_producer.anycast_event(DoStartSessionEvent())
         case SchedulerEvent.SCALE_SERVICES:
-            await root_ctx.event_producer.produce_event(DoScaleEvent())
+            await root_ctx.event_producer.anycast_event(DoScaleEvent())
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 

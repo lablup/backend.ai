@@ -28,26 +28,26 @@ from ai.backend.common import validators as tx
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
 )
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelCancelledBroadcastEvent,
+    KernelCreatingBroadcastEvent,
+    KernelPreparingBroadcastEvent,
+    KernelPullingBroadcastEvent,
+    KernelStartedBroadcastEvent,
+    KernelTerminatedBroadcastEvent,
+    KernelTerminatingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionFailureBroadcastEvent,
+    SessionScheduledBroadcastEvent,
+    SessionStartedBroadcastEvent,
+    SessionSuccessBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
+    SessionTerminatingBroadcastEvent,
+)
 from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
-from ai.backend.common.events.kernel import (
-    KernelCancelledEvent,
-    KernelCreatingEvent,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
-)
-from ai.backend.common.events.session import (
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
-)
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
@@ -211,7 +211,10 @@ async def push_background_task_events(
 async def enqueue_kernel_creation_status_update(
     app: web.Application,
     source: AgentId,
-    event: KernelPreparingEvent | KernelPullingEvent | KernelCreatingEvent | KernelStartedEvent,
+    event: KernelPreparingBroadcastEvent
+    | KernelPullingBroadcastEvent
+    | KernelCreatingBroadcastEvent
+    | KernelStartedBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -248,7 +251,9 @@ async def enqueue_kernel_creation_status_update(
 async def enqueue_kernel_termination_status_update(
     app: web.Application,
     agent_id: AgentId,
-    event: KernelCancelledEvent | KernelTerminatingEvent | KernelTerminatedEvent,
+    event: KernelCancelledBroadcastEvent
+    | KernelTerminatingBroadcastEvent
+    | KernelTerminatedBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -281,7 +286,7 @@ async def enqueue_kernel_termination_status_update(
     for q in app_ctx.session_event_queues:
         exit_code = (
             event.exit_code
-            if isinstance(event, (KernelTerminatingEvent, KernelTerminatedEvent))
+            if isinstance(event, (KernelTerminatingBroadcastEvent, KernelTerminatedBroadcastEvent))
             else None
         )
         q.put_nowait((event.event_name(), row._mapping, event.reason, exit_code))
@@ -291,7 +296,10 @@ async def enqueue_session_creation_status_update(
     app: web.Application,
     source: AgentId,
     event: (
-        SessionEnqueuedEvent | SessionScheduledEvent | SessionStartedEvent | SessionCancelledEvent
+        SessionEnqueuedBroadcastEvent
+        | SessionScheduledBroadcastEvent
+        | SessionStartedBroadcastEvent
+        | SessionCancelledBroadcastEvent
     ),
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
@@ -333,7 +341,7 @@ async def enqueue_session_creation_status_update(
 async def enqueue_session_termination_status_update(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionTerminatingEvent | SessionTerminatedEvent,
+    event: SessionTerminatingBroadcastEvent | SessionTerminatedBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -374,7 +382,7 @@ async def enqueue_session_termination_status_update(
 async def enqueue_batch_task_result_update(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionSuccessEvent | SessionFailureEvent,
+    event: SessionSuccessBroadcastEvent | SessionFailureBroadcastEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -422,27 +430,47 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx: PrivateContext = app["events.context"]
     app_ctx.session_event_queues = set()
     event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
-    event_dispatcher.subscribe(SessionEnqueuedEvent, app, enqueue_session_creation_status_update)
-    event_dispatcher.subscribe(SessionScheduledEvent, app, enqueue_session_creation_status_update)
-    event_dispatcher.subscribe(KernelPreparingEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(KernelPullingEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(KernelCreatingEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(KernelStartedEvent, app, enqueue_kernel_creation_status_update)
-    event_dispatcher.subscribe(SessionStartedEvent, app, enqueue_session_creation_status_update)
     event_dispatcher.subscribe(
-        KernelTerminatingEvent, app, enqueue_kernel_termination_status_update
-    )
-    event_dispatcher.subscribe(KernelTerminatedEvent, app, enqueue_kernel_termination_status_update)
-    event_dispatcher.subscribe(KernelCancelledEvent, app, enqueue_kernel_termination_status_update)
-    event_dispatcher.subscribe(
-        SessionTerminatingEvent, app, enqueue_session_termination_status_update
+        SessionEnqueuedBroadcastEvent, app, enqueue_session_creation_status_update
     )
     event_dispatcher.subscribe(
-        SessionTerminatedEvent, app, enqueue_session_termination_status_update
+        SessionScheduledBroadcastEvent, app, enqueue_session_creation_status_update
     )
-    event_dispatcher.subscribe(SessionCancelledEvent, app, enqueue_session_creation_status_update)
-    event_dispatcher.subscribe(SessionSuccessEvent, app, enqueue_batch_task_result_update)
-    event_dispatcher.subscribe(SessionFailureEvent, app, enqueue_batch_task_result_update)
+    event_dispatcher.subscribe(
+        KernelPreparingBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelPullingBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelCreatingBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelStartedBroadcastEvent, app, enqueue_kernel_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionStartedBroadcastEvent, app, enqueue_session_creation_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelTerminatingBroadcastEvent, app, enqueue_kernel_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelTerminatedBroadcastEvent, app, enqueue_kernel_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        KernelCancelledBroadcastEvent, app, enqueue_kernel_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionTerminatingBroadcastEvent, app, enqueue_session_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionTerminatedBroadcastEvent, app, enqueue_session_termination_status_update
+    )
+    event_dispatcher.subscribe(
+        SessionCancelledBroadcastEvent, app, enqueue_session_creation_status_update
+    )
+    event_dispatcher.subscribe(SessionSuccessBroadcastEvent, app, enqueue_batch_task_result_update)
+    event_dispatcher.subscribe(SessionFailureBroadcastEvent, app, enqueue_batch_task_result_update)
     yield
 
 
