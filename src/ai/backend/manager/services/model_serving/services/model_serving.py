@@ -59,7 +59,7 @@ from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
@@ -187,6 +187,11 @@ class ModelServingService:
 
         async with self._db.begin_readonly_session() as db_sess:
             model_vfolder_row = await VFolderRow.get(db_sess, service_prepare_ctx.model_id)
+            if model_vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
+                raise InvalidAPIParameters(
+                    "Cannot create model service with the project type's vfolder"
+                )
+
             chunks = await self._fetch_file_from_storage_proxy(
                 "service-definition.toml", model_vfolder_row
             )
