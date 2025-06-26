@@ -85,37 +85,6 @@ MODEL_SERVICE_TEST_SPECS = {
             ]
         },
     ),
-    "creation_auto_scaling_rule_success": TestSpec(
-        name="creation_auto_scaling_rule_success",
-        description=textwrap.dedent("""\
-            Test for successful creation of an auto-scaling rule.
-            This test verifies that an auto-scaling rule can be created successfully.
-            The test will:
-            1. Create an auto-scaling rule with specified parameters.
-            2. Verify that the auto-scaling rule is created and available.
-            3. Clean up the auto-scaling rule after verification.
-        """),
-        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE},
-        template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, EndpointTemplate, AutoScalingRuleTemplate
-        ),
-        parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
-        },
-    ),
     "creation_private_endpoint_success": TestSpec(
         name="creation_private_endpoint_success",
         description=textwrap.dedent("""\
@@ -148,19 +117,18 @@ MODEL_SERVICE_TEST_SPECS = {
             ]
         },
     ),
-    "scale_up_auto_scaling_rule_success": TestSpec(
-        name="scale_up_auto_scaling_rule_success",
+    "creation_auto_scaling_rule_success": TestSpec(
+        name="creation_auto_scaling_rule_success",
         description=textwrap.dedent("""\
-            Test for successful scaling up of an auto-scaling rule.
-            This test verifies that an auto-scaling rule can scale up successfully.
+            Test for successful creation of an auto-scaling rule.
+            This test verifies that an auto-scaling rule can be created successfully.
             The test will:
             1. Create an auto-scaling rule with specified parameters.
-            2. Trigger a scale-up event.
-            3. Verify that the auto-scaling rule scales up as expected.
-            4. Clean up the auto-scaling rule after verification.
+            2. Verify that the auto-scaling rule is created and available.
+            3. Clean up the auto-scaling rule after verification.
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE},
-        template=BasicTestTemplate(ScaleByAutoScalingRules()).with_wrappers(
+        template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, EndpointTemplate, AutoScalingRuleTemplate
         ),
         parametrizes={
@@ -176,6 +144,38 @@ MODEL_SERVICE_TEST_SPECS = {
                 ClusterDep(
                     cluster_mode=ClusterMode.MULTI_NODE,
                     cluster_size=3,
+                ),
+            ]
+        },
+    ),
+    "scale_by_auto_scaling_rule_success": TestSpec(
+        name="scale_by_auto_scaling_rule_success",
+        description=textwrap.dedent("""\
+            Test for successful scaling of a service by auto-scaling rule.
+            This test verifies that a service can be scaled successfully using an auto-scaling rule.
+            The test will:
+            1. Create an auto-scaling rule with specified parameters.
+            2. Scale the service using the auto-scaling rule.
+            3. Verify that the service is scaled successfully.
+            4. Clean up the auto-scaling rule after verification.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE},
+        template=BasicTestTemplate(ScaleByAutoScalingRules()).with_wrappers(
+            KeypairAuthTemplate, EndpointTemplate, AutoScalingRuleTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=2,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=2,
                 ),
             ]
         },
