@@ -114,19 +114,23 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[bool], default: bool) -> bool: ...
+def read_sysfs(
+    path: Union[str, Path], type_: Type[bool], default: Optional[bool] = None
+) -> bool: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[int], default: int) -> int: ...
+def read_sysfs(path: Union[str, Path], type_: Type[int], default: Optional[int] = None) -> int: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[float], default: float) -> float: ...
+def read_sysfs(
+    path: Union[str, Path], type_: Type[float], default: Optional[float] = None
+) -> float: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[str], default: str) -> str: ...
+def read_sysfs(path: Union[str, Path], type_: Type[str], default: Optional[str] = None) -> str: ...
 
 
 def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] = None) -> Any:

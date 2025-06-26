@@ -945,6 +945,16 @@ class KubernetesAgent(
             # Stop k8s event monitoring.
             pass
 
+    @override
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        # Not implemented yet for K8s Agent
+        return Path()
+
+    @override
+    def get_cgroup_version(self) -> str:
+        # Not implemented yet for K8s Agent
+        return ""
+
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config)
 
