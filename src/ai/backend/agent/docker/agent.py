@@ -1415,6 +1415,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if self.docker:
             await self.docker.close()
 
+    @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
         driver = self.docker_info["CgroupDriver"]
         version = self.docker_info["CgroupVersion"]
@@ -1428,6 +1429,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             case _:
                 raise ValueError(f"Unsupported cgroup driver: {driver!r}")
         return mount_point / cgroup
+
+    @override
+    def get_cgroup_version(self) -> str:
+        return self.docker_info["CgroupVersion"]
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config)
