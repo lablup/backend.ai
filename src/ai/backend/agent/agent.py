@@ -1252,8 +1252,7 @@ class AbstractAgent(
                                     reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
                                 ),
                             )
-                        if ev.done_future is not None:
-                            ev.done_future.set_result(None)
+                        ev.set_done_future_result(None)
                         return
                 else:
                     kernel_obj.state = KernelLifecycleStatus.TERMINATING
@@ -1264,8 +1263,7 @@ class AbstractAgent(
                 try:
                     await self.destroy_kernel(ev.kernel_id, ev.container_id)
                 except Exception as e:
-                    if ev.done_future is not None:
-                        ev.done_future.set_exception(e)
+                    ev.set_done_future_exception(e)
                     raise
                 else:
                     log.info("Kernel {0} destroyed", ev.kernel_id)
@@ -1314,8 +1312,7 @@ class AbstractAgent(
                 )
             except Exception as e:
                 log.exception("unhandled exception while processing CLEAN event: {0}", repr(e))
-                if ev.done_future is not None:
-                    ev.done_future.set_exception(e)
+                ev.set_done_future_exception(e)
                 await self.produce_error_event()
             else:
                 log.info("Kernel {0} cleaned", ev.kernel_id)
@@ -1349,8 +1346,7 @@ class AbstractAgent(
                     # Notify cleanup waiters after all state updates.
                     if kernel_obj is not None and kernel_obj.clean_event is not None:
                         kernel_obj.clean_event.set_result(None)
-                    if ev.done_future is not None and not ev.done_future.done():
-                        ev.done_future.set_result(None)
+                    ev.set_done_future_result(None)
         log.info(
             "Handled clean event for kernel {0} with container {1}", ev.kernel_id, ev.container_id
         )

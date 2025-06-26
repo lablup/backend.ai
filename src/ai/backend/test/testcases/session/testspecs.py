@@ -41,6 +41,7 @@ from ai.backend.test.testcases.session.creation_failure_wrong_command import (
     BatchSessionCreationFailureWrongCommand,
 )
 from ai.backend.test.testcases.session.execution import (
+    InteractiveSessionExecuteCodeFailureWithCustomExitCode,
     InteractiveSessionExecuteCodeFailureWrongCommand,
     InteractiveSessionExecuteCodeSuccess,
 )
@@ -236,6 +237,30 @@ INTERACTIVE_SESSION_TEST_SPECS = {
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(
             InteractiveSessionExecuteCodeFailureWrongCommand()
+        ).with_wrappers(KeypairAuthTemplate, InteractiveSessionTemplate),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+            ],
+        },
+    ),
+    "execution_command_on_interactive_session_failure_with_custom_exitcode": TestSpec(
+        name="execution_command_on_interactive_session_failure_with_custom_exitcode",
+        description=textwrap.dedent("""\
+            Test for executing code in an interactive session.
+            This test verifies that code can be executed in an interactive session, and that the session transitions through the expected lifecycle events.
+            The test will:
+            1. Create an interactive session with the specified image and resources.
+            2. Execute a command in the session and verify the output.
+            3. Assert that the session is running after execution.
+            4. Destroy the session after the test is complete.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
+        template=BasicTestTemplate(
+            InteractiveSessionExecuteCodeFailureWithCustomExitCode()
         ).with_wrappers(KeypairAuthTemplate, InteractiveSessionTemplate),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [

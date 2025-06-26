@@ -12,7 +12,7 @@ from ai.backend.test.contexts.domain import DomainContext
 from ai.backend.test.contexts.group import GroupContext
 from ai.backend.test.contexts.image import ImageContext
 from ai.backend.test.contexts.model_service import (
-    CreatedModelServiceEndpointContext,
+    CreatedModelServiceEndpointMetaContext,
     ModelServiceContext,
 )
 from ai.backend.test.contexts.scaling_group import ScalingGroupContext
@@ -20,13 +20,13 @@ from ai.backend.test.contexts.session import (
     ClusterContext,
     SessionContext,
 )
+from ai.backend.test.data.model_service import ModelServiceEndpointMeta
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
 from ai.backend.test.utils.exceptions import DependencyNotSet
 
 _ENDPOINT_CREATION_TIMEOUT = 30
-_ENDPOINT_HEALTH_CHECK_TIMEOUT = 10
 
 
 class _BaseEndpointTemplate(WrapperTestTemplate):
@@ -56,6 +56,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             "model_definition_path": model_service_dep.model_definition_path,
             "cluster_mode": cluster_dep.cluster_mode,
             "cluster_size": cluster_dep.cluster_size,
+            "runtime_variant": model_service_dep.runtime_variant,
             # TODO: Make `envs` required.
             "envs": {
                 "TEST_KEY": "test_value",
@@ -68,17 +69,16 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     def _extra_service_params(self) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement the _extra_service_params method.")
 
-    # TODO:
+    # TODO: Remove the polling loop below after the SSE API is added to the model service API
     async def _wait_until_all_inference_sessions_ready(
         self,
         client_session: AsyncSession,
-        endpoint_id: str,
+        endpoint_id: UUID,
         replicas: int,
         vfolder_id: UUID,
     ) -> None:
         """
-        Poll the service endpoint until every backing inference-session is RUNNING
-        and has the model vfolder mounted.
+        Poll the model service endpoint until the every inference sessions become RUNNING, and the service endpoint is available
         """
         while True:
             result = await client_session.Service(endpoint_id).info()
@@ -108,7 +108,9 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
                     ready_session_cnt += 1
 
             if ready_session_cnt >= replicas:
-                break
+                # It may take additional time for the endpoint to become available even after all sessions have transitioned to the RUNNING state.
+                if result["service_endpoint"] is not None:
+                    break
 
             await asyncio.sleep(1)
 
@@ -130,16 +132,17 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
                 **self._build_service_params(),
             )
 
-            endpoint_id = response["endpoint_id"]
+            endpoint_id = UUID(response["endpoint_id"])
             assert response["replicas"] == model_service_dep.replicas, (
                 "Replicas count does not match the expected value."
             )
-            assert not response["is_public"], "Service should not be public by default."
 
             info = await client_session.Service(endpoint_id).info()
-            assert info["service_endpoint"] is None, "Service endpoint should not be given yet."
-            assert info["runtime_variant"] == "custom", (
-                "Default runtime variant should be 'custom'."
+            assert info["service_endpoint"] is None, (
+                "Service endpoint should not be initialized yet."
+            )
+            assert info["runtime_variant"] == model_service_dep.runtime_variant, (
+                f"Runtime variant should be '{model_service_dep.runtime_variant}'."
             )
             assert info["desired_session_count"] == model_service_dep.replicas, (
                 "Desired session count should match the replicas."
@@ -158,9 +161,13 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
 
             info = await client_session.Service(endpoint_id).info()
             model_service_endpoint = info["service_endpoint"]
-            assert model_service_endpoint is not None, "Service endpoint should be initialized."
 
-            with CreatedModelServiceEndpointContext.with_current(model_service_endpoint):
+            with CreatedModelServiceEndpointMetaContext.with_current(
+                ModelServiceEndpointMeta(
+                    service_id=endpoint_id,
+                    endpoint_url=model_service_endpoint,
+                )
+            ):
                 yield
         finally:
             if endpoint_id:
@@ -176,3 +183,13 @@ class EndpointTemplate(_BaseEndpointTemplate):
     @override
     def _extra_service_params(self) -> dict[str, Any]:
         return {}
+
+
+class PublicEndpointTemplate(_BaseEndpointTemplate):
+    @property
+    def name(self) -> str:
+        return "public_endpoint_template"
+
+    @override
+    def _extra_service_params(self) -> dict[str, Any]:
+        return {"expose_to_public": True}
