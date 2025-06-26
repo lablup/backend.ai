@@ -898,6 +898,9 @@ class AbstractAgent(
         """
         await cancel_tasks(self._ongoing_exec_batch_tasks)
 
+        for _, computer in self.computers.items():
+            await computer.instance.cleanup()
+
         async with self.registry_lock:
             # Close all pending kernel runners.
             for kernel_obj in self.kernel_registry.values():
