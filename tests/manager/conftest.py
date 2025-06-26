@@ -934,7 +934,9 @@ async def registry_ctx(mocker):
     mock_redis_stream = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
-    mock_event_producer.produce_event = AsyncMock()
+    mock_event_producer.anycast_event = AsyncMock()
+    mock_event_producer.broadcast_event = AsyncMock()
+    mock_event_producer.anycast_and_broadcast_event = AsyncMock()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
     network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore

@@ -36,17 +36,21 @@ import zmq.asyncio
 from async_timeout import timeout
 
 from ai.backend.common import msgpack
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import (
+    CodeCompletionResp,
+    CodeCompletionResult,
+)
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
-    ModelServiceStatusEvent,
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    ModelServiceStatusAnycastEvent,
 )
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.types import (
@@ -177,7 +181,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     last_used: float
     termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
-    stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
@@ -215,7 +218,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.last_used = time.monotonic()
         self.termination_reason = None
         self.clean_event = None
-        self.stats_enabled = False
         self.environ = environ
         self.runner = None
         self.container_id = None
@@ -229,9 +231,16 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             default_api_version,
             default_client_features,
         )
-        self.runner = await self.create_code_runner(
-            event_producer, client_features=default_client_features, api_version=default_api_version
-        )
+        try:
+            self.runner = await self.create_code_runner(
+                event_producer,
+                client_features=default_client_features,
+                api_version=default_api_version,
+            )
+        except Exception as e:
+            log.error("kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e)
+            self.runner = None
+            raise
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
@@ -251,6 +260,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             )
         if "session_type" not in props:
             props["session_type"] = SessionTypes.INTERACTIVE
+        if "stats_enabled" in props:
+            # stats_enabled is a property, not an attribute.
+            del props["stats_enabled"]
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
@@ -277,6 +289,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         for accel_key, accel_alloc in self.resource_spec.allocations.items():
             computer_ctxs[accel_key].alloc_map.free(accel_alloc)
 
+    @property
+    def stats_enabled(self) -> bool:
+        """
+        Returns True if the kernel supports statistics gathering.
+        """
+        return self.state == KernelLifecycleStatus.RUNNING
+
     @abstractmethod
     async def create_code_runner(
         self,
@@ -292,7 +311,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts):
+    async def get_completions(self, text, opts) -> CodeCompletionResp:
         raise NotImplementedError
 
     @abstractmethod
@@ -433,6 +452,7 @@ class RobustSocket:
     _sock: zmq.asyncio.Socket
     _socket_type: int
     _addr: str
+    _closed: bool
 
     def __init__(
         self,
@@ -445,6 +465,7 @@ class RobustSocket:
         self._sock = self._zctx.socket(self._socket_type)
         self._sock.connect(self._addr)
         self._sock.setsockopt(zmq.LINGER, 50)
+        self._closed = False
 
     @property
     def addr(self) -> str:
@@ -454,7 +475,12 @@ class RobustSocket:
     def socket(self) -> zmq.asyncio.Socket:
         return self._sock
 
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     def close(self) -> None:
+        self._closed = True
         try:
             self._sock.close()
         except zmq.ZMQError:
@@ -578,14 +604,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self._closed = False
 
     async def __ainit__(self) -> None:
-        loop = current_loop()
         await self._get_socket_pair()
-        self.status_task = loop.create_task(self.ping_status())
-        self.read_task = loop.create_task(self.read_output())
-        if self.exec_timeout > 0:
-            self.watchdog_task = loop.create_task(self.watchdog())
-        else:
-            self.watchdog_task = None
+        await self._create_tasks()
 
     async def _create_sockets(self) -> SocketPair:
         input_sock = RobustSocket(zmq.PUSH, await self.get_repl_in_addr())
@@ -657,15 +677,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return
         self._closed = True
         try:
-            if self.watchdog_task and not self.watchdog_task.done():
-                self.watchdog_task.cancel()
-                await self.watchdog_task
-            if self.status_task and not self.status_task.done():
-                self.status_task.cancel()
-                await self.status_task
-            if self.read_task and not self.read_task.done():
-                self.read_task.cancel()
-                await self.read_task
+            await self._close_tasks()
             if self._sockets is not None:
                 self._sockets.close()
             # WARNING:
@@ -673,6 +685,27 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # may cause deadlocks.
         except Exception:
             log.exception("AbstractCodeRunner.close(): unexpected error")
+
+    async def _create_tasks(self) -> None:
+        # close the previous task if any
+        await self._close_tasks()
+
+        loop = asyncio.get_running_loop()
+        self.status_task = loop.create_task(self.ping_status())
+        self.read_task = loop.create_task(self.read_output())
+        if self.exec_timeout > 0:
+            self.watchdog_task = loop.create_task(self.watchdog())
+
+    async def _close_tasks(self) -> None:
+        concurrent_safe_tasks: tuple[Optional[asyncio.Task], ...] = (
+            self.status_task,
+            self.read_task,
+            self.watchdog_task,
+        )
+        await asyncio.gather(
+            *[cancel_task(task) for task in concurrent_safe_tasks if task is not None],
+            return_exceptions=True,
+        )
 
     async def ping(self) -> dict[str, float] | None:
         try:
@@ -751,7 +784,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return None
 
-    async def feed_and_get_completion(self, code_text, opts):
+    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
         sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
@@ -764,9 +797,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
-            return load_json(result)
+            return CodeCompletionResult.success(load_json(result))
         except asyncio.CancelledError:
-            return []
+            return CodeCompletionResult.failure()
 
     async def feed_start_model_service(self, model_info):
         sock = await self._get_socket_pair()
@@ -1079,7 +1112,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
                             response = load_json(msg_data)
-                            event = ModelServiceStatusEvent(
+                            event = ModelServiceStatusAnycastEvent(
                                 self.kernel_id,
                                 self.session_id,
                                 response["model_name"],
@@ -1089,7 +1122,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                                     else ModelServiceStatus.UNHEALTHY
                                 ),
                             )
-                            await self.event_producer.produce_event(event)
+                            await self.event_producer.anycast_event(event)
                         case b"apps-result":
                             await self.service_apps_info_queue.put(msg_data)
                         case b"stdout":

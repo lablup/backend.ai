@@ -43,24 +43,29 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.types import (
     KernelLifecycleEventReason,
 )
-from ai.backend.common.events.model_serving import (
-    RouteCreatedEvent,
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    RouteCreatedAnycastEvent,
 )
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
-    SessionCancelledEvent,
-    SessionCheckingPrecondEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
+    SessionCancelledAnycastEvent,
+    SessionCheckingPrecondAnycastEvent,
+    SessionPreparingAnycastEvent,
+    SessionScheduledAnycastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionCancelledBroadcastEvent,
+    SessionPreparingBroadcastEvent,
+    SessionScheduledBroadcastEvent,
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin.hook import PASSED, HookResult
@@ -675,12 +680,17 @@ class SchedulerDispatcher(aobject):
                         await db_sess.execute(query)
                         if pending_sess.is_private:
                             await _apply_cancellation(db_sess, [pending_sess.id])
-                            await self.event_producer.produce_event(
-                                SessionCancelledEvent(
+                            await self.event_producer.anycast_and_broadcast_event(
+                                SessionCancelledAnycastEvent(
                                     pending_sess.id,
                                     pending_sess.creation_id,
                                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
-                                )
+                                ),
+                                SessionCancelledBroadcastEvent(
+                                    pending_sess.id,
+                                    pending_sess.creation_id,
+                                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                                ),
                             )
 
                 await execute_with_retry(_cancel_failed_system_session)
@@ -783,7 +793,7 @@ class SchedulerDispatcher(aobject):
                 continue
             num_scheduled += 1
         if num_scheduled > 0:
-            await self.event_producer.produce_event(DoCheckPrecondEvent())
+            await self.event_producer.anycast_event(DoCheckPrecondEvent())
 
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
@@ -1023,8 +1033,9 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.produce_event(
-            SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
+        await self.registry.event_producer.anycast_and_broadcast_event(
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
     async def _schedule_multi_node_session(
@@ -1259,8 +1270,9 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.event_producer.produce_event(
-            SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
+        await self.registry.event_producer.anycast_and_broadcast_event(
+            SessionScheduledAnycastEvent(sess_ctx.id, sess_ctx.creation_id),
+            SessionScheduledBroadcastEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
     async def check_precond(
@@ -1331,8 +1343,8 @@ class SchedulerDispatcher(aobject):
                                 allocated_host_ports=set(),
                             )
                         )
-                    await self.registry.event_producer.produce_event(
-                        SessionCheckingPrecondEvent(
+                    await self.registry.event_producer.anycast_event(
+                        SessionCheckingPrecondAnycastEvent(
                             scheduled_session.id,
                             scheduled_session.creation_id,
                         ),
@@ -1423,8 +1435,12 @@ class SchedulerDispatcher(aobject):
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
-                        await self.registry.event_producer.produce_event(
-                            SessionPreparingEvent(
+                        await self.registry.event_producer.anycast_and_broadcast_event(
+                            SessionPreparingAnycastEvent(
+                                scheduled_session.id,
+                                scheduled_session.creation_id,
+                            ),
+                            SessionPreparingBroadcastEvent(
                                 scheduled_session.id,
                                 scheduled_session.creation_id,
                             ),
@@ -1775,7 +1791,7 @@ class SchedulerDispatcher(aobject):
                     created_routes.append(route_id)
             await db_sess.commit()
         for route_id in created_routes:
-            await self.event_producer.produce_event(RouteCreatedEvent(route_id))
+            await self.event_producer.anycast_event(RouteCreatedAnycastEvent(route_id))
         await redis_helper.execute(
             self.redis_live,
             lambda r: r.hset(
@@ -1891,8 +1907,13 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
                 await execute_with_retry(_mark_session_cancelled)
-                await self.registry.event_producer.produce_event(
-                    SessionCancelledEvent(
+                await self.registry.event_producer.anycast_and_broadcast_event(
+                    SessionCancelledAnycastEvent(
+                        session.id,
+                        session.creation_id,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                    ),
+                    SessionCancelledBroadcastEvent(
                         session.id,
                         session.creation_id,
                         KernelLifecycleEventReason.FAILED_TO_START,
@@ -1935,8 +1956,13 @@ class SchedulerDispatcher(aobject):
                 async with self.db.begin_session() as db_sess:
                     await _apply_cancellation(db_sess, session_ids)
         for item in cancelled_sessions:
-            await self.event_producer.produce_event(
-                SessionCancelledEvent(
+            await self.event_producer.anycast_and_broadcast_event(
+                SessionCancelledAnycastEvent(
+                    item.id,
+                    item.creation_id,
+                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                ),
+                SessionCancelledBroadcastEvent(
                     item.id,
                     item.creation_id,
                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,

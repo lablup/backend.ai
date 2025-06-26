@@ -15,6 +15,7 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
+from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -73,6 +74,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     ImageConfig,
@@ -114,7 +116,6 @@ from ..server import get_extra_volumes
 from ..types import (
     AgentEventData,
     Container,
-    ContainerStatus,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -1189,7 +1190,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await network.connect({"Container": container._id})
 
             kernel_obj.container_id = container._id
-            container_network_info: ContainerNetworkInfo | None = None
+            container_network_info: Optional[ContainerNetworkInfo] = None
             if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
                 try:
                     plugin = self.network_plugin_ctx.plugins[mode]
@@ -1229,8 +1230,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 stdin_port = 0
                 stdout_port = 0
                 for idx, port in enumerate(exposed_ports):
-                    ports: list[PortInfo] | None = await container.port(port)
-                    if ports is None:
+                    ports: Optional[list[PortInfo]] = await container.port(port)
+                    if not ports:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
                         )
@@ -1436,7 +1437,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> Optional[str]:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
             return result["Config"].get("Cmd")
@@ -1468,6 +1469,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                         container_from_docker_container(container),
                                     ),
                                 )
+                    except DockerError as e:
+                        if e.status == HTTPStatus.NOT_FOUND:
+                            log.warning(e.message)
+                            return
+                        raise
                     except asyncio.CancelledError:
                         pass
                     except Exception:
@@ -1675,7 +1681,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None | Sentinel = Sentinel.TOKEN,
+        timeout: Optional[float] | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
             return
@@ -1707,7 +1713,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: float | None,
+        timeout: Optional[float],
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
@@ -1771,7 +1777,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         return True
             log.info("found the local up-to-date image for {}", image_ref.canonical)
         except DockerError as e:
-            if e.status == 404:
+            if e.status == HTTPStatus.NOT_FOUND:
                 if auto_pull == AutoPullBehavior.DIGEST:
                     return True
                 elif auto_pull == AutoPullBehavior.TAG:
@@ -1851,11 +1857,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 # to kill if container does not self-terminate.
                 await container.stop()
         except DockerError as e:
-            if e.status == 409 and "is not running" in e.message:
+            if e.status == HTTPStatus.CONFLICT and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
                 await self.reconstruct_resource_usage()
-            elif e.status == 404:
+            elif e.status == HTTPStatus.NOT_FOUND:
                 # missing
                 log.warning(
                     "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
@@ -1890,7 +1896,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(60):
                         await self.collect_logs(kernel_id, container_id, log_iter())
                 except DockerError as e:
-                    if e.status == 404:
+                    if e.status == HTTPStatus.NOT_FOUND:
                         log.warning(
                             "container is already cleaned or missing (k:{}, cid:{})",
                             kernel_id,
@@ -1932,9 +1938,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(90):
                         await container.delete(force=True, v=True)
                 except DockerError as e:
-                    if e.status == 409 and "already in progress" in e.message:
+                    if e.status == HTTPStatus.CONFLICT and "already in progress" in e.message:
                         return
-                    elif e.status == 404:
+                    elif e.status == HTTPStatus.NOT_FOUND:
                         return
                     else:
                         log.exception(

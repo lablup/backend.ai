@@ -4,16 +4,16 @@ from io import BytesIO
 import sqlalchemy as sa
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events.kernel import (
+from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
+    KernelCancelledAnycastEvent,
+    KernelCreatingAnycastEvent,
     KernelHeartbeatEvent,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
+    KernelPreparingAnycastEvent,
+    KernelPullingAnycastEvent,
+    KernelStartedAnycastEvent,
+    KernelTerminatedAnycastEvent,
+    KernelTerminatingAnycastEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -93,11 +93,11 @@ class KernelEventHandler:
         context: None,
         source: AgentId,
         event: (
-            KernelPreparingEvent
-            | KernelPullingEvent
-            | KernelCreatingEvent
-            | KernelStartedEvent
-            | KernelCancelledEvent
+            KernelPreparingAnycastEvent
+            | KernelPullingAnycastEvent
+            | KernelCreatingAnycastEvent
+            | KernelStartedAnycastEvent
+            | KernelCancelledAnycastEvent
         ),
     ) -> None:
         """
@@ -115,32 +115,32 @@ class KernelEventHandler:
             event.kernel_id,
         )
         match event:
-            case KernelPreparingEvent():
+            case KernelPreparingAnycastEvent():
                 # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
                 pass
-            case KernelPullingEvent(kernel_id, session_id, reason=reason):
+            case KernelPullingAnycastEvent(kernel_id, session_id, reason=reason):
                 async with self._db.connect() as db_conn:
                     await self._registry.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
-            case KernelCreatingEvent(kernel_id, session_id, reason=reason):
+            case KernelCreatingAnycastEvent(kernel_id, session_id, reason=reason):
                 async with self._db.connect() as db_conn:
                     await self._registry.mark_kernel_creating(
                         db_conn, kernel_id, session_id, reason
                     )
-            case KernelStartedEvent(
+            case KernelStartedAnycastEvent(
                 kernel_id, session_id, reason=reason, creation_info=creation_info
             ):
                 async with self._db.connect() as db_conn:
                     await self._registry.mark_kernel_running(
                         db_conn, kernel_id, session_id, reason, creation_info
                     )
-            case KernelCancelledEvent():
+            case KernelCancelledAnycastEvent():
                 log.warning(f"Kernel cancelled, {event.reason = }")
 
     async def handle_kernel_preparing(
         self,
         context: None,
         source: AgentId,
-        event: KernelPreparingEvent,
+        event: KernelPreparingAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_preparing: ev:{} k:{}",
@@ -153,7 +153,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelPullingEvent,
+        event: KernelPullingAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_pulling: ev:{} k:{}",
@@ -169,7 +169,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelCreatingEvent,
+        event: KernelCreatingAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_creating: ev:{} k:{}",
@@ -185,7 +185,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelStartedEvent,
+        event: KernelStartedAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_started: ev:{} k:{}",
@@ -201,7 +201,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelCancelledEvent,
+        event: KernelCancelledAnycastEvent,
     ) -> None:
         log.info(
             "handle_kernel_cancelled: ev:{} k:{}",
@@ -213,7 +213,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelTerminatingEvent,
+        event: KernelTerminatingAnycastEvent,
     ) -> None:
         # `destroy_kernel()` has already changed the kernel status to "TERMINATING".
         pass
@@ -222,7 +222,7 @@ class KernelEventHandler:
         self,
         context: None,
         source: AgentId,
-        event: KernelTerminatedEvent,
+        event: KernelTerminatedAnycastEvent,
     ) -> None:
         async with self._db.connect() as db_conn:
             await self._registry.mark_kernel_terminated(

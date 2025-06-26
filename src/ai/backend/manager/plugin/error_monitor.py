@@ -5,8 +5,8 @@ import sys
 import traceback
 from typing import TYPE_CHECKING, Any, Mapping, Optional, override
 
-from ai.backend.common.events.agent import AgentErrorEvent
 from ai.backend.common.events.dispatcher import AbstractEvent
+from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent
 from ai.backend.common.plugin.event import AbstractEventDispatcherPlugin
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId

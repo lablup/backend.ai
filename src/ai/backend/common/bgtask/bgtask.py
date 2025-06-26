@@ -34,16 +34,16 @@ from ai.backend.common.exception import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import redis_helper
-from ..events.bgtask import (
+from ..events.dispatcher import (
+    EventProducer,
+)
+from ..events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
-)
-from ..events.dispatcher import (
-    EventProducer,
 )
 from ..types import DispatchResult, RedisConnectionInfo, Sentinel
 
@@ -154,7 +154,7 @@ class ProgressReporter:
             return pipe
 
         await redis_helper.execute(self._redis_client, _pipe_builder)
-        await self._event_producer.produce_event(
+        await self._event_producer.broadcast_event(
             BgtaskUpdatedEvent(
                 self._task_id,
                 message=message,
@@ -357,7 +357,7 @@ class BackgroundTaskManager:
         **kwargs,
     ) -> None:
         bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
-        await self._event_producer.produce_event(bgtask_result_event)
+        await self._event_producer.broadcast_event(bgtask_result_event)
         log.info(
             "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
         )
