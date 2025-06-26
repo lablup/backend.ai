@@ -1,4 +1,5 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
 from ..output.fields import user_resource_policy_fields
 from ..output.types import FieldSpec
@@ -28,9 +29,11 @@ class UserResourcePolicy(BaseFunction):
     Provides interactions with user resource policy.
     """
 
+    _name: Optional[str]
+
     def __init__(self, name: Optional[str]) -> None:
         super().__init__()
-        self.name = name
+        self._name = name
 
     @api_function
     @classmethod
@@ -127,8 +130,6 @@ class UserResourcePolicy(BaseFunction):
     async def delete(self) -> dict:
         """
         Delete an existing user resource policy.
-
-        :param name: Name of the user resource policy to delete.
         :return: Result of the deletion operation.
         """
         q = _d("""
@@ -140,7 +141,7 @@ class UserResourcePolicy(BaseFunction):
             }
         """)
 
-        result = await api_session.get().Admin._query(q, {"name": self.name})
+        result = await api_session.get().Admin._query(q, {"name": self._name})
         return result["delete_user_resource_policy"]
 
     @api_function
@@ -174,5 +175,5 @@ class UserResourcePolicy(BaseFunction):
         """
         q = "query($name: String!) { user_resource_policy(name: $name) { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
-        data = await api_session.get().Admin._query(q, {"name": self.name})
+        data = await api_session.get().Admin._query(q, {"name": self._name})
         return data["user_resource_policy"]
