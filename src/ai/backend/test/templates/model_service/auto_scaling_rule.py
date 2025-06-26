@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager as actxmgr
 from decimal import Decimal
 from typing import AsyncIterator, override
 
+from ai.backend.client.utils import to_global_id
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.model_service import (
     AutoScalingRuleContext,
@@ -38,4 +39,5 @@ class AutoScalingRuleTemplate(WrapperTestTemplate):
             with CreatedAutoScalingRuleIDContext.with_current(result.rule_id):
                 yield
         finally:
-            await client_session.ServiceAutoScalingRule(result.rule_id).delete()
+            global_rule_id = to_global_id("delete_endpoint_auto_scaling_rule_node", result.rule_id)
+            await client_session.ServiceAutoScalingRule(global_rule_id).delete()  # type: ignore
