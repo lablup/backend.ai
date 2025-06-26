@@ -62,6 +62,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageIdentifier
+from ai.backend.manager.models.vfolder import VFolderOwnershipType, VFolderRow
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
@@ -540,6 +541,12 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     validation_result = await _validate(request, params)
 
     async with root_ctx.db.begin_readonly_session() as session:
+        model_vfolder_row = await VFolderRow.get(session, validation_result.model_id)
+        if model_vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
+            raise InvalidAPIParameters(
+                "Cannot create model service with the project type's vfolder"
+            )
+
         image_row = await ImageRow.resolve(
             session,
             [
