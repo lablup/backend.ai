@@ -15,6 +15,7 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
+from http import HTTPStatus
 from io import StringIO
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -1407,6 +1408,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if self.docker:
             await self.docker.close()
 
+    @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
         driver = self.docker_info["CgroupDriver"]
         version = self.docker_info["CgroupVersion"]
@@ -1420,6 +1422,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             case _:
                 raise ValueError(f"Unsupported cgroup driver: {driver!r}")
         return mount_point / cgroup
+
+    @override
+    def get_cgroup_version(self) -> str:
+        return self.docker_info["CgroupVersion"]
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config)
@@ -1461,6 +1467,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                         container_from_docker_container(container),
                                     ),
                                 )
+                    except DockerError as e:
+                        if e.status == HTTPStatus.NOT_FOUND:
+                            log.warning(e.message)
+                            return
+                        raise
                     except asyncio.CancelledError:
                         pass
                     except Exception:
@@ -1764,7 +1775,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         return True
             log.info("found the local up-to-date image for {}", image_ref.canonical)
         except DockerError as e:
-            if e.status == 404:
+            if e.status == HTTPStatus.NOT_FOUND:
                 if auto_pull == AutoPullBehavior.DIGEST:
                     return True
                 elif auto_pull == AutoPullBehavior.TAG:
@@ -1844,11 +1855,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 # to kill if container does not self-terminate.
                 await container.stop()
         except DockerError as e:
-            if e.status == 409 and "is not running" in e.message:
+            if e.status == HTTPStatus.CONFLICT and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
                 await self.reconstruct_resource_usage()
-            elif e.status == 404:
+            elif e.status == HTTPStatus.NOT_FOUND:
                 # missing
                 log.warning(
                     "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
@@ -1883,7 +1894,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(60):
                         await self.collect_logs(kernel_id, container_id, log_iter())
                 except DockerError as e:
-                    if e.status == 404:
+                    if e.status == HTTPStatus.NOT_FOUND:
                         log.warning(
                             "container is already cleaned or missing (k:{}, cid:{})",
                             kernel_id,
@@ -1925,9 +1936,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(90):
                         await container.delete(force=True, v=True)
                 except DockerError as e:
-                    if e.status == 409 and "already in progress" in e.message:
+                    if e.status == HTTPStatus.CONFLICT and "already in progress" in e.message:
                         return
-                    elif e.status == 404:
+                    elif e.status == HTTPStatus.NOT_FOUND:
                         return
                     else:
                         log.exception(
