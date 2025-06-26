@@ -38,7 +38,7 @@ class ScaleByAutoScalingRules(TestCode):
             code="while True: pass",
         )
 
-        await asyncio.sleep(1)  # Give some time for making cpu-intensive environment
+        await asyncio.sleep(5)  # Give some time for making cpu-intensive environment
 
         await asyncio.wait_for(
             wait_until_all_inference_sessions_ready(
