@@ -179,6 +179,43 @@ class VFolderDep(BaseDependencyModel):
     )
 
 
+class AutoScalingRuleDep(BaseDependencyModel):
+    metric_source: str = Field(
+        description="The source of the metric for auto-scaling.",
+        examples=["KERNEL", "INFERENCE_FRAMEWORK"],
+    )
+    metric_name: str = Field(
+        description="The name of the metric to monitor for auto-scaling.",
+        examples=["cpu_util", "mem"],
+    )
+    threshold: str = Field(
+        description="The threshold value for triggering auto-scaling.",
+        examples=["0.8", "0.5"],
+    )
+    comparator: str = Field(
+        description="The comparator to use for the threshold.",
+        examples=["GREATER_THAN", "LESS_THAN"],
+    )
+    step_size: int = Field(
+        description="The step size for scaling up or down.",
+        examples=[1, 2],
+    )
+    cooldown_seconds: int = Field(
+        description="The cooldown period in seconds after scaling.",
+        examples=[60, 120],
+    )
+    max_replicas: Optional[int] = Field(
+        default=None,
+        description="The maximum number of replicas for the service.",
+        examples=[10, 20],
+    )
+    min_replicas: Optional[int] = Field(
+        default=None,
+        description="The minimum number of replicas for the service.",
+        examples=[1, 2],
+    )
+
+
 class TestContextInjectionModel(BaseDependencyModel):
     endpoint: Optional[EndpointDep] = Field(
         default=None,
@@ -235,6 +272,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     vfolder: Optional[VFolderDep] = Field(
         default=None,
         description="The vfolder configuration for the test context.",
+    )
+    auto_scaling_rule: Optional[AutoScalingRuleDep] = Field(
+        default=None,
+        description="The auto-scaling rule configuration for the test context.",
     )
 
 

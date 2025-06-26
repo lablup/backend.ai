@@ -3,6 +3,7 @@ import textwrap
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
+from ai.backend.test.templates.model_service.auto_scaling_rule import AutoScalingRuleTemplate
 from ai.backend.test.templates.model_service.endpoint import (
     EndpointTemplate,
     PublicEndpointTemplate,
@@ -12,10 +13,13 @@ from ai.backend.test.testcases.model_service.health_check import (
     EndpointHealthCheck,
     EndpointHealthCheckWithToken,
 )
+from ai.backend.test.testcases.model_service.scale_by_auto_scaling_rule import (
+    ScaleByAutoScalingRules,
+)
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep
 
-from ...templates.template import BasicTestTemplate
+from ...templates.template import BasicTestTemplate, NopTestCode
 
 MODEL_SERVICE_TEST_SPECS = {
     "creation_endpoint_success": TestSpec(
@@ -70,6 +74,45 @@ MODEL_SERVICE_TEST_SPECS = {
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
+    ),
+    "creation_auto_scaling_rule_success": TestSpec(
+        name="creation_auto_scaling_rule_success",
+        description=textwrap.dedent("""\
+            Test for successful creation of an auto-scaling rule.
+            This test verifies that an auto-scaling rule can be created successfully.
+            The test will:
+            1. Create an auto-scaling rule with specified parameters.
+            2. Verify that the auto-scaling rule is created and available.
+            3. Clean up the auto-scaling rule after verification.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE},
+        template=BasicTestTemplate(NopTestCode()).with_wrappers(
+            KeypairAuthTemplate, EndpointTemplate, AutoScalingRuleTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
             ]
         },
     ),
@@ -93,6 +136,46 @@ MODEL_SERVICE_TEST_SPECS = {
                 ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
+    ),
+    "scale_up_auto_scaling_rule_success": TestSpec(
+        name="scale_up_auto_scaling_rule_success",
+        description=textwrap.dedent("""\
+            Test for successful scaling up of an auto-scaling rule.
+            This test verifies that an auto-scaling rule can scale up successfully.
+            The test will:
+            1. Create an auto-scaling rule with specified parameters.
+            2. Trigger a scale-up event.
+            3. Verify that the auto-scaling rule scales up as expected.
+            4. Clean up the auto-scaling rule after verification.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE},
+        template=BasicTestTemplate(ScaleByAutoScalingRules()).with_wrappers(
+            KeypairAuthTemplate, EndpointTemplate, AutoScalingRuleTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
                 ),
             ]
         },

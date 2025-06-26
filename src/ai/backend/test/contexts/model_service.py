@@ -1,6 +1,8 @@
+from uuid import UUID
+
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
 from ai.backend.test.data.model_service import ModelServiceEndpointMeta
-from ai.backend.test.tester.dependency import ModelServiceDep
+from ai.backend.test.tester.dependency import AutoScalingRuleDep, ModelServiceDep
 
 
 class ModelServiceContext(BaseTestContext[ModelServiceDep]):
@@ -19,3 +21,15 @@ class CreatedModelServiceTokenContext(BaseTestContext[str]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.CREATED_MODEL_SERVICE_TOKEN
+
+
+class AutoScalingRuleContext(BaseTestContext[AutoScalingRuleDep]):
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.AUTO_SCALING_RULE
+
+
+class CreatedAutoScalingRuleIDContext(BaseTestContext[UUID]):
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.CREATED_AUTO_SCALING_RULE_ID
