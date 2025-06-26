@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from collections.abc import Sequence
 from decimal import Decimal
@@ -36,6 +37,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.models.minilang import JSONFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
     FieldSpecType,
@@ -125,6 +127,7 @@ __all__ = (
     "ClearImages",
 )
 
+
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
     "name": ("name", None),
@@ -137,6 +140,7 @@ _queryfilter_fieldspec: FieldSpecType = {
     "is_local": ("is_local", None),
     "type": ("session_type", ImageType),
     "accelerators": ("accelerators", None),
+    # "label_ai_backend_resource_min_cpu": (JSONFieldItem("labels", "ai.backend.resource.min.cpu"), None),
 }
 
 _queryorder_colmap: ColumnMapType = {
@@ -677,6 +681,7 @@ class ImageNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ImagePermission,
+        filter_labels: list[str],
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         filter_expr: Optional[str] = None,
         order_expr: Optional[str] = None,
@@ -687,8 +692,20 @@ class ImageNode(graphene.ObjectType):
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
+
+        for filter_label in filter_labels:
+            _queryfilter_fieldspec_2 = copy.deepcopy(_queryfilter_fieldspec)
+            filter_label_2 = filter_label.replace(".", "_")
+            print("filter_label", filter_label_2)
+            _queryfilter_fieldspec_2[f"label_{filter_label_2}"] = (
+                JSONFieldItem("labels", filter_label),
+                None,
+            )
+            print("_queryfilter_fieldspec_2!", _queryfilter_fieldspec_2)
+
+        # _queryfilter_fieldspec_2 = _queryfilter_fieldspec
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
+            FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec_2))
             if filter_expr is not None
             else None
         )

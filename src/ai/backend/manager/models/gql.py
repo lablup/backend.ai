@@ -720,6 +720,10 @@ class Queries(graphene.ObjectType):
             default_value=ImagePermission.READ_ATTRIBUTE,
             description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
         ),
+        filter_labels=graphene.List(
+            graphene.String,
+            description="Added in 25.11.0",
+        ),
         filter_by_statuses=graphene.List(
             ImageStatusType,
             default_value=[ImageStatus.ALIVE],
@@ -1931,7 +1935,7 @@ class Queries(graphene.ObjectType):
     ) -> Optional[ImageNode]:
         if scope_id is None:
             scope_id = SystemScope()
-        return await ImageNode.get_node(info, id, scope_id, permission)
+        return await ImageNode.get_node(info, id, scope_id, permission, filter_labels)
 
     @staticmethod
     async def resolve_image_nodes(
@@ -1939,6 +1943,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         scope_id: ScopeType,
+        filter_labels: list[str] = [],
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
         filter: Optional[str] = None,
@@ -1953,6 +1958,7 @@ class Queries(graphene.ObjectType):
             info,
             scope_id,
             permission,
+            filter_labels,
             filter_by_statuses,
             filter_expr=filter,
             order_expr=order,

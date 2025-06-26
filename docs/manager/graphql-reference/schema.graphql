@@ -156,6 +156,9 @@ type Queries {
     """Default is read_attribute."""
     permission: ImagePermissionValueField = "read_attribute"
 
+    """Added in 25.11.0"""
+    filter_labels: [String]
+
     """Added in 25.4.0."""
     filter_by_statuses: [ImageStatus] = [ALIVE]
     filter: String
