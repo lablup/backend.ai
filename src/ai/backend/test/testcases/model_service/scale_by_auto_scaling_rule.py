@@ -34,7 +34,6 @@ class ScaleByAutoScalingRules(TestCode):
         await self._make_cpu_intensive_task_in_service(
             client_session,
             service_id,
-            code="while True: pass",
         )
 
         await asyncio.sleep(5)  # Give some time for making cpu-intensive environment
@@ -59,11 +58,11 @@ class ScaleByAutoScalingRules(TestCode):
         )
 
     async def _make_cpu_intensive_task_in_service(
-        self, client_session: AsyncSession, service_id: UUID, code: str
+        self, client_session: AsyncSession, service_id: UUID
     ) -> None:
         result = await client_session.Service(service_id).info()
         active_routes = result["active_routes"]
         session_ids = [route["session_id"] for route in active_routes]
-        print(f"code excuted on session_ids: {session_ids}")
+        code = "while True: pass"
         for session_id in session_ids:
             await client_session.ComputeSession.from_session_id(session_id).execute(code=code)
