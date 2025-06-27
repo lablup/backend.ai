@@ -36,13 +36,13 @@ class ContextName(enum.StrEnum):
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
     SESSION_DEPENDENCY = "session_dependency"
     VFOLDER = "vfolder"
-    CREATED_VFOLDER_META = "created_vfolder_meta"
+    AUTO_SCALING_RULE = "auto_scaling_rule"
 
+    CREATED_VFOLDER_META = "created_vfolder_meta"
     CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
     CREATED_MODEL_SERVICE_TOKEN = "created_model_service_token"
     CREATED_MODEL_SERVICE_ENDPOINT = "created_model_service_endpoint"
-    AUTO_SCALING_RULE = "auto_scaling_rule"
     CREATED_AUTO_SCALING_RULE_ID = "created_auto_scaling_rule_id"
 
 
