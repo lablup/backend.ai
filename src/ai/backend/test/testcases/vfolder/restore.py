@@ -13,6 +13,11 @@ class VFolderDeleteAndRestoreSuccess(TestCode):
         except Exception as e:
             raise AssertionError(f"Failed to delete vfolder: {e}")
 
+        vfolder_info = await client_session.VFolder(str(vfolder_meta.name)).info()
+        assert vfolder_info["status"] == "delete-pending", (
+            "VFolder is not soft-deleted successfully"
+        )
+
         try:
             await client_session.VFolder(str(vfolder_meta.name)).restore()
         except Exception as e:
