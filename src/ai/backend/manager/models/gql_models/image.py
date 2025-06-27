@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from decimal import Decimal
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -20,6 +21,7 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from graphene.relay.connection import connection_adapter, connection_from_array, page_info_adapter
 from graphql import Undefined, UndefinedType
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -87,7 +89,14 @@ from ..base import (
     batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
 )
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
+from ..gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionField,
+    ConnectionPaginationOrder,
+    ConnectionResolverResult,
+    ResolvedGlobalID,
+)
 from ..image import (
     ImageIdentifier,
     ImageLoadFilter,
@@ -985,6 +994,10 @@ class UnloadImage(graphene.Mutation):
 
 
 class RescanImages(graphene.Mutation):
+    """
+    Deprecated since 25.10.0. use `RescanImagesV2` instead
+    """
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -1053,6 +1066,100 @@ class RescanImages(graphene.Mutation):
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
+class RescanImagesV2Input(graphene.InputObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    registry = graphene.String(
+        required=True, description="Name of the container registry to rescan."
+    )
+    project = graphene.String(
+        required=False,
+        default_value=None,
+        description="Name of the project of the container registry to rescan images.",
+    )
+
+
+class RescanImagesV2Payload(graphene.ObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    task_id = graphene.String()
+    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
+
+
+class RescanImagesV2(graphene.Mutation):
+    """
+    Added in 25.10.0.
+    """
+
+    class Arguments:
+        key = RescanImagesV2Input(required=True)
+
+    Output = RescanImagesV2Payload
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        key: RescanImagesV2Input,
+    ) -> RescanImagesV2Payload:
+        registry = key.registry
+        project = key.project
+
+        log.info(
+            "rescanning docker registry {0} by API request",
+            f"(registry: {registry or 'all'}, project: {project or 'all'})",
+        )
+        ctx: GraphQueryContext = info.context
+
+        async def _bg_task(reporter: ProgressReporter) -> DispatchResult:
+            loaded_registries: list[ContainerRegistryData]
+
+            if registry is None:
+                all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
+                    LoadAllContainerRegistriesAction()
+                )
+                loaded_registries = all_registries.registries
+            else:
+                registries = await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                    LoadContainerRegistriesAction(
+                        registry=registry,
+                        project=project,
+                    )
+                )
+                loaded_registries = registries.registries
+
+            rescanned_images = []
+            errors = []
+            for registry_data in loaded_registries:
+                action_result = (
+                    await ctx.processors.container_registry.rescan_images.wait_for_complete(
+                        RescanImagesAction(
+                            registry=registry_data.registry_name,
+                            project=registry_data.project,
+                            progress_reporter=reporter,
+                        )
+                    )
+                )
+
+                for error in action_result.errors:
+                    log.error(error)
+
+                errors.extend(action_result.errors)
+                rescanned_images.extend(action_result.images)
+
+            rescanned_image_ids = [image.id for image in rescanned_images]
+            if errors:
+                return DispatchResult.partial_success(rescanned_image_ids, errors)
+            return DispatchResult.success(rescanned_image_ids)
+
+        task_id = await ctx.background_task_manager.start(_bg_task)
+        return RescanImagesV2Payload(task_id=task_id)
+
+
 class AliasImage(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -1114,6 +1221,10 @@ class DealiasImage(graphene.Mutation):
 
 
 class ClearImages(graphene.Mutation):
+    """
+    Deprecated since 25.10.0. use `ClearImagesV2` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1149,6 +1260,114 @@ class ClearImages(graphene.Mutation):
             )
 
         return ClearImages(ok=True, msg="")
+
+
+class ClearImagesV2Input(graphene.InputObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    registry = graphene.String(
+        required=True, description="Name of the container registry to clear images."
+    )
+    project = graphene.String(
+        required=False,
+        default_value=None,
+        description="Name of the project of the container registry to clear images.",
+    )
+
+
+class ClearImagesV2Payload(graphene.ObjectType):
+    """
+    Added in 25.10.0.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+    cleared_images = ConnectionField(
+        ImageConnection, description="List of images that were cleared from the registry."
+    )
+
+    def __init__(self, _cleared_images: Sequence[ImageNode], **kwargs: Any):
+        super().__init__(**kwargs)
+        self._cleared_images = _cleared_images
+
+    async def resolve_cleared_images(
+        self, info: graphene.ResolveInfo, **args: Any
+    ) -> ConnectionResolverResult[ImageNode]:
+        conn = connection_from_array(
+            self._cleared_images,
+            args,
+            partial(connection_adapter, ImageConnection),
+            ImageConnection.Edge,
+            page_info_adapter,
+        )
+        node_list = [edge.node for edge in conn.edges]
+        cursor = conn.page_info.end_cursor  # type: ignore
+
+        order = ConnectionPaginationOrder.FORWARD
+        page_sz = args.get("first")
+
+        if args.get("last"):
+            order = ConnectionPaginationOrder.BACKWARD
+            page_sz = args.get("last")
+
+        return ConnectionResolverResult(
+            node_list=node_list,
+            cursor=cursor,
+            pagination_order=order,
+            requested_page_size=page_sz,
+            total_count=len(node_list),
+        )
+
+
+class ClearImagesV2(graphene.Mutation):
+    """
+    Added in 25.10.0.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        key = ClearImagesV2Input(required=True)
+
+    Output = ClearImagesV2Payload
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        key: ClearImagesV2Input,
+    ) -> ClearImagesV2Payload:
+        registry = key.registry
+        project = key.project
+
+        ctx: GraphQueryContext = info.context
+        log.info("clear images from registry {0} by API request", registry)
+
+        result = (
+            await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                LoadContainerRegistriesAction(
+                    registry=registry,
+                    project=project,
+                )
+            )
+        )
+
+        cleared_images = []
+        for registry_data in result.registries:
+            action_result = await ctx.processors.container_registry.clear_images.wait_for_complete(
+                ClearImagesAction(
+                    registry=registry_data.registry_name,
+                    project=registry_data.project,
+                )
+            )
+            cleared_images.extend(action_result.cleared_images)
+
+        return ClearImagesV2Payload(
+            _cleared_images=[
+                ImageNode.from_row(ctx, ImageRow.from_dataclass(image)) for image in cleared_images
+            ]
+        )
 
 
 class ModifyImageInput(graphene.InputObjectType):
