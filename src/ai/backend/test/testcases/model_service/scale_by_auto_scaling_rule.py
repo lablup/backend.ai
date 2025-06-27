@@ -11,7 +11,6 @@ from ai.backend.test.contexts.model_service import (
 )
 from ai.backend.test.templates.model_service.utils import wait_until_all_inference_sessions_ready
 from ai.backend.test.templates.template import TestCode
-from ai.backend.test.templates.vfolder.utils import get_vfolder_id_by_name
 from ai.backend.test.utils.exceptions import DependencyNotSet
 
 _SCALE_TIMEOUT = 30
@@ -28,9 +27,9 @@ class ScaleByAutoScalingRules(TestCode):
         max_replicas = auto_scaling_rule_dep.max_replicas
         if max_replicas is None:
             raise DependencyNotSet("AutoScalingRuleContext.max_replicas must be set")
-        vfolder_id = await get_vfolder_id_by_name(
-            client_session, model_service_dep.model_vfolder_name
-        )
+        vfolder_id = await client_session.VFolder(
+            name=model_service_dep.model_vfolder_name
+        ).get_id()
 
         await self._make_cpu_intensive_task_in_service(
             client_session,

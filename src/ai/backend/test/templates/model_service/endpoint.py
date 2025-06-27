@@ -23,7 +23,6 @@ from ai.backend.test.templates.model_service.utils import wait_until_all_inferen
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
-from ai.backend.test.templates.vfolder.utils import get_vfolder_id_by_name
 from ai.backend.test.utils.exceptions import DependencyNotSet
 
 _ENDPOINT_CREATION_TIMEOUT = 30
@@ -75,9 +74,9 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     async def _context(self) -> AsyncIterator[None]:
         client_session = ClientSessionContext.current()
         model_service_dep = ModelServiceContext.current()
-        vfolder_id = await get_vfolder_id_by_name(
-            client_session, model_service_dep.model_vfolder_name
-        )
+        vfolder_id = await client_session.VFolder(
+            name=model_service_dep.model_vfolder_name
+        ).get_id()
 
         endpoint_id = None
         try:
