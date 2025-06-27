@@ -4,7 +4,7 @@ from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.testcases.vfolder.restore import VFolderRestoreSuccess
+from ai.backend.test.testcases.vfolder.restore import VFolderDeleteAndRestoreSuccess
 
 VFOLDER_TEST_SPECS = {
     "restore_vfolder": TestSpec(
@@ -20,7 +20,7 @@ VFOLDER_TEST_SPECS = {
             5. Clean up the vfolder after verification.
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
-        template=BasicTestTemplate(VFolderRestoreSuccess()).with_wrappers(
+        template=BasicTestTemplate(VFolderDeleteAndRestoreSuccess()).with_wrappers(
             KeypairAuthTemplate, GeneralVFolderTemplate
         ),
     ),

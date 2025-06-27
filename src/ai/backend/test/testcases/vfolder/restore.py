@@ -3,7 +3,7 @@ from ai.backend.test.contexts.vfolder import CreatedVFolderMetaContext
 from ai.backend.test.templates.template import TestCode
 
 
-class VFolderRestoreSuccess(TestCode):
+class VFolderDeleteAndRestoreSuccess(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()
