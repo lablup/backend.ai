@@ -20,6 +20,7 @@ from ai.backend.test.templates.session.vfolder_mounted_interactive_session impor
 )
 from ai.backend.test.templates.template import BasicTestTemplate, NopTestCode
 from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
+from ai.backend.test.testcases.config import STANDARD_CLUSTER_CONFIGS
 from ai.backend.test.testcases.session.commit import (
     InteractiveSessionCommitSuccess,
     InteractiveSessionImagifySuccess,
@@ -78,20 +79,7 @@ BATCH_SESSION_TEST_SPECS = {
             KeypairAuthTemplate, BatchSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "creation_batch_session_failure_wrong_command": TestSpec(
@@ -141,20 +129,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             KeypairAuthTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "creation_interactive_session_success_with_bootstrap_script": TestSpec(
@@ -203,20 +178,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             KeypairAuthTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ],
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
             ContextName.CODE_EXECUTION: [
                 CodeExecutionDep(code='print("Hello, world!")', expected_result="Hello, world!\n"),
                 CodeExecutionDep(code="1 + 1", expected_result="2"),
@@ -391,20 +353,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
             KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionFromTemplateTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "creation_batch_session_success_from_template": TestSpec(
@@ -422,20 +371,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
             KeypairAuthTemplate, SessionTemplateTemplate, BatchSessionFromTemplateTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ],
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
 }
@@ -458,20 +394,7 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
             KeypairAuthTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ],
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "session_dependency_graph_retriever": TestSpec(
@@ -485,20 +408,7 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
             KeypairAuthTemplate, BatchSessionTemplate, DependentSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ],
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "session_status_history": TestSpec(
@@ -512,20 +422,7 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
             testcode=SessionStatusHistoryRetriever(),
         ).with_wrappers(KeypairAuthTemplate, InteractiveSessionTemplate),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ],
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
 }
@@ -547,20 +444,7 @@ SESSION_RENAME_TEST_SPECS = {
             KeypairAuthTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ],
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "session_rename_fail_duplicated_name": TestSpec(
@@ -579,20 +463,7 @@ SESSION_RENAME_TEST_SPECS = {
             KeypairAuthTemplate, InteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ],
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
 }
@@ -615,20 +486,7 @@ SESSION_VFOLDER_TEST_SPECS = {
             KeypairAuthTemplate, GeneralVFolderTemplate, VFolderMountedInteractiveSessionTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
 }
