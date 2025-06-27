@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
+from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.contexts.vfolder import CreatedVFolderMetaContext
 from ai.backend.test.templates.template import TestCode
 
@@ -10,6 +11,10 @@ _CONTENT = "This is a test file for VFolder download."
 
 class VFolderUploadAndDownloadSuccess(TestCode):
     async def test(self) -> None:
+        spec_meta = TestSpecMetaContext.current()
+        test_id = spec_meta.test_id
+        test_dirname = f"test-{str(test_id)[:8]}"
+
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()
 
@@ -19,21 +24,26 @@ class VFolderUploadAndDownloadSuccess(TestCode):
             uploaded_dir_name = upload_root.name
 
             for i in range(3):
-                rel_path = f"{uploaded_dir_name}/temp_{i}.txt"
+                rel_path = f"{test_dirname}/{uploaded_dir_name}/test_{i}.txt"
                 uploaded_files.append(rel_path)
-                (upload_root / f"temp_{i}.txt").write_text(_CONTENT)
+                (upload_root / f"test_{i}.txt").write_text(_CONTENT)
 
             (upload_root / "nested").mkdir()
             (upload_root / "nested" / "inner.txt").write_text(_CONTENT)
-            uploaded_files.append(f"{uploaded_dir_name}/nested/inner.txt")
+            uploaded_files.append(f"{test_dirname}/{uploaded_dir_name}/nested/inner.txt")
 
             await client_session.VFolder(vfolder_meta.name).upload(
-                [upload_root], basedir=upload_root.parent, recursive=True
+                [upload_root],
+                basedir=upload_root.parent,
+                dst_dir=test_dirname,
+                recursive=True,
             )
 
         with tempfile.TemporaryDirectory() as download_dir:
             download_root = Path(download_dir)
-            (download_root / uploaded_dir_name / "nested").mkdir(parents=True, exist_ok=True)
+            (download_root / test_dirname / uploaded_dir_name / "nested").mkdir(
+                parents=True, exist_ok=True
+            )
 
             await client_session.VFolder(vfolder_meta.name).download(
                 uploaded_files,
