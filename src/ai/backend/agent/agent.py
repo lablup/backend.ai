@@ -936,7 +936,7 @@ class AbstractAgent(
         for _, computer in self.computers.items():
             try:
                 await computer.instance.cleanup()
-            except Exception as e:
+            except Exception:
                 log.exception("Failed to clean up computer instance:")
 
         async with self.registry_lock:
