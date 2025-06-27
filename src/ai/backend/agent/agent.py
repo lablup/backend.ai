@@ -937,7 +937,7 @@ class AbstractAgent(
             try:
                 await computer.instance.cleanup()
             except Exception as e:
-                log.error("Failed to clean up computer instance: {}", e)
+                log.exception("Failed to clean up computer instance:")
 
         async with self.registry_lock:
             # Close all pending kernel runners.
