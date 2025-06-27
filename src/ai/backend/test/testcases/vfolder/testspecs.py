@@ -12,8 +12,8 @@ from ai.backend.test.tester.dependency import UploadFileDep
 _TEST_FILE_CONTENT = "This is a test file for VFolder download."
 
 VFOLDER_TEST_SPECS = {
-    "upload_and_download_files_vfolder": TestSpec(
-        name="upload_and_download_files_vfolder",
+    "download_files": TestSpec(
+        name="download_files",
         description=textwrap.dedent("""\
             Test for uploading and downloading files in a VFolder.
             The test will:
