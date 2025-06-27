@@ -206,7 +206,7 @@ class CPUPlugin(AbstractComputePlugin):
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
                 unit_hint="msec",
-                current_hook=lambda metric: metric.stats.diff,
+                current_hook=lambda metric: metric.stats.diff_skip_first_zero,
                 per_node=Measurement(total_cpu_used, interval),
                 per_device={
                     DeviceId(str(idx)): Measurement(
