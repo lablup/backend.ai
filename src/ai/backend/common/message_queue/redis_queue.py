@@ -5,6 +5,7 @@ import socket
 from dataclasses import dataclass
 from typing import AsyncGenerator, Mapping, Optional
 
+import glide
 import redis
 from aiotools.server import process_index
 
@@ -65,7 +66,8 @@ class RedisQueue(AbstractMessageQueue):
                     self._auto_claim_loop(stream_key, start_id, args.autoclaim_idle_timeout)
                 )
             )
-        self._tasks.append(asyncio.create_task(self._read_broadcast_messages_loop()))
+        if args.subscribe_channels:
+            self._tasks.append(asyncio.create_task(self._read_broadcast_messages_loop()))
 
     async def send(self, payload: dict[bytes, bytes]) -> None:
         """
@@ -156,7 +158,9 @@ class RedisQueue(AbstractMessageQueue):
                 if claimed:
                     autoclaim_start_id = next_start_id
                     continue
-            except redis.exceptions.ResponseError as e:
+            except glide.TimeoutError:
+                pass
+            except glide.GlideError as e:
                 await self._failover_consumer(e)
             except AttributeError:
                 # Skip handling this error
@@ -229,7 +233,7 @@ class RedisQueue(AbstractMessageQueue):
         msg = BroadcastMessage(payload)
         await self._subscribe_queue.put(msg)
 
-    async def _failover_consumer(self, e: redis.exceptions.ResponseError) -> None:
+    async def _failover_consumer(self, e: Exception) -> None:
         # If the group does not exist, create it
         # and start the auto claim loop again
         if "NOGROUP" in str(e):
