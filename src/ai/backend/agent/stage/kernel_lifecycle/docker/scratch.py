@@ -46,7 +46,6 @@ class ScratchSpecGenerator(SpecGenerator[ScratchSpec]):
         """
         Waits for the spec to be ready.
         """
-        # In a real implementation, this would wait for some condition to be met.
         return ScratchSpec()
 
 
@@ -90,10 +89,6 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
 
     @override
     async def setup(self, spec: ScratchSpec) -> ScratchResult:
-        loop = asyncio.get_running_loop()
-
-        scratch_dir = self._scratch_dir(spec.scratch_root, spec.kernel_id).resolve()
-        tmp_dir = self._tmp_dir(spec.scratch_root, spec.kernel_id).resolve()
         work_dir = self._work_dir(spec.scratch_root, spec.kernel_id).resolve()
         config_dir = self._config_dir(spec.scratch_root, spec.kernel_id).resolve()
 
@@ -263,9 +258,6 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
 
     @override
     async def teardown(self, resource: ScratchResult) -> None:
-        await self._destroy_filesystem(resource)
-
-    async def _destroy_filesystem(self, resource: ScratchResult) -> None:
         loop = asyncio.get_running_loop()
         scratch_dir = self._scratch_dir(resource.scratch_root, resource.kernel_id).resolve()
         tmp_dir = self._tmp_dir(resource.scratch_root, resource.kernel_id).resolve()
