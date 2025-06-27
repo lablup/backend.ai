@@ -35,25 +35,23 @@ class PlainTextFilesUploader(WrapperTestTemplate):
 
         with tempfile.TemporaryDirectory() as upload_dir:
             upload_root = Path(upload_dir)
+            upload_paths = []
 
-            for dep in upload_deps:
-                local_path = upload_root / dep.path
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-                local_path.write_text(dep.content)
+            for upload_dep in upload_deps:
+                upload_path = upload_root / upload_dep.path
+                upload_path.parent.mkdir(parents=True, exist_ok=True)
+                upload_path.write_text(upload_dep.content)
+                upload_paths.append(upload_path)
 
                 uploaded_files.append(
                     UploadedFile(
-                        path=f"{test_dirname}/{dep.path}",
-                        content=dep.content,
+                        path=f"{test_dirname}/{upload_dep.path}",
+                        content=upload_dep.content,
                     )
                 )
 
-            upload_files = []
-            for dep in upload_deps:
-                upload_files.append(upload_root / dep.path)
-
             await client_session.VFolder(vfolder_meta.name).upload(
-                upload_files,
+                upload_paths,
                 basedir=upload_root,
                 dst_dir=test_dirname,
                 recursive=True,
