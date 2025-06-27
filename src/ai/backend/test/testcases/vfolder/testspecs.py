@@ -4,7 +4,7 @@ from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.testcases.vfolder.download import VFolderUploadAndDownloadSuccess
+from ai.backend.test.testcases.vfolder.upload_and_download import VFolderUploadAndDownloadSuccess
 
 VFOLDER_TEST_SPECS = {
     "upload_and_download_files_vfolder": TestSpec(

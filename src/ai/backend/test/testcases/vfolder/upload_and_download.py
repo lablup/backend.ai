@@ -6,7 +6,7 @@ from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.contexts.vfolder import CreatedVFolderMetaContext
 from ai.backend.test.templates.template import TestCode
 
-_CONTENT = "This is a test file for VFolder download."
+_TEST_FILE_CONTENT = "This is a test file for VFolder download."
 
 
 class VFolderUploadAndDownloadSuccess(TestCode):
@@ -26,10 +26,10 @@ class VFolderUploadAndDownloadSuccess(TestCode):
             for i in range(3):
                 rel_path = f"{test_dirname}/{uploaded_dir_name}/test_{i}.txt"
                 uploaded_files.append(rel_path)
-                (upload_root / f"test_{i}.txt").write_text(_CONTENT)
+                (upload_root / f"test_{i}.txt").write_text(_TEST_FILE_CONTENT)
 
             (upload_root / "nested").mkdir()
-            (upload_root / "nested" / "inner.txt").write_text(_CONTENT)
+            (upload_root / "nested" / "inner.txt").write_text(_TEST_FILE_CONTENT)
             uploaded_files.append(f"{test_dirname}/{uploaded_dir_name}/nested/inner.txt")
 
             await client_session.VFolder(vfolder_meta.name).upload(
@@ -54,4 +54,6 @@ class VFolderUploadAndDownloadSuccess(TestCode):
             for rel_path in uploaded_files:
                 local_path = download_root / rel_path
                 assert local_path.exists(), f"{local_path} is missing"
-                assert local_path.read_text() == _CONTENT, f"{local_path} file content mismatch"
+                assert local_path.read_text() == _TEST_FILE_CONTENT, (
+                    f"{local_path} file content mismatch"
+                )
