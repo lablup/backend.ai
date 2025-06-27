@@ -954,6 +954,9 @@ class AbstractAgent(
             stream_redis_target,
             name="event_producer.stream",
             db=REDIS_STREAM_DB,
+            pubsub_channels={
+                "events_all",
+            },
         )
         return RedisQueue(
             client,

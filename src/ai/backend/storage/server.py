@@ -347,6 +347,9 @@ async def _make_message_queue(
         redis_profile_target.profile_target(RedisRole.STREAM),
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
+        pubsub_channels={
+            "events_all",
+        },
     )
     return RedisQueue(
         client,
