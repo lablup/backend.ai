@@ -41,6 +41,7 @@ class ContextName(enum.StrEnum):
     CREATED_SESSION_META = "created_session_meta"
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
     CREATED_MODEL_SERVICE_ENDPOINT = "created_model_service_endpoint"
+    CREATED_MODEL_SERVICE_TOKEN = "created_model_service_token"
 
 
 class BaseTestContext(Generic[T]):

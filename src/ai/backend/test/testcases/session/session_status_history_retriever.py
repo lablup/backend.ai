@@ -30,7 +30,7 @@ class SessionStatusHistoryRetriever(TestCode):
 
         result = await session.ComputeSession(name=session_name).get_status_history()
         assert result["result"] != "", "Status history should not be empty"
-        for status_key, status_value in result["result"].items():
+        for status_key, _status_value in result["result"].items():
             assert status_key in expected_status, (
                 f"Status {status_key} is not a valid session status"
             )

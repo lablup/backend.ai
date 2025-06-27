@@ -268,6 +268,16 @@ class DummyAgent(
     async def resolve_image_distro(self, image: ImageConfig) -> str:
         return "ubuntu16.04"
 
+    @override
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        #  Dummy agent does not use cgroups, so we return an empty path.
+        return Path()
+
+    @override
+    def get_cgroup_version(self) -> str:
+        # Dummy agent does not use cgroups, so we return an empty string.
+        return ""
+
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config, self.dummy_config)
 

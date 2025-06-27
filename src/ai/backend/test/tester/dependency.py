@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 
 class BaseDependencyModel(BaseModel):
@@ -140,6 +140,11 @@ class ModelServiceDep(BaseDependencyModel):
     replicas: int = Field(
         description="The number of replicas for the model service.",
         examples=[1, 2, 3],
+    )
+    runtime_variant: RuntimeVariant = Field(
+        default=RuntimeVariant.CUSTOM,
+        description="The runtime variant for the model service.",
+        examples=[v.name for v in RuntimeVariant],
     )
     # Separate group is required for the model service, so we placed this independently from the group context.
     group_name: str = Field(

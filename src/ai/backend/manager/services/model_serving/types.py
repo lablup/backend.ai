@@ -56,7 +56,7 @@ class MountOption:
 @dataclass
 class RouteInfo:
     route_id: uuid.UUID
-    session_id: uuid.UUID
+    session_id: Optional[uuid.UUID]
     traffic_ratio: float
 
 
@@ -471,5 +471,14 @@ class ModelServiceDefinition(BaseModel):
         """,
         examples=[
             {"cpu": 1, "mem": "2gb"},
+        ],
+    )
+    environ: Optional[dict[str, str]] = Field(
+        default=None,
+        description="""
+        Environment variables to set for the model service.
+        """,
+        examples=[
+            {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
         ],
     )

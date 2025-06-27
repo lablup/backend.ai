@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.10.1 (2025-06-25)
+
+### Features
+* Configure the logging module's config file to use Pydantic ([#2834](https://github.com/lablup/backend.ai/issues/2834))
+* Add installed field to GQL image node query schema ([#4757](https://github.com/lablup/backend.ai/issues/4757))
+
+### Fixes
+* Fixed optional field handling in `AutoScalingRule` modify action by replacing `None` with `Undefined` ([#1636](https://github.com/lablup/backend.ai/issues/1636))
+* Cool down Redis error logs `AttributeError: 'NoneType' object has no attribute 'get'` ([#4795](https://github.com/lablup/backend.ai/issues/4795))
+* Fix wrong `Accept` Header on `HarborRegistryV2._process_oci_index()` ([#4807](https://github.com/lablup/backend.ai/issues/4807))
+
+
 ## 25.10.0 (2025-06-23)
 
 ### Features

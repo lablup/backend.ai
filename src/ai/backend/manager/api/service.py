@@ -186,7 +186,9 @@ class RouteInfoModel(BaseFieldModel):
             " relationship with the inference session."
         )
     )
-    session_id: uuid.UUID = Field(description="Unique ID referencing the inference session.")
+    session_id: Optional[uuid.UUID] = Field(
+        description="Unique ID referencing the inference session."
+    )
     traffic_ratio: NonNegativeFloat
 
 
