@@ -90,6 +90,7 @@ group_fields = FieldSet([
 image_fields = FieldSet([
     FieldSpec("id"),
     FieldSpec("name"),
+    FieldSpec("project"),
     FieldSpec("registry"),
     FieldSpec("architecture"),
     FieldSpec("tag"),

@@ -52,7 +52,7 @@ async def verify_session_events(
 async def verify_bgtask_events(
     client_session: AsyncSession,
     bgtask_id: str,
-    expected_event: str,
+    expected_events: set[str],
     failure_events: set[str],
 ) -> Optional[str]:
     """
@@ -68,12 +68,12 @@ async def verify_bgtask_events(
 
     async with client_session.BackgroundTask(bgtask_id).listen_events() as response:
         async for ev in response:
-            if ev.event == expected_event:
+            if ev.event in expected_events:
                 data = load_json(ev.data)
                 return data.get("message")
 
             if ev.event in failure_events:
                 raise RuntimeError(
-                    f"Got failure event: {ev.event}, Expected event: {expected_event}"
+                    f"Got failure event: {ev.event}, Expected event: {expected_events}"
                 )
     return None

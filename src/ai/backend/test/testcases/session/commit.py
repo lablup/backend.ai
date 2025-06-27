@@ -22,7 +22,7 @@ class InteractiveSessionImagifySuccess(TestCode):
             verify_bgtask_events(
                 client_session,
                 result["task_id"],
-                BgtaskStatus.DONE,
+                {BgtaskStatus.DONE},
                 {BgtaskStatus.FAILED, BgtaskStatus.CANCELLED, BgtaskStatus.PARTIAL_SUCCESS},
             ),
             timeout,
@@ -47,6 +47,6 @@ class InteractiveSessionCommitSuccess(TestCode):
         await verify_bgtask_events(
             client_session,
             result["bgtask_id"],
-            BgtaskStatus.DONE,
+            {BgtaskStatus.DONE},
             {BgtaskStatus.FAILED, BgtaskStatus.CANCELLED, BgtaskStatus.PARTIAL_SUCCESS},
         )

@@ -61,6 +61,13 @@ class CreatedSessionMetaContext(BaseTestContext[CreatedSessionMeta]):
         return ContextName.CREATED_SESSION_META
 
 
+class RescannedImagesContext(BaseTestContext[CreatedSessionMeta]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.CREATED_SESSION_META
+
+
 class SessionDependencyContext(BaseTestContext[SessionDependency]):
     @override
     @classmethod
