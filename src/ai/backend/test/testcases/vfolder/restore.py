@@ -17,3 +17,6 @@ class VFolderRestoreSuccess(TestCode):
             await client_session.VFolder(str(vfolder_meta.name)).restore()
         except Exception as e:
             raise AssertionError(f"Failed to restore vfolder: {e}")
+
+        vfolder_info = await client_session.VFolder(str(vfolder_meta.name)).info()
+        assert vfolder_info["status"] == "ready", "VFolder is not restored successfully"
