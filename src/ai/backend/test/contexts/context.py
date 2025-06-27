@@ -36,7 +36,6 @@ class ContextName(enum.StrEnum):
     TEST_ERROR_OUTPUT_DIRECTORY = "test_error_output_directory"
     SESSION_DEPENDENCY = "session_dependency"
     VFOLDER = "vfolder"
-    AUTO_SCALING_RULE = "auto_scaling_rule"
 
     CREATED_VFOLDER_META = "created_vfolder_meta"
     CREATED_SESSION_META = "created_session_meta"

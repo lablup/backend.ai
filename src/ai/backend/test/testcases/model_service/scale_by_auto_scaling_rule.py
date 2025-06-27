@@ -5,7 +5,6 @@ from uuid import UUID
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.model_service import (
-    AutoScalingRuleContext,
     CreatedModelServiceEndpointMetaContext,
     ModelServiceContext,
 )
@@ -23,10 +22,14 @@ class ScaleByAutoScalingRules(TestCode):
         service_id = endpoint_meta.service_id
         client_session = ClientSessionContext.current()
         model_service_dep = ModelServiceContext.current()
-        auto_scaling_rule_dep = AutoScalingRuleContext.current()
-        max_replicas = auto_scaling_rule_dep.max_replicas
+        auto_scaling_rule = model_service_dep.auto_scaling_rule
+        if auto_scaling_rule is None:
+            raise DependencyNotSet("AutoScalingRuleContext must be set in ModelServiceContext")
+
+        max_replicas = auto_scaling_rule.max_replicas
         if max_replicas is None:
             raise DependencyNotSet("AutoScalingRuleContext.max_replicas must be set")
+
         vfolder_id = await client_session.VFolder(
             name=model_service_dep.model_vfolder_name
         ).get_id()

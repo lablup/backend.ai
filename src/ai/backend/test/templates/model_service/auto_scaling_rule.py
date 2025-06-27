@@ -5,11 +5,12 @@ from typing import AsyncIterator, override
 from ai.backend.client.utils import to_global_id
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.model_service import (
-    AutoScalingRuleContext,
     CreatedAutoScalingRuleIDContext,
     CreatedModelServiceEndpointMetaContext,
+    ModelServiceContext,
 )
 from ai.backend.test.templates.template import WrapperTestTemplate
+from ai.backend.test.utils.exceptions import DependencyNotSet
 
 
 class AutoScalingRuleTemplate(WrapperTestTemplate):
@@ -20,7 +21,10 @@ class AutoScalingRuleTemplate(WrapperTestTemplate):
     @override
     @actxmgr
     async def _context(self) -> AsyncIterator[None]:
-        auto_scaling_rule_dep = AutoScalingRuleContext.current()
+        model_service_dep = ModelServiceContext.current()
+        auto_scaling_rule_dep = model_service_dep.auto_scaling_rule
+        if auto_scaling_rule_dep is None:
+            raise DependencyNotSet("AutoScalingRuleContext must be set in ModelServiceContext")
         client_session = ClientSessionContext.current()
         endpoint_meta = CreatedModelServiceEndpointMetaContext.current()
 

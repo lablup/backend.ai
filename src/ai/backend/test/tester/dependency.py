@@ -132,53 +132,6 @@ class SessionImagifyDep(BaseDependencyModel):
     )
 
 
-class ModelServiceDep(BaseDependencyModel):
-    model_vfolder_name: str = Field(
-        description="The model VFolder name to use for the model service.",
-        examples=["vfolder-name"],
-    )
-    replicas: int = Field(
-        description="The number of replicas for the model service.",
-        examples=[1, 2, 3],
-    )
-    runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant.CUSTOM,
-        description="The runtime variant for the model service.",
-        examples=[v.name for v in RuntimeVariant],
-    )
-    # Separate group is required for the model service, so we placed this independently from the group context.
-    group_name: str = Field(
-        description="The group name for the model service.",
-        examples=["model-store"],
-    )
-    model_mount_destination: str = Field(
-        default="models",
-        description="The destination path for the model mount in the model service.",
-        examples=["models"],
-    )
-    model_definition_path: str = Field(
-        default="./model-definition.yaml",
-        description="The path to the model definition file in the model service.",
-        examples=["./model-definition.yaml"],
-    )
-
-
-class VFolderDep(BaseDependencyModel):
-    group: Optional[str] = Field(
-        default=None,
-        description="The group name for the vfolder.",
-    )
-    unmanaged_path: Optional[str] = Field(
-        default=None, description="The unmanaged path for the vfolder."
-    )
-    permission: str = Field(
-        description="The permission for the vfolder.",
-    )
-    cloneable: bool = Field(
-        description="Whether the vfolder is cloneable.",
-    )
-
-
 class AutoScalingRuleDep(BaseDependencyModel):
     metric_source: str = Field(
         description="The source of the metric for auto-scaling.",
@@ -213,6 +166,56 @@ class AutoScalingRuleDep(BaseDependencyModel):
         default=None,
         description="The minimum number of replicas for the service.",
         examples=[1, 2],
+    )
+
+
+class ModelServiceDep(BaseDependencyModel):
+    model_vfolder_name: str = Field(
+        description="The model VFolder name to use for the model service.",
+        examples=["vfolder-name"],
+    )
+    replicas: int = Field(
+        description="The number of replicas for the model service.",
+        examples=[1, 2, 3],
+    )
+    runtime_variant: RuntimeVariant = Field(
+        default=RuntimeVariant.CUSTOM,
+        description="The runtime variant for the model service.",
+        examples=[v.name for v in RuntimeVariant],
+    )
+    # Separate group is required for the model service, so we placed this independently from the group context.
+    group_name: str = Field(
+        description="The group name for the model service.",
+        examples=["model-store"],
+    )
+    model_mount_destination: str = Field(
+        default="models",
+        description="The destination path for the model mount in the model service.",
+        examples=["models"],
+    )
+    model_definition_path: str = Field(
+        default="./model-definition.yaml",
+        description="The path to the model definition file in the model service.",
+        examples=["./model-definition.yaml"],
+    )
+    auto_scaling_rule: Optional[AutoScalingRuleDep] = Field(
+        description="The auto-scaling rule for the model service.",
+    )
+
+
+class VFolderDep(BaseDependencyModel):
+    group: Optional[str] = Field(
+        default=None,
+        description="The group name for the vfolder.",
+    )
+    unmanaged_path: Optional[str] = Field(
+        default=None, description="The unmanaged path for the vfolder."
+    )
+    permission: str = Field(
+        description="The permission for the vfolder.",
+    )
+    cloneable: bool = Field(
+        description="Whether the vfolder is cloneable.",
     )
 
 
