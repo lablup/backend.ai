@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
@@ -156,6 +156,7 @@ class AutoScalingRuleDep(BaseDependencyModel):
     )
     step_size: int = Field(
         description="The step size for scaling up or down.",
+        gt=0,
         examples=[1, 2],
     )
     cooldown_seconds: int = Field(
@@ -172,6 +173,15 @@ class AutoScalingRuleDep(BaseDependencyModel):
         description="The minimum number of replicas for the service.",
         examples=[1, 2],
     )
+
+    @model_validator(mode="after")
+    def check_replicas(self) -> "AutoScalingRuleDep":
+        if self.max_replicas is not None and self.min_replicas is not None:
+            if self.max_replicas < self.min_replicas:
+                raise ValueError(
+                    f"max_replicas ({self.max_replicas}) must be >= min_replicas ({self.min_replicas})"
+                )
+        return self
 
 
 class ModelServiceDep(BaseDependencyModel):
@@ -206,6 +216,25 @@ class ModelServiceDep(BaseDependencyModel):
     auto_scaling_rule: Optional[AutoScalingRuleDep] = Field(
         description="The auto-scaling rule for the model service.",
     )
+
+    @model_validator(mode="after")
+    def check_replicas(self) -> "ModelServiceDep":
+        if self.auto_scaling_rule is None:
+            return self
+
+        auto_scaling = self.auto_scaling_rule
+
+        if auto_scaling.max_replicas is not None and self.replicas > auto_scaling.max_replicas:
+            raise ValueError(
+                f"replicas ({self.replicas}) cannot exceed max_replicas ({auto_scaling.max_replicas})"
+            )
+
+        if auto_scaling.min_replicas is not None and self.replicas < auto_scaling.min_replicas:
+            raise ValueError(
+                f"replicas ({self.replicas}) cannot be less than min_replicas ({auto_scaling.min_replicas})"
+            )
+
+        return self
 
 
 class VFolderDep(BaseDependencyModel):
