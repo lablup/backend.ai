@@ -2,7 +2,12 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.types import (
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
+    ClusterMode,
+    RuntimeVariant,
+)
 
 
 class BaseDependencyModel(BaseModel):
@@ -133,9 +138,9 @@ class SessionImagifyDep(BaseDependencyModel):
 
 
 class AutoScalingRuleDep(BaseDependencyModel):
-    metric_source: str = Field(
+    metric_source: AutoScalingMetricSource = Field(
         description="The source of the metric for auto-scaling.",
-        examples=["KERNEL", "INFERENCE_FRAMEWORK"],
+        examples=[AutoScalingMetricSource.KERNEL, AutoScalingMetricSource.INFERENCE_FRAMEWORK],
     )
     metric_name: str = Field(
         description="The name of the metric to monitor for auto-scaling.",
@@ -145,9 +150,9 @@ class AutoScalingRuleDep(BaseDependencyModel):
         description="The threshold value for triggering auto-scaling.",
         examples=["0.8", "0.5"],
     )
-    comparator: str = Field(
+    comparator: AutoScalingMetricComparator = Field(
         description="The comparator to use for the threshold.",
-        examples=["GREATER_THAN", "LESS_THAN"],
+        examples=[AutoScalingMetricComparator.GREATER_THAN, AutoScalingMetricComparator.LESS_THAN],
     )
     step_size: int = Field(
         description="The step size for scaling up or down.",

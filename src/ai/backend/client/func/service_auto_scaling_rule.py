@@ -109,10 +109,10 @@ class ServiceAutoScalingRule(BaseFunction):
             q,
             {
                 "endpoint": str(service),
-                "metric_source": metric_source,
+                "metric_source": AutoScalingMetricSource(metric_source).name,
                 "metric_name": metric_name,
                 "threshold": threshold,
-                "comparator": comparator,
+                "comparator": AutoScalingMetricComparator(comparator).name,
                 "step_size": step_size,
                 "cooldown_seconds": cooldown_seconds,
                 "min_replicas": min_replicas,
@@ -173,6 +173,10 @@ class ServiceAutoScalingRule(BaseFunction):
             """
         )
         inputs: dict[str, Any] = {}
+        if isinstance(metric_source, AutoScalingMetricSource):
+            metric_source = metric_source.name  # type: ignore
+        if isinstance(comparator, AutoScalingMetricComparator):
+            comparator = comparator.name  # type: ignore
         set_if_set(inputs, "metric_source", metric_source)
         set_if_set(inputs, "metric_name", metric_name)
         set_if_set(inputs, "threshold", threshold)
