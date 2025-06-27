@@ -57,6 +57,18 @@ class PlainTextFilesUploader(WrapperTestTemplate):
                 recursive=True,
             )
 
+            response = await client_session.VFolder(vfolder_meta.name).list_files()
+
+            assert "items" in response, "Response does not contain 'items' key."
+            assert len(response["items"]) > 0, "Response items list is empty."
+
+            directory_names = [
+                item["name"] for item in response["items"] if item["type"] == "DIRECTORY"
+            ]
+            assert test_dirname in directory_names, (
+                f"Directory '{test_dirname}' not found in response."
+            )
+
             with UploadedFilesContext.with_current(
                 UploadedFilesMeta(
                     files=uploaded_files,
