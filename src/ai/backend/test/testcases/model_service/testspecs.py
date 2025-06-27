@@ -9,6 +9,7 @@ from ai.backend.test.templates.model_service.endpoint import (
     PublicEndpointTemplate,
 )
 from ai.backend.test.templates.model_service.jwt_token import ModelServiceTokenTemplate
+from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.testcases.model_service.health_check import (
     EndpointHealthCheck,
     EndpointHealthCheckWithToken,
@@ -18,8 +19,6 @@ from ai.backend.test.testcases.model_service.scale_by_auto_scaling_rule import (
 )
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep
-
-from ...templates.template import BasicTestTemplate, NopTestCode
 
 MODEL_SERVICE_TEST_SPECS = {
     "creation_endpoint_success": TestSpec(
@@ -57,7 +56,7 @@ MODEL_SERVICE_TEST_SPECS = {
     "creation_public_endpoint_success": TestSpec(
         name="creation_public_endpoint_success",
         description=textwrap.dedent("""\
-            Test for successful creation of an endpoint.
+            Test for successful creation of an endpoixsnt.
             This test verifies that an endpoint can be created successfully.
             The test will:
             1. Create an endpoint with a specified name and resources.
@@ -100,37 +99,6 @@ MODEL_SERVICE_TEST_SPECS = {
         template=BasicTestTemplate(
             EndpointHealthCheckWithToken(expected_status_codes={200})
         ).with_wrappers(KeypairAuthTemplate, EndpointTemplate, ModelServiceTokenTemplate),
-        parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
-        },
-    ),
-    "creation_auto_scaling_rule_success": TestSpec(
-        name="creation_auto_scaling_rule_success",
-        description=textwrap.dedent("""\
-            Test for successful creation of an auto-scaling rule.
-            This test verifies that an auto-scaling rule can be created successfully.
-            The test will:
-            1. Create an auto-scaling rule with specified parameters.
-            2. Verify that the auto-scaling rule is created and available.
-            3. Clean up the auto-scaling rule after verification.
-        """),
-        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE},
-        template=BasicTestTemplate(NopTestCode()).with_wrappers(
-            KeypairAuthTemplate, EndpointTemplate, AutoScalingRuleTemplate
-        ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
                 ClusterDep(
