@@ -15,7 +15,9 @@ from ai.backend.test.utils.exceptions import DependencyNotSet
 _AUTO_SCALING_RULE_NODE_NAME = "endpoint_auto_scaling_rule_node"
 
 
-class AutoScalingRuleTemplate(WrapperTestTemplate):
+class _BaseAutoScalingRuleTemplate(WrapperTestTemplate):
+    step_size_sign: int = 1  # 1 for scale up, -1 for scale down
+
     @property
     def name(self) -> str:
         return "auto_scaling_rule"
@@ -27,17 +29,18 @@ class AutoScalingRuleTemplate(WrapperTestTemplate):
         auto_scaling_rule_dep = model_service_dep.auto_scaling_rule
         if auto_scaling_rule_dep is None:
             raise DependencyNotSet("AutoScalingRuleContext must be set in ModelServiceContext")
+
         client_session = ClientSessionContext.current()
         endpoint_meta = CreatedModelServiceEndpointMetaContext.current()
 
         try:
             result = await client_session.ServiceAutoScalingRule.create(
                 service=endpoint_meta.service_id,
-                metric_source=auto_scaling_rule_dep.metric_source,  # type: ignore
+                metric_source=auto_scaling_rule_dep.metric_source,
                 metric_name=auto_scaling_rule_dep.metric_name,
                 threshold=Decimal(auto_scaling_rule_dep.threshold),
-                comparator=auto_scaling_rule_dep.comparator,  # type: ignore
-                step_size=auto_scaling_rule_dep.step_size,
+                comparator=auto_scaling_rule_dep.comparator,
+                step_size=abs(auto_scaling_rule_dep.step_size) * self.step_size_sign,
                 cooldown_seconds=auto_scaling_rule_dep.cooldown_seconds,
                 min_replicas=auto_scaling_rule_dep.min_replicas,
                 max_replicas=auto_scaling_rule_dep.max_replicas,
@@ -47,3 +50,11 @@ class AutoScalingRuleTemplate(WrapperTestTemplate):
         finally:
             global_rule_id = to_global_id(_AUTO_SCALING_RULE_NODE_NAME, result.rule_id)
             await client_session.ServiceAutoScalingRule(global_rule_id).delete()  # type: ignore
+
+
+class ScaleUpAutoScalingRuleTemplate(_BaseAutoScalingRuleTemplate):
+    step_size_sign: int = 1
+
+
+class ScaleDownAutoScalingRuleTemplate(_BaseAutoScalingRuleTemplate):
+    step_size_sign: int = -1
