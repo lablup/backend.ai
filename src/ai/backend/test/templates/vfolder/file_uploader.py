@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
-from ai.backend.test.contexts.tester import TestSpecMetaContext
 from ai.backend.test.contexts.vfolder import (
     CreatedVFolderMetaContext,
     UploadedFilesContext,
@@ -23,10 +22,6 @@ class PlainTextFilesUploader(WrapperTestTemplate):
     @override
     @actxmgr
     async def _context(self) -> AsyncIterator[None]:
-        spec_meta = TestSpecMetaContext.current()
-        test_id = spec_meta.test_id
-        test_dirname = f"test-{str(test_id)[:8]}"
-
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()
         upload_deps = UploadFilesContext.current()
@@ -45,7 +40,7 @@ class PlainTextFilesUploader(WrapperTestTemplate):
 
                 uploaded_files.append(
                     UploadedFile(
-                        path=f"{test_dirname}/{upload_dep.path}",
+                        path=upload_dep.path,
                         content=upload_dep.content,
                     )
                 )
@@ -53,7 +48,6 @@ class PlainTextFilesUploader(WrapperTestTemplate):
             await client_session.VFolder(vfolder_meta.name).upload(
                 upload_paths,
                 basedir=upload_root,
-                dst_dir=test_dirname,
                 recursive=True,
             )
 
@@ -61,13 +55,6 @@ class PlainTextFilesUploader(WrapperTestTemplate):
 
             assert "items" in response, "Response does not contain 'items' key."
             assert len(response["items"]) > 0, "Response items list is empty."
-
-            directory_names = [
-                item["name"] for item in response["items"] if item["type"] == "DIRECTORY"
-            ]
-            assert test_dirname in directory_names, (
-                f"Directory '{test_dirname}' not found in response."
-            )
 
             with UploadedFilesContext.with_current(
                 UploadedFilesMeta(
