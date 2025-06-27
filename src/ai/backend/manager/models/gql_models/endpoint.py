@@ -533,6 +533,8 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         id: str,
     ) -> Self:
         _, rule_id = AsyncNode.resolve_global_id(info, id)
+        if rule_id is None:
+            rule_id = id
         try:
             _rule_id = RuleId(UUID(rule_id))
         except ValueError:
