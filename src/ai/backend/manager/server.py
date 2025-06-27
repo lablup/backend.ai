@@ -61,7 +61,7 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import ErrorCode
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import (
@@ -759,28 +759,31 @@ async def _make_message_queue(
     )
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = root_ctx.config_provider.config.manager.id
+    args = RedisMQArgs(
+        anycast_stream_key="events",
+        broadcast_channel="events_all",
+        consume_stream_keys=["events"],
+        subscribe_channels=["events_all"],
+        group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+        node_id=node_id,
+        db=REDIS_STREAM_DB,
+    )
     if root_ctx.config_provider.config.manager.use_experimental_redis_event_dispatcher:
         return HiRedisQueue(
             stream_redis_target,
-            HiRedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-                db=REDIS_STREAM_DB,
-            ),
+            args,
         )
     client = await ValkeyStreamClient.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
+        pubsub_channels={
+            "events_all",
+        },
     )
     return RedisQueue(
-        RedisMQArgs(
-            client=client,
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
-        ),
+        client,
+        args,
     )
 
 

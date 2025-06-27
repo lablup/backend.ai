@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from ai.backend.common import redis_helper
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.queue import MQMessage
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import (
@@ -36,10 +37,10 @@ async def redis_conn(redis_container):
 @pytest.fixture
 def queue_args(test_valkey_stream):
     return RedisMQArgs(
-        client=test_valkey_stream,
-        stream_key="test-stream",
+        anycast_stream_key="test-stream",
         group_name="test-group",
         node_id="test-node",
+        db=REDIS_STREAM_DB,
     )
 
 
@@ -52,7 +53,7 @@ async def redis_queue(test_valkey_stream, queue_args):
         # Group may already exist
         pass
 
-    queue = RedisQueue(queue_args)
+    queue = RedisQueue(test_valkey_stream, queue_args)
     yield queue
     await queue.close()
 

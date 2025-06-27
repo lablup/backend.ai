@@ -28,7 +28,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -329,15 +329,19 @@ async def _make_message_queue(
 ) -> AbstractMessageQueue:
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = local_config["storage-proxy"]["node-id"]
+    args = RedisMQArgs(
+        anycast_stream_key="events",
+        broadcast_channel="events_all",
+        consume_stream_keys=[],
+        subscribe_channels=["events_all"],
+        group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+        node_id=node_id,
+        db=REDIS_STREAM_DB,
+    )
     if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
         return HiRedisQueue(
             stream_redis_target,
-            HiRedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-                db=REDIS_STREAM_DB,
-            ),
+            args,
         )
     client = await ValkeyStreamClient.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
@@ -345,12 +349,8 @@ async def _make_message_queue(
         db=REDIS_STREAM_DB,
     )
     return RedisQueue(
-        RedisMQArgs(
-            client=client,
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
-        ),
+        client,
+        args,
     )
 
 

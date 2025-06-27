@@ -151,7 +151,7 @@ from ai.backend.common.json import (
     load_json,
 )
 from ai.backend.common.lock import FileLock
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -936,15 +936,19 @@ class AbstractAgent(
         Returns the message queue object.
         """
         node_id = self.local_config["agent"]["id"]
+        args = RedisMQArgs(
+            anycast_stream_key="events",
+            broadcast_channel="events_all",
+            consume_stream_keys=[],
+            subscribe_channels=["events_all"],
+            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+            node_id=node_id,
+            db=REDIS_STREAM_DB,
+        )
         if self.local_config["agent"].get("use-experimental-redis-event-dispatcher"):
             return HiRedisQueue(
                 stream_redis_target,
-                HiRedisMQArgs(
-                    stream_key="events",
-                    group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                    node_id=node_id,
-                    db=REDIS_STREAM_DB,
-                ),
+                args,
             )
         client = await ValkeyStreamClient.create(
             stream_redis_target,
@@ -952,12 +956,8 @@ class AbstractAgent(
             db=REDIS_STREAM_DB,
         )
         return RedisQueue(
-            RedisMQArgs(
-                client=client,
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-            ),
+            client,
+            args,
         )
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -1151,7 +1151,6 @@ class AbstractAgent(
         async_log_iterator: AsyncGenerator[bytes],
     ) -> None:
         chunk_size = self.local_config["agent"]["container-logs"]["chunk-size"]
-        log_key = f"containerlog.{container_id}"
         log_length = 0
         chunk_buffer = BytesIO()
         chunk_length = 0
