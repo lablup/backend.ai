@@ -852,7 +852,6 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/MountOptionModel"
             },
-            "default": {},
             "description": "Specifications about extra VFolders mounted to model service session. MODEL type VFolders are not allowed to be attached to model service session with this option.",
             "propertyNames": {
               "format": "uuid"
