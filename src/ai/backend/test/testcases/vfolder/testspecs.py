@@ -4,7 +4,7 @@ from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.testcases.vfolder.download import VFolderDownloadSuccess
+from ai.backend.test.testcases.vfolder.download import VFolderUploadAndDownloadSuccess
 
 VFOLDER_TEST_SPECS = {
     "upload_and_download_files_vfolder": TestSpec(
@@ -18,7 +18,7 @@ VFOLDER_TEST_SPECS = {
             4. Verify that the downloaded files match the uploaded files.
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
-        template=BasicTestTemplate(VFolderDownloadSuccess()).with_wrappers(
+        template=BasicTestTemplate(VFolderUploadAndDownloadSuccess()).with_wrappers(
             KeypairAuthTemplate, GeneralVFolderTemplate
         ),
     ),

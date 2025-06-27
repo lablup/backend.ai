@@ -8,7 +8,7 @@ from ai.backend.test.templates.template import TestCode
 _CONTENT = "This is a test file for VFolder download."
 
 
-class VFolderDownloadSuccess(TestCode):
+class VFolderUploadAndDownloadSuccess(TestCode):
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()
