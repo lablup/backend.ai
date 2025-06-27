@@ -1,6 +1,5 @@
 import textwrap
 
-from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.model_service.auto_scaling_rule import AutoScalingRuleTemplate
@@ -10,6 +9,7 @@ from ai.backend.test.templates.model_service.endpoint import (
 )
 from ai.backend.test.templates.model_service.jwt_token import ModelServiceTokenTemplate
 from ai.backend.test.templates.template import BasicTestTemplate
+from ai.backend.test.testcases.config import STANDARD_CLUSTER_CONFIGS
 from ai.backend.test.testcases.model_service.health_check import (
     EndpointHealthCheck,
     EndpointHealthCheckWithToken,
@@ -18,7 +18,6 @@ from ai.backend.test.testcases.model_service.scale_by_auto_scaling_rule import (
     ScaleByAutoScalingRules,
 )
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.tester.dependency import ClusterDep
 
 MODEL_SERVICE_TEST_SPECS = {
     "creation_endpoint_success": TestSpec(
@@ -37,26 +36,13 @@ MODEL_SERVICE_TEST_SPECS = {
             EndpointHealthCheck(expected_status_codes={400, 401})
         ).with_wrappers(KeypairAuthTemplate, EndpointTemplate),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "creation_public_endpoint_success": TestSpec(
         name="creation_public_endpoint_success",
         description=textwrap.dedent("""\
-            Test for successful creation of an endpoixsnt.
+            Test for successful creation of an endpoint.
             This test verifies that an endpoint can be created successfully.
             The test will:
             1. Create an endpoint with a specified name and resources.
@@ -68,20 +54,7 @@ MODEL_SERVICE_TEST_SPECS = {
             KeypairAuthTemplate, PublicEndpointTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "creation_private_endpoint_success": TestSpec(
@@ -100,20 +73,7 @@ MODEL_SERVICE_TEST_SPECS = {
             EndpointHealthCheckWithToken(expected_status_codes={200})
         ).with_wrappers(KeypairAuthTemplate, EndpointTemplate, ModelServiceTokenTemplate),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=3,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=3,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
     "scale_by_auto_scaling_rule_success": TestSpec(
@@ -132,20 +92,7 @@ MODEL_SERVICE_TEST_SPECS = {
             KeypairAuthTemplate, EndpointTemplate, AutoScalingRuleTemplate
         ),
         parametrizes={
-            ContextName.CLUSTER_CONFIG: [
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=2,
-                ),
-                ClusterDep(
-                    cluster_mode=ClusterMode.MULTI_NODE,
-                    cluster_size=2,
-                ),
-            ]
+            ContextName.CLUSTER_CONFIG: STANDARD_CLUSTER_CONFIGS,
         },
     ),
 }
