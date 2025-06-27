@@ -1,3 +1,4 @@
+import secrets
 from typing import Callable, Iterable, Mapping, Optional, Self
 
 from aiohttp import web
@@ -5,7 +6,7 @@ from aiohttp.typedefs import Handler
 
 type RequestPolicy = Callable[[web.Request], None]
 
-type ResponsePolicy = Callable[[web.StreamResponse], web.StreamResponse]
+type ResponsePolicy = Callable[[web.Request, web.StreamResponse], web.StreamResponse]
 
 
 @web.middleware
@@ -13,7 +14,7 @@ async def security_policy_middleware(request: web.Request, handler: Handler) -> 
     security_policy: SecurityPolicy = request.app["security_policy"]
     security_policy.check_request_policies(request)
     response = await handler(request)
-    return security_policy.apply_response_policies(response)
+    return security_policy.apply_response_policies(request, response)
 
 
 class SecurityPolicy:
@@ -52,6 +53,7 @@ class SecurityPolicy:
         except KeyError as e:
             raise ValueError(f"Unknown security policy name: {e}")
         if csp_config is not None:
+            request_policies.append(add_nonce_policy)
             response_policies.append(csp_policy_builder(csp_config))
         return cls(request_policies, response_policies)
 
@@ -59,9 +61,11 @@ class SecurityPolicy:
         for policy in self._request_policies:
             policy(request)
 
-    def apply_response_policies(self, response: web.StreamResponse) -> web.StreamResponse:
+    def apply_response_policies(
+        self, request: web.Request, response: web.StreamResponse
+    ) -> web.StreamResponse:
         for policy in self._response_policies:
-            response = policy(response)
+            response = policy(request, response)
         return response
 
 
@@ -93,26 +97,51 @@ def reject_access_for_unsafe_file_policy(request: web.Request) -> None:
         raise web.HTTPForbidden()
 
 
-def add_self_content_security_policy(response: web.StreamResponse) -> web.StreamResponse:
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
-    )
-    return response
+def add_nonce_policy(request: web.Request) -> None:
+    nonce = secrets.token_urlsafe(16)
+    request["request_nonce"] = nonce
 
 
 def csp_policy_builder(csp_config: Mapping[str, Optional[list[str]]]) -> ResponsePolicy:
-    csp = [key + " " + " ".join(value) for key, value in csp_config.items() if value]
-    csp_str = "; ".join(csp)
-    if csp_str:
-        csp_str = csp_str + ";"
+    nonce_targets_map: dict[str, bool] = {}
+    if "nonce-targets" in csp_config:
+        nonce_targets = csp_config["nonce-targets"]
+        if nonce_targets is None:
+            nonce_targets = []
+        for target in nonce_targets:
+            nonce_targets_map[target] = True
+    csp_config = {key: value for key, value in csp_config.items() if key != "nonce-targets"}
 
-    def policy(response: web.StreamResponse) -> web.StreamResponse:
+    def generate_csp(request: web.Request) -> Optional[str]:
+        csp = []
+        nonce = request.get("request_nonce")
+        for key, value in csp_config.items():
+            csp_fields: list[str] = []
+            if value is not None:
+                csp_fields.extend(value)
+            if nonce is not None and nonce_targets_map.get(key):
+                csp_fields.append(f"'nonce-{nonce}'")
+            if len(csp_fields) > 0:
+                csp.append(key + " " + " ".join(csp_fields))
+        if len(csp) == 0:
+            return None
+        csp_str = "; ".join(csp)
+        if csp_str:
+            csp_str = csp_str + ";"
+        return csp_str
+
+    def policy(request: web.Request, response: web.StreamResponse) -> web.StreamResponse:
+        csp_str = generate_csp(request)
+        if csp_str is None:
+            return response
         response.headers["Content-Security-Policy"] = csp_str
         return response
 
     return policy
 
 
-def set_content_type_nosniff_policy(response: web.StreamResponse) -> web.StreamResponse:
+def set_content_type_nosniff_policy(
+    _: web.Request, response: web.StreamResponse
+) -> web.StreamResponse:
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
