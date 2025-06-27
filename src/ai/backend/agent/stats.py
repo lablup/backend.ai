@@ -242,6 +242,16 @@ class MovingStatistics:
         return Decimal(0)
 
     @property
+    def diff_skip_first_zero(self) -> Decimal:
+        if len(self._last) == 2:
+            if self._last[-2][0] == Decimal(0):
+                # I FUCKING HATE THIS
+                # if the previous value is 0, we cannot calculate the difference
+                return Decimal(0)
+            return self._last[-1][0] - self._last[-2][0]
+        return Decimal(0)
+
+    @property
     def rate(self) -> Decimal:
         if len(self._last) == 2:
             return (self._last[-1][0] - self._last[-2][0]) / Decimal(
