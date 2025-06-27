@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
+from collections.abc import Collection
 
 import attrs
 from aiohttp import web

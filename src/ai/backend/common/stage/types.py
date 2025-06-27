@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar
+from typing import Generic, Optional, TypeVar, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -89,7 +89,7 @@ class ProvisionStage(Stage[TSpec, TResource]):
     It waits for the spec to be ready and then uses the provisioner to set up the resource.
     """
 
-    _provisioner: Provisioner
+    _provisioner: Provisioner[TSpec, TResource]
     _resource: Optional[TResource]
     _setup_completed: asyncio.Event
 
@@ -98,6 +98,7 @@ class ProvisionStage(Stage[TSpec, TResource]):
         self._resource = None
         self._setup_completed = asyncio.Event()
 
+    @override
     async def setup(self, spec_generator: SpecGenerator[TSpec]) -> None:
         """
         Sets up the lifecycle stage.
@@ -111,12 +112,14 @@ class ProvisionStage(Stage[TSpec, TResource]):
         finally:
             self._setup_completed.set()
 
+    @override
     async def wait_for_resource(self) -> TResource:
         await self._setup_completed.wait()
         if self._resource is None:
             raise RuntimeError("Resource setup failed")
         return self._resource
 
+    @override
     async def teardown(self) -> None:
         """
         Tears down the lifecycle stage.

@@ -221,6 +221,7 @@ class UserService:
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
         email = action.email
         data = action.modifier.fields_to_update()
+        print(f"{data = }")
         if data.get("password") is None:
             data.pop("password", None)
 
@@ -238,6 +239,7 @@ class UserService:
         user_update_data: dict[str, Any] = {}
         prev_domain_name: str
         prev_role: UserRole
+        print(f"{main_access_key = }")
 
         async def _pre_func(conn: SAConnection) -> None:
             nonlocal user_update_data, prev_domain_name, prev_role, main_access_key

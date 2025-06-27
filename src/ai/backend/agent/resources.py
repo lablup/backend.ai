@@ -464,6 +464,13 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
 
 
 @attrs.define(auto_attribs=True, slots=True)
+class ComputerContext:
+    instance: AbstractComputePlugin
+    devices: Collection[AbstractComputeDevice]
+    alloc_map: AbstractAllocMap
+
+
+@attrs.define(auto_attribs=True, slots=True)
 class Mount:
     type: MountTypes
     source: Optional[Path]
