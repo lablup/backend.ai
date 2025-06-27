@@ -176,8 +176,6 @@ class AutoScalingService:
                 row = await EndpointAutoScalingRuleRow.get(
                     db_session, action.id, load_endpoint=True
                 )
-                if row.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
-                    raise EndpointAutoScalingRuleNotFound
             except NoResultFound:
                 raise EndpointAutoScalingRuleNotFound
 
