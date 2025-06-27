@@ -12,6 +12,8 @@ from ai.backend.test.contexts.model_service import (
 from ai.backend.test.templates.template import WrapperTestTemplate
 from ai.backend.test.utils.exceptions import DependencyNotSet
 
+_AUTO_SCALING_RULE_NODE_NAME = "endpoint_auto_scaling_rule_node"
+
 
 class AutoScalingRuleTemplate(WrapperTestTemplate):
     @property
@@ -43,5 +45,5 @@ class AutoScalingRuleTemplate(WrapperTestTemplate):
             with CreatedAutoScalingRuleIDContext.with_current(result.rule_id):
                 yield
         finally:
-            global_rule_id = to_global_id("delete_endpoint_auto_scaling_rule_node", result.rule_id)
+            global_rule_id = to_global_id(_AUTO_SCALING_RULE_NODE_NAME, result.rule_id)
             await client_session.ServiceAutoScalingRule(global_rule_id).delete()  # type: ignore
