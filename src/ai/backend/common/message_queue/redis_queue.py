@@ -11,7 +11,6 @@ from aiotools.server import process_index
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from ..types import RedisConnectionInfo
 from .queue import AbstractMessageQueue, BroadcastMessage, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -24,10 +23,13 @@ _DEFAULT_AUTOCLAIM_COUNT = 64
 @dataclass
 class RedisMQArgs:
     # Required arguments
-    client: ValkeyStreamClient
-    stream_key: str
+    anycast_stream_key: str
+    broadcast_channel: str
+    consume_stream_keys: list[str]
+    subscribe_channels: list[str]
     group_name: str
     node_id: str
+    db: int
     # Optional arguments
     autoclaim_idle_timeout: int = _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT
     autoclaim_start_id: Optional[str] = None
@@ -35,7 +37,6 @@ class RedisMQArgs:
 
 class RedisQueue(AbstractMessageQueue):
     _client: ValkeyStreamClient
-    _conn: RedisConnectionInfo
     _consume_queue: asyncio.Queue[MQMessage]
     _subscribe_queue: asyncio.Queue[BroadcastMessage]
     _stream_key: str
@@ -44,27 +45,27 @@ class RedisQueue(AbstractMessageQueue):
     _consumer_id: str
     _closed: bool
     # loop tasks for consuming messages
-    _auto_claim_loop_task: asyncio.Task
-    _read_messages_task: asyncio.Task
-    _read_broadcast_messages_task: asyncio.Task
+    _tasks: list[asyncio.Task]
 
-    def __init__(self, args: RedisMQArgs) -> None:
-        self._client = args.client
+    def __init__(self, client: ValkeyStreamClient, args: RedisMQArgs) -> None:
+        self._client = client
         self._consume_queue = asyncio.Queue()
         self._subscribe_queue = asyncio.Queue()
-        self._stream_key = args.stream_key
-        self._broadcast_channel
+        self._stream_key = args.anycast_stream_key
+        self._broadcast_channel = args.broadcast_channel
         self._group_name = args.group_name
         self._consumer_id = _generate_consumer_id(args.node_id)
         self._closed = False
         start_id = args.autoclaim_start_id or "0-0"
-        self._auto_claim_loop_task = asyncio.create_task(
-            self._auto_claim_loop(start_id, args.autoclaim_idle_timeout)
-        )
-        self._read_messages_task = asyncio.create_task(self._read_messages_loop())
-        self._read_broadcast_messages_task = asyncio.create_task(
-            self._read_broadcast_messages_loop()
-        )
+        self._tasks = []
+        for stream_key in args.consume_stream_keys:
+            self._tasks.append(asyncio.create_task(self._read_messages_loop(stream_key)))
+            self._tasks.append(
+                asyncio.create_task(
+                    self._auto_claim_loop(stream_key, start_id, args.autoclaim_idle_timeout)
+                )
+            )
+        self._tasks.append(asyncio.create_task(self._read_broadcast_messages_loop()))
 
     async def send(self, payload: dict[bytes, bytes]) -> None:
         """
@@ -131,22 +132,26 @@ class RedisQueue(AbstractMessageQueue):
                 break
 
     async def done(self, msg_id: MessageId) -> None:
-        await self._client.done_stream_message(self._stream_key, self._group_name, msg_id)
+        await self._done(self._stream_key, msg_id)
+
+    async def _done(self, stream_key: str, msg_id: MessageId) -> None:
+        await self._client.done_stream_message(stream_key, self._group_name, msg_id)
 
     async def close(self) -> None:
         if self._closed:
             return
         self._closed = True
-        self._auto_claim_loop_task.cancel()
-        self._read_messages_task.cancel()
-        self._read_broadcast_messages_task.cancel()
+        for task in self._tasks:
+            task.cancel()
 
-    async def _auto_claim_loop(self, autoclaim_start_id: str, autoclaim_idle_timeout: int) -> None:
-        log.debug("Starting auto claim loop for stream {}", self._stream_key)
+    async def _auto_claim_loop(
+        self, stream_key: str, autoclaim_start_id: str, autoclaim_idle_timeout: int
+    ) -> None:
+        log.debug("Starting auto claim loop for stream {}", stream_key)
         while not self._closed:
             try:
                 next_start_id, claimed = await self._auto_claim(
-                    autoclaim_start_id, autoclaim_idle_timeout
+                    stream_key, autoclaim_start_id, autoclaim_idle_timeout
                 )
                 if claimed:
                     autoclaim_start_id = next_start_id
@@ -162,10 +167,10 @@ class RedisQueue(AbstractMessageQueue):
             await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
 
     async def _auto_claim(
-        self, autoclaim_start_id: str, autoclaim_idle_timeout: int
+        self, stream_key: str, autoclaim_start_id: str, autoclaim_idle_timeout: int
     ) -> tuple[str, bool]:
         message = await self._client.auto_claim_stream_message(
-            self._stream_key,
+            stream_key,
             self._group_name,
             self._consumer_id,
             autoclaim_start_id,
@@ -176,30 +181,30 @@ class RedisQueue(AbstractMessageQueue):
         for msg in message.messages:
             mq_msg = MQMessage(msg.msg_id, {**msg.payload})
             if mq_msg.retry():
-                await self._retry_message(mq_msg)
+                await self._retry_message(stream_key, mq_msg)
                 continue
             # discard the message
-            await self.done(mq_msg.msg_id)
+            await self._done(stream_key, mq_msg.msg_id)
         return autoclaim_start_id, len(message.messages) > 0
 
-    async def _retry_message(self, message: MQMessage) -> None:
+    async def _retry_message(self, stream_key: str, message: MQMessage) -> None:
         await self._client.reque_stream_message(
-            self._stream_key, self._group_name, message.msg_id, message.payload
+            stream_key, self._group_name, message.msg_id, message.payload
         )
 
-    async def _read_messages_loop(self) -> None:
-        log.debug("Reading messages from stream {}", self._stream_key)
+    async def _read_messages_loop(self, stream_key: str) -> None:
+        log.info("Starting read messages loop for stream {}", stream_key)
         while not self._closed:
             try:
-                await self._read_messages()
+                await self._read_messages(stream_key)
             except redis.exceptions.ResponseError as e:
                 await self._failover_consumer(e)
             except Exception as e:
                 log.error("Error while reading messages: {}", e)
 
-    async def _read_messages(self) -> None:
+    async def _read_messages(self, stream_key: str) -> None:
         payload = await self._client.read_consumer_group(
-            self._stream_key,
+            stream_key,
             self._group_name,
             self._consumer_id,
             count=_DEFAULT_AUTOCLAIM_COUNT,
@@ -212,7 +217,7 @@ class RedisQueue(AbstractMessageQueue):
             await self._consume_queue.put(mq_msg)
 
     async def _read_broadcast_messages_loop(self) -> None:
-        log.debug("Reading broadcast messages loop")
+        log.info("Starting read broadcast messages loop")
         while not self._closed:
             try:
                 await self._read_broadcast_messages()

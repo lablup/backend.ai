@@ -2,8 +2,9 @@ import asyncio
 
 import pytest
 
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import MQMessage
+from ai.backend.common.message_queue.redis_queue import RedisMQArgs
 from ai.backend.common.redis_client import RedisConnection
 from ai.backend.common.types import (
     RedisHelperConfig,
@@ -13,8 +14,11 @@ from ai.backend.common.types import (
 
 @pytest.fixture
 def queue_args():
-    return HiRedisMQArgs(
-        stream_key="test-stream",
+    return RedisMQArgs(
+        anycast_stream_key="test-stream",
+        broadcast_channel="test-broadcast",
+        consume_stream_keys=["test-stream"],
+        subscribe_channels=["test-broadcast"],
         group_name="test-group",
         node_id="test-node",
         db=0,

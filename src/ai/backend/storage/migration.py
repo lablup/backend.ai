@@ -238,11 +238,15 @@ async def check_and_upgrade(
         db=REDIS_STREAM_DB,
     )
     redis_mq = RedisQueue(
+        client,
         RedisMQArgs(
-            client=client,
-            stream_key="events",
+            anycast_stream_key="events",
+            broadcast_channel="events_all",
+            consume_stream_keys=[],
+            subscribe_channels=[],
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
     event_producer = EventProducer(

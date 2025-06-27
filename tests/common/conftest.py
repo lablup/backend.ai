@@ -108,11 +108,15 @@ async def test_valkey_stream(redis_container):  # noqa: F811
 @pytest.fixture
 async def test_valkey_stream_mq(test_valkey_stream, test_node_id):
     redis_mq = RedisQueue(
+        test_valkey_stream,
         RedisMQArgs(
-            client=test_valkey_stream,
-            stream_key="events",
+            anycast_stream_key="events",
+            broadcast_channel="events_broadcast",
+            consume_stream_keys=["events"],
+            subscribe_channels=["events_broadcast"],
             group_name=f"test-group-{random.randint(0, 1000)}",
             node_id=test_node_id,
+            db=REDIS_STREAM_DB,
         ),
     )
     try:
