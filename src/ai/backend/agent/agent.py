@@ -933,6 +933,12 @@ class AbstractAgent(
         """
         await cancel_tasks(self._ongoing_exec_batch_tasks)
 
+        for _, computer in self.computers.items():
+            try:
+                await computer.instance.cleanup()
+            except Exception:
+                log.exception("Failed to clean up computer instance:")
+
         async with self.registry_lock:
             # Close all pending kernel runners.
             for kernel_obj in self.kernel_registry.values():
