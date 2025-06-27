@@ -82,10 +82,7 @@ class AutoScalingService:
         async with self._db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await EndpointRow.get(db_session, action.endpoint_id)
-                if row.lifecycle_stage in (
-                    EndpointLifecycle.DESTROYING,
-                    EndpointLifecycle.DESTROYED,
-                ):
+                if row.lifecycle_stage in EndpointLifecycle.inactive_states():
                     raise EndpointNotFound
             except NoResultFound:
                 raise EndpointNotFound
@@ -138,10 +135,7 @@ class AutoScalingService:
                 row = await EndpointAutoScalingRuleRow.get(
                     db_session, action.id, load_endpoint=True
                 )
-                if row.endpoint_row.lifecycle_stage in (
-                    EndpointLifecycle.DESTROYING,
-                    EndpointLifecycle.DESTROYED,
-                ):
+                if row.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                     raise EndpointAutoScalingRuleNotFound
             except NoResultFound:
                 raise EndpointAutoScalingRuleNotFound
@@ -182,10 +176,7 @@ class AutoScalingService:
                 row = await EndpointAutoScalingRuleRow.get(
                     db_session, action.id, load_endpoint=True
                 )
-                if row.endpoint_row.lifecycle_stage in (
-                    EndpointLifecycle.DESTROYING,
-                    EndpointLifecycle.DESTROYED,
-                ):
+                if row.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                     raise EndpointAutoScalingRuleNotFound
             except NoResultFound:
                 raise EndpointAutoScalingRuleNotFound
