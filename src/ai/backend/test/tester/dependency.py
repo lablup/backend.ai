@@ -179,6 +179,17 @@ class VFolderDep(BaseDependencyModel):
     )
 
 
+class UploadFileDep(BaseDependencyModel):
+    path: str = Field(
+        description="The name of the file to upload.",
+        examples=["test_file.txt", "nested/inner_file.txt"],
+    )
+    content: str = Field(
+        description="The content of the file to upload.",
+        examples=["This is a test file content."],
+    )
+
+
 class TestContextInjectionModel(BaseDependencyModel):
     endpoint: Optional[EndpointDep] = Field(
         default=None,
