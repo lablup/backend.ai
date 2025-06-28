@@ -20,7 +20,6 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
-from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import (
     ConfigurationError,
     override_key,
@@ -332,8 +331,10 @@ async def _make_message_queue(
     args = RedisMQArgs(
         anycast_stream_key="events",
         broadcast_channel="events_all",
-        consume_stream_keys=[],
-        subscribe_channels=["events_all"],
+        consume_stream_keys=None,
+        subscribe_channels={
+            "events_all",
+        },
         group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=node_id,
         db=REDIS_STREAM_DB,
@@ -343,16 +344,8 @@ async def _make_message_queue(
             stream_redis_target,
             args,
         )
-    client = await ValkeyStreamClient.create(
+    return await RedisQueue.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-        pubsub_channels={
-            "events_all",
-        },
-    )
-    return RedisQueue(
-        client,
         args,
     )
 

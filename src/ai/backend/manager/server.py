@@ -44,7 +44,6 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
@@ -762,8 +761,12 @@ async def _make_message_queue(
     args = RedisMQArgs(
         anycast_stream_key="events",
         broadcast_channel="events_all",
-        consume_stream_keys=["events"],
-        subscribe_channels=["events_all"],
+        consume_stream_keys={
+            "events",
+        },
+        subscribe_channels={
+            "events_all",
+        },
         group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=node_id,
         db=REDIS_STREAM_DB,
@@ -773,16 +776,8 @@ async def _make_message_queue(
             stream_redis_target,
             args,
         )
-    client = await ValkeyStreamClient.create(
-        redis_profile_target.profile_target(RedisRole.STREAM),
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-        pubsub_channels={
-            "events_all",
-        },
-    )
-    return RedisQueue(
-        client,
+    return await RedisQueue.create(
+        stream_redis_target,
         args,
     )
 

@@ -1,5 +1,8 @@
+import asyncio
+import logging
+import time
 from dataclasses import dataclass
-from typing import List, Mapping, Optional, Self, cast
+from typing import Awaitable, Callable, List, Mapping, Optional, ParamSpec, Self, TypeVar, cast
 
 from glide import (
     GlideClient,
@@ -11,8 +14,13 @@ from glide import (
 
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.client import ValkeyClient
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.json import dump_json, load_json
+from ai.backend.common.metrics.metric import ClientMetricObserver, ClientType
 from ai.backend.common.types import RedisTarget
+from ai.backend.logging.utils import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MAX_STREAM_LENGTH = 128
 _DEFAULT_CACHE_EXPIRATION = 60  # 1 minutes
@@ -36,6 +44,57 @@ class AutoClaimMessage:
     messages: list[StreamMessage]
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def valkey_decorator(
+    retry_count: int = 3,
+    retry_delay: float = 0.1,
+) -> Callable[
+    [Callable[P, Awaitable[R]]],
+    Callable[P, Awaitable[R]],
+]:
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+        observer = ClientMetricObserver.instance()
+
+        async def wrapper(*args, **kwargs) -> R:
+            log.debug("Calling {} with args: {}, kwargs: {}", func.__name__, args, kwargs)
+            start = time.perf_counter()
+            for attempt in range(retry_count):
+                try:
+                    observer.observe_client_operation_triggered(
+                        client_type=ClientType.VALKEY,
+                        operation=func.__name__,
+                    )
+                    res = await func(*args, **kwargs)
+                    observer.observe_client_operation(
+                        client_type=ClientType.VALKEY,
+                        operation=func.__name__,
+                        success=True,
+                        duration=time.perf_counter() - start,
+                    )
+                    return res
+                except Exception as e:
+                    if attempt < retry_count - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    observer.observe_client_operation(
+                        client_type=ClientType.VALKEY,
+                        operation=func.__name__,
+                        success=False,
+                        duration=time.perf_counter() - start,
+                    )
+                    raise e
+            raise UnreachableError(
+                f"Reached unreachable code in {func.__name__} after {retry_count} attempts"
+            )
+
+        return wrapper
+
+    return decorator
+
+
 class ValkeyStreamClient(ValkeyClient):
     """
     Client for interacting with Valkey Streams using GlideClient.
@@ -43,10 +102,12 @@ class ValkeyStreamClient(ValkeyClient):
 
     _client: GlideClient
     _is_cluster_mode: bool
+    _closed: bool
 
     def __init__(self, client: GlideClient, is_cluster_mode: bool) -> None:
         self._client = client
         self._is_cluster_mode = is_cluster_mode
+        self._closed = False
 
     @classmethod
     async def create(
@@ -75,8 +136,13 @@ class ValkeyStreamClient(ValkeyClient):
         """
         Close the ValkeyStreamClient connection.
         """
+        if self._closed:
+            log.warning("ValkeyStreamClient is already closed.")
+            return
+        self._closed = True
         await self._client.close()
 
+    @valkey_decorator()
     async def make_consumer_group(
         self,
         stream_key: str,
@@ -94,6 +160,7 @@ class ValkeyStreamClient(ValkeyClient):
             stream_key, group_name, "$", StreamGroupOptions(make_stream=True)
         )
 
+    @valkey_decorator()
     async def read_consumer_group(
         self,
         stream_key: str,
@@ -131,6 +198,7 @@ class ValkeyStreamClient(ValkeyClient):
                 messages.append(StreamMessage.from_list(msg_id, msg_data))
         return messages
 
+    @valkey_decorator(retry_count=3, retry_delay=0.1)
     async def done_stream_message(
         self,
         stream_key: str,
@@ -147,6 +215,7 @@ class ValkeyStreamClient(ValkeyClient):
         """
         await self._client.xack(stream_key, group_name, [message_id])
 
+    @valkey_decorator()
     async def enqueue_stream_message(
         self,
         stream_key: str,
@@ -168,6 +237,7 @@ class ValkeyStreamClient(ValkeyClient):
             ),
         )
 
+    @valkey_decorator()
     async def reque_stream_message(
         self,
         stream_key: str,
@@ -196,6 +266,7 @@ class ValkeyStreamClient(ValkeyClient):
         )
         await self._client.exec(tx, raise_on_error=True)
 
+    @valkey_decorator()
     async def auto_claim_stream_message(
         self,
         stream_key: str,
@@ -237,10 +308,11 @@ class ValkeyStreamClient(ValkeyClient):
             messages=messages,
         )
 
+    @valkey_decorator()
     async def broadcast(
         self,
         channel: str,
-        payload: Mapping[bytes, bytes],
+        payload: Mapping[str, str | bytes],
     ) -> None:
         """
         Broadcast a message to a channel.
@@ -252,11 +324,12 @@ class ValkeyStreamClient(ValkeyClient):
         message = dump_json(payload)
         await self._client.publish(message=message, channel=channel)
 
+    @valkey_decorator()
     async def broadcast_with_cache(
         self,
         channel: str,
         cache_id: str,
-        payload: Mapping[bytes, bytes],
+        payload: Mapping[str, str | bytes],
         timeout: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -283,6 +356,7 @@ class ValkeyStreamClient(ValkeyClient):
         )
         await self._client.exec(tx, raise_on_error=True)
 
+    @valkey_decorator()
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
@@ -298,9 +372,10 @@ class ValkeyStreamClient(ValkeyClient):
             return None
         return result
 
+    @valkey_decorator()
     async def receive_broadcast_message(
         self,
-    ) -> Mapping[bytes, bytes]:
+    ) -> Mapping[str, str]:
         """
         Receive a broadcast message from a channel.
         This method blocks until a message is received.
@@ -310,6 +385,7 @@ class ValkeyStreamClient(ValkeyClient):
         message = await self._client.get_pubsub_message()
         return load_json(message.message)
 
+    @valkey_decorator()
     async def enqueue_container_logs(
         self,
         container_id: str,
@@ -335,6 +411,7 @@ class ValkeyStreamClient(ValkeyClient):
         )
         await self._client.exec(tx, raise_on_error=True)
 
+    @valkey_decorator()
     async def container_log_len(
         self,
         container_id: str,
@@ -349,6 +426,7 @@ class ValkeyStreamClient(ValkeyClient):
         key = self._container_log_key(container_id)
         return await self._client.llen(key)
 
+    @valkey_decorator()
     async def pop_container_logs(
         self,
         container_id: str,
@@ -364,6 +442,7 @@ class ValkeyStreamClient(ValkeyClient):
         key = self._container_log_key(container_id)
         return await self._client.lpop_count(key, count)
 
+    @valkey_decorator()
     async def clear_container_logs(
         self,
         container_id: str,
