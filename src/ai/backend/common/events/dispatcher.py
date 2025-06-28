@@ -28,7 +28,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.message_queue.queue import AbstractMessageQueue, MessageId
+from ai.backend.common.message_queue.queue import AbstractMessageQueue, BroadcastMessage, MessageId
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import msgpack
@@ -603,11 +603,12 @@ class EventDispatcher(EventDispatcherGroup):
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:
                 return
-            decoded_event_name = msg.payload[b"name"].decode()
+            msg = cast(BroadcastMessage, msg)
+            decoded_event_name = msg.payload["name"].decode()
             await self.dispatch_subscribers(
                 decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
+                AgentId(msg.payload["source"].decode()),
+                msgpack.unpackb(msg.payload["args"]),
             )
 
 
@@ -664,9 +665,9 @@ class EventProducer:
             source_bytes = source_override.encode()
 
         raw_event = {
-            b"name": event.event_name().encode(),
-            b"source": source_bytes,
-            b"args": msgpack.packb(event.serialize()),
+            "name": event.event_name().encode(),
+            "source": source_bytes,
+            "args": msgpack.packb(event.serialize()),
         }
         await self._msg_queue.broadcast(raw_event)
 
@@ -681,9 +682,9 @@ class EventProducer:
         """
         source_bytes = self._source_bytes
         raw_event = {
-            b"name": event.event_name().encode(),
-            b"source": source_bytes,
-            b"args": msgpack.packb(event.serialize()),
+            "name": event.event_name().encode(),
+            "source": source_bytes,
+            "args": msgpack.packb(event.serialize()),
         }
         await self._msg_queue.broadcast_with_cache(
             cache_id,

@@ -16,7 +16,6 @@ import pytest
 from redis.asyncio import Redis
 
 from ai.backend.common import config
-from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -110,22 +109,21 @@ async def run_timer(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = RedisTarget(
+    redis_target = RedisTarget(
         addr=redis_addr, redis_helper_config=config.redis_helper_default_config
     )
     node_id = f"{test_case_ns}-node-{threading.get_ident()}"
-    client = await ValkeyStreamClient.create(
-        redis_config,
-        name="event_producer.stream",
-        db=REDIS_STREAM_DB,
-    )
-    redis_mq = RedisQueue(
-        client,
+    redis_mq = await RedisQueue.create(
+        redis_target,
         RedisMQArgs(
             anycast_stream_key="events",
             broadcast_channel="events_broadcast",
-            consume_stream_keys=["events"],
-            subscribe_channels=["events_broadcast"],
+            consume_stream_keys={
+                "events",
+            },
+            subscribe_channels={
+                "events_broadcast",
+            },
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
             db=REDIS_STREAM_DB,

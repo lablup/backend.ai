@@ -939,8 +939,10 @@ class AbstractAgent(
         args = RedisMQArgs(
             anycast_stream_key="events",
             broadcast_channel="events_all",
-            consume_stream_keys=[],
-            subscribe_channels=["events_all"],
+            consume_stream_keys=None,
+            subscribe_channels={
+                "events_all",
+            },
             group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=node_id,
             db=REDIS_STREAM_DB,
@@ -950,16 +952,8 @@ class AbstractAgent(
                 stream_redis_target,
                 args,
             )
-        client = await ValkeyStreamClient.create(
+        return await RedisQueue.create(
             stream_redis_target,
-            name="event_producer.stream",
-            db=REDIS_STREAM_DB,
-            pubsub_channels={
-                "events_all",
-            },
-        )
-        return RedisQueue(
-            client,
             args,
         )
 

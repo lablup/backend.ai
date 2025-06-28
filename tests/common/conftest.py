@@ -85,7 +85,7 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
 
 @pytest.fixture
 async def test_valkey_stream(redis_container):  # noqa: F811
-    redis_config = RedisTarget(
+    redis_target = RedisTarget(
         addr=redis_container[1],
         redis_helper_config={
             "socket_timeout": 5.0,
@@ -94,9 +94,10 @@ async def test_valkey_stream(redis_container):  # noqa: F811
         },
     )
     client = await ValkeyStreamClient.create(
-        redis_config,
+        redis_target,
         name="event_producer.stream",
         db=REDIS_STREAM_DB,
+        pubsub_channels=["test-broadcast"],
     )
     try:
         yield client
@@ -106,9 +107,17 @@ async def test_valkey_stream(redis_container):  # noqa: F811
 
 
 @pytest.fixture
-async def test_valkey_stream_mq(test_valkey_stream, test_node_id):
-    redis_mq = RedisQueue(
-        test_valkey_stream,
+async def test_valkey_stream_mq(test_node_id):
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    redis_mq = await RedisQueue.create(
+        redis_target,
         RedisMQArgs(
             anycast_stream_key="events",
             broadcast_channel="events_broadcast",

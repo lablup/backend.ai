@@ -57,13 +57,14 @@ class HiRedisQueue(AbstractMessageQueue):
         self._closed = False
         start_id = args.autoclaim_start_id or "0-0"
         self._loop_tasks = []
-        for stream_key in args.consume_stream_keys:
-            self._loop_tasks.append(asyncio.create_task(self._read_messages_loop(stream_key)))
-            self._loop_tasks.append(
-                asyncio.create_task(
-                    self._auto_claim_loop(stream_key, start_id, args.autoclaim_idle_timeout)
+        if args.consume_stream_keys:
+            for stream_key in args.consume_stream_keys:
+                self._loop_tasks.append(asyncio.create_task(self._read_messages_loop(stream_key)))
+                self._loop_tasks.append(
+                    asyncio.create_task(
+                        self._auto_claim_loop(stream_key, start_id, args.autoclaim_idle_timeout)
+                    )
                 )
-            )
         if args.subscribe_channels:
             self._loop_tasks.append(
                 asyncio.create_task(self._read_broadcast_messages_loop(args.subscribe_channels))
@@ -81,7 +82,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 *pieces,
             ])
 
-    async def broadcast(self, payload: dict[bytes, bytes]) -> None:
+    async def broadcast(self, payload: Mapping[str, str | bytes]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
             await client.execute([
@@ -90,10 +91,10 @@ class HiRedisQueue(AbstractMessageQueue):
                 payload_bytes,
             ])
 
-    async def broadcast_with_cache(self, cache_id: str, payload: dict[bytes, bytes]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str | bytes]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
-            args = []
+            args: list[str | bytes] = []
             for k, v in payload.items():
                 args.append(k)
                 args.append(v)
@@ -287,7 +288,7 @@ class HiRedisQueue(AbstractMessageQueue):
                     msg = MQMessage(msg_id, payload)
                     await self._consume_queue.put(msg)
 
-    async def _read_broadcast_messages_loop(self, subscribe_channels: list[str]) -> None:
+    async def _read_broadcast_messages_loop(self, subscribe_channels: set[str]) -> None:
         log.info("Starting broadcast messages reading loop for channels: {}", subscribe_channels)
         while not self._closed:
             try:
@@ -298,11 +299,12 @@ class HiRedisQueue(AbstractMessageQueue):
                 log.error("Error while reading broadcast messages: {}", e)
                 await asyncio.sleep(_DEFAULT_AUTO_RECONNECT_INTERVAL)
 
-    async def _read_broadcast_messages(self, subscribe_channels: list[str]) -> None:
+    async def _read_broadcast_messages(self, subscribe_channels: set[str]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             for channel in subscribe_channels:
                 await client.execute(["SUBSCRIBE", channel])
             async for reply in client.subscribe_reader():
+                log.debug("Received reply from subscribe: {}", reply)
                 if len(reply) < 3:
                     log.debug("Invalid reply from subscribe: {}", reply)
                     continue

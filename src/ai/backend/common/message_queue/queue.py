@@ -9,7 +9,7 @@ _DEFAULT_MAX_RETRIES = 3
 
 @dataclass
 class BroadcastMessage:
-    payload: Mapping[bytes, bytes]
+    payload: Mapping[str, str]
 
 
 @dataclass
@@ -55,7 +55,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def broadcast(
         self,
-        payload: dict[bytes, bytes],
+        payload: Mapping[str, str | bytes],
     ) -> None:
         """
         Broadcast a message to all subscribers of the channel.
@@ -69,7 +69,7 @@ class AbstractMessageQueue(ABC):
     async def broadcast_with_cache(
         self,
         cache_id: str,
-        payload: dict[bytes, bytes],
+        payload: Mapping[str, str | bytes],
     ) -> None:
         """
         Broadcast a message to all subscribers of the channel with cache.
@@ -109,7 +109,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def subscribe_queue(
         self,
-    ) -> AsyncGenerator[MQMessage, None]:
+    ) -> AsyncGenerator[BroadcastMessage, None]:
         """
         Subscribe to messages from the queue.
         This method will block until a message is available.
