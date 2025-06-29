@@ -3,7 +3,7 @@ import hashlib
 import logging
 import socket
 from dataclasses import dataclass
-from typing import AsyncGenerator, Mapping, Optional, Self
+from typing import Any, AsyncGenerator, Mapping, Optional, Self
 
 import glide
 from aiotools.server import process_index
@@ -102,7 +102,7 @@ class RedisQueue(AbstractMessageQueue):
             raise RuntimeError("Queue is closed")
         await self._client.enqueue_stream_message(self._anycast_stream_key, payload)
 
-    async def broadcast(self, payload: Mapping[str, str | bytes]) -> None:
+    async def broadcast(self, payload: Mapping[str, Any]) -> None:
         """
         Broadcast a message to all subscribers.
         The message will be delivered to all subscribers.
@@ -111,7 +111,7 @@ class RedisQueue(AbstractMessageQueue):
             raise RuntimeError("Queue is closed")
         await self._client.broadcast(self._broadcast_channel, payload)
 
-    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str | bytes]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, Any]) -> None:
         """
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
@@ -184,8 +184,13 @@ class RedisQueue(AbstractMessageQueue):
             except glide.TimeoutError:
                 # If the auto claim times out, we just continue to the next iteration
                 pass
+            except glide.ClosingError:
+                log.info(
+                    "Client connection closed, stopping auto claim loop for stream {}", stream_key
+                )
+                break
             except glide.GlideError as e:
-                await self._failover_consumer(e)
+                await self._failover_consumer(stream_key, e)
             except Exception as e:
                 log.exception("Error while auto claiming messages: {}", e)
             await asyncio.sleep(_DEFAULT_AUTOCLAIM_INTERVAL / 1000)
@@ -226,6 +231,12 @@ class RedisQueue(AbstractMessageQueue):
         while not self._closed:
             try:
                 await self._read_messages(client, stream_key)
+            except glide.ClosingError:
+                log.info(
+                    "Client connection closed, stopping read messages loop for stream {}",
+                    stream_key,
+                )
+                break
             except glide.GlideError as e:
                 await self._failover_consumer(stream_key, e)
             except Exception as e:
@@ -250,6 +261,9 @@ class RedisQueue(AbstractMessageQueue):
         while not self._closed:
             try:
                 await self._read_broadcast_messages()
+            except glide.ClosingError:
+                log.info("Client connection closed, stopping read broadcast messages loop")
+                break
             except Exception as e:
                 log.error("Error while reading broadcast messages: {}", e)
 

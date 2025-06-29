@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from ai.backend.common import redis_helper
@@ -49,7 +51,7 @@ def queue_args() -> RedisMQArgs:
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 async def redis_queue(redis_container, queue_args: RedisMQArgs):
     # Create consumer group if not exists
     redis_target = RedisTarget(
@@ -81,48 +83,39 @@ async def test_send_and_consume(redis_queue: RedisQueue):
         break
 
 
-# async def test_subscribe(redis_queue: RedisQueue):
-#     # Test message subscription
-#     test_payload = {"key": "value", "key2": "value2"}
+async def test_subscribe(redis_queue: RedisQueue):
+    # Test message subscription
+    test_payload = {"key": "value", "key2": "value2"}
 
-#     # Create task to subscribe
-#     received_messages: list[MQMessage] = []
+    # Create task to subscribe
+    received_messages: list[MQMessage] = []
 
-#     async def subscriber():
-#         async for message in redis_queue.subscribe_queue():
-#             received_messages.append(message)
-#             if len(received_messages) >= 1:
-#                 break
+    async def subscriber():
+        async for message in redis_queue.subscribe_queue():
+            received_messages.append(message)
+            if len(received_messages) >= 1:
+                break
 
-#     subscriber_task = asyncio.create_task(subscriber())
+    subscriber_task = asyncio.create_task(subscriber())
 
-#     # Send message
-#     await redis_queue.broadcast(test_payload)
+    # Send message
+    await redis_queue.broadcast(test_payload)
 
-#     # Wait for message to be received
-#     await asyncio.wait_for(subscriber_task, timeout=5)
+    # Wait for message to be received
+    await asyncio.wait_for(subscriber_task, timeout=5)
 
-#     assert len(received_messages) == 1
-#     assert received_messages[0].payload == test_payload
-
-
-# async def test_done(redis_queue: RedisQueue):
-#     # Test message acknowledgment
-#     test_payload = {b"key": b"value"}
-
-#     # Send message
-#     await redis_queue.send(test_payload)
-
-#     # Consume and acknowledge message
-#     async for message in redis_queue.consume_queue():
-#         await redis_queue.done(message.msg_id)
+    assert len(received_messages) == 1
+    assert received_messages[0].payload == test_payload
 
 
-# async def test_close(redis_queue):
-#     # Test queue closing
-#     await redis_queue.close()
-#     assert redis_queue._closed
-#     await asyncio.sleep(0.1)  # Allow time for tasks to be cancelled
-#     # Verify tasks are cancelled
-#     for task in redis_queue._tasks:
-#         assert task.done() or task.cancelled(), "Task should be done or cancelled after close"
+async def test_done(redis_queue: RedisQueue):
+    # Test message acknowledgment
+    test_payload = {b"key": b"value"}
+
+    # Send message
+    await redis_queue.send(test_payload)
+
+    # Consume and acknowledge message
+    async for message in redis_queue.consume_queue():
+        await redis_queue.done(message.msg_id)
+        return

@@ -2,9 +2,11 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from typing import Awaitable, Callable, List, Mapping, Optional, ParamSpec, Self, TypeVar, cast
+from typing import Any, Awaitable, Callable, List, Mapping, Optional, ParamSpec, Self, TypeVar, cast
 
 from glide import (
+    ExpirySet,
+    ExpiryType,
     GlideClient,
     StreamAddOptions,
     StreamGroupOptions,
@@ -140,7 +142,7 @@ class ValkeyStreamClient(ValkeyClient):
             log.warning("ValkeyStreamClient is already closed.")
             return
         self._closed = True
-        await self._client.close()
+        await self._client.close(err_message="ValkeyStreamClient is closed.")
 
     @valkey_decorator()
     async def make_consumer_group(
@@ -312,7 +314,7 @@ class ValkeyStreamClient(ValkeyClient):
     async def broadcast(
         self,
         channel: str,
-        payload: Mapping[str, str | bytes],
+        payload: Mapping[str, Any],
     ) -> None:
         """
         Broadcast a message to a channel.
@@ -329,7 +331,7 @@ class ValkeyStreamClient(ValkeyClient):
         self,
         channel: str,
         cache_id: str,
-        payload: Mapping[str, str | bytes],
+        payload: Mapping[str, Any],
         timeout: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -338,18 +340,12 @@ class ValkeyStreamClient(ValkeyClient):
         :param channel: The channel to broadcast the message to.
         :param cache_id: The ID for caching the message.
         :param payload: The payload of the message.
+        :param timeout: The expiration time for the cached message in seconds.
         :raises: GlideClientError if the message cannot be broadcasted or cached.
         """
         message = dump_json(payload)
         tx = self._create_batch()
-        tx.hset(
-            cache_id,
-            field_value_map=cast(Mapping[str | bytes, str | bytes], payload),
-        )
-        tx.expire(
-            cache_id,
-            timeout,
-        )
+        tx.set(key=cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, timeout))
         tx.publish(
             message=message,
             channel=channel,
