@@ -103,11 +103,10 @@ async def test_valkey_stream(redis_container):  # noqa: F811
         yield client
     finally:
         await client._client.flushdb()
-        await client.close()
 
 
 @pytest.fixture
-async def test_valkey_stream_mq(test_node_id):
+async def test_valkey_stream_mq(redis_container, test_node_id):  # noqa: F811
     redis_target = RedisTarget(
         addr=redis_container[1],
         redis_helper_config={

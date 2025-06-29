@@ -604,17 +604,17 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             msg = cast(BroadcastMessage, msg)
-            decoded_event_name = msg.payload["name"].decode()
             await self.dispatch_subscribers(
-                decoded_event_name,
-                AgentId(msg.payload["source"].decode()),
-                msgpack.unpackb(msg.payload["args"]),
+                msg.payload["name"],
+                AgentId(msg.payload["source"]),
+                msg.payload["args"],
             )
 
 
 class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
+    _source: AgentId
     _source_bytes: bytes
     _log_events: bool
 
@@ -627,6 +627,7 @@ class EventProducer:
     ) -> None:
         self._closed = False
         self._msg_queue = msg_queue
+        self._source = source
         self._source_bytes = source.encode()
         self._log_events = log_events
 
@@ -650,7 +651,6 @@ class EventProducer:
             b"source": source_bytes,
             b"args": msgpack.packb(event.serialize()),
         }
-        # TODO: impl anycast message queue
         await self._msg_queue.send(raw_event)
 
     async def broadcast_event(
@@ -660,14 +660,14 @@ class EventProducer:
     ) -> None:
         if self._closed:
             return
-        source_bytes = self._source_bytes
+        source = self._source
         if source_override is not None:
-            source_bytes = source_override.encode()
+            source = source_override
 
         raw_event = {
-            "name": event.event_name().encode(),
-            "source": source_bytes,
-            "args": msgpack.packb(event.serialize()),
+            "name": event.event_name(),
+            "source": source,
+            "args": event.serialize(),
         }
         await self._msg_queue.broadcast(raw_event)
 
@@ -680,11 +680,10 @@ class EventProducer:
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
         """
-        source_bytes = self._source_bytes
         raw_event = {
-            "name": event.event_name().encode(),
-            "source": source_bytes,
-            "args": msgpack.packb(event.serialize()),
+            "name": event.event_name(),
+            "source": self._source,
+            "args": event.serialize(),
         }
         await self._msg_queue.broadcast_with_cache(
             cache_id,

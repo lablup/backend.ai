@@ -399,14 +399,14 @@ class ClientType(enum.StrEnum):
 class ClientMetricObserver:
     _instance: Optional[Self] = None
 
-    _client_operation_triggered_count: Counter
+    _client_operation_triggered_count: Gauge
     _client_operation_count: Counter
     _client_operation_duration_sec: Histogram
 
     def __init__(self) -> None:
-        self._client_operation_triggered_count = Counter(
+        self._client_operation_triggered_count = Gauge(
             name="backendai_client_operation_triggered_count",
-            documentation="Total number of client operations triggered",
+            documentation="Number of client operations triggered",
             labelnames=["client_type", "operation"],
         )
         self._client_operation_count = Counter(
@@ -449,7 +449,7 @@ class ClientMetricObserver:
         self._client_operation_triggered_count.labels(
             client_type=client_type,
             operation=operation,
-        ).inc(-1)  # Decrement the triggered count since the operation is now complete
+        ).dec()  # Decrement the triggered count since the operation is now complete
         self._client_operation_count.labels(
             client_type=client_type,
             operation=operation,

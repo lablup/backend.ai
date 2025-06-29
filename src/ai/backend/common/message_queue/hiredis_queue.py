@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import logging
 import socket
-from typing import AsyncGenerator, Mapping, Optional
+from typing import Any, AsyncGenerator, Mapping, Optional
 
 import hiredis
 from aiotools.server import process_index
@@ -82,7 +82,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 *pieces,
             ])
 
-    async def broadcast(self, payload: Mapping[str, str | bytes]) -> None:
+    async def broadcast(self, payload: Mapping[str, Any]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
             await client.execute([
@@ -91,17 +91,13 @@ class HiRedisQueue(AbstractMessageQueue):
                 payload_bytes,
             ])
 
-    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str | bytes]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, Any]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
-            args: list[str | bytes] = []
-            for k, v in payload.items():
-                args.append(k)
-                args.append(v)
             await client.execute([
-                "HSET",
+                "SET",
                 cache_id,
-                *args,
+                payload_bytes,
             ])
             await client.execute([
                 "EXPIRE",

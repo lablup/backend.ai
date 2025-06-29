@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import AsyncGenerator, Mapping, Optional
+from typing import Any, AsyncGenerator, Mapping, Optional
 
 type MessageId = bytes
 _DEFAULT_RETRY_FIELD = b"_retry_count"
@@ -9,7 +9,7 @@ _DEFAULT_MAX_RETRIES = 3
 
 @dataclass
 class BroadcastMessage:
-    payload: Mapping[str, str]
+    payload: Mapping[str, Any]
 
 
 @dataclass
@@ -55,7 +55,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def broadcast(
         self,
-        payload: Mapping[str, str | bytes],
+        payload: Mapping[str, Any],
     ) -> None:
         """
         Broadcast a message to all subscribers of the channel.
@@ -69,7 +69,7 @@ class AbstractMessageQueue(ABC):
     async def broadcast_with_cache(
         self,
         cache_id: str,
-        payload: Mapping[str, str | bytes],
+        payload: Mapping[str, Any],
     ) -> None:
         """
         Broadcast a message to all subscribers of the channel with cache.
