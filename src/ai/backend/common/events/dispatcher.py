@@ -28,7 +28,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.message_queue.queue import AbstractMessageQueue, MessageId
+from ai.backend.common.message_queue.queue import AbstractMessageQueue, BroadcastMessage, MessageId
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import msgpack
@@ -603,17 +603,19 @@ class EventDispatcher(EventDispatcherGroup):
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:
                 return
-            decoded_event_name = msg.payload[b"name"].decode()
+            msg = cast(BroadcastMessage, msg)
             await self.dispatch_subscribers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
+                msg.payload["name"],
+                AgentId(msg.payload["source"]),
+                msg.payload["args"],
             )
 
 
 class EventProducer:
     _closed: bool
     _msg_queue: AbstractMessageQueue
+    _source: AgentId
+    _source_bytes: bytes
     _log_events: bool
 
     def __init__(
@@ -625,6 +627,7 @@ class EventProducer:
     ) -> None:
         self._closed = False
         self._msg_queue = msg_queue
+        self._source = source
         self._source_bytes = source.encode()
         self._log_events = log_events
 
@@ -648,7 +651,6 @@ class EventProducer:
             b"source": source_bytes,
             b"args": msgpack.packb(event.serialize()),
         }
-        # TODO: impl anycast message queue
         await self._msg_queue.send(raw_event)
 
     async def broadcast_event(
@@ -658,17 +660,35 @@ class EventProducer:
     ) -> None:
         if self._closed:
             return
-        source_bytes = self._source_bytes
+        source = self._source
         if source_override is not None:
-            source_bytes = source_override.encode()
+            source = source_override
 
         raw_event = {
-            b"name": event.event_name().encode(),
-            b"source": source_bytes,
-            b"args": msgpack.packb(event.serialize()),
+            "name": event.event_name(),
+            "source": source,
+            "args": event.serialize(),
         }
-        # TODO: impl broadcast message queue
-        await self._msg_queue.send(raw_event)
+        await self._msg_queue.broadcast(raw_event)
+
+    async def broadcast_event_with_cache(
+        self,
+        cache_id: str,
+        event: AbstractBroadcastEvent,
+    ) -> None:
+        """
+        Broadcast a message to all subscribers with cache.
+        The message will be delivered to all subscribers.
+        """
+        raw_event = {
+            "name": event.event_name(),
+            "source": self._source,
+            "args": event.serialize(),
+        }
+        await self._msg_queue.broadcast_with_cache(
+            cache_id,
+            raw_event,
+        )
 
     async def anycast_and_broadcast_event(
         self,

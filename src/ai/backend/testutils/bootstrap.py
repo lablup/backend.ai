@@ -180,17 +180,19 @@ def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
             time.sleep(0.1)
             continue
     time.sleep(0.5)
-    yield container_id, HostPortPairModel(host="127.0.0.1", port=published_port)
-    subprocess.run(
-        [
-            "docker",
-            "rm",
-            "-v",
-            "-f",
-            container_id,
-        ],
-        capture_output=True,
-    )
+    try:
+        yield container_id, HostPortPairModel(host="127.0.0.1", port=published_port)
+    finally:
+        subprocess.run(
+            [
+                "docker",
+                "rm",
+                "-v",
+                "-f",
+                container_id,
+            ],
+            capture_output=True,
+        )
 
 
 @pytest.fixture(scope="session", autouse=False)

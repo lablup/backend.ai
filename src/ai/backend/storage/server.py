@@ -27,7 +27,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.message_queue.hiredis_queue import HiRedisMQArgs, HiRedisQueue
+from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -148,7 +148,7 @@ async def server_main(
             log.exception("Unable to read config from etcd")
             raise e
         redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
-        mq = _make_message_queue(
+        mq = await _make_message_queue(
             local_config,
             redis_profile_target,
         )
@@ -322,35 +322,31 @@ async def server_main(
             m.close()
 
 
-def _make_message_queue(
+async def _make_message_queue(
     local_config: dict[str, Any],
     redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
-    stream_redis = redis_helper.get_redis_object(
-        stream_redis_target,
-        name="event_producer.stream",
+    node_id = local_config["storage-proxy"]["node-id"]
+    args = RedisMQArgs(
+        anycast_stream_key="events",
+        broadcast_channel="events_all",
+        consume_stream_keys=None,
+        subscribe_channels={
+            "events_all",
+        },
+        group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
+        node_id=node_id,
         db=REDIS_STREAM_DB,
     )
-    node_id = local_config["storage-proxy"]["node-id"]
     if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
         return HiRedisQueue(
             stream_redis_target,
-            HiRedisMQArgs(
-                stream_key="events",
-                group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-                node_id=node_id,
-                db=REDIS_STREAM_DB,
-            ),
+            args,
         )
-
-    return RedisQueue(
-        stream_redis,
-        RedisMQArgs(
-            stream_key="events",
-            group_name=EVENT_DISPATCHER_CONSUMER_GROUP,
-            node_id=node_id,
-        ),
+    return await RedisQueue.create(
+        redis_profile_target.profile_target(RedisRole.STREAM),
+        args,
     )
 
 

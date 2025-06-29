@@ -4,6 +4,7 @@ from typing import Self, override
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
@@ -74,6 +75,7 @@ class ServiceArgs:
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     redis_stat: RedisConnectionInfo
+    event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -130,6 +132,7 @@ class Services:
             SessionServiceArgs(
                 db=args.db,
                 agent_registry=args.agent_registry,
+                event_fetcher=args.event_fetcher,
                 background_task_manager=args.background_task_manager,
                 event_hub=args.event_hub,
                 error_monitor=args.error_monitor,
