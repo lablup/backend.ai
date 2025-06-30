@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import (
     ValkeyStreamClient,
@@ -8,17 +9,17 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import (
 
 
 async def test_valkey_stream_anycast(test_valkey_stream: ValkeyStreamClient) -> None:
-    await test_valkey_stream.make_consumer_group("test-stream", "test-group")
+    test_stream = f"test-stream-{random.randint(1000, 9999)}"
+    test_group = f"test-group-{random.randint(1000, 9999)}"
+    await test_valkey_stream.make_consumer_group(test_stream, test_group)
     await test_valkey_stream.enqueue_stream_message(
-        "test-stream",
+        test_stream,
         {
             b"key1": b"value1",
             b"key2": b"value2",
         },
     )
-    values = await test_valkey_stream.read_consumer_group(
-        "test-stream", "test-group", "test-consumer"
-    )
+    values = await test_valkey_stream.read_consumer_group(test_stream, test_group, "test-consumer")
     assert values is not None
     assert len(values) == 1
     assert values[0].payload == {
@@ -44,20 +45,23 @@ async def test_valkey_stream_broadcast(test_valkey_stream: ValkeyStreamClient) -
 
 
 async def test_valkey_stream_auto_claim(test_valkey_stream: ValkeyStreamClient) -> None:
-    await test_valkey_stream.make_consumer_group("test-stream", "test-group")
+    test_stream = f"test-stream-{random.randint(1000, 9999)}"
+    test_group = f"test-group-{random.randint(1000, 9999)}"
+
+    await test_valkey_stream.make_consumer_group(test_stream, test_group)
     await test_valkey_stream.enqueue_stream_message(
-        "test-stream",
+        test_stream,
         {
             b"key1": b"value1",
             b"key2": b"value2",
         },
     )
-    await test_valkey_stream.read_consumer_group("test-stream", "test-group", "test-consumer")
+    await test_valkey_stream.read_consumer_group(test_stream, test_group, "test-consumer")
     await asyncio.sleep(0.1)  # Ensure the message is available for auto claim
     # Auto claim the message
     auto_claimed = await test_valkey_stream.auto_claim_stream_message(
-        "test-stream",
-        "test-group",
+        test_stream,
+        test_group,
         "test-consumer",
         "0-0",
         min_idle_timeout=0,  # Set to 0 for immediate auto claim
@@ -71,12 +75,12 @@ async def test_valkey_stream_auto_claim(test_valkey_stream: ValkeyStreamClient) 
     }
     # Acknowledge the auto claimed message
     await test_valkey_stream.done_stream_message(
-        "test-stream", "test-group", auto_claimed.messages[0].msg_id
+        test_stream, test_group, auto_claimed.messages[0].msg_id
     )
 
     auto_claimed = await test_valkey_stream.auto_claim_stream_message(
-        "test-stream",
-        "test-group",
+        test_stream,
+        test_group,
         "test-consumer",
         "0-0",
         min_idle_timeout=0,  # Set to 0 for immediate auto claim

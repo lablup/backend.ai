@@ -99,10 +99,7 @@ async def test_valkey_stream(redis_container):  # noqa: F811
         db=REDIS_STREAM_DB,
         pubsub_channels=["test-broadcast"],
     )
-    try:
-        yield client
-    finally:
-        await client._client.flushdb()
+    yield client
 
 
 @pytest.fixture

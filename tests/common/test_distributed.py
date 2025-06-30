@@ -44,6 +44,7 @@ class TimerNodeContext:
     test_case_ns: str
     interval: float
     redis_container: HostPortPair
+    stream_key: str
     group_name: str
     node_id: str
 
@@ -182,14 +183,12 @@ def etcd_timer_node_process(
         redis_mq = await RedisQueue.create(
             redis_target,
             RedisMQArgs(
-                anycast_stream_key="events",
+                anycast_stream_key=timer_ctx.stream_key,
                 broadcast_channel="events_broadcast",
                 consume_stream_keys={
-                    "events",
+                    timer_ctx.stream_key,
                 },
-                subscribe_channels={
-                    "events_broadcast",
-                },
+                subscribe_channels=None,
                 group_name=timer_ctx.group_name,
                 node_id=timer_ctx.node_id,
                 db=REDIS_STREAM_DB,
@@ -205,6 +204,7 @@ def etcd_timer_node_process(
         )
         event_dispatcher.consume(NoopAnycastEvent, None, _tick)
         await event_dispatcher.start()
+        await asyncio.sleep(0.1)  # Allow dispatcher to start
 
         etcd_lock: AbstractDistributedLock
         match etcd_client:
@@ -234,6 +234,8 @@ def etcd_timer_node_process(
             await timer.leave()
             await event_dispatcher.close()
             await event_producer.close()
+            await redis_mq.close()
+            await asyncio.sleep(0.2)  # Allow cleanup to complete
 
     asyncio.run(_main())
 
@@ -253,6 +255,7 @@ class TimerNode(threading.Thread):
         self.interval = timer_ctx.interval
         self.test_case_ns = timer_ctx.test_case_ns
         self.redis_container = timer_ctx.redis_container
+        self.stream_key = timer_ctx.stream_key
         self.group_name = timer_ctx.group_name
         self.node_id = timer_ctx.node_id
 
@@ -270,10 +273,10 @@ class TimerNode(threading.Thread):
         redis_mq = await RedisQueue.create(
             redis_target,
             RedisMQArgs(
-                anycast_stream_key="events",
+                anycast_stream_key=self.stream_key,
                 broadcast_channel="events_broadcast",
                 consume_stream_keys={
-                    "events",
+                    self.stream_key,
                 },
                 subscribe_channels={
                     "events_broadcast",
@@ -334,6 +337,7 @@ async def test_global_timer_filelock(
     interval = 0.5
     target_count = delay / interval
     threads: List[TimerNode] = []
+    stream_key = f"{test_case_ns}-stream-{random.randint(0, 1000)}"
     group_name = f"test-group-{random.randint(0, 1000)}"
     for thread_idx in range(num_threads):
         timer_node = TimerNode(
@@ -344,6 +348,7 @@ async def test_global_timer_filelock(
                 test_case_ns=test_case_ns,
                 interval=interval,
                 redis_container=redis_container[1],
+                stream_key=stream_key,
                 group_name=group_name,
                 node_id=test_node_id,
             ),
@@ -437,6 +442,7 @@ async def test_global_timer_etcdlock(
     target_count = delay / interval
     processes: List[Process] = []
     stop_event = Event()
+    stream_key = f"test-stream-{random.randint(0, 1000)}"
     group_name = f"test-group-{random.randint(0, 1000)}"
     for proc_idx in range(num_processes):
         process = Process(
@@ -454,6 +460,7 @@ async def test_global_timer_etcdlock(
                     test_case_ns=test_case_ns,
                     interval=interval,
                     redis_container=redis_container[1],
+                    stream_key=stream_key,
                     group_name=group_name,
                     node_id=test_node_id,
                 ),

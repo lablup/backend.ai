@@ -97,6 +97,7 @@ async def test_subscribe(redis_queue: RedisQueue):
                 break
 
     subscriber_task = asyncio.create_task(subscriber())
+    await asyncio.sleep(0.1)  # Allow subscriber to start
 
     # Send message
     await redis_queue.broadcast(test_payload)

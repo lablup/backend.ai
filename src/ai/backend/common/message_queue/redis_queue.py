@@ -168,6 +168,11 @@ class RedisQueue(AbstractMessageQueue):
         self._closed = True
         for task in self._loop_tasks:
             task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                log.debug("Task {} cancelled", task.get_name())
+        await self._client.close()
 
     async def _auto_claim_loop(
         self, stream_key: str, autoclaim_start_id: str, autoclaim_idle_timeout: int
