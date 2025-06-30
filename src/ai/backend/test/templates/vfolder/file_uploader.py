@@ -12,7 +12,7 @@ from ai.backend.test.contexts.vfolder import (
 )
 from ai.backend.test.data.vfolder import UploadedFile, UploadedFilesMeta
 from ai.backend.test.templates.template import WrapperTestTemplate
-from ai.backend.test.templates.vfolder.utils import retrieve_files
+from ai.backend.test.templates.vfolder.utils import retrieve_all_files
 
 
 class PlainTextFilesUploader(WrapperTestTemplate):
@@ -58,7 +58,7 @@ class PlainTextFilesUploader(WrapperTestTemplate):
             assert len(response["items"]) > 0, "Response items list is empty."
 
             upload_requested_files = {uploaded_file.path for uploaded_file in uploaded_files}
-            files_in_response = await retrieve_files(client_session, vfolder_meta.name)
+            files_in_response = await retrieve_all_files(client_session, vfolder_meta.name)
 
             for upload_requested_file in upload_requested_files:
                 assert upload_requested_file in files_in_response, (
