@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import enum
 import logging
 import secrets
@@ -604,10 +605,12 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             msg = cast(BroadcastMessage, msg)
+            args_bytes = base64.b64decode(msg.payload["args"])
+            args = msgpack.unpackb(args_bytes)
             await self.dispatch_subscribers(
                 msg.payload["name"],
                 AgentId(msg.payload["source"]),
-                msg.payload["args"],
+                args,
             )
 
 
@@ -663,11 +666,11 @@ class EventProducer:
         source = self._source
         if source_override is not None:
             source = source_override
-
+        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
         raw_event = {
             "name": event.event_name(),
             "source": source,
-            "args": event.serialize(),
+            "args": args,
         }
         await self._msg_queue.broadcast(raw_event)
 
@@ -680,10 +683,11 @@ class EventProducer:
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
         """
+        args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
         raw_event = {
             "name": event.event_name(),
             "source": self._source,
-            "args": event.serialize(),
+            "args": args,
         }
         await self._msg_queue.broadcast_with_cache(
             cache_id,
