@@ -15,7 +15,7 @@ VFOLDER_TEST_SPECS = {
     "download_files": TestSpec(
         name="download_files",
         description=textwrap.dedent("""\
-            Test for uploading and downloading files in a VFolder.
+            Test for downloading files in a VFolder.
             The test will:
             1. Create a VFolder.
             2. Upload files to the VFolder.
