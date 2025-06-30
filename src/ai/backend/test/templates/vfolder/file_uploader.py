@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import override
 
-from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.vfolder import (
     CreatedVFolderMetaContext,
@@ -20,25 +19,6 @@ class PlainTextFilesUploader(WrapperTestTemplate):
     @property
     def name(self) -> str:
         return "upload_plain_text_files"
-
-    async def _get_all_files(
-        self, client_session: AsyncSession, vfolder_name: str, path: str = ""
-    ) -> set[str]:
-        response = await client_session.VFolder(vfolder_name).list_files(path)
-        assert "items" in response, "Response does not contain 'items' key."
-
-        all_files = set()
-
-        for item in response["items"]:
-            if item["type"] == "FILE":
-                file_path = f"{path}/{item['name']}" if path else item["name"]
-                all_files.add(file_path)
-            elif item["type"] == "DIRECTORY":
-                subdir_path = f"{path}/{item['name']}" if path else item["name"]
-                subdir_files = await self._get_all_files(client_session, vfolder_name, subdir_path)
-                all_files.update(subdir_files)
-
-        return all_files
 
     @override
     @actxmgr
