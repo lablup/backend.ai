@@ -10,7 +10,7 @@ from ai.backend.test.testcases.vfolder.delete_files import (
     VFolderFilesDeletionSuccess,
     VFolderFilesRecursiveDeletionSuccess,
 )
-from ai.backend.test.testcases.vfolder.download import VFolderDownloadSuccess
+from ai.backend.test.testcases.vfolder.list_files import VFolderListFilesSuccess
 from ai.backend.test.testcases.vfolder.move import VFolderFileMoveSuccess
 from ai.backend.test.testcases.vfolder.rename_file import VFolderFileRenameSuccess
 from ai.backend.test.tester.dependency import UploadFileDep
@@ -18,6 +18,39 @@ from ai.backend.test.tester.dependency import UploadFileDep
 _TEST_FILE_CONTENT = "This is a test file for VFolder download."
 
 VFOLDER_TEST_SPECS = {
+    "list_files": TestSpec(
+        name="list_files",
+        description=textwrap.dedent("""\
+            Test for renaming a file in a VFolder.
+            The test will:
+            1. Create a VFolder.
+            2. Upload files to the VFolder.
+            3. List files in the VFolder.
+            4. Verify that the files are listed correctly.
+        """),
+        tags={TestTag.MANAGER, TestTag.VFOLDER},
+        template=BasicTestTemplate(VFolderListFilesSuccess()).with_wrappers(
+            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+        ),
+        parametrizes={
+            ContextName.VFOLDER_UPLOAD_FILES: [
+                [
+                    UploadFileDep(
+                        path="test_1.txt",
+                        content=_TEST_FILE_CONTENT,
+                    ),
+                    UploadFileDep(
+                        path="test_2.txt",
+                        content=_TEST_FILE_CONTENT,
+                    ),
+                    UploadFileDep(
+                        path="test_3.txt",
+                        content=_TEST_FILE_CONTENT,
+                    ),
+                ]
+            ]
+        },
+    ),
     "rename_file": TestSpec(
         name="rename_file",
         description=textwrap.dedent("""\
