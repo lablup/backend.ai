@@ -78,6 +78,15 @@ def valkey_decorator(
                     )
                     return res
                 except Exception as e:
+                    log.warning(
+                        "Error in {} (attempt {}/{}) with args: {}, kwargs: {}: {}",
+                        func.__name__,
+                        attempt + 1,
+                        retry_count,
+                        args,
+                        kwargs,
+                        e,
+                    )
                     if attempt < retry_count - 1:
                         await asyncio.sleep(retry_delay)
                         continue

@@ -250,7 +250,7 @@ class HiRedisQueue(AbstractMessageQueue):
             except hiredis.HiredisError as e:
                 await self._failover_consumer(e)
             except Exception as e:
-                log.error("Error while reading messages: {}", e)
+                log.exception("Error while reading messages: {}", e)
 
     async def _read_messages(self, stream_key: str) -> None:
         log.debug("Reading messages from stream {}", stream_key)
