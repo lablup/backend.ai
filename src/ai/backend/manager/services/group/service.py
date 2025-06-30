@@ -21,6 +21,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.exceptions import VFolderOperationFailed
+from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.kernel import (
     LIVE_STATUS,
@@ -198,6 +199,7 @@ class GroupService:
                 raise RuntimeError(
                     "Group has some active session. Terminate them first to proceed removal.",
                 )
+            await self._delete_endpoints(conn, gid)
             await self._delete_vfolders(gid)
             await self._delete_kernels(conn, gid)
             await self._delete_sessions(conn, gid)
@@ -319,6 +321,60 @@ class GroupService:
 
         stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
         await db_conn.execute(stmt)
+
+    async def _delete_endpoints(self, db_conn: SAConnection, group_id: uuid.UUID) -> None:
+        from ai.backend.manager.models.endpoint import EndpointRow
+        from ai.backend.manager.models.routing import RoutingRow
+
+        active_endpoint = await db_conn.scalar(
+            sa.select(EndpointRow.id).where(
+                (EndpointRow.project == group_id)
+                & (
+                    EndpointRow.lifecycle_stage
+                    in (EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING)
+                )
+            )
+        )
+        if active_endpoint is not None:
+            raise RuntimeError(
+                f"Cannot delete group {group_id} because it has an active endpoint {active_endpoint}. "
+                f"Please delete the endpoint first."
+            )
+
+        endpoint_ids = await db_conn.execute(
+            sa.select(EndpointRow.id).where(EndpointRow.project == group_id)
+        )
+        if endpoint_ids is None:
+            return
+
+        for endpoint_id in endpoint_ids:
+            deleted_sessions = await self._delete_sessions_by_endpoint(db_conn, endpoint_id)
+            if deleted_sessions > 0:
+                print(f"Deleted {deleted_sessions} sessions for endpoint {endpoint_id}")
+
+        await db_conn.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
+
+        await db_conn.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
+
+        print(f"Hard deleted {len(endpoint_ids)} destroyed endpoints")
+
+        stmt = sa.delete(EndpointRow).where(EndpointRow.project == group_id)
+        await db_conn.execute(stmt)
+
+    async def _delete_sessions_by_endpoint(self, db_conn: SAConnection, endpoint_id: UUID) -> int:
+        from ai.backend.manager.models.routing import RoutingRow
+        from ai.backend.manager.models.session import SessionRow
+
+        session_ids = await db_conn.execute(
+            sa.select(SessionRow.id)
+            .select_from(SessionRow.join(RoutingRow, SessionRow.id == RoutingRow.session))
+            .where((RoutingRow.endpoint == endpoint_id) & (RoutingRow.session is not None))
+        )
+
+        if not session_ids:
+            return 0
+        result = await db_conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
+        return result.rowcount
 
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[MutationResult]]
