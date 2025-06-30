@@ -232,8 +232,8 @@ def etcd_timer_node_process(
                 await asyncio.sleep(0)
         finally:
             await timer.leave()
-            await event_producer.close()
             await event_dispatcher.close()
+            await event_producer.close()
 
     asyncio.run(_main())
 
@@ -309,8 +309,8 @@ class TimerNode(threading.Thread):
             await self.stop_event.wait()
         finally:
             await timer.leave()
-            await event_producer.close()
             await event_dispatcher.close()
+            await event_producer.close()
 
     def run(self) -> None:
         asyncio.run(self.timer_node_async())
