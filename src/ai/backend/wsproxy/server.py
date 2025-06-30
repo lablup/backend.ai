@@ -123,6 +123,7 @@ async def exception_middleware(
                 "error.jinja2",
                 request,
                 ex.body_dict,
+                status=ex.status_code,
             )
     except web.HTTPException as ex:
         if ex.status_code == 404:
