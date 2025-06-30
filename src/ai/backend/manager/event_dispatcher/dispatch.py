@@ -181,6 +181,12 @@ class Dispatchers:
         event_dispatcher.consume(
             AgentHeartbeatEvent, None, self._agent_event_handler.handle_agent_heartbeat
         )
+        event_dispatcher.consume(
+            AgentStatusHeartbeat,
+            None,
+            self._agent_event_handler.handle_agent_container_heartbeat,
+            name="agent.status_heartbeat",
+        )
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(AgentStartedEvent, None, self._agent_event_handler.handle_agent_started)
@@ -193,12 +199,6 @@ class Dispatchers:
             None,
             self._agent_event_handler.handle_agent_error,
             name="agent.error",
-        )
-        evd.consume(
-            AgentStatusHeartbeat,
-            None,
-            self._agent_event_handler.handle_agent_container_heartbeat,
-            name="agent.status_heartbeat",
         )
 
     def _dispatch_image_events(self, event_dispatcher: EventDispatcher) -> None:
