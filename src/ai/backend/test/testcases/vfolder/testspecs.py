@@ -10,6 +10,7 @@ from ai.backend.test.testcases.vfolder.delete_files import (
     VFolderFilesDeletionSuccess,
     VFolderFilesRecursiveDeletionSuccess,
 )
+from ai.backend.test.testcases.vfolder.download import VFolderDownloadSuccess
 from ai.backend.test.testcases.vfolder.list_files import VFolderListFilesSuccess
 from ai.backend.test.testcases.vfolder.move import VFolderFileMoveSuccess
 from ai.backend.test.testcases.vfolder.rename_file import VFolderFileRenameSuccess
@@ -161,6 +162,43 @@ VFOLDER_TEST_SPECS = {
                     ),
                     UploadFileDep(
                         path="nested/inner_nested/test_3.txt",
+                        content=_TEST_FILE_CONTENT,
+                    ),
+                ]
+            ]
+        },
+    ),
+    "download_files": TestSpec(
+        name="download_files",
+        description=textwrap.dedent("""\
+            Test for downloading files in a VFolder.
+            The test will:
+            1. Create a VFolder.
+            2. Upload files to the VFolder.
+            3. Download the files from the VFolder.
+            4. Verify that the downloaded files match the uploaded files.
+        """),
+        tags={TestTag.MANAGER, TestTag.VFOLDER},
+        template=BasicTestTemplate(VFolderDownloadSuccess()).with_wrappers(
+            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+        ),
+        parametrizes={
+            ContextName.VFOLDER_UPLOAD_FILES: [
+                [
+                    UploadFileDep(
+                        path="test_1.txt",
+                        content=_TEST_FILE_CONTENT,
+                    ),
+                    UploadFileDep(
+                        path="test_2.txt",
+                        content=_TEST_FILE_CONTENT,
+                    ),
+                    UploadFileDep(
+                        path="test_3.txt",
+                        content=_TEST_FILE_CONTENT,
+                    ),
+                    UploadFileDep(
+                        path="nested/inner.txt",
                         content=_TEST_FILE_CONTENT,
                     ),
                 ]
