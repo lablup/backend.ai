@@ -99,6 +99,10 @@ class EndpointLifecycle(Enum):
     DESTROYING = "destroying"
     DESTROYED = "destroyed"
 
+    @classmethod
+    def inactive_states(cls) -> set[EndpointLifecycle]:
+        return {cls.DESTROYING, cls.DESTROYED}
+
 
 class EndpointRow(Base):
     __tablename__ = "endpoints"
