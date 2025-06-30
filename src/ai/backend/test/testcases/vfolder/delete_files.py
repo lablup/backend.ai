@@ -24,6 +24,8 @@ class VFolderFilesDeletionSuccess(TestCode):
 
 
 class VFolderFilesRecursiveDeletionSuccess(TestCode):
+    _dirname_to_delete: str
+
     def __init__(self, dirname_to_delete: str) -> None:
         self._dirname_to_delete = dirname_to_delete
 
