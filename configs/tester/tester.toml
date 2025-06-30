@@ -50,4 +50,4 @@ timeout = 60.0
 group = "default"
 usage_mode = "general"
 permission = "rw"
-cloneable = "False"
+cloneable = "True"

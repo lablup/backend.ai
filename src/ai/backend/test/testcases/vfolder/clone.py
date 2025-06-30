@@ -9,11 +9,11 @@ class VFolderCloneSuccess(TestCode):
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()
 
-        new_folder_name = vfolder_meta.name + "_cloned"
-        await client_session.VFolder(vfolder_meta.name).clone(target_name=new_folder_name)
+        new_vfolder_name = vfolder_meta.name + "_cloned"
+        await client_session.VFolder(vfolder_meta.name).clone(target_name=new_vfolder_name)
 
         old_vfolder_files = await retrieve_all_files(client_session, vfolder_meta.name)
-        new_vfolder_files = await retrieve_all_files(client_session, new_folder_name)
+        new_vfolder_files = await retrieve_all_files(client_session, new_vfolder_name)
 
         assert old_vfolder_files == new_vfolder_files, (
             "Files in the cloned VFolder do not match the original VFolder."
