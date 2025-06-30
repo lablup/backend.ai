@@ -6,6 +6,7 @@ from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.templates.vfolder.file_uploader import PlainTextFilesUploader
 from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
+from ai.backend.test.testcases.vfolder.clone import VFolderCloneSuccess
 from ai.backend.test.testcases.vfolder.delete_files import (
     VFolderFilesDeletionSuccess,
     VFolderFilesRecursiveDeletionSuccess,
