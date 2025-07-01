@@ -1,9 +1,30 @@
 from ai.backend.client.exceptions import BackendAPIError
-from ai.backend.test.contexts.client_session import CreatedUserClientSessionContext
+from ai.backend.test.contexts.client_session import (
+    ClientSessionContext,
+    CreatedUserClientSessionContext,
+)
 from ai.backend.test.contexts.user import CreatedUserContext
-from ai.backend.test.contexts.vfolder import VFolderInvitationPermissionContext
+from ai.backend.test.contexts.vfolder import (
+    CreatedVFolderMetaContext,
+    VFolderInvitationPermissionContext,
+)
 from ai.backend.test.templates.template import TestCode
 from ai.backend.test.utils.exceptions import UnexpectedSuccess
+
+
+class VFolderInviteFailure(TestCode):
+    async def test(self) -> None:
+        client_session = ClientSessionContext.current()
+        vfolder_meta = CreatedVFolderMetaContext.current()
+        test_user = CreatedUserContext.current()
+        perm = VFolderInvitationPermissionContext.current()
+
+        try:
+            await client_session.VFolder(vfolder_meta.name).invite(
+                perm=perm, emails=[test_user.email]
+            )
+        except BackendAPIError as e:
+            assert e.status == 404, f"Expected 404 error, but got {e.status}: Exception: {e}"
 
 
 class VFolderAcceptDuplicatedInvitation(TestCode):

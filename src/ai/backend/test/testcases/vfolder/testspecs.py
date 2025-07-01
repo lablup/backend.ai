@@ -25,7 +25,10 @@ from ai.backend.test.testcases.vfolder.delete_files import (
     VFolderFilesRecursiveDeletionSuccess,
 )
 from ai.backend.test.testcases.vfolder.download import VFolderDownloadSuccess
-from ai.backend.test.testcases.vfolder.invite_failures import VFolderAcceptDuplicatedInvitation
+from ai.backend.test.testcases.vfolder.invite_failures import (
+    VFolderAcceptDuplicatedInvitation,
+    VFolderInviteFailure,
+)
 from ai.backend.test.testcases.vfolder.list_files import VFolderListFilesSuccess
 from ai.backend.test.testcases.vfolder.move import VFolderFileMoveSuccess
 from ai.backend.test.testcases.vfolder.rename_file import VFolderFileRenameSuccess
@@ -110,6 +113,34 @@ VFOLDER_INVITATION_TEST_SPECS = {
             VFolderInviteTemplate,
             # Run as invitee user
             KeypairAuthAsCreatedUserTemplate,
+        ),
+        parametrizes={
+            ContextName.VFOLDER_INVITATION_PERMISSION: ["rw"],
+        },
+    ),
+    "invite_vfolder_failure_duplicated_invitation": TestSpec(
+        name="invite_vfolder_failure_duplicated_invitation",
+        description=textwrap.dedent("""\
+            Test for VFolder invitation functionality.
+            The test will:
+            1. Authenticate as admin and create a VFolder.
+            2. Create a test user.
+            3. Invite the test user to the VFolder.
+            4. Login as the test user.
+            5. Accept the VFolder invitation.
+            6. Try to invite the same user again to the same VFolder.
+            7. Verify that the second invitation fails with an error.
+        """),
+        tags={TestTag.MANAGER, TestTag.VFOLDER},
+        template=BasicTestTemplate(VFolderInviteFailure()).with_wrappers(
+            # Run as admin
+            KeypairAuthTemplate,
+            UserVFolderTemplate,
+            UserTemplate,
+            VFolderInviteTemplate,
+            # Run as invitee user
+            KeypairAuthAsCreatedUserTemplate,
+            AcceptInvitationTemplate,
         ),
         parametrizes={
             ContextName.VFOLDER_INVITATION_PERMISSION: ["rw"],
