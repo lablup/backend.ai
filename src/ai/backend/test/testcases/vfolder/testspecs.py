@@ -7,12 +7,18 @@ from ai.backend.test.templates.auth.keypair import (
 )
 from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.templates.user.user import UserTemplate
-from ai.backend.test.templates.vfolder.accept_invitation import AcceptInvitationTemplate
 from ai.backend.test.templates.vfolder.file_uploader import PlainTextFilesUploader
-from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
-from ai.backend.test.templates.vfolder.invite import VFolderInviteTemplate
+from ai.backend.test.templates.vfolder.general_vfolder import (
+    ProjectVFolderTemplate,
+    UserVFolderTemplate,
+)
+from ai.backend.test.templates.vfolder.invite import (
+    AcceptInvitationTemplate,
+    RejectInvitationTemplate,
+    VFolderInviteTemplate,
+)
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.testcases.vfolder.access import VFolderAccessSuccess
+from ai.backend.test.testcases.vfolder.access import VFolderAccessFailure, VFolderAccessSuccess
 from ai.backend.test.testcases.vfolder.clone import VFolderCloneSuccess
 from ai.backend.test.testcases.vfolder.delete_files import (
     VFolderFilesDeletionSuccess,
@@ -25,6 +31,63 @@ from ai.backend.test.testcases.vfolder.rename_file import VFolderFileRenameSucce
 from ai.backend.test.tester.dependency import UploadFileDep
 
 _TEST_FILE_CONTENT = "This is a test file for VFolder download."
+
+VFOLDER_INVITATION_TEST_SPECS = {
+    "invite_vfolder_success": TestSpec(
+        name="invite_vfolder_success",
+        description=textwrap.dedent("""\
+            Test for VFolder invitation functionality.
+            The test will:
+            1. Authenticate as admin and create a VFolder.
+            2. Create a test user.
+            3. Invite the test user to the VFolder.
+            4. Login as the test user.
+            5. Accept the VFolder invitation.
+            6. Verify that the test user can access the VFolder.
+        """),
+        tags={TestTag.MANAGER, TestTag.VFOLDER},
+        template=BasicTestTemplate(VFolderAccessSuccess()).with_wrappers(
+            # Run as admin
+            KeypairAuthTemplate,
+            UserVFolderTemplate,
+            UserTemplate,
+            VFolderInviteTemplate,
+            # Run as invitee user
+            KeypairAuthAsCreatedUserTemplate,
+            AcceptInvitationTemplate,
+        ),
+        parametrizes={
+            ContextName.VFOLDER_INVITATION_PERMISSION: ["rw", "ro"],
+        },
+    ),
+    "invite_vfolder_failure_reject": TestSpec(
+        name="invite_vfolder_failure_reject",
+        description=textwrap.dedent("""\
+            Test for VFolder invitation functionality.
+            The test will:
+            1. Authenticate as admin and create a VFolder.
+            2. Create a test user.
+            3. Invite the test user to the VFolder.
+            4. Login as the test user.
+            5. Reject the VFolder invitation.
+            6. Verify that the test user cannot access the VFolder.
+        """),
+        tags={TestTag.MANAGER, TestTag.VFOLDER},
+        template=BasicTestTemplate(VFolderAccessFailure()).with_wrappers(
+            # Run as admin
+            KeypairAuthTemplate,
+            UserVFolderTemplate,
+            UserTemplate,
+            VFolderInviteTemplate,
+            # Run as invitee user
+            KeypairAuthAsCreatedUserTemplate,
+            RejectInvitationTemplate,
+        ),
+        parametrizes={
+            ContextName.VFOLDER_INVITATION_PERMISSION: ["rw", "ro"],
+        },
+    ),
+}
 
 VFOLDER_TEST_SPECS = {
     "list_files": TestSpec(
@@ -39,7 +102,7 @@ VFOLDER_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
         template=BasicTestTemplate(VFolderListFilesSuccess()).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+            KeypairAuthTemplate, ProjectVFolderTemplate, PlainTextFilesUploader
         ),
         parametrizes={
             ContextName.VFOLDER_UPLOAD_FILES: [
@@ -72,7 +135,7 @@ VFOLDER_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
         template=BasicTestTemplate(VFolderFileRenameSuccess()).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+            KeypairAuthTemplate, ProjectVFolderTemplate, PlainTextFilesUploader
         ),
         parametrizes={
             ContextName.VFOLDER_UPLOAD_FILES: [
@@ -97,7 +160,7 @@ VFOLDER_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
         template=BasicTestTemplate(VFolderFileMoveSuccess()).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+            KeypairAuthTemplate, ProjectVFolderTemplate, PlainTextFilesUploader
         ),
         parametrizes={
             ContextName.VFOLDER_UPLOAD_FILES: [
@@ -122,7 +185,7 @@ VFOLDER_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
         template=BasicTestTemplate(VFolderFilesDeletionSuccess()).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+            KeypairAuthTemplate, ProjectVFolderTemplate, PlainTextFilesUploader
         ),
         parametrizes={
             ContextName.VFOLDER_UPLOAD_FILES: [
@@ -155,7 +218,7 @@ VFOLDER_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
         template=BasicTestTemplate(VFolderFilesRecursiveDeletionSuccess("nested")).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+            KeypairAuthTemplate, ProjectVFolderTemplate, PlainTextFilesUploader
         ),
         parametrizes={
             ContextName.VFOLDER_UPLOAD_FILES: [
@@ -188,7 +251,7 @@ VFOLDER_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
         template=BasicTestTemplate(VFolderDownloadSuccess()).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+            KeypairAuthTemplate, ProjectVFolderTemplate, PlainTextFilesUploader
         ),
         parametrizes={
             ContextName.VFOLDER_UPLOAD_FILES: [
@@ -225,7 +288,7 @@ VFOLDER_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.VFOLDER},
         template=BasicTestTemplate(VFolderCloneSuccess()).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, PlainTextFilesUploader
+            KeypairAuthTemplate, ProjectVFolderTemplate, PlainTextFilesUploader
         ),
         parametrizes={
             ContextName.VFOLDER_UPLOAD_FILES: [
@@ -246,31 +309,5 @@ VFOLDER_TEST_SPECS = {
             ]
         },
     ),
-    "invite_vfolder": TestSpec(
-        name="invite_vfolder",
-        description=textwrap.dedent("""\
-            Test for VFolder invitation functionality.
-            The test will:
-            1. Authenticate as admin and create a VFolder.
-            2. Create a test user.
-            3. Invite the test user to the VFolder.
-            4. Login as the test user.
-            5. Accept the VFolder invitation.
-            6. Verify that the test user can access the VFolder.
-        """),
-        tags={TestTag.MANAGER, TestTag.VFOLDER},
-        template=BasicTestTemplate(VFolderAccessSuccess()).with_wrappers(
-            # Run as admin
-            KeypairAuthTemplate,
-            GeneralVFolderTemplate,
-            UserTemplate,
-            VFolderInviteTemplate,
-            # Run as invitee user
-            KeypairAuthAsCreatedUserTemplate,
-            AcceptInvitationTemplate,
-        ),
-        parametrizes={
-            ContextName.VFOLDER_INVITATION_PERMISSION: ["rw", "ro"],
-        },
-    ),
+    **VFOLDER_INVITATION_TEST_SPECS,
 }

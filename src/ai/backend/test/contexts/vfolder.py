@@ -40,6 +40,7 @@ class VFolderInvitationContext(BaseTestContext[VFolderInvitationMeta]):
         return ContextName.VFOLDER_INVITATION
 
 
+# TODO: Move the VFolderPermission type to the common package and use VFolderPermission instead of str.
 class VFolderInvitationPermissionContext(BaseTestContext[str]):
     @override
     @classmethod
