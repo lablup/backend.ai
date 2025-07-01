@@ -23,6 +23,7 @@ class GeneralVFolderTemplate(WrapperTestTemplate):
         vfolder_name = f"test-{str(test_id)[:8]}"
         vfolder_cfg = VFolderContext.current()
 
+        vfolder = None
         try:
             vfolder = await client_session.VFolder.create(
                 name=vfolder_name,
@@ -38,5 +39,6 @@ class GeneralVFolderTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            await client_session.VFolder.delete_by_id(vfolder["id"])
-            await client_session.VFolder(vfolder["name"]).purge()
+            if vfolder:
+                await client_session.VFolder.delete_by_id(vfolder["id"])
+                await client_session.VFolder(vfolder["name"]).purge()
