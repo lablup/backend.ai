@@ -25,6 +25,19 @@ class VFolderNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class VFolderInvitationNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/vfolder-invitation-not-found"
+    error_title = "Virtual folder invitation not found."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class VFolderCreationFailure(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-creation-failed"
     error_title = "Virtual folder creation failed."
