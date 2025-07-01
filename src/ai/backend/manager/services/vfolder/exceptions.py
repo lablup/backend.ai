@@ -32,7 +32,7 @@ class VFolderInvitationNotFound(BackendAIError, web.HTTPNotFound):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
+            domain=ErrorDomain.VFOLDER_INVITATION,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )

@@ -149,6 +149,7 @@ class ErrorDomain(enum.StrEnum):
     ROUTE = "route"
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
+    VFOLDER_INVITATION = "vfolder-invitation"
     MODEL_SERVICE = "model-service"
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
