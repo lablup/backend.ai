@@ -75,7 +75,7 @@ class UserTemplate(WrapperTestTemplate):
             user_id=email,
             fields=[keypair_fields["access_key"], keypair_fields["secret_key"]],
         )
-        assert keypair_info, "Keypair list should not be empty"
+        assert len(keypair_info) > 0, "Keypair list should not be empty"
         keypair_info = keypair_info[0]
 
         user_meta = CreatedUserMeta(
