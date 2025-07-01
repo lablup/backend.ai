@@ -79,7 +79,6 @@ class UserTemplate(WrapperTestTemplate):
         keypair_info = keypair_info[0]
 
         user_meta = CreatedUserMeta(
-            username=user_info["username"],
             email=user_info["email"],
             password=password,
             access_key=keypair_info["access_key"],

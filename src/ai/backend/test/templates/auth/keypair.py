@@ -34,11 +34,10 @@ class KeypairAuthTemplate(WrapperTestTemplate):
                 yield
 
 
-# TODO: Rename this?
-class VFolderInviteeKeypairAuthTemplate(WrapperTestTemplate):
+class KeypairAuthAsCreatedUserTemplate(WrapperTestTemplate):
     @property
     def name(self) -> str:
-        return "keypair_auth_vfolder_invitee"
+        return "keypair_auth_as_created_user"
 
     @override
     @actxmgr
@@ -54,6 +53,6 @@ class VFolderInviteeKeypairAuthTemplate(WrapperTestTemplate):
         )
 
         async with AsyncSession(config=api_config) as session:
-            # TODO: Check this: should we make another separate context?
+            # TODO: Should we make another separate context?
             with ClientSessionContext.with_current(session):
                 yield

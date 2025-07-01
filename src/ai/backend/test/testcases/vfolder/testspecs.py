@@ -2,8 +2,8 @@ import textwrap
 
 from ai.backend.test.contexts.context import ContextName
 from ai.backend.test.templates.auth.keypair import (
+    KeypairAuthAsCreatedUserTemplate,
     KeypairAuthTemplate,
-    VFolderInviteeKeypairAuthTemplate,
 )
 from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.templates.user.user import UserTemplate
@@ -266,7 +266,7 @@ VFOLDER_TEST_SPECS = {
             UserTemplate,
             VFolderInviteTemplate,
             # Run as invitee user
-            VFolderInviteeKeypairAuthTemplate,
+            KeypairAuthAsCreatedUserTemplate,
             AcceptInvitationTemplate,
         ),
         parametrizes={
