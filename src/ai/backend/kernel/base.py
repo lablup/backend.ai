@@ -495,8 +495,10 @@ class BaseRunner(metaclass=ABCMeta):
 
         assert self.kernel_client is not None
         log.debug("executing in query mode...")
+        exit_code = 0
 
         async def output_hook(msg):
+            nonlocal exit_code
             content = msg.get("content", "")
             if msg["msg_type"] == "stream":
                 # content['name'] will be 'stdout' or 'stderr'.
@@ -505,6 +507,16 @@ class BaseRunner(metaclass=ABCMeta):
                     content["text"].encode("utf-8"),
                 ])
             elif msg["msg_type"] == "error":
+                ename = content.get("ename")
+                evalue = content.get("evalue")
+
+                if ename == "SystemExit":
+                    try:
+                        exit_code = int(evalue) if evalue not in (None, "") else 0
+                    except Exception:
+                        exit_code = 1
+                else:
+                    exit_code = 1
                 tbs = "\n".join(content["traceback"])
                 await self.outsock.send_multipart([b"stderr", tbs.encode("utf-8")])
             elif msg["msg_type"] in ["execute_result", "display_data"]:
@@ -569,16 +581,19 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception as e:
             log.exception(str(e))
             return 127
-        return 0
+        return exit_code
 
-    async def _complete(self, completion_data) -> Sequence[str]:
+    async def _complete(self, completion_data) -> None:
         result: Sequence[str] = []
         try:
             result = await self.complete(completion_data)
         except Exception:
             log.exception("unexpected error")
         finally:
-            return result
+            await self.outsock.send_multipart([
+                b"completion",
+                json.dumps({"suggestions": result}).encode("utf8"),
+            ])
 
     async def complete(self, completion_data) -> Sequence[str]:
         """Return the list of strings to be shown in the auto-complete list.

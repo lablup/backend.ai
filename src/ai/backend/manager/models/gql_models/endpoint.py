@@ -376,7 +376,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
                 metric_source=OptionalState.from_graphql(
                     AutoScalingMetricSource(self.metric_source)
                     if self.metric_source is not Undefined
-                    else None,
+                    else Undefined,
                 ),
                 metric_name=OptionalState.from_graphql(
                     self.metric_name,
@@ -387,7 +387,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
                 comparator=OptionalState.from_graphql(
                     AutoScalingMetricComparator(self.comparator)
                     if self.comparator is not Undefined
-                    else None,
+                    else Undefined,
                 ),
                 step_size=OptionalState.from_graphql(
                     self.step_size,

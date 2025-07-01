@@ -186,7 +186,9 @@ class RouteInfoModel(BaseFieldModel):
             " relationship with the inference session."
         )
     )
-    session_id: uuid.UUID = Field(description="Unique ID referencing the inference session.")
+    session_id: Optional[uuid.UUID] = Field(
+        description="Unique ID referencing the inference session."
+    )
     traffic_ratio: NonNegativeFloat
 
 
@@ -303,7 +305,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
             "Specifications about extra VFolders mounted to model service session. "
             "MODEL type VFolders are not allowed to be attached to model service session with this option."
         ),
-        default={},
+        default_factory=dict,
     )
 
     environ: Optional[dict[str, str]] = Field(

@@ -43,6 +43,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     ImageConfig,
@@ -68,7 +69,7 @@ from ..agent import (
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, KernelOwnershipData, MountInfo, Port
+from ..types import Container, KernelOwnershipData, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,
@@ -948,6 +949,16 @@ class KubernetesAgent(
         finally:
             # Stop k8s event monitoring.
             pass
+
+    @override
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        # Not implemented yet for K8s Agent
+        return Path()
+
+    @override
+    def get_cgroup_version(self) -> str:
+        # Not implemented yet for K8s Agent
+        return ""
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config)

@@ -23,6 +23,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     DeviceId,
     DeviceName,
     ImageConfig,
@@ -49,7 +50,7 @@ from ..agent import (
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, KernelOwnershipData, MountInfo
+from ..types import Container, KernelOwnershipData, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
 from .resources import load_resources, scan_available_resources
@@ -266,6 +267,16 @@ class DummyAgent(
 
     async def resolve_image_distro(self, image: ImageConfig) -> str:
         return "ubuntu16.04"
+
+    @override
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        #  Dummy agent does not use cgroups, so we return an empty path.
+        return Path()
+
+    @override
+    def get_cgroup_version(self) -> str:
+        # Dummy agent does not use cgroups, so we return an empty string.
+        return ""
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config, self.dummy_config)

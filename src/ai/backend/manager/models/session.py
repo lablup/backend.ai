@@ -38,13 +38,17 @@ from ai.backend.common import redis_helper
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
-from ai.backend.common.events.schedule import (
+from ai.backend.common.events.event_types.schedule.anycast import (
     DoStartSessionEvent,
 )
-from ai.backend.common.events.session import (
+from ai.backend.common.events.event_types.session.anycast import (
     DoUpdateSessionStatusEvent,
-    SessionStartedEvent,
-    SessionTerminatedEvent,
+    SessionStartedAnycastEvent,
+    SessionTerminatedAnycastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionStartedBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
 )
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
@@ -1561,15 +1565,16 @@ class SessionLifecycleManager:
     ) -> None:
         match session_row.status:
             case SessionStatus.PREPARED:
-                await self.event_producer.produce_event(DoStartSessionEvent())
+                await self.event_producer.anycast_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
                 log.debug(
                     "Producing SessionStartedEvent({}, {})",
                     session_row.id,
                     session_row.creation_id,
                 )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                await self.event_producer.anycast_and_broadcast_event(
+                    SessionStartedAnycastEvent(session_row.id, session_row.creation_id),
+                    SessionStartedBroadcastEvent(session_row.id, session_row.creation_id),
                 )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
@@ -1582,8 +1587,13 @@ class SessionLifecycleManager:
                 if session_row.session_type == SessionTypes.BATCH:
                     await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
-                await self.event_producer.produce_event(
-                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                await self.event_producer.anycast_and_broadcast_event(
+                    SessionTerminatedAnycastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
+                    SessionTerminatedBroadcastEvent(
+                        session_row.id, session_row.main_kernel.status_info
+                    ),
                 )
             case _:
                 pass
@@ -1634,7 +1644,7 @@ class SessionLifecycleManager:
             redis.exceptions.ChildDeadlockedError,
         ) as e:
             log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
-        await self.event_producer.produce_event(DoUpdateSessionStatusEvent())
+        await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
 
     async def get_status_updatable_sessions(self) -> set[SessionId]:
         pop_all_session_id_script = textwrap.dedent("""

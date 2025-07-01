@@ -147,6 +147,15 @@ keypair_resource_policy_fields = FieldSet([
 ])
 
 
+user_resource_policy_fields = FieldSet([
+    FieldSpec("name"),
+    FieldSpec("max_vfolder_count"),
+    FieldSpec("max_quota_scope_size"),
+    FieldSpec("max_session_count_per_model_session"),
+    FieldSpec("max_customized_image_count"),
+])
+
+
 scaling_group_fields = FieldSet([
     FieldSpec("name"),
     FieldSpec("description"),
@@ -162,6 +171,71 @@ scaling_group_fields = FieldSet([
     FieldSpec("wsproxy_api_token"),
 ])
 
+session_node_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("tag"),
+    FieldSpec("name"),
+    FieldSpec("type"),
+    FieldSpec("priority"),
+    FieldSpec("cluster_template"),
+    FieldSpec("cluster_mode"),
+    FieldSpec("cluster_size"),
+    FieldSpec("domain_name"),
+    FieldSpec("project_id"),
+    FieldSpec("user_id"),
+    FieldSpec("access_key"),
+    FieldSpec("permissions"),
+    FieldSpec("status"),
+    FieldSpec("status_info"),
+    FieldSpec("status_data", formatter=nested_dict_formatter),
+    FieldSpec("status_history", formatter=nested_dict_formatter),
+    FieldSpec("created_at"),
+    FieldSpec("terminated_at"),
+    FieldSpec("starts_at"),
+    FieldSpec("scheduled_at"),
+    FieldSpec("startup_command"),
+    FieldSpec("result"),
+    FieldSpec("commit_status"),
+    FieldSpec("abusing_reports"),
+    FieldSpec("idle_checks", formatter=nested_dict_formatter),
+    FieldSpec("agent_ids"),
+    FieldSpec("resource_opts", formatter=nested_dict_formatter),
+    FieldSpec("scaling_group"),
+    FieldSpec("service_ports", formatter=nested_dict_formatter),
+    FieldSpec("vfolder_mounts"),
+    FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+    FieldSpec("requested_slots", formatter=resource_slot_formatter),
+    FieldSpec("image_references"),
+    FieldSpec("num_queries"),
+    FieldSpec("inference_metrics", formatter=nested_dict_formatter),
+])
+
+kernel_node_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("cluster_idx"),
+    FieldSpec("local_rank"),
+    FieldSpec("cluster_role"),
+    FieldSpec("cluster_hostname"),
+    FieldSpec("session_id"),
+    FieldSpec("image_reference"),
+    FieldSpec("architecture"),
+    FieldSpec("status"),
+    FieldSpec("status_changed"),
+    FieldSpec("status_info"),
+    FieldSpec("status_data", formatter=nested_dict_formatter),
+    FieldSpec("created_at"),
+    FieldSpec("terminated_at"),
+    FieldSpec("starts_at"),
+    FieldSpec("scheduled_at"),
+    FieldSpec("agent_id"),
+    FieldSpec("agent_addr"),
+    FieldSpec("container_id"),
+    FieldSpec("resource_opts", formatter=nested_dict_formatter),
+    FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+    FieldSpec("live_stat", formatter=nested_dict_formatter),
+    FieldSpec("abusing_report", formatter=nested_dict_formatter),
+    FieldSpec("preopen_ports"),
+])
 
 session_fields = FieldSet([
     FieldSpec("id", "Session ID", alt_name="session_id"),

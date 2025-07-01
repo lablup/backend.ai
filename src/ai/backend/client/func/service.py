@@ -7,6 +7,7 @@ from typing_extensions import deprecated
 
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
+from ai.backend.common.types import RuntimeVariant
 
 from ..exceptions import BackendClientError
 from ..output.fields import service_fields
@@ -113,6 +114,7 @@ class Service(BaseFunction):
         owner_access_key: Optional[str] = None,
         model_definition_path: Optional[str] = None,
         expose_to_public: bool = False,
+        runtime_variant: Optional[RuntimeVariant] = None,
     ) -> dict[str, Any]:
         """
         Creates an inference service.
@@ -142,6 +144,7 @@ class Service(BaseFunction):
         :param model_definition_path: Relative path to model definition file. Defaults to `model-definition.yaml`.
         :param expose_to_public: Visibility of API Endpoint which serves inference workload.
             If set to true, no authentication will be required to access the endpoint.
+        :param runtime_variant: The runtime variant to use for the service.
 
         :returns: The :class:`ComputeSession` instance.
         """
@@ -186,8 +189,9 @@ class Service(BaseFunction):
         }
         if model_version:
             model_config["model_version"] = model_version
+        model_config = {k: v for k, v in model_config.items() if v is not None}
         rqst = Request("POST", "/services")
-        rqst.set_json({
+        rqst_body = {
             "name": service_name,
             "replicas": initial_session_count,
             "image": image,
@@ -201,8 +205,11 @@ class Service(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "owner_access_key": owner_access_key,
             "open_to_public": expose_to_public,
+            "runtime_variant": runtime_variant,
             "config": model_config,
-        })
+        }
+        rqst_body = {k: v for k, v in rqst_body.items() if v is not None}
+        rqst.set_json(rqst_body)
         async with rqst.fetch() as resp:
             body = await resp.json()
             return {
