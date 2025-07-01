@@ -3651,6 +3651,9 @@ class AgentRegistry:
             "abuse_report": result,
         }
 
+    async def get_health_check_info(self, endpoint: EndpointRow) -> None:
+        pass
+
     async def update_appproxy_endpoint_routes(
         self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
     ) -> None:
