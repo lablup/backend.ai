@@ -326,6 +326,12 @@ class GroupService:
         from ai.backend.manager.models.endpoint import EndpointRow
         from ai.backend.manager.models.routing import RoutingRow
 
+        endpoint_ids = (
+            await db_conn.scalars(sa.select(EndpointRow.id).where(EndpointRow.project == group_id))
+        ).all()
+        if len(endpoint_ids) == 0:
+            return
+
         active_endpoint = await db_conn.scalar(
             sa.select(EndpointRow.id).where(
                 (EndpointRow.project == group_id)
@@ -341,37 +347,27 @@ class GroupService:
                 f"Please delete the endpoint first."
             )
 
-        endpoint_ids = await db_conn.execute(
-            sa.select(EndpointRow.id).where(EndpointRow.project == group_id)
-        )
-        if endpoint_ids is None:
-            return
-
         for endpoint_id in endpoint_ids:
             deleted_sessions = await self._delete_sessions_by_endpoint(db_conn, endpoint_id)
             if deleted_sessions > 0:
-                print(f"Deleted {deleted_sessions} sessions for endpoint {endpoint_id}")
+                log.info(f"Deleted {deleted_sessions} sessions for endpoint {endpoint_id}")
 
         await db_conn.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
-
         await db_conn.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
-
-        print(f"Hard deleted {len(endpoint_ids)} destroyed endpoints")
-
-        stmt = sa.delete(EndpointRow).where(EndpointRow.project == group_id)
-        await db_conn.execute(stmt)
 
     async def _delete_sessions_by_endpoint(self, db_conn: SAConnection, endpoint_id: UUID) -> int:
         from ai.backend.manager.models.routing import RoutingRow
         from ai.backend.manager.models.session import SessionRow
 
-        session_ids = await db_conn.execute(
-            sa.select(SessionRow.id)
-            .select_from(SessionRow.join(RoutingRow, SessionRow.id == RoutingRow.session))
-            .where((RoutingRow.endpoint == endpoint_id) & (RoutingRow.session is not None))
-        )
+        session_ids = (
+            await db_conn.scalars(
+                sa.select(SessionRow.id)
+                .select_from(sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session))
+                .where((RoutingRow.endpoint == endpoint_id) & (RoutingRow.session.is_not(None)))
+            )
+        ).all()
 
-        if not session_ids:
+        if len(session_ids) == 0:
             return 0
         result = await db_conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
         return result.rowcount
