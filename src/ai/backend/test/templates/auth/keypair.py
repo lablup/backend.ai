@@ -5,7 +5,10 @@ from typing import override
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.auth import EndpointContext, KeypairContext
-from ai.backend.test.contexts.client_session import ClientSessionContext
+from ai.backend.test.contexts.client_session import (
+    ClientSessionContext,
+    CreatedUserClientSessionContext,
+)
 from ai.backend.test.contexts.user import CreatedUserContext
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
@@ -53,6 +56,5 @@ class KeypairAuthAsCreatedUserTemplate(WrapperTestTemplate):
         )
 
         async with AsyncSession(config=api_config) as session:
-            # TODO: Should we make another separate context?
-            with ClientSessionContext.with_current(session):
+            with CreatedUserClientSessionContext.with_current(session):
                 yield
