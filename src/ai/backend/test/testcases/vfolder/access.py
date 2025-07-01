@@ -40,8 +40,7 @@ class VFolderAccessFailure(TestCode):
         client_session = ClientSessionContext.current()
 
         try:
-            _ = await client_session.VFolder(vfolder_meta.name).info()
+            await client_session.VFolder(vfolder_meta.name).info()
             raise UnexpectedSuccess("VFolder access should have failed, but it succeeded.")
         except BackendAPIError as e:
             assert e.status == 404, f"Expected 404 error, but got {e.status}: Exception: {e}"
-            pass
