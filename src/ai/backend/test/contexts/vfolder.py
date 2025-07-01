@@ -1,7 +1,7 @@
 from typing import override
 
 from ai.backend.test.contexts.context import BaseTestContext, ContextName
-from ai.backend.test.data.vfolder import UploadedFilesMeta, VFolderMeta
+from ai.backend.test.data.vfolder import UploadedFilesMeta, VFolderInvitationMeta, VFolderMeta
 from ai.backend.test.tester.dependency import UploadFileDep, VFolderDep
 
 
@@ -31,3 +31,17 @@ class UploadedFilesContext(BaseTestContext[UploadedFilesMeta]):
     @classmethod
     def name(cls) -> ContextName:
         return ContextName.VFOLDER_UPLOADED_FILES_META
+
+
+class VFolderInvitationContext(BaseTestContext[VFolderInvitationMeta]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.VFOLDER_INVITATION
+
+
+class VFolderInvitationPermissionContext(BaseTestContext[str]):
+    @override
+    @classmethod
+    def name(cls) -> ContextName:
+        return ContextName.VFOLDER_INVITATION_PERMISSION

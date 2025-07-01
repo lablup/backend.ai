@@ -1,11 +1,16 @@
 import textwrap
 
 from ai.backend.test.contexts.context import ContextName
+from ai.backend.test.templates.auth.auth_vfolder_invitee import VFolderInviteeKeypairAuthTemplate
 from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
 from ai.backend.test.templates.template import BasicTestTemplate
+from ai.backend.test.templates.user.user import UserTemplate
+from ai.backend.test.templates.vfolder.accept_invitation import AcceptInvitationTemplate
 from ai.backend.test.templates.vfolder.file_uploader import PlainTextFilesUploader
 from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
+from ai.backend.test.templates.vfolder.invite import VFolderInviteTemplate
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
+from ai.backend.test.testcases.vfolder.access import VFolderAccessSuccess
 from ai.backend.test.testcases.vfolder.clone import VFolderCloneSuccess
 from ai.backend.test.testcases.vfolder.delete_files import (
     VFolderFilesDeletionSuccess,
@@ -237,6 +242,33 @@ VFOLDER_TEST_SPECS = {
                     ),
                 ]
             ]
+        },
+    ),
+    "invite_vfolder": TestSpec(
+        name="invite_vfolder",
+        description=textwrap.dedent("""\
+            Test for VFolder invitation functionality.
+            The test will:
+            1. Authenticate as admin and create a VFolder.
+            2. Create a test user.
+            3. Invite the test user to the VFolder.
+            4. Login as the test user.
+            5. Accept the VFolder invitation.
+            6. Verify that the test user can access the VFolder.
+        """),
+        tags={TestTag.MANAGER, TestTag.VFOLDER},
+        template=BasicTestTemplate(VFolderAccessSuccess()).with_wrappers(
+            # Run as admin
+            KeypairAuthTemplate,
+            GeneralVFolderTemplate,
+            UserTemplate,
+            VFolderInviteTemplate,
+            # Run as test user
+            VFolderInviteeKeypairAuthTemplate,
+            AcceptInvitationTemplate,
+        ),
+        parametrizes={
+            ContextName.VFOLDER_INVITATION_PERMISSION: ["rw", "ro"],
         },
     ),
 }

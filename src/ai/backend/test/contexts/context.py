@@ -1,9 +1,9 @@
 import enum
 from abc import abstractmethod
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generic, Iterator, Optional, TypeVar, final
+from typing import Generic, Optional, TypeVar, final
 
 T = TypeVar("T")
 
