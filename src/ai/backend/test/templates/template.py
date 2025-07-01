@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, Protocol, final
+from typing import AsyncIterator, Optional, Protocol, final
 
 from ai.backend.test.tester.exporter import TestExporter
 
@@ -11,6 +11,12 @@ class WrapperTestTemplateProtocol(Protocol):
         """
         Class method to wrap a test template with a wrapper template.
         :param template: The test template to wrap.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def wrap_by_instance(self, template: "TestTemplate") -> "TestTemplate":
+        """
+        Method to wrap a test template with a wrapper template.
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
@@ -36,7 +42,9 @@ class NopTestCode(TestCode):
 
 class TestTemplate(ABC):
     @final
-    def with_wrappers(self, *wrappers: WrapperTestTemplateProtocol) -> "TestTemplate":
+    def with_wrappers(
+        self, *wrappers: WrapperTestTemplateProtocol | type[WrapperTestTemplateProtocol]
+    ) -> "TestTemplate":
         """
         Create a wrapper test template with the given template and optional wrapper templates.
         This method is syntactic sugar for wrapping the current template
@@ -44,7 +52,12 @@ class TestTemplate(ABC):
         """
         current = self
         for wrapper in wrappers[::-1]:
-            current = wrapper.wrap(current)
+            if isinstance(wrapper, type):
+                current = wrapper.wrap(current)
+            elif isinstance(wrapper, WrapperTestTemplate):
+                current = wrapper.wrap_by_instance(current)
+            else:
+                current = wrapper.wrap(current)
         return current
 
     @property
@@ -86,9 +99,9 @@ class BasicTestTemplate(TestTemplate):
 
 
 class WrapperTestTemplate(TestTemplate, ABC):
-    _template: TestTemplate
+    _template: Optional[TestTemplate]
 
-    def __init__(self, template: TestTemplate) -> None:
+    def __init__(self, template: Optional[TestTemplate] = None, *args, **kwargs) -> None:
         """
         Initialize the wrapper template with a test template.
 
@@ -106,6 +119,15 @@ class WrapperTestTemplate(TestTemplate, ABC):
         """
         return cls(template)
 
+    @final
+    def wrap_by_instance(self, template: "TestTemplate") -> "TestTemplate":
+        """
+        Method to wrap a test template with this wrapper template.
+        :return: An instance of the test template.
+        """
+        self._template = template
+        return self
+
     @abstractmethod
     @actxmgr
     async def _context(self) -> AsyncIterator[None]:
@@ -121,6 +143,8 @@ class WrapperTestTemplate(TestTemplate, ABC):
         try:
             async with self._context():
                 await exporter.export_stage_done(self.name)
+                if self._template is None:
+                    raise ValueError("No template provided to run the test.")
                 await self._template.run_test(exporter)
         except BaseException as e:
             await exporter.export_stage_exception(self.name, e)
