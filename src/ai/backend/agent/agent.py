@@ -1423,7 +1423,7 @@ class AbstractAgent(
                 }
                 dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
                 if dangling_kernel_ids:
-                    log.warning(
+                    log.info(
                         "cleaning up dangling kernel objects (kernel ids): {}",
                         ", ".join(map(str, dangling_kernel_ids)),
                     )
