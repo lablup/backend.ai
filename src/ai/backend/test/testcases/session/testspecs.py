@@ -105,7 +105,7 @@ BATCH_SESSION_TEST_SPECS = {
         """),
         tags={TestTag.MANAGER, TestTag.AGENT, TestTag.SESSION},
         template=BasicTestTemplate(BatchSessionCreationFailureWrongCommand()).with_wrappers(
-            KeypairAuthTemplate
+            KeypairAuthTemplate(abc="def")
         ),
     ),
     "creation_batch_session_failure_command_timeout": TestSpec(
