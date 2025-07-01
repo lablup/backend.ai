@@ -1,8 +1,10 @@
 import textwrap
 
 from ai.backend.test.contexts.context import ContextName
-from ai.backend.test.templates.auth.auth_vfolder_invitee import VFolderInviteeKeypairAuthTemplate
-from ai.backend.test.templates.auth.keypair import KeypairAuthTemplate
+from ai.backend.test.templates.auth.keypair import (
+    KeypairAuthTemplate,
+    VFolderInviteeKeypairAuthTemplate,
+)
 from ai.backend.test.templates.template import BasicTestTemplate
 from ai.backend.test.templates.user.user import UserTemplate
 from ai.backend.test.templates.vfolder.accept_invitation import AcceptInvitationTemplate
@@ -263,7 +265,7 @@ VFOLDER_TEST_SPECS = {
             GeneralVFolderTemplate,
             UserTemplate,
             VFolderInviteTemplate,
-            # Run as test user
+            # Run as invitee user
             VFolderInviteeKeypairAuthTemplate,
             AcceptInvitationTemplate,
         ),
