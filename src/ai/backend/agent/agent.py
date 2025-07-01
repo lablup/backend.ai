@@ -1422,10 +1422,16 @@ class AbstractAgent(
                     if kernel.state == KernelLifecycleStatus.RUNNING
                 }
                 dangling_kernel_ids = registered_kernel_ids - alive_kernel_ids
-                log.info("found dangling kernels in registry: {}", dangling_kernel_ids)
-                asyncio.create_task(
-                    asyncio.wait_for(self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0)
-                )
+                if dangling_kernel_ids:
+                    log.warning(
+                        "cleaning up dangling kernel objects (kernel ids): {}",
+                        ", ".join(map(str, dangling_kernel_ids)),
+                    )
+                    asyncio.create_task(
+                        asyncio.wait_for(
+                            self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0
+                        )
+                    )
             except Exception as e:
                 log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
             finally:
