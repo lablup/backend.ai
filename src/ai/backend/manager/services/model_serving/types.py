@@ -78,7 +78,7 @@ class ServiceConfig:
             "model_definition_path": self.model_definition_path,
             "model_mount_destination": self.model_mount_destination,
             "extra_mounts": {key: value.to_dict() for key, value in self.extra_mounts.items()},
-            "environ": self.environ,
+            "environ": self.environ if self.environ is not None else {},
             "scaling_group": self.scaling_group,
             "resources": self.resources,
             "resource_opts": self.resource_opts,
