@@ -20,6 +20,7 @@ from collections.abc import (
     Awaitable,
     Callable,
     Collection,
+    Coroutine,
     Iterable,
     Mapping,
     MutableMapping,
@@ -691,6 +692,34 @@ class ComputerContext:
     alloc_map: AbstractAllocMap
 
 
+def _observe_stat_task(
+    stat_scope: StatScope,
+) -> Callable[
+    [Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]],
+    Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
+]:
+    stat_task_observer = StatTaskObserver.instance()
+
+    def decorator(
+        func: Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
+    ) -> Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]:
+        async def wrapper(self: AbstractAgent, interval: float) -> None:
+            stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
+            try:
+                await func(self, interval)
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                stat_task_observer.observe_stat_task_failure(
+                    agent_id=self.id, stat_scope=stat_scope, exception=e
+                )
+            stat_task_observer.observe_stat_task_success(agent_id=self.id, stat_scope=stat_scope)
+
+        return wrapper
+
+    return decorator
+
+
 class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
@@ -765,7 +794,6 @@ class AbstractAgent(
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
-        self._stat_task_observer = StatTaskObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
     async def __ainit__(self) -> None:
@@ -1165,32 +1193,19 @@ class AbstractAgent(
         )
         await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 
+    @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, interval: float):
-        stat_scope = StatScope.NODE
-        self._stat_task_observer.observe_stat_task_triggered(
-            agent_id=self.id, stat_scope=stat_scope
-        )
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting node statistics")
         try:
             await self.stat_ctx.collect_node_stat()
-            self._stat_task_observer.observe_stat_task_success(
-                agent_id=self.id, stat_scope=stat_scope
-            )
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
+        except Exception:
             log.exception("unhandled exception while syncing node stats")
-            self._stat_task_observer.observe_stat_task_failure(
-                agent_id=self.id, stat_scope=stat_scope, exception=e
-            )
             await self.produce_error_event()
+            raise
 
+    @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self, interval: float):
-        stat_scope = StatScope.CONTAINER
-        self._stat_task_observer.observe_stat_task_triggered(
-            agent_id=self.id, stat_scope=stat_scope
-        )
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
         try:
@@ -1200,23 +1215,15 @@ class AbstractAgent(
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
                 await self.stat_ctx.collect_container_stat(container_ids)
-            self._stat_task_observer.observe_stat_task_success(
-                agent_id=self.id, stat_scope=stat_scope
-            )
         except asyncio.CancelledError:
             pass
-        except Exception as e:
+        except Exception:
             log.exception("unhandled exception while syncing container stats")
-            self._stat_task_observer.observe_stat_task_failure(
-                agent_id=self.id, stat_scope=stat_scope, exception=e
-            )
             await self.produce_error_event()
+            raise
 
+    @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float):
-        stat_scope = StatScope.PROCESS
-        self._stat_task_observer.observe_stat_task_triggered(
-            agent_id=self.id, stat_scope=stat_scope
-        )
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting process statistics in container")
         try:
@@ -1226,17 +1233,10 @@ class AbstractAgent(
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
             await self.stat_ctx.collect_per_container_process_stat(container_ids)
-            self._stat_task_observer.observe_stat_task_success(
-                agent_id=self.id, stat_scope=stat_scope
-            )
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
+        except Exception:
             log.exception("unhandled exception while syncing process stats")
-            self._stat_task_observer.observe_stat_task_failure(
-                agent_id=self.id, stat_scope=stat_scope, exception=e
-            )
             await self.produce_error_event()
+            raise
 
     def _get_public_host(self) -> str:
         agent_config: Mapping[str, Any] = self.local_config["agent"]
