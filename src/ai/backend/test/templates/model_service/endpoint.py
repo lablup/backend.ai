@@ -87,6 +87,10 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
 
             ready_session_cnt = 0
             for session_id in session_ids:
+                # Wait until all inference sessions are ready.
+                if not session_id:
+                    break
+
                 session_info = await client_session.ComputeSession.from_session_id(
                     UUID(session_id)
                 ).detail([
