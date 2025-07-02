@@ -65,7 +65,7 @@ class PurgeGroupActionVFoldersMountedToActiveKernelsError(BackendAIError):
 
 
 class PurgeGroupActionActiveEndpointsError(BackendAIError):
-    error_type = "https://api.backend.ai/probs/group-has-active-endpoints"
+    error_type = "https://api.backend.ai/probs/group-active-endpoints"
     error_title = "Group has active endpoints."
 
     @classmethod
