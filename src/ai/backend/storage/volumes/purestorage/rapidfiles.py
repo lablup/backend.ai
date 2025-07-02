@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -6,11 +7,14 @@ from typing import AsyncIterator
 
 from ai.backend.common.json import load_json
 from ai.backend.common.types import BinarySize
+from ai.backend.logging.utils import BraceStyleAdapter
 
 from ...subproc import run
 from ...types import DirEntry, DirEntryType, Stat, TreeUsage
 from ...utils import fstime2datetime
 from ..vfs import BaseFSOpModel
+
+log: BraceStyleAdapter = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RapidFileToolsFSOpModel(BaseFSOpModel):
@@ -71,6 +75,8 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                         break
                     line = line.rstrip(b"\n")
                     item = load_json(line)
+                    log.debug("Scanned item: {}", item)
+
                     item_path = Path(item["path"])
                     entry_type = DirEntryType.FILE
                     if item["filetype"] == 40000:
