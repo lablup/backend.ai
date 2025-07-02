@@ -946,8 +946,6 @@ class AbstractAgent(
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
             await self.save_last_registry(force=True)
-            if stop_signal == signal.SIGTERM:
-                await self.clean_all_kernels(blocking=True)
 
         # Stop timers.
         cancel_results = await cancel_tasks(self.timer_tasks)
@@ -1774,25 +1772,6 @@ class AbstractAgent(
         await redis_helper.execute(
             self.redis_stat_pool, lambda r: r.set(f"container_count.{self.id}", container_count)
         )
-
-    async def clean_all_kernels(self, blocking: bool = False) -> None:
-        kernel_ids = [*self.kernel_registry.keys()]
-        clean_events = {}
-        loop = asyncio.get_running_loop()
-        if blocking:
-            for kernel_id in kernel_ids:
-                clean_events[kernel_id] = loop.create_future()
-        for kernel_id in kernel_ids:
-            await self.inject_container_lifecycle_event(
-                kernel_id,
-                self.kernel_registry[kernel_id].session_id,
-                LifecycleEvent.DESTROY,
-                KernelLifecycleEventReason.AGENT_TERMINATION,
-                done_future=clean_events[kernel_id] if blocking else None,
-            )
-        if blocking:
-            waiters = [clean_events[kernel_id] for kernel_id in kernel_ids]
-            await asyncio.gather(*waiters)
 
     @abstractmethod
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
