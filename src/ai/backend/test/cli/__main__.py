@@ -143,7 +143,7 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
     default=_DEFAULT_CONFIG_PATH,
     help="The path to the configuration file for the tester",
 )
-@main.command()
+@main.command(help="Run a specific test by its name")
 @click.pass_obj
 def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
     config_file_path = Path(config_path)
@@ -162,7 +162,26 @@ def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
     default=_DEFAULT_CONFIG_PATH,
     help="The path to the configuration file for the tester",
 )
-@main.command()
+@main.command(help="Run configured tests in the config file")
+@click.pass_obj
+def run(cli_ctx: CLIContext, config_path: str) -> None:
+    config_file_path = Path(config_path)
+    spec_manager = _spec_manager()
+    tester = Tester(
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
+    )
+    asyncio.run(tester.run())
+
+
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
+@main.command(help="Run all tests defined in the test specifications")
 @click.pass_obj
 def run_all(cli_ctx: CLIContext, config_path: str) -> None:
     spec_manager = _spec_manager()
