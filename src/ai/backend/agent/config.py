@@ -46,7 +46,7 @@ agent_local_config_iv = (
             tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
             tx.AliasedKey(
-                ["service-addr", "service-internal-addr"], default=("0.0.0.0", 6003)
+                ["service-addr", "internal-addr"], default=("0.0.0.0", 6003)
             ): tx.HostPortPair,
             tx.AliasedKey(
                 ["announce-addr", "announce-internal-addr"], default=("host.docker.internal", 6003)
