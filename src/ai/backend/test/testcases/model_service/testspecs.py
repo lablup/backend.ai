@@ -125,7 +125,7 @@ SINGLE_NODE_MULTI_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
             TestTag.AGENT,
             TestTag.MODEL_SERVICE,
             TestTag.SESSION,
-            TestTag.SINGLE_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_SINGLE_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         # Endpoint health check failure is expected.
         template=BasicTestTemplate(
@@ -155,7 +155,7 @@ SINGLE_NODE_MULTI_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
             TestTag.AGENT,
             TestTag.MODEL_SERVICE,
             TestTag.SESSION,
-            TestTag.SINGLE_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_SINGLE_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(EndpointHealthCheck(expected_status_codes={200})).with_wrappers(
             KeypairAuthTemplate, PublicEndpointTemplate
@@ -184,7 +184,7 @@ SINGLE_NODE_MULTI_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
             TestTag.AGENT,
             TestTag.MODEL_SERVICE,
             TestTag.SESSION,
-            TestTag.SINGLE_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_SINGLE_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         # Endpoint health check success is expected since we're inject JWT token into the request.
         template=BasicTestTemplate(
@@ -217,7 +217,7 @@ MULTI_NODE_MULTI_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
             TestTag.AGENT,
             TestTag.MODEL_SERVICE,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         # Endpoint health check failure is expected.
         template=BasicTestTemplate(
@@ -247,7 +247,7 @@ MULTI_NODE_MULTI_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
             TestTag.AGENT,
             TestTag.MODEL_SERVICE,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(EndpointHealthCheck(expected_status_codes={200})).with_wrappers(
             KeypairAuthTemplate, PublicEndpointTemplate
@@ -276,7 +276,7 @@ MULTI_NODE_MULTI_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
             TestTag.AGENT,
             TestTag.MODEL_SERVICE,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         # Endpoint health check success is expected since we're inject JWT token into the request.
         template=BasicTestTemplate(

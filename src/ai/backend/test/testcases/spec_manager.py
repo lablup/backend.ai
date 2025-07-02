@@ -24,9 +24,13 @@ class TestTag(enum.StrEnum):
     MODEL_SERVICE = "model_service"
 
     # Need extra configuration to pass these tests
-    SINGLE_NODE_MULTI_CONTAINER = "single_node_multi_container"
-    MULTI_NODE_MULTI_CONTAINER = "multi_node_multi_container"
-    CONTAINER_REGISTRY_CONFIGURATION = "container_registry_configuration"
+    REQUIRED_SINGLE_NODE_MULTI_CONTAINER_CONFIGURATION = (
+        "required_single_node_multi_container_configuration"
+    )
+    REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION = (
+        "required_multi_node_multi_containe_configurationr"
+    )
+    REQUIRED_CONTAINER_REGISTRY_CONFIGURATION = "required_container_registry_configuration"
 
     # Others
     LONG_RUNNING = "long_running"

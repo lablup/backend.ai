@@ -71,7 +71,7 @@ BATCH_SESSION_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, BatchSessionTemplate
@@ -96,7 +96,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
@@ -119,7 +119,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(
             FileExistenceCheck(path=Path("."), checklist=["test-abc"])
@@ -148,7 +148,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(InteractiveSessionExecuteCodeSuccess()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
@@ -176,7 +176,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(
             InteractiveSessionExecuteCodeFailureWrongCommand()
@@ -198,7 +198,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(
             InteractiveSessionExecuteCodeFailureWithCustomExitCode()
@@ -223,8 +223,8 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.IMAGE,
             TestTag.CONTAINER_REGISTRY,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
-            TestTag.CONTAINER_REGISTRY_CONFIGURATION,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
+            TestTag.REQUIRED_CONTAINER_REGISTRY_CONFIGURATION,
         },
         template=BasicTestTemplate(InteractiveSessionImagifySuccess()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
@@ -246,7 +246,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.AGENT,
             TestTag.IMAGE,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
             TestTag.LONG_RUNNING,
         },
         template=BasicTestTemplate(InteractiveSessionCommitSuccess()).with_wrappers(
@@ -272,7 +272,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, SessionTemplateTemplate, InteractiveSessionFromTemplateTemplate
@@ -293,7 +293,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(NopTestCode()).with_wrappers(
             KeypairAuthTemplate, SessionTemplateTemplate, BatchSessionFromTemplateTemplate
@@ -319,7 +319,7 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(testcode=TestContainerLogRetriever()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
@@ -332,7 +332,11 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
             Retrieve and validate the dependency graph of a compute session,
             ensuring the session name matches and the dependency structure is present.
         """),
-        tags={TestTag.SESSION, TestTag.MANAGER, TestTag.MULTI_NODE_MULTI_CONTAINER},
+        tags={
+            TestTag.SESSION,
+            TestTag.MANAGER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
+        },
         template=BasicTestTemplate(testcode=DependencyGraphRetriever()).with_wrappers(
             KeypairAuthTemplate, BatchSessionTemplate, DependentSessionTemplate
         ),
@@ -344,7 +348,11 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
             Tests retrieval of session status history
             Validate that the status history is not empty and contains valid statuses
         """),
-        tags={TestTag.SESSION, TestTag.MANAGER, TestTag.MULTI_NODE_MULTI_CONTAINER},
+        tags={
+            TestTag.SESSION,
+            TestTag.MANAGER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
+        },
         template=BasicTestTemplate(
             testcode=SessionStatusHistoryRetriever(),
         ).with_wrappers(KeypairAuthTemplate, InteractiveSessionTemplate),
@@ -368,7 +376,7 @@ SESSION_RENAME_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(testcode=TestSessionRename()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
@@ -390,7 +398,7 @@ SESSION_RENAME_TEST_SPECS = {
             TestTag.MANAGER,
             TestTag.AGENT,
             TestTag.SESSION,
-            TestTag.MULTI_NODE_MULTI_CONTAINER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(testcode=SessionRenameFailureDuplicatedName()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate
@@ -412,7 +420,11 @@ SESSION_VFOLDER_TEST_SPECS = {
         4. Download the file from the vfolder and verify its content matches the original.
         5. Clean up the session and test files after completion.
         """),
-        tags={TestTag.SESSION, TestTag.VFOLDER, TestTag.MULTI_NODE_MULTI_CONTAINER},
+        tags={
+            TestTag.SESSION,
+            TestTag.VFOLDER,
+            TestTag.REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION,
+        },
         template=BasicTestTemplate(testcode=FileHandlingInMountedVFolderSuccess()).with_wrappers(
             KeypairAuthTemplate, GeneralVFolderTemplate, VFolderMountedInteractiveSessionTemplate
         ),

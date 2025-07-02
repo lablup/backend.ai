@@ -1,9 +1,9 @@
 [runner]
 concurrency = 1
 exclude_tags = [
-    "single_node_multi_container",
-    "multi_node_multi_container",
-    "container_registry_configuration",
+    "required_single_node_multi_container_configuration",
+    "required_multi_node_multi_container_configuration",
+    "required_container_registry_configuration",
     "long_running",
 ]
 
