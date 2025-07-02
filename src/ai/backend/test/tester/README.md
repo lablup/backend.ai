@@ -62,7 +62,8 @@ If needed, use the `--config-path` option when running tests to specify a differ
 This section provides guidance on tags that require additional environment setup in order to pass.
 
 <!-- #### `required_single_node_multi_container_configuration` -->
-<!-- --- -->
+
+---
 
 #### `required_multi_node_multi_container_configuration`
 
