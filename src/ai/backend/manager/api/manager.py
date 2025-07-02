@@ -203,7 +203,7 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
         # It supposed to kill all running sessions and kernels
         # but there is no RPC to do that.
         pass
-    await root_ctx.config_provider.legacy_etcd_config_loader.update_manager_status(status)
+    await root_ctx.shared_config.update_manager_status(status)
 
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
