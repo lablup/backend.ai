@@ -218,7 +218,6 @@ from .models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
     is_db_retry_error,
-    reenter_txn,
     reenter_txn_session,
     sql_json_merge,
 )
@@ -2952,25 +2951,6 @@ class AgentRegistry:
     ) -> None:
         # noop for performance reasons
         pass
-
-    async def kill_all_sessions_in_agent(self, agent_id, agent_addr):
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            coro = rpc.call.clean_all_kernels("manager-freeze-force-kill")
-            return await coro
-
-    async def kill_all_sessions(self, conn=None):
-        async with reenter_txn(self.db, conn, {"postgresql_readonly": True}) as conn:
-            query = sa.select([agents.c.id, agents.c.addr]).where(
-                agents.c.status == AgentStatus.ALIVE
-            )
-            result = await conn.execute(query)
-            rows = result.fetchall()
-        tasks = []
-        for row in rows:
-            tasks.append(
-                self.kill_all_sessions_in_agent(row["id"], row["addr"]),
-            )
-        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def handle_heartbeat(self, agent_id, agent_info):
         now = datetime.now(tzutc())
