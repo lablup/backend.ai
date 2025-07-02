@@ -10,39 +10,43 @@ It performs actual integration tests by directly sending requests to the real Ba
 
 ## How to run tester-based integration tests in CLI
 
-To run all the tests based on Tester, execute the following command.
+### Basic test execution
+
+The most commonly used command is `run`, which executes tests that are expected to pass in a default development environment:
+
+```console
+$ backend.ai test run
+```
+
+This command automatically excludes tests that require special environment configurations, making it ideal for first-time users and standard development workflows.
+
+### Running all tests
+
+To run all available tests, including those that require special configurations, use:
 
 ```console
 $ backend.ai test run-all
 ```
 
-If you want to run only a specific test, execute the command as follows.
+### Running specific tests
+
+If you want to run only a specific test, execute the command as follows:
 
 ```console
 $ backend.ai test run-test <test_name>
 ```
 
-You can use the following command to see which test codes exist and which tests can be executed.
+You can use the following command to see which test codes exist and which tests can be executed:
 
 ```console
 $ backend.ai test get-all-specs
 ```
 
-### `run` vs `run-all`
+### Understanding `run` vs `run-all`
 
-Some tests will only pass if certain configurations have been done in the development environment before running the `tester`.
+Some tests will only pass if certain configurations have been done in the development environment before running the `tester`. These tests are marked with a tag named `required_XXX_configuration`.
 
-These tests are marked with a tag named `required_XXX_configuration`.
-
-Tester configuration file exclude these tests using the `exclude_tags`.
-
-This is intended to help first-time users of the `tester` see all tests pass in their default development environment, reducing potential confusion.
-
-You can try running only the tests that pass in the default development environment using the following command.
-
-```console
-$ backend.ai test run
-```
+The tester configuration file excludes these tests using the `exclude_tags` when using the `run` command. This is intended to help first-time users of the `tester` see all tests pass in their default development environment, reducing potential confusion.
 
 If you want to ignore the `exclude_tags` and run all tests, use the `run-all` command.
 
