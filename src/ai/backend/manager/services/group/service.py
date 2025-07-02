@@ -332,18 +332,20 @@ class GroupService:
         if len(endpoint_ids) == 0:
             return
 
-        active_endpoint = await db_conn.scalar(
-            sa.select(EndpointRow.id).where(
-                (EndpointRow.project == group_id)
-                & (
-                    EndpointRow.lifecycle_stage
-                    in (EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING)
+        active_endpoints = (
+            await db_conn.scalars(
+                sa.select(EndpointRow.id).where(
+                    (EndpointRow.project == group_id)
+                    & (
+                        EndpointRow.lifecycle_stage
+                        in (EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING)
+                    )
                 )
             )
-        )
-        if active_endpoint is not None:
+        ).all()
+        if len(active_endpoints) > 0:
             log.error(
-                f"Cannot delete group {group_id} because it has an active endpoint {active_endpoint}. Please delete the endpoint first."
+                f"Cannot delete group {group_id} because it has active endpoints {active_endpoints}. Please delete the endpoints first."
             )
             raise PurgeGroupActionActiveEndpointsError()
 
