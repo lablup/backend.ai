@@ -51,7 +51,10 @@ from ai.backend.manager.services.group.actions.modify_group import (
 )
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
+    PurgeGroupActionActiveEndpointsError,
+    PurgeGroupActionActiveKernelsError,
     PurgeGroupActionResult,
+    PurgeGroupActionVFoldersMountedToActiveKernelsError,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -190,15 +193,11 @@ class GroupService:
 
         async def _pre_func(conn: SAConnection) -> None:
             if await self._group_vfolder_mounted_to_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Some of virtual folders that belong to this group "
-                    "are currently mounted to active sessions. "
-                    "Terminate them first to proceed removal.",
-                )
+                log.error(f"error on deleting group {gid} with vfolders mounted to active kernels")
+                raise PurgeGroupActionVFoldersMountedToActiveKernelsError()
             if await self._group_has_active_kernels(conn, gid):
-                raise RuntimeError(
-                    "Group has some active session. Terminate them first to proceed removal.",
-                )
+                log.error(f"error on deleting group {gid} with active kernels")
+                raise PurgeGroupActionActiveKernelsError()
             await self._delete_endpoints(conn, gid)
             await self._delete_vfolders(gid)
             await self._delete_kernels(conn, gid)
@@ -342,10 +341,10 @@ class GroupService:
             )
         )
         if active_endpoint is not None:
-            raise RuntimeError(
-                f"Cannot delete group {group_id} because it has an active endpoint {active_endpoint}. "
-                f"Please delete the endpoint first."
+            log.error(
+                f"Cannot delete group {group_id} because it has an active endpoint {active_endpoint}. Please delete the endpoint first."
             )
+            raise PurgeGroupActionActiveEndpointsError()
 
         for endpoint_id in endpoint_ids:
             deleted_sessions = await self._delete_sessions_by_endpoint(db_conn, endpoint_id)
