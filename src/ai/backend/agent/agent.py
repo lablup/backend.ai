@@ -1214,7 +1214,8 @@ class AbstractAgent(
                 if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
-            await self.stat_ctx.collect_container_stat(container_ids)
+            if container_ids:
+                await self.stat_ctx.collect_container_stat(container_ids)
         except asyncio.CancelledError:
             pass
         except Exception:
