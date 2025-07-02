@@ -811,6 +811,7 @@ class MemoryPlugin(AbstractComputePlugin):
         ) -> tuple[Optional[int], Optional[int], Optional[int]]:
             try:
                 p = psutil.Process(pid)
+                stats = p.as_dict(attrs=["memory_info", "io_counters"])
             except psutil.NoSuchProcess:
                 log.debug(
                     "Process not found for memory stats (pid:{0}, container id:{1})",
@@ -818,7 +819,6 @@ class MemoryPlugin(AbstractComputePlugin):
                     cid,
                 )
             else:
-                stats = p.as_dict(attrs=["memory_info", "io_counters"])
                 mem_cur_bytes = io_read_bytes = io_write_bytes = None
                 if stats["memory_info"] is not None:
                     mem_cur_bytes = stats["memory_info"].rss
