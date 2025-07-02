@@ -26,7 +26,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 )
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.hub.propagators.bgtask import WithCachePropagator
+from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import (
     EventCacheDomain,
     EventDomain,

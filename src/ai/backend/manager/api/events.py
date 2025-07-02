@@ -47,7 +47,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
-from ai.backend.common.events.hub.propagators.bgtask import WithCachePropagator
+from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
