@@ -10,7 +10,7 @@ import logging
 import sys
 import time
 import uuid
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -179,6 +179,18 @@ class ProcessMeasurement:
     unit_hint: str = "count"
 
 
+def _to_serializable_value(value: Decimal, *, quantize_val: Decimal = Decimal("0.000")) -> str:
+    """
+    Convert a Decimal value to a string without scientific notation.
+    """
+    try:
+        return str(remove_exponent(value.quantize(quantize_val)))
+    except DecimalException:
+        # If the value is too large or too small to be represented as a Decimal,
+        # we raise a ValueError to indicate that the value cannot be serialized.
+        raise ValueError
+
+
 class MovingStatistics:
     __slots__ = (
         "_sum",
@@ -250,14 +262,13 @@ class MovingStatistics:
         return Decimal(0)
 
     def to_serializable_dict(self) -> MovingStatValue:
-        q = Decimal("0.000")
         return {
-            "min": str(remove_exponent(self.min.quantize(q))),
-            "max": str(remove_exponent(self.max.quantize(q))),
-            "sum": str(remove_exponent(self.sum.quantize(q))),
-            "avg": str(remove_exponent(self.avg.quantize(q))),
-            "diff": str(remove_exponent(self.diff.quantize(q))),
-            "rate": str(remove_exponent(self.rate.quantize(q))),
+            "min": _to_serializable_value(self.min),
+            "max": _to_serializable_value(self.max),
+            "sum": _to_serializable_value(self.sum),
+            "avg": _to_serializable_value(self.avg),
+            "diff": _to_serializable_value(self.diff),
+            "rate": _to_serializable_value(self.rate),
             "version": 2,
         }
 
@@ -282,20 +293,15 @@ class Metric:
             self.current = self.current_hook(self)
 
     def to_serializable_dict(self) -> MetricValue:
-        q = Decimal("0.000")
         q_pct = Decimal("0.00")
         return {
-            "current": str(remove_exponent(self.current.quantize(q))),
+            "current": _to_serializable_value(self.current),
             "capacity": (
-                str(remove_exponent(self.capacity.quantize(q)))
-                if self.capacity is not None
-                else None
+                _to_serializable_value(self.capacity) if self.capacity is not None else None
             ),
             "pct": (
-                str(
-                    remove_exponent(
-                        (Decimal(self.current) / Decimal(self.capacity) * 100).quantize(q_pct)
-                    )
+                _to_serializable_value(
+                    (Decimal(self.current) / Decimal(self.capacity) * 100), quantize_val=q_pct
                 )
                 if (self.capacity is not None and self.capacity.is_normal() and self.capacity > 0)
                 else "0.00"
@@ -450,7 +456,13 @@ class StatContext:
             if metric_key not in device_metrics:
                 device_metrics[metric_key] = {}
             for device_id, obj in per_device.items():
-                metric_value = obj.to_serializable_dict()
+                try:
+                    metric_value = obj.to_serializable_dict()
+                except ValueError:
+                    log.warning(
+                        "Failed to serialize metric (Device Id: {}, {})", device_id, obj.stats
+                    )
+                    continue
                 device_metrics[metric_key][device_id] = metric_value
                 value_pairs = [
                     (CURRENT_METRIC_KEY, metric_value["current"]),
@@ -468,8 +480,16 @@ class StatContext:
                 )
 
         # push to the Redis server
+        node_metrics: dict[MetricKey, MetricValue] = {}
+        for key, obj in self.node_metrics.items():
+            try:
+                node_metrics[key] = obj.to_serializable_dict()
+            except ValueError:
+                log.warning("Failed to serialize node metric (Metric key: {}, {})", key, obj.stats)
+                continue
+
         redis_agent_updates = {
-            "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
+            "node": node_metrics,
             "devices": device_metrics,
         }
         if self.agent.local_config["debug"]["log-stats"]:
@@ -597,7 +617,11 @@ class StatContext:
             metrics = self.kernel_metrics[kernel_id]
             serializable_metrics: dict[MetricKey, MetricValue] = {}
             for key, obj in metrics.items():
-                metric_value = obj.to_serializable_dict()
+                try:
+                    metric_value = obj.to_serializable_dict()
+                except ValueError:
+                    log.warning("Failed to serialize metric (Metric key: {}, {})", key, obj.stats)
+                    continue
                 serializable_metrics[key] = metric_value
                 value_pairs = [
                     (CURRENT_METRIC_KEY, metric_value["current"]),
@@ -666,8 +690,8 @@ class StatContext:
         Intended to be used by the agent.
         """
         # FIXME: support Docker Desktop backend (#1230)
-        if sys.platform == "darwin":
-            return
+        # if sys.platform == "darwin":
+        #     return
 
         async with self._lock:
             pid_map: dict[PID, ContainerId] = {}
@@ -741,9 +765,13 @@ class StatContext:
                     serializable_table = {}
                     for pid in self.process_metrics[cid].keys():
                         metrics = self.process_metrics[cid][pid]
-                        serializable_metrics = {
-                            str(key): obj.to_serializable_dict() for key, obj in metrics.items()
-                        }
+                        serializable_metrics = {}
+                        for key, obj in metrics.items():
+                            try:
+                                serializable_metrics[str(key)] = obj.to_serializable_dict()
+                            except ValueError:
+                                log.warning("Failed to serialize metric {}: {}", key, obj.stats)
+                                continue
                         serializable_table[pid] = serializable_metrics
                     if self.agent.local_config["debug"]["log-stats"]:
                         log.debug(
