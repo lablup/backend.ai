@@ -2953,11 +2953,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def kill_all_sessions_in_agent(self, agent_id, agent_addr):
-        async with self.agent_cache.rpc_context(agent_id) as rpc:
-            coro = rpc.call.clean_all_kernels("manager-freeze-force-kill")
-            return await coro
-
     async def kill_all_sessions(self, conn=None):
         async with reenter_txn(self.db, conn, {"postgresql_readonly": True}) as conn:
             query = sa.select([agents.c.id, agents.c.addr]).where(
