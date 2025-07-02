@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import multiprocessing
 import os
 import platform
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -91,6 +92,19 @@ async def netstat_ns(ns_path: Path):
     # Unfortunately, CPython drops GIL while running IO and does not
     # provide any similar functionality. Therefore we execute namespace
     # dependent operation in the new process.
+
+    # Check if we're already in a daemon process
+    current_process = multiprocessing.current_process()
+    try:
+        is_daemon = current_process.daemon
+    except AttributeError:
+        is_daemon = False
+
+    if is_daemon:
+        # We're in a daemon process, run directly in thread pool
+        # This is less safe but works as a fallback
+        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
+        return result
     with ProcessPoolExecutor(max_workers=1) as executor:
         result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
     return result
@@ -306,10 +320,10 @@ class CPUPlugin(AbstractComputePlugin):
         async def psutil_impl(pid: int, cid: str) -> Optional[Decimal]:
             try:
                 p = psutil.Process(pid)
+                cpu_times = p.cpu_times()
             except psutil.NoSuchProcess:
                 log.debug("Process not found for CPU stats (pid:{0}, container id:{1})", pid, cid)
             else:
-                cpu_times = p.cpu_times()
                 cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
                 return cpu_used
             return None
@@ -811,6 +825,7 @@ class MemoryPlugin(AbstractComputePlugin):
         ) -> tuple[Optional[int], Optional[int], Optional[int]]:
             try:
                 p = psutil.Process(pid)
+                stats = p.as_dict(attrs=["memory_info", "io_counters"])
             except psutil.NoSuchProcess:
                 log.debug(
                     "Process not found for memory stats (pid:{0}, container id:{1})",
@@ -818,7 +833,6 @@ class MemoryPlugin(AbstractComputePlugin):
                     cid,
                 )
             else:
-                stats = p.as_dict(attrs=["memory_info", "io_counters"])
                 mem_cur_bytes = io_read_bytes = io_write_bytes = None
                 if stats["memory_info"] is not None:
                     mem_cur_bytes = stats["memory_info"].rss
