@@ -14,7 +14,7 @@ from ...types import DirEntry, DirEntryType, Stat, TreeUsage
 from ...utils import fstime2datetime
 from ..vfs import BaseFSOpModel
 
-log: BraceStyleAdapter = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RapidFileToolsFSOpModel(BaseFSOpModel):
