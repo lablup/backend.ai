@@ -179,12 +179,12 @@ class ProcessMeasurement:
     unit_hint: str = "count"
 
 
-def _to_serializable_value(value: Decimal, *, quantize_val: Decimal = Decimal("0.000")) -> str:
+def _to_serializable_value(value: Decimal, *, exponent: Decimal = Decimal("0.000")) -> str:
     """
     Convert a Decimal value to a string without scientific notation.
     """
     try:
-        return str(remove_exponent(value.quantize(quantize_val)))
+        return str(remove_exponent(value.quantize(exponent)))
     except DecimalException:
         # If the value is too large or too small to be represented as a Decimal,
         # we raise a ValueError to indicate that the value cannot be serialized.
@@ -301,7 +301,7 @@ class Metric:
             ),
             "pct": (
                 _to_serializable_value(
-                    (Decimal(self.current) / Decimal(self.capacity) * 100), quantize_val=q_pct
+                    (Decimal(self.current) / Decimal(self.capacity) * 100), exponent=q_pct
                 )
                 if (self.capacity is not None and self.capacity.is_normal() and self.capacity > 0)
                 else "0.00"
