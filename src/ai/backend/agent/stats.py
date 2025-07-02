@@ -32,7 +32,7 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
-from ai.backend.common.metrics.metric import StageMetricDomain, StageObserver
+from ai.backend.common.metrics.metric import StageObserver
 from ai.backend.common.types import (
     PID,
     AgentId,
@@ -403,9 +403,8 @@ class StatContext:
         Intended to be used by the agent.
         """
         self._stage_observer.observe_stage(
-            stage_name="collect_node_stat_lock",
-            metric_domain=StageMetricDomain.AGENT,
-            metric_domain_id=self.agent.id,
+            stage="before_lock",
+            upper_layer="collect_node_stat",
         )
         async with self._lock:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
@@ -415,15 +414,13 @@ class StatContext:
             for computer in self.agent.computers.values():
                 _tasks.append(asyncio.create_task(computer.instance.gather_node_measures(self)))
             self._stage_observer.observe_stage(
-                stage_name="collect_node_stat_gather_measures",
-                metric_domain=StageMetricDomain.AGENT,
-                metric_domain_id=self.agent.id,
+                stage="before_gather_measures",
+                upper_layer="collect_node_stat",
             )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             self._stage_observer.observe_stage(
-                stage_name="collect_node_stat_observe",
-                metric_domain=StageMetricDomain.AGENT,
-                metric_domain_id=self.agent.id,
+                stage="before_observe",
+                upper_layer="collect_node_stat",
             )
             for result in results:
                 if isinstance(result, BaseException):
@@ -519,9 +516,8 @@ class StatContext:
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
         self._stage_observer.observe_stage(
-            stage_name="collect_node_stat_to_redis",
-            metric_domain=StageMetricDomain.AGENT,
-            metric_domain_id=self.agent.id,
+            stage="before_report_to_redis",
+            upper_layer="collect_node_stat",
         )
 
         async def _pipe_builder(r: Redis) -> Pipeline:
@@ -567,9 +563,8 @@ class StatContext:
         Intended to be used by the agent and triggered by container cgroup synchronization processes.
         """
         self._stage_observer.observe_stage(
-            stage_name="collect_container_stat_lock",
-            metric_domain=StageMetricDomain.AGENT,
-            metric_domain_id=self.agent.id,
+            stage="before_lock",
+            upper_layer="collect_container_stat",
         )
         async with self._lock:
             kernel_id_map: dict[ContainerId, KernelId] = {}
@@ -599,16 +594,14 @@ class StatContext:
                     )
                 )
             self._stage_observer.observe_stage(
-                stage_name="collect_container_stat_gather_measures",
-                metric_domain=StageMetricDomain.AGENT,
-                metric_domain_id=self.agent.id,
+                stage="before_gather_measures",
+                upper_layer="collect_container_stat",
             )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             updated_kernel_ids: Set[KernelId] = set()
             self._stage_observer.observe_stage(
-                stage_name="collect_container_stat_observe",
-                metric_domain=StageMetricDomain.AGENT,
-                metric_domain_id=self.agent.id,
+                stage="before_observe",
+                upper_layer="collect_container_stat",
             )
             for result in results:
                 if isinstance(result, BaseException):
@@ -685,9 +678,8 @@ class StatContext:
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
         self._stage_observer.observe_stage(
-            stage_name="collect_container_stat_to_redis",
-            metric_domain=StageMetricDomain.AGENT,
-            metric_domain_id=self.agent.id,
+            stage="before_report_to_redis",
+            upper_layer="collect_container_stat",
         )
 
         async def _pipe_builder(r: Redis) -> Pipeline:
@@ -739,9 +731,8 @@ class StatContext:
         #     return
 
         self._stage_observer.observe_stage(
-            stage_name="collect_process_stat_lock",
-            metric_domain=StageMetricDomain.AGENT,
-            metric_domain_id=self.agent.id,
+            stage="before_lock",
+            upper_layer="collect_per_container_process_stat",
         )
         async with self._lock:
             pid_map: dict[PID, ContainerId] = {}
@@ -776,15 +767,13 @@ class StatContext:
                     )
                 )
             self._stage_observer.observe_stage(
-                stage_name="collect_process_stat_gather_measures",
-                metric_domain=StageMetricDomain.AGENT,
-                metric_domain_id=self.agent.id,
+                stage="before_gather_measures",
+                upper_layer="collect_per_container_process_stat",
             )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             self._stage_observer.observe_stage(
-                stage_name="collect_process_stat_observe",
-                metric_domain=StageMetricDomain.AGENT,
-                metric_domain_id=self.agent.id,
+                stage="before_observe",
+                upper_layer="collect_per_container_process_stat",
             )
             updated_cids: Set[ContainerId] = set()
             for result in results:
@@ -820,9 +809,8 @@ class StatContext:
                             self.process_metrics[cid][pid][metric_key].update(measure)
 
             self._stage_observer.observe_stage(
-                stage_name="collect_process_stat_to_redis",
-                metric_domain=StageMetricDomain.AGENT,
-                metric_domain_id=self.agent.id,
+                stage="before_report_to_redis",
+                upper_layer="collect_per_container_process_stat",
             )
 
             async def _pipe_builder(r: Redis) -> Pipeline:

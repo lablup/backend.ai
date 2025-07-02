@@ -1,5 +1,4 @@
 import asyncio
-import enum
 import os
 from typing import Optional, Self
 
@@ -7,10 +6,6 @@ import psutil
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
-
-
-class StageMetricDomain(enum.StrEnum):
-    AGENT = "agent"
 
 
 class APIMetricObserver:
@@ -505,7 +500,7 @@ class StageObserver:
         self._stage_count = Counter(
             name="backendai_stage_count",
             documentation="Count stage occurrences",
-            labelnames=["stage_name", "metric_domain", "metric_domain_id"],
+            labelnames=["stage", "upper_layer"],
         )
 
     @classmethod
@@ -514,9 +509,5 @@ class StageObserver:
             cls._instance = cls()
         return cls._instance
 
-    def observe_stage(
-        self, *, stage_name: str, metric_domain: StageMetricDomain, metric_domain_id: str
-    ) -> None:
-        self._stage_count.labels(
-            stage_name=stage_name, metric_domain=metric_domain, metric_domain_id=metric_domain_id
-        ).inc()
+    def observe_stage(self, *, stage: str, upper_layer: str) -> None:
+        self._stage_count.labels(stage=stage, upper_layer=upper_layer).inc()
