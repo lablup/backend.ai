@@ -29,3 +29,5 @@ class VFolderCloneSuccess(TestCode):
         assert old_vfolder_files == new_vfolder_files, (
             "Files in the cloned VFolder do not match the original VFolder."
         )
+
+        await client_session.VFolder.delete_by_id(response["id"])
