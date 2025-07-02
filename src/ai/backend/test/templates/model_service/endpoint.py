@@ -5,8 +5,6 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.client.output.fields import session_node_fields
-from ai.backend.client.session import AsyncSession
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.domain import DomainContext
 from ai.backend.test.contexts.group import GroupContext
@@ -21,6 +19,7 @@ from ai.backend.test.contexts.session import (
     SessionContext,
 )
 from ai.backend.test.data.model_service import ModelServiceEndpointMeta
+from ai.backend.test.templates.model_service.utils import wait_until_all_inference_sessions_ready
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -69,55 +68,6 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
     def _extra_service_params(self) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement the _extra_service_params method.")
 
-    # TODO: Remove the polling loop below after the SSE API is added to the model service API
-    async def _wait_until_all_inference_sessions_ready(
-        self,
-        client_session: AsyncSession,
-        endpoint_id: UUID,
-        replicas: int,
-        vfolder_id: UUID,
-    ) -> None:
-        """
-        Poll the model service endpoint until the every inference sessions become RUNNING, and the service endpoint is available
-        """
-        while True:
-            result = await client_session.Service(endpoint_id).info()
-            active_routes = result["active_routes"]
-            session_ids = [route["session_id"] for route in active_routes]
-
-            ready_session_cnt = 0
-            for session_id in session_ids:
-                # Wait until all inference sessions are ready.
-                if not session_id:
-                    break
-
-                session_info = await client_session.ComputeSession.from_session_id(
-                    UUID(session_id)
-                ).detail([
-                    session_node_fields["type"],
-                    session_node_fields["status"],
-                    session_node_fields["vfolder_mounts"],
-                ])
-
-                assert session_info["type"] == "inference", (
-                    f"Session type should be 'inference'. "
-                    f"Actual type: {session_info['type']}, session_id: {session_id}"
-                )
-                assert session_info["vfolder_mounts"] == [str(vfolder_id)], (
-                    f"Model vfolder should be mounted into the inference session. "
-                    f"Actual mounted vfolder: {session_info['vfolder_mounts']}, "
-                    f"session_id: {session_id}"
-                )
-                if session_info["status"] == "RUNNING":
-                    ready_session_cnt += 1
-
-            if ready_session_cnt >= replicas:
-                # It may take additional time for the endpoint to become available even after all sessions have transitioned to the RUNNING state.
-                if result["service_endpoint"] is not None:
-                    break
-
-            await asyncio.sleep(1)
-
     @override
     @actxmgr
     # TODO: Automatically generate the required model VFolder through the VFolderTemplateWrapper.
@@ -154,11 +104,11 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             assert info["model_id"] == str(vfolder_func.id), "Model ID should match the VFolder ID."
 
             await asyncio.wait_for(
-                self._wait_until_all_inference_sessions_ready(
-                    client_session,
-                    endpoint_id,
-                    model_service_dep.replicas,
-                    vfolder_func.id,
+                wait_until_all_inference_sessions_ready(
+                    client_session=client_session,
+                    endpoint_id=endpoint_id,
+                    replicas=model_service_dep.replicas,
+                    vfolder_id=vfolder_func.id,
                 ),
                 timeout=_ENDPOINT_CREATION_TIMEOUT,
             )
