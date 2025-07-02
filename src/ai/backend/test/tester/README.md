@@ -63,18 +63,13 @@ This section provides guidance on tags that require additional environment setup
 
 <!-- TODO: Remove this after replacing this task with proper TemplateWrapper -->
 
-#### `required_single_node_multi_container_configuration`
+- #### `required_single_node_multi_container_configuration`
 
-#### `required_multi_node_multi_container_configuration`
-
+- #### `required_multi_node_multi_container_configuration`
 The nodes must be connected, for example, through a Docker Swarm setup.
-
 Set `swarm-enabled` to true in the `agent.toml` file, and initialize the swarm on the manager node.
-
 Then, join the agent nodes to the swarm.
 
-#### `required_container_registry_configuration`
-
+- #### `required_container_registry_configuration`
 The group used in the test must have the `container_registry` setting configured.
-
 Tests with this tag operate using the image and the configured container registry.
