@@ -489,3 +489,25 @@ class CommonMetricRegistry:
     def to_prometheus(self) -> str:
         self.system.observe()
         return generate_latest().decode("utf-8")
+
+
+class StageObserver:
+    _instance: Optional[Self] = None
+
+    _stage_count: Counter
+
+    def __init__(self) -> None:
+        self._stage_count = Counter(
+            name="backendai_stage_count",
+            documentation="Count stage occurrences",
+            labelnames=["stage", "upper_layer"],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_stage(self, *, stage: str, upper_layer: str) -> None:
+        self._stage_count.labels(stage=stage, upper_layer=upper_layer).inc()
