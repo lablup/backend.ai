@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import multiprocessing
 import os
 import platform
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -91,6 +92,19 @@ async def netstat_ns(ns_path: Path):
     # Unfortunately, CPython drops GIL while running IO and does not
     # provide any similar functionality. Therefore we execute namespace
     # dependent operation in the new process.
+
+    # Check if we're already in a daemon process
+    current_process = multiprocessing.current_process()
+    try:
+        is_daemon = current_process.daemon
+    except AttributeError:
+        is_daemon = False
+
+    if is_daemon:
+        # We're in a daemon process, run directly in thread pool
+        # This is less safe but works as a fallback
+        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
+        return result
     with ProcessPoolExecutor(max_workers=1) as executor:
         result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
     return result
