@@ -19,7 +19,7 @@ from ai.backend.test.templates.session.vfolder_mounted_interactive_session impor
     VFolderMountedInteractiveSessionTemplate,
 )
 from ai.backend.test.templates.template import BasicTestTemplate, NopTestCode
-from ai.backend.test.templates.vfolder.general_vfolder import GeneralVFolderTemplate
+from ai.backend.test.templates.vfolder.general_vfolder import ProjectVFolderTemplate
 from ai.backend.test.testcases.session.commit import (
     InteractiveSessionCommitSuccess,
     InteractiveSessionImagifySuccess,
@@ -426,7 +426,7 @@ SESSION_VFOLDER_TEST_SPECS = {
             TestTag.REQUIRED_SINGLE_NODE_MULTI_CONTAINER_CONFIGURATION,
         },
         template=BasicTestTemplate(testcode=FileHandlingInMountedVFolderSuccess()).with_wrappers(
-            KeypairAuthTemplate, GeneralVFolderTemplate, VFolderMountedInteractiveSessionTemplate
+            KeypairAuthTemplate, ProjectVFolderTemplate, VFolderMountedInteractiveSessionTemplate
         ),
         parametrizes=CLUSTER_CONFIG_PARAM,
     ),
