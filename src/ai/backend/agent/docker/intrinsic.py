@@ -306,10 +306,10 @@ class CPUPlugin(AbstractComputePlugin):
         async def psutil_impl(pid: int, cid: str) -> Optional[Decimal]:
             try:
                 p = psutil.Process(pid)
+                cpu_times = p.cpu_times()
             except psutil.NoSuchProcess:
                 log.debug("Process not found for CPU stats (pid:{0}, container id:{1})", pid, cid)
             else:
-                cpu_times = p.cpu_times()
                 cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
                 return cpu_used
             return None
