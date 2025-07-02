@@ -19,3 +19,8 @@ class UploadedFile:
 class UploadedFilesMeta:
     files: list[UploadedFile]
     uploaded_path: Path
+
+
+@dataclass
+class VFolderInvitationMeta:
+    invited_user_emails: list[str]

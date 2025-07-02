@@ -1,9 +1,9 @@
 import enum
 from abc import abstractmethod
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generic, Iterator, Optional, TypeVar, final
+from typing import Generic, Optional, TypeVar, final
 
 T = TypeVar("T")
 
@@ -43,6 +43,10 @@ class ContextName(enum.StrEnum):
     CREATED_SESSION_TEMPLATE_ID = "created_session_template_id"
     CREATED_MODEL_SERVICE_ENDPOINT = "created_model_service_endpoint"
     CREATED_MODEL_SERVICE_TOKEN = "created_model_service_token"
+    CREATED_USER_CONTEXT = "created_user_context"
+    CREATED_USER_CLIENT_SESSION = "created_user_client_session"
+    VFOLDER_INVITATION = "vfolder_invitation"
+    VFOLDER_INVITATION_PERMISSION = "vfolder_invitation_permission"
 
 
 class BaseTestContext(Generic[T]):

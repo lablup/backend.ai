@@ -1,5 +1,6 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, override
+from typing import override
 
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.tester import TestSpecMetaContext
@@ -22,6 +23,7 @@ class ModelVFolderTemplate(WrapperTestTemplate):
         vfolder_name = f"test-{str(test_id)[:8]}"
         vfolder_cfg = VFolderContext.current()
 
+        vfolder = None
         try:
             vfolder = await client_session.VFolder.create(
                 name=vfolder_name,
@@ -37,5 +39,6 @@ class ModelVFolderTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            await client_session.VFolder.delete_by_id(vfolder["id"])
-            await client_session.VFolder(vfolder["name"]).purge()
+            if vfolder:
+                await client_session.VFolder.delete_by_id(vfolder["id"])
+                await client_session.VFolder(vfolder["name"]).purge()
