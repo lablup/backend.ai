@@ -258,6 +258,7 @@ DEAD_STATUS_SET = frozenset([
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
+STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 KernelIdContainerPair = tuple[KernelId, Container]
@@ -713,7 +714,10 @@ def _observe_stat_task(
                 stat_task_observer.observe_stat_task_failure(
                     agent_id=self.id, stat_scope=stat_scope, exception=e
                 )
-            stat_task_observer.observe_stat_task_success(agent_id=self.id, stat_scope=stat_scope)
+            else:
+                stat_task_observer.observe_stat_task_success(
+                    agent_id=self.id, stat_scope=stat_scope
+                )
 
         return wrapper
 
@@ -1198,7 +1202,8 @@ class AbstractAgent(
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting node statistics")
         try:
-            await self.stat_ctx.collect_node_stat()
+            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+                await self.stat_ctx.collect_node_stat()
         except Exception:
             log.exception("unhandled exception while syncing node stats")
             await self.produce_error_event()
@@ -1214,6 +1219,7 @@ class AbstractAgent(
                 if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
+            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
                 await self.stat_ctx.collect_container_stat(container_ids)
         except asyncio.CancelledError:
             pass
@@ -1232,7 +1238,8 @@ class AbstractAgent(
                 if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
-            await self.stat_ctx.collect_per_container_process_stat(container_ids)
+            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+                await self.stat_ctx.collect_per_container_process_stat(container_ids)
         except Exception:
             log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
