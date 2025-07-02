@@ -24,6 +24,7 @@ import click
 import jinja2
 import tomli
 from aiohttp import web
+from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
@@ -315,8 +316,10 @@ async def login_handler(request: web.Request) -> web.Response:
         "data": None,
     }
 
+    redis: Redis = request.app["redis"]
+
     async def _get_login_history():
-        login_history = await request.app["redis"].get(
+        login_history = await redis.get(
             f"login_history_{creds['username']}",
         )
         if not login_history:
@@ -341,7 +344,7 @@ async def login_handler(request: web.Request) -> web.Response:
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
         })
-        await request.app["redis"].set(key, value)
+        await redis.set(name=key, value=value, ex=config["session"]["login_block_time"])
 
     # Block login if there are too many consecutive failed login attempts.
     BLOCK_TIME = config["session"]["login_block_time"]
