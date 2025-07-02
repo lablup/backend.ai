@@ -224,6 +224,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.CONTAINER_REGISTRY,
             TestTag.SESSION,
             TestTag.SINGLE_NODE_MULTI_CONTAINER,
+            TestTag.CONTAINER_REGISTRY_CONFIGURATION,
         },
         template=BasicTestTemplate(InteractiveSessionImagifySuccess()).with_wrappers(
             KeypairAuthTemplate, InteractiveSessionTemplate

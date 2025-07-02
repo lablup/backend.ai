@@ -23,14 +23,14 @@ class TestTag(enum.StrEnum):
     SESSION = "session"
     MODEL_SERVICE = "model_service"
 
-    # Features
-    SINGLE_NODE_SINGLE_CONTAINER = "single_node_single_container"
+    # Need extra configuration to pass these tests
     SINGLE_NODE_MULTI_CONTAINER = "single_node_multi_container"
     MULTI_NODE_MULTI_CONTAINER = "multi_node_multi_container"
     CONTAINER_REGISTRY_CONFIGURATION = "container_registry_configuration"
 
     # Others
     LONG_RUNNING = "long_running"
+    SINGLE_NODE_SINGLE_CONTAINER = "single_node_single_container"
 
 
 @dataclass
