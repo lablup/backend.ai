@@ -188,7 +188,7 @@ def _to_serializable_value(value: Decimal, *, quantize_val: Decimal = Decimal("0
     except DecimalException:
         # If the value is too large or too small to be represented as a Decimal,
         # we raise a ValueError to indicate that the value cannot be serialized.
-        raise ValueError
+        raise ValueError(f"Cannot serialize Decimal value: {value}")
 
 
 class MovingStatistics:
