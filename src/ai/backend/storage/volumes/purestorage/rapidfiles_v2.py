@@ -63,7 +63,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
                         break
                     line = line.rstrip(b"\n")
                     item = load_json(line)
-                    log.debug("Scanned item: {}", item)
+                    log.info("Scanned item: {}", item)
 
                     item_path = Path(item["path"])
                     entry_type = DirEntryType.FILE
