@@ -34,7 +34,7 @@ Some tests will only pass if certain configurations have been done in the develo
 
 These tests are marked with a tag named `required_XXX_configuration`.
 
-The `tester.toml` file is configured by default to exclude these tests using the `exclude_tags`.
+Tester configuration file exclude these tests using the `exclude_tags`.
 
 This is intended to help first-time users of the `tester` see all tests pass in their default development environment, reducing potential confusion.
 
@@ -44,7 +44,7 @@ You can try running only the tests that pass in the default development environm
 $ backend.ai test run
 ```
 
-If you want to ignore the exclude tags and run all tests, use the `run-all` command.
+If you want to ignore the `exclude_tags` and run all tests, use the `run-all` command.
 
 
 ## Tester configuration (`tester.toml`)
