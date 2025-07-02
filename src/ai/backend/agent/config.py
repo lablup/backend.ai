@@ -45,8 +45,12 @@ agent_local_config_iv = (
         t.Key("agent"): t.Dict({
             tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
-            t.Key("service-addr", default=("0.0.0.0", 6003)): tx.HostPortPair,
-            t.Key("announce-addr", default=("host.docker.internal", 6003)): tx.HostPortPair,
+            tx.AliasedKey(
+                ["service-addr", "service-internal-addr"], default=("0.0.0.0", 6003)
+            ): tx.HostPortPair,
+            tx.AliasedKey(
+                ["announce-addr", "announce-internal-addr"], default=("host.docker.internal", 6003)
+            ): tx.HostPortPair,
             t.Key("ssl-enabled", default=False): t.Bool,
             t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
             t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
