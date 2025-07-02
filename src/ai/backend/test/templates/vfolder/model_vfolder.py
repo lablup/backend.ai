@@ -38,3 +38,4 @@ class ModelVFolderTemplate(WrapperTestTemplate):
                 yield
         finally:
             await client_session.VFolder.delete_by_id(vfolder["id"])
+            await client_session.VFolder(vfolder["name"]).purge()

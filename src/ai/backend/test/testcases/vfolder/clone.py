@@ -31,3 +31,4 @@ class VFolderCloneSuccess(TestCode):
         )
 
         await client_session.VFolder.delete_by_id(response["id"])
+        await client_session.VFolder(response["name"]).purge()
