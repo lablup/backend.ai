@@ -47,7 +47,7 @@ $ backend.ai test run
 If you want to ignore the exclude tags and run all tests, use the `run-all` command.
 
 
-### `tester.toml`
+## Tester configuration (`tester.toml`)
 
 To perform actual integration tests, various context configurations are required.
 For example, you need to specify the endpoint configuration that determines which Manager and WebServer endpoints to send requests to.
