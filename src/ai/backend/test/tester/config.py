@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from ai.backend.test.testcases.spec_manager import TestTag
 from ai.backend.test.tester.dependency import TestContextInjectionModel
 
 
@@ -22,6 +23,11 @@ class TestRunnerConfig(BaseConfigModel):
         default=10,
         description="The number of concurrent tests to run.",
         examples=[1, 2, 4],
+    )
+    exclude_tags: set[str] = Field(
+        default_factory=set,
+        description="Tags to exclude from the test run.",
+        examples=[v.value for v in TestTag],
     )
 
 
