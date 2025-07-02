@@ -20,6 +20,7 @@ from collections.abc import (
     Awaitable,
     Callable,
     Collection,
+    Coroutine,
     Iterable,
     Mapping,
     MutableMapping,
@@ -64,7 +65,11 @@ from tenacity import (
 )
 from trafaret import DataError
 
-from ai.backend.agent.metrics.metric import SyncContainerLifecycleObserver
+from ai.backend.agent.metrics.metric import (
+    StatScope,
+    StatTaskObserver,
+    SyncContainerLifecycleObserver,
+)
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
@@ -687,6 +692,34 @@ class ComputerContext:
     alloc_map: AbstractAllocMap
 
 
+def _observe_stat_task(
+    stat_scope: StatScope,
+) -> Callable[
+    [Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]],
+    Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
+]:
+    stat_task_observer = StatTaskObserver.instance()
+
+    def decorator(
+        func: Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
+    ) -> Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]:
+        async def wrapper(self: AbstractAgent, interval: float) -> None:
+            stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
+            try:
+                await func(self, interval)
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                stat_task_observer.observe_stat_task_failure(
+                    agent_id=self.id, stat_scope=stat_scope, exception=e
+                )
+            stat_task_observer.observe_stat_task_success(agent_id=self.id, stat_scope=stat_scope)
+
+        return wrapper
+
+    return decorator
+
+
 class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
@@ -1160,17 +1193,18 @@ class AbstractAgent(
         )
         await self.anycast_event(DoSyncKernelLogsEvent(kernel_id, container_id))
 
+    @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, interval: float):
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting node statistics")
         try:
             await self.stat_ctx.collect_node_stat()
-        except asyncio.CancelledError:
-            pass
         except Exception:
             log.exception("unhandled exception while syncing node stats")
             await self.produce_error_event()
+            raise
 
+    @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self, interval: float):
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
@@ -1186,7 +1220,9 @@ class AbstractAgent(
         except Exception:
             log.exception("unhandled exception while syncing container stats")
             await self.produce_error_event()
+            raise
 
+    @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float):
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting process statistics in container")
@@ -1197,11 +1233,10 @@ class AbstractAgent(
                     continue
                 container_ids.append(ContainerId(kernel_obj.container_id))
             await self.stat_ctx.collect_per_container_process_stat(container_ids)
-        except asyncio.CancelledError:
-            pass
         except Exception:
             log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
+            raise
 
     def _get_public_host(self) -> str:
         agent_config: Mapping[str, Any] = self.local_config["agent"]
