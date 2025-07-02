@@ -344,7 +344,7 @@ async def login_handler(request: web.Request) -> web.Response:
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
         })
-        await redis.set(name=key, value=value, ex=config["session"]["login_block_time"])
+        await redis.set(key, value, ex=config["session"]["login_block_time"])
 
     # Block login if there are too many consecutive failed login attempts.
     BLOCK_TIME = config["session"]["login_block_time"]
