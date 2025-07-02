@@ -1,5 +1,11 @@
 [runner]
 concurrency = 1
+exclude_tags = [
+    "required_single_node_multi_container_configuration",
+    "required_multi_node_multi_container_configuration",
+    "required_container_registry_configuration",
+    "long_running",
+]
 
 [context.endpoint]
 api-endpoint = "http://127.0.0.1:8091"
