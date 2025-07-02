@@ -34,6 +34,7 @@ from ai.backend.manager.models.resource_usage import (
     parse_resource_usage_groups,
     parse_total_resource_group,
 )
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection, execute_with_retry
@@ -346,30 +347,21 @@ class GroupService:
             )
             raise PurgeGroupActionActiveEndpointsError()
 
-        for endpoint_id in endpoint_ids:
-            deleted_sessions = await self._delete_sessions_by_endpoint(db_conn, endpoint_id)
-            if deleted_sessions > 0:
-                log.info(f"Deleted {deleted_sessions} sessions for endpoint {endpoint_id}")
+        deleted_sessions = await db_conn.execute(
+            sa.delete(SessionRow).where(
+                SessionRow.id.in_(
+                    sa.select(RoutingRow.session).where(
+                        (RoutingRow.endpoint.in_(endpoint_ids)) & (RoutingRow.session.is_not(None))
+                    )
+                )
+            )
+        )
+        log.info(
+            f"Deleted {deleted_sessions.rowcount} sessions associated with endpoints in group {group_id}"
+        )
 
         await db_conn.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
         await db_conn.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
-
-    async def _delete_sessions_by_endpoint(self, db_conn: SAConnection, endpoint_id: UUID) -> int:
-        from ai.backend.manager.models.routing import RoutingRow
-        from ai.backend.manager.models.session import SessionRow
-
-        session_ids = (
-            await db_conn.scalars(
-                sa.select(SessionRow.id)
-                .select_from(sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session))
-                .where((RoutingRow.endpoint == endpoint_id) & (RoutingRow.session.is_not(None)))
-            )
-        ).all()
-
-        if len(session_ids) == 0:
-            return 0
-        result = await db_conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
-        return result.rowcount
 
     async def _db_mutation_wrapper(
         self, _do_mutate: Callable[[], Awaitable[MutationResult]]
