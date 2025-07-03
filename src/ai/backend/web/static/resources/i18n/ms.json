@@ -289,6 +289,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Tindakan",
+      "Allowed": "Dibenarkan",
       "ClickFilebrowserButton": "Untuk memuat naik Folder, sila klik butang Laksanakan penyemak imbas.",
       "CreateANewFolder": "Buat folder baru",
       "Created": "Dicipta",
@@ -1128,6 +1129,7 @@
     "MaxFolderCount": "Kiraan Folder Maks",
     "MaxNetworkCount": "Kiraan Rangkaian Maks",
     "MaxPendingSessionCount": "Kiraan sesi maksimum yang belum selesai",
+    "MaxPendingSessionResourceSlots": "Slot sumber sesi maksimum yang belum selesai",
     "MaxQuotaScopeSize": "Saiz Skop Kuota Maks (GB)",
     "MaxSessionCountPerModelSession": "Kiraan Sesi Maks Setiap Sesi Model",
     "MaxSessionLifetime": "Sepanjang Hayat Sesi (saat)",

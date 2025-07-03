@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "działania",
+      "Allowed": "Dozwolony",
       "ClickFilebrowserButton": "Aby przesłać folder(y), kliknij przycisk Uruchom przeglądarkę plików.",
       "CreateANewFolder": "Stworzyć nowy folder",
       "Created": "Utworzony",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "Maksymalna liczba folderów",
     "MaxNetworkCount": "Maksymalna liczba sieci",
     "MaxPendingSessionCount": "Max oczekujący na liczbę sesji",
+    "MaxPendingSessionResourceSlots": "Max oczekujący szczeliny zasobów sesji",
     "MaxQuotaScopeSize": "Maksymalny rozmiar zakresu przydziału (GB)",
     "MaxSessionCountPerModelSession": "Maksymalna liczba sesji na sesję modelu",
     "MaxSessionLifetime": "Czas trwania sesji (sek.)",

@@ -289,6 +289,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Үйлдэл",
+      "Allowed": "Зөвшөөрөгдсөн",
       "ClickFilebrowserButton": "Фолдер (ууд) -ыг байршуулахын тулд файл дарах товчийг ажиллуулах товчийг дарна уу.",
       "CreateANewFolder": "Шинэ хавтас үүсгэх",
       "Created": "Үүсгэсэн",
@@ -1127,6 +1128,7 @@
     "MaxFolderCount": "Хамгийн их хавтасны тоо",
     "MaxNetworkCount": "Хамгийн их сүлжээний тоо",
     "MaxPendingSessionCount": "Макс хүлээгдэж буй хуралдааны тоо",
+    "MaxPendingSessionResourceSlots": "Макс хүлээгдэж буй сешний нөөцийн слотууд",
     "MaxQuotaScopeSize": "Хамгийн их квот хамрах хүрээний хэмжээ (ГБ)",
     "MaxSessionCountPerModelSession": "Загвар бүрийн хамгийн их сеанс тоо",
     "MaxSessionLifetime": "Сеанс үргэлжлэх хугацаа (сек.)",
