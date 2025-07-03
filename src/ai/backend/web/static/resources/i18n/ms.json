@@ -100,16 +100,20 @@
     "Attachments": "Lampiran",
     "CannotFindModel": "Model LLM tidak dijumpai. \nSahkan laluan asas dan keserasian token dengan Openai, kemudian tekan 'Model Refresh'",
     "CompareWithOtherModels": "Bandingkan dengan model lain",
+    "CreateCompareChat": "Tambahkan obrolan perbandingan",
     "DeleteChatHistory": "Sembang jelas",
     "DeleteChattingSession": "Padam sembang",
     "DeleteChattingSessionDescription": "Anda akan memadamkan topik ini. \nSetelah dipadam, ia tidak boleh dipulihkan. \nSila teruskan dengan berhati-hati.",
     "DropFileHere": "Lepaskan fail di sini",
+    "History": "Sejarah",
     "NewChat": "Sembang Baharu",
     "SelectEndpoint": "Pilih Titik Akhir",
     "SelectModel": "Pilih Model",
     "SelectToken": "Pilih token",
-    "SyncInput": "Disegerakkan",
+    "SenderPlaceholder": "Taipkan mesej anda di sini ...",
+    "SyncInput": "Penyegerakan input sembang",
     "Thinking": "Berfikir",
+    "TokenCounterTooltip": "TPS mewakili bilangan token yang diproses sesaat. \nNilai ini diukur pada sisi pelanggan dan termasuk latensi rangkaian. \nJumlah token mewakili jumlah token dalam mesej input dan sembang.",
     "UploadFiles": "Muat naik fail",
     "UploadFilesDescription": "Klik atau seret fail ke kawasan ini untuk memuat naik",
     "ViewReasoning": "Lihat penalaran",
@@ -223,6 +227,8 @@
     "All": "Semua",
     "AllowsLettersNumbersAnd-_Dot": "Hanya huruf (a-z, a-z), nombor, '-', '_', dan '.' \ndibenarkan.",
     "AutoMount": "Auto Mount",
+    "AutomountFolderCreationDesc": "Folder auto-mount dipasang secara automatik apabila sesi bermula.",
+    "AutomountFolderNameMustStartWithDot": "Nama folder auto-mount mesti bermula dengan titik ('.').",
     "AutomountFolders": "Folder Automatik",
     "CloningIsOnlyPossibleSameHost": "Pada masa ini, pengklonan hanya boleh dilakukan pada hos yang sama.",
     "Create": "Buat",
@@ -235,6 +241,7 @@
     "DialogDataFolder": "Folder khusus saluran paip yang dibuat secara automatik apabila membuat saluran paip dalam FastTrack.",
     "DialogFolderStartingWithDotAutomount": "Folder yang bermula dengan. (Dot) dipasang secara automatik ketika sesi baru dimulakan.",
     "DialogModelFolder": "Anda boleh berkhidmat dan mengurus model.",
+    "DotPrefixReservedForAutomount": "Folder bermula dengan '.' \ndikhaskan untuk penggunaan auto-mount.",
     "EnterDifferentValue": "Masukkan nilai yang berbeza dengan nama fail atau folder yang ada. Sila Periksa sama ada watak ruang di ruang input atau tidak.",
     "ExistingFolderName": "Nama folder yang ada",
     "FileAndFolderNameRequired": "Nama fail / Folder diperlukan",
@@ -245,12 +252,14 @@
     "FolderToCopy": "Folder untuk disalin",
     "Foldername": "Nama folder",
     "Folders": "Folder",
+    "From": "Dari",
     "General": "Umum",
     "Host": "Tuan rumah",
     "HostDetails": "Memaparkan maklumat kuota untuk hos storan yang dipilih.",
     "InvalidEmail": "Alamat e -mel tidak sah",
     "Invited": "dijemput",
     "InvitedFolders": "Folder yang dijemput",
+    "InvitedFoldersTooltip": "{{ count }} Jemputan folder sedang menunggu tindak balas.",
     "Limit": "Had",
     "ModelStore": "Kedai Model",
     "Models": "Model",
@@ -280,6 +289,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Tindakan",
+      "Allowed": "Dibenarkan",
       "ClickFilebrowserButton": "Untuk memuat naik Folder, sila klik butang Laksanakan penyemak imbas.",
       "CreateANewFolder": "Buat folder baru",
       "Created": "Dicipta",
@@ -413,6 +423,8 @@
       "View": "Pandangan"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Gagal menerima jemputan",
+      "FailedToDeclineInvitation": "Gagal menolak jemputan",
       "FolderSharingNotAvailableToUser": "Perkongsian folder tidak tersedia untuk pengguna yang diminta:",
       "InvitationError": "Jemputan gagal. Pengguna mungkin sudah dijemput.",
       "Invited": "Berjaya dijemput",
@@ -423,7 +435,10 @@
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
       "Shared": "Berjaya berkongsi folder kumpulan",
       "SharingError": "Perkongsian gagal. Pengguna mungkin sudah dikongsi atau tidak tergolong dalam projek yang sesuai.",
-      "SuccessfullyLeftSharedFolder": "Berjaya meninggalkan folder kongsi"
+      "SuccessfullyAcceptedInvitation": "Jemputan yang berjaya diterima",
+      "SuccessfullyDeclinedInvitation": "Berjaya menolak jemputan",
+      "SuccessfullyLeftSharedFolder": "Berjaya meninggalkan folder kongsi",
+      "UserIsAlreadyInvited": "{{email}} sudah dijemput"
     },
     "modelStore": {
       "AddedItems": "Item ditambah",
@@ -468,6 +483,10 @@
       "StatusOfSelectedHost": "Status Hos Terpilih",
       "Used": "digunakan"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Penyemak imbas ini tidak menyokong pemberitahuan.",
+    "PermissionDenied": "Anda telah menafikan akses pemberitahuan. \nUntuk menggunakan makluman, sila berikannya dalam tetapan penyemak imbas anda."
   },
   "dialog": {
     "ErrorOccurred": "Ralat Berlaku",
@@ -533,7 +552,9 @@
     "DescSignificantInstallTime": "Proses ini memerlukan masa muat turun yang ketara.",
     "Digest": "Pencernaan",
     "Disabled": "kurang upaya",
+    "ErrorMinimumValue": "{{key}} mestilah sekurang -kurangnya {{value}}",
     "FullImagePath": "Laluan imej penuh",
+    "ImageReinstallationRequired": "Pemasaran imej diperlukan",
     "Images": "Gambar",
     "Install": "Pasang",
     "Installed": "dipasang",
@@ -544,6 +565,7 @@
     "ManageApps": "Urus Aplikasi",
     "ModifyImageResourceLimit": "Ubah Had Sumber Gambar",
     "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>",
+    "ModifyMinimumImageResourceLimit": "Ubah suai had sumber imej minimum",
     "Namespace": "Ruang Nama",
     "NoChangeMade": "Tiada perubahan dibuat",
     "NoImageToDisplay": "Tiada Imej untuk dipaparkan",
@@ -644,6 +666,7 @@
     "Manual": "Manual",
     "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}",
     "NSelected": "{{count}} dipilih",
+    "NavigateToDetailPage": "Pindah ke halaman perincian",
     "NewPassword": "Kata laluan baharu",
     "None": "tiada",
     "Password": "Kata Laluan",
@@ -805,6 +828,7 @@
     "Password": "Kata Laluan",
     "PasswordChanged": "Kata laluan berjaya diubah",
     "PleaseInputLoginInfo": "Sila masukkan ID dan kata laluan untuk log masuk.",
+    "PleaseInputOTPCode": "Sila masukkan kod 2FA anda untuk log masuk.",
     "PleaseWait": "Sila tunggu untuk log masuk.",
     "SecretKey": "Kunci Rahsia",
     "SendChangePasswordEmail": "Hantar e-mel kata laluan perubahan",
@@ -1105,6 +1129,7 @@
     "MaxFolderCount": "Kiraan Folder Maks",
     "MaxNetworkCount": "Kiraan Rangkaian Maks",
     "MaxPendingSessionCount": "Kiraan sesi maksimum yang belum selesai",
+    "MaxPendingSessionResourceSlots": "Slot sumber sesi maksimum yang belum selesai",
     "MaxQuotaScopeSize": "Saiz Skop Kuota Maks (GB)",
     "MaxSessionCountPerModelSession": "Kiraan Sesi Maks Setiap Sesi Model",
     "MaxSessionLifetime": "Sepanjang Hayat Sesi (saat)",
@@ -1153,7 +1178,7 @@
     "ResourcePresets": "Pratetap Sumber",
     "Resources": "Sumber",
     "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori",
-    "SharedMemory": "Memori bersama (GB)",
+    "SharedMemory": "Memori bersama",
     "Updated": "Pratetap sumber dikemas kini"
   },
   "session": {
@@ -1162,6 +1187,7 @@
     "Agents": "ejen",
     "AllowedClientIps": "IP pelanggan yang dibenarkan",
     "AlreadyTerminatingSession": "Sudah menamatkan sesi.",
+    "AnotherUserSession": "Sesi ini dibuat oleh pengguna lain.",
     "Architecture": "Seni bina",
     "Arguments": "Hujah",
     "AverageUsage": "Avg",
@@ -1661,10 +1687,9 @@
       "Last12Hours": "12 jam terakhir",
       "Last3Hours": "3 jam terakhir",
       "Last7Days": "7 hari terakhir",
-      "LastDay": "1 hari terakhir"
-    },
-    "timeRanges": {
-      "LastHour": "1 jam terakhir"
+      "LastDay": "1 hari terakhir",
+      "LastHour": "1 jam terakhir",
+      "Today": "Hari ini"
     }
   },
   "storageHost": {
@@ -1799,7 +1824,6 @@
     "BootstrapScriptDescription": "Skrip Bootstrap akan dilaksanakan sekali sahaja selepas penciptaan sesi",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
     "BootstrapScriptUpdated": "Skrip bootstrap dikemas kini.",
-    "ClassicSessionLauncher": "Pelancar Sesi Classic",
     "ClearSSHKeypairInput": "Pad Kekunci SSH yang ditulis akan dikeluarkan. Adakah anda pasti mahu meneruskan?",
     "ConfigFilename": "Konfigurasi nama fail",
     "CurrentSSHPublicKey": "Kunci awam semasa:",
@@ -1809,7 +1833,7 @@
     "DescAutomaticUpdateCheck": "Beritahu bila versi webui baru dikeluarkan. <br /> Di mana Internet tidak stabil atau di luar talian, pilihan ini akan dimatikan secara automatik. Anda boleh menukar suis ini untuk memulakan pemeriksaan kemas kini automatik sekali lagi.",
     "DescBetaFeatures": "Gunakan ciri beta untuk UI Web. <br /> Ciri-ciri beta mungkin tidak stabil. Beberapa ciri beta mungkin tidak digunakan sebagai ciri rasmi.",
     "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini.",
-    "DescDesktopNotification": "Hidupkan atau matikan pemberitahuan desktop. <br /> Jika dihidupkan, Backend.AI juga menggunakan sistem pemberitahuan terbina dalam OS. Mematikan pilihan ini tidak mempengaruhi pemberitahuan dalam UI web.",
+    "DescDesktopNotification": "Membolehkan pemberitahuan desktop. \n<br /> Jika dihidupkan, backend.ai menggunakan sistem pemberitahuan terbina dalam OS juga. \nMematikan pilihan ini tidak menjejaskan pemberitahuan dalam UI Web. \nBergantung pada sistem operasi, pemberitahuan desktop mungkin memerlukan keizinan pemberitahuan dalam tetapan sistem.",
     "DescExperimentalDashboard": "Gunakan halaman papan pemuka dan bukannya halaman ringkasan.",
     "DescKeepLoginSessionInformation": "Biarkan aplikasi webui menyimpan maklumat sesi log masuk semasa lain kali. <br /> Sekiranya pilihan dimatikan, maklumat log masuk akan dihapus setiap log keluar.",
     "DescLanguage": "Tetapkan bahasa antara muka. Bahasa selain bahasa Inggeris dan Korea akan disediakan melalui terjemahan mesin.",

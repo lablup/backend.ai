@@ -100,16 +100,20 @@
     "Attachments": "添付ファイル",
     "CannotFindModel": "LLM モデルが見つかりません。ベースパスと OpenAI とのトークンの互換性を確認し、'Refresh Models' を押してください。",
     "CompareWithOtherModels": "他モデルとの比較",
+    "CreateCompareChat": "比較チャットの追加",
     "DeleteChatHistory": "クリア・チャット",
     "DeleteChattingSession": "チャット削除",
     "DeleteChattingSessionDescription": "このトピックを削除しようとしています。\n一度削除すると復元することはできません。\n慎重に進めてください。",
     "DropFileHere": "ここにファイルをドロップします",
+    "History": "歴史",
     "NewChat": "新しいチャット",
     "SelectEndpoint": "エンドポイントの選択",
     "SelectModel": "モデルの選択",
     "SelectToken": "トークンを選択",
-    "SyncInput": "同期",
+    "SenderPlaceholder": "ここにメッセージを入力してください",
+    "SyncInput": "チャット入力同期",
     "Thinking": "考え",
+    "TokenCounterTooltip": "TPS は、1 秒あたりに処理されるトークンの数を表します。この値はクライアント側で測定され、ネットワーク遅延を含む。Total tokens は、入力およびチャット・メッセージ内のトークンの総数を表します。",
     "UploadFiles": "ファイルをアップロードする",
     "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします",
     "ViewReasoning": "推論を見る",
@@ -223,6 +227,8 @@
     "All": "全て",
     "AllowsLettersNumbersAnd-_Dot": "アルファベットの大文字と小文字(A-Z、a-z)、数字、「-」、「_」、「.」しか入力できません。",
     "AutoMount": "オートマウント",
+    "AutomountFolderCreationDesc": "自動マウントフォルダは、セッション開始時に自動的にマウントされる。",
+    "AutomountFolderNameMustStartWithDot": "自動マウントフォルダー名はドット（'.）",
     "AutomountFolders": "フォルダーの自動マウント",
     "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。",
     "Create": "作成する",
@@ -235,6 +241,7 @@
     "DialogDataFolder": "FastTrackでパイプライン作成時に自動的に生成されるパイプライン専用フォルダ。",
     "DialogFolderStartingWithDotAutomount": "。（dot）で始まるフォルダは、新しいセッションが開始されると自動的にマウントされます。",
     "DialogModelFolder": "モデルを選択して実行したり、モデルを管理することができます。",
+    "DotPrefixReservedForAutomount": ".'で始まるフォルダは自動マウント用に予約されている。",
     "EnterDifferentValue": "既存のファイル名またはフォルダ名とは異なる値を入力してください。入力フィールドにスペース文字があるかどうかを確認してください。",
     "ExistingFolderName": "既存のフォルダ名",
     "FileAndFolderNameRequired": "ファイル/フォルダ名が必要です",
@@ -245,12 +252,14 @@
     "FolderToCopy": "コピーするフォルダ",
     "Foldername": "フォルダ名",
     "Folders": "フォルダー",
+    "From": "から",
     "General": "一般的な",
     "Host": "ホスト",
     "HostDetails": "選択したストレージホストの空き容量情報を表示します。",
     "InvalidEmail": "無効なメールアドレス",
     "Invited": "招待",
     "InvitedFolders": "招待されたフォルダー",
+    "InvitedFoldersTooltip": "{{ count }}フォルダーの招待状は、回答が保留されています。",
     "Limit": "制限",
     "ModelStore": "模型店",
     "Models": "モデル",
@@ -280,6 +289,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "行動",
+      "Allowed": "許可された",
       "ClickFilebrowserButton": "フォルダをアップロードするには、[ファイルブラウザの実行]ボタンをクリックしてください。",
       "CreateANewFolder": "新しいフォルダを作成します",
       "Created": "作成した",
@@ -413,6 +423,8 @@
       "View": "見る"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "招待状を受け入れなかった",
+      "FailedToDeclineInvitation": "招待状を拒否できませんでした",
       "FolderSharingNotAvailableToUser": "次のユーザーはフォルダ共有ができない状態です：",
       "InvitationError": "招待に失敗しました。ユーザーはすでに招待されている可能性があります。",
       "Invited": "招待に成功",
@@ -423,7 +435,10 @@
       "NoValidEmails": "有効なメールが入力されていません",
       "Shared": "グループフォルダを正常に共有しました",
       "SharingError": "共有に失敗しました。ユーザーはすでに共有されているか、適切なプロジェクトに属していない可能性があります。",
-      "SuccessfullyLeftSharedFolder": "共有フォルダーを正常に残しました"
+      "SuccessfullyAcceptedInvitation": "招待状に成功しました",
+      "SuccessfullyDeclinedInvitation": "招待状を成功裏に拒否しました",
+      "SuccessfullyLeftSharedFolder": "共有フォルダーを正常に残しました",
+      "UserIsAlreadyInvited": "{{email}}はすでに招待されています"
     },
     "modelStore": {
       "AddedItems": "追加された項目",
@@ -468,6 +483,10 @@
       "StatusOfSelectedHost": "選択したホストの状態",
       "Used": "使用中"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "このブラウザは通知をサポートしていません。",
+    "PermissionDenied": "通知アクセスを拒否しました。\nアラートを使用するには、ブラウザの設定で許可してください。"
   },
   "dialog": {
     "ErrorOccurred": "エラーが発生しました",
@@ -533,7 +552,9 @@
     "DescSignificantInstallTime": "このプロセスには、かなりのダウンロード時間が必要です。",
     "Digest": "ダイジェスト",
     "Disabled": "無効",
+    "ErrorMinimumValue": "{{key}}は、少なくとも{{value}}でなければなりません",
     "FullImagePath": "完全な画像パス",
+    "ImageReinstallationRequired": "画像の再インストールが必要です",
     "Images": "画像",
     "Install": "インストール",
     "Installed": "インストール済み",
@@ -544,6 +565,7 @@
     "ManageApps": "アプリの管理",
     "ModifyImageResourceLimit": "画像リソース制限の変更",
     "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>",
+    "ModifyMinimumImageResourceLimit": "最小画像リソース制限を変更します",
     "Namespace": "名前空間",
     "NoChangeMade": "変更された部分はありません。",
     "NoImageToDisplay": "画像情報がありません。",
@@ -644,6 +666,7 @@
     "Manual": "マニュアル",
     "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
     "NSelected": "{count}}を選択",
+    "NavigateToDetailPage": "詳細ページへ",
     "NewPassword": "新しいパスワード",
     "None": "なし",
     "Password": "パスワード",
@@ -805,6 +828,7 @@
     "Password": "パスワード",
     "PasswordChanged": "パスワードが正常に変更されました",
     "PleaseInputLoginInfo": "ログイン用のIDとパスワードを入力してください。",
+    "PleaseInputOTPCode": "ログインのために2FAコードを入力してください。",
     "PleaseWait": "ログインするまでお待ちください。",
     "SecretKey": "シークレットキー",
     "SendChangePasswordEmail": "パスワード変更メールを送信する",
@@ -1105,6 +1129,7 @@
     "MaxFolderCount": "最大フォルダ数",
     "MaxNetworkCount": "最大ネットワーク数",
     "MaxPendingSessionCount": "最大保留中のセッションカウント",
+    "MaxPendingSessionResourceSlots": "最大保留中のセッションリソーススロット",
     "MaxQuotaScopeSize": "最大クォータ スコープ サイズ (GB)",
     "MaxSessionCountPerModelSession": "モデルセッションごとの最大セッション数",
     "MaxSessionLifetime": "セッションの最大実行時間",
@@ -1153,7 +1178,7 @@
     "ResourcePresets": "リソースプリセット",
     "Resources": "リソース",
     "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない",
-    "SharedMemory": "共有メモリ（GB）",
+    "SharedMemory": "共有メモリ",
     "Updated": "リソースプリセットが更新されました"
   },
   "session": {
@@ -1162,6 +1187,7 @@
     "Agents": "エージェント",
     "AllowedClientIps": "許可されたクライアントIP",
     "AlreadyTerminatingSession": "すでに終了しているセッションです",
+    "AnotherUserSession": "このセッションは、別のユーザーによって作成されました.",
     "Architecture": "アーキテクチャ",
     "Arguments": "引数",
     "AverageUsage": "平均",
@@ -1662,10 +1688,9 @@
       "Last12Hours": "過去12時間",
       "Last3Hours": "最後の3時間",
       "Last7Days": "過去7日間",
-      "LastDay": "最後の1日"
-    },
-    "timeRanges": {
-      "LastHour": "最後の1時間"
+      "LastDay": "最後の1日",
+      "LastHour": "最後の1時間",
+      "Today": "今日"
     }
   },
   "storageHost": {
@@ -1800,7 +1825,6 @@
     "BootstrapScriptDescription": "ブートストラップスクリプトはセッション作成後一度だけ実行されます。",
     "BootstrapScriptEmpty": "スクリプトが空です。\nスクリプトを入力してください。",
     "BootstrapScriptUpdated": "ブートストラップスクリプトが更新されました。",
-    "ClassicSessionLauncher": "Classic セッションランチャー",
     "ClearSSHKeypairInput": "書き込まれたSSHキーペアは削除されます。続行してもよろしいですか？",
     "ConfigFilename": "構成ファイル名",
     "CurrentSSHPublicKey": "現在の公開鍵：",
@@ -1810,7 +1834,7 @@
     "DescAutomaticUpdateCheck": "新しいwebuiバージョンがリリースされたときに通知します。 <br />インターネットが不安定またはオフラインの場合、このオプションは自動的にオフになります。このスイッチを切り替えると、自動更新チェックを再開できます。",
     "DescBetaFeatures": "WebUIのベータ機能を使用します。 <br />ベータ機能が不安定な場合があります。一部のベータ機能は、公式機能として採用されない場合があります。",
     "DescClassicSessionLauncher": "NEO セッション ランチャーの代わりに Classic セッション ランチャーを使用します。\nClassic セッション ランチャーには最新の機能が含まれていない可能性があります。",
-    "DescDesktopNotification": "デスクトップ通知をオンまたはオフにします。 <br />オンにすると、Backend.AIはOS組み込みの通知システムも使用します。このオプションをオフにしても、WebUI内の通知には影響しません。",
+    "DescDesktopNotification": "デスクトップ通知を有効にします。 \n<br />オンになった場合、backend.aiはOSビルトイン通知システムも使用します。\nこのオプションをオフにしても、Web UI内の通知には影響しません。\nオペレーティングシステムに応じて、デスクトップ通知には、システム設定で通知アクセス許可を有効にする必要があります。",
     "DescExperimentalDashboard": "要約ページの代わりにダッシュボードページを使用します。",
     "DescKeepLoginSessionInformation": "次回、webuiアプリに現在のログインセッション情報を保持させます。 <br />オプションがオフの場合、ログイン情報はログアウトごとにクリアされます。",
     "DescLanguage": "インターフェイス言語を設定します。英語と韓国以外の言語は、機械翻訳によって提供されます。",
