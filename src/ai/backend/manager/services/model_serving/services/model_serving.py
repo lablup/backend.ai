@@ -47,7 +47,7 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
-    ModelServicePredicateChecker,
+    ModelServiceHelper,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
@@ -805,7 +805,7 @@ class ModelServingService:
                 conn = await db_session.connection()
                 assert conn
 
-                await ModelServicePredicateChecker.check_scaling_group(
+                await ModelServiceHelper.check_scaling_group(
                     conn,
                     endpoint_row.resource_group,
                     session_owner.main_access_key,
@@ -848,7 +848,7 @@ class ModelServingService:
                         )
                         for mount in extra_mounts_input
                     }
-                    vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
+                    vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
                         conn,
                         self._config_provider.legacy_etcd_config_loader,
                         self._storage_manager,
@@ -861,10 +861,19 @@ class ModelServingService:
                     endpoint_row.extra_mounts = vfolder_mounts
 
                 if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
-                    await ModelServicePredicateChecker.validate_model_definition(
+                    model_definition_path = (
+                        await ModelServiceHelper.validate_model_definition_file_exists(
+                            self._storage_manager,
+                            endpoint_row.model_row.host,
+                            endpoint_row.model_row.vfid,
+                            endpoint_row.model_definition_path,
+                        )
+                    )
+                    await ModelServiceHelper.validate_model_definition(
                         self._storage_manager,
-                        endpoint_row.model_row,
-                        endpoint_row.model_definition_path,
+                        endpoint_row.model_row.host,
+                        endpoint_row.model_row.vfid,
+                        model_definition_path,
                     )
                 elif (
                     endpoint_row.runtime_variant != RuntimeVariant.CMD

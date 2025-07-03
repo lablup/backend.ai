@@ -55,6 +55,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.data.config.types import HealthCheckConfig
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -107,6 +108,7 @@ from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReport,
     AccessKey,
     AgentId,
@@ -129,6 +131,7 @@ from ai.backend.common.types import (
     ModelServiceStatus,
     RedisConnectionInfo,
     ResourceSlot,
+    RuntimeVariant,
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
@@ -138,6 +141,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
@@ -3651,8 +3655,36 @@ class AgentRegistry:
             "abuse_report": result,
         }
 
-    async def get_health_check_info(self, endpoint: EndpointRow) -> None:
-        pass
+    async def get_health_check_info(self, endpoint: EndpointRow) -> HealthCheckConfig | None:
+        _info: HealthCheckConfig | None = None
+
+        if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
+            _info = HealthCheckConfig(path=_path)
+        elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+            model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
+                self.storage_manager,
+                endpoint.model_row.host,
+                endpoint.model_row.vfid,
+                endpoint.model_definition_path,
+            )
+            model_definition = await ModelServiceHelper.validate_model_definition(
+                self.storage_manager,
+                endpoint.model_row.host,
+                endpoint.model_row.vfid,
+                model_definition_path,
+            )
+
+            for model in model_definition["models"]:
+                if health_check_info := model.get("service", {}).get("health_check"):
+                    _info = HealthCheckConfig(
+                        path=health_check_info["path"],
+                        interval=health_check_info["interval"],
+                        max_retries=health_check_info["max_retries"],
+                        max_wait_time=health_check_info["max_wait_time"],
+                        expected_status_code=health_check_info["expected_status_code"],
+                    )
+                    break
+        return _info
 
     async def update_appproxy_endpoint_routes(
         self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
@@ -3692,10 +3724,13 @@ class AgentRegistry:
                     "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
                 })
 
+        health_check_information = await self.get_health_check_info(endpoint)
+
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
                 json={
+                    "version": "v2",
                     "service_name": endpoint.name,
                     "tags": {
                         "session": {
@@ -3711,6 +3746,9 @@ class AgentRegistry:
                     },
                     "apps": inference_apps,
                     "open_to_public": endpoint.open_to_public,
+                    "health_check": health_check_information.model_dump(mode="json")
+                    if health_check_information
+                    else None,
                 },  # TODO: support for multiple inference apps
                 headers={
                     "X-BackendAI-Token": wsproxy_api_token,
