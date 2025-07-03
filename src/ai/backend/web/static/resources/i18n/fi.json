@@ -101,15 +101,20 @@
     "Attachments": "Liitteet",
     "CannotFindModel": "LLM-malleja ei löydy. Tarkista peruspolku ja tokenin yhteensopivuus OpenAI:n kanssa ja paina sitten 'Päivitä mallit'.",
     "CompareWithOtherModels": "Vertaa muihin malleihin",
+    "CreateCompareChat": "Lisää vertailukeskustelu",
     "DeleteChatHistory": "Selkeä keskustelu",
     "DeleteChattingSession": "Poista keskustelu",
     "DeleteChattingSessionDescription": "Olet poistamassa tätä aihetta. \nKun se on poistettu, sitä ei voi palauttaa. \nOle hyvä ja jatka varoen.",
     "DropFileHere": "Pudota tiedosto tähän",
+    "History": "Historia",
+    "NewChat": "Uusi keskustelu",
     "SelectEndpoint": "Valitse Päätepiste",
     "SelectModel": "Valitse Malli",
     "SelectToken": "Valitse Token",
-    "SyncInput": "Synkronoitu",
+    "SenderPlaceholder": "Kirjoita viestisi tähän...",
+    "SyncInput": "Chat-syötteen synkronointi",
     "Thinking": "Ajattelu",
+    "TokenCounterTooltip": "TPS edustaa sekunnissa käsiteltyjen merkkien lukumäärää. Tämä arvo mitataan asiakaspuolella, ja se sisältää verkon viiveen. Total tokens edustaa syöttö- ja keskusteluviesteissä olevien merkkien kokonaismäärää.",
     "UploadFiles": "Lataa tiedostoja",
     "UploadFilesDescription": "Napsauta tai vedä tiedostoja tälle alueelle ladataksesi",
     "ViewReasoning": "Näytä päättely",
@@ -223,6 +228,8 @@
     "All": "Kaikki",
     "AllowsLettersNumbersAnd-_Dot": "Vain kirjaimet (A-Z, a-z), numerot, '-', '_' ja '.' ovat sallittuja.",
     "AutoMount": "Automaattinen kiinnitys",
+    "AutomountFolderCreationDesc": "Automaattisesti kiinnitettävät kansiot kiinnitetään automaattisesti, kun istunto käynnistyy.",
+    "AutomountFolderNameMustStartWithDot": "Automaattisen kiinnityskansion nimen on alettava pisteellä ('.').",
     "AutomountFolders": "Automount-kansiot",
     "CloningIsOnlyPossibleSameHost": "Tällä hetkellä kloonaus on mahdollista vain samassa isännässä.",
     "Create": "Luo",
@@ -235,6 +242,7 @@
     "DialogDataFolder": "Putkistolle omistetut kansiot, jotka luodaan automaattisesti, kun luodaan putkia FastTrackissa.",
     "DialogFolderStartingWithDotAutomount": ".(pisteellä) alkavat kansiot asennetaan automaattisesti, kun uusi istunto aloitetaan.",
     "DialogModelFolder": "Voit palvella ja hallita malleja.",
+    "DotPrefixReservedForAutomount": "Kansiot, jotka alkavat kirjaimella '.', on varattu automaattista kiinnitystä varten.",
     "EnterDifferentValue": "Anna jokin muu arvo kuin olemassa olevan tiedoston tai kansion nimi. Tarkista, onko syöttökentässä välilyönti vai ei.",
     "ExistingFolderName": "Olemassa olevan kansion nimi",
     "FileAndFolderNameRequired": "Tiedoston/kansioiden nimi vaaditaan",
@@ -245,12 +253,14 @@
     "FolderToCopy": "Kopioitava kansio",
     "Foldername": "Kansion nimi",
     "Folders": "Kansiot",
+    "From": "-Sta",
     "General": "Yleinen",
     "Host": "Isäntä",
     "HostDetails": "Näyttää valitun tallennusaseman kiintiötiedot.",
     "InvalidEmail": "Virheellinen sähköpostiosoite",
     "Invited": "Kutsuttu",
     "InvitedFolders": "Kutsutut kansiot",
+    "InvitedFoldersTooltip": "{{ count }} -kansiokutsut odottavat vastausta.",
     "Limit": "Raja",
     "ModelStore": "Mallikauppa",
     "Models": "Mallit",
@@ -280,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Toimet",
+      "Allowed": "Sallittu",
       "ClickFilebrowserButton": "Lataa kansio(t) napsauttamalla Execute filebrowser-painiketta.",
       "CreateANewFolder": "Luo uusi kansio",
       "Created": "Luotu",
@@ -413,6 +424,8 @@
       "View": "Näytä"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "Kutsu epäonnistui",
+      "FailedToDeclineInvitation": "Kutsun hylkääminen epäonnistui",
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
       "InvitationError": "Kutsu epäonnistui. Käyttäjä on ehkä jo kutsuttu.",
       "Invited": "Kutsuttu onnistuneesti",
@@ -423,7 +436,10 @@
       "NoValidEmails": "Kelvollisia sähköposteja ei ole syötetty",
       "Shared": "Ryhmäkansion jakaminen onnistui",
       "SharingError": "Jakaminen epäonnistui. Käyttäjä on ehkä jo jaettu tai ei kuulu asianmukaiseen projektiin.",
-      "SuccessfullyLeftSharedFolder": "Jäljellä jaetussa kansiossa"
+      "SuccessfullyAcceptedInvitation": "Onnistuneesti hyväksytty kutsu",
+      "SuccessfullyDeclinedInvitation": "Onnistuneesti hylätty kutsu",
+      "SuccessfullyLeftSharedFolder": "Jäljellä jaetussa kansiossa",
+      "UserIsAlreadyInvited": "{{email}} on jo kutsuttu"
     },
     "modelStore": {
       "AddedItems": "Lisätyt kohteet",
@@ -468,6 +484,10 @@
       "StatusOfSelectedHost": "Valitun isännän tila",
       "Used": "käytetty"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "Tämä selain ei tue ilmoituksia.",
+    "PermissionDenied": "Olet kiistänyt ilmoituskäytön. \nJos haluat käyttää hälytyksiä, salli se selaimen asetuksissa."
   },
   "dialog": {
     "ErrorOccurred": "Tapahtunut virhe",
@@ -533,7 +553,9 @@
     "DescSignificantInstallTime": "Tämä prosessi vaatii huomattavan paljon latausaikaa.",
     "Digest": "Digest",
     "Disabled": "disabled",
+    "ErrorMinimumValue": "{{key}} on oltava vähintään {{value}}",
     "FullImagePath": "Koko kuvan polku",
+    "ImageReinstallationRequired": "Kuvan uudelleenasentaminen vaaditaan",
     "Images": "Kuvat",
     "Install": "Asenna",
     "Installed": "asennettu",
@@ -544,6 +566,7 @@
     "ManageApps": "Hallitse sovelluksia",
     "ModifyImageResourceLimit": "Kuvan resurssirajan muuttaminen",
     "ModifyImageResourceLimitReinstallRequired": "<p>Jos muokkaat jo asennettua kuvaa, sinun on asennettava se uudelleen.</p><p>Muokkauksia ei tehdä ennen kuin kuva on asennettu uudelleen.\n\n</p>",
+    "ModifyMinimumImageResourceLimit": "Muokkaa kuvan vähimmäisresurssirajaa",
     "Namespace": "Nimiavaruus",
     "NoChangeMade": "Muutoksia ei tehty",
     "NoImageToDisplay": "Ei näytettäviä kuvia",
@@ -644,6 +667,7 @@
     "Manual": "Manuaalinen",
     "MaxValueNotification": "{{name}} on oltava maksimi {{max}}",
     "NSelected": "{{count}} valittu",
+    "NavigateToDetailPage": "Siirry yksityiskohtien sivulle",
     "NewPassword": "Uusi salasana",
     "None": "Ei ole",
     "Password": "Salasana",
@@ -805,6 +829,7 @@
     "Password": "Salasana",
     "PasswordChanged": "Salasana on onnistuneesti vaihdettu",
     "PleaseInputLoginInfo": "Syötä tunnus ja salasana kirjautumista varten.",
+    "PleaseInputOTPCode": "Anna 2FA -koodisi kirjautumista varten.",
     "PleaseWait": "Odota kirjautumista.",
     "SecretKey": "Salainen avain",
     "SendChangePasswordEmail": "Lähetä sähköpostiviesti salasanan vaihtamisesta",
@@ -1104,6 +1129,7 @@
     "MaxFolderCount": "Kansioiden enimmäismäärä",
     "MaxNetworkCount": "Verkkojen enimmäismäärä",
     "MaxPendingSessionCount": "Maxin vireillä oleva istuntomäärä",
+    "MaxPendingSessionResourceSlots": "Max odottavat istunnon resurssipaikat",
     "MaxQuotaScopeSize": "Kiintiön enimmäiskoko (GB)",
     "MaxSessionCountPerModelSession": "Maksimi istuntojen määrä malliistuntoa kohti",
     "MaxSessionLifetime": "Istunnon kesto (sek.)",
@@ -1152,7 +1178,7 @@
     "ResourcePresets": "Resurssien esiasetukset",
     "Resources": "Resurssit",
     "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin",
-    "SharedMemory": "Jaettu muisti (GB)",
+    "SharedMemory": "Jaettu muisti",
     "Updated": "Resurssien esiasetus päivitetty"
   },
   "session": {
@@ -1161,6 +1187,7 @@
     "Agents": "Agentit",
     "AllowedClientIps": "Sallitut asiakkaan IP-osoitteet",
     "AlreadyTerminatingSession": "Istunto on jo päättymässä.",
+    "AnotherUserSession": "Tämän istunnon on luonut toinen käyttäjä.",
     "Architecture": "Arkkitehtuuri",
     "Arguments": "Argumentit",
     "AverageUsage": "Avg",
@@ -1661,10 +1688,9 @@
       "Last12Hours": "Viimeiset 12 tuntia",
       "Last3Hours": "Viimeiset 3 tuntia",
       "Last7Days": "Viimeiset 7 päivää",
-      "LastDay": "1 päivä"
-    },
-    "timeRanges": {
-      "LastHour": "1 tunti"
+      "LastDay": "1 päivä",
+      "LastHour": "1 tunti",
+      "Today": "Tänään"
     }
   },
   "storageHost": {
@@ -1799,7 +1825,6 @@
     "BootstrapScriptDescription": "Bootstrap-skripti suoritetaan vain kerran istunnon luomisen jälkeen.",
     "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
     "BootstrapScriptUpdated": "Bootstrap-skripti päivitetty.",
-    "ClassicSessionLauncher": "Classic istunnon käynnistysohjelma",
     "ClearSSHKeypairInput": "Kirjoitettu SSH-avainpari poistetaan. Haluatko varmasti jatkaa?",
     "ConfigFilename": "Konfigurointitiedoston nimi",
     "CurrentSSHPublicKey": "Nykyinen julkinen avain:",
@@ -1809,7 +1834,7 @@
     "DescAutomaticUpdateCheck": "Ilmoita, kun uusi webui-versio julkaistaan.<br />Jos Internet on epävakaa tai offline, tämä vaihtoehto kytkeytyy automaattisesti pois päältä. Voit vaihtaa tätä kytkintä käynnistääksesi automaattisen päivityksen tarkistuksen uudelleen.",
     "DescBetaFeatures": "Käytä web-käyttöliittymän beta-ominaisuuksia.<br />Beta-ominaisuudet voivat olla epävakaita. Joitakin beta-ominaisuuksia ei ehkä hyväksytä viralliseksi ominaisuudeksi.",
     "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia.",
-    "DescDesktopNotification": "Ota työpöytäilmoitukset käyttöön tai poista ne käytöstä. <br />Jos se on päällä, Backend.AI käyttää myös käyttöjärjestelmän sisäänrakennettua ilmoitusjärjestelmää. Tämän vaihtoehdon kytkeminen pois päältä ei vaikuta ilmoituksiin web-käyttöliittymässä.",
+    "DescDesktopNotification": "Mahdollistaa työpöytäilmoituksen. \n<br /> Jos kytketään päälle, backend.ai käyttää myös sisäänrakennettua ilmoitusjärjestelmää. \nTämän vaihtoehdon sammuttaminen ei vaikuta ilmoituksiin Web -käyttöliittymässä. \nKäyttöjärjestelmästä riippuen työpöytäilmoitukset voivat edellyttää ilmoitusoikeuksien mahdollistamista järjestelmä -asetuksissa.",
     "DescExperimentalDashboard": "Käytä kojelaudan sivua yhteenvetosivun sijasta.",
     "DescKeepLoginSessionInformation": "Anna webui-sovelluksen säilyttää nykyisen kirjautumisistunnon tiedot seuraavalla kerralla.<br />Jos vaihtoehto on pois päältä, kirjautumistiedot tyhjennetään jokaisen uloskirjautumisen yhteydessä.",
     "DescLanguage": "Aseta käyttöliittymäkieli. Muut kielet kuin englanti ja korea tarjotaan koneen käännöksen kautta.",

@@ -101,16 +101,20 @@
     "Attachments": "ไฟล์แนบ",
     "CannotFindModel": "ไม่พบรุ่น LLM \nตรวจสอบเส้นทางพื้นฐานและความเข้ากันได้ของโทเค็นกับ OpenAI จากนั้นกด 'Refresh Models'",
     "CompareWithOtherModels": "เปรียบเทียบกับรุ่นอื่นๆ",
+    "CreateCompareChat": "เพิ่มแชทเปรียบเทียบ",
     "DeleteChatHistory": "เคลียร์แชท",
     "DeleteChattingSession": "ลบแชท",
     "DeleteChattingSessionDescription": "คุณกำลังจะลบหัวข้อนี้ เมื่อลบแล้วจะไม่สามารถกู้คืนได้ กรุณาดำเนินการด้วยความระมัดระวัง",
     "DropFileHere": "วางไฟล์ที่นี่",
+    "History": "ประวัติศาสตร์",
     "NewChat": "แชทใหม่",
     "SelectEndpoint": "เลือกจุดสิ้นสุด",
     "SelectModel": "เลือกโมเดล",
     "SelectToken": "เลือกโทเค็น",
-    "SyncInput": "ที่ได้รับการซิงค์",
+    "SenderPlaceholder": "กรุณาพิมพ์ข้อความของคุณที่นี่...",
+    "SyncInput": "การซิงโครไนซ์ข้อมูลการแชท",
     "Thinking": "ความคิด",
+    "TokenCounterTooltip": "TPS คือจำนวนโทเค็นที่ประมวลผลต่อวินาที ค่านี้วัดจากฝั่งไคลเอนต์และรวมความล่าช้าของเครือข่ายไว้ด้วย โทเค็นทั้งหมดหมายถึงจำนวนโทเค็นทั้งหมดในข้อความอินพุตและแชท",
     "UploadFiles": "อัพโหลดไฟล์",
     "UploadFilesDescription": "คลิกหรือลากไฟล์ไปยังบริเวณนี้เพื่ออัปโหลด",
     "ViewReasoning": "ดูเหตุผล",
@@ -224,6 +228,8 @@
     "All": "ทั้งหมด",
     "AllowsLettersNumbersAnd-_Dot": "ตัวอักษรเท่านั้น (a-z, a-z), ตัวเลข, '-', '_' และ '.' \nได้รับอนุญาต",
     "AutoMount": "ติดตั้งอัตโนมัติ",
+    "AutomountFolderCreationDesc": "โฟลเดอร์ที่ติดตั้งอัตโนมัติจะถูกติดตั้งโดยอัตโนมัติเมื่อเริ่มต้นเซสชัน",
+    "AutomountFolderNameMustStartWithDot": "ชื่อของโฟลเดอร์ที่ติดตั้งอัตโนมัติต้องขึ้นต้นด้วยจุด ('.')",
     "AutomountFolders": "โฟลเดอร์เมาท์อัตโนมัติ",
     "CloningIsOnlyPossibleSameHost": "ปัจจุบันการโคลนสามารถทำได้เฉพาะบนโฮสต์เดียวกัน",
     "Create": "สร้าง",
@@ -236,6 +242,7 @@
     "DialogDataFolder": "โฟลเดอร์ที่สร้างขึ้นโดยอัตโนมัติเมื่อสร้างไปป์ไลน์ใน FastTrack",
     "DialogFolderStartingWithDotAutomount": "โฟลเดอร์ที่ขึ้นต้นด้วยจุด (.) จะถูกเมาท์โดยอัตโนมัติเมื่อเริ่มเซสชันใหม่",
     "DialogModelFolder": "คุณสามารถให้บริการและจัดการโมเดลได้",
+    "DotPrefixReservedForAutomount": "โฟลเดอร์ที่ขึ้นต้นด้วย '.' ถูกสงวนไว้สำหรับการใช้งานการเมาท์อัตโนมัติ",
     "EnterDifferentValue": "กรุณาป้อนค่าที่แตกต่างจากชื่อไฟล์หรือโฟลเดอร์ที่มีอยู่ กรุณาตรวจสอบว่ามีช่องว่างในช่องป้อนข้อมูลหรือไม่",
     "ExistingFolderName": "ชื่อโฟลเดอร์ที่มีอยู่",
     "FileAndFolderNameRequired": "ต้องระบุชื่อไฟล์/โฟลเดอร์",
@@ -246,12 +253,14 @@
     "FolderToCopy": "โฟลเดอร์ที่จะคัดลอก",
     "Foldername": "ชื่อโฟลเดอร์",
     "Folders": "โฟลเดอร์",
+    "From": "จาก",
     "General": "ทั่วไป",
     "Host": "โฮสต์",
     "HostDetails": "แสดงข้อมูลโควตาสำหรับโฮสต์จัดเก็บที่เลือก",
     "InvalidEmail": "ที่อยู่อีเมลไม่ถูกต้อง",
     "Invited": "เชิญแล้ว",
     "InvitedFolders": "โฟลเดอร์ที่ได้รับเชิญ",
+    "InvitedFoldersTooltip": "{{ count }} คำเชิญโฟลเดอร์กำลังรอการตอบสนอง",
     "Limit": "ขีดจำกัด",
     "ModelStore": "คลังโมเดล",
     "Models": "โมเดล",
@@ -281,6 +290,7 @@
     "UserQuotaScopeId": "รหัสขอบเขตโควตาผู้ใช้",
     "explorer": {
       "Actions": "การดำเนินการ",
+      "Allowed": "อนุญาต",
       "ClickFilebrowserButton": "หากต้องการอัปโหลดโฟลเดอร์ กรุณาคลิกปุ่มเรียกใช้เบราว์เซอร์ไฟล์",
       "CreateANewFolder": "สร้างโฟลเดอร์ใหม่",
       "Created": "สร้างเมื่อ",
@@ -414,6 +424,8 @@
       "View": "ดู"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "ไม่ยอมรับคำเชิญ",
+      "FailedToDeclineInvitation": "ล้มเหลวในการปฏิเสธคำเชิญ",
       "FolderSharingNotAvailableToUser": "การแชร์โฟลเดอร์ไม่สามารถใช้ได้สำหรับผู้ใช้ที่ร้องขอ: ",
       "InvitationError": "การเชิญล้มเหลว ผู้ใช้อาจได้รับเชิญแล้ว",
       "Invited": "เชิญสำเร็จแล้ว",
@@ -424,7 +436,10 @@
       "NoValidEmails": "ไม่มีอีเมลที่ถูกต้องถูกป้อน",
       "Shared": "แชร์โฟลเดอร์กลุ่มสำเร็จแล้ว",
       "SharingError": "การแชร์ล้มเหลว ผู้ใช้อาจได้รับการแชร์แล้วหรือไม่ได้อยู่ในโครงการที่เหมาะสม",
-      "SuccessfullyLeftSharedFolder": "ออกจากโฟลเดอร์ที่ใช้ร่วมกันสำเร็จ"
+      "SuccessfullyAcceptedInvitation": "คำเชิญที่ยอมรับได้สำเร็จ",
+      "SuccessfullyDeclinedInvitation": "คำเชิญปฏิเสธสำเร็จ",
+      "SuccessfullyLeftSharedFolder": "ออกจากโฟลเดอร์ที่ใช้ร่วมกันสำเร็จ",
+      "UserIsAlreadyInvited": "{{email}} ได้รับเชิญไปแล้ว"
     },
     "modelStore": {
       "AddedItems": "เพิ่มรายการแล้ว",
@@ -463,6 +478,10 @@
       "StatusOfSelectedHost": "สถานะของโฮสต์ที่เลือก",
       "Used": "ใช้แล้ว"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน",
+    "PermissionDenied": "คุณปฏิเสธการเข้าถึงการแจ้งเตือน \nหากต้องการใช้การแจ้งเตือนโปรดรอการตั้งค่าเบราว์เซอร์ของคุณ"
   },
   "dialog": {
     "ErrorOccurred": "เกิดข้อผิดพลาด",
@@ -525,7 +544,9 @@
     "DescSignificantDownloadTime": "กระบวนการนี้ต้องใช้เวลาดาวน์โหลดที่สำคัญ",
     "Digest": "ไดเจสต์",
     "Disabled": "ปิดใช้งาน",
+    "ErrorMinimumValue": "{{key}} ต้องมีอย่างน้อย {{value}}",
     "FullImagePath": "เส้นทางภาพเต็ม",
+    "ImageReinstallationRequired": "จำเป็นต้องติดตั้งรูปภาพใหม่",
     "Images": "อิมเมจ",
     "Install": "ติดตั้ง",
     "Installed": "ติดตั้งแล้ว",
@@ -535,6 +556,7 @@
     "ManageApps": "จัดการแอป",
     "ModifyImageResourceLimit": "แก้ไขขีดจำกัดทรัพยากรอิมเมจ",
     "ModifyImageResourceLimitReinstallRequired": "<p>หากคุณแก้ไขอิมเมจที่ได้รับการติดตั้งแล้ว คุณจะต้องติดตั้งอิมเมจใหม่</p><p>การแก้ไขจะไม่มีผลจนกว่าจะมีการติดตั้งอิมเมจใหม่\n</p>",
+    "ModifyMinimumImageResourceLimit": "แก้ไขขีด จำกัด ทรัพยากรภาพขั้นต่ำ",
     "Namespace": "เนมสเปซ",
     "NoChangeMade": "ไม่มีการเปลี่ยนแปลง",
     "NoImageToDisplay": "ไม่มีอิมเมจที่จะแสดง",
@@ -634,6 +656,7 @@
     "Manual": "คู่มือ",
     "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}",
     "NSelected": "{{count}} เลือก",
+    "NavigateToDetailPage": "ไปที่หน้าโดยละเอียด",
     "NewPassword": "รหัสผ่านใหม่",
     "None": "ไม่มี",
     "Password": "รหัสผ่าน",
@@ -795,6 +818,7 @@
     "Password": "รหัสผ่าน",
     "PasswordChanged": "เปลี่ยนรหัสผ่านสำเร็จแล้ว",
     "PleaseInputLoginInfo": "กรุณาป้อนรหัสประจำตัวและรหัสผ่านเพื่อเข้าสู่ระบบ",
+    "PleaseInputOTPCode": "โปรดป้อนรหัส 2FA ของคุณสำหรับการเข้าสู่ระบบ",
     "PleaseWait": "กรุณารอเพื่อเข้าสู่ระบบ",
     "SecretKey": "คีย์ลับ",
     "SendChangePasswordEmail": "ส่งอีเมลเปลี่ยนรหัสผ่าน",
@@ -1095,6 +1119,7 @@
     "MaxFolderCount": "จำนวนโฟลเดอร์สูงสุด",
     "MaxNetworkCount": "จำนวนเครือข่ายสูงสุด",
     "MaxPendingSessionCount": "จำนวนเซสชันที่ค้างอยู่สูงสุด",
+    "MaxPendingSessionResourceSlots": "ช่องทรัพยากรเซสชันที่รออยู่สูงสุด",
     "MaxQuotaScopeSize": "ขนาดขอบเขตโควตาสูงสุด (GB)",
     "MaxSessionCountPerModelSession": "จำนวนเซสชันสูงสุดต่อเซสชันโมเดล",
     "MaxSessionLifetime": "อายุการใช้งานเซสชันสูงสุด (วินาที)",
@@ -1143,7 +1168,7 @@
     "ResourcePresets": "ค่าที่กำหนดไว้ล่วงหน้าของทรัพยากร",
     "Resources": "ทรัพยากร",
     "SHMEMShouldBeSmallerThanMemory": "หน่วยความจำร่วมต้องน้อยกว่าหน่วยความจำ",
-    "SharedMemory": "หน่วยความจำร่วม (GB)",
+    "SharedMemory": "หน่วยความจำที่ใช้ร่วมกัน",
     "Updated": "อัปเดตค่าที่กำหนดไว้ล่วงหน้าของทรัพยากรแล้ว"
   },
   "session": {
@@ -1152,6 +1177,7 @@
     "Agents": "ตัวแทน",
     "AllowedClientIps": "IP ไคลเอนต์ที่อนุญาต",
     "AlreadyTerminatingSession": "กำลังยุติเซสชันอยู่แล้ว",
+    "AnotherUserSession": "เซสชันนี้ถูกสร้างขึ้นโดยผู้ใช้รายอื่น.",
     "Architecture": "สถาปัตยกรรม",
     "Arguments": "อาร์กิวเมนต์",
     "AverageUsage": "AVG",
@@ -1644,10 +1670,9 @@
       "Last12Hours": "12 ชั่วโมงสุดท้าย",
       "Last3Hours": "3 ชั่วโมงสุดท้าย",
       "Last7Days": "7 วันสุดท้าย",
-      "LastDay": "1 วันสุดท้าย"
-    },
-    "timeRanges": {
-      "LastHour": "1 ชั่วโมงสุดท้าย"
+      "LastDay": "1 วันสุดท้าย",
+      "LastHour": "1 ชั่วโมงสุดท้าย",
+      "Today": "วันนี้"
     }
   },
   "storageHost": {
@@ -1782,7 +1807,6 @@
     "BootstrapScriptDescription": "สคริปต์บูตสแตรปจะถูกดำเนินการเพียงครั้งเดียวหลังจากสร้างเซสชัน",
     "BootstrapScriptEmpty": "สคริปต์ว่างเปล่า \nกรุณาป้อนสคริปต์",
     "BootstrapScriptUpdated": "อัปเดตสคริปต์บูตสแตรปแล้ว",
-    "ClassicSessionLauncher": "ตัวเปิดเซสชัน Classic",
     "ClearSSHKeypairInput": "คู่คีย์ SSH ที่เขียนไว้จะถูกลบ คุณแน่ใจหรือไม่ที่จะดำเนินการต่อ?",
     "ConfigFilename": "ชื่อไฟล์การกำหนดค่า",
     "CurrentSSHPublicKey": "คีย์สาธารณะปัจจุบัน: ",
@@ -1792,7 +1816,7 @@
     "DescAutomaticUpdateCheck": "แจ้งเตือนเมื่อมีการปล่อยเวอร์ชันใหม่ของส่วนติดต่อผู้ใช้บนเว็บ<br />ในที่ที่อินเทอร์เน็ตไม่เสถียรหรือออฟไลน์ ตัวเลือกนี้จะถูกปิดโดยอัตโนมัติ คุณสามารถสลับสวิตช์นี้เพื่อเริ่มการตรวจสอบการอัปเดตอัตโนมัติอีกครั้ง",
     "DescBetaFeatures": "ใช้คุณสมบัติเบต้าสำหรับส่วนติดต่อผู้ใช้บนเว็บ<br />คุณสมบัติเบต้าอาจไม่เสถียร บางคุณสมบัติเบต้าอาจไม่ได้รับการยอมรับให้เป็นคุณสมบัติอย่างเป็นทางการ",
     "DescClassicSessionLauncher": "ใช้ตัวเรียกใช้เซสชัน Classic แทนตัวเรียกใช้เซสชัน NEO \nตัวเรียกใช้เซสชัน Classic อาจไม่มีคุณสมบัติล่าสุด",
-    "DescDesktopNotification": "เปิดหรือปิดการแจ้งเตือนบนเดสก์ท็อป <br />หากเปิด Backend.AI จะใช้ระบบการแจ้งเตือนในตัวของระบบปฏิบัติการด้วย การปิดตัวเลือกนี้จะไม่ส่งผลกระทบต่อการแจ้งเตือนภายในส่วนติดต่อผู้ใช้บนเว็บ",
+    "DescDesktopNotification": "เปิดใช้งานการแจ้งเตือนเดสก์ท็อป \n<br /> หากเปิดใช้งาน Backend.ai ใช้ระบบการแจ้งเตือนในตัวระบบปฏิบัติการด้วย \nการปิดตัวเลือกนี้ไม่ส่งผลกระทบต่อการแจ้งเตือนภายในเว็บ UI \nการแจ้งเตือนบนเดสก์ท็อปอาจต้องเปิดใช้งานการแจ้งเตือนในการตั้งค่าระบบทั้งนี้ขึ้นอยู่กับระบบปฏิบัติการ",
     "DescExperimentalDashboard": "ใช้หน้าแดชบอร์ดแทนหน้าสรุป",
     "DescKeepLoginSessionInformation": "ให้แอป webui เก็บข้อมูลเซสชันเข้าสู่ระบบปัจจุบันไว้สำหรับครั้งต่อไป<br />หากปิดตัวเลือกนี้ ข้อมูลการเข้าสู่ระบบจะถูกล้างทุกครั้งที่ออกจากระบบ",
     "DescLanguage": "ตั้งค่าภาษาอินเตอร์เฟส ภาษาอื่นที่ไม่ใช่ภาษาอังกฤษและเกาหลีจะได้รับผ่านการแปลด้วยเครื่อง",

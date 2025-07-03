@@ -101,16 +101,20 @@
     "Attachments": "附件",
     "CannotFindModel": "未找到 LLM 模型。验证基本路径和令牌与 OpenAI 的兼容性，然后按 \"刷新模型",
     "CompareWithOtherModels": "与其他型号比较",
+    "CreateCompareChat": "添加对比聊天",
     "DeleteChatHistory": "清晰聊天",
     "DeleteChattingSession": "删除聊天",
     "DeleteChattingSessionDescription": "您即将删除该主题。\n一旦删除，就无法恢复。\n请谨慎行事。",
     "DropFileHere": "将文件拖放到此处",
+    "History": "历史",
     "NewChat": "新聊天",
     "SelectEndpoint": "选择端点",
     "SelectModel": "选择型号",
     "SelectToken": "选择令牌",
-    "SyncInput": "同步",
+    "SenderPlaceholder": "在此输入您的信息...",
+    "SyncInput": "同步聊天输入",
     "Thinking": "思维",
+    "TokenCounterTooltip": "TPS 表示每秒处理的令牌数量。该值在客户端测量，包括网络延迟。令牌总数表示输入和聊天信息中的令牌总数。",
     "UploadFiles": "上传文件",
     "UploadFilesDescription": "点击或拖拽文件到该区域即可上传",
     "ViewReasoning": "查看推理",
@@ -224,6 +228,8 @@
     "All": "全部",
     "AllowsLettersNumbersAnd-_Dot": "只允许使用字母（A-Z、a-z）、数字、'-'、'_'和'.'。",
     "AutoMount": "自动安装",
+    "AutomountFolderCreationDesc": "自动挂载文件夹会在会话启动时自动挂载。",
+    "AutomountFolderNameMustStartWithDot": "自动挂载文件夹的名称必须以点（'.'）开头。",
     "AutomountFolders": "自动挂载文件夹",
     "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主机上进行。",
     "Create": "创造",
@@ -236,6 +242,7 @@
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
     "DialogFolderStartingWithDotAutomount": "启动新会话时，会自动挂载以 .（点）开头的文件夹。",
     "DialogModelFolder": "您可以服务和管理模型。",
+    "DotPrefixReservedForAutomount": "以\". \"开头的文件夹保留用于自动挂载。",
     "EnterDifferentValue": "请输入与现有文件或文件夹名称不同的值。请检查输入字段中是否有空格字符。",
     "ExistingFolderName": "现有文件夹名称",
     "FileAndFolderNameRequired": "需要文件/文件夹名称",
@@ -246,12 +253,14 @@
     "FolderToCopy": "要复制的文件夹",
     "Foldername": "文件夹名称",
     "Folders": "文件夹",
+    "From": "从",
     "General": "一般的",
     "Host": "主持人",
     "HostDetails": "显示所选存储主机的配额信息。",
     "InvalidEmail": "无效的电子邮件地址",
     "Invited": "受邀",
     "InvitedFolders": "邀请的文件夹",
+    "InvitedFoldersTooltip": "{{ count }}文件夹邀请正在待定响应。",
     "Limit": "限制",
     "ModelStore": "模型店",
     "Models": "楷模",
@@ -281,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "行动",
+      "Allowed": "允许",
       "ClickFilebrowserButton": "要上传文件夹，请单击执行文件浏览器按钮。",
       "CreateANewFolder": "新建一个文件夹",
       "Created": "已创建",
@@ -414,6 +424,8 @@
       "View": "看法"
     },
     "invitation": {
+      "FailedToAcceptInvitation": "未能接受邀请",
+      "FailedToDeclineInvitation": "未能拒绝邀请",
       "FolderSharingNotAvailableToUser": "请求的用户无法共享文件夹：",
       "InvitationError": "邀请失败。用户可能已被邀请。",
       "Invited": "已成功邀请",
@@ -424,7 +436,10 @@
       "NoValidEmails": "没有输入有效的电子邮件",
       "Shared": "已成功共享群组文件夹",
       "SharingError": "分享失败。用户可能已被共享或不属于适当的项目。",
-      "SuccessfullyLeftSharedFolder": "成功离开共享文件夹"
+      "SuccessfullyAcceptedInvitation": "成功接受的邀请",
+      "SuccessfullyDeclinedInvitation": "成功拒绝了邀请",
+      "SuccessfullyLeftSharedFolder": "成功离开共享文件夹",
+      "UserIsAlreadyInvited": "{{email}}已经被邀请"
     },
     "modelStore": {
       "AddedItems": "添加的项目",
@@ -469,6 +484,10 @@
       "StatusOfSelectedHost": "选定主机的状态",
       "Used": "中古"
     }
+  },
+  "desktopNotification": {
+    "NotSupported": "该浏览器不支持通知。",
+    "PermissionDenied": "您否认通知访问。\n要使用警报，请在浏览器设置中允许它。"
   },
   "dialog": {
     "ErrorOccurred": "错误发生",
@@ -534,7 +553,9 @@
     "DescSignificantInstallTime": "此过程需要大量下载时间。",
     "Digest": "消化",
     "Disabled": "残疾",
+    "ErrorMinimumValue": "{{key}}必须至少为{{value}}",
     "FullImagePath": "完整图像路径",
+    "ImageReinstallationRequired": "需要恢复图像",
     "Images": "图片",
     "Install": "安装",
     "Installed": "已安装",
@@ -545,6 +566,7 @@
     "ManageApps": "管理应用程序",
     "ModifyImageResourceLimit": "修改图片资源限制",
     "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安装的映像，则需要重新安装该映像。</p><p>在重新安装映像之前，修改不会应用。\n\n</p>",
+    "ModifyMinimumImageResourceLimit": "修改最小图像资源限制",
     "Namespace": "命名空间",
     "NoChangeMade": "未作改动",
     "NoImageToDisplay": "无图像显示",
@@ -645,6 +667,7 @@
     "Manual": "手册",
     "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
     "NSelected": "{{count}}已选择",
+    "NavigateToDetailPage": "转至详细信息页面",
     "NewPassword": "新密码",
     "None": "无",
     "Password": "密码",
@@ -806,6 +829,7 @@
     "Password": "密码",
     "PasswordChanged": "密码修改成功",
     "PleaseInputLoginInfo": "请输入用户名和密码进行登录。",
+    "PleaseInputOTPCode": "请输入您的2FA代码以进行登录。",
     "PleaseWait": "请等待登录。",
     "SecretKey": "密钥",
     "SendChangePasswordEmail": "发送修改密码邮件",
@@ -1106,6 +1130,7 @@
     "MaxFolderCount": "最大文件夹数",
     "MaxNetworkCount": "最大网络数",
     "MaxPendingSessionCount": "最大待定会话计数",
+    "MaxPendingSessionResourceSlots": "最大待处理会话资源插槽",
     "MaxQuotaScopeSize": "最大配额范围大小 (GB)",
     "MaxSessionCountPerModelSession": "每个模型会话的最大会话计数",
     "MaxSessionLifetime": "会话寿命（秒）",
@@ -1154,7 +1179,7 @@
     "ResourcePresets": "资源预设",
     "Resources": "资源",
     "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存",
-    "SharedMemory": "共享内存 (GB)",
+    "SharedMemory": "共享内存",
     "Updated": "资源预设已更新"
   },
   "session": {
@@ -1163,6 +1188,7 @@
     "Agents": "代理商",
     "AllowedClientIps": "允许的客户端 IP",
     "AlreadyTerminatingSession": "已经终止会话。",
+    "AnotherUserSession": "此会话是由另一个用户创建的。",
     "Architecture": "建筑学",
     "Arguments": "参数",
     "AverageUsage": "avg",
@@ -1663,10 +1689,9 @@
       "Last12Hours": "最近12个小时",
       "Last3Hours": "最近3个小时",
       "Last7Days": "最近7天",
-      "LastDay": "最后一天"
-    },
-    "timeRanges": {
-      "LastHour": "最后1小时"
+      "LastDay": "最后一天",
+      "LastHour": "最后1小时",
+      "Today": "今天"
     }
   },
   "storageHost": {
@@ -1801,7 +1826,6 @@
     "BootstrapScriptDescription": "Bootstrap 脚本只会在会话创建后执行一次",
     "BootstrapScriptEmpty": "脚本是空的。\n请输入脚本。",
     "BootstrapScriptUpdated": "引导脚本已更新。",
-    "ClassicSessionLauncher": "Classic会话启动器",
     "ClearSSHKeypairInput": "书面 SSH 密钥对将被删除。你确定你要继续吗？",
     "ConfigFilename": "配置文件名",
     "CurrentSSHPublicKey": "当前公钥：",
@@ -1811,7 +1835,7 @@
     "DescAutomaticUpdateCheck": "发布新的 webui 版本时通知。 <br /> 在互联网不稳定或离线的情况下，此选项将自动关闭。您可以切换此开关以再次启动自动更新检查。",
     "DescBetaFeatures": "使用 Web UI 的测试版功能。 <br /> Beta 功能可能不稳定。某些测试版功能可能不会被采用为正式功能。",
     "DescClassicSessionLauncher": "使用 Classic 会话启动器而不是 NEO 会话启动器。 \nClassic 会话启动器可能不具有最新功能。",
-    "DescDesktopNotification": "打开或关闭桌面通知。 <br /> 如果开启，Backend.AI 也会使用操作系统内置的通知系统。关闭此选项不会影响 Web UI 中的通知。",
+    "DescDesktopNotification": "启用桌面通知。 \n<br />如果打开，Backend.ai也使用OS内置通知系统。\n关闭此选项不会影响Web UI中的通知。\n根据操作系统，桌面通知可能需要在系统设置中启用通知权限。",
     "DescExperimentalDashboard": "使用仪表板页面而不是摘要页面。",
     "DescKeepLoginSessionInformation": "下次让 webui 应用程序保留当前登录会话信息。 <br /> 如果关闭该选项，则每次注销时都会清除登录信息。",
     "DescLanguage": "设置接口语言。英语和韩文以外的语言将通过机器翻译提供。",
