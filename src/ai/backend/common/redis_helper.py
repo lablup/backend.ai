@@ -560,14 +560,13 @@ async def create_valkey_client(
         addresses.append(
             NodeAddress(host=str(redis_target.addr.host), port=int(redis_target.addr.port))
         )
-    sentinel_addresses: list[_HostPortPair] = []
-    match type(redis_target.sentinel):
-        case str():
-            sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
-                redis_target.sentinel
-            )
-        case list():
-            sentinel_addresses = redis_target.sentinel
+    sentinel_addresses: Sequence[_HostPortPair] = []
+    if isinstance(redis_target.sentinel, str):
+        sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
+            redis_target.sentinel
+        )
+    elif isinstance(redis_target.sentinel, list):
+        sentinel_addresses = redis_target.sentinel
     if sentinel_addresses:
         for address in sentinel_addresses:
             addresses.append(NodeAddress(host=str(address.host), port=int(address.port)))
