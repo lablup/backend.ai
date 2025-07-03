@@ -2174,11 +2174,7 @@ WhereClauseType: TypeAlias = (
 OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     perm for perm in VFolderRBACPermission
 ])
-ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
-    VFolderRBACPermission.READ_ATTRIBUTE,
-    VFolderRBACPermission.UPDATE_ATTRIBUTE,
-    VFolderRBACPermission.DELETE_VFOLDER,
-])
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
 MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,
