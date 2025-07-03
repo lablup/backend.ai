@@ -30,7 +30,7 @@ class PlainTextFilesUploader(WrapperTestTemplate):
         uploaded_files: list[UploadedFile] = []
 
         with tempfile.TemporaryDirectory() as upload_dir:
-            upload_root = Path(upload_dir)
+            upload_root = Path(upload_dir).resolve()
             upload_paths = []
 
             for upload_dep in upload_deps:
