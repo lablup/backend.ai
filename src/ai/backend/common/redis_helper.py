@@ -20,6 +20,7 @@ from typing import (
 
 import redis.exceptions
 import yarl
+from glide import GlideClient, GlideClientConfiguration, NodeAddress, ServerCredentials
 from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
@@ -28,6 +29,7 @@ from redis.retry import Retry
 
 from ai.backend.logging import BraceStyleAdapter
 
+from .types import HostPortPair as _HostPortPair
 from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -544,6 +546,55 @@ def get_redis_object(
             service_name=None,
             redis_helper_config=redis_helper_config,
         )
+
+
+async def create_valkey_client(
+    redis_target: RedisTarget,
+    *,
+    name: str,
+    db: int = 0,
+    pubsub_channels: Optional[set[str]] = None,
+) -> GlideClient:
+    addresses: list[NodeAddress] = []
+    if redis_target.addr:
+        addresses.append(
+            NodeAddress(host=str(redis_target.addr.host), port=int(redis_target.addr.port))
+        )
+    sentinel_addresses: Sequence[_HostPortPair] = []
+    if isinstance(redis_target.sentinel, str):
+        sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
+            redis_target.sentinel
+        )
+    elif isinstance(redis_target.sentinel, list):
+        sentinel_addresses = redis_target.sentinel
+    if sentinel_addresses:
+        for address in sentinel_addresses:
+            addresses.append(NodeAddress(host=str(address.host), port=int(address.port)))
+    credentials: Optional[ServerCredentials] = None
+    if redis_target.password:
+        credentials = ServerCredentials(
+            password=redis_target.password,
+        )
+    pubsub_subscriptions: Optional[GlideClientConfiguration.PubSubSubscriptions] = None
+    if pubsub_channels is not None:
+        pubsub_subscriptions = GlideClientConfiguration.PubSubSubscriptions(
+            channels_and_patterns={
+                GlideClientConfiguration.PubSubChannelModes.Exact: pubsub_channels,
+            },
+            callback=None,
+            context=None,
+        )
+    if not addresses:
+        raise ValueError("At least one Redis address is required to create a GlideClient.")
+    config = GlideClientConfiguration(
+        addresses,
+        credentials=credentials,
+        database_id=db,
+        client_name=name,
+        request_timeout=1_000,  # 1 second
+        pubsub_subscriptions=pubsub_subscriptions,
+    )
+    return await GlideClient.create(config)
 
 
 async def ping_redis_connection(redis_client: Redis) -> bool:

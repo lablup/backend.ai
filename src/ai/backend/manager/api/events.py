@@ -47,8 +47,8 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
-from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
-from ai.backend.common.events.types import EventDomain
+from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
+from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
@@ -184,12 +184,13 @@ async def push_background_task_events(
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     async with sse_response(request) as resp:
-        propagator = BgtaskPropagator(root_ctx.background_task_manager)
+        propagator = WithCachePropagator(root_ctx.event_fetcher)
         root_ctx.event_hub.register_event_propagator(
             propagator, [(EventDomain.BGTASK, str(task_id))]
         )
         try:
-            async for event in propagator.receive(task_id):
+            cache_id = EventCacheDomain.BGTASK.cache_id(task_id)
+            async for event in propagator.receive(cache_id):
                 user_event = event.user_event()
                 if user_event is None:
                     log.warning(
@@ -202,6 +203,12 @@ async def push_background_task_events(
                     event=user_event.event_name(),
                     retry=user_event.retry_count(),
                 )
+                if user_event.is_close_event():
+                    log.debug(
+                        "Received close event: {}",
+                        user_event.event_name(),
+                    )
+                    break
             await resp.send(dump_json_str({}), event="server_close")
         finally:
             root_ctx.event_hub.unregister_event_propagator(propagator.id())

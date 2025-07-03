@@ -24,9 +24,11 @@ from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFea
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
 )
+from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.hub.propagators.bgtask import BgtaskPropagator
+from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import (
+    EventCacheDomain,
     EventDomain,
 )
 from ai.backend.common.exception import (
@@ -210,6 +212,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class SessionServiceArgs:
     db: ExtendedAsyncSAEngine
     agent_registry: AgentRegistry
+    event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
     error_monitor: ErrorPluginContext
@@ -220,6 +223,7 @@ class SessionService:
     _db: ExtendedAsyncSAEngine
     _agent_registry: AgentRegistry
     _background_task_manager: BackgroundTaskManager
+    _event_fetcher: EventFetcher
     _event_hub: EventHub
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
@@ -233,6 +237,7 @@ class SessionService:
         self._db = args.db
         self._agent_registry = args.agent_registry
         self._event_hub = args.event_hub
+        self._event_fetcher = args.event_fetcher
         self._background_task_manager = args.background_task_manager
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
@@ -454,12 +459,13 @@ class SessionService:
                 extra_labels=image_labels,
             )
             bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-            propagator = BgtaskPropagator(self._background_task_manager)
+            propagator = WithCachePropagator(self._event_fetcher)
             self._event_hub.register_event_propagator(
                 propagator, [(EventDomain.BGTASK, str(bgtask_id))]
             )
             try:
-                async for event in propagator.receive(bgtask_id):
+                cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
+                async for event in propagator.receive(cache_id):
                     if not isinstance(event, BaseBgtaskDoneEvent):
                         log.warning("unexpected event: {}", event)
                         continue
@@ -491,12 +497,13 @@ class SessionService:
                     image_registry,
                 )
                 bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-                propagator = BgtaskPropagator(self._background_task_manager)
+                propagator = WithCachePropagator(self._event_fetcher)
                 self._event_hub.register_event_propagator(
                     propagator, [(EventDomain.BGTASK, str(bgtask_id))]
                 )
                 try:
-                    async for event in propagator.receive(bgtask_id):
+                    cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
+                    async for event in propagator.receive(cache_id):
                         if not isinstance(event, BaseBgtaskDoneEvent):
                             log.warning("unexpected event: {}", event)
                             continue

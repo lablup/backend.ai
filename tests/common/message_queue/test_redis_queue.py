@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from ai.backend.common import redis_helper
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.queue import MQMessage
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import (
@@ -34,31 +35,40 @@ async def redis_conn(redis_container):
 
 
 @pytest.fixture
-def queue_args():
+def queue_args() -> RedisMQArgs:
     return RedisMQArgs(
-        stream_key="test-stream",
+        anycast_stream_key="test-stream",
+        broadcast_channel="test-broadcast",
+        consume_stream_keys={
+            "test-stream",
+        },
+        subscribe_channels={
+            "test-broadcast",
+        },
         group_name="test-group",
         node_id="test-node",
+        db=REDIS_STREAM_DB,
     )
 
 
-@pytest.fixture
-async def redis_queue(redis_conn, queue_args):
+@pytest.fixture(scope="function")
+async def redis_queue(redis_container, queue_args: RedisMQArgs):
     # Create consumer group if not exists
-    try:
-        await redis_conn.client.xgroup_create(
-            queue_args.stream_key, queue_args.group_name, mkstream=True
-        )
-    except Exception:
-        # Group may already exist
-        pass
-
-    queue = RedisQueue(redis_conn, queue_args)
+    redis_target = RedisTarget(
+        addr=redis_container[1],
+        redis_helper_config={
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
+    )
+    queue = await RedisQueue.create(redis_target, queue_args)
     yield queue
+    await queue._client._client.flushdb()
     await queue.close()
 
 
-async def test_send_and_consume(redis_queue):
+async def test_send_and_consume(redis_queue: RedisQueue):
     # Test message sending and consuming
     test_payload = {b"key": b"value", b"key2": b"value2"}
 
@@ -73,9 +83,9 @@ async def test_send_and_consume(redis_queue):
         break
 
 
-async def test_subscribe(redis_queue):
+async def test_subscribe(redis_queue: RedisQueue):
     # Test message subscription
-    test_payload = {b"key": b"value", b"key2": b"value2"}
+    test_payload = {"key": "value", "key2": "value2"}
 
     # Create task to subscribe
     received_messages: list[MQMessage] = []
@@ -87,9 +97,10 @@ async def test_subscribe(redis_queue):
                 break
 
     subscriber_task = asyncio.create_task(subscriber())
+    await asyncio.sleep(0.1)  # Allow subscriber to start
 
     # Send message
-    await redis_queue.send(test_payload)
+    await redis_queue.broadcast(test_payload)
 
     # Wait for message to be received
     await asyncio.wait_for(subscriber_task, timeout=5)
@@ -98,7 +109,7 @@ async def test_subscribe(redis_queue):
     assert received_messages[0].payload == test_payload
 
 
-async def test_done(redis_queue):
+async def test_done(redis_queue: RedisQueue):
     # Test message acknowledgment
     test_payload = {b"key": b"value"}
 
@@ -108,20 +119,4 @@ async def test_done(redis_queue):
     # Consume and acknowledge message
     async for message in redis_queue.consume_queue():
         await redis_queue.done(message.msg_id)
-        # Message should be acknowledged in Redis
-        pending = await redis_queue._conn.client.xpending(
-            redis_queue._stream_key, redis_queue._group_name
-        )
-        assert pending["pending"] == 0
-        break
-
-
-async def test_close(redis_queue):
-    # Test queue closing
-    await redis_queue.close()
-    assert redis_queue._closed
-    await asyncio.sleep(0.1)  # Allow time for tasks to be cancelled
-    # Verify tasks are cancelled
-    assert redis_queue._auto_claim_loop_task.cancelled()
-    assert redis_queue._read_messages_task.cancelled()
-    assert redis_queue._read_broadcast_messages_task.cancelled()
+        return

@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import os
 from typing import Optional, Self
 
@@ -388,6 +389,76 @@ class ActionMetricObserver:
             domain=error_code.domain if error_code else "",
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
+        ).observe(duration)
+
+
+class ClientType(enum.StrEnum):
+    VALKEY = "valkey"
+
+
+class ClientMetricObserver:
+    _instance: Optional[Self] = None
+
+    _client_operation_triggered_count: Gauge
+    _client_operation_count: Counter
+    _client_operation_duration_sec: Histogram
+
+    def __init__(self) -> None:
+        self._client_operation_triggered_count = Gauge(
+            name="backendai_client_operation_triggered_count",
+            documentation="Number of client operations triggered",
+            labelnames=["client_type", "operation"],
+        )
+        self._client_operation_count = Counter(
+            name="backendai_client_operation_count",
+            documentation="Total number of client operations",
+            labelnames=["client_type", "operation", "success"],
+        )
+        self._client_operation_duration_sec = Histogram(
+            name="backendai_client_operation_duration_sec",
+            documentation="Duration of client operations in seconds",
+            labelnames=["client_type", "operation", "success"],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_client_operation_triggered(
+        self,
+        *,
+        client_type: ClientType,
+        operation: str,
+    ) -> None:
+        self._client_operation_triggered_count.labels(
+            client_type=client_type,
+            operation=operation,
+        ).inc()
+
+    def observe_client_operation(
+        self,
+        *,
+        client_type: ClientType,
+        operation: str,
+        success: bool,
+        duration: float,
+    ) -> None:
+        self._client_operation_triggered_count.labels(
+            client_type=client_type,
+            operation=operation,
+        ).dec()  # Decrement the triggered count since the operation is now complete
+        self._client_operation_count.labels(
+            client_type=client_type,
+            operation=operation,
+            success=str(success),
+        ).inc()
+        self._client_operation_duration_sec.labels(
+            client_type=client_type,
+            operation=operation,
+            success=str(success),
         ).observe(duration)
 
 
