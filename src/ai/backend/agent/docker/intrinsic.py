@@ -101,12 +101,14 @@ async def netstat_ns(ns_path: Path):
         is_daemon = False
 
     if is_daemon:
-        # We're in a daemon process, run directly in thread pool
-        # This is less safe but works as a fallback
         result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
         return result
-    with ProcessPoolExecutor(max_workers=1) as executor:
-        result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
+    try:
+        with ProcessPoolExecutor(max_workers=1) as executor:
+            result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
+    except AssertionError:
+        # We're in a daemon process, run directly in thread pool
+        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
     return result
 
 
