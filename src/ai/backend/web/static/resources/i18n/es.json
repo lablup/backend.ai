@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Acciones",
+      "Allowed": "Permitido",
       "ClickFilebrowserButton": "Para cargar carpetas, haga clic en el botón Ejecutar explorador de archivos.",
       "CreateANewFolder": "Crear una nueva carpeta",
       "Created": "Creado",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "Número máximo de carpetas",
     "MaxNetworkCount": "Recuento máximo de red",
     "MaxPendingSessionCount": "Recuento de sesión pendiente máximo",
+    "MaxPendingSessionResourceSlots": "MAX PENDO PENDAS DE RECURSOS DE RECURSOS DE SESIÓN",
     "MaxQuotaScopeSize": "Tamaño máximo del alcance de la cuota (GB)",
     "MaxSessionCountPerModelSession": "Recuento máximo de sesiones por sesión de modelo",
     "MaxSessionLifetime": "Duración de la sesión (seg.)",

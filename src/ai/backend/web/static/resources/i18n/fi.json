@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Toimet",
+      "Allowed": "Sallittu",
       "ClickFilebrowserButton": "Lataa kansio(t) napsauttamalla Execute filebrowser-painiketta.",
       "CreateANewFolder": "Luo uusi kansio",
       "Created": "Luotu",
@@ -1128,6 +1129,7 @@
     "MaxFolderCount": "Kansioiden enimmäismäärä",
     "MaxNetworkCount": "Verkkojen enimmäismäärä",
     "MaxPendingSessionCount": "Maxin vireillä oleva istuntomäärä",
+    "MaxPendingSessionResourceSlots": "Max odottavat istunnon resurssipaikat",
     "MaxQuotaScopeSize": "Kiintiön enimmäiskoko (GB)",
     "MaxSessionCountPerModelSession": "Maksimi istuntojen määrä malliistuntoa kohti",
     "MaxSessionLifetime": "Istunnon kesto (sek.)",

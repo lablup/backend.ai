@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "行动",
+      "Allowed": "允许",
       "ClickFilebrowserButton": "要上传文件夹，请单击执行文件浏览器按钮。",
       "CreateANewFolder": "新建一个文件夹",
       "Created": "已创建",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "最大文件夹数",
     "MaxNetworkCount": "最大网络数",
     "MaxPendingSessionCount": "最大待定会话计数",
+    "MaxPendingSessionResourceSlots": "最大待处理会话资源插槽",
     "MaxQuotaScopeSize": "最大配额范围大小 (GB)",
     "MaxSessionCountPerModelSession": "每个模型会话的最大会话计数",
     "MaxSessionLifetime": "会话寿命（秒）",

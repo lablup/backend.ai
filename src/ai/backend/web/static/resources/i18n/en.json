@@ -292,6 +292,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Actions",
+      "Allowed": "Allowed",
       "ClickFilebrowserButton": "To upload Folder(s), Please click Execute filebrowser button.",
       "CreateANewFolder": "Create a new folder",
       "Created": "Created",
@@ -1133,6 +1134,7 @@
     "MaxFolderCount": "Max Folder Count",
     "MaxNetworkCount": "Max Network Count",
     "MaxPendingSessionCount": "Max Pending Session Count",
+    "MaxPendingSessionResourceSlots": "Max Pending Session Resource Slots",
     "MaxQuotaScopeSize": "Max Quota Scope Size (GB)",
     "MaxSessionCountPerModelSession": "Max Session Count Per Model Session",
     "MaxSessionLifetime": "Session Lifetime (sec.)",

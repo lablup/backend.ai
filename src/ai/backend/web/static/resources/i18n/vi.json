@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Hành động",
+      "Allowed": "Cho phép",
       "ClickFilebrowserButton": "Để tải lên (các) Thư mục, Vui lòng nhấp vào nút Thực thi trình duyệt tệp.",
       "CreateANewFolder": "Tạo một thư mục mới",
       "Created": "Tạo",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "Số lượng thư mục tối đa",
     "MaxNetworkCount": "Số lượng mạng tối đa",
     "MaxPendingSessionCount": "Số lượng phiên đang chờ xử lý tối đa",
+    "MaxPendingSessionResourceSlots": "Các khe cắm tài nguyên phiên đang chờ xử lý tối đa",
     "MaxQuotaScopeSize": "Kích thước phạm vi hạn ngạch tối đa (GB)",
     "MaxSessionCountPerModelSession": "Số phiên tối đa trên mỗi phiên mô hình",
     "MaxSessionLifetime": "Thời gian tồn tại của phiên (giây)",
