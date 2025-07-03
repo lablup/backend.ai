@@ -273,6 +273,16 @@ class MovingStatistics:
             "version": 2,
         }
 
+    def __str__(self) -> str:
+        return str({
+            "min": self.min,
+            "max": self.max,
+            "sum": self.sum,
+            "avg": self.avg,
+            "diff": self.diff,
+            "rate": self.rate,
+        })
+
 
 @attrs.define(auto_attribs=True, slots=True)
 class Metric:
@@ -475,7 +485,7 @@ class StatContext:
                     metric_value = obj.to_serializable_dict()
                 except ValueError:
                     log.warning(
-                        "Failed to serialize metric (Device Id: {}, {})", device_id, obj.stats
+                        "Failed to serialize metric (Device Id: {}, {})", device_id, str(obj.stats)
                     )
                     continue
                 device_metrics[metric_key][device_id] = metric_value
@@ -500,7 +510,9 @@ class StatContext:
             try:
                 node_metrics[key] = obj.to_serializable_dict()
             except ValueError:
-                log.warning("Failed to serialize node metric (Metric key: {}, {})", key, obj.stats)
+                log.warning(
+                    "Failed to serialize node metric (Metric key: {}, {})", key, str(obj.stats)
+                )
                 continue
 
         redis_agent_updates = {
@@ -652,7 +664,9 @@ class StatContext:
                 try:
                     metric_value = obj.to_serializable_dict()
                 except ValueError:
-                    log.warning("Failed to serialize metric (Metric key: {}, {})", key, obj.stats)
+                    log.warning(
+                        "Failed to serialize metric (Metric key: {}, {})", key, str(obj.stats)
+                    )
                     continue
                 serializable_metrics[key] = metric_value
                 value_pairs = [
@@ -824,7 +838,9 @@ class StatContext:
                             try:
                                 serializable_metrics[str(key)] = obj.to_serializable_dict()
                             except ValueError:
-                                log.warning("Failed to serialize metric {}: {}", key, obj.stats)
+                                log.warning(
+                                    "Failed to serialize metric {}: {}", key, str(obj.stats)
+                                )
                                 continue
                         serializable_table[pid] = serializable_metrics
                     if self.agent.local_config["debug"]["log-stats"]:
