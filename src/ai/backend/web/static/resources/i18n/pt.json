@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Ações",
+      "Allowed": "Permitido",
       "ClickFilebrowserButton": "Para fazer o upload da (s) pasta (s), clique no botão Executar o navegador de arquivos.",
       "CreateANewFolder": "Criar uma nova pasta",
       "Created": "Criada",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "Contagem máxima de pastas",
     "MaxNetworkCount": "Contagem máxima de rede",
     "MaxPendingSessionCount": "Contagem máxima de sessão pendente",
+    "MaxPendingSessionResourceSlots": "Slots de recurso de sessão pendente máximo",
     "MaxQuotaScopeSize": "Tamanho máximo do escopo da cota (GB)",
     "MaxSessionCountPerModelSession": "Contagem máxima de sessões por sessão de modelo",
     "MaxSessionLifetime": "Tempo de vida da sessão (seg.)",

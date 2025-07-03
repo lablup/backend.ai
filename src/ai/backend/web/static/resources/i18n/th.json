@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "รหัสขอบเขตโควตาผู้ใช้",
     "explorer": {
       "Actions": "การดำเนินการ",
+      "Allowed": "อนุญาต",
       "ClickFilebrowserButton": "หากต้องการอัปโหลดโฟลเดอร์ กรุณาคลิกปุ่มเรียกใช้เบราว์เซอร์ไฟล์",
       "CreateANewFolder": "สร้างโฟลเดอร์ใหม่",
       "Created": "สร้างเมื่อ",
@@ -1118,6 +1119,7 @@
     "MaxFolderCount": "จำนวนโฟลเดอร์สูงสุด",
     "MaxNetworkCount": "จำนวนเครือข่ายสูงสุด",
     "MaxPendingSessionCount": "จำนวนเซสชันที่ค้างอยู่สูงสุด",
+    "MaxPendingSessionResourceSlots": "ช่องทรัพยากรเซสชันที่รออยู่สูงสุด",
     "MaxQuotaScopeSize": "ขนาดขอบเขตโควตาสูงสุด (GB)",
     "MaxSessionCountPerModelSession": "จำนวนเซสชันสูงสุดต่อเซสชันโมเดล",
     "MaxSessionLifetime": "อายุการใช้งานเซสชันสูงสุด (วินาที)",

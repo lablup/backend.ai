@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Hareketler",
+      "Allowed": "İzin verilmiş",
       "ClickFilebrowserButton": "Klasör(ler)i yüklemek için lütfen Dosya tarayıcıyı çalıştır düğmesini tıklayın.",
       "CreateANewFolder": "Yeni bir klasör oluştur",
       "Created": "oluşturuldu",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "Maksimum Klasör Sayısı",
     "MaxNetworkCount": "Maksimum Ağ Sayısı",
     "MaxPendingSessionCount": "Max bekleyen oturum sayısı",
+    "MaxPendingSessionResourceSlots": "Max Bekleyen Oturum Kaynak Yuvaları",
     "MaxQuotaScopeSize": "Maksimum Kota Kapsamı Boyutu (GB)",
     "MaxSessionCountPerModelSession": "Model Oturumu Başına Maksimum Oturum Sayısı",
     "MaxSessionLifetime": "Oturum Ömrü (sn.)",

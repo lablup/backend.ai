@@ -290,6 +290,7 @@
     "UserQuotaScopeId": "Quota Scope ID",
     "explorer": {
       "Actions": "Actions",
+      "Allowed": "Autorisé",
       "ClickFilebrowserButton": "Pour télécharger le(s) dossier(s), veuillez cliquer sur le bouton Exécuter le navigateur de fichiers.",
       "CreateANewFolder": "Créer un nouveau dossier",
       "Created": "Créé",
@@ -1129,6 +1130,7 @@
     "MaxFolderCount": "Nombre maximum de dossiers",
     "MaxNetworkCount": "Nombre maximum de réseaux",
     "MaxPendingSessionCount": "Compte de session en attente maximum",
+    "MaxPendingSessionResourceSlots": "Emplacements de ressources de session en attente maximale",
     "MaxQuotaScopeSize": "Taille maximale de la portée du quota (Go)",
     "MaxSessionCountPerModelSession": "Nombre maximum de sessions par session de modèle",
     "MaxSessionLifetime": "Durée de vie de la session (sec.)",
