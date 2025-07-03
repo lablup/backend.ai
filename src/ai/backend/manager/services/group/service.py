@@ -326,29 +326,36 @@ class GroupService:
         from ai.backend.manager.models.endpoint import EndpointRow
         from ai.backend.manager.models.routing import RoutingRow
 
-        endpoint_ids = (
-            await db_conn.scalars(sa.select(EndpointRow.id).where(EndpointRow.project == group_id))
-        ).all()
-        if len(endpoint_ids) == 0:
-            return
-
-        active_endpoints = (
-            await db_conn.scalars(
-                sa.select(EndpointRow.id).where(
-                    (EndpointRow.project == group_id)
-                    & (
-                        EndpointRow.lifecycle_stage
-                        in (EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING)
-                    )
-                )
+        endpoints = (
+            await db_conn.execute(
+                sa.select(
+                    EndpointRow.id,
+                    sa.case(
+                        (
+                            EndpointRow.lifecycle_stage.in_([
+                                EndpointLifecycle.CREATED,
+                                EndpointLifecycle.DESTROYING,
+                            ]),
+                            True,
+                        ),
+                        else_=False,
+                    ).label("is_active"),
+                ).where(EndpointRow.project == group_id)
             )
         ).all()
+
+        if len(endpoints) == 0:
+            return
+
+        active_endpoints = [ep.id for ep in endpoints if ep.is_active]
         if len(active_endpoints) > 0:
             log.error(
-                f"Cannot delete group {group_id} because it has active endpoints {active_endpoints}. Please delete the endpoints first."
+                f"Cannot delete group {group_id} because it has active endpoints {active_endpoints}. "
+                "Please delete the endpoints first."
             )
             raise PurgeGroupActionActiveEndpointsError()
 
+        endpoint_ids = [ep.id for ep in endpoints]
         deleted_sessions = await db_conn.execute(
             sa.delete(SessionRow).where(
                 SessionRow.id.in_(
