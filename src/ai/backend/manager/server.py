@@ -318,11 +318,14 @@ def _debug_error_response(
 ) -> web.StreamResponse:
     error_type = ""
     error_title = ""
+    error_message = "Internal server error"
     status_code = 500
     error_code = ErrorCode.default()
     if isinstance(e, BackendError):
         error_type = e.error_type
         error_title = e.error_title
+        if e.extra_msg:
+            error_message = e.extra_msg
         status_code = e.status_code
         error_code = e.error_code()
 
@@ -331,7 +334,8 @@ def _debug_error_response(
             "type": error_type,
             "title": error_title,
             "error_code": str(error_code),
-            "msg": traceback.format_exc(),
+            "msg": error_message,
+            "traceback": traceback.format_exc(),
         },
         status=status_code,
         dumps=dump_json_str,
