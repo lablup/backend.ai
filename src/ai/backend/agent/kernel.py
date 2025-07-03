@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import codecs
 import io
+import json
 import logging
 import math
 import os
@@ -52,7 +53,7 @@ from ai.backend.common.events.event_types.kernel.types import (
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
 )
-from ai.backend.common.json import dump_json, load_json
+from ai.backend.common.json import load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -115,6 +116,10 @@ default_client_features = frozenset({
 })
 default_api_version = 4
 RUN_ID_FOR_BATCH_JOB = "batch-job"  # TODO: Deprecate usage of run-id
+
+
+def _dump_json_bytes(obj: Any) -> bytes:
+    return json.dumps(obj).encode("utf-8")
 
 
 class RunEvent(Exception):
@@ -768,7 +773,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             "type": evdata.type,
             "data": evdata.data,
         }
-        await sock.send_multipart([b"event", dump_json(data)])
+        await sock.send_multipart([b"event", _dump_json_bytes(data)])
 
     async def feed_interrupt(self):
         sock = await self._get_socket_pair()
@@ -792,7 +797,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         payload.update(opts)
         await sock.send_multipart([
             b"complete",
-            dump_json(payload),
+            _dump_json_bytes(payload),
         ])
         try:
             result = await self.completion_queue.get()
@@ -805,7 +810,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-model-service",
-            dump_json(model_info),
+            _dump_json_bytes(model_info),
         ])
         if health_check_info := model_info.get("service", {}).get("health_check"):
             timeout_seconds = (
@@ -827,7 +832,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
-            dump_json(service_info),
+            _dump_json_bytes(service_info),
         ])
         try:
             with timeout(10):
@@ -843,7 +848,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"shutdown-service",
-            dump_json(service_name),
+            _dump_json_bytes(service_name),
         ])
 
     async def feed_service_apps(self):
