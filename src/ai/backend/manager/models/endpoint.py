@@ -74,7 +74,7 @@ from .image import ImageRow
 from .routing import RouteStatus
 from .scaling_group import scaling_groups
 from .user import UserRow
-from .vfolder import VFolderRow, prepare_vfolder_mounts
+from .vfolder import prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.model_serving.types import EndpointTokenData
@@ -84,7 +84,7 @@ if TYPE_CHECKING:
 __all__ = (
     "EndpointRow",
     "EndpointLifecycle",
-    "ModelServicePredicateChecker",
+    "ModelServiceHelper",
     "EndpointStatistics",
     "EndpointTokenRow",
     "EndpointAutoScalingRuleRow",
@@ -724,7 +724,7 @@ class EndpointAutoScalingRuleRow(Base):
         await session.delete(self)
 
 
-class ModelServicePredicateChecker:
+class ModelServiceHelper:
     @staticmethod
     async def check_scaling_group(
         conn: AsyncConnection,
@@ -851,54 +851,55 @@ class ModelServicePredicateChecker:
             return await storage_resp.json()
 
     @staticmethod
-    async def validate_model_definition(
+    async def validate_model_definition_file_exists(
         storage_manager: StorageSessionManager,
-        model_vfolder_row: VFolderRow | Mapping[str, Any],
-        model_definition_path: str | None,
-    ) -> str | None:
+        folder_host: str,
+        vfid: VFolderID,
+        suggested_path: str | None,
+    ) -> str:
         """
-        Checks if model definition YAML exists and is syntactically perfect.
-        Returns relative path to customized model-definition.yaml (if any) or None.
+        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
+        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function ensures
+        at least one model definition file exists under the target VFolder and returns the matched filename.
         """
-        match model_vfolder_row:
-            case VFolderRow():
-                folder_name = model_vfolder_row.name
-                vfid = model_vfolder_row.vfid
-                folder_host = model_vfolder_row.host
-            case _:
-                folder_name = model_vfolder_row["name"]
-                vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
-                folder_host = model_vfolder_row["host"]
-
         proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
 
-        if model_definition_path:
-            path = Path(model_definition_path)
-            storage_reply = await ModelServicePredicateChecker._listdir(
+        if suggested_path:
+            path = Path(suggested_path)
+            storage_reply = await ModelServiceHelper._listdir(
                 storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
             )
             for item in storage_reply["items"]:
                 if item["name"] == path.name:
-                    yaml_name = model_definition_path
-                    break
+                    return suggested_path
             else:
                 raise InvalidAPIParameters(
-                    f"Model definition YAML file {model_definition_path} not found inside the model storage"
+                    f"Model definition YAML file {suggested_path} not found inside the model storage"
                 )
         else:
-            storage_reply = await ModelServicePredicateChecker._listdir(
+            storage_reply = await ModelServiceHelper._listdir(
                 storage_manager, proxy_name, volume_name, vfid, "."
             )
             model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
             for item in storage_reply["items"]:
                 if item["name"] in model_definition_candidates:
-                    yaml_name = item["name"]
-                    break
+                    return item["name"]
             else:
                 raise InvalidAPIParameters(
                     'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
                 )
 
+    @staticmethod
+    async def _read_model_definition(
+        storage_manager: StorageSessionManager,
+        folder_host: str,
+        vfid: VFolderID,
+        model_definition_filename: str,
+    ) -> dict[str, Any]:
+        """
+        Reads specified model definition file from target VFolder and returns
+        """
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
         chunks = bytes()
         async with storage_manager.request(
             proxy_name,
@@ -907,7 +908,7 @@ class ModelServicePredicateChecker:
             json={
                 "volume": volume_name,
                 "vfid": str(vfid),
-                "relpath": f"./{yaml_name}",
+                "relpath": f"./{model_definition_filename}",
             },
         ) as (client_api_url, storage_resp):
             while True:
@@ -917,19 +918,36 @@ class ModelServicePredicateChecker:
                 chunks += chunk
         model_definition_yaml = chunks.decode("utf-8")
         yaml = YAML()
-        model_definition_dict = yaml.load(model_definition_yaml)
+        return yaml.load(model_definition_yaml)
+
+    @staticmethod
+    async def validate_model_definition(
+        storage_manager: StorageSessionManager,
+        folder_host: str,
+        vfid: VFolderID,
+        model_definition_path: str,
+    ) -> dict[str, Any]:
+        """
+        Checks if model definition YAML exists and is syntactically perfect.
+        Returns validated model definition configuration.
+        """
+        raw_model_definition = await ModelServiceHelper._read_model_definition(
+            storage_manager,
+            folder_host,
+            vfid,
+            model_definition_path,
+        )
+
         try:
-            model_definition = model_definition_iv.check(model_definition_dict)
+            model_definition = model_definition_iv.check(raw_model_definition)
             assert model_definition is not None
+            return model_definition
         except t.DataError as e:
             raise InvalidAPIParameters(
-                f"Failed to validate model definition from vFolder {folder_name} (ID"
-                f" {vfid.folder_id}): {e}",
+                f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",
             ) from e
         except YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
-
-        return yaml_name
 
 
 class EndpointStatistics:
