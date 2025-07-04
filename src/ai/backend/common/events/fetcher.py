@@ -18,7 +18,7 @@ class EventFetcher:
         Fetch a cached event from the message queue.
         Returns None if no cached event is found.
         """
-        raw_event = await self._msg_queue.fetch_cached_broadcast_message(cache_id)
-        if raw_event is None:
+        message_payload = await self._msg_queue.fetch_cached_broadcast_message(cache_id)
+        if message_payload is None:
             return None
-        return AbstractBroadcastEvent.deserialize_from_wrapper(raw_event)
+        return AbstractBroadcastEvent.deserialize_from_wrapper(message_payload)

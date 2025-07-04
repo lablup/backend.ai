@@ -4,8 +4,8 @@ import pytest
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
-from ai.backend.common.message_queue.queue import MQMessage
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
+from ai.backend.common.message_queue.types import MQMessage
 from ai.backend.common.types import (
     RedisHelperConfig,
     RedisTarget,

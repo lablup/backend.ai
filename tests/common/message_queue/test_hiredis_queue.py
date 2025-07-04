@@ -3,8 +3,8 @@ import asyncio
 import pytest
 
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
-from ai.backend.common.message_queue.queue import BroadcastMessage, MQMessage
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs
+from ai.backend.common.message_queue.types import BroadcastMessage, MQMessage
 from ai.backend.common.redis_client import RedisConnection
 from ai.backend.common.types import (
     RedisHelperConfig,

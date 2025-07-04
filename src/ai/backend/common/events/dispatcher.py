@@ -29,7 +29,13 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
-from ai.backend.common.message_queue.queue import AbstractMessageQueue, BroadcastMessage, MessageId
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import (
+    BroadcastMessage,
+    MessageId,
+    MessagePayload,
+    MQMessage,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import msgpack
@@ -585,17 +591,17 @@ class EventDispatcher(EventDispatcherGroup):
         async for msg in self._msg_queue.consume_queue():  # type: ignore
             if self._closed:
                 return
-            decoded_event_name = msg.payload[b"name"].decode()
+            mq_msg = cast(MQMessage, msg)
+            msg_payload = MessagePayload.from_anycast(mq_msg.payload)
             post_callback = _ConsumerPostCallback(
                 msg.msg_id,
                 self._msg_queue,
-                len(self._consumers[decoded_event_name]),
+                len(self._consumers[msg_payload.name]),
             )
-
             await self.dispatch_consumers(
-                decoded_event_name,
-                AgentId(msg.payload[b"source"].decode()),
-                msgpack.unpackb(msg.payload[b"args"]),
+                msg_payload.name,
+                AgentId(msg_payload.source),
+                msg_payload.args,
                 [post_callback],
             )
 
@@ -605,12 +611,11 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             msg = cast(BroadcastMessage, msg)
-            args_bytes = base64.b64decode(msg.payload["args"])
-            args = msgpack.unpackb(args_bytes)
+            msg_payload = MessagePayload.from_broadcast(msg.payload)
             await self.dispatch_subscribers(
-                msg.payload["name"],
-                AgentId(msg.payload["source"]),
-                args,
+                msg_payload.name,
+                AgentId(msg_payload.source),
+                msg_payload.args,
             )
 
 

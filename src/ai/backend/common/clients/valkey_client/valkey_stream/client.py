@@ -340,7 +340,7 @@ class ValkeyStreamClient(ValkeyClient):
         self,
         channel: str,
         cache_id: str,
-        payload: Mapping[str, Any],
+        payload: Mapping[str, str],
         timeout: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -365,17 +365,18 @@ class ValkeyStreamClient(ValkeyClient):
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
-    ) -> Optional[Mapping[bytes, bytes]]:
+    ) -> Optional[Mapping[str, str]]:
         """
         Fetch a cached broadcast message by its ID.
 
         :param cache_id: The ID of the cached message.
         :return: The cached message payload or None if not found.
         """
-        result = await self._client.hgetall(cache_id)
+        result = await self._client.get(cache_id)
         if not result:
             return None
-        return result
+        payload = load_json(result)
+        return cast(Mapping[str, str], payload)
 
     @valkey_decorator()
     async def receive_broadcast_message(
