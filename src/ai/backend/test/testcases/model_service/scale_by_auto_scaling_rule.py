@@ -1,4 +1,5 @@
 import asyncio
+from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import override
 from uuid import UUID
@@ -23,9 +24,10 @@ from ai.backend.test.utils.exceptions import DependencyNotSet, UnexpectedFailure
 
 _METRIC_COLLECTION_TIMEOUT = 120
 _SCALE_TIMEOUT = 30
+_CONTAINER_METRIC_COLLECTION_INTERVAL = 5  # seconds
 
 
-class ScaleOutByCPUAutoScalingRule(TestCode):
+class _CPUAutoScalingRuleTestBase(TestCode, ABC):
     @override
     async def test(self) -> None:
         endpoint_meta = CreatedModelServiceEndpointMetaContext.current()
@@ -34,9 +36,154 @@ class ScaleOutByCPUAutoScalingRule(TestCode):
         model_service_dep = ModelServiceContext.current()
         auto_scaling_rule = AutoScalingRuleContext.current()
         cluster_config = ClusterContext.current()
+
         if auto_scaling_rule is None:
             raise DependencyNotSet("AutoScalingRuleContext must be set in ModelServiceContext")
 
+        await self._validate_replica_configuration(model_service_dep, auto_scaling_rule)
+
+        target_replicas = self._get_target_replicas(auto_scaling_rule)
+        session_ids = await self._get_session_ids(client_session, service_id)
+
+        await self._execute_cpu_task(client_session, session_ids)
+
+        await asyncio.wait_for(
+            self._wait_until_cpu_threshold_condition(
+                client_session,
+                session_ids,
+                cluster_config.cluster_size,
+                threshold=Decimal(auto_scaling_rule.threshold),
+            ),
+            timeout=_METRIC_COLLECTION_TIMEOUT,
+        )
+
+        vfolder_id = await client_session.VFolder(
+            name=model_service_dep.model_vfolder_name
+        ).get_id()
+        await asyncio.wait_for(
+            wait_until_all_inference_sessions_ready(
+                client_session,
+                service_id,
+                target_replicas,
+                vfolder_id,
+            ),
+            timeout=_SCALE_TIMEOUT,
+        )
+
+        await self._verify_scaling_result(client_session, service_id, target_replicas)
+
+    async def _get_session_ids(self, client_session: AsyncSession, service_id: UUID) -> list[UUID]:
+        result = await client_session.Service(service_id).info()
+        active_routes = result["active_routes"]
+        return [route["session_id"] for route in active_routes]
+
+    async def _get_cpu_utilization_metrics(
+        self,
+        client_session: AsyncSession,
+        session_ids: list[UUID],
+    ) -> list[float]:
+        cpu_utils = []
+        for session_id in session_ids:
+            kernels = await client_session.ComputeSession.from_session_id(session_id).detail(
+                fields=(
+                    session_node_fields["id"],
+                    create_connection_field("kernel_nodes", (kernel_node_fields["live_stat"],)),  # type: ignore
+                )
+            )
+            kernels_info = kernels["kernels"]
+
+            for kernel in kernels_info:
+                if kernel["live_stat"] is None:
+                    break
+                live_stat = orjson.loads(kernel["live_stat"])
+                cpu_utils.append(float(live_stat.get("cpu_util", {}).get("pct", 0.0)))
+
+        return cpu_utils
+
+    async def _verify_scaling_result(
+        self, client_session: AsyncSession, service_id: UUID, expected_replicas: int
+    ) -> None:
+        result = await client_session.Service(service_id).info()
+        assert result["replicas"] == expected_replicas, (
+            f"Expected replicas count: {expected_replicas}, actual: {result['replicas']}"
+        )
+        assert result["desired_session_count"] == expected_replicas, (
+            f"Expected desired session count: {expected_replicas}, "
+            f"actual: {result['desired_session_count']}"
+        )
+
+    @abstractmethod
+    async def _validate_replica_configuration(self, model_service_dep, auto_scaling_rule) -> None:
+        raise NotImplementedError(
+            "Subclasses must implement _validate_replica_configuration method."
+        )
+
+    @abstractmethod
+    def _get_target_replicas(self, auto_scaling_rule) -> int:
+        raise NotImplementedError("Subclasses must implement _get_target_replicas method.")
+
+    @abstractmethod
+    async def _execute_cpu_task(
+        self, client_session: AsyncSession, session_ids: list[UUID]
+    ) -> None:
+        raise NotImplementedError("Subclasses must implement _execute_cpu_task method.")
+
+    @abstractmethod
+    async def _wait_until_cpu_threshold_condition(
+        self,
+        client_session: AsyncSession,
+        session_ids: list[UUID],
+        cluster_size: int,
+        threshold: Decimal,
+    ) -> None:
+        raise NotImplementedError(
+            "Subclasses must implement _wait_until_cpu_threshold_condition method."
+        )
+
+
+class ScaleInByCPUAutoScalingRule(_CPUAutoScalingRuleTestBase):
+    async def _validate_replica_configuration(self, model_service_dep, auto_scaling_rule) -> None:
+        min_replicas = auto_scaling_rule.min_replicas
+        if min_replicas is None:
+            raise DependencyNotSet("AutoScalingRuleContext.min_replicas must be set")
+
+        if model_service_dep.replicas <= min_replicas:
+            raise UnexpectedFailure(
+                "ModelServiceContext.replicas must be greater than min_replicas. Check test configuration."
+            )
+
+    def _get_target_replicas(self, auto_scaling_rule) -> int:
+        return auto_scaling_rule.min_replicas
+
+    async def _execute_cpu_task(
+        self, client_session: AsyncSession, session_ids: list[UUID]
+    ) -> None:
+        for session_id in session_ids:
+            await client_session.ComputeSession.from_session_id(session_id).interrupt()
+
+    async def _wait_until_cpu_threshold_condition(
+        self,
+        client_session: AsyncSession,
+        session_ids: list[UUID],
+        cluster_size: int,
+        threshold: Decimal,
+    ) -> None:
+        while True:
+            cpu_utils = await self._get_cpu_utilization_metrics(client_session, session_ids)
+
+            if len(cpu_utils) != (cluster_size * len(session_ids)):
+                await asyncio.sleep(_CONTAINER_METRIC_COLLECTION_INTERVAL)
+                continue
+
+            avg_cpu_util = sum(cpu_utils) / len(cpu_utils)
+            if avg_cpu_util <= threshold:
+                break
+
+            await asyncio.sleep(_CONTAINER_METRIC_COLLECTION_INTERVAL)
+
+
+class ScaleOutByCPUAutoScalingRule(_CPUAutoScalingRuleTestBase):
+    async def _validate_replica_configuration(self, model_service_dep, auto_scaling_rule) -> None:
         max_replicas = auto_scaling_rule.max_replicas
         if max_replicas is None:
             raise DependencyNotSet("AutoScalingRuleContext.max_replicas must be set")
@@ -46,68 +193,28 @@ class ScaleOutByCPUAutoScalingRule(TestCode):
                 "ModelServiceContext.replicas must be less than max_replicas. Check test configuration."
             )
 
-        vfolder_id = await client_session.VFolder(
-            name=model_service_dep.model_vfolder_name
-        ).get_id()
+    def _get_target_replicas(self, auto_scaling_rule) -> int:
+        return auto_scaling_rule.max_replicas
 
-        session_ids = await self._get_session_ids(client_session, service_id)
-
-        await self._make_cpu_intensive_task_in_service(
-            client_session,
-            session_ids,
-        )
-
-        await asyncio.wait_for(
-            self._wait_until_cpu_utilization_above_threshold(
-                client_session,
-                session_ids,
-                cluster_config.cluster_size,
-                threshold=Decimal(auto_scaling_rule.threshold),
-            ),
-            timeout=_METRIC_COLLECTION_TIMEOUT,
-        )
-
-        await asyncio.wait_for(
-            wait_until_all_inference_sessions_ready(
-                client_session,
-                service_id,
-                max_replicas,
-                vfolder_id,
-            ),
-            timeout=_SCALE_TIMEOUT,
-        )
-
-        result = await client_session.Service(service_id).info()
-        assert result["replicas"] == max_replicas, (
-            f"Expected replicas count: {max_replicas}, actual: {result['replicas']}"
-        )
-        assert result["desired_session_count"] == max_replicas, (
-            f"Expected desired session count: {max_replicas}, "
-            f"actual: {result['desired_session_count']}"
-        )
-
-    async def _get_session_ids(self, client_session: AsyncSession, service_id: UUID) -> list[UUID]:
-        result = await client_session.Service(service_id).info()
-        active_routes = result["active_routes"]
-        return [route["session_id"] for route in active_routes]
-
-    async def _make_cpu_intensive_task_in_service(
+    async def _execute_cpu_task(
         self, client_session: AsyncSession, session_ids: list[UUID]
     ) -> None:
-        code = """
-                def fib(n):
-                    a, b = 0, 1
-                    for _ in range(n):
+        cpu_intensive_code = """
+            def fib(n):
+                a, b = 0, 1
+                for _ in range(n):
                     a, b = b, a + b
-                    return a
+                return a
 
-                while True:
-                    fib(1000)
-                """
+            while True:
+                fib(1000)
+        """
         for session_id in session_ids:
-            await client_session.ComputeSession.from_session_id(session_id).execute(code=code)
+            await client_session.ComputeSession.from_session_id(session_id).execute(
+                code=cpu_intensive_code
+            )
 
-    async def _wait_until_cpu_utilization_above_threshold(
+    async def _wait_until_cpu_threshold_condition(
         self,
         client_session: AsyncSession,
         session_ids: list[UUID],
@@ -115,27 +222,17 @@ class ScaleOutByCPUAutoScalingRule(TestCode):
         threshold: Decimal,
     ) -> None:
         while True:
-            cpu_utils = []
-            for session_id in session_ids:
-                kernels = await client_session.ComputeSession.from_session_id(session_id).detail(
-                    fields=(
-                        session_node_fields["id"],
-                        create_connection_field("kernel_nodes", (kernel_node_fields["live_stat"],)),  # type: ignore
-                    )
-                )
-                kernels_info = kernels["kernels"]
-
-                for kernel in kernels_info:
-                    if kernel["live_stat"] is None:
-                        break
-                    live_stat = orjson.loads(kernel["live_stat"])
-                    cpu_utils.append(float(live_stat.get("cpu_util", {}).get("pct", 0.0)))
+            cpu_utils = await self._get_cpu_utilization_metrics(
+                client_session,
+                session_ids,
+            )
 
             if len(cpu_utils) != (cluster_size * len(session_ids)):
-                await asyncio.sleep(
-                    5
-                )  # Container metrics collections are triggered every 5 seconds
+                await asyncio.sleep(_CONTAINER_METRIC_COLLECTION_INTERVAL)
                 continue
+
             avg_cpu_util = sum(cpu_utils) / len(cpu_utils)
             if avg_cpu_util >= threshold:
                 break
+
+            await asyncio.sleep(_CONTAINER_METRIC_COLLECTION_INTERVAL)
