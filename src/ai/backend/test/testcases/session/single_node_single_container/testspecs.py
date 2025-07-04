@@ -258,7 +258,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
 
 SESSION_TEMPLATE_TEST_SPECS = {
     "single_node_single_container_creation_interactive_session_success_from_template": TestSpec(
-        name="creation_interactive_session_success_from_template",
+        name="single_node_single_container_creation_interactive_session_success_from_template",
         description=textwrap.dedent("""\
         Test for creating a session from a template.
         This test verifies that a session can be created from a predefined template, and that it transitions through the expected lifecycle events.
@@ -280,7 +280,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
         parametrizes=CLUSTER_CONFIG_PARAM,
     ),
     "single_node_single_container_creation_batch_session_success_from_template": TestSpec(
-        name="creation_batch_session_success_from_template",
+        name="single_node_single_container_creation_batch_session_success_from_template",
         description=textwrap.dedent("""\
         Test for executing a session from a template.
         This test verifies that a session can be executed from a predefined template, and that it transitions through the expected lifecycle events.
@@ -304,7 +304,7 @@ SESSION_TEMPLATE_TEST_SPECS = {
 
 SESSION_INFO_RETRIEVER_TEST_SPECS = {
     "single_node_single_container_session_container_log_retriever": TestSpec(
-        name="session_container_log_retriever",
+        name="single_node_single_container_session_container_log_retriever",
         description=textwrap.dedent("""\
         Test for retrieving logs from a session's kernel(container).
         This test ensures that logs can be fetched from a running session's kernel(container).
@@ -327,7 +327,7 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
         parametrizes=CLUSTER_CONFIG_PARAM,
     ),
     "single_node_single_container_session_dependency_graph_retriever": TestSpec(
-        name="session_dependency_graph_retriever",
+        name="single_node_single_container_session_dependency_graph_retriever",
         description=textwrap.dedent("""
             Retrieve and validate the dependency graph of a compute session,
             ensuring the session name matches and the dependency structure is present.
@@ -339,7 +339,7 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
         parametrizes=CLUSTER_CONFIG_PARAM,
     ),
     "single_node_single_container_session_status_history": TestSpec(
-        name="session_status_history",
+        name="single_node_single_container_session_status_history",
         description=textwrap.dedent("""
             Tests retrieval of session status history
             Validate that the status history is not empty and contains valid statuses
@@ -354,7 +354,7 @@ SESSION_INFO_RETRIEVER_TEST_SPECS = {
 
 SESSION_RENAME_TEST_SPECS = {
     "single_node_single_container_session_rename_success": TestSpec(
-        name="session_rename_success",
+        name="single_node_single_container_session_rename_success",
         description=textwrap.dedent("""\
         Test for renaming a session.
         This test verifies that a session can be renamed successfully
@@ -376,7 +376,7 @@ SESSION_RENAME_TEST_SPECS = {
         parametrizes=CLUSTER_CONFIG_PARAM,
     ),
     "single_node_single_container_session_rename_fail_duplicated_name": TestSpec(
-        name="session_rename_fail_duplicated_name",
+        name="single_node_single_container_session_rename_fail_duplicated_name",
         description=textwrap.dedent("""\
         Test for renaming a session to a name that is already taken.
         This test verifies that renaming a session to a duplicate name fails as expected.
@@ -401,7 +401,7 @@ SESSION_RENAME_TEST_SPECS = {
 
 SESSION_VFOLDER_TEST_SPECS = {
     "single_node_single_container_session_with_vfolder_mount_works_successfully": TestSpec(
-        name="session_with_vfolder_mount_works_successfully",
+        name="single_node_single_container_session_with_vfolder_mount_works_successfully",
         description=textwrap.dedent("""
         Test for mounting a virtual folder in a session.
         This test verifies the ability to mount a virtual folder (vfolder) into a session and perform file operations.
