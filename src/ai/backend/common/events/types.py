@@ -1,7 +1,9 @@
 import enum
 import uuid
 from abc import ABC, abstractmethod
-from typing import Mapping, Optional, Self, cast, override
+from typing import Optional, Self, override
+
+from ai.backend.common.message_queue.types import MessagePayload
 
 from .user_event.user_event import UserEvent
 
@@ -121,17 +123,14 @@ class AbstractBroadcastEvent(AbstractEvent):
             return
 
     @classmethod
-    def deserialize_from_wrapper(cls, mapping: Mapping[bytes, bytes]) -> "AbstractBroadcastEvent":
+    def deserialize_from_wrapper(cls, payload: MessagePayload) -> "AbstractBroadcastEvent":
         """
         Deserialize the event from event wrapper mapping.
         """
-        name = mapping.get(b"name")
-        if not name:
-            raise ValueError("Event name is missing in the mapping")
-        event_class = cls._register_dict.get(name.decode())
+        event_class = cls._register_dict.get(payload.name)
         if not event_class:
-            raise ValueError(f"Event class for name {name.decode()} not found")
-        return event_class.deserialize(cast(tuple[bytes, ...], mapping.get(b"args", ())))
+            raise ValueError(f"Event class for name {payload.name} not found")
+        return event_class.deserialize(payload.args)
 
     @classmethod
     @override

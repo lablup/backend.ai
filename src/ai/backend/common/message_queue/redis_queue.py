@@ -13,7 +13,8 @@ from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from .queue import AbstractMessageQueue, BroadcastMessage, MessageId, MQMessage
+from .queue import AbstractMessageQueue
+from .types import BroadcastMessage, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -111,7 +112,7 @@ class RedisQueue(AbstractMessageQueue):
             raise RuntimeError("Queue is closed")
         await self._client.broadcast(self._broadcast_channel, payload)
 
-    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, Any]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
         """
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
@@ -120,9 +121,7 @@ class RedisQueue(AbstractMessageQueue):
             raise RuntimeError("Queue is closed")
         await self._client.broadcast_with_cache(self._broadcast_channel, cache_id, payload)
 
-    async def fetch_cached_broadcast_message(
-        self, cache_id: str
-    ) -> Optional[Mapping[bytes, bytes]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.

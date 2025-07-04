@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import logging
 import socket
-from typing import Any, AsyncGenerator, Mapping, Optional
+from typing import AsyncGenerator, Mapping, Optional
 
 import hiredis
 from aiotools.server import process_index
@@ -13,7 +13,8 @@ from ai.backend.common.redis_client import RedisConnection
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..types import RedisTarget
-from .queue import AbstractMessageQueue, BroadcastMessage, MessageId, MQMessage
+from .queue import AbstractMessageQueue
+from .types import BroadcastMessage, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -82,7 +83,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 *pieces,
             ])
 
-    async def broadcast(self, payload: Mapping[str, Any]) -> None:
+    async def broadcast(self, payload: Mapping[str, str]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
             await client.execute([
@@ -91,40 +92,35 @@ class HiRedisQueue(AbstractMessageQueue):
                 payload_bytes,
             ])
 
-    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, Any]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
-            await client.execute([
-                "SET",
-                cache_id,
-                payload_bytes,
-            ])
-            await client.execute([
-                "EXPIRE",
-                cache_id,
-                60,  # Set a default expiration time of 60 seconds
-            ])
-            await client.execute([
-                "PUBLISH",
-                f"{self._broadcast_channel}:{cache_id}",
-                payload_bytes,
+            await client.pipeline([
+                [
+                    "SET",
+                    cache_id,
+                    payload_bytes,
+                ],
+                [
+                    "EXPIRE",
+                    cache_id,
+                    60,  # Set a default expiration time of 60 seconds
+                ],
+                [
+                    "PUBLISH",
+                    self._broadcast_channel,
+                    payload_bytes,
+                ],
             ])
 
-    async def fetch_cached_broadcast_message(
-        self, cache_id: str
-    ) -> Optional[Mapping[bytes, bytes]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
         if self._closed:
             raise RuntimeError("Queue is closed")
         async with RedisConnection(self._target, db=self._db) as client:
-            reply = await client.execute(["HGETALL", cache_id])
+            reply = await client.execute(["GET", cache_id])
             if reply is None:
                 return None
-            kv_pairs = {}
-            for i in range(0, len(reply), 2):
-                key = reply[i]
-                value = reply[i + 1]
-                kv_pairs[key] = value
-            return kv_pairs
+            return load_json(reply)
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
         """

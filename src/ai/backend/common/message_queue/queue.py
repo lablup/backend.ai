@@ -1,40 +1,7 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Mapping, Optional
 
-type MessageId = bytes
-_DEFAULT_RETRY_FIELD = b"_retry_count"
-_DEFAULT_MAX_RETRIES = 3
-
-
-@dataclass
-class BroadcastMessage:
-    payload: Mapping[str, Any]
-
-
-@dataclass
-class MQMessage:
-    msg_id: MessageId
-    payload: dict[bytes, bytes]
-
-    def retry(self) -> bool:
-        """
-        Retry the message.
-        If the message has been retried more than the maximum number of retries,
-        the message will be discarded.
-        The retry count is stored in the message payload.
-        """
-        if self._retry_count() > _DEFAULT_MAX_RETRIES:
-            return False
-        self.payload[_DEFAULT_RETRY_FIELD] = str(self._retry_count() + 1).encode("utf-8")
-        return True
-
-    def _retry_count(self) -> int:
-        """
-        Get the retry count of the message.
-        The retry count is the number of times the message has been re-delivered.
-        """
-        return int(self.payload.get(_DEFAULT_RETRY_FIELD, b"0"))
+from .types import BroadcastMessage, MessageId, MQMessage
 
 
 class AbstractMessageQueue(ABC):
@@ -69,7 +36,7 @@ class AbstractMessageQueue(ABC):
     async def broadcast_with_cache(
         self,
         cache_id: str,
-        payload: Mapping[str, Any],
+        payload: Mapping[str, str],
     ) -> None:
         """
         Broadcast a message to all subscribers of the channel with cache.
@@ -81,9 +48,7 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_cached_broadcast_message(
-        self, cache_id: str
-    ) -> Optional[Mapping[bytes, bytes]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.
