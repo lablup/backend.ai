@@ -126,9 +126,7 @@ async def add(request: web.Request, params: AddRequestModel) -> PydanticResponse
     root_ctx: RootContext = request.app["_root.context"]
 
     config = root_ctx.local_config.wsproxy
-    base_url = (
-        f"http://{config.advertised_host}:{config.advertised_api_port or config.bind_api_port}"
-    )
+    base_url = config.advertised_api_addr
     qdict = {
         **params.model_dump(mode="json", exclude_defaults=True),
         "token": request.match_info["token"],

@@ -268,6 +268,14 @@ class WSProxyConfig(BaseConfigModel):
         default=39500,
     )
 
+    @property
+    def advertised_api_addr(self) -> str:
+        """
+        Returns the advertised API address.
+        """
+        port = self.advertised_api_port or self.bind_api_port
+        return f"http://{self.advertised_host}:{port}"
+
 
 class PyroscopeConfig(BaseConfigModel):
     enabled: bool = Field(default=False, description="Enable pyroscope profiler.")
