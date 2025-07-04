@@ -166,16 +166,17 @@ users = sa.Table(
 )
 
 
+# Defined for avoiding circular import
 def _get_session_row_join_condition():
     from ai.backend.manager.models.session import SessionRow
 
-    return foreign(UserRow.main_access_key) == SessionRow.access_key
+    return foreign(UserRow.uuid) == SessionRow.user_uuid
 
 
 def _get_kernel_row_join_condition():
     from ai.backend.manager.models.kernel import KernelRow
 
-    return foreign(UserRow.main_access_key) == KernelRow.access_key
+    return foreign(UserRow.uuid) == KernelRow.user_uuid
 
 
 class UserRow(Base):
@@ -186,14 +187,13 @@ class UserRow(Base):
         "SessionRow",
         back_populates="user",
         primaryjoin=_get_session_row_join_condition,
-        foreign_keys=[users.c.uuid],
-        overlaps="kernels",
+        foreign_keys=users.c.uuid,
     )
     kernels = relationship(
         "KernelRow",
         back_populates="user_row",
         primaryjoin=_get_kernel_row_join_condition,
-        foreign_keys=[users.c.uuid],
+        foreign_keys=users.c.uuid,
         overlaps="sessions",
     )
     domain = relationship("DomainRow", back_populates="users")
@@ -212,9 +212,7 @@ class UserRow(Base):
         primaryjoin="foreign(EndpointRow.session_owner) == UserRow.uuid",
     )
 
-    main_keypair = relationship(
-        "KeyPairRow", foreign_keys=users.c.main_access_key, overlaps="kernels,sessions"
-    )
+    main_keypair = relationship("KeyPairRow", foreign_keys=users.c.main_access_key)
 
     vfolder_rows = relationship(
         "VFolderRow",

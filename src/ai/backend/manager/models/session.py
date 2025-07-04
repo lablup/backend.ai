@@ -679,7 +679,7 @@ def _get_keypair_row_join_condition():
 def _get_user_row_join_condition():
     from ai.backend.manager.models.user import UserRow
 
-    return SessionRow.access_key == foreign(UserRow.main_access_key)
+    return SessionRow.user_uuid == foreign(UserRow.uuid)
 
 
 class SessionRow(Base):
@@ -737,6 +737,7 @@ class SessionRow(Base):
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="sessions",
+        foreign_keys="UserRow.uuid",
         viewonly=True,
         uselist=False,
     )
@@ -746,6 +747,7 @@ class SessionRow(Base):
         "KeyPairRow",
         primaryjoin=_get_keypair_row_join_condition,
         back_populates="sessions",
+        foreign_keys="KeyPairRow.access_key",
         viewonly=True,
         uselist=False,
     )

@@ -371,7 +371,7 @@ async def handle_kernel_exception(
 def _get_user_row_join_condition():
     from ai.backend.manager.models.user import UserRow
 
-    return KernelRow.access_key == foreign(UserRow.main_access_key)
+    return KernelRow.user_uuid == foreign(UserRow.uuid)
 
 
 class KernelRow(Base):
@@ -580,6 +580,7 @@ class KernelRow(Base):
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="kernels",
+        foreign_keys="UserRow.uuid",
         viewonly=True,
         uselist=False,
     )
