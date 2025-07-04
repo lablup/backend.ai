@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, AsyncGenerator, Mapping, Optional
 
-from .types import BroadcastMessage, MessageId, MessagePayload, MQMessage
+from .types import BroadcastMessage, MessageId, MQMessage
 
 
 class AbstractMessageQueue(ABC):
@@ -48,7 +48,7 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[MessagePayload]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.

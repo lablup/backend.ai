@@ -2,6 +2,7 @@ from typing import Optional
 
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import MessagePayload
 
 
 class EventFetcher:
@@ -18,7 +19,8 @@ class EventFetcher:
         Fetch a cached event from the message queue.
         Returns None if no cached event is found.
         """
-        message_payload = await self._msg_queue.fetch_cached_broadcast_message(cache_id)
-        if message_payload is None:
+        payload = await self._msg_queue.fetch_cached_broadcast_message(cache_id)
+        if payload is None:
             return None
+        message_payload = MessagePayload.from_broadcast(payload)
         return AbstractBroadcastEvent.deserialize_from_wrapper(message_payload)

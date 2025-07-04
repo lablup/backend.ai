@@ -44,6 +44,29 @@ async def test_valkey_stream_broadcast(test_valkey_stream: ValkeyStreamClient) -
     }
 
 
+async def test_valkey_stream_broadcast_with_cache(test_valkey_stream: ValkeyStreamClient) -> None:
+    cache_id = f"test-cache-{random.randint(1000, 9999)}"
+    await test_valkey_stream.broadcast_with_cache(
+        "test-broadcast",
+        cache_id,
+        {
+            "key1": "value1",
+            "key2": "value2",
+        },
+    )
+    values = await test_valkey_stream.receive_broadcast_message()
+    assert values == {
+        "key1": "value1",
+        "key2": "value2",
+    }
+    cached_values = await test_valkey_stream.fetch_cached_broadcast_message(cache_id)
+    assert cached_values is not None, "Cached values should not be None"
+    assert cached_values == {
+        "key1": "value1",
+        "key2": "value2",
+    }, "Cached values should match the broadcasted values"
+
+
 async def test_valkey_stream_auto_claim(test_valkey_stream: ValkeyStreamClient) -> None:
     test_stream = f"test-stream-{random.randint(1000, 9999)}"
     test_group = f"test-group-{random.randint(1000, 9999)}"

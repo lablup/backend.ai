@@ -691,7 +691,7 @@ class EventProducer:
         args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
         raw_event = {
             "name": event.event_name(),
-            "source": self._source,
+            "source": str(self._source),
             "args": args,
         }
         await self._msg_queue.broadcast_with_cache(
