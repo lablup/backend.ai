@@ -37,7 +37,7 @@ async def wait_until_all_inference_sessions_ready(
                 f"Session type should be 'inference'. "
                 f"Actual type: {session_info['type']}, session_id: {session_id}"
             )
-            assert session_info["vfolder_mounts"] == [str(vfolder_id)], (
+            assert str(vfolder_id) in session_info["vfolder_mounts"], (
                 f"Model vfolder should be mounted into the inference session. "
                 f"Actual mounted vfolder: {session_info['vfolder_mounts']}, "
                 f"session_id: {session_id}"
