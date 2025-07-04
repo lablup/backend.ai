@@ -1,8 +1,13 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.types import (
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
+    ClusterMode,
+    RuntimeVariant,
+)
 
 
 class BaseDependencyModel(BaseModel):
@@ -132,6 +137,52 @@ class SessionImagifyDep(BaseDependencyModel):
     )
 
 
+class AutoScalingRuleDep(BaseDependencyModel):
+    metric_source: AutoScalingMetricSource = Field(
+        description="The source of the metric for auto-scaling.",
+        examples=[AutoScalingMetricSource.KERNEL, AutoScalingMetricSource.INFERENCE_FRAMEWORK],
+    )
+    metric_name: str = Field(
+        description="The name of the metric to use for auto-scaling.",
+        examples=["cpu_util", "mem"],
+    )
+    threshold: str = Field(
+        description="The threshold value for triggering auto-scaling.",
+        examples=["0.8", "0.5"],
+    )
+    comparator: AutoScalingMetricComparator = Field(
+        description="The comparator to use for the threshold.",
+        examples=[AutoScalingMetricComparator.GREATER_THAN, AutoScalingMetricComparator.LESS_THAN],
+    )
+    step_size: int = Field(
+        description="The step size for scaling up or down.",
+        examples=[1, 2],
+    )
+    cooldown_seconds: int = Field(
+        description="The cooldown period in seconds after scaling.",
+        examples=[60, 120],
+    )
+    max_replicas: Optional[int] = Field(
+        default=None,
+        description="The maximum number of replicas for the service.",
+        examples=[10, 20],
+    )
+    min_replicas: Optional[int] = Field(
+        default=None,
+        description="The minimum number of replicas for the service.",
+        examples=[1, 2],
+    )
+
+    @model_validator(mode="after")
+    def check_replicas(self) -> "AutoScalingRuleDep":
+        if self.max_replicas is not None and self.min_replicas is not None:
+            if self.max_replicas < self.min_replicas:
+                raise ValueError(
+                    f"max_replicas ({self.max_replicas}) must be >= min_replicas ({self.min_replicas})"
+                )
+        return self
+
+
 class ModelServiceDep(BaseDependencyModel):
     model_vfolder_name: str = Field(
         description="The model VFolder name to use for the model service.",
@@ -246,6 +297,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     vfolder: Optional[VFolderDep] = Field(
         default=None,
         description="The vfolder configuration for the test context.",
+    )
+    auto_scaling_rule: Optional[AutoScalingRuleDep] = Field(
+        default=None,
+        description="The auto-scaling rule configuration for the test context.",
     )
 
 

@@ -36,6 +36,16 @@ group-name = "model-store"
 model-mount-destination = "/models"
 model-definition-path = "./model-definition.yaml"
 
+[context.auto-scaling-rule]
+metric-source = "KERNEL"
+threshold = "0.1"
+metric-name = "cpu_util"
+comparator = "GREATER_THAN_OR_EQUAL"
+step-size = 1
+cooldown-seconds = 10
+min-replicas = 1
+max-replicas = 3
+
 [context.image]
 name = "cr.backend.ai/multiarch/python:3.13-ubuntu24.04"
 architecture = "x86_64"
