@@ -28,7 +28,7 @@ class TestTag(enum.StrEnum):
         "required_single_node_multi_container_configuration"
     )
     REQUIRED_MULTI_NODE_MULTI_CONTAINER_CONFIGURATION = (
-        "required_multi_node_multi_containe_configurationr"
+        "required_multi_node_multi_container_configuration"
     )
     REQUIRED_CONTAINER_REGISTRY_CONFIGURATION = "required_container_registry_configuration"
 
