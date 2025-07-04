@@ -24,3 +24,9 @@ class UploadedFilesMeta:
 @dataclass
 class VFolderInvitationMeta:
     invited_user_emails: list[str]
+
+
+@dataclass
+class VFolderShareMeta:
+    override_permission: str
+    user_emails: list[str]
