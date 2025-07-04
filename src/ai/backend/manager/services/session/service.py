@@ -23,6 +23,7 @@ from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
+    BgtaskUpdatedEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -466,6 +467,8 @@ class SessionService:
             try:
                 cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
                 async for event in propagator.receive(cache_id):
+                    if isinstance(event, BgtaskUpdatedEvent):
+                        continue
                     if not isinstance(event, BaseBgtaskDoneEvent):
                         log.warning("unexpected event: {}", event)
                         continue
@@ -504,6 +507,8 @@ class SessionService:
                 try:
                     cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
                     async for event in propagator.receive(cache_id):
+                        if isinstance(event, BgtaskUpdatedEvent):
+                            continue
                         if not isinstance(event, BaseBgtaskDoneEvent):
                             log.warning("unexpected event: {}", event)
                             continue
