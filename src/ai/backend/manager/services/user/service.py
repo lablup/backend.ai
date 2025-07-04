@@ -451,14 +451,14 @@ class UserService:
             if user_uuid is None:
                 raise RuntimeError(f"User not found (email: {email})")
 
-            if await self.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
+            if await self._user_vfolder_mounted_to_active_kernels(conn, user_uuid):
                 raise RuntimeError(
                     "Some of user's virtual folders are mounted to active kernels. "
                     "Terminate those kernels first.",
                 )
 
             if action.purge_shared_vfolders.optional_value():
-                await self.migrate_shared_vfolders(
+                await self._migrate_shared_vfolders(
                     conn,
                     deleted_user_uuid=user_uuid,
                     target_user_uuid=action.user_info_ctx.uuid,
@@ -485,8 +485,8 @@ class UserService:
                     )
 
             await self._delete_vfolders(self._db, user_uuid, self._storage_manager)
-            await self.delete_error_logs(conn, user_uuid)
-            await self.delete_keypairs(conn, self._redis_stat, user_uuid)
+            await self._delete_error_logs(conn, user_uuid)
+            await self._delete_keypairs(conn, self._redis_stat, user_uuid)
 
             await db_session.execute(sa.delete(users).where(users.c.email == email))
 
@@ -495,7 +495,7 @@ class UserService:
 
         return PurgeUserActionResult(success=True)
 
-    async def migrate_shared_vfolders(
+    async def _migrate_shared_vfolders(
         self,
         conn: SAConnection,
         deleted_user_uuid: UUID,
@@ -629,7 +629,7 @@ class UserService:
             log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
         return deleted_count
 
-    async def user_vfolder_mounted_to_active_kernels(
+    async def _user_vfolder_mounted_to_active_kernels(
         self,
         conn: SAConnection,
         user_uuid: UUID,
@@ -716,7 +716,7 @@ class UserService:
             sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
         )
 
-    async def delete_error_logs(
+    async def _delete_error_logs(
         self,
         conn: SAConnection,
         user_uuid: UUID,
@@ -733,7 +733,7 @@ class UserService:
             log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
         return result.rowcount
 
-    async def delete_keypairs(
+    async def _delete_keypairs(
         self,
         conn: SAConnection,
         redis_conn: RedisConnectionInfo,
