@@ -43,7 +43,9 @@ class _CPUAutoScalingRuleTestBase(TestCode, ABC):
         await self._validate_replica_configuration(model_service_dep, auto_scaling_rule)
 
         target_replicas = self._get_target_replicas(auto_scaling_rule)
-        session_ids = await self._get_session_ids(client_session, service_id)
+        result = await client_session.Service(service_id).info()
+        active_routes = result["active_routes"]
+        session_ids = [route["session_id"] for route in active_routes]
 
         await self._execute_cpu_task(client_session, session_ids)
 
@@ -70,45 +72,12 @@ class _CPUAutoScalingRuleTestBase(TestCode, ABC):
             timeout=_SCALE_TIMEOUT,
         )
 
-        await self._verify_scaling_result(client_session, service_id, target_replicas)
-
-    async def _get_session_ids(self, client_session: AsyncSession, service_id: UUID) -> list[UUID]:
         result = await client_session.Service(service_id).info()
-        active_routes = result["active_routes"]
-        return [route["session_id"] for route in active_routes]
-
-    async def _get_cpu_utilization_metrics(
-        self,
-        client_session: AsyncSession,
-        session_ids: list[UUID],
-    ) -> list[float]:
-        cpu_utils = []
-        for session_id in session_ids:
-            kernels = await client_session.ComputeSession.from_session_id(session_id).detail(
-                fields=(
-                    session_node_fields["id"],
-                    create_connection_field("kernel_nodes", (kernel_node_fields["live_stat"],)),  # type: ignore
-                )
-            )
-            kernels_info = kernels["kernels"]
-
-            for kernel in kernels_info:
-                if kernel["live_stat"] is None:
-                    break
-                live_stat = orjson.loads(kernel["live_stat"])
-                cpu_utils.append(float(live_stat.get("cpu_util", {}).get("pct", 0.0)))
-
-        return cpu_utils
-
-    async def _verify_scaling_result(
-        self, client_session: AsyncSession, service_id: UUID, expected_replicas: int
-    ) -> None:
-        result = await client_session.Service(service_id).info()
-        assert result["replicas"] == expected_replicas, (
-            f"Expected replicas count: {expected_replicas}, actual: {result['replicas']}"
+        assert result["replicas"] == target_replicas, (
+            f"Expected replicas count: {target_replicas}, actual: {result['replicas']}"
         )
-        assert result["desired_session_count"] == expected_replicas, (
-            f"Expected desired session count: {expected_replicas}, "
+        assert result["desired_session_count"] == target_replicas, (
+            f"Expected desired session count: {target_replicas}, "
             f"actual: {result['desired_session_count']}"
         )
 
@@ -169,7 +138,21 @@ class ScaleInByCPUAutoScalingRule(_CPUAutoScalingRuleTestBase):
         threshold: Decimal,
     ) -> None:
         while True:
-            cpu_utils = await self._get_cpu_utilization_metrics(client_session, session_ids)
+            cpu_utils = []
+            for session_id in session_ids:
+                kernels = await client_session.ComputeSession.from_session_id(session_id).detail(
+                    fields=(
+                        session_node_fields["id"],
+                        create_connection_field("kernel_nodes", (kernel_node_fields["live_stat"],)),  # type: ignore
+                    )
+                )
+                kernels_info = kernels["kernels"]
+
+                for kernel in kernels_info:
+                    if kernel["live_stat"] is None:
+                        break
+                    live_stat = orjson.loads(kernel["live_stat"])
+                    cpu_utils.append(float(live_stat.get("cpu_util", {}).get("pct", 0.0)))
 
             if len(cpu_utils) != (cluster_size * len(session_ids)):
                 await asyncio.sleep(_CONTAINER_METRIC_COLLECTION_INTERVAL)
@@ -222,10 +205,21 @@ class ScaleOutByCPUAutoScalingRule(_CPUAutoScalingRuleTestBase):
         threshold: Decimal,
     ) -> None:
         while True:
-            cpu_utils = await self._get_cpu_utilization_metrics(
-                client_session,
-                session_ids,
-            )
+            cpu_utils = []
+            for session_id in session_ids:
+                kernels = await client_session.ComputeSession.from_session_id(session_id).detail(
+                    fields=(
+                        session_node_fields["id"],
+                        create_connection_field("kernel_nodes", (kernel_node_fields["live_stat"],)),  # type: ignore
+                    )
+                )
+                kernels_info = kernels["kernels"]
+
+                for kernel in kernels_info:
+                    if kernel["live_stat"] is None:
+                        break
+                    live_stat = orjson.loads(kernel["live_stat"])
+                    cpu_utils.append(float(live_stat.get("cpu_util", {}).get("pct", 0.0)))
 
             if len(cpu_utils) != (cluster_size * len(session_ids)):
                 await asyncio.sleep(_CONTAINER_METRIC_COLLECTION_INTERVAL)
