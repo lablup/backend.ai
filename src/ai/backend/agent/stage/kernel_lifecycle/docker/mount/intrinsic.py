@@ -1,0 +1,293 @@
+import sys
+import asyncio
+from dataclasses import dataclass
+from typing import override, Any
+from decimal import Decimal
+from pathlib import Path
+from collections.abc import Mapping
+from functools import partial
+import secrets
+import itertools
+
+from aiodocker.docker import Docker
+import aiotools
+
+from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
+from ai.backend.agent.types import VolumeInfo
+from ai.backend.agent.exception import UnsupportedResource
+from ai.backend.agent.resources import known_slot_types, KernelResourceSpec,Mount, allocate
+from ai.backend.common.asyncio import closing_async
+from ai.backend.common.docker import ImageRef
+from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
+from ai.backend.common.types import (
+    ResourceSlot,
+    MountTypes,
+    MountPermission,
+    SlotName,
+    current_resource_slots,
+)
+
+DEEPLINEARNING_IMAGE_KEYS = {
+    "tensorflow",
+    "caffe",
+    "keras",
+    "torch",
+    "mxnet",
+    "theano",
+}
+
+DEEPLEARNING_SAMPLE_VOLUME = VolumeInfo(
+    "deeplearning-samples",
+    "/home/work/samples",
+    "ro",
+)
+
+@dataclass
+class CoreDumpConfig:
+    enabled: bool
+    path: Path
+    core_path: Path
+
+
+@dataclass
+class IntrinsicMountSpec:
+    config_dir: Path
+    work_dir: Path
+    tmp_dir: Path
+    scratch_type: str
+
+    agent_sockpath: Path
+    image_ref: ImageRef
+    coredump: CoreDumpConfig
+    ipc_base_path: Path
+    domain_socket_proxies: list[DomainSocketProxy]
+
+
+class IntrinsicMountSpecGenerator(SpecGenerator[IntrinsicMountSpec]):
+    @override
+    async def wait_for_spec(self) -> IntrinsicMountSpec:
+        """
+        Waits for the spec to be ready.
+        """
+
+
+@dataclass
+class IntrinsicMountResult:
+    mounts: list[Mount]
+    domain_socket_proxies: list[DomainSocketProxy]
+
+
+class IntrinsicMountProvisioner(Provisioner[IntrinsicMountSpec, IntrinsicMountResult]):
+    """
+    Provisioner for the kernel creation setup stage.
+    This is a no-op provisioner as it does not create any resources.
+    """
+
+    @property
+    @override
+    def name(self) -> str:
+        return "docker-intrinsic-mount"
+
+    @override
+    async def setup(self, spec: IntrinsicMountSpec) -> IntrinsicMountResult:
+        scratch_mounts = await self._prepare_scratch_mounts(spec)
+        timezone_mounts = await self._prepare_timezone_mounts(spec)
+        lxcfs_mounts = await self._prepare_lxcfs_mounts(spec)
+        coredump_mounts = await self._prepare_coredump_mounts(spec)
+        agent_socket_mounts = await self._prepare_agent_socket_mounts(spec)
+        domain_socket_proxies, domain_socket_mounts = await self._prepare_domain_socket_proxies(spec)
+        extra_mounts = await self._prepare_extra_mounts(spec)
+        mounts = [
+            *scratch_mounts,
+            *timezone_mounts,
+            *lxcfs_mounts,
+            *coredump_mounts,
+            *agent_socket_mounts,
+            *domain_socket_mounts,
+            *extra_mounts,
+        ]
+        return IntrinsicMountResult(
+            mounts=mounts,
+            domain_socket_proxies=domain_socket_proxies,
+        )
+
+    async def _prepare_scratch_mounts(self, spec: IntrinsicMountSpec) -> list[Mount]:
+        # scratch/config/tmp mounts
+        mounts: list[Mount] = [
+            Mount(
+                MountTypes.BIND, spec.config_dir, Path("/home/config"), MountPermission.READ_ONLY
+            ),
+            Mount(MountTypes.BIND, spec.work_dir, Path("/home/work"), MountPermission.READ_WRITE),
+        ]
+        if (
+            sys.platform.startswith("linux")
+            and spec.scratch_type == "memory"
+        ):
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    spec.tmp_dir,
+                    Path("/tmp"),
+                    MountPermission.READ_WRITE,
+                )
+            )
+        return mounts
+
+    async def _prepare_timezone_mounts(self, spec: IntrinsicMountSpec) -> list[Mount]:
+        # /etc/localtime and /etc/timezone mounts
+        mounts = []
+        if sys.platform.startswith("linux"):
+            localtime_file = Path("/etc/localtime")
+            timezone_file = Path("/etc/timezone")
+            if localtime_file.exists():
+                mounts.append(
+                    Mount(
+                        type=MountTypes.BIND,
+                        source=localtime_file,
+                        target=localtime_file,
+                        permission=MountPermission.READ_ONLY,
+                    )
+                )
+            if timezone_file.exists():
+                mounts.append(
+                    Mount(
+                        type=MountTypes.BIND,
+                        source=timezone_file,
+                        target=timezone_file,
+                        permission=MountPermission.READ_ONLY,
+                    )
+                )
+        return mounts
+
+    async def _prepare_lxcfs_mounts(self, spec: IntrinsicMountSpec) -> list[Mount]:
+        # lxcfs mounts
+        mounts = []
+        lxcfs_root = Path("/var/lib/lxcfs")
+        if lxcfs_root.is_dir():
+            mounts.extend(
+                Mount(
+                    MountTypes.BIND,
+                    lxcfs_proc_path,
+                    "/" / lxcfs_proc_path.relative_to(lxcfs_root),
+                    MountPermission.READ_WRITE,
+                )
+                for lxcfs_proc_path in (lxcfs_root / "proc").iterdir()
+                if lxcfs_proc_path.stat().st_size > 0
+            )
+            mounts.extend(
+                Mount(
+                    MountTypes.BIND,
+                    lxcfs_root / path,
+                    "/" / Path(path),
+                    MountPermission.READ_WRITE,
+                )
+                for path in [
+                    "sys/devices/system/cpu",
+                    "sys/devices/system/cpu/online",
+                ]
+                if Path(lxcfs_root / path).exists()
+            )
+        return mounts
+
+    async def _prepare_coredump_mounts(self, spec: IntrinsicMountSpec) -> list[Mount]:
+        """ Prepare mounts for coredump if enabled. """
+        # debug mounts
+        mounts = []
+        if spec.coredump.enabled:
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    spec.coredump.path,
+                    spec.coredump.core_path,
+                    MountPermission.READ_WRITE,
+                )
+            )
+        return mounts
+
+    async def _prepare_agent_socket_mounts(self, spec: IntrinsicMountSpec) -> list[Mount]:
+        # agent-socket mount
+        mounts = []
+        if sys.platform != "darwin":
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    spec.agent_sockpath,
+                    Path("/opt/kernel/agent.sock"),
+                    MountPermission.READ_WRITE,
+                )
+            )
+        return mounts
+
+    async def _prepare_domain_socket_proxies(self, spec: IntrinsicMountSpec) -> tuple[list[DomainSocketProxy], list[Mount]]:
+        loop = asyncio.get_running_loop()
+        ipc_base_path = spec.ipc_base_path
+        domain_socket_proxies = []
+        mounts = []
+
+        # domain-socket proxy mount
+        # (used for special service containers such image importer)
+        for host_sock_path in spec.domain_socket_proxies:
+            await loop.run_in_executor(
+                None, partial((ipc_base_path / "proxy").mkdir, parents=True, exist_ok=True)
+            )
+            host_proxy_path = ipc_base_path / "proxy" / f"{secrets.token_hex(12)}.sock"
+            proxy_server = await asyncio.start_unix_server(
+                aiotools.apartial(proxy_connection, host_sock_path), str(host_proxy_path)
+            )
+            await loop.run_in_executor(None, host_proxy_path.chmod, 0o666)
+            domain_socket_proxies.append(
+                DomainSocketProxy(
+                    Path(host_sock_path),
+                    host_proxy_path,
+                    proxy_server,
+                )
+            )
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    host_proxy_path,
+                    host_sock_path,
+                    MountPermission.READ_WRITE,
+                )
+            )
+        return domain_socket_proxies, mounts
+
+    async def _prepare_extra_mounts(self, spec: IntrinsicMountSpec) -> list[Mount]:
+        # extra mounts
+        mounts = []
+        extra_mount_list = await self._get_extra_volumes(spec.image_ref.short)
+        mounts.extend(
+            Mount(MountTypes.VOLUME, v.name, v.container_path, v.mode) for v in extra_mount_list
+        )
+        return mounts
+
+    async def _get_extra_volumes(self, short_image_ref: str) -> list[VolumeInfo]:
+        # TODO: What?
+        async with closing_async(Docker()) as docker:
+            avail_volumes = (await docker.volumes.list())["Volumes"]
+            if not avail_volumes:
+                return []
+            avail_volume_names = set(v["Name"] for v in avail_volumes)
+
+            # deeplearning specialization
+            # TODO: extract as config
+            volume_list: list[VolumeInfo] = []
+            for k in DEEPLINEARNING_IMAGE_KEYS:
+                if k in short_image_ref:
+                    volume_list.append(DEEPLEARNING_SAMPLE_VOLUME)
+                    break
+
+            # Mount only actually existing volumes
+            mount_list: list[VolumeInfo] = []
+            for vol in volume_list:
+                if vol.name in avail_volume_names:
+                    mount_list.append(vol)
+            return mount_list
+
+    @override
+    async def teardown(self, resource: None) -> None:
+        pass
+
+
+class IntrinsicMountStage(ProvisionStage[IntrinsicMountSpec, IntrinsicMountResult]):
+    pass

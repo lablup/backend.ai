@@ -216,6 +216,7 @@ from .kernel import (
 )
 from .observer.heartbeat import HeartbeatObserver
 from .resources import (
+    ComputerContext,
     AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
@@ -686,11 +687,11 @@ class RestartTracker:
     done_event: asyncio.Event
 
 
-@attrs.define(auto_attribs=True, slots=True)
-class ComputerContext:
-    instance: AbstractComputePlugin
-    devices: Collection[AbstractComputeDevice]
-    alloc_map: AbstractAllocMap
+# @attrs.define(auto_attribs=True, slots=True)
+# class ComputerContext:
+#     instance: AbstractComputePlugin
+#     devices: Collection[AbstractComputeDevice]
+#     alloc_map: AbstractAllocMap
 
 
 def _observe_stat_task(
