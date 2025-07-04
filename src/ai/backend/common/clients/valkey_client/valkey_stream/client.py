@@ -61,7 +61,7 @@ def valkey_decorator(
         observer = ClientMetricObserver.instance()
 
         async def wrapper(*args, **kwargs) -> R:
-            log.debug("Calling {} with args: {}, kwargs: {}", func.__name__, args, kwargs)
+            log.debug("Calling {}", func.__name__)
             start = time.perf_counter()
             for attempt in range(retry_count):
                 try:
@@ -78,18 +78,17 @@ def valkey_decorator(
                     )
                     return res
                 except Exception as e:
-                    log.warning(
-                        "Error in {} (attempt {}/{}) with args: {}, kwargs: {}: {}",
-                        func.__name__,
-                        attempt + 1,
-                        retry_count,
-                        args,
-                        kwargs,
-                        e,
-                    )
                     if attempt < retry_count - 1:
                         await asyncio.sleep(retry_delay)
                         continue
+                    log.exception(
+                        "Error in {}, args: {}, kwargs: {}, retry_count: {}, error: {}",
+                        func.__name__,
+                        args,
+                        kwargs,
+                        retry_count,
+                        e,
+                    )
                     observer.observe_client_operation(
                         client_type=ClientType.VALKEY,
                         operation=func.__name__,
