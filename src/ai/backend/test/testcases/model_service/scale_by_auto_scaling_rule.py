@@ -18,7 +18,7 @@ from ai.backend.test.contexts.model_service import (
     ModelServiceContext,
 )
 from ai.backend.test.contexts.session import ClusterContext
-from ai.backend.test.templates.model_service.utils import wait_until_all_inference_sessions_ready
+from ai.backend.test.templates.model_service.utils import ensure_inference_sessions_ready
 from ai.backend.test.templates.template import TestCode
 from ai.backend.test.utils.exceptions import DependencyNotSet, UnexpectedFailure
 
@@ -61,7 +61,7 @@ class _CPUAutoScalingRuleTestBase(TestCode, ABC):
             name=model_service_dep.model_vfolder_name
         ).get_id()
         await asyncio.wait_for(
-            wait_until_all_inference_sessions_ready(
+            ensure_inference_sessions_ready(
                 client_session,
                 service_id,
                 target_replicas,

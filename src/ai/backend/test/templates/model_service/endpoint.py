@@ -19,7 +19,7 @@ from ai.backend.test.contexts.session import (
     SessionContext,
 )
 from ai.backend.test.data.model_service import ModelServiceEndpointMeta
-from ai.backend.test.templates.model_service.utils import wait_until_all_inference_sessions_ready
+from ai.backend.test.templates.model_service.utils import ensure_inference_sessions_ready
 from ai.backend.test.templates.template import (
     WrapperTestTemplate,
 )
@@ -102,7 +102,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
             assert info["model_id"] == str(vfolder_id), "Model ID should match the VFolder ID."
 
             await asyncio.wait_for(
-                wait_until_all_inference_sessions_ready(
+                ensure_inference_sessions_ready(
                     client_session,
                     endpoint_id,
                     model_service_dep.replicas,
