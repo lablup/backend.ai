@@ -15,6 +15,9 @@ login-endpoint = "http://127.0.0.1:8090"
 access-key = "AKIAIOSFODNN7EXAMPLE"
 secret-key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
+[context.user-resource-policy]
+name = "default"
+
 [context.login-credential]
 user-id = "admin@lablup.com"
 password = "wJalrXUt"

@@ -12,6 +12,12 @@ from ai.backend.test.testcases.model_service.health_check import (
     EndpointHealthCheck,
     EndpointHealthCheckWithToken,
 )
+from ai.backend.test.testcases.model_service.replicas_scale_successfully import (
+    ReplicasScaleSuccessfully,
+)
+from ai.backend.test.testcases.model_service.scale_failure_too_many_sessions import (
+    ReplicasScaleFailureTooManySessions,
+)
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
 from ai.backend.test.tester.dependency import ClusterDep
 
@@ -103,6 +109,67 @@ SINGLE_NODE_SINGLE_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
                 ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
+                ),
+            ]
+        },
+    ),
+    "replicas_successfully_scale": TestSpec(
+        name="replicas_successfully_scale",
+        description=textwrap.dedent("""\
+            Test for successful scaling of replicas in an endpoint.
+            This test verifies that the number of replicas can be successfully scaled.
+            The test will:
+            1. Create an endpoint with a specified number of replicas.
+            2. Scale up the replicas and verify the change.
+            3. Scale down the replicas and verify the change.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
+        template=BasicTestTemplate(ReplicasScaleSuccessfully()).with_wrappers(
+            KeypairAuthTemplate, EndpointTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
+                ),
+            ]
+        },
+    ),
+    "replicas_scale_failure_too_many_sessions": TestSpec(
+        name="replicas_scale_failure_too_many_sessions",
+        description=textwrap.dedent("""\
+            Test for failure when trying to scale replicas beyond the allowed limit.
+            This test verifies that scaling replicas beyond the allowed limit raises an error.
+            The test will:
+            1. Create an endpoint with a specified number of replicas.
+            2. Attempt to scale up the replicas beyond the allowed limit set in user resource policy and verify the error.
+        """),
+        tags={TestTag.MANAGER, TestTag.AGENT, TestTag.MODEL_SERVICE, TestTag.SESSION},
+        template=BasicTestTemplate(ReplicasScaleFailureTooManySessions()).with_wrappers(
+            KeypairAuthTemplate, EndpointTemplate
+        ),
+        parametrizes={
+            ContextName.CLUSTER_CONFIG: [
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=3,
+                ),
+                ClusterDep(
+                    cluster_mode=ClusterMode.MULTI_NODE,
+                    cluster_size=3,
                 ),
             ]
         },

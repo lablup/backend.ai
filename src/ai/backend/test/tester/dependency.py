@@ -24,6 +24,13 @@ class KeyPairDep(BaseDependencyModel):
     secret_key: str = Field(description="The secret key for the API.", examples=["some-secret-key"])
 
 
+class UserResourcePolicyDep(BaseDependencyModel):
+    name: str = Field(
+        description="The name of the user resource policy.",
+        examples=["default"],
+    )
+
+
 class EndpointDep(BaseDependencyModel):
     api_endpoint: Optional[str] = Field(
         default=None,
@@ -246,6 +253,10 @@ class TestContextInjectionModel(BaseDependencyModel):
     vfolder: Optional[VFolderDep] = Field(
         default=None,
         description="The vfolder configuration for the test context.",
+    )
+    user_resource_policy: Optional[UserResourcePolicyDep] = Field(
+        default=None,
+        description="The user resource policy configuration for the test context.",
     )
 
 
