@@ -14,13 +14,13 @@ from ai.backend.common.types import (
 @dataclass
 class VFolderMountSpec:
     mounts: list[VFolderMount]
-    prevent_vfolder_mounts: bool
+    prevent_vfolder_mount: bool
 
 
 class VFolderMountSpecGenerator(SpecGenerator[VFolderMountSpec]):
-    def __init__(self, raw_mounts: list[Mapping[str, Any]], prevent_vfolder_mounts: bool) -> None:
+    def __init__(self, raw_mounts: list[Mapping[str, Any]], prevent_vfolder_mount: bool) -> None:
         self._raw_mounts = raw_mounts
-        self._prevent_vfolder_mounts = prevent_vfolder_mounts
+        self._prevent_vfolder_mount = prevent_vfolder_mount
 
     @override
     async def wait_for_spec(self) -> VFolderMountSpec:
@@ -29,7 +29,7 @@ class VFolderMountSpecGenerator(SpecGenerator[VFolderMountSpec]):
         """
         vfolder_mounts = [VFolderMount.from_json(item) for item in self._raw_mounts]
         return VFolderMountSpec(
-            mounts=vfolder_mounts, prevent_vfolder_mounts=self._prevent_vfolder_mounts
+            mounts=vfolder_mounts, prevent_vfolder_mount=self._prevent_vfolder_mount
         )
 
 
@@ -53,7 +53,7 @@ class VFolderMountProvisioner(Provisioner[VFolderMountSpec, VFolderMountResult])
     async def setup(self, spec: VFolderMountSpec) -> VFolderMountResult:
         result: list[Mount] = []
         for vfolder in spec.mounts:
-            if spec.prevent_vfolder_mounts:
+            if spec.prevent_vfolder_mount:
                 if vfolder.name != ".logs":
                     continue
             mount = Mount(

@@ -11,8 +11,9 @@ import re
 import shutil
 import subprocess
 import textwrap
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Tuple, cast, override
+from typing import Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
 
 import janus
 import pkg_resources

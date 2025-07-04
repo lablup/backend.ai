@@ -8,27 +8,11 @@ from typing import override
 
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import Mount
-from ai.backend.agent.types import VolumeInfo
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
 from ai.backend.common.types import (
     MountPermission,
     MountTypes,
-)
-
-DEEPLINEARNING_IMAGE_KEYS = {
-    "tensorflow",
-    "caffe",
-    "keras",
-    "torch",
-    "mxnet",
-    "theano",
-}
-
-DEEPLEARNING_SAMPLE_VOLUME = VolumeInfo(
-    "deeplearning-samples",
-    "/home/work/samples",
-    "ro",
 )
 
 

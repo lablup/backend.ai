@@ -1,9 +1,10 @@
+import enum
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import override
+from typing import Final, override
 
 import pkg_resources
 from cachetools import LRUCache, cached
@@ -21,15 +22,20 @@ from ai.backend.common.types import (
 DISTRO_PATTERN = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
 ARTIFACT_PATH = Path(pkg_resources.resource_filename("ai.backend.agent", "../runner"))
 
-DEFAULT_LIBC_STYLE = "glibc"
-ALPINE_LIBC_STYLE = "musl"
+
+class LibcStyle(enum.StrEnum):
+    GLIBC = "glibc"
+    MUSL = "musl"
+
+
+FALLBACK_KERNEL_PYTHON_VERSION: Final[str] = "3.6"  # Need to update?
 
 
 @dataclass
 class KernelRunnerInfo:
     distro: str
     architecture: str
-    libc_style: str
+    libc_style: LibcStyle
     krunner_volume: str
     krunner_py_version: str
 
@@ -101,7 +107,7 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             *self._prepare_krunner_volume_mounts(info),
             *self._prepare_python_lib_mounts(info),
         ]
-        if info.libc_style == ALPINE_LIBC_STYLE:
+        if info.libc_style == LibcStyle.MUSL:
             mounts.extend(self._prepare_musl_mounts())
         if spec.sandbox_type == "jail":
             mounts.extend(self._prepare_jail_mounts(info))
@@ -311,10 +317,10 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
         self, distro: str, krunner_volumes: Mapping[str, str]
     ) -> KernelRunnerInfo:
         matched_distro, krunner_volume = match_distro_data(krunner_volumes, distro)
-        matched_libc_style = DEFAULT_LIBC_STYLE
+        matched_libc_style = LibcStyle.GLIBC
         if distro.startswith("alpine"):
-            matched_libc_style = ALPINE_LIBC_STYLE
-        krunner_pyver = "3.6"  # fallback
+            matched_libc_style = LibcStyle.MUSL
+        krunner_pyver = FALLBACK_KERNEL_PYTHON_VERSION
         if m := re.search(r"^([a-z-]+)(\d+(\.\d+)*)?$", matched_distro):
             matched_distro_pkgname = m.group(1).replace("-", "_")
             try:
