@@ -31,7 +31,7 @@ name = "default"
 [context.model-service]
 model-vfolder-name = "enter_model_vfolder_name_here"
 runtime-variant = "custom"
-replicas = 1
+replicas = 2
 group-name = "model-store"
 model-mount-destination = "/models"
 model-definition-path = "./model-definition.yaml"
