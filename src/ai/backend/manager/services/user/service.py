@@ -18,6 +18,7 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common import redis_helper
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -48,7 +49,13 @@ from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, prepare_new_keypair
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    QueryCondition,
+    QueryOption,
+    RelatedFields,
     SessionRow,
+    and_status,
+    and_user_id,
+    join_related_field,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
@@ -58,6 +65,7 @@ from ai.backend.manager.models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
 )
+from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -98,16 +106,19 @@ class UserService:
     _db: ExtendedAsyncSAEngine
     _storage_manager: StorageSessionManager
     _redis_stat: RedisConnectionInfo
+    _agent_registry: AgentRegistry
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         redis_stat: RedisConnectionInfo,
+        agent_registry: AgentRegistry,
     ) -> None:
         self._db = db
         self._storage_manager = storage_manager
         self._redis_stat = redis_stat
+        self._agent_registry = agent_registry
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
         username = action.input.username if action.input.username else action.input.email
@@ -463,9 +474,16 @@ class UserService:
                 await self._delete_endpoint(db_session, user_uuid, delete_destroyed_only=True)
             else:
                 await self._delete_endpoint(db_session, user_uuid, delete_destroyed_only=False)
-            if await self._user_has_active_sessions(db_session, user_uuid):
-                raise RuntimeError("User has some active sessions. Terminate them first.")
-            await self._delete_sessions(db_session, user_uuid)
+
+            if active_sessions := await self._retrieve_active_sessions(self._db, user_uuid):
+                for session in active_sessions:
+                    log.info(
+                        f"User to purge {user_uuid}'s active session found, terminating session {session.id}..."
+                    )
+                    await self._agent_registry.destroy_session(
+                        session, forced=True, reason=KernelLifecycleEventReason.USER_PURGED
+                    )
+
             await self._delete_vfolders(self._db, user_uuid, self._storage_manager)
             await self.delete_error_logs(conn, user_uuid)
             await self.delete_keypairs(conn, self._redis_stat, user_uuid)
@@ -645,25 +663,29 @@ class UserService:
                     pass
         return False
 
-    async def _user_has_active_sessions(
+    async def _retrieve_active_sessions(
         self,
-        db_session: SASession,
+        db: ExtendedAsyncSAEngine,
         user_uuid: UUID,
-    ) -> bool:
+    ) -> list[SessionRow]:
         """
         Check if the user does not have active sessions.
         """
-        active_session_count = await db_session.scalar(
-            sa.select(sa.func.count())
-            .select_from(SessionRow)
-            .where(
-                sa.and_(
-                    SessionRow.user_uuid == user_uuid,
-                    SessionRow.status.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
-                )
-            ),
+
+        query_conditions: list[QueryCondition] = [
+            and_user_id(user_uuid),
+            and_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+        ]
+
+        query_options: list[QueryOption] = [
+            join_related_field(RelatedFields.USER),
+        ]
+
+        session_rows = await SessionRow.list_session_by_condition(
+            query_conditions, query_options, db=db
         )
-        return active_session_count > 0
+
+        return session_rows
 
     async def _delete_endpoint(
         self,
@@ -710,18 +732,6 @@ class UserService:
         if result.rowcount > 0:
             log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
         return result.rowcount
-
-    async def _delete_sessions(
-        self,
-        db_session: SASession,
-        user_uuid: UUID,
-    ) -> None:
-        """
-        Delete user's sessions.
-        """
-        from ai.backend.manager.models.session import SessionRow
-
-        await SessionRow.delete_by_user_id(user_uuid, db_session=db_session)
 
     async def delete_keypairs(
         self,

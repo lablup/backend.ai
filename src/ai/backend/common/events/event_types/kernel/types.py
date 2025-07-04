@@ -30,6 +30,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
     UNKNOWN = "unknown"
     USER_REQUESTED = "user-requested"
+    USER_PURGED = "user-purged"
     NOT_FOUND_IN_MANAGER = "not-found-in-manager"
     CONTAINER_NOT_FOUND = "container-not-found"
 

@@ -2248,6 +2248,7 @@ class AgentRegistry:
 
         :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
         :param reason: Reason to destroy a session if client wants to specify it manually.
+        :param user_role: Role of the user who requested the session destruction.
         """
         session_id = session.id
         if not reason:
