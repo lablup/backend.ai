@@ -6,8 +6,12 @@ from functools import partial
 from pathlib import Path
 from typing import override
 
+from aiodocker.docker import Docker
+
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import Mount
+from ai.backend.agent.types import VolumeInfo
+from ai.backend.agent.utils import closing_async
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.stage.types import Provisioner, ProvisionStage, SpecGenerator
 from ai.backend.common.types import (
@@ -255,6 +259,52 @@ class IntrinsicMountProvisioner(Provisioner[IntrinsicMountSpec, IntrinsicMountRe
                 )
             )
         return domain_socket_proxies, mounts
+
+    async def _prepare_deeplearning_sample_mounts(self, spec: IntrinsicMountSpec) -> list[Mount]:
+        """
+        NOTE: !! This is deprecated and should not be used in new code !!
+        Prepare mounts for deeplearning sample data if needed.
+        """
+        deeplearning_image_keys = {
+            "tensorflow",
+            "caffe",
+            "keras",
+            "torch",
+            "mxnet",
+            "theano",
+        }
+
+        deeplearning_sample_volume = VolumeInfo(
+            "deeplearning-samples",
+            "/home/work/samples",
+            "ro",
+        )
+        short_image_ref = spec.image_ref.short
+        async with closing_async(Docker()) as docker:
+            avail_volumes = (await docker.volumes.list())["Volumes"]
+            if not avail_volumes:
+                return []
+            avail_volume_names = set(v["Name"] for v in avail_volumes)
+
+            # deeplearning specialization
+            # TODO: extract as config
+            volume_list: list[VolumeInfo] = []
+            for k in deeplearning_image_keys:
+                if k in short_image_ref:
+                    volume_list.append(deeplearning_sample_volume)
+                    break
+
+            # Mount only actually existing volumes
+            volume_mount_list: list[VolumeInfo] = []
+            for vol in volume_list:
+                if vol.name in avail_volume_names:
+                    volume_mount_list.append(vol)
+            return [
+                Mount(
+                    MountTypes.VOLUME, Path(v.name), Path(v.container_path), MountPermission(v.mode)
+                )
+                for v in volume_mount_list
+            ]
 
     @override
     async def teardown(self, resource: IntrinsicMountResult) -> None:
