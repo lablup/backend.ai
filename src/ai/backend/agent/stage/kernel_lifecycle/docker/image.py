@@ -50,7 +50,7 @@ class ImagePullSpecGenerator(SpecGenerator[ImagePullSpec]):
         """
         Waits for the spec to be ready.
         """
-        do_pull = (not self.image_ref.is_local) and await self._check_image()
+        do_pull = (not self.image_ref.is_local) and await self._check_image_exist()
         return ImagePullSpec(
             do_pull=do_pull,
             image_ref=self.image_ref,
@@ -58,7 +58,7 @@ class ImagePullSpecGenerator(SpecGenerator[ImagePullSpec]):
             pull_timeout=self.pull_timeout,
         )
 
-    async def _check_image(self) -> bool:
+    async def _check_image_exist(self) -> bool:
         try:
             async with closing_async(Docker()) as docker:
                 image_info = await docker.images.inspect(self.image_ref.canonical)
@@ -67,12 +67,11 @@ class ImagePullSpecGenerator(SpecGenerator[ImagePullSpec]):
                         return True
         except DockerError as e:
             if e.status == HTTPStatus.NOT_FOUND:
-                if self.auto_pull_behavior == AutoPullBehavior.DIGEST:
-                    return True
-                elif self.auto_pull_behavior == AutoPullBehavior.TAG:
-                    return True
-                elif self.auto_pull_behavior == AutoPullBehavior.NONE:
-                    raise ImageNotAvailable(self.image_ref)
+                match self.auto_pull_behavior:
+                    case AutoPullBehavior.DIGEST | AutoPullBehavior.TAG:
+                        return True
+                    case AutoPullBehavior.NONE:
+                        raise ImageNotAvailable(self.image_ref)
             else:
                 raise
         return False
