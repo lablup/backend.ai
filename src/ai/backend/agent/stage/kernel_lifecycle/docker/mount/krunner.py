@@ -95,7 +95,7 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
     @property
     @override
     def name(self) -> str:
-        return "docker-vfolder-mount"
+        return "docker-krunner-mount"
 
     @override
     async def setup(self, spec: KernelRunnerMountSpec) -> KernelRunnerMountResult:
