@@ -476,13 +476,22 @@ class UserService:
                 await self._delete_endpoint(db_session, user_uuid, delete_destroyed_only=False)
 
             if active_sessions := await self._retrieve_active_sessions(self._db, user_uuid):
-                for session in active_sessions:
-                    log.info(
-                        f"User to purge {user_uuid}'s active session found, terminating session {session.id}..."
+                tasks = [
+                    asyncio.create_task(
+                        self._agent_registry.destroy_session(
+                            session,
+                            forced=True,
+                            reason=KernelLifecycleEventReason.USER_PURGED,
+                        )
                     )
-                    await self._agent_registry.destroy_session(
-                        session, forced=True, reason=KernelLifecycleEventReason.USER_PURGED
-                    )
+                    for session in active_sessions
+                ]
+
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for sess, result in zip(active_sessions, results):
+                    if isinstance(result, Exception):
+                        log.warning(f"Session {sess.id} not terminated properly: {result}")
 
             await self._delete_vfolders(self._db, user_uuid, self._storage_manager)
             await self._delete_error_logs(conn, user_uuid)
