@@ -1198,7 +1198,7 @@ async def server_main(
     kernel_mod = importlib.import_module(
         f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
     )
-    krunner_volumes = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
+    krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
     log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
     local_config["container"]["krunner-volumes"] = krunner_volumes
