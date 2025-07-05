@@ -23,6 +23,7 @@ from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
+    BaseBgtaskEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -466,7 +467,7 @@ class SessionService:
             try:
                 cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
                 async for event in propagator.receive(cache_id):
-                    if not isinstance(event, BaseBgtaskDoneEvent):
+                    if not isinstance(event, BaseBgtaskEvent):
                         log.warning("unexpected event: {}", event)
                         continue
                     match event.status():
@@ -475,9 +476,13 @@ class SessionService:
                             await reporter.update(increment=1, message="Committed image")
                             break
                         case BgtaskStatus.FAILED:
-                            raise BgtaskFailedError(extra_msg=event.message)
+                            raise BgtaskFailedError(
+                                extra_msg=cast(BaseBgtaskDoneEvent, event).message
+                            )
                         case BgtaskStatus.CANCELLED:
                             raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                        case BgtaskStatus.UPDATED:
+                            continue
                         case _:
                             log.warning("unexpected bgtask done event: {}", event)
             finally:
@@ -504,16 +509,20 @@ class SessionService:
                 try:
                     cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
                     async for event in propagator.receive(cache_id):
-                        if not isinstance(event, BaseBgtaskDoneEvent):
+                        if not isinstance(event, BaseBgtaskEvent):
                             log.warning("unexpected event: {}", event)
                             continue
                         match event.status():
                             case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
                                 break
                             case BgtaskStatus.FAILED:
-                                raise BgtaskFailedError(extra_msg=event.message)
+                                raise BgtaskFailedError(
+                                    extra_msg=cast(BaseBgtaskDoneEvent, event).message
+                                )
                             case BgtaskStatus.CANCELLED:
                                 raise BgtaskCancelledError(extra_msg="Operation cancelled")
+                            case BgtaskStatus.UPDATED:
+                                continue
                             case _:
                                 log.warning("unexpected bgtask done event: {}", event)
                 finally:
