@@ -1,7 +1,6 @@
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
 from typing import Any, Final, Optional, Self, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
@@ -30,9 +29,6 @@ class AgentInfo:
     architecture: str
     kernel_uid: int
     kernel_gid: int
-    overriding_uid: Optional[int]
-    overriding_gid: Optional[int]
-    supplementary_gids: set[int]
 
 
 @dataclass
@@ -40,6 +36,9 @@ class KernelInfo:
     kernel_creation_config: KernelCreationConfig
     kernel_features: frozenset[str]
     resource_spec: KernelResourceSpec
+    overriding_uid: Optional[int]
+    overriding_gid: Optional[int]
+    supplementary_gids: set[int]
 
 
 @dataclass
@@ -118,10 +117,12 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
         environ = Environ({
             **spec.kernel_info.kernel_creation_config["environ"]
         })  # Start with the base environment
+        supplementary_gids = [str(gid) for gid in spec.kernel_info.supplementary_gids]
         environ = (
             environ.set_value(LD_PRELOAD, LIBBAIHOOK_MOUNT_PATH)
             .set_value(LOCAL_USER_ID, self._get_local_uid(spec))
             .set_value(LOCAL_GROUP_ID, self._get_local_gid(spec))
+            .append_value(ADDITIONAL_GIDS, supplementary_gids, separator=",")
             .append_value(ADDITIONAL_GIDS, self._get_computer_gids(spec), separator=",")
             .update_if_not_exists(self._get_core_count(spec))
         )
@@ -134,15 +135,15 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
         return EnvironResult(environ=dict(environ))
 
     def _get_local_uid(self, spec: EnvironSpec) -> Optional[int]:
-        if spec.agent_info.overriding_uid is not None:
-            return spec.agent_info.overriding_uid
+        if spec.kernel_info.overriding_uid is not None:
+            return spec.kernel_info.overriding_uid
         if KernelFeatures.UID_MATCH in spec.kernel_info.kernel_features:
             return spec.agent_info.kernel_uid
         return None
 
     def _get_local_gid(self, spec: EnvironSpec) -> Optional[int]:
-        if spec.agent_info.overriding_gid is not None:
-            return spec.agent_info.overriding_gid
+        if spec.kernel_info.overriding_gid is not None:
+            return spec.kernel_info.overriding_gid
         if KernelFeatures.UID_MATCH in spec.kernel_info.kernel_features:
             return spec.agent_info.kernel_gid
         return None
@@ -167,18 +168,18 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
     async def _get_container_hooks(self, spec: EnvironSpec) -> set[str]:
         container_hook_path_set: set[str] = set()
         for dev_type, device_alloc in spec.kernel_info.resource_spec.allocations.items():
-            computer_ctx = spec.agent_info.computers[dev_type]
-
             alloc_sum = Decimal(0)
             for per_dev_alloc in device_alloc.values():
                 alloc_sum += sum(per_dev_alloc.values())
             do_hook_mount = alloc_sum > 0
             if not do_hook_mount:
                 continue
+            computer_ctx = spec.agent_info.computers[dev_type]
             hook_paths = await computer_ctx.instance.get_hooks(
                 spec.agent_info.distro, spec.agent_info.architecture
             )
-            for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
+            for p in hook_paths:
+                hook_path = p.absolute()
                 final_path = f"/opt/kernel/{hook_path.name}"
                 if final_path in container_hook_path_set:
                     continue
