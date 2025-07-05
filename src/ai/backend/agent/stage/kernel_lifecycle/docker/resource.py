@@ -104,9 +104,11 @@ class ResourceProvisioner(Provisioner[ResourceSpec, ResourceResult]):
         self, spec: ResourceSpec
     ) -> tuple[KernelResourceSpec, Mapping[str, Any]]:
         slots = spec.resource_slots
-        # # Ensure that we have intrinsic slots.
+        # Ensure that we have intrinsic slots.
+        # But why do we need assertions here?
         # assert SlotName("cpu") in slots
         # assert SlotName("mem") in slots
+
         # accept unknown slot type with zero values
         # but reject if they have non-zero values.
         for st, sv in slots.items():
