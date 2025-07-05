@@ -64,12 +64,17 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-    from .agent import ComputerContext
-
 DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class ComputerContext:
+    instance: AbstractComputePlugin
+    devices: Collection[AbstractComputeDevice]
+    alloc_map: AbstractAllocMap
 
 
 @attrs.define(slots=True)

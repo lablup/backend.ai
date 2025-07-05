@@ -19,7 +19,6 @@ from collections.abc import (
     AsyncGenerator,
     Awaitable,
     Callable,
-    Collection,
     Coroutine,
     Iterable,
     Mapping,
@@ -216,9 +215,9 @@ from .kernel import (
 )
 from .observer.heartbeat import HeartbeatObserver
 from .resources import (
-    AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
+    ComputerContext,
     KernelResourceSpec,
     Mount,
     allocate,
@@ -684,13 +683,6 @@ class RestartTracker:
     request_lock: asyncio.Lock
     destroy_event: asyncio.Event
     done_event: asyncio.Event
-
-
-@attrs.define(auto_attribs=True, slots=True)
-class ComputerContext:
-    instance: AbstractComputePlugin
-    devices: Collection[AbstractComputeDevice]
-    alloc_map: AbstractAllocMap
 
 
 def _observe_stat_task(
