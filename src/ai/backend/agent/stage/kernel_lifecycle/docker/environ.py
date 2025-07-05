@@ -117,12 +117,11 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
         environ = Environ({
             **spec.kernel_info.kernel_creation_config["environ"]
         })  # Start with the base environment
-        supplementary_gids = [str(gid) for gid in spec.kernel_info.supplementary_gids]
         environ = (
             environ.set_value(LD_PRELOAD, LIBBAIHOOK_MOUNT_PATH)
             .set_value(LOCAL_USER_ID, self._get_local_uid(spec))
             .set_value(LOCAL_GROUP_ID, self._get_local_gid(spec))
-            .append_value(ADDITIONAL_GIDS, supplementary_gids, separator=",")
+            .append_value(ADDITIONAL_GIDS, self._get_supplementary_gids(spec), separator=",")
             .append_value(ADDITIONAL_GIDS, self._get_computer_gids(spec), separator=",")
             .update_if_not_exists(self._get_core_count(spec))
         )
@@ -147,6 +146,9 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
         if KernelFeatures.UID_MATCH in spec.kernel_info.kernel_features:
             return spec.agent_info.kernel_gid
         return None
+
+    def _get_supplementary_gids(self, spec: EnvironSpec) -> set[str]:
+        return {str(gid) for gid in spec.kernel_info.supplementary_gids}
 
     def _get_computer_gids(self, spec: EnvironSpec) -> set[str]:
         additional_gid_set: set[int] = set()
