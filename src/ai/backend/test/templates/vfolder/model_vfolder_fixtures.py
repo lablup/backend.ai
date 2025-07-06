@@ -1,4 +1,3 @@
-# TODO: If possible, change it to a simpler fixture.
 MODEL_SERVER_FIXTURE = """\
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
