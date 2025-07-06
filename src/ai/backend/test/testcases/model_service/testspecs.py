@@ -8,12 +8,18 @@ from ai.backend.test.templates.model_service.endpoint import (
     PublicEndpointTemplate,
 )
 from ai.backend.test.templates.model_service.jwt_token import ModelServiceTokenTemplate
+from ai.backend.test.templates.vfolder.file_uploader import PlainTextFilesUploader
+from ai.backend.test.templates.vfolder.model_vfolder import ModelVFolderTemplate
+from ai.backend.test.templates.vfolder.model_vfolder_fixtures import (
+    MODEL_DEFINITION_FIXTURE,
+    MODEL_SERVER_FIXTURE,
+)
 from ai.backend.test.testcases.model_service.health_check import (
     EndpointHealthCheck,
     EndpointHealthCheckWithToken,
 )
 from ai.backend.test.testcases.spec_manager import TestSpec, TestTag
-from ai.backend.test.tester.dependency import ClusterDep
+from ai.backend.test.tester.dependency import ClusterDep, UploadFileDep
 
 from ...templates.template import BasicTestTemplate
 
@@ -38,14 +44,28 @@ SINGLE_NODE_SINGLE_CONTAINER_MODEL_SERVICE_TEST_SPECS = {
         # Endpoint health check failure is expected.
         template=BasicTestTemplate(
             EndpointHealthCheck(expected_status_codes={400, 401})
-        ).with_wrappers(KeypairAuthTemplate, EndpointTemplate),
+        ).with_wrappers(
+            KeypairAuthTemplate, ModelVFolderTemplate, PlainTextFilesUploader, EndpointTemplate
+        ),
         parametrizes={
             ContextName.CLUSTER_CONFIG: [
                 ClusterDep(
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                 ),
-            ]
+            ],
+            ContextName.VFOLDER_UPLOAD_FILES: [
+                [
+                    UploadFileDep(
+                        path="model-definition.yaml",
+                        content=MODEL_DEFINITION_FIXTURE,
+                    ),
+                    UploadFileDep(
+                        path="server.py",
+                        content=MODEL_SERVER_FIXTURE,
+                    ),
+                ]
+            ],
         },
     ),
     "single_node_single_container_creation_public_endpoint_success": TestSpec(

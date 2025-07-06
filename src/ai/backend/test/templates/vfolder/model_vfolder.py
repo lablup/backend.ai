@@ -27,7 +27,6 @@ class ModelVFolderTemplate(WrapperTestTemplate):
         try:
             vfolder = await client_session.VFolder.create(
                 name=vfolder_name,
-                group=vfolder_cfg.group,
                 unmanaged_path=vfolder_cfg.unmanaged_path,
                 permission=vfolder_cfg.permission,
                 usage_mode="model",
