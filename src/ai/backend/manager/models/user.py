@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, relationship, selectinload
+from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common.types import CIStrEnum
@@ -166,16 +166,40 @@ users = sa.Table(
 )
 
 
+# Defined for avoiding circular import
+def _get_session_row_join_condition():
+    from ai.backend.manager.models.session import SessionRow
+
+    return UserRow.uuid == foreign(SessionRow.user_uuid)
+
+
+def _get_kernel_row_join_condition():
+    from ai.backend.manager.models.kernel import KernelRow
+
+    return UserRow.uuid == foreign(KernelRow.user_uuid)
+
+
 class UserRow(Base):
     __table__ = users
     # from .keypair import KeyPairRow
 
-    sessions = relationship("SessionRow", back_populates="user")
+    sessions = relationship(
+        "SessionRow",
+        back_populates="user",
+        primaryjoin=_get_session_row_join_condition,
+        foreign_keys="SessionRow.user_uuid",
+    )
+    kernels = relationship(
+        "KernelRow",
+        back_populates="user_row",
+        primaryjoin=_get_kernel_row_join_condition,
+        foreign_keys="KernelRow.user_uuid",
+        # overlaps="sessions",
+    )
     domain = relationship("DomainRow", back_populates="users")
     groups = relationship("AssocGroupUserRow", back_populates="user")
     resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
     keypairs = relationship("KeyPairRow", back_populates="user_row", foreign_keys="KeyPairRow.user")
-    kernels = relationship("KernelRow", back_populates="user_row")
 
     created_endpoints = relationship(
         "EndpointRow",

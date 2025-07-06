@@ -24,7 +24,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, noload, relationship, selectinload
+from sqlalchemy.orm import foreign, load_only, noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
@@ -367,6 +367,13 @@ async def handle_kernel_exception(
         raise
 
 
+# Defined for avoiding circular import
+def _get_user_row_join_condition():
+    from ai.backend.manager.models.user import UserRow
+
+    return UserRow.uuid == foreign(KernelRow.user_uuid)
+
+
 class KernelRow(Base):
     __tablename__ = "kernels"
 
@@ -428,8 +435,8 @@ class KernelRow(Base):
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
     group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
-    user_uuid = sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False)
-    access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
+    user_uuid = sa.Column("user_uuid", GUID, nullable=False)
+    access_key = sa.Column("access_key", sa.String(length=20))
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     image = sa.Column("image", sa.String(length=512))
     # ForeignKeyIDColumn("image_id", "images.id")
@@ -569,7 +576,12 @@ class KernelRow(Base):
     )
     agent_row = relationship("AgentRow", back_populates="kernels")
     group_row = relationship("GroupRow", back_populates="kernels")
-    user_row = relationship("UserRow", back_populates="kernels")
+    user_row = relationship(
+        "UserRow",
+        primaryjoin=_get_user_row_join_condition,
+        back_populates="kernels",
+        foreign_keys="KernelRow.user_uuid",
+    )
 
     @property
     def image_ref(self) -> ImageRef | None:

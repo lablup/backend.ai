@@ -118,7 +118,9 @@ class Services:
         group_service = GroupService(
             args.db, args.storage_manager, args.config_provider, args.redis_stat
         )
-        user_service = UserService(args.db, args.storage_manager, args.redis_stat)
+        user_service = UserService(
+            args.db, args.storage_manager, args.redis_stat, args.agent_registry
+        )
         image_service = ImageService(args.db, args.agent_registry)
         container_registry_service = ContainerRegistryService(args.db)
         vfolder_service = VFolderService(
