@@ -137,7 +137,7 @@ class SSHProvisioner(Provisioner[SSHSpec, SSHResult]):
                 port_mapping_json_path.write_bytes(dump_json(cluster_ssh_port_mapping))
 
         loop = asyncio.get_running_loop()
-        loop.run_in_executor(None, write_config)
+        await loop.run_in_executor(None, write_config)
 
     @override
     async def teardown(self, resource: SSHResult) -> None:
