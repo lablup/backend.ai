@@ -13,6 +13,8 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+from ai.backend.logging.formatter import CustomJsonFormatter
+
 
 @dataclass
 class OpenTelemetrySpec:
@@ -39,9 +41,18 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
     log_provider.add_log_record_processor(log_processor)
     log_level = logging.getLevelNamesMapping().get(spec.log_level.upper(), logging.INFO)
     handler = LoggingHandler(level=log_level, logger_provider=log_provider)
+
+    # Apply JSON formatter to handler for OTEL
+    json_formatter = CustomJsonFormatter()
+    handler.setFormatter(json_formatter)
+
     logging.getLogger().addHandler(handler)
     for logger in loggers:
         logger.addHandler(handler)
+        # Apply JSON formatter to existing handlers for extra fields
+        for existing_handler in logger.handlers:
+            if hasattr(existing_handler, "setFormatter"):
+                existing_handler.setFormatter(json_formatter)
     logging.info("open telemetry logging initialized successfully.")
 
 
