@@ -194,7 +194,6 @@ class UserRow(Base):
         back_populates="user_row",
         primaryjoin=_get_kernel_row_join_condition,
         foreign_keys="KernelRow.user_uuid",
-        # overlaps="sessions",
     )
     domain = relationship("DomainRow", back_populates="users")
     groups = relationship("AssocGroupUserRow", back_populates="user")
