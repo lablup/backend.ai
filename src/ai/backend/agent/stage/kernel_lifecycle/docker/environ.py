@@ -100,6 +100,9 @@ class Environ(dict[str, str]):
                 self[key] = value
         return self
 
+    def to_dict(self) -> dict[str, str]:
+        return dict(self)
+
 
 class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
     """
@@ -131,7 +134,7 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
         environ = environ.append_value(LD_PRELOAD, hook_paths, separator=":").override(
             device_environ
         )
-        return EnvironResult(environ=dict(environ))
+        return EnvironResult(environ=environ.to_dict())
 
     def _get_local_uid(self, spec: EnvironSpec) -> Optional[int]:
         if spec.kernel_info.overriding_uid is not None:
